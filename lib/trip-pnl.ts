@@ -91,6 +91,8 @@ export interface PnlExpense {
   status?: string | null
   expense_date?: string | null
   payment_date?: string | null
+  /** Set when the expense is a booking supplier's confirmed cost (migration 396). */
+  booking_supplier_status_id?: string | null
 }
 
 export interface PnlCommission {
@@ -134,6 +136,13 @@ export interface TripPnL {
   expenses_paid: number
   expenses_pending: number
   expense_breakdown: Record<string, number>
+  /**
+   * Of total_expenses, what is NOT a booking supplier's confirmed cost
+   * (booking_supplier_status_id null): the extras beyond the priced services
+   * — a tip paid on the day, a forgotten entrance. The supplier costs are
+   * already in the services' price, so this is what the quoted margin misses.
+   */
+  other_expenses: number
 
   /** Commission income (hotel, shopping, ...) — increases margin. */
   commissions_receivable: number
@@ -290,6 +299,7 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
   let expensesPaid = 0
   let expensesPending = 0
   let expenseCount = 0
+  let otherExpenses = 0
   const expenseBreakdown: Record<string, number> = {}
 
   for (const expense of expenses) {
@@ -318,6 +328,7 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     totalExpenses += converted.amount
     if (status === 'paid') expensesPaid += converted.amount
     else expensesPending += converted.amount
+    if (!expense.booking_supplier_status_id) otherExpenses += converted.amount
 
     const category = expense.category || 'other'
     expenseBreakdown[category] = roundMoney((expenseBreakdown[category] || 0) + converted.amount)
@@ -437,6 +448,7 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     expenses_paid: roundMoney(expensesPaid),
     expenses_pending: roundMoney(expensesPending),
     expense_breakdown: expenseBreakdown,
+    other_expenses: roundMoney(otherExpenses),
 
     commissions_receivable: roundMoney(commissionsReceivable),
     commissions_payable: roundMoney(commissionsPayable),

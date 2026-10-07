@@ -129,7 +129,7 @@ export function isNameTaken(
 // Routable-type exclusivity (P6)
 // ============================================
 // Task routing picks the FIRST department whose service_types contains the
-// task's type (lib/ai/task-generation.ts) — two active departments claiming
+// task's category (lib/tasks/itinerary-tasks.ts) — two active departments claiming
 // the same type would route silently to whichever loads first. Creation and
 // update therefore refuse a claim another active department already holds.
 

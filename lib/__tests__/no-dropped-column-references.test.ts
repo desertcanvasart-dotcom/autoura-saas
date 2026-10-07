@@ -15,14 +15,14 @@ const DROPPED: Record<string, string> = {
   // Its twin. NOT `pricing_model`, which is a live column on b2b partners —
   // the match below is on the whole word.
   pricing_mode: '372_drop_pricing_mode.sql',
-  // Never this app's: the sibling's migration, pasted into this database.
-  status_override: '373_drop_bookings_status_override.sql',
   // The sibling's again. (376 also drops content_library.content_type, which
   // cannot be listed: `content_type` is an everyday word — uploads, e-mail
   // attachments — and this match is by name alone. The generated types cover
   // it: naming it on content_library no longer compiles.)
   cabin_allocation: '376_drop_stray_columns.sql',
 }
+// Not listed: bookings.status_override. 373 dropped the sibling's pasted-in
+// column; 389 brings it back as this repo's own (the booking status control).
 
 const ROOTS = ['app', 'lib', 'components', 'hooks', 'scripts']
 const SKIP = /(^|\/)(node_modules|\.next|__tests__|__mocks__)(\/|$)|database\.types\.ts$|\.test\.tsx?$/

@@ -11,6 +11,9 @@ import {
 } from 'lucide-react'
 import AssigneeSelect from '@/components/AssigneeSelect'
 import BookingExtrasPanel from '@/components/BookingExtrasPanel'
+import BookingStatusControl, { type StatusOverride } from '@/components/booking/BookingStatusControl'
+import BookingSuppliersPanel from '@/components/booking/BookingSuppliersPanel'
+import { useRole } from '@/hooks/useRole'
 
 interface Booking {
   id: string
@@ -38,6 +41,7 @@ interface Booking {
     id: string
     full_name: string
     email: string
+    phone?: string | null
     whatsapp: string | null
   } | null
   b2b_partners: {
@@ -49,6 +53,9 @@ interface Booking {
     id: string
     itinerary_code: string
     trip_name: string
+    client_name?: string | null
+    client_email?: string | null
+    client_phone?: string | null
   } | null
 }
 
@@ -103,6 +110,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const { isAdmin, isManager, isViewer } = useRole()
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // New passenger form
@@ -358,7 +366,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       const data = await response.json()
 
       if (data.success) {
-        showToast('info', data.message)
+        showToast('success', data.message)
       } else {
         showToast('error', data.error || 'Failed to send confirmation')
       }
@@ -414,17 +422,30 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-gray-500 mt-1">{booking.trip_name}</p>
             </div>
 
+            <BookingStatusControl
+              bookingId={booking.id}
+              status={booking.status}
+              override={(booking as { status_override?: StatusOverride | null }).status_override}
+              canEdit={isAdmin || isManager}
+              onChanged={fetchBooking}
+              notify={showToast}
+            />
+
             {/* Action Buttons */}
-            {booking.quote_type !== 'b2b' && booking.clients && (
+            {/* A direct booking often has no CRM client: its itinerary's own
+                contact is used then (same rule as the send route). */}
+            {booking.quote_type !== 'b2b' && (booking.clients?.email || booking.itineraries?.client_email || booking.clients?.whatsapp || booking.clients?.phone || booking.itineraries?.client_phone) && (
               <div className="flex gap-2">
-                <button
-                  onClick={() => handleSendConfirmation('email')}
-                  className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 flex items-center gap-2 text-sm font-medium"
-                >
-                  <Mail className="w-4 h-4" />
-                  Send Email
-                </button>
-                {booking.clients.whatsapp && (
+                {(booking.clients?.email || booking.itineraries?.client_email) && (
+                  <button
+                    onClick={() => handleSendConfirmation('email')}
+                    className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 flex items-center gap-2 text-sm font-medium"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Send Email
+                  </button>
+                )}
+                {(booking.clients?.whatsapp || booking.clients?.phone || booking.itineraries?.client_phone) && (
                   <button
                     onClick={() => handleSendConfirmation('whatsapp')}
                     className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 flex items-center gap-2 text-sm font-medium"
@@ -439,7 +460,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-200">
-            {['overview', 'passengers', 'payments', 'documents'].map((tab) => (
+            {['overview', 'suppliers', 'passengers', 'payments', 'documents'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -600,6 +621,16 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </div>
             ))}
           </div>
+        )}
+
+        {activeTab === 'suppliers' && (
+          <BookingSuppliersPanel
+            bookingId={booking.id}
+            currency={booking.currency}
+            hasItinerary={Boolean((booking as { itinerary_id?: string | null }).itinerary_id)}
+            canEdit={!isViewer}
+            notify={showToast}
+          />
         )}
 
         {activeTab === 'passengers' && (

@@ -27,7 +27,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'service-key'
 type QueryBuilder = Record<string, (...args: unknown[]) => unknown>
 
 const calls: Record<string, unknown[][]> = {}
-let rows: Array<{ rate_eur: number }> = []
+let rows: Array<{ rate_eur: number; pricing_type?: string; max_capacity?: number | null }> = []
 
 function chain(): QueryBuilder {
   const self: QueryBuilder = {}
@@ -101,5 +101,24 @@ describe('getAirportServiceRate', () => {
     rows = []
     const { getAirportServiceRate } = await import('@/lib/auto-pricing-service')
     expect(await getAirportServiceRate(SCOPE, 'XXX', 'arrival')).toBeNull()
+  })
+})
+
+// Migration 393: the rate says how it applies to the group.
+describe('getAirportServiceRateDetail', () => {
+  it('returns the rate with its pricing basis', async () => {
+    rows = [{ rate_eur: 700, pricing_type: 'per_person' }]
+    const { getAirportServiceRateDetail, getAirportServiceRate } = await import('@/lib/auto-pricing-service')
+    expect(await getAirportServiceRateDetail(SCOPE, 'ASW', 'arrival')).toEqual({ rate: 700, basis: 'per_person', capacity: null })
+    // The number-only lookup is unchanged.
+    expect(await getAirportServiceRate(SCOPE, 'ASW', 'arrival')).toBe(700)
+  })
+
+  it('a row that states nothing is per group; per unit keeps its capacity', async () => {
+    const { getAirportServiceRateDetail } = await import('@/lib/auto-pricing-service')
+    rows = [{ rate_eur: 15 }]
+    expect(await getAirportServiceRateDetail(SCOPE, 'CAI', 'arrival')).toEqual({ rate: 15, basis: 'flat', capacity: null })
+    rows = [{ rate_eur: 40, pricing_type: 'per_unit', max_capacity: 4 }]
+    expect(await getAirportServiceRateDetail(SCOPE, 'CAI', 'arrival')).toEqual({ rate: 40, basis: 'per_unit', capacity: 4 })
   })
 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 // POST - Send supplier document via WhatsApp with PDF attachment
@@ -18,26 +19,19 @@ export async function POST(request: NextRequest) {
 
     // Upload PDF to Supabase Storage (needs admin client for storage access)
     const adminClient = createAdminClient()
-    const fileName = `supplier-documents/${(documentNumber || 'doc').replace(/\s+/g, '-')}-${Date.now()}.pdf`
     const pdfBuffer = Buffer.from(pdfBase64, 'base64')
-
-    const { error: uploadError } = await adminClient.storage
-      .from('documents')
-      .upload(fileName, pdfBuffer, {
-        contentType: 'application/pdf',
-        upsert: true,
-      })
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError)
-      return NextResponse.json({ success: false, error: `Failed to upload PDF: ${uploadError.message}` }, { status: 500 })
+    // Private bucket + signed link (lib/storage/shareable-pdf.ts).
+    const shared = await uploadShareablePdf(adminClient, {
+      tenantId: authResult.tenant_id,
+      kind: 'supplier-documents',
+      fileName: `${documentNumber || 'doc'}-${Date.now()}.pdf`,
+      bytes: pdfBuffer,
+    })
+    if (!shared.ok) {
+      console.error('Upload error:', shared.error)
+      return NextResponse.json({ success: false, error: shared.error }, { status: 500 })
     }
-
-    const { data: urlData } = adminClient.storage
-      .from('documents')
-      .getPublicUrl(fileName)
-
-    const pdfUrl = urlData.publicUrl
+    const pdfUrl = shared.url
 
     // Build WhatsApp message
     const senderTenant = await loadSenderTenant(authResult.tenant_id)

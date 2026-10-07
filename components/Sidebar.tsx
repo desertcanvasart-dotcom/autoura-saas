@@ -59,6 +59,7 @@ import {
   Globe,
   BookA,
   Signpost,
+  Blocks,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -148,8 +149,9 @@ const navigation: NavSection[] = [
     key: 'sell',
     roles: ['admin', 'manager', 'member'],
     items: [
-      { label: 'New Quote', href: '/itineraries/new', icon: Sparkles },
-      { label: 'Pricing Grid', href: '/pricing-grid', icon: Grid3x3 },
+      // "New Quote" (the new-itinerary form) is hidden here: quotes start in
+      // the Quote Builder, and the dashboard's quick action still opens the form.
+      { label: 'Quote Builder', href: '/pricing-grid', icon: Grid3x3 },
       { label: 'B2C Quotes', href: '/quotes/b2c', icon: User },
       // Single B2B quote store since migration 270 — calculator and
       // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
@@ -281,6 +283,8 @@ const navigation: NavSection[] = [
       { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA, roles: ['admin'] },
       // Which fee a tour's wording means. The agency's own since migration 370.
       { label: 'Attraction Names', href: '/settings/attraction-aliases', icon: Signpost, roles: ['admin'] },
+      // The agency's standard days, kept once (migration 398).
+      { label: 'Day Blocks', href: '/settings/day-blocks', icon: Blocks, roles: ['admin'] },
       { label: 'Destinations', href: '/settings/destinations', icon: Globe, roles: ['admin'] },
       // The demand calendar: the dates you charge more on, and by how much
       // (lib/pricing/season-uplift.ts). Managers price, so they keep this.

@@ -84,7 +84,9 @@ export async function POST(
       notes
     } = body
 
-    if (!amount || amount <= 0) {
+    // A number, and positive: "abc" slipped past `!amount || amount <= 0`
+    // and failed inside the payment RPC with a 500.
+    if (typeof amount !== 'number' && typeof amount !== 'string' || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       return NextResponse.json(
         { success: false, error: 'Valid payment amount is required' },
         { status: 400 }
@@ -123,7 +125,7 @@ export async function POST(
         p_booking_id: id,
         p_tenant_id: tenant_id,
         p_payment_number: payment_number,
-        p_amount: amount,
+        p_amount: Number(amount),
         p_payment_type: payment_type,
         p_payment_method: payment_method || null,
         p_payment_date: payment_date,

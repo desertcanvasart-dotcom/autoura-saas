@@ -44,11 +44,52 @@ describe('isAutomatedSender', () => {
     }
   })
 
+  it('knows the services found on the dashboard on 2026-10-05', () => {
+    for (const address of [
+      'support@supabase.com',
+      'ant@supabase.io',
+      'hello@mail.app.supabase.io',
+      'info@egymonuments.gov.eg',
+      'tickets@egymonuments.com',
+      'contact@visit-gem.com',
+      'gem@tickets.gem.gov.eg',
+    ]) {
+      expect(isAutomatedSender(address), address).toBe(true)
+    }
+  })
+
+  it('knows booking systems that confirm rather than ask', () => {
+    for (const address of [
+      'gem-portal@example.com',
+      'portal@example.com',
+      'autoreply@example.com',
+      'auto-confirm@example.com',
+      'confirmation@example.com',
+      'receipts@example.com',
+    ]) {
+      expect(isAutomatedSender(address), address).toBe(true)
+    }
+  })
+
+  it('does not mistake a lookalike domain for a service', () => {
+    for (const address of [
+      'ada@notsupabase.com',      // shares a suffix, not the domain
+      'ada@supabase.com.evil.io', // contains the name, is somewhere else
+      'ada@visit-gem.co',
+    ]) {
+      expect(isAutomatedSender(address), address).toBe(false)
+    }
+  })
+
   it('leaves a person alone', () => {
     for (const address of [
       'ada@example.com',
       'ada.lovelace@gmail.com',
       'reservations@hotel.com',
+      'rese.eatabe@aracan.ca',   // a hotel's reservations desk is a person
+      'reservation.cairo@hotel.com',
+      'portalis@example.com',    // a surname, not a "portal"
+      'support@egymonuments-tours.com', // a tour company, not the ticket system
       'nora@example.com',      // starts with "no", is not a no-reply
       'newton@example.com',    // starts with "new", is not a newsletter
       'systemaxx@example.com', // begins with "system" but is a company name

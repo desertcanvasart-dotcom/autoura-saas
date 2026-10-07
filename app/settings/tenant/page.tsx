@@ -23,8 +23,22 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { identityFromTenant } from '@/lib/company-identity'
+import { DocumentFooter } from '@/components/documents/Letterhead'
 
 const supabase = createClient()
+
+const LETTERHEAD_LABELS: Record<string, string> = {
+  tagline: 'Tagline', company_phone: 'Phone', company_website: 'Website', company_address: 'Address',
+  license_number: 'Tourism license no.', tax_number: 'Tax / registration no.', document_footer_text: 'Footer note',
+}
+
+/** PostgREST / Postgres saying one of `columns` does not exist on the table. */
+function isMissingColumnError(err: { code?: string; message?: string }, columns: string[]): boolean {
+  const msg = err.message || ''
+  if (err.code !== 'PGRST204' && err.code !== '42703' && !/schema cache|does not exist/i.test(msg)) return false
+  return columns.some(c => msg.includes(c))
+}
 
 export default function TenantSettingsPage() {
   const { tenant, tenantMember, features, isAdmin, loading, refetchTenant } = useTenant()
@@ -32,6 +46,15 @@ export default function TenantSettingsPage() {
   // Tenant basic info state
   const [companyName, setCompanyName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
+  // Document letterhead & footer (migration 394; phone/website/tagline are
+  // older columns that had no field here). Blank = the line is omitted.
+  const [tagline, setTagline] = useState('')
+  const [companyPhone, setCompanyPhone] = useState('')
+  const [companyWebsite, setCompanyWebsite] = useState('')
+  const [companyAddress, setCompanyAddress] = useState('')
+  const [licenseNumber, setLicenseNumber] = useState('')
+  const [taxNumber, setTaxNumber] = useState('')
+  const [footerText, setFooterText] = useState('')
 
 
   // Branding state
@@ -57,6 +80,9 @@ export default function TenantSettingsPage() {
   // "fall through to the platform constant". A number state would force 0 —
   // and 0 is a real house rate (an at-cost agency), not an absence.
   const [defaultMargin, setDefaultMargin] = useState('')
+  // The minimum margin (mig 399), same measure as the house margin. '' = none:
+  // no below-minimum warning on itineraries.
+  const [minMargin, setMinMargin] = useState('')
   // The org's deposit rule (mig 325): blank = the defaults (30% / 7 days).
   const [depositPercent, setDepositPercent] = useState('')
   const [depositDueDays, setDepositDueDays] = useState('')
@@ -71,6 +97,13 @@ export default function TenantSettingsPage() {
     if (tenant) {
       setCompanyName(tenant.company_name)
       setContactEmail(tenant.contact_email || '')
+      setTagline(tenant.tagline || '')
+      setCompanyPhone(tenant.company_phone || '')
+      setCompanyWebsite(tenant.company_website || '')
+      setCompanyAddress(tenant.company_address || '')
+      setLicenseNumber(tenant.license_number || '')
+      setTaxNumber(tenant.tax_number || '')
+      setFooterText(tenant.document_footer_text || '')
       setLogoUrl(tenant.logo_url || null)
       setLogoPreview(tenant.logo_url || null)
       setPrimaryColor(tenant.primary_color || '#647C47')
@@ -81,6 +114,8 @@ export default function TenantSettingsPage() {
           ? ''
           : String(tenant.default_margin_percent)
       )
+      const mm = tenant.min_margin_percent
+      setMinMargin(mm === null || mm === undefined ? '' : String(mm))
       const t = tenant as { deposit_percent?: number | null; deposit_due_days?: number | null }
       setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
       setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
@@ -223,28 +258,103 @@ export default function TenantSettingsPage() {
       // (Colors used to go to tenant_features while the PDF generators read
       // tenants.primary_color, so every document rendered the default blue
       // no matter what was picked here. Migration 255 consolidated this.)
-      const { error: tenantError } = await supabase
+      const letterhead = {
+        // Blank -> NULL -> the document omits the line.
+        tagline: tagline.trim() || null,
+        company_phone: companyPhone.trim() || null,
+        company_website: companyWebsite.trim() || null,
+        company_address: companyAddress.trim() || null,
+        license_number: licenseNumber.trim() || null,
+        tax_number: taxNumber.trim() || null,
+        document_footer_text: footerText.trim() || null,
+      }
+      const core = {
+        company_name: companyName,
+        contact_email: contactEmail,
+        logo_url: finalLogoUrl,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        // Empty field -> NULL -> the resolver falls through to the platform
+        // constant. Storing 0 here would silently make every quote at-cost.
+        default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
+        // Blank -> NULL -> resolveDepositRule falls back to the defaults.
+        deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
+        deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
+        ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
+          ? { rates_currency: ratesCurrency || null }
+          : {}),
+      }
+
+      // .select() returns the row as stored: an update that RLS blocks or
+      // that matched nothing comes back EMPTY with no error, and used to be
+      // reported as "saved" — the form then reloaded the old values and the
+      // edit looked lost.
+      let { data: saved, error: tenantError } = await supabase
         .from('tenants')
-        .update({
-          company_name: companyName,
-          contact_email: contactEmail,
-          logo_url: finalLogoUrl,
-          primary_color: primaryColor,
-          secondary_color: secondaryColor,
-          // Empty field -> NULL -> the resolver falls through to the platform
-          // constant. Storing 0 here would silently make every quote at-cost.
-          default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
-          // Blank -> NULL -> resolveDepositRule falls back to the defaults.
-          deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
-          deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
-          ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
-            ? { rates_currency: ratesCurrency || null }
-            : {}),
-        })
+        .update({ ...core, ...letterhead })
         .eq('id', tenant.id)
+        .select('id, tagline, company_phone, company_website, company_address, license_number, tax_number, document_footer_text')
+
+      // The document-letterhead columns arrive with migration 394. Where the
+      // database does not have them yet, the whole write failed and nothing
+      // saved; save the rest and say exactly what is missing.
+      let letterheadMissing = false
+      if (tenantError && isMissingColumnError(tenantError, Object.keys(letterhead))) {
+        letterheadMissing = true
+        ;({ data: saved, error: tenantError } = await supabase
+          .from('tenants')
+          .update(core)
+          .eq('id', tenant.id)
+          .select('id'))
+      }
 
       if (tenantError) throw tenantError
+      if (!saved || saved.length === 0) {
+        throw new Error('Nothing was saved — your account may not have permission to change the organization. Ask the owner, or sign out and in again.')
+      }
 
+      // The minimum margin arrives with migration 399. Saved on its own, and
+      // only when it changed, so a database without the column still saves
+      // everything else — and says what it could not keep.
+      let minMarginMissing = false
+      const minValue = minMargin.trim() === '' ? null : Number(minMargin)
+      const storedMin = tenant.min_margin_percent ?? null
+      if (minValue !== (storedMin === null ? null : Number(storedMin))) {
+        const { error: minError } = await supabase
+          .from('tenants')
+          .update({ min_margin_percent: minValue })
+          .eq('id', tenant.id)
+        if (minError && isMissingColumnError(minError, ['min_margin_percent'])) minMarginMissing = true
+        else if (minError) throw minError
+      }
+
+      // What we asked for vs what the database kept, field by field.
+      const stored = saved[0] as Record<string, unknown>
+      const notKept = letterheadMissing ? [] : Object.entries(letterhead)
+        .filter(([k, v]) => (stored[k] ?? null) !== v)
+        .map(([k]) => LETTERHEAD_LABELS[k] || k)
+
+      // Refetch tenant data
+      await refetchTenant()
+
+      if (minMarginMissing) {
+        setMessage({
+          type: 'error',
+          text: 'Saved — except the minimum margin: the database has not been updated for it yet. Run the database migration (npm run migrate), then save again.',
+        })
+        return
+      }
+      if (letterheadMissing) {
+        setMessage({
+          type: 'error',
+          text: 'Saved — except the document header & footer fields (tagline, phone, website, address, licence, tax, footer note): the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
+        })
+        return
+      }
+      if (notKept.length > 0) {
+        setMessage({ type: 'error', text: `Saved, but these fields were not kept by the database: ${notKept.join(', ')}.` })
+        return
+      }
       // Refetch tenant data
       await refetchTenant()
 
@@ -422,6 +532,27 @@ export default function TenantSettingsPage() {
               <p className="mt-1 text-[10px] text-gray-400">
                 Leave blank to use the platform default. A colleague who clears their own
                 margin falls back to this.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Minimum Margin %
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Warn below this)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="200"
+                step="0.5"
+                value={minMargin}
+                onChange={(e) => setMinMargin(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="Not set — no warning"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                On cost, like the house margin. An itinerary whose quoted margin, or profit so far,
+                is below this shows it under Needs attention. A trip losing money is always shown.
               </p>
             </div>
 
@@ -726,6 +857,74 @@ export default function TenantSettingsPage() {
                 Primary & Secondary colors
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Document header & footer */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <FileText className="w-4 h-4 text-gray-600" />
+            <h2 className="text-sm font-semibold text-gray-900">Document header &amp; footer</h2>
+          </div>
+          <p className="text-[11px] text-gray-500 mb-3">
+            Printed on the documents you send suppliers (vouchers, service orders). The header shows your logo, company name and tagline; the footer shows the details below. Leave a field blank to leave it off.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {([
+              ['Tagline', tagline, setTagline, 'e.g. Tailor-made journeys across Egypt'],
+              ['Phone', companyPhone, setCompanyPhone, '+20 2 1234 5678'],
+              ['Website', companyWebsite, setCompanyWebsite, 'www.yourcompany.com'],
+              ['Tourism license no.', licenseNumber, setLicenseNumber, 'e.g. 1234'],
+              ['Tax / registration no.', taxNumber, setTaxNumber, 'e.g. 123-456-789'],
+            ] as const).map(([label, value, set, placeholder]) => (
+              <div key={label}>
+                <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                  placeholder={placeholder}
+                />
+              </div>
+            ))}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+              <textarea
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="Street, city, country"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Footer note
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(bank details, a legal note — printed at the bottom of every page)</span>
+              </label>
+              <textarea
+                value={footerText}
+                onChange={(e) => setFooterText(e.target.value)}
+                rows={2}
+                maxLength={400}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="e.g. Bank: CIB · IBAN EG00 0000 0000 0000 0000 0000 000"
+              />
+            </div>
+          </div>
+
+          {/* Live preview of exactly what the footer will print */}
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Footer preview</p>
+            <DocumentFooter
+              company={identityFromTenant({
+                company_name: companyName, contact_email: contactEmail, company_phone: companyPhone,
+                company_website: companyWebsite, company_address: companyAddress, license_number: licenseNumber,
+                tax_number: taxNumber, document_footer_text: footerText, primary_color: primaryColor,
+              })}
+            />
           </div>
         </div>
       </div>

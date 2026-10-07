@@ -19,12 +19,34 @@ import {
   buildAwaitingReplyItems,
   type AwaitingConversation,
   AttentionExtraRequest,
+  withoutDismissed,
+  type AttentionDismissal,
+  type AttentionItem,
 } from '@/lib/dashboard/attention'
 
 const BOOKING_COLS =
   'id, booking_number, trip_name, client_id, start_date, status, itinerary_id, balance_due, payment_deadline'
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10)
+
+/** What the operator has dismissed (migration 397). A database without the
+ *  table hides nothing rather than sinking the list. */
+async function dismissalsFor(
+  supabase: NonNullable<Awaited<ReturnType<typeof requireAuth>>['supabase']>
+): Promise<AttentionDismissal[]> {
+  const { data, error } = await supabase
+    .from('dashboard_attention_dismissals')
+    .select('item_key, fingerprint')
+  return error ? [] : ((data ?? []) as AttentionDismissal[])
+}
+
+function respond(items: AttentionItem[], scannedBookings: number, dismissals: AttentionDismissal[]) {
+  const visible = withoutDismissed(items, dismissals)
+  return NextResponse.json({
+    success: true,
+    data: { items: visible.items, scannedBookings, dismissed: visible.dismissed },
+  })
+}
 
 export async function GET() {
   try {
@@ -36,6 +58,7 @@ export async function GET() {
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const today = day(0)
+    const dismissalsPromise = dismissalsFor(supabase)
 
     const [departing, balanceDue] = await Promise.all([
       supabase
@@ -68,7 +91,7 @@ export async function GET() {
     // someone who wrote in is waiting either way (migration 366).
     const awaitingRows = await supabase
       .from('unified_conversations')
-      .select('id, contact_name, contact_email, awaiting_reply_since')
+      .select('id, contact_name, contact_email, awaiting_reply_since, last_inbound_at')
       .not('awaiting_reply_since', 'is', null)
       .order('awaiting_reply_since', { ascending: true })
       .limit(50)
@@ -78,10 +101,7 @@ export async function GET() {
     )
 
     if (bookingIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: { items: awaitingItems, scannedBookings: 0 },
-      })
+      return respond(awaitingItems, 0, await dismissalsPromise)
     }
 
     // Portal extras waiting on the office (migration 321). The ids came from
@@ -135,13 +155,7 @@ export async function GET() {
       today,
     })
 
-    return NextResponse.json({
-
-      success: true,
-
-      data: { ...result, items: [...awaitingItems, ...result.items] },
-
-    })
+    return respond([...awaitingItems, ...result.items], result.scannedBookings, await dismissalsPromise)
   } catch (error) {
     console.error('Error building attention list:', error)
     return NextResponse.json({ success: false, error: 'Failed to build the attention list' }, { status: 500 })

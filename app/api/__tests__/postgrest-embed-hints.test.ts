@@ -82,3 +82,26 @@ describe('PostgREST embed hints', () => {
     }
   })
 })
+
+// itinerary_services has TWO foreign keys to itinerary_days (day_id and
+// itinerary_day_id; migration 385 keeps them equal). An embed that does not
+// name one is ambiguous — PGRST201, the whole query fails. Live 2026-09-24:
+// every Share link / Send refused with "Could not check this itinerary's
+// services", and the grid's "load itinerary" came back with no days.
+describe('itinerary_services embeds name their key', () => {
+  it('no bare itinerary_services( embed anywhere in app/ or lib/', () => {
+    const root = join(__dirname, '..', '..', '..')
+    const files = [...walk(join(root, 'app')), ...walk(join(root, 'lib'))]
+    const bare: string[] = []
+    for (const file of files) {
+      readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+        if (/^\s*(\/\/|\*|\/\*)/.test(line)) return
+        if (/select\(.*itinerary_services\((?!\))/.test(line) || /[:,'\s]itinerary_services\(/.test(line) && /select\(/.test(line)) {
+          if (!/itinerary_services!/.test(line)) bare.push(`${file.replace(root, '')}:${i + 1}`)
+        }
+      })
+    }
+    expect(bare).toEqual([])
+  })
+})
+

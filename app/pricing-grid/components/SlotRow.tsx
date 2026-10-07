@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { SlotDefinition, SlotValue, RateOption, SelectedItem, PassportType } from '../types'
+import { supplementItem } from '../lib/single-supplement'
 
 interface SlotRowProps {
   definition: SlotDefinition
@@ -12,9 +13,11 @@ interface SlotRowProps {
   passport: PassportType
   onChange: (value: SlotValue) => void
   hidden?: boolean
+  /** Offered on daily items (water): copy this selection to every day. */
+  onApplyToAllDays?: () => void
 }
 
-export default function SlotRow({ definition, value, options, allOptions, passport, onChange, hidden }: SlotRowProps) {
+export default function SlotRow({ definition, value, options, allOptions, passport, onChange, hidden, onApplyToAllDays }: SlotRowProps) {
   const [search, setSearch] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
@@ -50,14 +53,19 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
           // carry these and the gate falls through to its count-based path.
           serviceType: opt.service_type,
           pricingClass: opt.pricing_class,
+          ...(opt.pricing_basis ? { pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null } : {}),
+          ...(opt.tip_role ? { tipRole: opt.tip_role } : {}),
         }]
       })
     }
   }
 
   const selectSingle = (opt: RateOption | null) => {
+    // A choice made in the row replaces any hidden custom amount — the
+    // calculator prefers a custom amount, so a leftover one made the row's
+    // choice count for nothing (hydrate-rates.ts).
     if (!opt) {
-      onChange({ ...value, selectedItems: [] })
+      onChange({ ...value, selectedItems: [], customAmount: 0 })
       return
     }
     const item: SelectedItem = {
@@ -67,17 +75,14 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
       rateNonEur: opt.rateNonEur,
       serviceType: opt.service_type,
       pricingClass: opt.pricing_class,
+      ...(opt.pricing_basis ? { pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null } : {}),
     }
     const items: SelectedItem[] = [item]
-    if (definition.slotId === 'accommodation' && (opt as any).single_supp_eur) {
-      items.push({
-        rateId: `${opt.id}_supp`,
-        name: 'Single Supplement',
-        rateEur: (opt as any).single_supp_eur || 0,
-        rateNonEur: (opt as any).single_supp_non_eur || 0,
-      })
+    if (definition.slotId === 'accommodation') {
+      const supp = supplementItem(opt)
+      if (supp) items.push(supp)
     }
-    onChange({ ...value, selectedItems: items })
+    onChange({ ...value, selectedItems: items, customAmount: 0 })
   }
 
   const unselectedCount = options.filter(o => !value.selectedItems.some(i => i.rateId === o.id)).length
@@ -115,6 +120,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
               ? [{ id: selected.rateId, name: selected.name, rateEur: selected.rateEur, rateNonEur: selected.rateNonEur } as RateOption, ...options]
               : options
             return (
+              <div className="flex items-center gap-2">
               <select
                 value={selected?.rateId || ''}
                 onChange={(e) => {
@@ -135,6 +141,17 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                   </option>
                 ))}
               </select>
+              {onApplyToAllDays && selected && (
+                <button
+                  type="button"
+                  onClick={onApplyToAllDays}
+                  className="shrink-0 text-[11px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                  title="Put this on every day of the trip"
+                >
+                  Apply to all days
+                </button>
+              )}
+              </div>
             )
           })()
         ) : (
@@ -151,6 +168,10 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                   >
                     {item.name.length > 30 ? item.name.substring(0, 30) + '...' : item.name}
                     {' '}€{item[rateKey].toFixed(2)}
+                    {item.pricingBasis === 'per_person' && <span className="opacity-70">/person</span>}
+                    {item.pricingBasis === 'per_unit' && (
+                      <span className="opacity-70">/unit{item.unitCapacity ? ` of ${item.unitCapacity}` : ''}</span>
+                    )}
                     <span className="font-bold ml-0.5 text-[10px]">×</span>
                   </span>
                 ))}

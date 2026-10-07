@@ -120,11 +120,15 @@ export function mapServicesToSlots(
     service_type: string
     service_name: string
     quantity: number
-    rate_eur: number
-    rate_non_eur: number
+    rate_eur: number | null
+    rate_non_eur: number | null
     total_cost: number
     notes?: string | null
     description?: string | null
+    /** What the grid's save writes (migration 391): the rate it priced the
+     *  line at, and the rate row it came from. */
+    unit_cost?: number | null
+    rate_id?: string | null
   }>,
   pax: number
 ): SlotValue[] {
@@ -147,10 +151,17 @@ export function mapServicesToSlots(
     // Try to extract original slotId from grid metadata
     // Check description first (new format: __grid:slot:xxx|rate_id:yyy)
     // Then notes (legacy format: slot:xxx|rate_id:yyy)
+    // The grid's save tags each line "[pricing-grid:<slot>] <name>" — the
+    // slot it came from. This used to look only for the legacy "slot:<id>"
+    // tag, so every grid-saved line typed 'other' or 'transfer' (water,
+    // hotel services, boat rides, airport services…) reloaded into
+    // "Other (Group)", and removing it from its own row was impossible.
     let slotId: string | null = null
     const metaSource = svc.description || svc.notes || ''
+    const gridTag = (svc.description || '').match(/^\[pricing-grid:([a-z_]+)\]\s*(.*)$/)
     const slotMatch = metaSource.match(/slot:(\w+)/)
-    if (slotMatch) slotId = slotMatch[1]
+    if (gridTag && slotMap.has(gridTag[1])) slotId = gridTag[1]
+    else if (slotMatch) slotId = slotMatch[1]
 
     // Fall back to service_type reverse mapping
     if (!slotId) {
@@ -160,22 +171,32 @@ export function mapServicesToSlots(
     const slot = slotMap.get(slotId)
     if (!slot) continue
 
+    // The grid's save never writes rate_eur / rate_non_eur — only the rate it
+    // priced the line at (unit_cost). Without this fallback every reloaded
+    // grid line was worth nothing.
+    // rate_eur / rate_non_eur default to 0, so 0 means "not written" too.
+    const unit = Number(svc.unit_cost) || 0
+    const rateEur = Number(svc.rate_eur) > 0 ? Number(svc.rate_eur) : unit
+    const rateNonEur = Number(svc.rate_non_eur) > 0 ? Number(svc.rate_non_eur) : unit
+
     // Check if this was a custom amount
-    if (metaSource.includes('custom_amount')) {
-      slot.customAmount = svc.rate_eur
+    if (metaSource.includes('custom_amount') || (gridTag && gridTag[2] === 'custom')) {
+      slot.customAmount = Number(svc.rate_eur) > 0 ? Number(svc.rate_eur) : unit
       continue
     }
 
     // Extract original rate_id from metadata if available
-    let rateId = svc.id // fallback to service row ID
+    let rateId = svc.rate_id || svc.id // fallback to service row ID
     const rateMatch = metaSource.match(/rate_id:(.+?)(\||$)/)
     if (rateMatch) rateId = rateMatch[1]
+    // Water's one option has a fixed id; match it so the row shows it selected.
+    if (slotId === 'water' && !svc.rate_id && !rateMatch) rateId = 'water-standard'
 
     slot.selectedItems.push({
       rateId,
       name: svc.service_name,
-      rateEur: svc.rate_eur,
-      rateNonEur: svc.rate_non_eur,
+      rateEur,
+      rateNonEur,
     })
   }
 

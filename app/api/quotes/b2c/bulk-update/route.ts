@@ -1,25 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
-
-// Create authenticated Supabase client from request
-async function createAuthenticatedClient() {
-  const cookieStore = await cookies();
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          cookie: cookieStore.toString(),
-        },
-      },
-    }
-  );
-}
+import { createAuthenticatedClient } from '@/lib/supabase-server';
 
 /**
  * PUT /api/quotes/b2c/bulk-update

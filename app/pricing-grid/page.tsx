@@ -5,10 +5,17 @@ import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
 import { SLOT_DEFINITIONS } from './types'
-import { calculateGrandTotals, calculateDay } from './lib/calculator'
+import { calculateGrandTotals, calculateDay, convertAmount, buildTransportTierIndex } from './lib/calculator'
+import { gridSheetCosts } from './lib/b2b-rate-sheet'
+import { getCurrencySymbol } from '@/lib/currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
+import { hydrateDayRates } from './lib/hydrate-rates'
+import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
+import type { DayMatch } from '@/lib/day-blocks/match'
+import { preParseRawItinerary } from '@/lib/ai/parsing-utils'
+import type { BlockNote } from './components/DayRow'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
 import InputPanel from './components/InputPanel'
@@ -112,11 +119,18 @@ function PricingGridContent() {
     loadFromStorage(STORAGE_KEY_DAYS, [])
   )
   const [rates, setRates] = useState<AllRates | null>(null)
+  // The agency's day blocks (Settings → Day blocks); empty until imported.
+  const [blocks, setBlocks] = useState<GridBlock[]>([])
+  // Per day: what the last block laid on it left for the operator to pick.
+  const [blockNotes, setBlockNotes] = useState<Record<string, BlockNote>>({})
   const [loading, setLoading] = useState(true)
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null)
+  // The selling total as last saved (or loaded), so the Update button can
+  // show what a re-save changes. Only meaningful while config.itineraryId is set.
+  const [savedSellingTotal, setSavedSellingTotal] = useState<number | null>(null)
   const [savedQuoteNumber, setSavedQuoteNumber] = useState<string | null>(null)
 
   const isInitialLoad = useRef(true)
@@ -174,7 +188,12 @@ function PricingGridContent() {
       setLoading(true)
       const res = await fetch(`/api/pricing-grid/rates?tier=${tier}`)
       const data = await res.json()
-      if (data.success) setRates(data.data)
+      if (data.success) {
+        setRates(data.data)
+        // A draft restored from this browser may hold items with no price, or
+        // water as a hidden amount (hydrate-rates.ts) — fill them from the rates.
+        setDays(prev => hydrateDayRates(prev, data.data, 'missing').days)
+      }
     } catch (err) {
       console.error('Failed to fetch rates:', err)
     } finally {
@@ -400,6 +419,40 @@ function PricingGridContent() {
   // --- Day Management ---
   const addDay = () => setDays(prev => [...prev, createEmptyDay(prev.length + 1)])
 
+  // --- Day blocks ---
+  useEffect(() => {
+    let live = true
+    fetch('/api/day-blocks')
+      .then(res => res.json())
+      .then(json => {
+        if (live && json?.success) setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+      })
+      // No library (or no table yet): the Grid simply offers no blocks.
+      .catch(() => {})
+    return () => { live = false }
+  }, [])
+
+  const blockSummary = (code: string, filled: string[], toPick: string[]) =>
+    `${code}: ${filled.length ? filled.join(', ') : 'nothing priced'}${toPick.length ? ` — ${toPick.length} to pick yourself` : ''}`
+
+  const addDayFromBlock = (block: GridBlock) => {
+    if (!rates) return
+    const fresh = createEmptyDay(days.length + 1)
+    const { day, filled, toPick } = applyBlockToGridDay(fresh, block, rates, config.pax)
+    setDays(prev => [...prev, { ...day, dayNumber: prev.length + 1, isExpanded: true }])
+    setBlockNotes(prev => ({ ...prev, [day.id]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
+    showToast(toPick.length ? 'warning' : 'success', `Day ${days.length + 1} from ${blockSummary(block.code, filled, toPick)}`)
+  }
+
+  const applyBlockToDay = (dayId: string, block: GridBlock) => {
+    const target = days.find(d => d.id === dayId)
+    if (!rates || !target) return
+    const { day, filled, toPick } = applyBlockToGridDay(target, block, rates, config.pax)
+    setDays(prev => prev.map(d => (d.id === dayId ? day : d)))
+    setBlockNotes(prev => ({ ...prev, [dayId]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
+    showToast(toPick.length ? 'warning' : 'success', `Day ${target.dayNumber} ← ${blockSummary(block.code, filled, toPick)}`)
+  }
+
   const removeDay = (dayId: string) => {
     setDays(prev => prev.filter(d => d.id !== dayId).map((d, i) => ({ ...d, dayNumber: i + 1 })))
   }
@@ -410,6 +463,25 @@ function PricingGridContent() {
 
   const expandAll = () => setDays(prev => prev.map(d => ({ ...d, isExpanded: true })))
   const collapseAll = () => setDays(prev => prev.map(d => ({ ...d, isExpanded: false })))
+
+  // Jump to a day from the day bar: open it and bring it into view.
+  const jumpToDay = (dayId: string) => {
+    setDays(prev => prev.map(d => d.id === dayId ? { ...d, isExpanded: true } : d))
+    requestAnimationFrame(() =>
+      document.getElementById(`grid-day-${dayId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  // Copy one service to every day (offered on Water, a daily item).
+  const applySlotToAllDays = (slotId: string, value: SlotValue) => {
+    const copy = (): SlotValue => ({ ...value, slotId, selectedItems: value.selectedItems.map(i => ({ ...i })) })
+    setDays(prev => prev.map(d => ({
+      ...d,
+      slots: d.slots.some(s => s.slotId === slotId)
+        ? d.slots.map(s => (s.slotId === slotId ? copy() : s))
+        : [...d.slots, copy()],
+    })))
+    showToast('success', `Applied to all ${days.length} days`)
+  }
 
   const updateDay = (dayId: string, partial: Partial<GridDay>) => {
     setDays(prev => prev.map(d => d.id === dayId ? { ...d, ...partial } : d))
@@ -463,9 +535,60 @@ function PricingGridContent() {
   // --- Clear All ---
   const handleClearAll = () => {
     setDays([])
+    setBlockNotes({})
     setConfig(DEFAULT_CONFIG)
     clearStorage()
     setSaveMessage(null)
+  }
+
+  // --- Day blocks for a parsed itinerary ---
+  const matchParsedDaysToBlocks = async (text: string, parsed: GridDay[], pax: number) => {
+    if (!rates) return
+    try {
+      // The day's own words, when the text is split into D1 / Day 1 parts.
+      const segments = preParseRawItinerary(text)
+      const rawFor = (n: number) => (segments.length > 1 ? segments.find(s => s.dayNumber === n)?.rawContent ?? null : null)
+      const res = await fetch('/api/day-blocks/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          days: parsed.map(d => ({ dayNumber: d.dayNumber, title: d.title, city: d.city, description: d.description, raw: rawFor(d.dayNumber) })),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'matching failed')
+      const matches: DayMatch[] = json.data.matches
+      const byCode = new Map(blocks.map(b => [b.code, b]))
+      const byNumber = new Map(parsed.map(d => [d.dayNumber, d]))
+      const applied = new Map<string, GridDay>()
+      const notes: Record<string, BlockNote> = {}
+      for (const m of matches) {
+        const day = byNumber.get(m.dayNumber)
+        if (!day) continue
+        const block = m.code ? byCode.get(m.code) : undefined
+        if (block && m.confidence === 'high') {
+          const result = applyBlockToGridDay(day, block, rates, pax)
+          applied.set(day.id, result.day)
+          notes[day.id] = { kind: 'applied', code: block.code, by: m.by === 'shorthand' ? 'shorthand' : 'ai', toPick: result.toPick, reason: m.reason }
+        } else if (block) {
+          notes[day.id] = { kind: 'suggested', code: block.code, toPick: [], reason: m.reason }
+        } else {
+          notes[day.id] = { kind: 'unmatched', code: null, toPick: [], reason: m.reason }
+        }
+      }
+      // Only the days still there: the operator may have edited meanwhile.
+      setDays(prev => prev.map(d => applied.get(d.id) ?? d))
+      setBlockNotes(prev => ({ ...prev, ...notes }))
+      const count = (k: BlockNote['kind']) => Object.values(notes).filter(n => n.kind === k).length
+      const unmatched = count('unmatched'), suggested = count('suggested')
+      showToast(unmatched || suggested ? 'warning' : 'success',
+        `Day blocks: ${count('applied')} of ${parsed.length} day(s) built from your blocks` +
+        (suggested ? `, ${suggested} to confirm` : '') +
+        (unmatched ? `, ${unmatched} with no block (check the AI's reading)` : ''))
+    } catch (err) {
+      console.error('Matching days to blocks:', err)
+      showToast('info', "Couldn't match the days to your day blocks — the days show the AI's reading.")
+    }
   }
 
   // --- Parse Text via AI ---
@@ -476,6 +599,7 @@ function PricingGridContent() {
       // Clear old data immediately so the loading indicator shows
       // and the user knows a fresh parse is starting
       setDays([])
+      setBlockNotes({})
       setConfig(prev => ({ ...prev, itineraryId: null, itineraryCode: null }))
       const res = await fetch('/api/pricing-grid/parse', {
         method: 'POST',
@@ -485,7 +609,16 @@ function PricingGridContent() {
       const data = await res.json()
       if (data.success && data.days) {
         const parsedDays: GridDay[] = parsedDaysToGrid(data.days, () => crypto.randomUUID())
-        setDays(parsedDays)
+        // The parser's prices are its own derivation (a seasonal hotel came in
+        // at 0); the grid's rate list is the authority (hydrate-rates.ts).
+        const hydrated = rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays
+        setDays(hydrated)
+        // Which of the agency's day blocks is each day? The blocks then supply
+        // the services (lib/day-blocks/match.ts); the AI's reading stays only
+        // where no block fits, and is flagged.
+        if (rates && blocks.length > 0) {
+          void matchParsedDaysToBlocks(text, hydrated, data.metadata?.pax ?? config.pax)
+        }
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
           setSaveMessage('✨ AI-suggested itinerary based on inquiry — review and adjust as needed')
@@ -554,6 +687,7 @@ function PricingGridContent() {
         itineraryId: itn.id,
         itineraryCode: itn.itinerary_code,
       }))
+      setSavedSellingTotal(typeof itn.total_cost === 'number' ? itn.total_cost : Number(itn.total_cost) || null)
 
       // Fetch days with services
       const daysRes = await fetch(`/api/itineraries/${itineraryId}/days?language=en`)
@@ -589,7 +723,9 @@ function PricingGridContent() {
             intercity: dayData.intercity ?? undefined,
           }
         })
-        setDays(loadedDays)
+        // A saved line with no price (rate_eur defaults to 0) takes the rate
+        // list's; priced lines keep the price they were saved at.
+        setDays(rates ? hydrateDayRates(loadedDays, rates, 'missing').days : loadedDays)
         setSaveMessage(`Loaded ${itn.itinerary_code}`)
       }
     } catch (err) {
@@ -640,12 +776,17 @@ function PricingGridContent() {
       const data = await res.json()
 
       if (data.success) {
+        // An office address offered as the client's was dropped by the save.
+        const warned = Array.isArray(data.warnings) && data.warnings.length > 0
+        if (warned) for (const w of data.warnings as string[]) showToast('error', w)
         setConfig(prev => ({
           ...prev,
           itineraryId: data.itineraryId,
           itineraryCode: data.itineraryCode,
           clientId: data.clientId ?? prev.clientId,
+          ...(warned ? { clientEmail: '' } : {}),
         }))
+        if (typeof data.sellingTotal === 'number') setSavedSellingTotal(data.sellingTotal)
 
         // For B2B: create quote + template, then redirect to /tours/manage
         if (config.clientType === 'b2b') {
@@ -662,6 +803,12 @@ function PricingGridContent() {
                 language: 'English',
                 // Stored via B1's columns, non-default only.
                 guide_mode: config.guideMode === 'throughout' ? 'throughout' : undefined,
+                // The partner price list: the grid's cost at each group size
+                // (b2b-rate-sheet.ts); the route applies the quote's margin.
+                rate_sheet_costs: gridSheetCosts(
+                  days, config, buildTransportTierIndex(rates?.route ?? []),
+                  { groupExtraEur: throughoutGuide.totalEur },
+                ),
               })
             })
             const quoteData = await quoteRes.json()
@@ -709,9 +856,21 @@ function PricingGridContent() {
             setSaveMessage(`Saved as ${data.itineraryCode} (B2B processing failed)`)
           }
         } else {
-          setSavedQuoteId(null)
-          setSavedQuoteNumber(null)
-          setSaveMessage(`Saved as ${data.itineraryCode}`)
+          // B2C: the save repriced the itinerary's open quote, or created one.
+          setSavedQuoteId(data.quoteId ?? null)
+          setSavedQuoteNumber(data.quoteNumber ?? null)
+          const money = (n: number) => `${getCurrencySymbol(config.currency)}${convertAmount(n, config.exchangeRate).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          if (data.quoteAction === 'updated') {
+            const before = typeof data.previousSellingTotal === 'number' ? data.previousSellingTotal : null
+            setSaveMessage(
+              `Saved ${data.itineraryCode} · quote ${data.quoteNumber} repriced` +
+              (before !== null && Math.abs(before - data.sellingTotal) >= 0.01 ? `: ${money(before)} → ${money(data.sellingTotal)}` : ' (price unchanged)')
+            )
+          } else if (data.quoteAction === 'created') {
+            setSaveMessage(`Saved as ${data.itineraryCode} + quote ${data.quoteNumber}`)
+          } else {
+            setSaveMessage(`Saved as ${data.itineraryCode}`)
+          }
         }
       } else {
         showToast('error', `Save failed: ${data.error}`)
@@ -759,6 +918,8 @@ function PricingGridContent() {
       <InputPanel
         onParseDays={handleParseDays}
         onAddDay={addDay}
+        blocks={rates ? blocks : []}
+        onAddDayFromBlock={addDayFromBlock}
         onLoadItinerary={handleLoadItinerary}
         packageType={config.packageType ?? 'full-package'}
         onPackageTypeChange={(p) => setConfig(prev => ({ ...prev, packageType: p }))}
@@ -832,8 +993,36 @@ function PricingGridContent() {
             </div>
           </div>
 
+          {/* Day bar: every day at a glance, one click to jump to it */}
+          <div className="sticky top-0 z-20 -mx-1 mb-2 px-1 py-1.5 bg-gray-50/95 backdrop-blur border-b border-gray-200">
+            <div className="flex gap-1.5 overflow-x-auto">
+              {days.map(day => {
+                const perPerson = calculateDay(day, config).dailyPerPerson
+                return (
+                  <button
+                    key={day.id}
+                    type="button"
+                    onClick={() => jumpToDay(day.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition-colors ${
+                      day.isExpanded
+                        ? 'bg-[#556B2F] text-white border-[#556B2F]'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-[#556B2F]'
+                    }`}
+                    title={day.title || `Day ${day.dayNumber}`}
+                  >
+                    <span className="font-semibold">Day {day.dayNumber}</span>
+                    {day.city && <span className="opacity-80">{day.city}</span>}
+                    <span className="tabular-nums opacity-80">
+                      {getCurrencySymbol(config.currency)}{convertAmount(perPerson, config.exchangeRate).toFixed(0)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Day Cards */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {days.map(day => (
               <DayRow
                 key={day.id}
@@ -845,6 +1034,11 @@ function PricingGridContent() {
                 onUpdateSlot={(slotId, value) => updateSlot(day.id, slotId, value)}
                 onUpdateDay={(partial) => updateDay(day.id, partial)}
                 onRemoveDay={() => removeDay(day.id)}
+                onApplyToAllDays={applySlotToAllDays}
+                blocks={rates ? blocks : []}
+                onApplyBlock={(block) => applyBlockToDay(day.id, block)}
+                blockNote={blockNotes[day.id]}
+                onDismissBlockNote={() => setBlockNotes(prev => { const next = { ...prev }; delete next[day.id]; return next })}
               />
             ))}
           </div>
@@ -862,6 +1056,7 @@ function PricingGridContent() {
             savedQuoteId={savedQuoteId}
             savedQuoteNumber={savedQuoteNumber}
             saveMessage={saveMessage}
+            savedSellingTotal={config.itineraryId ? savedSellingTotal : null}
           />
         </>
       )}

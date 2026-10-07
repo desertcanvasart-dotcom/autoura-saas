@@ -47,8 +47,11 @@ export function trackEvent(name: string, params?: Record<string, unknown>) {
 function loadGa(gaId: string) {
   if (document.getElementById('ga4-script')) return
   window.dataLayer = window.dataLayer || []
-  window.gtag = function gtag(...args: unknown[]) {
-    window.dataLayer!.push(args)
+  window.gtag = function gtag(..._args: unknown[]) {
+    // GA4 only processes commands pushed as an Arguments object — an array
+    // from rest params is ignored — so `arguments` is required here.
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer!.push(arguments)
   }
   window.gtag('js', new Date())
   // Consent Mode: only reached after an explicit grant.

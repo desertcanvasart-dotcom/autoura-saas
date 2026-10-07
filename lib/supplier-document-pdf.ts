@@ -3,7 +3,8 @@
 // Unified branding with Travel2Egypt / Autoura colors
 
 import jsPDF from 'jspdf'
-import { brandColorRgb, tint } from './company-identity'
+import { brandColorRgb, tint, type CompanyIdentity } from './company-identity'
+import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
 import { formatDateOnly, daysBetween } from '@/lib/date-utils'
 
 interface ServiceItem {
@@ -19,7 +20,7 @@ interface ServiceItem {
 interface SupplierDocument {
   /** The operator authorising the document. Previously hardcoded Travel2Egypt
    *  with a placeholder phone ("+20 100 XXX XXXX") in the footer. */
-  company?: { name: string; email?: string | null; phone?: string | null; website?: string | null; primaryColor?: string; logoDataUrl?: string }
+  company?: CompanyIdentity
   id: string
   document_type: string
   document_number: string
@@ -164,57 +165,22 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   
   const title = DOCUMENT_TITLES[doc.document_type] || 'SERVICE DOCUMENT'
 
-  // ==================== HEADER SECTION ====================
+  // ==================== HEADER: the agency's letterhead ====================
+  // Settings → Organization (lib/pdf-letterhead). Was a hard-coded
+  // "TRAVEL2EGYPT / Your Gateway to Egypt" for every agency.
 
-  // Top accent bar (thin)
-  pdf.setFillColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-  pdf.rect(0, 0, pageWidth, 4, 'F')
-  
-  y = 15
-  
-  // Company Logo Area (Left side)
-  pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
-  pdf.roundedRect(margin, y, 55, 20, 3, 3, 'F')
-  
-  pdf.setFontSize(16)
-  pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-  pdf.text('TRAVEL2EGYPT', margin + 5, y + 9)
-  
-  pdf.setFontSize(7)
-  pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
-  pdf.text('Your Gateway to Egypt', margin + 5, y + 15)
-  
-  // Document Type & Number (Right side)
-  const rightBoxX = pageWidth - margin - 65
-  pdf.setFillColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-  pdf.roundedRect(rightBoxX, y, 65, 20, 3, 3, 'F')
-  
-  pdf.setFontSize(10)
-  pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(ACTIVE.white.r, ACTIVE.white.g, ACTIVE.white.b)
-  pdf.text(title, rightBoxX + 32.5, y + 8, { align: 'center' })
-  
-  pdf.setFontSize(9)
-  pdf.setFont('helvetica', 'normal')
-  pdf.text(doc.document_number, rightBoxX + 32.5, y + 15, { align: 'center' })
-  
-  y += 28
-  
-  // Issue date line
-  pdf.setFontSize(8)
-  pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
-  const issueDate = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long',
-    month: 'long', 
-    day: 'numeric', 
-    year: 'numeric' 
-  })
-  pdf.text(`Issue Date: ${issueDate}`, pageWidth - margin, y, { align: 'right' })
-  
-  y += 8
+  const company: CompanyIdentity = doc.company ?? { name: '' }
+  const issueDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  y = drawLetterhead(pdf, company, ACTIVE.primary, { title, number: doc.document_number, dateLine: `Issued ${issueDate}` }, margin)
+
+  // Content stops above the footer, which is drawn on every page at the end.
+  const bottomLimit = pageHeight - footerReserve(pdf, company, contentWidth) - 4
+  const ensureSpace = (needed: number) => {
+    if (y + needed > bottomLimit) {
+      pdf.addPage()
+      y = drawContinuationHeader(pdf, ACTIVE.primary)
+    }
+  }
 
   // ==================== SUPPLIER & GUEST INFO ====================
   
@@ -491,6 +457,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   const hasServices = (doc.services && doc.services.length > 0) || (doc.selected_attractions && doc.selected_attractions.length > 0) || (doc.selected_routes && doc.selected_routes.length > 0) || (doc.selected_meals && doc.selected_meals.length > 0) || (doc.selected_guides && doc.selected_guides.length > 0)
   
   if (hasServices) {
+    ensureSpace(32)
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
@@ -516,20 +483,37 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     const items = doc.selected_routes || doc.selected_meals || doc.selected_guides || doc.selected_attractions || doc.services || []
     
     items.forEach((item: any, idx: number) => {
-      const isOdd = idx % 2 === 0
-      if (isOdd) {
-        pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
-        pdf.rect(margin, y, contentWidth, 10, 'F')
-      }
-      
-      pdf.setFontSize(8)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-      
       // Get item name
       const itemName = item.route_name || item.restaurant_name || (item.guide_language ? `${item.guide_language} ${(item.guide_type || '').replace(/_/g, ' ')} - ${(item.tour_duration || '').replace(/_/g, ' ')}` : null) || item.attraction_name || item.service_name || item.service_type || 'Service'
       const itemCity = item.city ? ` (${item.city})` : ''
-      pdf.text((itemName + itemCity).substring(0, 60), margin + 4, y + 6.5)
+      // The whole name, wrapped — an entrance order names its sites, which
+      // ran past the 60 characters this used to cut at — and the line's
+      // notes under it ("Inside: … | Photo stops: …"), never printed before.
+      pdf.setFontSize(8)
+      const nameLines: string[] = pdf.splitTextToSize(itemName + itemCity, contentWidth - 60).slice(0, 3)
+      pdf.setFontSize(7)
+      const noteLines: string[] = item.notes && typeof item.notes === 'string'
+        ? pdf.splitTextToSize(item.notes, contentWidth - 60).slice(0, 2)
+        : []
+      const rowHeight = Math.max(10, 4 + nameLines.length * 4 + noteLines.length * 3.5)
+
+      const isOdd = idx % 2 === 0
+      if (isOdd) {
+        pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
+        pdf.rect(margin, y, contentWidth, rowHeight, 'F')
+      }
+
+      pdf.setFontSize(8)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
+      pdf.text(nameLines, margin + 4, y + 6.5)
+      if (noteLines.length > 0) {
+        pdf.setFontSize(7)
+        pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
+        pdf.text(noteLines, margin + 4, y + 6.5 + nameLines.length * 4)
+        pdf.setFontSize(8)
+        pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
+      }
 
       // Quantity
       const qty = item.quantity || 1
@@ -542,19 +526,11 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       } else {
         pdf.text('—', pageWidth - margin - 4, y + 6.5, { align: 'right' })
       }
-      
-      y += 10
-      
-      // Page break check
-      if (y > pageHeight - 70) {
-        pdf.addPage()
-        y = margin
 
-        // Re-add header bar on new page (thin)
-        pdf.setFillColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-        pdf.rect(0, 0, pageWidth, 4, 'F')
-        y = 15
-      }
+      y += rowHeight
+      
+      // Page break before the next row would run into the footer
+      if (idx < items.length - 1) ensureSpace(14)
     })
     
     y += 5
@@ -563,6 +539,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   // ==================== SPECIAL REQUESTS ====================
   
   if (doc.special_requests) {
+    ensureSpace(28)
     pdf.setFillColor(255, 250, 240)
     pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.setLineWidth(0.5)
@@ -584,6 +561,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
 
   // ==================== TOTAL & PAYMENT ====================
   
+  ensureSpace(28 + 22)
   // Payment terms (left)
   const paymentBoxWidth = contentWidth * 0.55
   pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
@@ -644,23 +622,9 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.line(pageWidth - margin - sigWidth, y + 12, pageWidth - margin, y + 12)
   pdf.text('Supplier Confirmation & Stamp', pageWidth - margin - sigWidth, y + 18)
 
-  // ==================== FOOTER ====================
-  
-  const footerY = pageHeight - 12
-  
-  // Footer bar
-  pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
-  pdf.rect(0, footerY - 8, pageWidth, 20, 'F')
-  
-  pdf.setFontSize(7)
-  pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
-  const footerLine = [doc.company?.name, doc.company?.website, doc.company?.email, doc.company?.phone].filter(Boolean).join(' | ')
-  if (footerLine) pdf.text(footerLine, pageWidth / 2, footerY, { align: 'center' })
-  
-  pdf.setFontSize(6)
-  pdf.setTextColor(ACTIVE.textLight.r, ACTIVE.textLight.g, ACTIVE.textLight.b)
-  pdf.text(`Document generated on ${new Date().toLocaleString()} | ${doc.document_number}`, pageWidth / 2, footerY + 5, { align: 'center' })
+  // ==================== FOOTER: every page ====================
+
+  drawFooters(pdf, company, ACTIVE.primary, doc.document_number, margin)
 
   return pdf
 }

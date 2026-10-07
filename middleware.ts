@@ -152,7 +152,7 @@ export async function middleware(request: NextRequest) {
   // grant public access automatically; the middleware has to know.
   const publicRoutes = [
     '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
-    '/about', '/contact', '/docs', '/integrations', '/pricing', '/privacy', '/terms',
+    '/about', '/contact', '/demo', '/docs', '/integrations', '/pricing', '/privacy', '/terms',
     // Crawler surfaces (Next metadata routes; .txt/.xml are NOT excluded by
     // the matcher the way images are). These redirected to /login, which
     // made organic discovery impossible.
@@ -305,6 +305,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
   ],
 }

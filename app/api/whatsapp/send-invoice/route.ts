@@ -1,214 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadSenderTenant } from '@/lib/sender-tenant'
+import { loadSenderTenant, type SenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
+import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
 import { createClient } from '@supabase/supabase-js'
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { generateInvoicePDF } from '@/lib/invoice-pdf-generator'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
-import { brandColorRgb, fetchLogoBytes } from '@/lib/company-identity'
+import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 import { getCurrencySymbol } from '@/lib/currency'
 
-// Generate Invoice PDF
-async function generateInvoicePDF(
-  invoice: any,
-  company: {
-    name: string
-    email?: string | null
-    website?: string | null
-    primaryColor?: string | null
-    logoUrl?: string | null
-  } = { name: '' }
-): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.create()
-  const page = pdfDoc.addPage([595, 842]) // A4
-
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
-
-  const { width, height } = page.getSize()
-  const margin = 50
-  let y = height - 50
-
-  const currencySymbol = getCurrencySymbol(invoice.currency)
-
-  // Brand accent: tenant color, falling back to the template's original olive.
-  const [br, bg, bb] = brandColorRgb(
-    { primaryColor: company.primaryColor || undefined },
-    [100, 124, 71]
-  )
-  const brand = rgb(br / 255, bg / 255, bb / 255)
-
-  // Header — logo left of the name when the tenant uploaded one (best-effort),
-  // matching the jsPDF letterhead in lib/invoice-pdf-generator.ts.
-  let nameX = margin
+// The invoice PDF a customer receives on WhatsApp is the SAME document the
+// app downloads (lib/invoice-pdf-generator.ts) on the agency's letterhead —
+// it was a separate, plainer pdf-lib layout with a one-line footer.
+async function invoicePdfBytes(invoice: any, senderTenant: SenderTenant | null): Promise<Uint8Array> {
   // SSRF: validate the tenant logo URL before the server fetches it.
-  const logo = (company.logoUrl && (await checkPublicHttpUrl(company.logoUrl)).ok)
-    ? await fetchLogoBytes(company.logoUrl)
+  const logoUrl = senderTenant?.logo_url
+  const logoDataUrl = logoUrl && (await checkPublicHttpUrl(logoUrl)).ok
+    ? await fetchLogoDataUrl(logoUrl)
     : undefined
-  if (logo) {
-    try {
-      const img = logo.format === 'png' ? await pdfDoc.embedPng(logo.bytes) : await pdfDoc.embedJpg(logo.bytes)
-      const scale = Math.min(30 / img.height, 90 / img.width, 1)
-      const w = img.width * scale
-      const h = img.height * scale
-      page.drawImage(img, { x: margin, y: y - 6, width: w, height: h })
-      nameX = margin + w + 10
-    } catch { /* bad image data — text-only header */ }
-  }
-  if (company.name) {
-    page.drawText(company.name, {
-      x: nameX, y, size: 24, font: helveticaBold, color: brand
-    })
-  }
-
-  page.drawText('INVOICE', {
-    x: width - margin - 80, y, size: 20, font: helveticaBold, color: rgb(0.2, 0.2, 0.2)
-  })
-  y -= 30
-
-  // Invoice details
-  page.drawText(`Invoice: ${invoice.invoice_number}`, {
-    x: margin, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4)
-  })
-
-  const typeLabel = invoice.invoice_type === 'deposit' 
-    ? `Deposit (${invoice.deposit_percent}%)`
-    : invoice.invoice_type === 'final' ? 'Final Balance' : 'Standard'
-  page.drawText(`Type: ${typeLabel}`, {
-    x: width - margin - 100, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4)
-  })
-  y -= 15
-
-  page.drawText(`Issue Date: ${new Date(invoice.issue_date).toLocaleDateString('en-GB')}`, {
-    x: margin, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4)
-  })
-  page.drawText(`Due: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-GB') : 'On Arrival'}`, {
-    x: width - margin - 100, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4)
-  })
-  y -= 30
-
-  // Divider
-  page.drawLine({
-    start: { x: margin, y },
-    end: { x: width - margin, y },
-    thickness: 1,
-    color: rgb(0.8, 0.8, 0.8)
-  })
-  y -= 25
-
-  // Bill To
-  page.drawText('BILL TO', { x: margin, y, size: 10, font: helveticaBold, color: rgb(0.5, 0.5, 0.5) })
-  y -= 15
-  page.drawText(invoice.client_name, { x: margin, y, size: 12, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  y -= 15
-  if (invoice.client_email) {
-    page.drawText(invoice.client_email, { x: margin, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-    y -= 15
-  }
-  y -= 20
-
-  // Line Items Header
-  page.drawRectangle({
-    x: margin, y: y - 5, width: width - 2 * margin, height: 25,
-    color: rgb(0.95, 0.95, 0.95)
-  })
-
-  page.drawText('Description', { x: margin + 10, y: y + 5, size: 9, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
-  page.drawText('Qty', { x: 350, y: y + 5, size: 9, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
-  page.drawText('Price', { x: 400, y: y + 5, size: 9, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
-  page.drawText('Amount', { x: 480, y: y + 5, size: 9, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
-  y -= 30
-
-  // Line Items
-  const lineItems = invoice.line_items || []
-  for (const item of lineItems) {
-    const description = item.description.length > 45 
-      ? item.description.substring(0, 45) + '...' 
-      : item.description
-
-    page.drawText(description, { x: margin + 10, y, size: 10, font: helvetica, color: rgb(0.2, 0.2, 0.2) })
-    page.drawText(String(item.quantity), { x: 350, y, size: 10, font: helvetica, color: rgb(0.3, 0.3, 0.3) })
-    page.drawText(`${currencySymbol}${Number(item.unit_price).toFixed(2)}`, { x: 400, y, size: 10, font: helvetica, color: rgb(0.3, 0.3, 0.3) })
-    page.drawText(`${currencySymbol}${Number(item.amount).toFixed(2)}`, { x: 480, y, size: 10, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-    y -= 20
-  }
-  y -= 10
-
-  // Divider
-  page.drawLine({
-    start: { x: 350, y },
-    end: { x: width - margin, y },
-    thickness: 1,
-    color: rgb(0.8, 0.8, 0.8)
-  })
-  y -= 20
-
-  // Totals
-  page.drawText('Subtotal:', { x: 400, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-  page.drawText(`${currencySymbol}${Number(invoice.subtotal).toFixed(2)}`, { x: 480, y, size: 10, font: helvetica, color: rgb(0.2, 0.2, 0.2) })
-  y -= 18
-
-  if (Number(invoice.tax_amount) > 0) {
-    page.drawText(`Tax (${invoice.tax_rate}%):`, { x: 400, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-    page.drawText(`${currencySymbol}${Number(invoice.tax_amount).toFixed(2)}`, { x: 480, y, size: 10, font: helvetica, color: rgb(0.2, 0.2, 0.2) })
-    y -= 18
-  }
-
-  if (Number(invoice.discount_amount) > 0) {
-    page.drawText('Discount:', { x: 400, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-    page.drawText(`-${currencySymbol}${Number(invoice.discount_amount).toFixed(2)}`, { x: 480, y, size: 10, font: helvetica, color: rgb(0.0, 0.5, 0.0) })
-    y -= 18
-  }
-
-  y -= 5
-  page.drawLine({
-    start: { x: 350, y },
-    end: { x: width - margin, y },
-    thickness: 1,
-    color: brand
-  })
-  y -= 20
-
-  // Total
-  page.drawText('TOTAL:', { x: 400, y, size: 12, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  page.drawText(`${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`, { x: 480, y, size: 14, font: helveticaBold, color: brand })
-  y -= 25
-
-  // Amount Paid & Balance
-  page.drawText('Amount Paid:', { x: 400, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-  page.drawText(`${currencySymbol}${Number(invoice.amount_paid).toFixed(2)}`, { x: 480, y, size: 10, font: helvetica, color: rgb(0.0, 0.5, 0.0) })
-  y -= 18
-
-  page.drawText('Balance Due:', { x: 400, y, size: 11, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  const balanceColor = Number(invoice.balance_due) > 0 ? rgb(0.8, 0.2, 0.2) : rgb(0.0, 0.5, 0.0)
-  page.drawText(`${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`, { x: 480, y, size: 12, font: helveticaBold, color: balanceColor })
-  y -= 40
-
-  // Payment Terms
-  if (invoice.payment_terms) {
-    page.drawText('Payment Terms:', { x: margin, y, size: 10, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
-    y -= 15
-    page.drawText(invoice.payment_terms, { x: margin, y, size: 9, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-    y -= 25
-  }
-
-  // Notes
-  if (invoice.notes) {
-    page.drawText('Notes:', { x: margin, y, size: 10, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
-    y -= 15
-    page.drawText(invoice.notes, { x: margin, y, size: 9, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-  }
-
-  // Footer
-  const footerLine = [company.name, company.website, company.email].filter(Boolean).join(' | ')
-  if (footerLine) {
-    page.drawText(footerLine, {
-      x: width / 2 - 100, y: 30, size: 8, font: helvetica, color: rgb(0.5, 0.5, 0.5)
-    })
-  }
-
-  return await pdfDoc.save()
+  const pdf = generateInvoicePDF(invoice, { ...identityFromTenant(senderTenant), logoDataUrl })
+  return new Uint8Array(pdf.output('arraybuffer'))
 }
 
 export async function POST(request: NextRequest) {
@@ -301,36 +113,23 @@ export async function POST(request: NextRequest) {
     // Generate PDF
 
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
-    const pdfBytes = await generateInvoicePDF(invoice, {
-      name: senderTenant?.company_name || '',
-      email: senderTenant?.contact_email || null,
-      website: senderTenant?.company_website || null,
-      primaryColor: senderTenant?.primary_color || null,
-      logoUrl: senderTenant?.logo_url || null,
-    })
+    const pdfBytes = await invoicePdfBytes(invoice, senderTenant)
 
     // Upload to Supabase Storage (use admin client for storage)
 
-    const fileName = `invoices/invoice-${invoice.invoice_number}-${Date.now()}.pdf`
-
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('documents')
-      .upload(fileName, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true
-      })
-
-    if (uploadError) {
-      console.error('❌ Upload error:', uploadError)
-      throw new Error(`Failed to upload PDF: ${uploadError.message}`)
+    // Private bucket + signed link (lib/storage/shareable-pdf.ts): the old
+    // `documents` bucket never existed, and a public link would expose it.
+    const shared = await uploadShareablePdf(supabaseAdmin, {
+      tenantId: authResult.tenant_id,
+      kind: 'invoices',
+      fileName: `invoice-${invoice.invoice_number}-${Date.now()}.pdf`,
+      bytes: pdfBytes,
+    })
+    if (!shared.ok) {
+      console.error('❌ Upload error:', shared.error)
+      throw new Error(shared.error)
     }
-
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from('documents')
-      .getPublicUrl(fileName)
-
-    const pdfUrl = urlData.publicUrl
+    const pdfUrl = shared.url
 
 
     const businessName = senderTenant?.company_name || ''

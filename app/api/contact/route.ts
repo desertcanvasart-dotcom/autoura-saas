@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendSystemEmail } from '@/lib/email'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit'
 
 // Public marketing contact / pilot-application endpoint.
 //
@@ -45,8 +45,10 @@ const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 export async function POST(request: NextRequest) {
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  // The hardened client IP (lib/rate-limit.ts), not the leftmost
+  // X-Forwarded-For entry — a client can prepend any value there, so keying
+  // on it let anyone rotate a fake IP per request and never hit the limit.
+  const ip = getClientIdentifier(request)
   const limited = checkRateLimit(ip, 'contact')
   if (!limited.success) {
     return NextResponse.json(

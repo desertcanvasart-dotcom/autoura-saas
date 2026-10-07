@@ -1,12 +1,12 @@
 /**
  * The vocabulary for `departments.service_types`.
  *
- * This is not cosmetic. `findDepartmentForServiceType` (lib/ai/task-generation)
- * matches an itinerary service's `service_type` against these arrays to decide
- * which department a generated task routes to, and returns null on no match —
- * so a task with an unrecognised service type lands unassigned, silently. That
- * is why the departments editor offers a fixed multi-select rather than free
- * text.
+ * This is not cosmetic. The task generator (lib/tasks/itinerary-tasks.ts)
+ * groups an itinerary's services into task categories and sends each task to
+ * the department whose service_types claim that category; a category no
+ * active department claims gets no task (the generate dialog lists it as
+ * skipped). That is why the departments editor offers a fixed multi-select
+ * rather than free text.
  *
  * Two groups:
  *
@@ -37,6 +37,8 @@ export const ROUTABLE_SERVICE_TYPES: ServiceTypeOption[] = [
   { value: 'entrance', label: 'Entrance tickets', routable: true },
   { value: 'airport_service', label: 'Airport services', routable: true },
   { value: 'hotel_service', label: 'Hotel porterage', routable: true },
+  // Boat rides, experiences and the grid's "other" lines.
+  { value: 'other', label: 'Other services', routable: true },
 ]
 
 export const BACK_OFFICE_SERVICE_TYPES: ServiceTypeOption[] = [
@@ -76,7 +78,7 @@ export function normalizeServiceType(value: string): string {
 /**
  * A valid type is a curated one OR any well-formed snake_case key (B-item
  * 5: custom service types). Routing needs no whitelist —
- * findDepartmentForServiceType matches whatever the department rows own,
+ * the task generator matches whatever the department rows own,
  * so a tenant can route their own service vocabulary (a custom
  * service_category on itinerary services) to a department. The curated
  * lists remain what the picker OFFERS; they no longer bound what it may

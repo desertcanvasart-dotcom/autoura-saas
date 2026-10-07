@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { findRecipient } from '@/lib/notify/find-recipient'
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,30 +44,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get resource details from suppliers table (scoped to the session tenant)
-    const { data: resource, error: resourceError } = await supabase
-      .from('suppliers')
-      .select('*')
-      .eq('id', resourceId)
-      .eq('tenant_id', authResult.tenant_id)
-      .single()
+    // Find the person in the table their type actually lives in (scoped to
+    // the session tenant). This read only `suppliers` until 2026-10-06, so
+    // every airport-staff, hotel-staff and directory-restaurant notify
+    // answered "Resource not found": those ids are not supplier ids.
+    const resource = await findRecipient(supabase, authResult.tenant_id, resourceType, resourceId)
 
-    if (resourceError || !resource) {
-      console.error('❌ Resource error:', resourceError)
+    if (!resource) {
       return NextResponse.json(
-        { success: false, error: 'Resource not found' },
+        { success: false, error: `${resourceName || 'This person'} is not in your records, so there is no number to message. Use the staff link instead.` },
         { status: 404 }
       )
     }
 
-    // Use contact_phone or whatsapp field
-    const resourcePhone = resource.contact_phone || resource.whatsapp || resource.phone2
-
-
+    const resourcePhone = resource.phone
 
     if (!resourcePhone) {
       return NextResponse.json(
-        { success: false, error: `No phone number found for ${resource.name || resourceName}. Please add contact_phone to the supplier.` },
+        { success: false, error: `No phone number found for ${resource.name || resourceName}. Add one to their record first.` },
         { status: 400 }
       )
     }
@@ -94,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     if (resourceType === 'restaurant') {
       message = `🍽️ *${businessName} - Reservation Request*\n\n` +
-        `Hello ${resource.name},\n\n` +
+        `Hello ${resource.name || resourceName || "there"},\n\n` +
         `We would like to make a reservation:\n\n` +
         `📅 *Date:* ${formatDate(startDate)}\n` +
         `👥 *Guests:* ${guestCount}\n` +
@@ -106,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     } else if (resourceType === 'airport_staff') {
       message = `✈️ *${businessName} - Airport Assignment*\n\n` +
-        `Hello ${resource.name},\n\n` +
+        `Hello ${resource.name || resourceName || "there"},\n\n` +
         `You have been assigned to airport duty:\n\n` +
         `📅 *Date:* ${formatDate(startDate)}\n` +
         `👤 *Client:* ${itinerary.client_name || 'N/A'}\n` +
@@ -120,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     } else if (resourceType === 'hotel_staff') {
       message = `🏨 *${businessName} - Hotel Assignment*\n\n` +
-        `Hello ${resource.name},\n\n` +
+        `Hello ${resource.name || resourceName || "there"},\n\n` +
         `You have been assigned to hotel duty:\n\n` +
         `📅 *Dates:* ${formatDate(startDate)}` +
         `${endDate && endDate !== startDate ? ` - ${formatDate(endDate)}` : ''}\n` +
@@ -133,7 +128,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Generic message for other resource types
       message = `📋 *${businessName} - Assignment*\n\n` +
-        `Hello ${resource.name},\n\n` +
+        `Hello ${resource.name || resourceName || "there"},\n\n` +
         `You have been assigned:\n\n` +
         `📅 *Date:* ${formatDate(startDate)}` +
         `${endDate && endDate !== startDate ? ` - ${formatDate(endDate)}` : ''}\n` +

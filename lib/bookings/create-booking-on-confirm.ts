@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { itineraryBookingFacts } from '@/lib/bookings/booking-on-confirm'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
+import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
 
 /**
  * Create the booking a freshly-confirmed itinerary implies (B-item 7).
@@ -104,6 +105,11 @@ export async function createBookingOnConfirm(
       console.error('booking-on-confirm insert failed:', insertError)
       return { booking: null, note: 'Booking not created: the insert failed — see server logs.' }
     }
+
+    // Its suppliers, listed from the itinerary straight away. Best effort:
+    // the booking stands either way, and the Suppliers tab can re-sync.
+    const synced = await syncBookingSuppliers(admin, tenantId, String(booking.id))
+    if (!synced.ok) console.error('booking-on-confirm supplier sync failed:', synced.error)
 
     return { booking, note: null }
   } catch (err) {

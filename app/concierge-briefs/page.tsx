@@ -15,10 +15,14 @@ import {
   Clock,
   Inbox,
   Eye,
+  Trash2,
 } from 'lucide-react'
 import BriefDetailDrawer from './BriefDetailDrawer'
 import { conciergeSla, type SlaLevel } from '@/lib/concierge-sla'
 import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
+import { useRole } from '@/hooks/useRole'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface Brief {
   id: string
@@ -104,6 +108,9 @@ export default function ConciergeBriefsPage() {
   const [tab, setTab] = useState<'all' | StatusKey>('needs_review')
   const [updating, setUpdating] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const { isAdmin, isManager } = useRole()
+  const canDelete = isAdmin || isManager
+  const { confirm } = useConfirmDialog()
 
   const fetchBriefs = useCallback(async () => {
     try {
@@ -123,7 +130,10 @@ export default function ConciergeBriefsPage() {
     fetchBriefs()
   }, [fetchBriefs])
 
-  const updateStatus = async (id: string, to: StatusKey) => {
+  // Says so when it fails. It used to ignore a failed PATCH, so Archive
+  // (refused by a missing database policy, migration 386) looked like a
+  // button that did nothing.
+  const updateStatus = async (id: string, to: StatusKey): Promise<boolean> => {
     setUpdating(id)
     try {
       const res = await fetch(`/api/concierge-briefs/${id}`, {
@@ -131,12 +141,53 @@ export default function ConciergeBriefsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ review_status: to }),
       })
-      if (res.ok) {
-        setBriefs(prev => prev.map(b => (b.id === id ? { ...b, review_status: to } : b)))
-        requestBadgeRefresh() // the sidebar's "needs review" count follows now
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        showToast('error', data.error || 'Could not update the lead')
+        return false
       }
+      setBriefs(prev => prev.map(b => (b.id === id ? { ...b, review_status: to } : b)))
+      requestBadgeRefresh() // the sidebar's "needs review" count follows now
+      if (to === 'archived') showToast('success', 'Lead archived — find it under the Archived tab')
+      return true
     } catch (e) {
       console.error('Error updating brief:', e)
+      showToast('error', 'Could not update the lead')
+      return false
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  // Permanent removal — test enquiries, spam. Archived leads only (the API
+  // enforces it too), manager and above.
+  const deleteBrief = async (id: string): Promise<boolean> => {
+    const lead = briefs.find(b => b.id === id)
+    const ok = await confirm({
+      title: 'Delete this lead permanently?',
+      message: `${lead?.visitor_name || 'This lead'} will be removed for good, with its conversation history. The CRM client it created stays in Clients.`,
+      confirmText: 'Delete permanently',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return false
+    setUpdating(id)
+    try {
+      const res = await fetch(`/api/concierge-briefs/${id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        showToast('error', data.error || 'Could not delete the lead')
+        return false
+      }
+      setBriefs(prev => prev.filter(b => b.id !== id))
+      if (detailId === id) setDetailId(null)
+      requestBadgeRefresh()
+      showToast('success', 'Lead deleted')
+      return true
+    } catch (e) {
+      console.error('Error deleting brief:', e)
+      showToast('error', 'Could not delete the lead')
+      return false
     } finally {
       setUpdating(null)
     }
@@ -325,6 +376,15 @@ export default function ConciergeBriefsPage() {
                           {a.label}
                         </button>
                       ))}
+                      {b.review_status === 'archived' && canDelete && (
+                        <button
+                          onClick={() => deleteBrief(b.id)}
+                          disabled={updating === b.id}
+                          className="inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -339,6 +399,7 @@ export default function ConciergeBriefsPage() {
           briefId={detailId}
           onClose={() => setDetailId(null)}
           onStatusChange={updateStatus}
+          onDelete={canDelete ? deleteBrief : undefined}
         />
       )}
     </div>

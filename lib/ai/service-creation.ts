@@ -1,3 +1,6 @@
+import { dayReturnsTo } from '@/lib/itineraries/overnight-city'
+import { priceByBasis } from '@/lib/pricing/pricing-basis'
+import type { StaffPricing } from '@/lib/ai/staff-rate-resolution'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { ServiceTier } from './parsing-utils'
 import { getCruiseRate } from './cruise-pricing'
@@ -17,7 +20,11 @@ export async function createLandItineraryServices(
      *  nights). Per person in a double; an odd traveller pays the single
      *  supplement. The route refuses to price when a night has no rate. */
     hotelByDay: Record<number, { ppd: number; singleSupplement: number; hotelName: string; rateId: string }>;
-    airportServiceRates: { arrival: number; departure: number }; hotelServiceRate: number; lunchRate: number; dinnerRate: number;
+    airportServiceRates: { arrival: number; departure: number; arrivalPricing?: StaffPricing; departurePricing?: StaffPricing };
+    hotelServiceRate: number;
+    /** How the hotel assistance rate applies to the group (migration 393); absent = per group. */
+    hotelServicePricing?: StaffPricing;
+    lunchRate: number; dinnerRate: number;
     /** The agency's active tipping rows, in the run's currency — priced by the
      *  SAME rules as the tour engine (lib/pricing/tipping.ts). */
     tippingRows: TippingRow[]; allEntranceFees: any[] | null | undefined;
@@ -36,7 +43,7 @@ export async function createLandItineraryServices(
     includeLunch, includeDinner, includeAccommodationFinal,
     guidePerDay, selectedGuide,
     hotelByDay,
-    airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
+    airportServiceRates, hotelServiceRate, hotelServicePricing, lunchRate, dinnerRate,
     tippingRows, allEntranceFees, transportByDay,
   } = params
 
@@ -74,6 +81,8 @@ export async function createLandItineraryServices(
     }
   })
 
+  // The last night spent ashore, for a day the AI gave no overnight city.
+  let lastNightAshore: string | null = null
   for (const dayData of days || []) {
     const dayNumber = dayData.day_number || 1
     const dayDate = new Date(startDateObj)
@@ -100,10 +109,17 @@ export async function createLandItineraryServices(
     // Determine accommodation type for this day
     const dayAccommodationType = isCruiseDay ? (isLastDay ? 'none' : 'cruise') : (includesHotelForDay ? 'hotel' : 'none')
 
-    // Determine overnight display — show cruise name for cruise days
-    let overnightCity = dayData.overnight_city || dayData.city || effectiveCity
+    // Determine overnight display — show cruise name for cruise days.
+    // With no overnight city from the AI, the night is where the night before
+    // was — a day trip does not move the bed; only a transfer day does
+    // (lib/itineraries/overnight-city.ts). It used to fall to the day's own
+    // city: "Overnight in Alexandria" on a day trip from Cairo.
+    let overnightCity: string = generatedOvernightCity(dayData, lastNightAshore) || dayData.city || effectiveCity
     if (isCruiseDay && !isLastDay) {
       overnightCity = `On board - ${dayData.city || effectiveCity}`
+      lastNightAshore = null
+    } else {
+      lastNightAshore = overnightCity
     }
 
     // Create day record
@@ -187,38 +203,42 @@ export async function createLandItineraryServices(
       const dayRate = dayData.is_arrival
         ? airportServiceRates.arrival
         : airportServiceRates.departure
+      // Per group, per person or per unit (migration 393).
+      const pricing = dayData.is_arrival ? airportServiceRates.arrivalPricing : airportServiceRates.departurePricing
+      const line = priceByBasis(dayRate, pricing?.basis, totalPax, pricing?.capacity)
 
       services.push({
         service_type: 'airport_service',
         service_code: 'AIRPORT',
         service_name: serviceDesc,
-        quantity: 1,
+        quantity: line.quantity,
         rate_eur: dayRate,
         rate_non_eur: dayRate,
-        total_cost: dayRate,
-        client_price: withMargin(dayRate),
+        total_cost: line.lineTotal,
+        client_price: withMargin(line.lineTotal),
         notes: dayData.flight_info ? `Flight: ${dayData.flight_info}` : 'Airport assistance'
       })
-      totalSupplierCost += dayRate
-      totalClientPrice += withMargin(dayRate)
+      totalSupplierCost += line.lineTotal
+      totalClientPrice += withMargin(line.lineTotal)
     }
 
     // Hotel Services (for check-in/check-out including cruise)
     if (dayData.needs_hotel_service && !isFreeDay) {
       const isCruiseService = dayData.accommodation_type === 'cruise' || dayData.is_cruise_day
+      const line = priceByBasis(hotelServiceRate, hotelServicePricing?.basis, totalPax, hotelServicePricing?.capacity)
       services.push({
         service_type: 'hotel_service',
         service_code: 'HOTEL-SVC',
         service_name: isCruiseService ? 'Cruise Boarding Assistance' : 'Hotel Porterage & Assistance',
-        quantity: 1,
+        quantity: line.quantity,
         rate_eur: hotelServiceRate,
         rate_non_eur: hotelServiceRate,
-        total_cost: hotelServiceRate,
-        client_price: withMargin(hotelServiceRate),
+        total_cost: line.lineTotal,
+        client_price: withMargin(line.lineTotal),
         notes: isCruiseService ? 'Cruise embarkation/disembarkation assistance' : 'Hotel check-in/out assistance'
       })
-      totalSupplierCost += hotelServiceRate
-      totalClientPrice += withMargin(hotelServiceRate)
+      totalSupplierCost += line.lineTotal
+      totalClientPrice += withMargin(line.lineTotal)
     }
 
     // Transportation — what the day NEEDS (an airport transfer, a road move to
@@ -473,16 +493,58 @@ export function tipOccasionsForGeneratedDay(
 /** The nights a generated itinerary sleeps in a hotel, and where — read with
  *  the same conditions the loop above uses to write the accommodation line. */
 export function hotelNightsForGeneratedDays(
-  days: ReadonlyArray<{ day_number?: number; city?: string | null; overnight_city?: string | null; is_cruise_day?: boolean; accommodation_type?: string | null; includes_hotel?: boolean }> | null | undefined,
+  days: ReadonlyArray<{ day_number?: number; city?: string | null; overnight_city?: string | null; is_cruise_day?: boolean; accommodation_type?: string | null; includes_hotel?: boolean; description?: string | null; activities?: readonly string[] | null }> | null | undefined,
   p: { durationDays: number; effectiveCity: string; includeAccommodationFinal: boolean }
 ): Array<{ day: number; city: string }> {
   if (!p.includeAccommodationFinal) return []
+  // A day trip's night is booked where the loop puts the bed.
+  let lastNightAshore: string | null = null
   return (days ?? []).flatMap(d => {
     const day = d.day_number || 1
     const onShip = d.is_cruise_day || d.accommodation_type === 'cruise'
-    if (day === p.durationDays || onShip || d.includes_hotel === false) return []
-    return [{ day, city: String(d.overnight_city || d.city || p.effectiveCity || '').trim() }]
+    // Only the AI's own overnight city is corrected here (a day trip that
+    // returns); a day without one is booked in its city, as before.
+    const night = (d.overnight_city ? generatedOvernightCity(d, lastNightAshore) : null) || d.city || p.effectiveCity
+    const isLastDay = day === p.durationDays
+    lastNightAshore = onShip && !isLastDay ? null : night
+    if (isLastDay || onShip || d.includes_hotel === false) return []
+    return [{ day, city: String(night || '').trim() }]
   })
+}
+
+const norm = (s: string | null | undefined) => String(s ?? '').trim().toLowerCase()
+
+/**
+ * Where a generated day's night is, before the day's own city is the
+ * fallback. The AI's overnight city wins, except on a plain day trip: the AI
+ * often echoes the day's city ("Alexandria") while the day itself says it
+ * returns to the night before's city ("Return to Cairo for overnight").
+ * The bed stays where it was (lib/itineraries/overnight-city.ts). With no
+ * overnight city from the AI, the night is the night before's, unless the
+ * day is a transfer.
+ */
+export function generatedOvernightCity(
+  dayData: {
+    city?: string | null
+    overnight_city?: string | null
+    is_transfer_only?: boolean
+    description?: string | null
+    activities?: readonly string[] | null
+  },
+  lastNightAshore: string | null
+): string | null {
+  const given = String(dayData.overnight_city ?? '').trim() || null
+  if (dayData.is_transfer_only) return given
+  if (!given) return lastNightAshore
+  if (
+    lastNightAshore &&
+    norm(given) === norm(dayData.city) &&
+    norm(given) !== norm(lastNightAshore) &&
+    dayReturnsTo([dayData.description, ...(dayData.activities ?? [])], lastNightAshore)
+  ) {
+    return lastNightAshore
+  }
+  return given
 }
 
 /** The days a generated itinerary needs a guide on — the loop's own condition. */

@@ -1,6 +1,7 @@
 'use client'
 
 import { identityFromTenant } from '@/lib/company-identity'
+import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
@@ -9,20 +10,25 @@ import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import Link from 'next/link'
 import { ArrowLeft, Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { contractNumber, contractTravelers, contractDuration, contractDestinations } from '@/lib/contract-facts'
 
+// The fields an itinerary actually has (the old shape named num_travelers,
+// tour_name, destinations and parsed_data — none of which exist).
 interface Itinerary {
   id: string
   itinerary_code: string
   client_name: string
   client_email: string
   client_phone?: string
-  num_travelers: number
+  trip_name?: string | null
+  num_adults?: number | null
+  num_children?: number | null
+  total_days?: number | null
   start_date: string
   end_date: string
   total_cost: number
-  tour_name: string
-  destinations: string
-  parsed_data: any
+  currency?: string | null
+  itinerary_days?: { day_number?: number | null; city?: string | null; overnight_city?: string | null }[]
 }
 
 interface ContractData {
@@ -66,8 +72,10 @@ export default function ContractPage() {
     contractNumber: '',
     contractDate: todayLocal(),
     serviceProvider: tenant?.company_name || '',
-    providerWebsite: 'https://travel2egypt.org/',
-    providerLocation: 'Cairo, Egypt',
+    // The agency's own details (Settings → Organization) — these defaulted to
+    // Travel2Egypt's website and city for every agency.
+    providerWebsite: tenant?.company_website || '',
+    providerLocation: tenant?.company_address || '',
     clientName: '',
     clientEmail: '',
     numTravelers: 2,
@@ -104,9 +112,22 @@ export default function ContractPage() {
     cancellation14to0Days: 'Cancellations received 14 days to 0 days before travel date are subject to 100% cancellation fees.',
     flightCancellation: 'Any ticket cancellation (domestic and/or international) will be subject to a 50% fee from the flight price from day 1 of booking.',
     noShowPolicy: 'Clients who fail to show up for departure without prior notification will forfeit 100% of the tour cost.',
-    forceMajeure: 'In case of cancellation due to force majeure events (natural disasters, political unrest, pandemic restrictions, etc.), Travel2Egypt will work with clients to reschedule or provide credit for future travel, subject to supplier policies.',
+    forceMajeure: 'In case of cancellation due to force majeure events (natural disasters, political unrest, pandemic restrictions, etc.), the Service Provider will work with clients to reschedule or provide credit for future travel, subject to supplier policies.',
     specialNotes: 'Safety & Comfort: Meet & assist at all airports, trusted vetted teams, 24/7 WhatsApp support.\nPractical: Bottled water provided daily, restaurants chosen for cleanliness and hygiene.'
   })
+
+  // The tenant often loads after the first render: fill the provider's own
+  // fields then, without overwriting anything already typed.
+  useEffect(() => {
+    if (!tenant) return
+    setContractData(prev => ({
+      ...prev,
+      serviceProvider: prev.serviceProvider || tenant.company_name || '',
+      providerWebsite: prev.providerWebsite || tenant.company_website || '',
+      providerLocation: prev.providerLocation || tenant.company_address || '',
+    }))
+  }, [tenant])
+
 
   useEffect(() => {
     if (params.id) {
@@ -116,7 +137,8 @@ export default function ContractPage() {
 
   const fetchItinerary = async (id: string) => {
     try {
-      const response = await fetch(`/api/itineraries/${id}`)
+      // ?include=days: the destinations are the trip's own cities.
+      const response = await fetch(`/api/itineraries/${id}?include=days`)
       const data = await response.json()
       
       if (data.success) {
@@ -125,15 +147,18 @@ export default function ContractPage() {
         
         setContractData(prev => ({
           ...prev,
-          contractNumber: `TC-2025-${itin.id.slice(0, 8).toUpperCase()}`,
+          // From the itinerary itself (lib/contract-facts.ts) — these read
+          // fields an itinerary does not have, then invented "Cairo, Luxor,
+          // Aswan", "N/A", a blank traveller count and a 2025 number.
+          contractNumber: contractNumber(itin.id),
           clientName: itin.client_name,
           clientEmail: itin.client_email || '',
-          numTravelers: itin.num_travelers,
-          tourPackage: itin.tour_name || 'Custom Egypt Tour',
+          numTravelers: contractTravelers(itin) ?? 0,
+          tourPackage: itin.trip_name || '',
           startDate: itin.start_date,
           endDate: itin.end_date,
-          duration: itin.parsed_data?.duration || 'N/A',
-          destinations: itin.destinations || 'Cairo, Luxor, Aswan',
+          duration: contractDuration(itin) ?? '',
+          destinations: contractDestinations(itin.itinerary_days ?? []),
           totalCost: itin.total_cost
         }))
       }
@@ -172,8 +197,7 @@ export default function ContractPage() {
   const handleDownloadPDF = async () => {
     setSaving(true)
     try {
-      // Loaded on demand: pdf-lib is ~176 KB gzipped and this page is the only
-      // route that needs it, so it must not sit in the first-load bundle.
+      // Loaded on demand, so the PDF library is not in the first-load bundle.
       const { generateContractPDF } = await import('@/lib/contract-pdf-generator')
 
       // Use client-side PDF generation
@@ -189,7 +213,7 @@ export default function ContractPage() {
         endDate: contractData.endDate,
         destinations: contractData.destinations,
         totalCost: contractData.totalCost,
-        currency: 'USD'
+        currency: itinerary?.currency || ''
       })
       
       // Download the PDF
@@ -290,8 +314,11 @@ export default function ContractPage() {
         </div>
 
         {/* COMPACT CONTRACT FORM/PREVIEW */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-6">
-          
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          {/* Header: the agency's letterhead (Settings → Organization) */}
+          <DocumentLetterhead company={identityFromTenant(tenant)} title="Travel Contract" number={contractData.contractNumber} />
+          <div className="p-6 space-y-6">
+
           {/* Title */}
           <div className="text-center border-b border-gray-200 pb-4">
             <h1 className="text-2xl font-bold text-gray-900 mb-3">TRAVEL CONTRACT</h1>
@@ -482,7 +509,7 @@ export default function ContractPage() {
             {editMode ? (
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-600">Total Package Price (USD)</label>
+                  <label className="text-xs text-gray-600">Total Package Price ({itinerary?.currency || 'currency'})</label>
                   <input
                     type="number"
                     value={contractData.totalCost}
@@ -516,11 +543,13 @@ export default function ContractPage() {
               <>
                 <div className="bg-primary-50 border border-primary-200 rounded-md p-4 mb-3">
                   <p className="text-lg font-bold text-gray-900">
-                    Total Package Price: <span className="text-primary-600">USD ${contractData.totalCost.toLocaleString()}</span>
+                    Total Package Price: <span className="text-primary-600">{itinerary?.currency} {contractData.totalCost.toLocaleString()}</span>
                   </p>
-                  <p className="text-gray-600 text-xs mt-1">
-                    (USD ${(contractData.totalCost / contractData.numTravelers).toFixed(2)} per person × {contractData.numTravelers} {contractData.numTravelers === 1 ? 'traveler' : 'travelers'})
-                  </p>
+                  {contractData.numTravelers > 0 && (
+                    <p className="text-gray-600 text-xs mt-1">
+                      ({itinerary?.currency} {(contractData.totalCost / contractData.numTravelers).toFixed(2)} per person × {contractData.numTravelers} {contractData.numTravelers === 1 ? 'traveler' : 'travelers'})
+                    </p>
+                  )}
                 </div>
 
                 <h3 className="font-semibold text-gray-900 mb-2 text-sm">PAYMENT SCHEDULE</h3>
@@ -838,7 +867,12 @@ export default function ContractPage() {
               </p>
             </div>
           </div>
+          </div>
 
+          {/* Footer: Settings → Organization */}
+          <div className="border-t border-gray-100 bg-gray-50/60 px-6 py-4">
+            <DocumentFooter company={identityFromTenant(tenant)} />
+          </div>
         </div>
       </div>
     </div>

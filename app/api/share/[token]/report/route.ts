@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { isValidShareToken, cleanClientText } from '@/lib/itinerary-share'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit'
 import { createNotification } from '@/lib/notifications'
 import { sendPushToTenant } from '@/lib/push'
 
@@ -31,7 +31,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
     }
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    // Hardened client IP — never the client-controllable leftmost XFF entry.
+    const ip = getClientIdentifier(request)
     if (!checkRateLimit(`share-report:${ip}`, 'contact').success ||
         !checkRateLimit(`share-report:${token}`, 'contact').success) {
       return NextResponse.json(

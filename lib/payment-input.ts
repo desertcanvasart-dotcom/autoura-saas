@@ -20,8 +20,9 @@
 // already carries exactly those values (migration 257 explains why a second
 // status column would be a bug, not a feature).
 
+/** What payments and invoice_payments accept (their CHECKs, migration 400). */
 export const PAYMENT_METHODS = [
-  'bank_transfer', 'cash', 'credit_card', 'paypal', 'stripe', 'other',
+  'bank_transfer', 'cash', 'credit_card', 'paypal', 'stripe', 'tab', 'other',
 ] as const
 
 export const PAYMENT_STATUSES = ['pending', 'completed', 'failed', 'refunded'] as const

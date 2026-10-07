@@ -95,6 +95,12 @@ describe('vocabularies match the CHECK constraints', () => {
     expect(parsePaymentInput({ ...valid, payment_method: 'crypto' }).ok).toBe(false)
   })
 
+  it('accepts Tab (migration 400); Wise and Airwallex are no longer taken', () => {
+    expect(ok({ ...valid, payment_method: 'tab' }).payment_method).toBe('tab')
+    expect(parsePaymentInput({ ...valid, payment_method: 'wise' }).ok).toBe(false)
+    expect(parsePaymentInput({ ...valid, payment_method: 'airwallex' }).ok).toBe(false)
+  })
+
   it('accepts every payment_type the migration allows', () => {
     for (const t of ['deposit', 'installment', 'balance', 'full_payment', 'refund', 'penalty']) {
       expect(ok({ ...valid, payment_type: t }).payment_type, t).toBe(t)

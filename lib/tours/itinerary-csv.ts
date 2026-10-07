@@ -112,6 +112,9 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   // A transfer to somewhere else in town that is not sightseeing: the sound &
   // light show, the market, an evening out (operator, 2026-09-18).
   { name: 'city_transfer', label: 'Local Transfer', kind: 'bool' },
+  // A day trip: where the party stays tonight, the sightseeing being in City
+  // (lib/pricing/day-trip). Blank = an ordinary day.
+  { name: 'day_trip_from', label: 'Day Trip From' },
   // Four hours, eight, or twelve — priced as different transport routes.
   { name: 'sightseeing_length', label: 'Sightseeing Length', allowed: ['half_day', 'day_tour', 'long_day_tour'] },
   { name: 'description', label: 'Description' },
@@ -176,6 +179,7 @@ export function serializeDaysCsv(
         // for a day that says nothing: a re-import must not invent the answer.
         sightseeing: sightseeingStatement(d) === 'none' ? 'none' : '',
         city_transfer: !!d.city_transfer,
+        day_trip_from: typeof d.day_trip_from === 'string' ? d.day_trip_from : '',
         sightseeing_length: d.sightseeing_length ?? '',
         description: d.description ?? '',
       }
@@ -426,6 +430,7 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
       ? { accommodation_type: 'none', in_transit: true, overnight_kind: 'flight' }
       : rec.accommodation_type ? { accommodation_type: rec.accommodation_type } : {}),
     ...(rec.city_transfer ? { city_transfer: true } : {}),
+    ...(String(rec.day_trip_from ?? '').trim() ? { day_trip_from: String(rec.day_trip_from).trim() } : {}),
     ...(rec.sightseeing_length ? { sightseeing_length: rec.sightseeing_length } : {}),
     ...(rec.sightseeing === 'none' ? { sightseeing: 'none' } : {}),
     meals: {

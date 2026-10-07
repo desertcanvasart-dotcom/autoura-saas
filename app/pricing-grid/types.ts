@@ -1,3 +1,4 @@
+import type { PricingBasis } from '@/lib/pricing/pricing-basis'
 import type { PackageType } from '@/lib/package-types'
 
 // ============================================
@@ -73,13 +74,17 @@ export type DayType = 'arrival' | 'tour' | 'transfer' | 'cruise' | 'free' | 'dep
 
 export const DAY_TYPES: DayType[] = ['arrival', 'tour', 'transfer', 'cruise', 'free', 'departure']
 
+// What the day IS, for the completeness gate — never a transport route. The
+// words keep clear of the transport service types (an "Intercity Overnight"
+// is a rate; a day that ends in a hotel is "hotel tonight"), so the two
+// lists are not read as one (operator, 2026-10-07).
 export const DAY_TYPE_LABELS: Record<DayType, string> = {
-  arrival:   'Arrival (airport in + hotel check-in)',
-  tour:      'Tour (overnight + sightseeing)',
-  transfer:  'Transfer (intercity by road)',
-  cruise:    'Cruise (on board)',
-  free:      'Free day (overnight, no sightseeing)',
-  departure: 'Departure (hotel check-out + airport out)',
+  arrival:   'Arrival day (airport in + hotel check-in)',
+  tour:      'Sightseeing day (hotel tonight)',
+  transfer:  'Travel day (move to another city)',
+  cruise:    'Cruise day (on board)',
+  free:      'Free day (hotel tonight, no sightseeing)',
+  departure: 'Departure day (hotel check-out + airport out)',
 }
 
 export const DEFAULT_DAY_TYPE: DayType = 'tour'
@@ -162,6 +167,15 @@ export interface SelectedItem {
   // path. See app/pricing-grid/lib/grid-completeness.ts.
   serviceType?: string         // e.g. 'airport_transfer' / 'day_tour' / 'intercity_transfer' on route slot
   pricingClass?: PricingClass  // 'mandatory' / 'optional' / 'free' on entrance_fees
+  /** How the rate applies to the group — per group (flat), per person or per
+   *  unit (lib/pricing/pricing-basis.ts). Set on airport / hotel services and
+   *  activities (boat rides, experiences); absent = the slot's own bucket. */
+  pricingBasis?: PricingBasis
+  /** per_unit only: people per unit. */
+  unitCapacity?: number | null
+  /** Tipping only: who the tip is for (tipping_rates.role_type — 'guide',
+   *  'driver' …). Switching the guide off drops the guide's tips by it. */
+  tipRole?: string | null
 }
 
 export interface SlotValue {
@@ -224,6 +238,16 @@ export interface RateOption {
    *  unpriced night, never a silent zero), or a flight's negotiated guide
    *  fare (null = customer fare, 0 = rides free). */
   guide_rate_eur?: number | null
+  /** The rate's pricing basis and, for per_unit, people per unit
+   *  (airport / hotel services, activities). */
+  pricing_basis?: PricingBasis
+  unit_capacity?: number | null
+  /** Accommodation only: the single supplement, added as a second item when
+   *  the hotel is picked (single-supplement.ts). */
+  single_supp_eur?: number | null
+  single_supp_non_eur?: number | null
+  /** Tipping only: who the tip is for (tipping_rates.role_type). */
+  tip_role?: string | null
 }
 
 export interface AllRates {

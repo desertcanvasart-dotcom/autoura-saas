@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { GridConfig, GridDay } from '@/app/pricing-grid/types'
-import { calculateDay } from '@/app/pricing-grid/lib/calculator'
+import { calculateDay, calculatePaxRange } from '@/app/pricing-grid/lib/calculator'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
 
 // ============================================================================
@@ -13,14 +13,34 @@ import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
 
 type Row = Record<string, unknown>
 const inserted: Record<string, Row[]> = {}
+const deleted: string[] = []
 let seq = 0
+// What save_pricing_grid_days (migration 391) received, and whether it fails.
+let rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = []
+let rpcError: { message: string } | null = null
+
+// The days and services go to the database in ONE call; its SQL (tested on
+// PGlite in lib/__tests__/pricing-grid-atomic-save.test.ts) writes them.
+async function rpc(fn: string, args: Record<string, unknown>) {
+  rpcCalls.push({ fn, args })
+  if (rpcError) return { data: null, error: rpcError }
+  const days = (args.p_days as Row[]) ?? []
+  let services = 0
+  for (const d of days) {
+    const { services: svcs, ...dayRow } = d as Row & { services: Row[] }
+    ;(inserted.itinerary_days ??= []).push(dayRow)
+    ;(inserted.itinerary_services ??= []).push(...svcs)
+    services += svcs.length
+  }
+  return { data: [{ days_inserted: days.length, services_inserted: services }], error: null }
+}
 
 function table(name: string) {
   let payload: Row | Row[] | null = null
   const chain = {
     insert(p: Row | Row[]) { payload = p; return chain },
     update() { return chain },
-    delete() { return chain },
+    delete() { deleted.push(name); return chain },
     select() { return chain },
     eq() { return chain }, in() { return chain }, is() { return chain }, ilike() { return chain }, limit() { return chain },
     maybeSingle() { return Promise.resolve({ data: null, error: null }) },
@@ -40,7 +60,7 @@ function table(name: string) {
 }
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from: table } }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from: table, rpc } }),
   createAdminClient: () => ({ rpc: async () => ({ data: 'Q-1', error: null }), from: table }),
 }))
 
@@ -59,17 +79,22 @@ const config = (withGuide: boolean) => ({
   startDate: '2026-11-01', clientName: '', clientEmail: '', clientPhone: '', tourName: 'T',
 }) as unknown as GridConfig
 
-async function save(withGuide: boolean) {
+async function save(withGuide: boolean, days: GridDay[] = [day()]) {
   for (const k of Object.keys(inserted)) delete inserted[k]
+  deleted.length = 0
+  rpcCalls = []
   const { POST } = await import('@/app/api/pricing-grid/save/route')
   const res = await POST(new Request('http://x', {
     method: 'POST',
-    body: JSON.stringify({ config: config(withGuide), days: [day()], totals: {} }),
+    body: JSON.stringify({ config: config(withGuide), days, totals: {} }),
   }) as never)
-  return res.json()
+  return { status: res.status, ...(await res.json()) }
 }
 
-beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}) })
+beforeEach(() => {
+  rpcError = null
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+})
 
 describe('the grid saves what it priced', () => {
   it('guide OFF: no guide row and no guide tip is saved, the driver tip is', async () => {
@@ -93,15 +118,34 @@ describe('the grid saves what it priced', () => {
     expect(names).toEqual(['English Cairo', 'Guide tip', 'Driver tip', 'Pyramids'])
   })
 
-  it('every service names its day in BOTH columns and leaves client_price empty', async () => {
-    await save(true)
-    const dayId = inserted.itinerary_days?.[0]?.id
-    expect(dayId).toBeTruthy()
-    for (const s of inserted.itinerary_services ?? []) {
-      expect(s.day_id).toBe(dayId)
-      expect(s.itinerary_day_id).toBe(dayId)
-      expect(s.client_price).toBeNull()
-    }
+  // Both day columns and an empty client_price are now set by the SQL
+  // function itself — asserted on PGlite (pricing-grid-atomic-save.test.ts).
+})
+
+describe('the save is one transaction and keeps each day\'s settings (migration 391)', () => {
+  it('days and services go to save_pricing_grid_days in ONE call; nothing is deleted or inserted piecemeal', async () => {
+    const body = await save(true)
+    expect(body.success).toBe(true)
+    expect(rpcCalls.map(c => c.fn)).toEqual(['save_pricing_grid_days'])
+    expect(deleted).not.toContain('itinerary_days')
+    expect(body.daysCreated).toBe(1)
+    expect(body.servicesCreated).toBe(4)
+  })
+
+  it("each day carries its type and overrides; an unset override stays null", async () => {
+    const d = { ...day(), dayType: 'transfer', intercity: 'flight', hasSightseeing: true } as GridDay
+    await save(true, [d, { ...day(), id: 'd2', dayNumber: 2 }])
+    const [first, second] = inserted.itinerary_days ?? []
+    expect(first).toMatchObject({ day_type: 'transfer', intercity: 'flight', has_sightseeing: true, overnight: null })
+    expect(second).toMatchObject({ day_type: 'tour', intercity: null, has_sightseeing: null })
+  })
+
+  it('a failed save answers 500 — never success — and removes the empty new itinerary', async () => {
+    rpcError = { message: 'boom' }
+    const body = await save(true)
+    expect(body.status).toBe(500)
+    expect(body.success).toBe(false)
+    expect(deleted).toEqual(['itineraries'])
   })
 })
 
@@ -118,5 +162,132 @@ describe('guide-rule', () => {
     expect(customAmountSold('tipping', false)).toBe(false)
     expect(customAmountSold('other_group', false)).toBe(true)
     expect(customAmountSold('guide', true)).toBe(true)
+  })
+})
+
+// Migration 393: airport / hotel services and activities save by their own
+// basis, so the itinerary stores what the grid priced.
+describe('the grid saves each line by its rate’s basis', () => {
+  const basisDay = (): GridDay => ({
+    id: 'd1', dayNumber: 1, title: 'Aswan', city: 'Aswan', description: '',
+    slots: [
+      { slotId: 'airport_services', selectedItems: [{ ...item('a1', 'ASW meet & assist', 30), pricingBasis: 'per_person' }] },
+      { slotId: 'hotel_services', selectedItems: [{ ...item('h1', 'Porterage', 5), pricingBasis: 'per_unit', unitCapacity: 2 }] },
+      { slotId: 'experiences', selectedItems: [{ ...item('x1', 'Private felucca', 40), pricingBasis: 'flat' }] },
+    ],
+  } as unknown as GridDay)
+
+  it('quantity and total follow the basis; the itinerary total matches the calculator', async () => {
+    await save(true, [basisDay()])
+    const rows = (inserted.itinerary_services ?? []).map(s => [s.service_name, s.quantity, s.total_cost])
+    expect(rows).toEqual([
+      ['ASW meet & assist', 2, 60],
+      ['Porterage', 1, 5],
+      ['Private felucca', 1, 40],
+    ])
+    const priced = calculateDay(basisDay(), config(true))
+    expect(priced.dailyTotal).toBe(105)
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(105 * 1.3, 2)
+  })
+})
+
+// The single supplement is sold only to a party of one (single-supplement.ts).
+// The save used to write it for every party, × pax: a 2-pax trip stored a
+// supplement line the quote never charged.
+describe('the grid saves the single supplement only for a party of one', () => {
+  const hotelDay = (): GridDay => ({
+    id: 'd1', dayNumber: 1, title: 'Cairo', city: 'Cairo', description: '',
+    slots: [
+      { slotId: 'accommodation', selectedItems: [item('mena', 'Mena House', 100), item('mena_supp', 'Single Supplement', 60)] },
+    ],
+  } as unknown as GridDay)
+
+  async function saveAt(pax: number) {
+    for (const k of Object.keys(inserted)) delete inserted[k]
+    const { POST } = await import('@/app/api/pricing-grid/save/route')
+    await POST(new Request('http://x', {
+      method: 'POST',
+      body: JSON.stringify({ config: { ...config(true), pax }, days: [hotelDay()], totals: {} }),
+    }) as never)
+    return (inserted.itinerary_services ?? []).map(s => [s.service_name, s.quantity, s.total_cost])
+  }
+
+  it('2 pax: only the double rate is saved, and the total matches the calculator', async () => {
+    expect(await saveAt(2)).toEqual([['Mena House', 2, 200]])
+    const priced = calculateDay(hotelDay(), { ...config(true), pax: 2 })
+    expect(priced.dailyTotal).toBe(200)
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(200 * 1.3, 2)
+  })
+
+  it('1 pax: the supplement is saved and charged', async () => {
+    expect(await saveAt(1)).toEqual([['Mena House', 1, 100], ['Single Supplement', 1, 60]])
+    const priced = calculateDay(hotelDay(), { ...config(true), pax: 1 })
+    expect(priced.dailyTotal).toBe(160)
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(160 * 1.3, 2)
+  })
+})
+
+// A typed accommodation amount (a legacy saved row, an old draft) is per
+// person and wins over a picked hotel, as in every other slot. The on-screen
+// price used to ignore it while the B2B sheet and the save counted it.
+describe('a typed accommodation amount: the price, the B2B sheet and the save agree', () => {
+  const amountDay = (items: ReturnType<typeof item>[] = []): GridDay => ({
+    id: 'd1', dayNumber: 1, title: 'Cairo', city: 'Cairo', description: '',
+    slots: [{ slotId: 'accommodation', selectedItems: items, customAmount: 90 }],
+  } as unknown as GridDay)
+
+  for (const [label, items] of [['alone', []], ['beside a picked hotel', [item('mena', 'Mena House', 100)]]] as const) {
+    it(label, async () => {
+      const d = amountDay([...items])
+      expect(calculateDay(d, config(true)).dailyTotal).toBe(180)
+      const sheet = calculatePaxRange([d], { ...config(true), marginPercent: 0 }, new Map(), { paxFrom: 2, paxTo: 2 })
+      expect(sheet.paxPricing[0].withoutLeader.totalCost).toBe(180)
+      await save(true, [d])
+      expect((inserted.itinerary_services ?? []).map(s => [s.quantity, s.total_cost])).toEqual([[2, 180]])
+      expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(180 * 1.3, 2)
+    })
+  }
+})
+
+// The throughout guide's bed / meals / seats are written as rows; the total a
+// save computes when the grid sends none must count them too.
+describe('a save without client totals counts the throughout guide', () => {
+  async function saveWith(extras: unknown[]) {
+    for (const k of Object.keys(inserted)) delete inserted[k]
+    const { POST } = await import('@/app/api/pricing-grid/save/route')
+    await POST(new Request('http://x', {
+      method: 'POST',
+      body: JSON.stringify({ config: config(true), days: [day()], totals: {}, throughout_extras: extras }),
+    }) as never)
+  }
+  // day(): guide 40 + guide tip 10 + driver tip 5 + entrance 10 × 2 pax = 75.
+  it('his rows are written and the stored total includes them', async () => {
+    await saveWith([
+      { dayNumber: 1, kind: 'bed', label: 'Throughout Guide — bed (Mena House)', amountEur: 50 },
+      { dayNumber: 1, kind: 'meal', label: 'Throughout Guide — meal (Lunch)', amountEur: 12.5 },
+    ])
+    const guideRows = (inserted.itinerary_services ?? []).filter(s => String(s.description).startsWith('[pricing-grid:throughout_guide]'))
+    expect(guideRows.map(s => s.total_cost)).toEqual([50, 12.5])
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo((75 + 62.5) * 1.3, 2)
+  })
+  it('an extra for a day the trip does not have is neither written nor counted', async () => {
+    await saveWith([{ dayNumber: 9, kind: 'bed', label: 'x', amountEur: 50 }])
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(75 * 1.3, 2)
+  })
+})
+
+// Real grid tips are tipping_rates rows: UUID ids, the role on the item.
+describe('guide off: the guide’s real tips are not saved', () => {
+  it('the guide’s tip (by its role) is left out; the driver’s is saved', async () => {
+    const d = {
+      id: 'd1', dayNumber: 1, title: 'Cairo', city: 'Cairo', description: '',
+      slots: [{ slotId: 'tipping', selectedItems: [
+        { ...item('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Tour guide - full day', 10), tipRole: 'guide' },
+        { ...item('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Driver - full day', 5), tipRole: 'driver' },
+      ] }],
+    } as unknown as GridDay
+    await save(false, [d])
+    expect((inserted.itinerary_services ?? []).map(s => s.service_name)).toEqual(['Driver - full day'])
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(5 * 1.3, 2)
   })
 })

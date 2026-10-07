@@ -40,6 +40,33 @@ describe('what a generated day needs — the engine’s rule', () => {
     ])).toEqual(['1: airport_transfer Cairo', '2: day_tour Cairo', '3: intercity_dropoff Cairo→Alexandria', '4: airport_transfer Alexandria'])
   })
 
+  it('a day trip — the night back at the Cairo hotel — is the Intercity Day Trip out and back, with no road move either side', () => {
+    expect(needs([
+      { day_number: 1, city: 'Cairo', overnight_city: 'Cairo', guide_required: true, attractions: ['Giza Plateau'] },
+      { day_number: 2, city: 'Alexandria', overnight_city: 'Cairo', guide_required: true, attractions: ['Catacombs'] },
+      { day_number: 3, city: 'Cairo', overnight_city: 'Cairo', guide_required: true, attractions: ['Egyptian Museum'] },
+    ])).toEqual(['1: day_tour Cairo', '2: intercity_day_trip Cairo→Alexandria', '3: day_tour Cairo'])
+  })
+
+  it('the AI echoing "Alexandria" as the night on a day that returns to Cairo is still a day trip', () => {
+    const [, alx] = transportNeedsForGeneratedDays([
+      { day_number: 1, city: 'Cairo', overnight_city: 'Cairo', guide_required: true, attractions: ['Giza Plateau'] },
+      { day_number: 2, city: 'Alexandria', overnight_city: 'Alexandria', description: 'Full day in Alexandria. Return to Cairo for overnight.', guide_required: true, attractions: ['Catacombs'] },
+    ], 'Cairo')
+    expect(alx).toMatchObject({ serviceType: 'intercity_day_trip', originCity: 'Cairo', city: 'Alexandria', label: 'Day Trip Cairo → Alexandria and back' })
+  })
+
+  it('not a day trip: a move with the night there, or a hotel next door (Giza for a Cairo day)', () => {
+    expect(needs([
+      { day_number: 1, city: 'Cairo', overnight_city: 'Cairo', guide_required: true, attractions: ['Giza Plateau'] },
+      { day_number: 2, city: 'Alexandria', overnight_city: 'Alexandria', guide_required: true, attractions: ['Catacombs'] },
+    ])).toEqual(['1: day_tour Cairo', '2: intercity_dropoff Cairo→Alexandria'])
+    expect(needs([
+      { day_number: 1, city: 'Giza', overnight_city: 'Giza', guide_required: true, attractions: ['Giza Plateau'] },
+      { day_number: 2, city: 'Cairo', overnight_city: 'Giza', guide_required: true, attractions: ['Egyptian Museum'] },
+    ]).some(n => n.includes('intercity_day_trip'))).toBe(false)
+  })
+
   it('a day that FLIES to the next city has no road transfer — it tours where it lands', () => {
     expect(needs([
       { day_number: 1, city: 'Cairo', guide_required: true, attractions: ['Giza Plateau'] },

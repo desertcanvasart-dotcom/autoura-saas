@@ -1,6 +1,7 @@
 'use client'
 
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
+import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -171,20 +172,14 @@ export default function InvoicePage() {
         </div>
 
         {/* Invoice Preview */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-8 pb-6 border-b-2 border-gray-200">
-            <div>
-              <h1 className="text-3xl font-bold text-primary-600 mb-1">INVOICE</h1>
-              <p className="text-sm text-gray-600 font-mono">{invoiceNumber}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-bold text-gray-900">Travel2Egypt</p>
-              <p className="text-xs text-gray-500">Cairo, Egypt</p>
-              <p className="text-xs text-gray-500">{tenant?.contact_email || ''}</p>
-            </div>
-          </div>
-
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {/* Header: the agency's letterhead (Settings → Organization) */}
+          <DocumentLetterhead
+            company={identityFromTenant(tenant)}
+            title="Invoice"
+            number={invoiceNumber}
+          />
+          <div className="px-8 pb-8 pt-2">
           {/* Bill To & Invoice Info */}
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
@@ -285,14 +280,12 @@ export default function InvoicePage() {
             </p>
           </div>
 
-          {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-            <p className="text-base font-semibold text-gray-900 mb-1">
-              Thank you for your business!
-            </p>
-            <p className="text-xs text-gray-500">
-              {tenant?.contact_email ? `For questions, contact us at ${tenant.contact_email}` : ''}
-            </p>
+            <p className="mt-8 text-center text-base font-semibold text-gray-900">Thank you for your business!</p>
+          </div>
+
+          {/* Footer: Settings → Organization */}
+          <div className="border-t border-gray-100 bg-gray-50/60 px-8 py-4">
+            <DocumentFooter company={identityFromTenant(tenant)} />
           </div>
         </div>
       </div>

@@ -12,6 +12,8 @@ import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { DEFAULT_WATER_PER_PERSON_PER_DAY, isWaterCostType } from '@/lib/fixed-costs'
+import { pricingBasisLabel, toPricingBasis } from '@/lib/pricing/pricing-basis'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 
@@ -34,6 +36,12 @@ export async function GET(request: NextRequest) {
     const directionLabel = (key: string | null | undefined) => labelFor(directions, key || 'both')
     const pricingTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'activity_pricing_type')
     const pricingTypeLabel = (key: string | null | undefined) => (key ? labelFor(pricingTypes, key) : '')
+    const transportTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'transport_service_type')
+    const transportTypeLabel = (key: string | null | undefined) => {
+      const label = key ? labelFor(transportTypes, key) : ''
+      // A key the agency's list does not hold reads as words, not a code.
+      return label === key ? label.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()) : label
+    }
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
@@ -52,6 +60,7 @@ export async function GET(request: NextRequest) {
       { data: rawCruiseRates },
       { data: rawCruiseTransportPkgs },
       { data: rawFlightRates },
+      { data: rawFixedCosts },
     ] = await Promise.all([
       supabase.from('transportation_rates').select('*').eq('is_active', true),
       supabase.from('guide_rates').select('*').eq('is_active', true),
@@ -65,6 +74,10 @@ export async function GET(request: NextRequest) {
       supabase.from('nile_cruises').select('*').eq('is_active', true).eq('tier', tier),
       supabase.from('b2b_transport_packages').select('*').eq('is_active', true),
       supabase.from('flight_rates').select('*').eq('is_active', true),
+      // Water is priced from the company's "Water Bottle" fixed cost (Rates →
+      // Fixed costs), the same rate the pricing engine uses — the grid used a
+      // hardcoded 0.50 of its own. rate_currency lets normalizeRateRows convert it.
+      supabase.from('fixed_daily_costs').select('cost_type, cost_per_person_per_day, rate_currency, tenant_id').eq('is_active', true),
     ])
 
     // Per-rate currency (P3): rows priced in a contract currency are
@@ -74,7 +87,7 @@ export async function GET(request: NextRequest) {
     const [
       transportRates, guideRates, airportRates, hotelServiceRates,
       tippingRates, activityRates, accommodationRates, entranceFees,
-      mealRates, cruiseRates, cruiseTransportPkgs, flightRates,
+      mealRates, cruiseRates, cruiseTransportPkgs, flightRates, fixedCosts,
     ] = await Promise.all([
       normalizeRateRows(supabase, 'transportation_rates', rawTransportRates as Record<string, unknown>[], runCurrency),
       normalizeRateRows(supabase, 'guide_rates', rawGuideRates as Record<string, unknown>[], runCurrency),
@@ -88,7 +101,12 @@ export async function GET(request: NextRequest) {
       normalizeRateRows(supabase, 'nile_cruises', rawCruiseRates as Record<string, unknown>[], runCurrency),
       normalizeRateRows(supabase, 'b2b_transport_packages', rawCruiseTransportPkgs as Record<string, unknown>[], runCurrency),
       normalizeRateRows(supabase, 'flight_rates', rawFlightRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'fixed_daily_costs', rawFixedCosts as Record<string, unknown>[], runCurrency),
     ])
+    // The company's own row wins over a shared (tenant-less) one.
+    const waterRows = (fixedCosts || []).filter(r => isWaterCostType(r.cost_type))
+    const waterRow = waterRows.find(r => r.tenant_id === authResult.tenant_id) ?? waterRows[0]
+    const waterRate = waterRow ? toNum(waterRow.cost_per_person_per_day) : DEFAULT_WATER_PER_PERSON_PER_DAY
 
     // First stored period's guide bed rate (B-item 3); 0 in a period means
     // "no concession entered" (the sanitizer stores blanks as 0) → null.
@@ -107,11 +125,14 @@ export async function GET(request: NextRequest) {
         // buildTransportTierIndex can re-select the vehicle as group size grows.
         // Read-only — no schema change; uses the same grouping key as
         // travel-ops-pro migration 20260205_transportation_rates_restructure.
-        ...groupVehicleRowsToTiers(transportRates || []),
-        // Cruise transport packages (bundled sightseeing vehicle for cruise days)
+        ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel),
+        // Cruise transport packages (bundled sightseeing vehicle for cruise days).
+        // They live in the B2B packages list (B2B → Pricing rules), not in
+        // Rates → Transportation, so the name says where to find them; the
+        // grid offers them on cruise days only (DayRow).
         ...(cruiseTransportPkgs || []).map((r: any) => ({
           id: r.id,
-          name: `${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
+          name: `B2B package: ${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
           rateEur: toNum(r.sedan_rate),
           rateNonEur: toNum(r.sedan_rate),
           city: r.origin_city,
@@ -141,7 +162,8 @@ export async function GET(request: NextRequest) {
         rateEur: toNum(r.rate_eur),
         rateNonEur: toNum(r.rate_eur),
         city: r.airport_code,
-        details: `${directionLabel(r.direction)} | ${r.description || ''}`.trim(),
+        details: `${directionLabel(r.direction)} | ${pricingBasisLabel(toPricingBasis(r.pricing_type), r.max_capacity)}${r.description ? ` | ${r.description}` : ''}`,
+        ...basisOf(r),
       })),
 
       hotel_services: (hotelServiceRates || []).map((r: any) => {
@@ -156,13 +178,18 @@ export async function GET(request: NextRequest) {
           rateNonEur: toNum(r.rate_eur),
           category: r.hotel_category,
           city: r.destination,  // Use destination as city for filtering
-          details: r.description || `${typeLabel} | ${r.hotel_category || 'all'}`,
+          details: `${pricingBasisLabel(toPricingBasis(r.pricing_type), r.max_capacity)} | ${r.description || `${typeLabel} | ${r.hotel_category || 'all'}`}`,
+          ...basisOf(r),
         }
       }),
 
       tipping: (tippingRates || []).map((r: any) => ({
         id: r.id,
-        name: r.role || r.service_code || 'Tip',
+        // `r.role` is not a column: every tip without a service code was
+        // listed as just "Tip". The description says whose it is.
+        name: r.description || r.service_code || [r.role_type, r.context].filter(Boolean).join(' – ') || 'Tip',
+        // Whose tip — the guide's are dropped when the guide is off (guide-rule.ts).
+        tip_role: r.role_type ?? null,
         rateEur: toNum(r.rate_eur || r.amount_eur),
         rateNonEur: toNum(r.rate_eur || r.amount_eur),
         details: r.description,
@@ -177,6 +204,7 @@ export async function GET(request: NextRequest) {
           rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
           city: r.city,
           details: pricingTypeLabel(r.pricing_type),
+          ...basisOf(r),
         })),
 
       accommodation: (accommodationRates || []).map((r: any) => ({
@@ -227,6 +255,7 @@ export async function GET(request: NextRequest) {
           rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
           city: r.city,
           details: pricingTypeLabel(r.pricing_type),
+          ...basisOf(r),
         })),
 
       meals: (mealRates || []).map((r: any) => ({
@@ -240,7 +269,14 @@ export async function GET(request: NextRequest) {
       })),
 
       water: [
-        { id: 'water-standard', name: 'Water Bottles', rateEur: 0.50, rateNonEur: 0.50, details: 'Per person per day' }
+        {
+          id: 'water-standard', name: 'Water Bottles', rateEur: waterRate, rateNonEur: waterRate,
+          details: !waterRow
+            ? 'Per person per day (default — set it in Rates → Fixed costs)'
+            : waterRate > 0
+              ? 'Per person per day'
+              : 'rate is 0 — set it in Rates → Fixed costs',
+        }
       ],
 
       cruise: (cruiseRates || []).map((r: any) => ({
@@ -267,6 +303,13 @@ export async function GET(request: NextRequest) {
     console.error('Failed to fetch grid rates:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
+}
+
+/** A rate row's pricing basis for the grid (lib/pricing/pricing-basis.ts). */
+function basisOf(r: { pricing_type?: unknown; max_capacity?: unknown }) {
+  const basis = toPricingBasis(r.pricing_type)
+  const capacity = typeof r.max_capacity === 'number' && r.max_capacity > 0 ? r.max_capacity : null
+  return basis ? { pricing_basis: basis, unit_capacity: capacity } : {}
 }
 
 function toNum(v: any): number {
@@ -314,7 +357,7 @@ function vehicleSlug(v: any): string {
  * Each vehicle row keeps its own rate + capacity band (falling back to the
  * canonical tier band when the row's capacity columns are null).
  */
-export function groupVehicleRowsToTiers(rows: any[]): any[] {
+export function groupVehicleRowsToTiers(rows: any[], typeLabel?: (serviceType: string) => string): any[] {
   // One row per (route, vehicle) since migration 337 — nothing to expand.
   const groupKey = (r: any) =>
     [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
@@ -336,11 +379,16 @@ export function groupVehicleRowsToTiers(rows: any[]): any[] {
       return String(a.id) < String(b.id) ? -1 : 1
     })
     const keeper = sorted[0]
-    const label =
+    const routeLabel =
       keeper.route_name ||
       `${keeper.origin_city || keeper.city || ''}${keeper.destination_city ? ' → ' + keeper.destination_city : ''}`.trim() ||
       keeper.service_code ||
       `${keeper.city || ''} ${keeper.service_type || 'Transport'}`.trim()
+    // The kind of journey, in the agency's words (Day Tour, Intercity Day
+    // Trip …): two routes on the same road differ only by it, and without it
+    // an "Intercity Overnight" chip read like the day's whole programme.
+    const kind = keeper.service_type && typeLabel ? typeLabel(String(keeper.service_type)) : ''
+    const label = kind && !normLower(routeLabel).includes(normLower(kind)) ? `${routeLabel} · ${kind}` : routeLabel
 
     const usedTierKeys = new Map<string, number>()
     for (const r of sorted) {

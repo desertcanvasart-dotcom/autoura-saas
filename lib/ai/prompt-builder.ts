@@ -257,6 +257,8 @@ TRAVELERS: ${totalPax}
 LANGUAGE: ${language}
 PACKAGE: ${packageType || 'cruise-land'}
 
+OVERNIGHT: overnight_city is where the traveller SLEEPS, not where the day is spent. On a day trip that returns the same day (e.g. Alexandria from Cairo), keep overnight_city as the base city ("Cairo"); change it only when the traveller moves to a new hotel.
+
 ═══════════════════════════════════════════════════════════════
 📤 OUTPUT FORMAT (Return ONLY valid JSON)
 ═══════════════════════════════════════════════════════════════
@@ -379,6 +381,7 @@ PLANNING GUIDELINES:
 4. Group nearby attractions on the same day
 5. Include realistic driving times
 6. For ${tier} tier: ${tierDescription(tier)}
+7. overnight_city is where the traveller SLEEPS, not where the day is spent. On a day trip that returns the same day (e.g. Alexandria from Cairo), keep overnight_city as the base city ("Cairo"); change it only when the traveller moves to a new hotel.
 
 Return ONLY valid JSON:
 {

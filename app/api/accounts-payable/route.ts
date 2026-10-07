@@ -75,42 +75,71 @@ export async function GET(request: NextRequest) {
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const DAY = 1000 * 60 * 60 * 24
+    const dateOnly = (d: string) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 
-    // Calculate aging for each expense (based on expense_date, not due_date since expenses don't have due dates)
+    // When a supplier's bill is matched to an expense, the bill's due date is
+    // when the money is owed. Without one, an expense is due 14 days after it
+    // was incurred (the long-standing default). Aging counts days PAST DUE,
+    // so Payables and Supplier Invoices agree on what is overdue.
+    const dueByExpense = new Map<string, { due_date: string; supplier_invoice_number: string | null }>()
+    const expenseIds = (expenses || []).map((e: any) => e.id)
+    if (expenseIds.length) {
+      const { data: links, error: linkErr } = await supabase
+        .from('supplier_invoice_expenses')
+        .select('expense_id, supplier_invoices(due_date, status, supplier_invoice_number)')
+        .in('expense_id', expenseIds)
+      if (linkErr) console.error('[accounts-payable] supplier invoice due dates:', linkErr.message)
+      for (const link of (links || []) as any[]) {
+        const inv = Array.isArray(link.supplier_invoices) ? link.supplier_invoices[0] : link.supplier_invoices
+        if (!inv?.due_date || inv.status === 'cancelled') continue
+        // An expense split across bills is due on the earliest of them.
+        const prev = dueByExpense.get(link.expense_id)
+        if (!prev || inv.due_date < prev.due_date) {
+          dueByExpense.set(link.expense_id, { due_date: inv.due_date, supplier_invoice_number: inv.supplier_invoice_number ?? null })
+        }
+      }
+    }
+
     const expensesWithAging = (expenses || []).map((exp: any) => {
-      const expenseDate = new Date(exp.expense_date)
-      expenseDate.setHours(0, 0, 0, 0)
-      const daysOutstanding = Math.floor((today.getTime() - expenseDate.getTime()) / (1000 * 60 * 60 * 24))
-      
+      const expenseDate = dateOnly(exp.expense_date)
+      const daysOutstanding = Math.floor((today.getTime() - expenseDate.getTime()) / DAY)
+      const fromInvoice = dueByExpense.get(exp.id)
+      const dueDate = fromInvoice ? dateOnly(fromInvoice.due_date) : new Date(expenseDate.getTime() + 14 * DAY)
+      const daysPastDue = Math.round((today.getTime() - dueDate.getTime()) / DAY)
+
       let agingBucket = 'current'
-      if (daysOutstanding > 90) agingBucket = '90plus'
-      else if (daysOutstanding > 60) agingBucket = '60'
-      else if (daysOutstanding > 30) agingBucket = '30'
-      else if (daysOutstanding > 14) agingBucket = 'overdue'
+      if (daysPastDue > 60) agingBucket = '90plus'
+      else if (daysPastDue > 30) agingBucket = '60'
+      else if (daysPastDue > 0) agingBucket = '30'
 
       return {
         ...exp,
         days_outstanding: Math.max(0, daysOutstanding),
+        due_date: fromInvoice ? fromInvoice.due_date : dueDate.toISOString().slice(0, 10),
+        // The bill the due date came from (its number), or null for the 14-day default.
+        due_from_invoice: fromInvoice ? (fromInvoice.supplier_invoice_number || 'supplier invoice') : null,
+        days_past_due: daysPastDue,
         aging_bucket: agingBucket,
-        is_overdue: daysOutstanding > 14 // Consider overdue after 2 weeks
+        is_overdue: daysPastDue > 0,
       }
     })
 
-    // Filter by aging if specified
+    // Filter by aging if specified (days past due)
     let filteredExpenses = expensesWithAging
     if (agingFilter) {
       switch (agingFilter) {
         case 'current':
-          filteredExpenses = expensesWithAging.filter(exp => exp.days_outstanding <= 14)
+          filteredExpenses = expensesWithAging.filter(exp => exp.days_past_due <= 0)
           break
         case '30':
-          filteredExpenses = expensesWithAging.filter(exp => exp.days_outstanding > 14 && exp.days_outstanding <= 30)
+          filteredExpenses = expensesWithAging.filter(exp => exp.days_past_due > 0 && exp.days_past_due <= 30)
           break
         case '60':
-          filteredExpenses = expensesWithAging.filter(exp => exp.days_outstanding > 30 && exp.days_outstanding <= 60)
+          filteredExpenses = expensesWithAging.filter(exp => exp.days_past_due > 30 && exp.days_past_due <= 60)
           break
         case '90':
-          filteredExpenses = expensesWithAging.filter(exp => exp.days_outstanding > 60)
+          filteredExpenses = expensesWithAging.filter(exp => exp.days_past_due > 60)
           break
       }
     }
@@ -143,11 +172,11 @@ export async function GET(request: NextRequest) {
       supplier.expenses.push(exp)
 
       // Update aging buckets
-      if (exp.days_outstanding <= 14) {
+      if (exp.days_past_due <= 0) {
         addToTotals(supplier.aging.current, amount, exp.currency)
-      } else if (exp.days_outstanding <= 30) {
+      } else if (exp.days_past_due <= 30) {
         addToTotals(supplier.aging.days30, amount, exp.currency)
-      } else if (exp.days_outstanding <= 60) {
+      } else if (exp.days_past_due <= 60) {
         addToTotals(supplier.aging.days60, amount, exp.currency)
       } else {
         addToTotals(supplier.aging.days90Plus, amount, exp.currency)

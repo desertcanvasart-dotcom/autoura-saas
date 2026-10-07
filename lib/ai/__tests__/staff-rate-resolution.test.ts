@@ -189,3 +189,25 @@ describe('resolveHotelServiceRate', () => {
     expect(r.ok).toBe(false)
   })
 })
+
+// Migration 393: the resolved rate carries how it applies to the group.
+describe('staff rate pricing basis', () => {
+  it('each direction carries its row’s basis; none stated is per group', async () => {
+    const { resolveAirportRates } = await import('@/lib/ai/staff-rate-resolution')
+    const res = resolveAirportRates([
+      { airport_code: 'CAI', service_type: 'meet_greet', direction: 'arrival', rate_eur: 30, pricing_type: 'per_person' },
+      { airport_code: 'CAI', service_type: 'meet_greet', direction: 'departure', rate_eur: 20 },
+    ], { tier: 'standard', city: 'Cairo' })
+    if (!res.ok) throw new Error(res.detail)
+    expect(res.rates.arrivalPricing).toEqual({ basis: 'per_person', capacity: null })
+    expect(res.rates.departurePricing).toEqual({ basis: 'flat', capacity: null })
+  })
+
+  it('the hotel rate carries its basis and capacity', async () => {
+    const { resolveHotelServiceRate } = await import('@/lib/ai/staff-rate-resolution')
+    const res = resolveHotelServiceRate([
+      { service_type: 'porter', hotel_category: 'all', rate_eur: 5, pricing_type: 'per_unit', max_capacity: 2 },
+    ])
+    expect(res).toMatchObject({ ok: true, rate: 5, pricing: { basis: 'per_unit', capacity: 2 } })
+  })
+})

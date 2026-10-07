@@ -1,4 +1,5 @@
-import { identityFooterLine, brandColorRgb, type CompanyIdentity } from './company-identity'
+import { brandColorRgb, type CompanyIdentity } from './company-identity'
+import { drawLetterhead, drawFooters } from './pdf-letterhead'
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
 import { getCurrencySymbol } from '@/lib/currency'
@@ -34,40 +35,12 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   const margin = 20
   let y = margin
 
-  // Header
-  doc.setFontSize(24)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...brandColorRgb(company, [100, 124, 71]))
-  let receiptNameX = margin
-  if (company.logoDataUrl) {
-    try {
-      doc.addImage(company.logoDataUrl, margin, y - 2, 12, 12)
-      receiptNameX = margin + 15
-    } catch { /* text-only header */ }
-  }
-  if (company.name) doc.text(company.name, receiptNameX, y + 8)
-
-  doc.setFontSize(20)
-  doc.setTextColor(40, 40, 40)
-  doc.text('PAYMENT RECEIPT', pageWidth - margin, y + 8, { align: 'right' })
-
-  y += 25
-
-  // Receipt info
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(100, 100, 100)
-  doc.text(`Receipt #: ${receipt.receiptNumber}`, margin, y)
-  doc.text(`Date: ${formatDateOnly(receipt.paymentDate, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - margin, y, { align: 'right' })
-
-  y += 15
-
-  // Divider
-  doc.setDrawColor(100, 124, 71)
-  doc.setLineWidth(0.5)
-  doc.line(margin, y, pageWidth - margin, y)
-
-  y += 15
+  // Header: the agency's letterhead (Settings → Organization)
+  const [br, bg, bb] = brandColorRgb(company, [100, 124, 71])
+  const brand = { r: br, g: bg, b: bb }
+  const paidOn = formatDateOnly(receipt.paymentDate, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  y = drawLetterhead(doc, company, brand, { title: 'Payment Receipt', number: receipt.receiptNumber, dateLine: `Paid ${paidOn}` }, margin)
+  y += 4
 
   // Client info
   doc.setFontSize(12)
@@ -89,7 +62,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   y += 20
 
   // Payment details box
-  doc.setFillColor(248, 250, 245)
+  doc.setFillColor(br + (255 - br) * 0.94, bg + (255 - bg) * 0.94, bb + (255 - bb) * 0.94)
   doc.roundedRect(margin, y, pageWidth - 2 * margin, 50, 3, 3, 'F')
 
   y += 10
@@ -117,7 +90,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   // Amount
   const currencySymbol = getCurrencySymbol(receipt.currency)
   
-  doc.setFillColor(100, 124, 71)
+  doc.setFillColor(br, bg, bb)
   doc.roundedRect(margin, y, pageWidth - 2 * margin, 25, 3, 3, 'F')
 
   doc.setFontSize(12)
@@ -137,28 +110,20 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
     doc.setFont('helvetica', 'normal')
     doc.text('Notes:', margin, y)
     y += 6
-    doc.text(receipt.notes, margin, y)
-    y += 15
+    const noteLines = (doc.splitTextToSize(receipt.notes, pageWidth - 2 * margin) as string[]).slice(0, 6)
+    doc.text(noteLines, margin, y)
+    y += noteLines.length * 5 + 10
   }
 
   // Thank you
   y += 10
   doc.setFontSize(11)
-  doc.setTextColor(100, 124, 71)
+  doc.setTextColor(br, bg, bb)
   doc.setFont('helvetica', 'bold')
   doc.text('Thank you for your payment!', pageWidth / 2, y, { align: 'center' })
 
-  // Footer
-  const footerY = doc.internal.pageSize.getHeight() - 15
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5)
-
-  doc.setFontSize(8)
-  doc.setTextColor(150, 150, 150)
-  doc.setFont('helvetica', 'normal')
-  const footerLine = identityFooterLine(company)
-  if (footerLine) doc.text(footerLine, pageWidth / 2, footerY, { align: 'center' })
+  // Footer: the agency's details (Settings → Organization)
+  drawFooters(doc, company, brand, receipt.receiptNumber, margin)
 
   return doc
 }

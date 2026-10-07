@@ -6,16 +6,24 @@
 // Pricing parity note: per-service costs are derived from the grid's
 // passport-aware `selectedItems` (rateEur / rateNonEur) exactly as in
 // travel-ops-pro — group slots charged once, per-person slots × pax, custom
-// amounts honoured. The tenant_id / client_id persistence model and the B2B
-// quote RPC are the sibling's own and are preserved unchanged.
+// amounts honoured. The tenant_id / client_id persistence model is the
+// sibling's own and is preserved unchanged. A B2B quote is not made here — the
+// grid asks /api/b2b/quote-from-itinerary for it after the save.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { isOwnAddress, loadOwnAddresses } from '@/lib/email/own-address'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { ratePin } from '@/lib/pricing/rate-pin'
+import { gridDayComponents } from '@/lib/pricing/grid-day-components'
+import { gridOvernightCities } from '@/lib/itineraries/grid-overnight'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveGridClient } from '@/lib/grid-client-link'
+import { findOpenGridQuote, quotePriceFields } from '@/lib/pricing/grid-quote-sync'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
-import type { TablesInsert } from '@/types/database.types'
+import { fillTipRoles, type TipRoleReader } from '@/lib/pricing/tip-roles'
+import { BASIS_SLOTS, itemCost } from '@/app/pricing-grid/lib/item-basis'
+import { soldAccommodationItems } from '@/app/pricing-grid/lib/single-supplement'
+import type { Json, TablesInsert } from '@/types/database.types'
 
 function generateItineraryCode(): string {
   const year = new Date().getFullYear()
@@ -24,7 +32,13 @@ function generateItineraryCode(): string {
 }
 
 // A selected rate as the grid sends it.
-interface SavedGridItem { rateId: string; name?: string; rateEur?: number; rateNonEur?: number }
+interface SavedGridItem {
+  rateId: string; name?: string; rateEur?: number; rateNonEur?: number
+  /** Per group / per person / per unit (item-basis.ts). */
+  pricingBasis?: 'flat' | 'per_person' | 'per_unit'; unitCapacity?: number | null
+  /** Tipping: who the tip is for (guide-rule.ts). */
+  tipRole?: string | null
+}
 
 // Group slots are charged once for the whole group; per-person slots scale by pax.
 const GRID_GROUP_SLOTS = ['route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group']
@@ -34,18 +48,27 @@ function itemRate(item: any, passport: string): number {
   return passport === 'eu' ? (Number(item.rateEur) || 0) : (Number(item.rateNonEur) || 0)
 }
 
+// The slot's items the quote actually charges: guide off drops the guide
+// (guide-rule.ts); the accommodation single supplement is sold only to a party
+// of one (single-supplement.ts). Both are the calculator's own rules.
+function slotSoldItems(slot: any, pax: number, withGuide: boolean): SavedGridItem[] {
+  const sold = soldItems<SavedGridItem>(slot, withGuide)
+  return slot.slotId === 'accommodation' ? soldAccommodationItems(sold, pax) : sold
+}
+
 // Supplier (cost) total for one slot under the given passport, before margin.
-// Only what is SOLD: with the guide switched off the guide slot (and guide
-// tips) are not — the calculator's own rule (guide-rule.ts).
+// Only what is SOLD (slotSoldItems).
 function slotSupplierCost(slot: any, passport: string, pax: number, withGuide: boolean): number {
   const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
   if (slot.customAmount && slot.customAmount > 0 && customAmountSold(slot.slotId, withGuide)) {
     return isGroup ? slot.customAmount : slot.customAmount * pax
   }
   let line = 0
-  for (const item of soldItems(slot, withGuide)) {
+  for (const item of slotSoldItems(slot, pax, withGuide)) {
     const rate = itemRate(item, passport)
-    line += isGroup ? rate : rate * pax
+    // Airport / hotel services and activities: by the item's own basis.
+    if (BASIS_SLOTS.has(slot.slotId)) line += itemCost(slot.slotId, item, rate, pax).lineTotal
+    else line += isGroup ? rate : rate * pax
   }
   return line
 }
@@ -83,17 +106,30 @@ export async function POST(request: NextRequest) {
     const totalDays = days.length
     const endDate = new Date(new Date(startDate).getTime() + (totalDays - 1) * 86400000).toISOString().split('T')[0]
 
+    // A tip that reached the save without its role (a grid tab opened before
+    // tips carried one) gets it from its rate row, so switching the guide off
+    // still leaves the guide's tips out of both the price and the lines.
+    await fillTipRoles(supabase as unknown as TipRoleReader, days || [])
+
     // Server-authoritative pricing total. Sum the exact services we're about to
     // write (the source of truth) from the passport-aware selectedItems instead
     // of trusting the client `totals` to be present/non-zero — that's why
     // itinerary.total_cost previously persisted 0 while the services held real
     // prices. total_cost stores the CLIENT/selling price (how the header,
     // invoice and PDF consume it).
-    const supplierTotal = (days || []).reduce((sum: number, day: any) => {
+    const slotsTotal = (days || []).reduce((sum: number, day: any) => {
       return sum + (day.slots || []).reduce((dsum: number, slot: any) => {
         return dsum + slotSupplierCost(slot, passport, pax, withGuide)
       }, 0)
     }, 0)
+    // The throughout guide's bed / meals / flight seats: the same rows the
+    // save writes below (one per extra on a day of this trip). Left out, a
+    // save without client totals stored the trip without his costs.
+    const dayNumbers = new Set((days || []).map((d: any) => d.dayNumber))
+    const throughoutTotal = throughoutExtras
+      .filter(e => dayNumbers.has(e.dayNumber))
+      .reduce((sum, e) => sum + (Number(e.amountEur) || 0), 0)
+    const supplierTotal = slotsTotal + throughoutTotal
     // `resolveMarginPercent`, not `|| 25`: 0 is an at-cost grid, and `0 || 25`
     // resold it at 25%.
     const marginPct = resolveMarginPercent({ explicit: config.marginPercent }).marginPercent
@@ -104,6 +140,16 @@ export async function POST(request: NextRequest) {
     // server-computed figures so we never persist 0 when services exist.
     const finalSupplierTotal = (totals?.totalCost && totals.totalCost > 0) ? totals.totalCost : computedSupplierTotal
     const finalSellingTotal = (totals?.sellingPriceTotal && totals.sellingPriceTotal > 0) ? totals.sellingPriceTotal : computedSellingTotal
+
+    // The office's own address is never the client's: "Price in Grid" from a
+    // message the office sent fills the client's email with the office's
+    // (ITN-S-2026-8987 carried the admin's). Dropped — not saved on the trip,
+    // not used to find or create the client — and said so.
+    const warnings: string[] = []
+    if (config.clientEmail && isOwnAddress(await loadOwnAddresses(supabase, tenant_id, user), config.clientEmail)) {
+      warnings.push(`${config.clientEmail} is your own office's address, so it was not saved as the client's email.`)
+      config.clientEmail = ''
+    }
 
     // 0. The CRM client this trip belongs to: the one the grid was opened for,
     //    else a match by email/phone, else (direct travellers) a new Lead.
@@ -154,31 +200,31 @@ export async function POST(request: NextRequest) {
     // Try with new columns, fallback without
     let itinerary: any
     if (config.itineraryId) {
-      // Update existing
+      // Update existing. A re-save changes the trip and its price — it does
+      // not rename it (a fresh random code on every save broke every
+      // reference to it), re-open it as a draft, or overwrite its notes.
       // Re-saving never unlinks: with no client resolved, the itinerary keeps
       // whichever client it already had.
-      const { client_id: _clientId, ...unlinked } = itineraryData
+      const {
+        client_id: _clientId, itinerary_code: _code, status: _status, notes: _notes, trip_name: _tripName,
+        ...changes
+      } = itineraryData
+      const update = {
+        ...changes,
+        ...(clientId ? { client_id: clientId } : {}),
+        ...(config.tourName ? { trip_name: config.tourName } : {}),
+      }
       const { data, error } = await supabase
         .from('itineraries')
-        .update(clientId ? itineraryData : unlinked)
+        .update(update)
         .eq('id', config.itineraryId)
         .select()
         .single()
       if (error) throw error
       itinerary = data
-
-      // Delete old days and services — CHECKED, because the replacements are
-      // inserted immediately below. A silent failure here leaves the old days
-      // in place alongside the new ones and the itinerary silently doubles.
-      const { error: daysErr } = await supabase
-        .from('itinerary_days').delete().eq('itinerary_id', config.itineraryId)
-      if (daysErr) {
-        console.error('[pricing-grid/save] clearing old days:', daysErr.message)
-        return NextResponse.json(
-          { error: 'Could not clear the existing itinerary days — nothing was saved' },
-          { status: 500 }
-        )
-      }
+      // The old days are replaced inside save_pricing_grid_days (below), in
+      // the same transaction as the new ones — deleting them here first
+      // would leave an itinerary with no days if the save then failed.
     } else {
       // Create new
       try {
@@ -213,43 +259,30 @@ export async function POST(request: NextRequest) {
     // The client the saved itinerary actually carries (a re-save keeps its own).
     const linkedClientId: string | null = clientId ?? itinerary.client_id ?? null
 
-    // 2. Create days
-    let daysCreated = 0
-    let servicesCreated = 0
+    // 2. Days and their services — built here, written in ONE transaction by
+    //    save_pricing_grid_days (migration 391). It used to delete the old
+    //    days and insert day by day, only logging a failed day or service and
+    //    carrying on: a failure part-way left the itinerary missing days or
+    //    services while the save still answered success. Now any error rolls
+    //    the whole write back and the previous days survive.
+    const dayPayload: Array<Record<string, unknown>> = []
+    // Where each night is spent: the booked hotel's city, not the day's
+    // sightseeing city (lib/itineraries/overnight-city.ts).
+    const overnightByDay = await gridOvernightCities(supabase as unknown as Parameters<typeof gridOvernightCities>[0], days)
 
     for (const day of days) {
       const dayDate = new Date(new Date(startDate).getTime() + (day.dayNumber - 1) * 86400000)
         .toISOString().split('T')[0]
 
-      const { data: dayRecord, error: dayError } = await supabase
-        .from('itinerary_days')
-        .insert({
-          tenant_id,
-          itinerary_id: itineraryId,
-          day_number: day.dayNumber,
-          date: dayDate,
-          title: day.title || `Day ${day.dayNumber}`,
-          description: day.description || '',
-          city: day.city || '',
-          overnight_city: day.city || '',
-        })
-        .select()
-        .single()
-
-      if (dayError) {
-        console.error(`Error creating day ${day.dayNumber}:`, dayError)
-        continue
-      }
-      daysCreated++
-
-      // 3. Create services from non-empty slots. One service row per selected
+      // 3. Services from non-empty slots. One service row per selected
       //    item (passport-aware rate), plus custom-amount slots. Group slots are
       //    charged once; per-person slots × pax — identical to calculator.ts.
       const services: any[] = []
       for (const slot of day.slots) {
-        // Only what the grid SOLD — guide off leaves the guide out here
-        // exactly as it does in the price (guide-rule.ts).
-        const sold = soldItems<SavedGridItem>(slot, withGuide)
+        // Only what the grid SOLD — guide off leaves the guide out, and a
+        // party of more than one the single supplement, exactly as the price
+        // does (slotSoldItems).
+        const sold = slotSoldItems(slot, pax, withGuide)
         const hasItems = sold.length > 0
         const hasCustom = slot.customAmount && slot.customAmount > 0 && customAmountSold(slot.slotId, withGuide)
         if (!hasItems && !hasCustom) continue
@@ -260,8 +293,6 @@ export async function POST(request: NextRequest) {
         if (hasCustom) {
           const unit = slot.customAmount
           services.push({
-            itinerary_id: itineraryId,
-            day_id: dayRecord.id,
             service_type: serviceType,
             service_name: slot.slotId === 'other_group' ? 'Other (Group)' : 'Other (Per Person)',
             description: `[pricing-grid:${slot.slotId}] custom`,
@@ -275,15 +306,16 @@ export async function POST(request: NextRequest) {
 
         for (const item of sold) {
           const rate = itemRate(item, passport)
+          // Airport / hotel services and activities: quantity and total by the
+          // item's own basis (per group / per person / per unit).
+          const byBasis = BASIS_SLOTS.has(slot.slotId) ? itemCost(slot.slotId, item, rate, pax) : null
           services.push({
-            itinerary_id: itineraryId,
-            day_id: dayRecord.id,
             service_type: serviceType,
             service_name: item.name || slot.slotId.replace(/_/g, ' '),
             description: `[pricing-grid:${slot.slotId}] ${item.name || ''}`,
-            quantity: isGroup ? 1 : pax,
+            quantity: byBasis ? byBasis.quantity : isGroup ? 1 : pax,
             unit_cost: rate,
-            total_cost: isGroup ? rate : rate * pax,
+            total_cost: byBasis ? byBasis.lineTotal : isGroup ? rate : rate * pax,
             is_included: true,
             // The pin (migration 353): which rate row this line was priced
             // from, so a later re-price (B2B quote, single supplement) reads
@@ -301,8 +333,6 @@ export async function POST(request: NextRequest) {
       for (const extra of throughoutExtras.filter((e: { dayNumber: number }) => e.dayNumber === day.dayNumber)) {
         const kind = String(extra.kind)
         services.push({
-          itinerary_id: itineraryId,
-          day_id: dayRecord.id,
           service_type: kind === 'bed' ? 'accommodation' : kind === 'meal' ? 'meal' : 'flight',
           service_name: String(extra.label || 'Throughout Guide'),
           description: `[pricing-grid:throughout_guide] ${kind}`,
@@ -313,69 +343,105 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (services.length > 0) {
-        // Both day columns (the itinerary pages read itinerary_day_id; the
-        // grid wrote only day_id, so its services were invisible there —
-        // migration 385 now keeps them in step regardless). client_price is
-        // left empty: the service is priced at cost × margin, and the old
-        // column default of 0 read as "sold for free".
-        const { error: svcError } = await supabase
-          .from('itinerary_services')
-          .insert(services.map(svc => ({ ...svc, itinerary_day_id: dayRecord.id, client_price: null })))
-        if (svcError) {
-          console.error(`Error creating services for day ${day.dayNumber}:`, svcError)
-        } else {
-          servicesCreated += services.length
-        }
-      }
+      dayPayload.push({
+        day_number: day.dayNumber,
+        date: dayDate,
+        title: day.title || `Day ${day.dayNumber}`,
+        description: day.description || '',
+        city: day.city || '',
+        overnight_city: overnightByDay.get(day.dayNumber) ?? null,
+        // The day's type and its per-part overrides (NULL = the type's
+        // default). The grid's reload and completeness gate read these back;
+        // they were never stored, so every reload reset every day to "tour".
+        ...gridDayComponents(day),
+        services,
+      })
     }
 
-    // 4. B2B: Create quote if needed
+    const { data: saved, error: saveError } = await supabase
+      .rpc('save_pricing_grid_days', { p_itinerary_id: itineraryId, p_days: dayPayload as unknown as Json })
+
+    if (saveError) {
+      console.error('[pricing-grid/save] saving days:', saveError.message)
+      // A NEW itinerary's header was created just above; without its days it
+      // is an empty shell, so it goes too. A re-saved itinerary keeps its
+      // previous days — the transaction rolled back.
+      if (!config.itineraryId) {
+        const { error: cleanupError } = await supabase.from('itineraries').delete().eq('id', itineraryId)
+        if (cleanupError) console.error('[pricing-grid/save] removing the empty itinerary:', cleanupError.message)
+      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: config.itineraryId
+            ? 'Could not save the itinerary days — nothing was changed'
+            : 'Could not save the itinerary days — nothing was saved',
+        },
+        { status: 500 }
+      )
+    }
+
+    const savedRow = Array.isArray(saved) ? saved[0] : saved
+    const daysCreated: number = savedRow?.days_inserted ?? dayPayload.length
+    const servicesCreated: number = savedRow?.services_inserted ?? 0
+
+    // 4. B2B: the quote is made by /api/b2b/quote-from-itinerary, which the
+    // grid calls next with its multi-size rate sheet (b2b-rate-sheet.ts). This
+    // route used to make one too, so a save with a partner left two quotes.
     let quoteId: string | undefined
+    let quoteNumber: string | undefined
     let redirectUrl: string | undefined
 
-    if (config.clientType === 'b2b' && config.partnerId) {
-      try {
-        const adminClient = createAdminClient()
-        // Generate quote number via RPC
-        const { data: quoteNum } = await adminClient.rpc('generate_b2b_quote_number')
-
-        const { data: quote, error: quoteError } = await supabase
-          .from('b2b_quotes')
-          .insert({
-            tenant_id,
-            itinerary_id: itineraryId,
-            partner_id: config.partnerId,
-            quote_number: quoteNum || `B2B-${Date.now()}`,
-            tier: config.tier,
-            currency: config.currency || 'EUR',
-            status: 'draft',
-            pricing_table: [{
-              pax,
-              cost_per_person: totals.costPerPerson,
-              selling_per_person: totals.sellingPricePerPerson,
-              total: totals.sellingPriceTotal,
-            }],
-            internal_notes: `Created via Pricing Grid`,
-          })
-          .select()
-          .single()
-
-        if (!quoteError && quote) {
-          quoteId = quote.id
-          redirectUrl = `/quotes/b2b/${quote.id}`
-        }
-      } catch (b2bError: any) {
-        console.error('B2B quote creation error:', b2bError.message)
-        // Non-fatal: itinerary was still saved
-      }
-    }
-
-    // 5. B2C: create the commercial-offer wrapper, mirroring the B2B branch.
+    // 5. B2C: the commercial-offer wrapper.
     // The priced itinerary is the trip; the b2c_quotes row is the offer with
     // the sales lifecycle (quote number, sent/viewed, versioning) and the
     // anchor bookings convert from (one booking per quote, migration 256).
-    if (config.clientType === 'b2c') {
+    // A re-save REPRICES the itinerary's open quote (lib/pricing/
+    // grid-quote-sync.ts) — it used to add a new draft every time, leaving
+    // the quote the operator was working from at the old price.
+    let quoteAction: 'created' | 'updated' | undefined
+    let previousSellingTotal: number | null = null
+    const openQuote = config.clientType === 'b2c' && config.itineraryId
+      ? await findOpenGridQuote(supabase, itineraryId).catch(err => {
+          console.error('B2C quote lookup error:', err instanceof Error ? err.message : err)
+          return null
+        })
+      : null
+    if (openQuote) {
+      const { data: updated, error: updateError } = await supabase
+        .from('b2c_quotes')
+        .update({
+          ...quotePriceFields({
+            pax, tier: config.tier || 'standard', currency: config.currency || 'EUR',
+            supplierTotal: finalSupplierTotal, sellingTotal: finalSellingTotal, marginPercent: marginPct,
+          }),
+          ...(linkedClientId ? { client_id: linkedClientId } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', openQuote.id)
+        .select('id')
+        .maybeSingle()
+      if (updateError || !updated) {
+        console.error('B2C quote update error:', updateError?.message ?? 'not visible')
+      } else {
+        quoteId = openQuote.id
+        quoteNumber = openQuote.quote_number
+        quoteAction = 'updated'
+        previousSellingTotal = openQuote.selling_price
+        redirectUrl = `/quotes/b2c/${openQuote.id}`
+        // The same version snapshot the quote editor records. The quote id
+        // came from the caller's own (RLS) read and update just above.
+        try {
+          await createAdminClient().rpc('create_b2c_quote_version', {
+            p_quote_id: openQuote.id,
+            p_changed_by: authResult.user!.id,
+            p_change_reason: 'Repriced from the Pricing Grid',
+          })
+        } catch (versionError) {
+          console.error('Error creating quote version:', versionError instanceof Error ? versionError.message : versionError)
+        }
+      }
+    } else if (config.clientType === 'b2c') {
       try {
         const adminClient = createAdminClient()
         const { data: quoteNum } = await adminClient.rpc('generate_b2c_quote_number')
@@ -408,6 +474,8 @@ export async function POST(request: NextRequest) {
 
         if (!quoteError && quote) {
           quoteId = quote.id
+          quoteNumber = quote.quote_number
+          quoteAction = 'created'
           redirectUrl = `/quotes/b2c/${quote.id}`
         } else if (quoteError) {
           console.error('B2C quote creation error:', quoteError.message)
@@ -420,11 +488,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      ...(warnings.length ? { warnings } : {}),
       itineraryId,
-      itineraryCode,
+      // A re-save keeps the itinerary's own code.
+      itineraryCode: itinerary.itinerary_code ?? itineraryCode,
       daysCreated,
       servicesCreated,
       quoteId,
+      quoteNumber,
+      quoteAction,
+      previousSellingTotal,
+      sellingTotal: finalSellingTotal,
       clientId: linkedClientId,
       clientLinkedBy: clientLink.how,
       redirectUrl: redirectUrl || `/itineraries/${itineraryId}`,

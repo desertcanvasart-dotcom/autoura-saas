@@ -1,3 +1,4 @@
+import { dayTripFromItineraryDay } from '@/lib/pricing/day-trip'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
       if (isCruiseDay) accommodationType = 'cruise'
       else if (isLast && !daySvcs.some((s: any) => s.service_type === 'accommodation' || s.service_type === 'cruise')) accommodationType = 'none'
 
+      const tripFrom = dayTripFromItineraryDay(day, accommodationType)
       return {
         day: day.day_number,
         title: day.title || `Day ${day.day_number}`,
@@ -70,6 +72,9 @@ export async function POST(request: NextRequest) {
         is_cruise_day: isCruiseDay,
         attractions: day.attractions || [],
         overnight_city: day.overnight_city || null,
+        // The night is somewhere other than the day's city on a road day: a
+        // day trip from there (lib/pricing/day-trip), priced as one.
+        ...(tripFrom ? { day_trip_from: tripFrom } : {}),
         accommodation_type: accommodationType,
         services: {
           airport_arrival: isFirst && daySvcs.some((s: any) => s.service_type === 'airport_service' || s.service_type === 'airport_services'),

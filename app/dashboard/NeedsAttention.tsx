@@ -9,10 +9,14 @@
 //
 // Loads on its own so a slow or failing scan degrades to a quiet panel rather
 // than holding up the numbers above it.
+//
+// Each row can be dismissed ("seen it, handled elsewhere") — migration 397.
+// A dismissal holds only while the row's state does, so it comes back when
+// something changes; see withoutDismissed in lib/dashboard/attention.ts.
 
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, CheckCircle2, Wallet, IdCard, UserRound, MessageSquare, PackagePlus, MailWarning } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Wallet, IdCard, UserRound, MessageSquare, PackagePlus, MailWarning, X } from 'lucide-react'
 // The item and its kinds are the API's own. This panel used to keep a copy of
 // the list, typed out by hand — and the copy stopped at four while the API
 // went on to six ('extra_request' in #300, 'awaiting_reply' in #449). An item
@@ -21,6 +25,7 @@ import { AlertTriangle, CheckCircle2, Wallet, IdCard, UserRound, MessageSquare, 
 // production on 2026-09-20, the first account with a customer waiting more
 // than a day for a reply.
 import type { AttentionItem, AttentionType } from '@/lib/dashboard/attention'
+import { attentionKey, attentionFingerprint } from '@/lib/dashboard/attention'
 
 type IconType = ComponentType<{ className?: string }>
 
@@ -80,9 +85,20 @@ export function describe(item: AttentionItem): string {
   }
 }
 
+function insertAt(list: AttentionItem[], item: AttentionItem, index: number): AttentionItem[] {
+  const key = attentionKey(item)
+  if (list.some(i => attentionKey(i) === key)) return list
+  const next = [...list]
+  next.splice(Math.min(index, next.length), 0, item)
+  return next
+}
+
 export default function NeedsAttention() {
   const [items, setItems] = useState<AttentionItem[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
+  // The last row dismissed, kept long enough to undo a mis-click.
+  const [undo, setUndo] = useState<{ item: AttentionItem; index: number } | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -101,6 +117,50 @@ export default function NeedsAttention() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (!undo) return
+    const t = setTimeout(() => setUndo(null), 8000)
+    return () => clearTimeout(t)
+  }, [undo])
+
+  const dismiss = useCallback(async (item: AttentionItem, index: number) => {
+    const key = attentionKey(item)
+    // Optimistic: the row goes now, and comes back if the save fails.
+    setItems(prev => prev.filter(i => attentionKey(i) !== key))
+    setUndo({ item, index })
+    setNotice(null)
+    try {
+      const res = await fetch('/api/dashboard/attention/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, fingerprint: attentionFingerprint(item) }),
+      })
+      if (!res.ok) throw new Error(String(res.status))
+    } catch {
+      setItems(prev => insertAt(prev, item, index))
+      setUndo(null)
+      setNotice('Couldn’t dismiss that just now — please try again.')
+    }
+  }, [])
+
+  const restore = useCallback(async () => {
+    if (!undo) return
+    const { item, index } = undo
+    setUndo(null)
+    setItems(prev => insertAt(prev, item, index))
+    try {
+      const res = await fetch('/api/dashboard/attention/dismiss', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: attentionKey(item) }),
+      })
+      if (!res.ok) throw new Error(String(res.status))
+    } catch {
+      setItems(prev => prev.filter(i => attentionKey(i) !== attentionKey(item)))
+      setNotice('Couldn’t bring that back just now — please try again.')
+    }
+  }, [undo])
+
   const urgent = items.filter(i => i.severity === 'urgent').length
 
   return (
@@ -117,6 +177,16 @@ export default function NeedsAttention() {
         </h2>
         <span className="text-xs text-gray-400">Next 45 days</span>
       </div>
+
+      {undo && (
+        <div className="flex items-center justify-between gap-3 mb-2 px-3 py-2 rounded bg-gray-50 border border-gray-200 text-xs text-gray-600">
+          <span className="truncate">Dismissed “{headline(undo.item)}”. It comes back if anything changes.</span>
+          <button type="button" onClick={restore} className="font-medium text-gray-900 hover:underline shrink-0">
+            Undo
+          </button>
+        </div>
+      )}
+      {notice && <p className="mb-2 text-xs text-red-700">{notice}</p>}
 
       {state === 'loading' ? (
         <div className="space-y-2">
@@ -136,8 +206,8 @@ export default function NeedsAttention() {
           {items.map((item, i) => {
             const Icon = iconFor(item.type)
             return (
-              <li key={`${item.bookingId}-${item.type}-${i}`}>
-                <Link href={item.href} className="flex items-start gap-3 py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+              <li key={`${attentionKey(item)}-${i}`} className="group flex items-start gap-1">
+                <Link href={item.href} className="flex flex-1 min-w-0 items-start gap-3 py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
                   <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${item.severity === 'urgent' ? 'text-red-600' : 'text-amber-500'}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-gray-900 truncate">
@@ -155,6 +225,15 @@ export default function NeedsAttention() {
                     </span>
                   )}
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => dismiss(item, i)}
+                  title="Dismiss"
+                  aria-label={`Dismiss: ${headline(item)} — ${describe(item)}`}
+                  className="mt-2 p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </li>
             )
           })}

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import BlockPicker from '@/components/day-blocks/BlockPicker'
+import type { GridBlock } from '@/lib/day-blocks/grid-apply'
 import { PACKAGE_TYPE_CONFIGS, type PackageType } from '@/lib/package-types'
 import { Plus, FileText, Upload, Loader2, Trash2, X, File, Image, FileSpreadsheet } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -51,6 +53,9 @@ function formatFileSize(bytes: number) {
 interface InputPanelProps {
   onParseDays: (text: string) => Promise<void>
   onAddDay: () => void
+  /** The agency's day blocks: add a day from one. */
+  blocks?: GridBlock[]
+  onAddDayFromBlock?: (block: GridBlock) => void
   onLoadItinerary: (itineraryId: string) => Promise<void>
   onClearAll?: () => void
   isParsing: boolean
@@ -63,7 +68,7 @@ interface InputPanelProps {
   onPackageTypeChange: (p: PackageType) => void
 }
 
-export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onClearAll, isParsing, hasDays, packageType, onPackageTypeChange }: InputPanelProps) {
+export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFromBlock, onLoadItinerary, onClearAll, isParsing, hasDays, packageType, onPackageTypeChange }: InputPanelProps) {
   const [text, setText] = useState('')
   const [showPaste, setShowPaste] = useState(false)
   const [itineraryId, setItineraryId] = useState('')
@@ -173,7 +178,7 @@ export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onC
             onClick={async () => {
               const ok = await confirm({
                 title: 'Start New Quote',
-                message: 'This will clear all days and reset the pricing grid. Any unsaved changes will be lost.',
+                message: 'This will clear all days and reset the Quote Builder. Any unsaved changes will be lost.',
                 confirmText: 'New Quote',
                 cancelText: 'Cancel',
                 variant: 'warning',
@@ -310,13 +315,16 @@ export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onC
             >
               <Plus className="w-4 h-4" />
             </button>
+            {blocks && onAddDayFromBlock && (
+              <BlockPicker blocks={blocks} onPick={onAddDayFromBlock} label="Day from block" title="Add a day from one of your day blocks" disabled={isWorking} />
+            )}
             {hasDays && onClearAll && (
               <button
                 type="button"
                 onClick={async () => {
                   const ok = await confirm({
                     title: 'Clear All Days',
-                    message: 'This will remove all days and reset the pricing grid. This cannot be undone.',
+                    message: 'This will remove all days and reset the Quote Builder. This cannot be undone.',
                     confirmText: 'Clear All',
                     cancelText: 'Cancel',
                     variant: 'danger',

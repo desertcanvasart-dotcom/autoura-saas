@@ -10,6 +10,9 @@ import ToolbarMenu from '@/components/ToolbarMenu'
 import { sampleTemplateCsv } from '@/lib/tours/template-csv'
 import { sampleDaysCsv } from '@/lib/tours/itinerary-csv'
 import { readDayMeals, summarizeMeals, mealStatusLabel, MEAL_SLOTS, type DayMeals, type DayMealStatus, type MealSlot } from '@/lib/tours/day-meals'
+import BlockPicker from '@/components/day-blocks/BlockPicker'
+import type { GridBlock } from '@/lib/day-blocks/grid-apply'
+import { blockToTourDay } from '@/lib/day-blocks/tour-form'
 import {
   Map,
   Plus,
@@ -149,6 +152,9 @@ interface ItineraryDay {
   property_by_tier?: Record<string, string>
   /** A non-sightseeing transfer in town: sound & light, the market, dinner. */
   city_transfer?: boolean
+  /** A day trip: where the party stays tonight, the sightseeing being in
+   *  `city` (lib/pricing/day-trip). */
+  day_trip_from?: string
   /** Four hours, eight, or twelve — the agency prices those as different
    *  transport routes. */
   sightseeing_length?: 'half_day' | 'day_tour' | 'long_day_tour'
@@ -453,6 +459,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
   const [dayProperties, setDayProperties] = useState<Record<string, string>>({})
   /** A transfer to somewhere else in town that is not sightseeing. */
   const [dayCityTransfer, setDayCityTransfer] = useState(false)
+  /** A day trip: where the party stays tonight; '' = an ordinary day. */
+  const [dayTripFromCity, setDayTripFromCity] = useState('')
   // Road beside a ticket / no vehicle on a road day. '' = not stated.
   const [dayRoad, setDayRoad] = useState<'' | 'on' | 'off'>('')
   // The day's own transport list; null = automatic (the rules decide).
@@ -470,10 +478,43 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
   /** The day being edited, or null when the form is adding a new one. */
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null)
 
+  // The agency's day blocks (Settings → Day blocks): "Fill from a block"
+  // fills this form; the operator reviews it and adds the day as always.
+  const [blocks, setBlocks] = useState<GridBlock[]>([])
+  const [blockFill, setBlockFill] = useState<{ code: string; notes: string[] } | null>(null)
+  useEffect(() => {
+    let live = true
+    fetch('/api/day-blocks')
+      .then(r => r.json())
+      .then(j => { if (live && j?.success) setBlocks((j.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active)) })
+      .catch(() => undefined)
+    return () => { live = false }
+  }, [])
+
+  const fillFromBlock = (block: GridBlock) => {
+    const fill = blockToTourDay(block, attractionOptions, { dayTour: isDayTour })
+    setDayTitle(fill.title)
+    setDayDescription(fill.description)
+    setDayCity(fill.city)
+    setDayNight(fill.night)
+    setDayMeals(fill.meals)
+    setDayMealsError(null)
+    setDayAttractions(fill.picked)
+    setDayTransportType(fill.transportType)
+    setDayTransportRateId('')
+    setDayLegFrom(fill.legFrom)
+    setDayLegTo(fill.legTo)
+    setDayLength(fill.length)
+    setDayNoSightseeing(fill.noSightseeing)
+    setDayCruiseAssist(fill.cruiseAssist)
+    setBlockFill({ code: block.code, notes: fill.notes })
+  }
+
   // What this city has on file, per tier. Loaded only when a city is named:
   // the picker is an offer to be exact, not a requirement.
   useEffect(() => {
-    const city = dayCity.trim()
+    // A day trip's night is where the party stays, not where it sightsees.
+    const city = (dayTransportType ? '' : dayTripFromCity.trim()) || dayCity.trim()
     if (!city || tiers.length === 0) {
       setCityHotels({})
       return
@@ -505,7 +546,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
       if (!cancelled) setCityHotels(next)
     })()
     return () => { cancelled = true }
-  }, [dayCity, dayNight, tiers])
+  }, [dayCity, dayTripFromCity, dayTransportType, dayNight, tiers])
 
   const setMeal = (slot: MealSlot, status: DayMealStatus | '') => {
     setDayMealsError(null)
@@ -527,6 +568,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
   }
 
   const resetDayForm = () => {
+    setBlockFill(null)
     setDayTitle('')
     setDayDescription('')
     setDayMeals({ breakfast: '', lunch: '', dinner: '' })
@@ -541,6 +583,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
     setDayNight('')
     setDayProperties({})
     setDayCityTransfer(false)
+    setDayTripFromCity('')
     setDayRoad('')
     setDayCruiseAssist({})
     setDayTransportLines(null)
@@ -574,6 +617,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
     setDayCity(day.city || '')
     setDayProperties((day.property_by_tier as Record<string, string>) || {})
     setDayCityTransfer(day.city_transfer === true)
+    setDayTripFromCity(day.day_trip_from || '')
     setDayRoad(day.road_transfers === true ? 'on' : day.road_transfers === false ? 'off' : '')
     setDayTransportLines(sanitizeTransportLines(day.transport_lines) ?? null)
     const svc = (day.services ?? {}) as Record<string, unknown>
@@ -625,12 +669,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
     return applyDayForm(existing, {
       title: dayTitle || 'Day', description: dayDescription, meals: { ...dayMeals }, picked: dayAttractions,
       transportType: dayTransportType, transportRateId: dayTransportRateId, legFrom: dayLegFrom, legTo: dayLegTo, legAssist: dayLegAssist,
-      city: dayCity, night: dayNight, cityTransfer: dayCityTransfer, roadTransfers: dayRoad === '' ? undefined : dayRoad === 'on',
+      city: dayCity, night: dayNight, cityTransfer: dayCityTransfer, dayTripFrom: dayTransportType || dayNight === 'cruise' || dayNight === 'in_transit' ? '' : dayTripFromCity, roadTransfers: dayRoad === '' ? undefined : dayRoad === 'on',
       cruiseAssist: dayCruiseAssist, transportLines: dayTransportLines ?? undefined,
       length: dayLength, propertiesByTier: dayProperties, noSightseeing: dayNoSightseeing,
       activityIds: dayActivities.map(a => a.id),
     }, editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day)
-  }, [editingDayIndex, itinerary, dayTitle, dayDescription, dayMeals, dayAttractions, dayActivities, dayTransportType, dayTransportRateId, dayLegFrom, dayLegTo, dayLegAssist, dayCity, dayNight, dayCityTransfer, dayRoad, dayCruiseAssist, dayTransportLines, dayLength, dayProperties, dayNoSightseeing])
+  }, [editingDayIndex, itinerary, dayTitle, dayDescription, dayMeals, dayAttractions, dayActivities, dayTransportType, dayTransportRateId, dayLegFrom, dayLegTo, dayLegAssist, dayCity, dayNight, dayCityTransfer, dayTripFromCity, dayRoad, dayCruiseAssist, dayTransportLines, dayLength, dayProperties, dayNoSightseeing])
   useEffect(() => {
     const idx = editingDayIndex ?? itinerary.length
     const days = itinerary.map((d, i) => (i === idx ? formDayForPreview : d))
@@ -678,6 +722,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
       city: dayCity,
       night: dayNight,
       cityTransfer: dayCityTransfer,
+      dayTripFrom: dayTransportType || dayNight === 'cruise' || dayNight === 'in_transit' ? '' : dayTripFromCity,
       roadTransfers: dayRoad === '' ? undefined : dayRoad === 'on',
       transportLines: dayTransportLines ?? undefined,
       cruiseAssist: dayCruiseAssist,
@@ -738,16 +783,27 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               ? `Day ${itinerary.length + 1}`
               : `Editing day ${itinerary[editingDayIndex]?.day}`}
           </span>
-          {editingDayIndex !== null && (
-            <button
-              type="button"
-              onClick={resetDayForm}
-              className="ml-auto text-xs text-gray-500 hover:text-gray-800 underline"
-            >
-              Cancel
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-3">
+            {blocks.length > 0 && (
+              <BlockPicker blocks={blocks} onPick={fillFromBlock} label="Fill from a block" title="Fill this day from one of your day blocks" />
+            )}
+            {editingDayIndex !== null && (
+              <button
+                type="button"
+                onClick={resetDayForm}
+                className="text-xs text-gray-500 hover:text-gray-800 underline"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
+        {blockFill && (
+          <div className="text-xs rounded-md border border-green-200 bg-green-50 text-green-900 px-3 py-2 space-y-0.5">
+            <p>Filled from day block {blockFill.code}. Check it, then {editingDayIndex === null ? 'add the day' : 'save the day'} below.</p>
+            {blockFill.notes.map(n => <p key={n} className="text-amber-900">{n}</p>)}
+          </div>
+        )}
 
         {/* Where the day is, and where the night is spent. Both used to be
             read out of the title: an unplaced day was priced as Cairo, and a
@@ -798,6 +854,30 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             </p>
           </div>
         </div>
+
+        {/* A day trip: the sightseeing is in the City above, the night back
+            where the party stays (lib/pricing/day-trip). Without it, a day in
+            Alexandria from a Cairo hotel was priced as a move to Alexandria
+            and back the next day. Only a road day can be one. */}
+        {!dayTransportType && dayNight !== 'cruise' && dayNight !== 'in_transit' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Day trip from <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              list="tour-day-cities"
+              value={dayTripFromCity}
+              onChange={(e) => setDayTripFromCity(e.target.value)}
+              placeholder="Where they stay tonight — e.g. Cairo, for a day in Alexandria"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              {dayTripFromCity.trim() && dayCity.trim() && dayTripFromCity.trim().toLowerCase() !== dayCity.trim().toLowerCase()
+                ? `Out from ${dayTripFromCity.trim()} to ${dayCity.trim()} and back the same day: priced at the Intercity Day Trip rate, with the night in ${dayTripFromCity.trim()}.`
+                : 'Leave blank when the party sleeps in this day’s city.'}
+            </p>
+          </div>
+        )}
 
         {/* Four hours, eight, or twelve: the agency prices those as different
             transport routes, so the length is a choice on the day. */}
@@ -953,7 +1033,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                       <option value="">
                         {dayNight === 'cruise'
                           ? `Automatic — whatever this tier sails`
-                          : `Automatic — whatever this tier has in ${dayCity.trim()}`}
+                          : `Automatic — whatever this tier has in ${(!dayTransportType && dayTripFromCity.trim()) || dayCity.trim()}`}
                       </option>
                       {options.map(o => (
                         <option key={o.id} value={o.id}>{o.name}</option>
@@ -1303,6 +1383,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 )}
                 {day.city_transfer && (
                   <p className="text-xs text-purple-700 mt-0.5">🚐 Local transfer</p>
+                )}
+                {day.day_trip_from && (
+                  <p className="text-xs text-teal-700 mt-0.5">↩️ Day trip from {day.day_trip_from} — the night is there</p>
                 )}
                 {day.property_by_tier && Object.values(day.property_by_tier).some(Boolean) && (
                   <p className="text-xs text-indigo-700 mt-0.5">

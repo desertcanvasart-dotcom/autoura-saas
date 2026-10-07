@@ -262,13 +262,11 @@ export default function RecordPaymentPage() {
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="bank_transfer">Bank Transfer</option>
-                <option value="airwallex">Airwallex</option>
                 <option value="tab">Tab</option>
                 <option value="credit_card">Credit Card</option>
                 <option value="cash">Cash</option>
                 <option value="paypal">PayPal</option>
                 <option value="stripe">Stripe</option>
-                <option value="wise">Wise</option>
               </select>
             </div>
 

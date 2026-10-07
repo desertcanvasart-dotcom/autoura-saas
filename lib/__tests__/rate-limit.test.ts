@@ -49,3 +49,33 @@ describe('getRateLimitIdentifier', () => {
     expect(getRateLimitIdentifier(req({ 'x-forwarded-for': '203.0.113.9' }), null)).toBe('ip:203.0.113.9')
   })
 })
+
+// The helper is only as good as its callers. Three public routes (the contact
+// form, and the shared-trip report and chat) each read the LEFTMOST
+// X-Forwarded-For entry themselves — the one value a client can set — so a
+// fake IP per request walked straight past their limits. Every route must go
+// through getClientIdentifier; only lib/rate-limit.ts reads the header.
+describe('no route reads X-Forwarded-For itself', () => {
+  it('only lib/rate-limit.ts touches the header', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs')
+    const { join, relative } = await import('node:path')
+    const root = process.cwd()
+    const files: string[] = []
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        if (name === 'node_modules' || name === '__tests__' || name.startsWith('.')) continue
+        const p = join(dir, name)
+        if (statSync(p).isDirectory()) walk(p)
+        else if (/\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name)) files.push(p)
+      }
+    }
+    for (const d of ['app', 'lib', 'components']) walk(join(root, d))
+    files.push(join(root, 'middleware.ts'))
+
+    const offenders = files
+      .filter(f => /['"`]x-forwarded-for['"`]/i.test(readFileSync(f, 'utf8')))
+      .map(f => relative(root, f))
+      .filter(f => f !== join('lib', 'rate-limit.ts'))
+    expect(offenders, 'use getClientIdentifier (lib/rate-limit.ts) instead').toEqual([])
+  })
+})

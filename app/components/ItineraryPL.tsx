@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { quotedMargin } from '@/lib/itineraries/margin'
 import { getCurrencySymbol } from '@/lib/currency'
+import type { TripPnL } from '@/lib/trip-pnl'
 import { 
-  TrendingUp, 
-  DollarSign, 
-  Percent,
+  TrendingUp,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
@@ -31,6 +31,9 @@ interface ItineraryPLProps {
   currency: string
   marginPercent?: number
   days: DayWithServices[]
+  /** The trip's real money so far (GET /api/profit-loss, lib/trip-pnl):
+   *  invoiced, minus expenses and commissions, in the trip's currency. */
+  actual?: TripPnL | null
 }
 
 interface PLBreakdown {
@@ -59,7 +62,8 @@ export default function ItineraryPL({
   totalCost, 
   currency, 
   marginPercent = 25,
-  days 
+  days,
+  actual,
 }: ItineraryPLProps) {
   const [expanded, setExpanded] = useState(false)
   const [breakdown, setBreakdown] = useState<PLBreakdown[]>([])
@@ -76,8 +80,6 @@ export default function ItineraryPL({
 
   const calculatePL = () => {
     const byType: Record<string, PLBreakdown> = {}
-    let totalSupplierCost = 0
-    let totalClientPrice = 0
 
     days.forEach(day => {
       (day.services || []).forEach(service => {
@@ -86,8 +88,6 @@ export default function ItineraryPL({
           ? Number(service.client_price) 
           : supplierCost * (1 + marginPercent / 100)
 
-        totalSupplierCost += supplierCost
-        totalClientPrice += clientPrice
 
         if (!byType[service.service_type]) {
           byType[service.service_type] = {
@@ -114,17 +114,15 @@ export default function ItineraryPL({
     })
 
     const sortedBreakdown = Object.values(byType).sort((a, b) => b.margin - a.margin)
-    const totalMargin = totalClientPrice - totalSupplierCost
-    const overallMarginPercent = totalSupplierCost > 0 
-      ? (totalMargin / totalSupplierCost) * 100 
-      : 0
+    // The same figure the page's minimum-margin warning reads.
+    const q = quotedMargin(days.flatMap(day => day.services || []), marginPercent)
 
     setBreakdown(sortedBreakdown)
     setTotals({
-      supplierCost: totalSupplierCost,
-      clientPrice: totalClientPrice,
-      margin: totalMargin,
-      marginPercent: overallMarginPercent
+      supplierCost: q.supplierCost,
+      clientPrice: q.clientPrice,
+      margin: q.margin,
+      marginPercent: q.percent
     })
   }
 
@@ -159,83 +157,86 @@ export default function ItineraryPL({
           </div>
           <div className="text-left">
             <h3 className="text-sm font-semibold text-gray-900">Profit & Loss</h3>
-            <p className="text-xs text-gray-500">Cost breakdown and margins</p>
+            <p className="text-xs text-gray-500">Quoted from the services; actual from invoices and expenses</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-xs text-gray-500">Supplier Cost</p>
-              <p className="text-sm font-medium text-gray-900">{formatCurrency(totals.supplierCost)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500">Client Price</p>
-              <p className="text-sm font-medium text-blue-600">{formatCurrency(totals.clientPrice)}</p>
-            </div>
-            <div className={`px-3 py-1.5 rounded-lg border ${getMarginBg(totals.marginPercent)}`}>
-              <p className="text-xs text-gray-500">Margin</p>
-              <p className={`text-sm font-bold ${getMarginColor(totals.marginPercent)}`}>
-                {formatCurrency(totals.margin)} ({totals.marginPercent.toFixed(1)}%)
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span className="hidden sm:inline">{expanded ? 'Hide breakdown' : 'By service type'}</span>
           {expanded ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
         </div>
       </button>
 
-      <div className="md:hidden px-5 pb-4 grid grid-cols-3 gap-3">
-        <div className="text-center p-2 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-500">Cost</p>
-          <p className="text-sm font-medium text-gray-900">{formatCurrency(totals.supplierCost)}</p>
+      {/* The four figures the trip turns on. Extra expenses are the costs
+          recorded that are NOT a booking supplier's confirmed cost (those are
+          already the supplier cost); net margin takes them and the
+          commissions off the quoted margin. Markup on cost, like the house
+          margin. */}
+      {(() => {
+        const extras = actual ? actual.other_expenses : null
+        const commission = actual ? actual.net_commission : 0
+        const net = totals.margin - (extras ?? 0) + commission
+        const base = totals.supplierCost + (extras ?? 0)
+        const netPercent = base > 0 ? (net / base) * 100 : 0
+        return (
+          <div className="px-5 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-500">Client price</p>
+              <p className="text-lg font-semibold text-blue-600">{formatCurrency(totals.clientPrice)}</p>
+              <p className="text-[11px] text-gray-400">What the client pays</p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-500">Supplier cost</p>
+              <p className="text-lg font-semibold text-gray-900">{formatCurrency(totals.supplierCost)}</p>
+              <p className="text-[11px] text-gray-400">The priced services</p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-500">Extra expenses</p>
+              <p className="text-lg font-semibold text-gray-900">{extras == null ? '—' : formatCurrency(extras)}</p>
+              <p className="text-[11px] text-gray-400">{extras == null ? 'Not loaded' : 'Recorded beyond the suppliers'}</p>
+            </div>
+            <div className={`p-3 rounded-lg border ${getMarginBg(netPercent)}`}>
+              <p className="text-xs text-gray-500">Net margin</p>
+              <p className={`text-lg font-bold ${getMarginColor(netPercent)}`}>{formatCurrency(net)} <span className="text-sm font-semibold">({netPercent.toFixed(1)}%)</span></p>
+              <p className="text-[11px] text-gray-500">
+                Quoted {formatCurrency(totals.margin)} ({totals.marginPercent.toFixed(1)}%)
+                {commission !== 0 && <> · commissions {commission > 0 ? '+' : ''}{formatCurrency(commission)}</>}
+              </p>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* What the trip has actually made so far — the Profit & Loss report's
+          own figures. The quoted margin above is on the services' costs; a
+          supplier's confirmed cost is an expense here, never counted twice. */}
+      {actual && (
+        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 text-xs flex flex-wrap items-center gap-x-5 gap-y-1">
+          <span className="font-semibold text-gray-700">Actual so far</span>
+          {actual.invoice_count === 0 ? (
+            <span className="text-gray-600">
+              No invoice yet{actual.total_expenses > 0 ? ` · costs recorded ${formatCurrency(actual.total_expenses)}` : ''}. Actual profit shows once the trip is invoiced.
+            </span>
+          ) : (
+            <>
+              <span className="text-gray-600">Invoiced <span className="font-medium text-gray-900">{formatCurrency(actual.total_revenue)}</span></span>
+              <span className="text-gray-600">Expenses <span className="font-medium text-gray-900">{formatCurrency(actual.total_expenses)}</span></span>
+              {actual.net_commission !== 0 && (
+                <span className="text-gray-600">Commissions <span className="font-medium text-gray-900">{actual.net_commission > 0 ? '+' : ''}{formatCurrency(actual.net_commission)}</span></span>
+              )}
+              <span className={`font-semibold ${getMarginColor(actual.profit_margin)}`}>
+                Profit {formatCurrency(actual.gross_profit)} ({actual.profit_margin.toFixed(1)}% of revenue)
+              </span>
+            </>
+          )}
+          {!actual.complete && (
+            <span className="text-amber-700">Incomplete: {actual.holes.length} line(s) in another currency had no rate and are left out.</span>
+          )}
         </div>
-        <div className="text-center p-2 bg-blue-50 rounded-lg">
-          <p className="text-xs text-gray-500">Price</p>
-          <p className="text-sm font-medium text-blue-600">{formatCurrency(totals.clientPrice)}</p>
-        </div>
-        <div className={`text-center p-2 rounded-lg ${getMarginBg(totals.marginPercent)}`}>
-          <p className="text-xs text-gray-500">Margin</p>
-          <p className={`text-sm font-bold ${getMarginColor(totals.marginPercent)}`}>{totals.marginPercent.toFixed(1)}%</p>
-        </div>
-      </div>
+      )}
 
       {expanded && (
         <div className="border-t border-gray-200">
-          <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50">
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-4 w-4 text-gray-400" />
-                <span className="text-xs text-gray-500">Supplier Cost</span>
-              </div>
-              <p className="text-xl font-semibold text-gray-900">{formatCurrency(totals.supplierCost)}</p>
-              <p className="text-xs text-gray-400 mt-1">What you pay</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-4 w-4 text-blue-500" />
-                <span className="text-xs text-gray-500">Client Price</span>
-              </div>
-              <p className="text-xl font-semibold text-blue-600">{formatCurrency(totals.clientPrice)}</p>
-              <p className="text-xs text-gray-400 mt-1">What client pays</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-gray-500">Gross Profit</span>
-              </div>
-              <p className={`text-xl font-semibold ${getMarginColor(totals.marginPercent)}`}>{formatCurrency(totals.margin)}</p>
-              <p className="text-xs text-gray-400 mt-1">Your earnings</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Percent className="h-4 w-4 text-purple-500" />
-                <span className="text-xs text-gray-500">Margin %</span>
-              </div>
-              <p className={`text-xl font-semibold ${getMarginColor(totals.marginPercent)}`}>{totals.marginPercent.toFixed(1)}%</p>
-              <p className="text-xs text-gray-400 mt-1">Markup on cost</p>
-            </div>
-          </div>
-
           <div className="p-5">
             <h4 className="text-sm font-semibold text-gray-900 mb-4">Breakdown by Service Type</h4>
             <div className="space-y-3">

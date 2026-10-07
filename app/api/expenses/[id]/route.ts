@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { EXPENSE_STATUSES, expenseStatusUpdate } from '@/lib/expense-status'
 
 export async function GET(
   _request: NextRequest,
@@ -77,6 +78,7 @@ export async function PUT(
       'expense_date',
       'supplier_id',
       'supplier_name',
+      'supplier_type',
       'itinerary_id',
       'booking_id',
       'notes',
@@ -87,6 +89,31 @@ export async function PUT(
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
     for (const field of allowedFields) {
       if (body[field] !== undefined) updateData[field] = body[field]
+    }
+
+    // Status moves here too. It was left off the list above, so every
+    // Approve / Mark as paid button (Expenses, Payables, the edit form) sent
+    // a status that was silently dropped — and the expense never moved. The
+    // payment date follows it: set on paid (today unless given), cleared
+    // when the expense is no longer paid.
+    if (body.status !== undefined) {
+      const status = expenseStatusUpdate(body.status, body.payment_date)
+      if (!status) {
+        return NextResponse.json({ success: false, error: `status must be one of: ${EXPENSE_STATUSES.join(', ')}` }, { status: 400 })
+      }
+      Object.assign(updateData, status)
+    }
+
+    // A picked supplier must be one of this agency's (RLS scopes the read).
+    if (updateData.supplier_id) {
+      const { data: supplier } = await supabase
+        .from('suppliers')
+        .select('id')
+        .eq('id', updateData.supplier_id)
+        .maybeSingle()
+      if (!supplier) {
+        return NextResponse.json({ success: false, error: 'Supplier not found or access denied' }, { status: 404 })
+      }
     }
 
     const { data, error } = await supabase

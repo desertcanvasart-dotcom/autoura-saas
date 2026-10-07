@@ -1,12 +1,25 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
-import type { GridDay, GridConfig, AllRates, SlotValue, DayCalc, SelectedItem, DayType, Intercity } from '../types'
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
+import type { GridDay, GridConfig, AllRates, SlotValue, DayCalc, SelectedItem, DayType, Intercity, SlotDefinition } from '../types'
 import { GROUP_SLOTS, PP_SLOTS, DAY_TYPES, DAY_TYPE_LABELS, DEFAULT_DAY_TYPE, DAY_TYPE_DEFAULTS } from '../types'
 import { calculateDay, convertAmount } from '../lib/calculator'
 import SlotRow from './SlotRow'
 import CitySelect from '@/components/CitySelect'
+import BlockPicker from '@/components/day-blocks/BlockPicker'
+import type { GridBlock } from '@/lib/day-blocks/grid-apply'
+
+/** A day block on a day: laid on it, suggested for it, or none fitting. */
+export interface BlockNote {
+  kind: 'applied' | 'suggested' | 'unmatched'
+  code: string | null
+  /** Who chose it: by hand, by the shorthand in the text, or by the AI. */
+  by?: 'manual' | 'shorthand' | 'ai'
+  /** What no rate answered: the operator picks it. */
+  toPick: string[]
+  reason?: string | null
+}
 
 interface DayRowProps {
   day: GridDay
@@ -17,9 +30,20 @@ interface DayRowProps {
   onUpdateSlot: (slotId: string, value: SlotValue) => void
   onUpdateDay: (partial: Partial<GridDay>) => void
   onRemoveDay: () => void
+  /** Copy one service to every day of the trip (offered on Water). */
+  onApplyToAllDays?: (slotId: string, value: SlotValue) => void
+  /** The agency's day blocks, to lay one onto this day. */
+  blocks?: GridBlock[]
+  onApplyBlock?: (block: GridBlock) => void
+  /** What a day block did (or would do) for this day. */
+  blockNote?: BlockNote
+  onDismissBlockNote?: () => void
 }
 
-export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay }: DayRowProps) {
+/** Services offered "Apply to all days" — a daily item, not a one-off. */
+const APPLY_TO_ALL_SLOTS = new Set(['water'])
+
+export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote }: DayRowProps) {
   const calc: DayCalc = calculateDay(day, config)
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
   const sym = config.currency === 'EUR' ? '€' : config.currency === 'USD' ? '$' : config.currency === 'GBP' ? '£' : config.currency
@@ -52,9 +76,29 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
     return slot?.selectedItems || []
   }
 
-  // Count filled slots for collapsed summary
-  const filledSlots = day.slots.filter(s => s.selectedItems.length > 0 || s.customAmount > 0).length
-  const totalSlots = day.slots.length
+  // An open day lists the services it HAS; the empty ones wait behind
+  // "Add service" (or "Show all") instead of filling the page with
+  // "— Select —" rows.
+  const [showEmpty, setShowEmpty] = useState(false)
+  const [revealed, setRevealed] = useState<Set<string>>(() => new Set())
+  const isFilled = (slotId: string) => {
+    const slot = day.slots.find(s => s.slotId === slotId)
+    return !!slot && (slot.selectedItems.length > 0 || slot.customAmount > 0)
+  }
+  const offered = (def: SlotDefinition) => def.slotId !== 'guide' || config.withGuide
+  const shown = (def: SlotDefinition) =>
+    offered(def) && (isFilled(def.slotId) || showEmpty || revealed.has(def.slotId))
+  const addable = [...GROUP_SLOTS, ...PP_SLOTS].filter(def => offered(def) && !shown(def))
+
+  // The collapsed day's services, as names.
+  const chosen = [...GROUP_SLOTS, ...PP_SLOTS]
+    .filter(offered)
+    .flatMap(def => {
+      const slot = day.slots.find(s => s.slotId === def.slotId)
+      if (!slot) return []
+      if (slot.customAmount > 0) return [`${def.label} ${sym}${cv(slot.customAmount).toFixed(0)}`]
+      return slot.selectedItems.map(i => i.name)
+    })
 
   // Filter options by day city/context — show only relevant items
   const getFilteredOptions = (slotId: string) => {
@@ -225,8 +269,23 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
   const getAllOptions = (slotId: string) => getSlotOptions(slotId)
 
+  const renderSlot = (def: SlotDefinition) => (
+    <SlotRow
+      key={def.slotId}
+      definition={def}
+      value={getSlotValue(def.slotId)}
+      options={getFilteredOptions(def.slotId)}
+      allOptions={getAllOptions(def.slotId)}
+      passport={config.passport}
+      onChange={(val) => onUpdateSlot(def.slotId, val)}
+      onApplyToAllDays={onApplyToAllDays && APPLY_TO_ALL_SLOTS.has(def.slotId) && allDays.length > 1
+        ? () => onApplyToAllDays(def.slotId, getSlotValue(def.slotId))
+        : undefined}
+    />
+  )
+
   return (
-    <div className={`bg-white border rounded-xl shadow-sm overflow-hidden transition-shadow ${
+    <div id={`grid-day-${day.id}`} className={`scroll-mt-24 bg-white border rounded-xl shadow-sm overflow-hidden transition-shadow ${
       day.isExpanded ? 'shadow-md ring-1 ring-gray-200' : 'hover:shadow-md'
     }`}>
       {/* Day Header — always visible, acts as collapsed summary card */}
@@ -264,19 +323,26 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
               aria-label="City"
               className="text-xs text-gray-500 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 w-28"
             />
-            {/* Collapsed mini summary: show key cost breakdown */}
-            {!day.isExpanded && calc.dailyPerPerson > 0 && (
-              <div className="hidden sm:flex items-center gap-2 text-[10px] text-gray-400">
-                <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded font-medium">
-                  Grp {sym}{cv(calc.groupPerPerson).toFixed(0)}
-                </span>
-                <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded font-medium">
-                  PP {sym}{cv(calc.perPersonTotal).toFixed(0)}
-                </span>
-                <span className="text-gray-300">{filledSlots}/{totalSlots} slots</span>
-              </div>
-            )}
           </div>
+          {/* Collapsed: what the day has, at a glance */}
+          {!day.isExpanded && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              {chosen.length === 0 ? (
+                <span className="text-[11px] text-gray-400 italic">No services yet</span>
+              ) : (
+                <>
+                  {chosen.slice(0, 6).map((name, i) => (
+                    <span key={i} className="max-w-[220px] truncate px-1.5 py-0.5 text-[11px] bg-gray-100 text-gray-600 rounded">
+                      {name}
+                    </span>
+                  ))}
+                  {chosen.length > 6 && (
+                    <span className="text-[11px] text-gray-400">+{chosen.length - 6} more</span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Price */}
@@ -291,6 +357,9 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
+          {blocks && onApplyBlock && (
+            <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
+          )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemoveDay() }}
@@ -308,6 +377,43 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
         </div>
       </div>
 
+      {/* What a day block did here, or why none did. */}
+      {blockNote && (() => {
+        const suggested = blockNote.kind === 'suggested' && blockNote.code ? blocks?.find(b => b.code === blockNote.code) : undefined
+        const tone = blockNote.kind === 'applied' && blockNote.toPick.length === 0
+          ? 'bg-green-50 border-green-100 text-green-900'
+          : 'bg-amber-50 border-amber-100 text-amber-900'
+        const by = blockNote.by === 'shorthand' ? ' (your shorthand)' : blockNote.by === 'ai' ? ' (matched by AI)' : ''
+        return (
+          <div className={`px-4 py-2 border-t text-xs flex items-start justify-between gap-2 ${tone}`} onClick={(e) => e.stopPropagation()}>
+            <span>
+              {blockNote.kind === 'applied' && (
+                <>
+                  From day block {blockNote.code}{by}.
+                  {blockNote.toPick.length > 0 && <> No rate found &mdash; pick these yourself: {blockNote.toPick.join('; ')}.</>}
+                </>
+              )}
+              {blockNote.kind === 'suggested' && (
+                <>
+                  Looks like day block {blockNote.code}{blockNote.reason ? ` — ${blockNote.reason}` : ''}. Not applied: confirm it.
+                  {suggested && onApplyBlock && (
+                    <button type="button" onClick={() => onApplyBlock(suggested)} className="ml-2 font-medium underline">
+                      Use {suggested.code}
+                    </button>
+                  )}
+                </>
+              )}
+              {blockNote.kind === 'unmatched' && (
+                <>No day block fits this day{blockNote.reason ? ` (${blockNote.reason})` : ''}: its services are the AI&rsquo;s reading of your text &mdash; check them.</>
+              )}
+            </span>
+            {onDismissBlockNote && (
+              <button type="button" onClick={onDismissBlockNote} className="shrink-0 hover:underline">Dismiss</button>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Expanded Grid */}
       {day.isExpanded && (
         <div>
@@ -317,8 +423,8 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
               <textarea
                 value={day.description}
                 onChange={(e) => onUpdateDay({ description: e.target.value })}
-                rows={1}
-                className="w-full text-xs text-gray-500 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 resize-none"
+                rows={2}
+                className="w-full text-xs leading-5 text-gray-600 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 resize-none"
                 placeholder="Day description / activities..."
               />
             </div>
@@ -417,18 +523,10 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 {sym}{cv(calc.groupTotal).toFixed(2)} ÷ {config.pax} pax = <strong>{sym}{cv(calc.groupPerPerson).toFixed(2)}/pp</strong>
               </span>
             </div>
-            {GROUP_SLOTS.map(def => (
-              <SlotRow
-                key={def.slotId}
-                definition={def}
-                value={getSlotValue(def.slotId)}
-                options={getFilteredOptions(def.slotId)}
-                allOptions={getAllOptions(def.slotId)}
-                passport={config.passport}
-                onChange={(val) => onUpdateSlot(def.slotId, val)}
-                hidden={def.slotId === 'guide' && !config.withGuide}
-              />
-            ))}
+            {GROUP_SLOTS.filter(shown).map(def => renderSlot(def))}
+            {!GROUP_SLOTS.some(shown) && (
+              <div className="px-4 py-2 text-[11px] text-gray-400 italic">No group services</div>
+            )}
           </div>
 
           {/* PER-PERSON SERVICES */}
@@ -439,17 +537,37 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 <strong>{sym}{cv(calc.perPersonTotal).toFixed(2)}/pp</strong>
               </span>
             </div>
-            {PP_SLOTS.map(def => (
-              <SlotRow
-                key={def.slotId}
-                definition={def}
-                value={getSlotValue(def.slotId)}
-                options={getFilteredOptions(def.slotId)}
-                allOptions={getAllOptions(def.slotId)}
-                passport={config.passport}
-                onChange={(val) => onUpdateSlot(def.slotId, val)}
-              />
-            ))}
+            {PP_SLOTS.filter(shown).map(def => renderSlot(def))}
+            {!PP_SLOTS.some(shown) && (
+              <div className="px-4 py-2 text-[11px] text-gray-400 italic">No per-person services</div>
+            )}
+          </div>
+
+          {/* Add a service this day does not have yet */}
+          <div className="px-4 py-2 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
+            {addable.length > 0 && (
+              <>
+                <span className="text-[11px] font-medium text-gray-500 mr-1">Add service:</span>
+                {addable.map(def => (
+                  <button
+                    key={def.slotId}
+                    type="button"
+                    onClick={() => setRevealed(prev => new Set(prev).add(def.slotId))}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-gray-600 bg-white border border-gray-200 rounded-full hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50"
+                  >
+                    <Plus className="w-3 h-3" />
+                    {def.label}
+                  </button>
+                ))}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => { setShowEmpty(v => !v); setRevealed(new Set()) }}
+              className="ml-auto text-[11px] text-gray-400 hover:text-gray-700 underline-offset-2 hover:underline"
+            >
+              {showEmpty ? 'Hide empty services' : 'Show all services'}
+            </button>
           </div>
 
           {/* DAY TOTAL */}

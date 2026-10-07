@@ -13,6 +13,7 @@
 // details, other assignments, or anything else on the itinerary.
 
 import { generateShareToken, isValidShareToken, str } from '@/lib/itinerary-share'
+import { parseManualAssignee } from '@/lib/notify/assignment-message'
 
 export const generateStaffToken = generateShareToken
 export const isValidStaffToken = isValidShareToken
@@ -75,6 +76,13 @@ export function toStaffView(
 // the staff tap route's actor resolution: person-types only — a hotel or
 // restaurant is a venue, not a link-holder.
 
+/** Who holds an assignment: for the wa.me handoff (phone) and the email brief. */
+export interface AssigneeContact {
+  name: string | null
+  phone: string | null
+  email: string | null
+}
+
 type ContactClient = {
   from: (table: string) => {
     select: (cols: string) => {
@@ -86,7 +94,20 @@ type ContactClient = {
 export async function resolveAssigneeContact(
   supabase: ContactClient,
   resource: { resource_type?: string | null; resource_id?: string | null; resource_name?: string | null }
-): Promise<{ name: string | null; phone: string | null } | null> {
+): Promise<AssigneeContact | null> {
+  const found = await lookupAssigneeContact(supabase, resource)
+  if (found?.phone) return found
+  // Typed in by hand for this trip: no directory row, so the phone lives in
+  // the saved name ("Name · +20 … (outside)").
+  const manual = parseManualAssignee(resource?.resource_name)
+  if (manual) return { name: manual.name, phone: manual.phone, email: found?.email ?? null }
+  return found
+}
+
+async function lookupAssigneeContact(
+  supabase: ContactClient,
+  resource: { resource_type?: string | null; resource_id?: string | null; resource_name?: string | null }
+): Promise<AssigneeContact | null> {
   try {
     const type = resource?.resource_type
     const rid = resource?.resource_id
@@ -95,22 +116,22 @@ export async function resolveAssigneeContact(
     const pick = (row: Record<string, unknown> | null) => {
       if (!row) return null
       const phone = str(row.whatsapp) ?? str(row.phone)
-      return { name: str(row.name) ?? str(resource.resource_name), phone }
+      return { name: str(row.name) ?? str(resource.resource_name), phone, email: str(row.email) }
     }
 
     if (type === 'driver') {
-      const { data } = await supabase.from('team_members').select('name, phone, whatsapp').eq('id', rid).maybeSingle()
+      const { data } = await supabase.from('team_members').select('name, phone, whatsapp, email').eq('id', rid).maybeSingle()
       return pick(data)
     }
     if (type === 'vehicle') {
       const { data: v } = await supabase.from('vehicles').select('default_driver_id, default_driver_name, default_driver_phone').eq('id', rid).maybeSingle()
       if (v && typeof v.default_driver_id === 'string') {
-        const { data: tm } = await supabase.from('team_members').select('name, phone, whatsapp').eq('id', v.default_driver_id).maybeSingle()
+        const { data: tm } = await supabase.from('team_members').select('name, phone, whatsapp, email').eq('id', v.default_driver_id).maybeSingle()
         const picked = pick(tm)
         if (picked?.phone) return picked
       }
       if (!v) return null
-      return { name: str(v.default_driver_name) ?? str(resource.resource_name), phone: str(v.default_driver_phone) }
+      return { name: str(v.default_driver_name) ?? str(resource.resource_name), phone: str(v.default_driver_phone), email: null }
     }
     if (type === 'guide') {
       // Guides live in the SUPPLIERS table (supplier_type='guide') — that is
@@ -118,20 +139,20 @@ export async function resolveAssigneeContact(
       // The standalone guides table is legacy; check it second so old
       // assignment rows still resolve.
       const { data: sup } = await supabase
-        .from('suppliers').select('name, phone, contact_phone, whatsapp').eq('id', rid).maybeSingle()
+        .from('suppliers').select('name, phone, contact_phone, whatsapp, email, contact_email').eq('id', rid).maybeSingle()
       if (sup) {
         const phone = str(sup.whatsapp) ?? str(sup.phone) ?? str(sup.contact_phone)
-        return { name: str(sup.name) ?? str(resource.resource_name), phone }
+        return { name: str(sup.name) ?? str(resource.resource_name), phone, email: str(sup.email) ?? str(sup.contact_email) }
       }
       const { data: legacy } = await supabase
-        .from('guides').select('name, phone, whatsapp').eq('id', rid).maybeSingle()
+        .from('guides').select('name, phone, whatsapp, email').eq('id', rid).maybeSingle()
       return pick(legacy)
     }
     const table = type === 'airport_staff' ? 'airport_staff'
       : type === 'hotel_staff' ? 'hotel_staff'
       : null
     if (!table) return null
-    const { data } = await supabase.from(table).select('name, phone, whatsapp').eq('id', rid).maybeSingle()
+    const { data } = await supabase.from(table).select('name, phone, whatsapp, email').eq('id', rid).maybeSingle()
     return pick(data)
   } catch {
     return null

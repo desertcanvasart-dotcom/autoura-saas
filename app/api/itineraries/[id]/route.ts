@@ -42,7 +42,10 @@ export async function GET(
     if (url.searchParams.get('include') === 'days') {
       const { data: days } = await supabase
         .from('itinerary_days')
-        .select('*, itinerary_services(*)')
+        // Hinted — two keys to itinerary_days make the bare embed ambiguous
+        // (PGRST201), and this load (the grid's "load itinerary") came back
+        // with no days at all.
+        .select('*, itinerary_services!itinerary_services_day_id_fkey(*)')
         .eq('itinerary_id', id)
         .order('day_number', { ascending: true })
       ;(data as any).itinerary_days = days || []
@@ -118,6 +121,10 @@ export async function PUT(
     if (body.num_children !== undefined) updateData.num_children = body.num_children
     if (body.total_cost !== undefined) updateData.total_cost = body.total_cost
     if (body.status !== undefined) updateData.status = body.status
+    // Cancelling records when and why; reopening clears both.
+    if (body.cancellation_reason !== undefined) updateData.cancellation_reason = body.cancellation_reason || null
+    if (body.status === 'cancelled') updateData.cancelled_at = new Date().toISOString()
+    else if (body.status !== undefined) { updateData.cancelled_at = null; updateData.cancellation_reason = null }
     if (body.notes !== undefined) updateData.notes = body.notes
 
     // Assignments consolidated (mig 289): the assigned_* columns are DERIVED

@@ -42,7 +42,9 @@ export default function SupplierInvoiceDetail() {
 
   const action = async (key: string, fn: () => Promise<Response>) => {
     setBusy(key)
-    try { const res = await fn(); const d = await res.json(); if (!res.ok || d.success === false) showToast('error', d.error || 'Action failed'); await load() }
+    try { const res = await fn(); const d = await res.json(); if (!res.ok || d.success === false) showToast('error', d.error || 'Action failed')
+      else if (key === 'pay') showToast('success', d.expenses_paid ? `Paid — ${d.expenses_paid} matched expense${d.expenses_paid === 1 ? '' : 's'} marked paid too` : 'Paid')
+      await load() }
     catch (e) { console.error(e) } finally { setBusy(null) }
   }
 

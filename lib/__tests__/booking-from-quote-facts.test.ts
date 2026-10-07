@@ -188,3 +188,18 @@ describe('/api/bookings/from-quote client_id', () => {
     expect(source).not.toMatch(/client_id:\s*b2cQuote\?\.client_id \?\? ['"]/)
   })
 })
+
+// The grid's B2B quotes store the table keyed by group size — the shape the
+// quote pages read — so the booking reads it too.
+describe('a pricing table keyed by group size', () => {
+  const keyed = { '2': { pp: 450, total: 900 }, '4': { pp: 400, total: 1600 } }
+  it('answers the total for the quote’s own group size', () => {
+    expect(b2bTotalAmount(quote({ pricing_table: keyed }), 4)).toEqual({ ok: true, value: 1600 })
+  })
+  it('a single keyed row answers the travellers', () => {
+    expect(b2bNumTravelers(quote({ pricing_table: { '3': { pp: 500, total: 1500 } } }))).toEqual({ ok: true, value: 3 })
+  })
+  it('a non-numeric key is not a row', () => {
+    expect(b2bNumTravelers(quote({ pricing_table: { two: { pp: 1, total: 2 } } })).ok).toBe(false)
+  })
+})

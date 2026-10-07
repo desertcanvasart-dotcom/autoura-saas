@@ -62,12 +62,14 @@ import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/l
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
 import { guideLanguageKey, pickGuideRateRow, type GuideRateRow } from '@/lib/guides/guide-language'
 import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
+import { dayTripFrom } from '@/lib/pricing/day-trip'
 import { selectVehicleFromPackage, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
+import { priceByBasis, toPricingBasis, unitsFor, type PricingBasis } from '@/lib/pricing/pricing-basis'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -212,6 +214,11 @@ export interface ItineraryDay {
    *  whatever else happens to be in that city. Absent = the engine picks, as
    *  it always has. */
   property_by_tier?: Record<string, string>
+  /** A DAY TRIP (lib/pricing/day-trip): the city the party goes to and comes
+   *  back from the same day. `city` is then where it is STAYING — the hotel,
+   *  the road moves before and after — and the vehicle is the Intercity Day
+   *  Trip from `city` to here. Absent = an ordinary day. */
+  day_trip_to?: string
   /** A transfer to somewhere else in town that is NOT sightseeing: the sound &
    *  light show, the market in Luxor or Aswan, an evening out. A day tour is
    *  the sightseeing; this is the getting there and back (operator,
@@ -605,6 +612,10 @@ export function determineTransportNeeds(
   area: TransportArea
   useSpecialVehicle: boolean
   specialVehicleType?: VehicleType
+  /** The road the vehicle runs when it is not "yesterday's city → today's":
+   *  a day trip's stay → sightseeing city. */
+  originCity?: string
+  destinationCity?: string
 } {
   // Check for explicit overrides first
   if (day.transport?.service_type) {
@@ -640,6 +651,21 @@ export function determineTransportNeeds(
       duration: 'one_way',
       area: null,
       useSpecialVehicle: false
+    }
+  }
+
+  // A day trip (lib/pricing/day-trip): out from where the party stays to the
+  // sightseeing city and back the same day — the agency's "Intercity Day
+  // Trip", priced on that road. Whatever city the day before was in, the
+  // party is based here tonight, so it is not a road move.
+  if (day.day_trip_to) {
+    return {
+      serviceType: 'intercity_day_trip',
+      duration: 'full_day',
+      area: null,
+      useSpecialVehicle: false,
+      originCity: day.city,
+      destinationCity: day.day_trip_to,
     }
   }
 
@@ -887,6 +913,11 @@ export function parseItinerary(itineraryData: any, opts?: {
     // tour, not from anything it says, so they do not make it a stated day.
     const asksForNothing = attractions.length === 0 && !hasAttractions
 
+    // A day trip is filed under where the party STAYS; the sightseeing city
+    // rides beside it (lib/pricing/day-trip).
+    const tripFrom = dayTripFrom({ ...day, transport_type })
+    const dayCity = day.city || inferCityFromTitle(day.title || '')
+
     return {
       day: day.day || index + 1,
       title: day.title || `Day ${index + 1}`,
@@ -900,7 +931,8 @@ export function parseItinerary(itineraryData: any, opts?: {
       /** A day-tour day that names no attraction: the guide, the vehicle and
        *  the tips are asked for, but its entrance fees cannot be. */
       dayTourWithoutAttractions: isDayTour && !saysNoSightseeing && attractions.length === 0 && attraction_ids.length === 0,
-      city: day.city || inferCityFromTitle(day.title || ''),
+      city: tripFrom ?? dayCity,
+      ...(tripFrom ? { day_trip_to: String(day.city).trim() } : {}),
       // A sleeping-train night has no hotel bed — the ticket IS the bed
       // (B-item 2); the sleeper night joins the rooming list instead.
       // A day tour has no overnight, whatever the day says: three live
@@ -2083,6 +2115,31 @@ export async function getAirportServiceRate(
   direction: 'arrival' | 'departure',
   serviceType: AirportServiceType = 'meet_greet'
 ): Promise<number | null> {
+  return (await getAirportServiceRateDetail(scope, airportCode, direction, serviceType))?.rate ?? null
+}
+
+/** An airport or hotel assistance rate, with how it applies to the group
+ *  (migration 393: per group / per person / per unit). */
+export interface StaffServiceRate {
+  rate: number
+  basis: PricingBasis
+  capacity: number | null
+}
+
+function staffRateOf(row: unknown): StaffServiceRate | null {
+  const r = row as { rate_eur?: unknown; pricing_type?: unknown; max_capacity?: unknown } | undefined
+  if (!r || typeof r.rate_eur !== 'number') return null
+  const capacity = typeof r.max_capacity === 'number' && r.max_capacity > 0 ? r.max_capacity : null
+  return { rate: r.rate_eur, basis: toPricingBasis(r.pricing_type) ?? 'flat', capacity }
+}
+
+/** getAirportServiceRate, with the rate's pricing basis. */
+export async function getAirportServiceRateDetail(
+  scope: CatalogScope,
+  airportCode: string,
+  direction: 'arrival' | 'departure',
+  serviceType: AirportServiceType = 'meet_greet'
+): Promise<StaffServiceRate | null> {
   try {
     const { data: rawAirportRates } = await getSupabaseAdmin()
       .from('airport_staff_rates')
@@ -2110,8 +2167,7 @@ export async function getAirportServiceRate(
       return null
     }
 
-    const rate = (rates[0] as any).rate_eur
-    return typeof rate === 'number' ? rate : null
+    return staffRateOf(rates[0])
   } catch (err) {
     return null
   }
@@ -2125,10 +2181,19 @@ export async function getHotelServiceRate(
   serviceType: HotelServiceType,
   tier: ServiceTier
 ): Promise<number | null> {
+  return (await getHotelServiceRateDetail(scope, serviceType, tier))?.rate ?? null
+}
+
+/** getHotelServiceRate, with the rate's pricing basis. */
+export async function getHotelServiceRateDetail(
+  scope: CatalogScope,
+  serviceType: HotelServiceType,
+  tier: ServiceTier
+): Promise<StaffServiceRate | null> {
   try {
     const category = getTierCategory(tier, await tenantTierLadder(scope.tenantId))
 
-    const lookup = async (type: HotelServiceType): Promise<number | null> => {
+    const lookup = async (type: HotelServiceType): Promise<StaffServiceRate | null> => {
       const { data: rawHotelStaffRates } = await getSupabaseAdmin()
         .from('hotel_staff_rates')
         .select('*')
@@ -2143,8 +2208,7 @@ export async function getHotelServiceRate(
         .limit(1)
       const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
       if (!rates || rates.length === 0) return null
-      const rate = (rates[0] as any).rate_eur
-      return typeof rate === 'number' ? rate : null
+      return staffRateOf(rates[0])
     }
 
     const direct = await lookup(serviceType)
@@ -2577,8 +2641,9 @@ export async function previewDayTransport(
       if (requiresHere && day.city) {
         const needs = determineTransportNeeds(day, previousDay, nextDay, roadShape)
         const intercity = isIntercityType(String(needs.serviceType))
-        lookup(String(needs.serviceType), day.city, intercity ? { from: previousDay?.city ?? '', to: day.city } : undefined, [],
-          intercity ? `${String(needs.serviceType).replace(/_/g, ' ')} ${previousDay?.city ?? '?'} → ${day.city}` : String(needs.serviceType).replace(/_/g, ' '), true)
+        const from = needs.originCity ?? previousDay?.city, to = needs.destinationCity ?? day.city
+        lookup(String(needs.serviceType), to, intercity ? { from: from ?? '', to } : undefined, [],
+          intercity ? `${String(needs.serviceType).replace(/_/g, ' ')} ${from ?? '?'} → ${to}${needs.originCity ? ' and back' : ''}` : String(needs.serviceType).replace(/_/g, ' '), true)
       }
     }
     // The extras — the derived ones (dinner, local, the road legs of a ticket),
@@ -3637,6 +3702,10 @@ export async function calculateDayBasedPricing(
   // ============================================
 
   let fixedCosts = 0
+  // Airport / hotel assistance priced per person (migration 393) scales with
+  // the group; per-unit rates are sized at the requested pax.
+  let staffPerPax = 0
+  const staffPax = requestedPax ?? 2
 
   // The throughout guide's beds (STEP 5) and ticket seats (B-item 2) are
   // fixed costs too.
@@ -3753,6 +3822,28 @@ export async function calculateDayBasedPricing(
       }
     }
 
+    // ----- AIRPORT / HOTEL ASSISTANCE: per group, per person or per unit -----
+    // (migration 393). A per-person rate scales with the group like an
+    // entrance fee; per group and per unit are fixed costs, a unit sized at
+    // the requested pax like a per-unit activity boat.
+    const priceStaff = (info: StaffServiceRate) => {
+      const line = priceByBasis(info.rate, info.basis, staffPax, info.capacity)
+      if (line.isPerPax) staffPerPax += info.rate
+      else fixedCosts += line.lineTotal
+      return {
+        quantity: 1,
+        quantityMode: line.isPerPax ? ('per_pax' as const) : ('fixed' as const),
+        unitCost: info.rate,
+        // A per-pax line stores the per-PERSON figure (scaled by pax later);
+        // a fixed line stores its group total.
+        lineTotal: line.isPerPax ? info.rate : line.lineTotal,
+        isPerPax: line.isPerPax,
+        ...(info.basis === 'per_unit'
+          ? { notes: `${unitsFor(staffPax, info.capacity)} unit(s)${info.capacity ? ` of ${info.capacity}` : ''} × ${info.rate}` }
+          : {}),
+      }
+    }
+
     // ----- SERVICE LEVELS -----
     // Each defaults to the level that has always been charged, so an itinerary
     // that does not specify one prices exactly as it did before.
@@ -3785,14 +3876,14 @@ export async function calculateDayBasedPricing(
         })
         return
       }
-      const rate = await getAirportServiceRate(catalogScope, code, direction, airportLevel)
+      const rate = await getAirportServiceRateDetail(catalogScope, code, direction, airportLevel)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id, dayNumber: day.day, serviceType: 'airport_service',
           serviceName: `${label} (${code}) — ${flightLeg!.from} → ${flightLeg!.to}`,
-          quantity: 1, quantityMode: 'fixed', unitCost: rate, lineTotal: rate,
-          rateSource: 'airport_staff_rates', isPerPax: false, isOptional: false,
+          ...priced,
+          rateSource: 'airport_staff_rates', isOptional: false,
         })
       } else {
         addHole({
@@ -3818,7 +3909,7 @@ export async function calculateDayBasedPricing(
     if (meetOnArrival) {
       const airportCode = connectionArrival ? routeAirportCode(landsAt) : getAirportCode(landsAt)
       const rate = airportCode
-        ? await getAirportServiceRate(catalogScope, airportCode, 'arrival', airportLevel)
+        ? await getAirportServiceRateDetail(catalogScope, airportCode, 'arrival', airportLevel)
         : null
       if (!airportCode) {
         addHole({
@@ -3832,18 +3923,14 @@ export async function calculateDayBasedPricing(
         })
       }
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-airport-arrival`,
           dayNumber: day.day,
           serviceType: 'airport_service',
           serviceName: `Airport Meet & Greet (${airportCode})`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'airport_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else if (airportCode) {
@@ -3862,7 +3949,7 @@ export async function calculateDayBasedPricing(
     if (day.services.airport_departure) {
       const airportCode = getAirportCode(day.city)
       const rate = airportCode
-        ? await getAirportServiceRate(catalogScope, airportCode, 'departure', airportLevel)
+        ? await getAirportServiceRateDetail(catalogScope, airportCode, 'departure', airportLevel)
         : null
       if (!airportCode) {
         addHole({
@@ -3876,18 +3963,14 @@ export async function calculateDayBasedPricing(
         })
       }
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-airport-departure`,
           dayNumber: day.day,
           serviceType: 'airport_service',
           serviceName: `Airport Departure Assist (${airportCode})`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'airport_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else if (airportCode) {
@@ -3905,20 +3988,16 @@ export async function calculateDayBasedPricing(
 
     // ----- HOTEL SERVICES (fixed per service) -----
     if (day.services.hotel_checkin) {
-      const rate = await getHotelServiceRate(catalogScope, checkinLevel, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, checkinLevel, tier)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-hotel-checkin`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
           serviceName: `Hotel ${HOTEL_LEVEL_LABEL[checkinLevel]}`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'hotel_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else {
@@ -3935,20 +4014,16 @@ export async function calculateDayBasedPricing(
     }
 
     if (day.services.hotel_checkout) {
-      const rate = await getHotelServiceRate(catalogScope, checkoutLevel, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, checkoutLevel, tier)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-hotel-checkout`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
           serviceName: `Hotel ${HOTEL_LEVEL_LABEL[checkoutLevel]}`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'hotel_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else {
@@ -3976,20 +4051,16 @@ export async function calculateDayBasedPricing(
       [boarding.disembark, checkoutLevel, 'cruise-disembark', 'Cruise Leaving Assistance'],
     ] as const) {
       if (!wanted) continue
-      const rate = await getHotelServiceRate(catalogScope, level, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, level, tier)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-${id}`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
           serviceName: name,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'hotel_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else {
@@ -4303,7 +4374,7 @@ export async function calculateDayBasedPricing(
     })
   }
 
-  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax + activitiesPerPax
+  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax + activitiesPerPax + staffPerPax
 
 
 
@@ -4477,8 +4548,9 @@ export async function calculateDayBasedPricing(
       duration: needs.duration,
       area: needs.area,
       vehicleType,
-      originCity: itinerary[info.day - 2]?.city, // Previous day city for intercity
-      destinationCity: info.city
+      // Previous day city for intercity; a day trip names its own road.
+      originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
+      destinationCity: needs.destinationCity ?? info.city
     })
 
     if (match && match.source === 'db') {
@@ -4486,7 +4558,7 @@ export async function calculateDayBasedPricing(
         id: `day${info.day}-transport`,
         dayNumber: info.day,
         serviceType: 'transportation',
-        serviceName: match.rate.route_name || `${vehicleType} - ${info.city}`,
+        serviceName: match.rate.route_name || (needs.originCity ? `${vehicleType} - ${needs.originCity} → ${needs.destinationCity} and back` : `${vehicleType} - ${info.city}`),
         quantity: 1,
         quantityMode: 'fixed',
         unitCost: match.rate.base_rate_eur,
@@ -4507,7 +4579,7 @@ export async function calculateDayBasedPricing(
         vehicleType,
         lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
         message: isIntercity(String(needs.serviceType))
-          ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${itinerary[info.day - 2]?.city ?? '?'} → ${info.city}. Add that route, in that shape, in Rates → Transportation.`
+          ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
           : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
       })
     }
@@ -4623,8 +4695,8 @@ export async function calculateDayBasedPricing(
         duration: needs.duration,
         area: needs.area,
         vehicleType,
-        originCity: itinerary[info.day - 2]?.city,
-        destinationCity: info.city
+        originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
+        destinationCity: needs.destinationCity ?? info.city
       })
 
       if (match && match.source === 'db') {
@@ -4640,7 +4712,7 @@ export async function calculateDayBasedPricing(
           vehicleType,
           lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
           message: isIntercity(String(needs.serviceType))
-            ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${itinerary[info.day - 2]?.city ?? '?'} → ${info.city}. Add that route, in that shape, in Rates → Transportation.`
+            ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
             : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
         })
       }
@@ -4685,7 +4757,7 @@ export async function calculateDayBasedPricing(
     transportAt: throughoutGuide ? (pax: number) => transportAtPax(pax + 1) : transportAtPax,
     // Tour leader: single room (PPD + single supplement) + their own per-pax costs
     // The tour leader pays CUSTOMER fare on tickets (B-item 2).
-    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax,
+    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax + staffPerPax,
     paxFrom: PAX_COUNTS[0],
     paxTo: PAX_COUNTS[PAX_COUNTS.length - 1],
   })

@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
       .from('tenant_members')
       .select('user_id, tenant_id, joined_at')
       .eq('user_id', userId)
+      .eq('status', 'active') // the one company rule (migration 390)
     const tenantId = tenantForUser(userId, null, (memberships ?? []) as MembershipRow[])
 
     // Upsert token record

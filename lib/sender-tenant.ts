@@ -32,10 +32,17 @@ export interface SenderTenant {
   company_website: string | null
   primary_color: string | null
   logo_url: string | null
+  // The document letterhead (Settings → Organization, migration 394).
+  tagline: string | null
+  company_address: string | null
+  license_number: string | null
+  tax_number: string | null
+  document_footer_text: string | null
 }
 
 const COLUMNS =
-  'company_name, contact_email, company_phone, company_website, primary_color, logo_url'
+  'company_name, contact_email, company_phone, company_website, primary_color, logo_url, ' +
+  'tagline, company_address, license_number, tax_number, document_footer_text'
 
 /**
  * The tenant an outbound message is sent AS.

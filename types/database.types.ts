@@ -694,6 +694,8 @@ export interface Database {
           airport_name: string | null
           supplier_name: string | null
           rate_currency: string | null
+          pricing_type: string
+          max_capacity: number | null
           supplier_id: string | null
         }
         Insert: {
@@ -712,6 +714,8 @@ export interface Database {
           airport_name?: string | null
           supplier_name?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
         }
         Update: {
@@ -730,6 +734,8 @@ export interface Database {
           airport_name?: string | null
           supplier_name?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
         }
         Relationships: [
@@ -2080,6 +2086,7 @@ export interface Database {
           total_paid: number
           balance_due: number
           status: string
+          status_override: Json | null
           confirmation_date: string | null
           payment_deadline: string | null
           full_payment_date: string | null
@@ -2122,6 +2129,7 @@ export interface Database {
           total_paid?: number
           balance_due: number
           status?: string
+          status_override?: Json | null
           confirmation_date?: string | null
           payment_deadline?: string | null
           full_payment_date?: string | null
@@ -2164,6 +2172,7 @@ export interface Database {
           total_paid?: number
           balance_due?: number
           status?: string
+          status_override?: Json | null
           confirmation_date?: string | null
           payment_deadline?: string | null
           full_payment_date?: string | null
@@ -3670,6 +3679,111 @@ export interface Database {
           },
         ]
       }
+      day_blocks: {
+        Row: {
+          id: string
+          tenant_id: string
+          code: string
+          name: string
+          shorthand: string[]
+          day_type: string
+          city: string | null
+          to_city: string | null
+          night: string
+          night_place: string | null
+          attractions: string[]
+          photo_stops: string[]
+          guide: string
+          meals: Json
+          transport: string | null
+          assistance: string[]
+          optional_extras: string[]
+          description: string | null
+          notes: string | null
+          source: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          code: string
+          name: string
+          shorthand?: string[]
+          day_type?: string
+          city?: string | null
+          to_city?: string | null
+          night?: string
+          night_place?: string | null
+          attractions?: string[]
+          photo_stops?: string[]
+          guide?: string
+          meals?: Json
+          transport?: string | null
+          assistance?: string[]
+          optional_extras?: string[]
+          description?: string | null
+          notes?: string | null
+          source?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          code?: string
+          name?: string
+          shorthand?: string[]
+          day_type?: string
+          city?: string | null
+          to_city?: string | null
+          night?: string
+          night_place?: string | null
+          attractions?: string[]
+          photo_stops?: string[]
+          guide?: string
+          meals?: Json
+          transport?: string | null
+          assistance?: string[]
+          optional_extras?: string[]
+          description?: string | null
+          notes?: string | null
+          source?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dashboard_attention_dismissals: {
+        Row: {
+          id: string
+          tenant_id: string
+          item_key: string
+          fingerprint: string
+          dismissed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          item_key: string
+          fingerprint: string
+          dismissed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          item_key?: string
+          fingerprint?: string
+          dismissed_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       departments: {
         Row: {
           id: string
@@ -4519,6 +4633,7 @@ export interface Database {
           category: string
           description: string | null
           amount: number
+          booking_supplier_status_id: string | null
           currency: string
           expense_date: string
           supplier_name: string | null
@@ -4542,6 +4657,7 @@ export interface Database {
           category: string
           description?: string | null
           amount: number
+          booking_supplier_status_id?: string | null
           currency?: string
           expense_date: string
           supplier_name?: string | null
@@ -4565,6 +4681,7 @@ export interface Database {
           category?: string
           description?: string | null
           amount?: number
+          booking_supplier_status_id?: string | null
           currency?: string
           expense_date?: string
           supplier_name?: string | null
@@ -5425,6 +5542,8 @@ export interface Database {
           updated_at: string | null
           destination: string | null
           rate_currency: string | null
+          pricing_type: string
+          max_capacity: number | null
           supplier_id: string | null
           supplier_name: string | null
         }
@@ -5442,6 +5561,8 @@ export interface Database {
           updated_at?: string | null
           destination?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
           supplier_name?: string | null
         }
@@ -5459,6 +5580,8 @@ export interface Database {
           updated_at?: string | null
           destination?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
           supplier_name?: string | null
         }
@@ -6001,6 +6124,14 @@ export interface Database {
           is_sailing_day: boolean | null
           is_transfer_only: boolean | null
           flight_to: string | null
+          day_type: string
+          overnight: boolean | null
+          has_sightseeing: boolean | null
+          airport_arrival: boolean | null
+          airport_departure: boolean | null
+          hotel_check_in: boolean | null
+          hotel_check_out: boolean | null
+          intercity: string | null
         }
         Insert: {
           id?: string
@@ -6031,6 +6162,14 @@ export interface Database {
           is_sailing_day?: boolean | null
           is_transfer_only?: boolean | null
           flight_to?: string | null
+          day_type?: string
+          overnight?: boolean | null
+          has_sightseeing?: boolean | null
+          airport_arrival?: boolean | null
+          airport_departure?: boolean | null
+          hotel_check_in?: boolean | null
+          hotel_check_out?: boolean | null
+          intercity?: string | null
         }
         Update: {
           id?: string
@@ -6061,6 +6200,14 @@ export interface Database {
           is_sailing_day?: boolean | null
           is_transfer_only?: boolean | null
           flight_to?: string | null
+          day_type?: string
+          overnight?: boolean | null
+          has_sightseeing?: boolean | null
+          airport_arrival?: boolean | null
+          airport_departure?: boolean | null
+          hotel_check_in?: boolean | null
+          hotel_check_out?: boolean | null
+          intercity?: string | null
         }
         Relationships: [
           {
@@ -8521,6 +8668,9 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           department_id: string | null
+          service_type: string | null
+          generation_snapshot: Json | null
+          checklist: Json | null
         }
         Insert: {
           id?: string
@@ -8540,6 +8690,9 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           department_id?: string | null
+          service_type?: string | null
+          generation_snapshot?: Json | null
+          checklist?: Json | null
         }
         Update: {
           id?: string
@@ -8559,6 +8712,9 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           department_id?: string | null
+          service_type?: string | null
+          generation_snapshot?: Json | null
+          checklist?: Json | null
         }
         Relationships: [
           {
@@ -9240,10 +9396,15 @@ export interface Database {
           default_currency: string | null
           services_offered: Json | null
           company_website: string | null
+          company_address: string | null
+          license_number: string | null
+          tax_number: string | null
+          document_footer_text: string | null
           company_phone: string | null
           tagline: string | null
           is_primary: boolean | null
           locale: string
+          min_margin_percent: number | null
           stripe_customer_id: string | null
           email_domain: string | null
           email_from_local: string
@@ -9272,10 +9433,15 @@ export interface Database {
           default_currency?: string | null
           services_offered?: Json | null
           company_website?: string | null
+          company_address?: string | null
+          license_number?: string | null
+          tax_number?: string | null
+          document_footer_text?: string | null
           company_phone?: string | null
           tagline?: string | null
           is_primary?: boolean | null
           locale?: string
+          min_margin_percent?: number | null
           stripe_customer_id?: string | null
           email_domain?: string | null
           email_from_local?: string
@@ -9304,10 +9470,15 @@ export interface Database {
           default_currency?: string | null
           services_offered?: Json | null
           company_website?: string | null
+          company_address?: string | null
+          license_number?: string | null
+          tax_number?: string | null
+          document_footer_text?: string | null
           company_phone?: string | null
           tagline?: string | null
           is_primary?: boolean | null
           locale?: string
+          min_margin_percent?: number | null
           stripe_customer_id?: string | null
           email_domain?: string | null
           email_from_local?: string
@@ -11396,6 +11567,16 @@ export interface Database {
     // every select('*') result to {}.
     Views: { [_ in never]: never }
     Functions: {
+      save_pricing_grid_days: {
+        Args: {
+          p_itinerary_id: string
+          p_days: Json
+        }
+        Returns: {
+          days_inserted: number
+          services_inserted: number
+        }[]
+      }
       attraction_alias_resolves: {
         Args: {
           p_canonical?: string

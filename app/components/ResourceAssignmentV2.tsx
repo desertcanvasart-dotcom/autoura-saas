@@ -5,10 +5,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { 
   Users, Truck, Hotel, UtensilsCrossed, Ship, Plane, UserCheck,
   Check, AlertCircle, Loader2, MapPin, Clock, Plus, Trash2, Calendar,
-  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2, Car } from 'lucide-react'
+  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2, Car, Mail, MoreHorizontal } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
+import { buildAssignmentMessage } from '@/lib/notify/assignment-message'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import HeaderMenu from '@/components/HeaderMenu'
 
 // Types
 interface Resource {
@@ -57,6 +60,9 @@ interface ResourceAssignmentV2Props {
   clientName?: string
   tripName?: string
   onUpdate?: () => void
+  /** The types this trip uses (lib/itineraries/coverage): only their tabs show
+   *  until "More types" is pressed. Empty or absent: every type, as before. */
+  types?: string[]
 }
 
 // City options for Egypt
@@ -134,14 +140,15 @@ const RESOURCE_TYPES = [
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: { name?: string; phone?: string }) => `${r.name}${r.phone ? ` · ${r.phone}` : ''}`,
-    canNotify: true
+    canNotify: true,
+    allowManual: true
   },
   { 
     key: 'hotel', 
     label: 'Hotels', 
     icon: Hotel, 
     color: 'purple',
-    apiEndpoint: '/api/resources/hotels',
+    apiEndpoint: '/api/resources/hotels/assignable',
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.city ? ` - ${r.city}` : ''}${r.star_rating ? ` ⭐${r.star_rating}` : ''}`,
@@ -154,7 +161,7 @@ const RESOURCE_TYPES = [
     label: 'Restaurants', 
     icon: UtensilsCrossed, 
     color: 'orange',
-    apiEndpoint: '/api/resources/restaurants',
+    apiEndpoint: '/api/resources/restaurants/assignable',
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.city ? ` - ${r.city}` : ''}${r.cuisine_type ? ` (${r.cuisine_type})` : ''}`,
@@ -167,7 +174,7 @@ const RESOURCE_TYPES = [
     label: 'Nile Cruises', 
     icon: Ship, 
     color: 'indigo',
-    apiEndpoint: '/api/cruises',
+    apiEndpoint: '/api/cruises/assignable',
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: any) => {
@@ -177,7 +184,7 @@ const RESOURCE_TYPES = [
         'round_trip': 'Round Trip (7n)'
       }
       const routeLabel = r.route ? routeLabels[r.route] || r.route : ''
-      return `${r.name}${r.ship_name ? ` - ${r.ship_name}` : ''}${routeLabel ? ` • ${routeLabel}` : ''}`
+      return `${r.name}${routeLabel ? ` • ${routeLabel}` : ''}`
     },
     canNotify: false,
     filterType: 'route',
@@ -193,6 +200,7 @@ const RESOURCE_TYPES = [
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.airport_location ? ` - ${r.airport_location}` : ''}${r.role ? ` (${r.role})` : ''}`,
     canNotify: true,
+    allowManual: true,
     filterType: 'airport',
     cityField: 'airport_location'
   },
@@ -206,10 +214,14 @@ const RESOURCE_TYPES = [
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.hotel?.name ? ` - ${r.hotel.name}` : ''}${r.hotel?.city ? ` (${r.hotel.city})` : ''}${r.role ? ` • ${r.role}` : ''}`,
     canNotify: true,
+    allowManual: true,
     filterType: 'hotelCity',
     cityField: 'hotel.city'
   }
 ]
+
+/** Booked for a moment, not a stretch: their end date follows their start. */
+const SINGLE_DAY_TYPES = new Set(['airport_staff', 'restaurant'])
 
 const COLOR_CLASSES: Record<string, { bg: string, border: string, text: string, light: string }> = {
   blue: { bg: 'bg-blue-600', border: 'border-blue-200', text: 'text-blue-600', light: 'bg-blue-50' },
@@ -231,10 +243,26 @@ export default function ResourceAssignmentV2({
   numTravelers,
   clientName,
   tripName,
-  onUpdate
+  onUpdate,
+  types
 }: ResourceAssignmentV2Props) {
   const dialog = useConfirmDialog()
+  const { tenant } = useTenant()
   const [activeTab, setActiveTab] = useState('guide')
+  const [showAllTypes, setShowAllTypes] = useState(false)
+  // Changing an assignment's dates in place (PATCH /api/itinerary-resources).
+  const [editingDates, setEditingDates] = useState<{ id: string; start: string; end: string } | null>(null)
+  const [savingDates, setSavingDates] = useState(false)
+  const usedTypes = (types ?? []).filter(t => RESOURCE_TYPES.some(r => r.key === t))
+  const limited = usedTypes.length > 0 && !showAllTypes
+  const visibleTypes = limited ? RESOURCE_TYPES.filter(r => usedTypes.includes(r.key) || r.key === activeTab) : RESOURCE_TYPES
+  // Open on the trip's first used type once it is known, unless one was picked.
+  const [tabPicked, setTabPicked] = useState(false)
+  const usedKey = usedTypes.join(',')
+  useEffect(() => {
+    const used = usedKey ? usedKey.split(',') : []
+    if (!tabPicked && used.length > 0 && !used.includes(activeTab)) setActiveTab(used[0])
+  }, [usedKey, tabPicked, activeTab])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -261,6 +289,12 @@ export default function ResourceAssignmentV2({
     notes: '',
     quantity: 1
   })
+  // Drivers, airport and hotel staff are often hired case by case — someone
+  // from outside who is not in the directory. They can be typed in for this
+  // trip only; nothing is added to the directory.
+  const [manualMode, setManualMode] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualPhone, setManualPhone] = useState('')
 
   // WhatsApp sending state
   const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null)
@@ -434,7 +468,12 @@ export default function ResourceAssignmentV2({
   }
 
   const handleAddResource = async () => {
-    if (!addFormData.resource_id) {
+    const manual = manualMode && Boolean(RESOURCE_TYPES.find(t => t.key === activeTab)?.allowManual)
+    if (manual && !manualName.trim()) {
+      showToast('error', 'Please enter a name')
+      return
+    }
+    if (!manual && !addFormData.resource_id) {
       showToast('error', 'Please select a resource')
       return
     }
@@ -464,13 +503,23 @@ export default function ResourceAssignmentV2({
         resourceName += ` (${selectedResource.city})`
       }
 
+      // Someone typed in by hand has no directory row: a fresh id stands in
+      // (resource_id has no foreign key), and the name carries the phone so
+      // it is on the trip for whoever reads it.
+      let resourceId = addFormData.resource_id
+      if (manual) {
+        resourceId = crypto.randomUUID()
+        const phone = manualPhone.trim()
+        resourceName = `${manualName.trim()}${phone ? ` · ${phone}` : ''} (outside)`
+      }
+
       const response = await fetch('/api/itinerary-resources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itinerary_id: itineraryId,
           resource_type: activeTab,
-          resource_id: addFormData.resource_id,
+          resource_id: resourceId,
           resource_name: resourceName,
           start_date: addFormData.start_date,
           end_date: addFormData.end_date,
@@ -496,6 +545,28 @@ export default function ResourceAssignmentV2({
       showToast('error', 'Failed to add resource')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSaveDates = async () => {
+    if (!editingDates) return
+    setSavingDates(true)
+    try {
+      const res = await fetch(`/api/itinerary-resources?id=${editingDates.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_date: editingDates.start, end_date: editingDates.end }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(data.error || 'Could not change the dates')
+      setEditingDates(null)
+      await fetchAssignedResources()
+      await fetchConflicts()
+      if (onUpdate) onUpdate()
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not change the dates')
+    } finally {
+      setSavingDates(false)
     }
   }
 
@@ -544,7 +615,8 @@ export default function ResourceAssignmentV2({
   // Hand the tap-link over on the OFFICE's own WhatsApp (wa.me deep link) —
   // our API never sends, so no template approval and no auto-send risk. The
   // staff-link POST returns the assignee's contact alongside the URL.
-  const handleWhatsAppStaffLink = async (resourceId: string) => {
+  const handleWhatsAppStaffLink = async (resource: AssignedResource) => {
+    const resourceId = resource.id
     setCopyingLink(resourceId)
     // Open the tab SYNCHRONOUSLY, inside the click's gesture stack — a
     // window.open after an await is popup-blocked on Safari, leaving a
@@ -566,8 +638,20 @@ export default function ResourceAssignmentV2({
         }
         return
       }
-      const firstName = (data.contact?.name as string | undefined)?.split(' ')[0] ?? 'there'
-      const text = `Hi ${firstName}! Here is your check-in link${tripName ? ` for "${tripName}"` : ''}. Tap a button at each step (Departed, Arrived, Picked up…) — no login needed:\n${data.url}`
+      // The whole assignment, not just the link: this is usually the first
+      // the person hears of it (Meta blocks our number from starting the
+      // chat without an approved template — this goes from the office's own).
+      const text = buildAssignmentMessage({
+        name: (data.contact?.name as string | undefined) ?? resource.resource_name,
+        agency: tenant?.company_name,
+        tripName,
+        clientName,
+        startDate: resource.start_date,
+        endDate: resource.end_date,
+        travelers: numTravelers,
+        notes: resource.notes,
+        url: data.url,
+      })
       // formatPhoneForWhatsApp normalizes local numbers ('01…' -> '201…');
       // a raw digit-strip mints dead wa.me links for most Egyptian entries.
       const waUrl = generateWhatsAppLink(formatPhoneForWhatsApp(phone), text)
@@ -576,6 +660,45 @@ export default function ResourceAssignmentV2({
     } catch (err) {
       waTab?.close()
       showToast('error', err instanceof Error ? err.message : 'Could not create the staff link')
+    } finally {
+      setCopyingLink(null)
+    }
+  }
+
+  // The same brief by email, from the office's own mail app (mailto) — like
+  // the wa.me handoff, nothing is sent by our servers. With no address on
+  // file, the brief is copied so it can be pasted anywhere.
+  const handleEmailBrief = async (resource: AssignedResource) => {
+    setCopyingLink(resource.id)
+    try {
+      const res = await fetch(`/api/itinerary-resources/${resource.id}/staff-link`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.success || !data.url) throw new Error(data.error || 'Failed')
+      const text = buildAssignmentMessage({
+        name: (data.contact?.name as string | undefined) ?? resource.resource_name,
+        agency: tenant?.company_name,
+        tripName,
+        clientName,
+        startDate: resource.start_date,
+        endDate: resource.end_date,
+        travelers: numTravelers,
+        notes: resource.notes,
+        url: data.url,
+      })
+      const email = data.contact?.email as string | undefined
+      if (!email) {
+        try {
+          await navigator.clipboard.writeText(text)
+          showToast('error', 'No email on file for this person — the brief is copied instead')
+        } catch {
+          showToast('error', 'No email on file for this person')
+        }
+        return
+      }
+      const subject = `Assignment${tripName ? `: ${tripName}` : ''}`
+      window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not prepare the brief')
     } finally {
       setCopyingLink(null)
     }
@@ -597,7 +720,7 @@ export default function ResourceAssignmentV2({
           itineraryId, 
           guideId: resource.resource_id 
         }
-      } else if (['restaurant', 'airport_staff', 'hotel_staff'].includes(resource.resource_type)) {
+      } else if (['restaurant', 'airport_staff', 'hotel_staff', 'driver'].includes(resource.resource_type)) {
         endpoint = '/api/whatsapp/notify-resource'
         body = {
           itineraryId,
@@ -645,10 +768,16 @@ export default function ResourceAssignmentV2({
     setAddFormData({
       resource_id: '',
       start_date: startDate,
-      end_date: endDate,
+      // An airport meeting or a restaurant meal is one day, not the trip:
+      // defaulting them to the whole trip put the arrival's airport staff on
+      // every day.
+      end_date: SINGLE_DAY_TYPES.has(activeTab) ? startDate : endDate,
       notes: '',
       quantity: 1
     })
+    setManualMode(false)
+    setManualName('')
+    setManualPhone('')
     resetModalFilters()
   }
 
@@ -685,7 +814,7 @@ export default function ResourceAssignmentV2({
   const allAvailableForType = availableResources[activeTab] || []
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <div>
@@ -705,7 +834,7 @@ export default function ResourceAssignmentV2({
       {/* Tabs */}
       <div className="border-b border-gray-200 overflow-x-auto">
         <div className="flex min-w-max">
-          {RESOURCE_TYPES.map((type) => {
+          {visibleTypes.map((type) => {
             const Icon = type.icon
             const count = getResourcesForType(type.key).length
             const hasConflict = getConflictsForType(type.key).length > 0
@@ -715,7 +844,7 @@ export default function ResourceAssignmentV2({
             return (
               <button
                 key={type.key}
-                onClick={() => setActiveTab(type.key)}
+                onClick={() => { setActiveTab(type.key); setTabPicked(true) }}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   isActive 
                     ? `${colorClass.text} border-current` 
@@ -737,6 +866,15 @@ export default function ResourceAssignmentV2({
               </button>
             )
           })}
+          {usedTypes.length > 0 && usedTypes.length < RESOURCE_TYPES.length && (
+            <button
+              type="button"
+              onClick={() => setShowAllTypes(v => !v)}
+              className="px-4 py-3 text-xs font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap"
+            >
+              {showAllTypes ? 'Fewer types' : 'More types'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -766,7 +904,11 @@ export default function ResourceAssignmentV2({
           <div className="space-y-3 mb-4">
             {activeResources.map((resource) => {
               const typeConfig = RESOURCE_TYPES.find(t => t.key === resource.resource_type)
-              const canNotify = typeConfig?.canNotify || false
+              // Typed in by hand: no record, so no number to message. The staff
+              // link still works for them.
+              const inDirectory = !typeConfig?.allowManual ||
+                (availableResources[resource.resource_type] || []).some(r => r.id === resource.resource_id)
+              const canNotify = (typeConfig?.canNotify || false) && inDirectory
               const isSending = sendingWhatsApp === resource.id
               const wasSent = whatsAppSent.has(resource.id)
 
@@ -792,89 +934,100 @@ export default function ResourceAssignmentV2({
                           {resource.status}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {formatDate(resource.start_date)}
-                          {resource.end_date && resource.end_date !== resource.start_date && (
-                            <> - {formatDate(resource.end_date)}</>
-                          )}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-600">
+                        {editingDates?.id === resource.id ? (
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <input
+                              type="date" value={editingDates.start} min={startDate} max={endDate}
+                              onChange={e => {
+                                const start = e.target.value
+                                setEditingDates(d => d && ({ ...d, start, end: SINGLE_DAY_TYPES.has(resource.resource_type) || d.end < start ? start : d.end }))
+                              }}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded" aria-label="Start date"
+                            />
+                            <span>–</span>
+                            <input
+                              type="date" value={editingDates.end} min={editingDates.start} max={endDate}
+                              onChange={e => setEditingDates(d => d && ({ ...d, end: e.target.value }))}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded" aria-label="End date"
+                            />
+                            <button type="button" onClick={handleSaveDates} disabled={savingDates} className="px-2 py-1 text-xs font-medium bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
+                              {savingDates ? 'Saving…' : 'Save'}
+                            </button>
+                            <button type="button" onClick={() => setEditingDates(null)} className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {formatDate(resource.start_date)}
+                            {resource.end_date && resource.end_date !== resource.start_date && (
+                              <> - {formatDate(resource.end_date)}</>
+                            )}
+                          </span>
+                        )}
                         {resource.notes && (
                           <span className="text-gray-500 truncate max-w-xs">• {resource.notes}</span>
                         )}
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Actions: one Send brief menu, the staff link, and Remove
+                        out of the way in ⋯ (the itinerary page redesign). */}
                     <div className="flex items-center gap-2">
-                      {/* WhatsApp Button */}
-                      {canNotify && (
-                        <button
-                          onClick={() => handleSendWhatsApp(resource)}
-                          disabled={isSending}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            wasSent 
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-[#25D366] text-white hover:bg-[#20BD5A]'
-                          } disabled:opacity-50`}
-                          title="Send WhatsApp notification"
-                        >
-                          {isSending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : wasSent ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <MessageCircle className="w-4 h-4" />
-                          )}
-                          <span className="hidden sm:inline">
-                            {isSending ? 'Sending...' : wasSent ? 'Sent!' : 'Notify'}
-                          </span>
-                        </button>
-                      )}
+                      <HeaderMenu
+                        label={isSending ? 'Sending…' : wasSent ? 'Sent' : copyingLink === resource.id ? 'Preparing…' : 'Send brief'}
+                        icon={isSending || copyingLink === resource.id ? <Loader2 className="w-4 h-4 animate-spin" /> : wasSent ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                        items={[
+                          canNotify && {
+                            label: 'Notify on WhatsApp',
+                            icon: <MessageCircle className="w-4 h-4" />,
+                            onSelect: () => handleSendWhatsApp(resource),
+                            disabled: isSending,
+                            title: 'Send the assignment from the agency’s WhatsApp number',
+                          },
+                          {
+                            label: 'Send via my WhatsApp',
+                            icon: <MessageCircle className="w-4 h-4" />,
+                            onSelect: () => handleWhatsAppStaffLink(resource),
+                            disabled: copyingLink === resource.id,
+                            title: 'Open your own WhatsApp with the assignment and check-in link typed in — works for anyone, no Meta template needed',
+                          },
+                          {
+                            label: 'Send by email',
+                            icon: <Mail className="w-4 h-4" />,
+                            onSelect: () => handleEmailBrief(resource),
+                            disabled: copyingLink === resource.id,
+                            title: 'Open your email with the assignment and check-in link written in',
+                          },
+                        ]}
+                      />
 
                       {/* Staff tap-link: copies the no-login checkpoint URL */}
                       <button
                         onClick={() => handleCopyStaffLink(resource.id)}
                         disabled={copyingLink === resource.id}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                           linkCopied.has(resource.id)
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         } disabled:opacity-50`}
                         title="Copy staff tap-link (no login needed)"
                       >
-                        {copyingLink === resource.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : linkCopied.has(resource.id) ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Link2 className="w-4 h-4" />
-                        )}
+                        {linkCopied.has(resource.id) ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
                         <span className="hidden sm:inline">
                           {linkCopied.has(resource.id) ? 'Copied!' : 'Staff link'}
                         </span>
                       </button>
 
-                      {/* Same tap-link, handed over via the office's own WhatsApp */}
-                      <button
-                        onClick={() => handleWhatsAppStaffLink(resource.id)}
-                        disabled={copyingLink === resource.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
-                        title="Send the staff tap-link from your WhatsApp"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span className="hidden sm:inline">WhatsApp link</span>
-                      </button>
-
-                      {/* Remove Button */}
-                      <button
-                        onClick={() => handleRemoveResource(resource.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Remove"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <HeaderMenu
+                        icon={<MoreHorizontal className="w-4 h-4" />}
+                        ariaLabel="More actions"
+                        items={[
+                          { label: 'Change dates', icon: <Calendar className="w-4 h-4" />, onSelect: () => setEditingDates({ id: resource.id, start: resource.start_date.slice(0, 10), end: (resource.end_date || resource.start_date).slice(0, 10) }) },
+                          { label: 'Remove', icon: <Trash2 className="w-4 h-4" />, onSelect: () => handleRemoveResource(resource.id), danger: true },
+                        ]}
+                      />
                     </div>
                   </div>
                 </div>
@@ -956,7 +1109,7 @@ export default function ResourceAssignmentV2({
               )}
 
               {/* Airport Location Filter - for airport staff */}
-              {activeTypeConfig.filterType === 'airport' && (
+              {activeTypeConfig.filterType === 'airport' && !manualMode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Plane className="w-4 h-4 inline mr-1.5 text-gray-400" />
@@ -984,7 +1137,7 @@ export default function ResourceAssignmentV2({
               )}
 
               {/* Hotel City Filter - for hotel staff */}
-              {activeTypeConfig.filterType === 'hotelCity' && (
+              {activeTypeConfig.filterType === 'hotelCity' && !manualMode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Hotel className="w-4 h-4 inline mr-1.5 text-gray-400" />
@@ -1027,11 +1180,14 @@ export default function ResourceAssignmentV2({
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   >
                     <option value="all">All Routes ({allAvailableForType.length})</option>
-                    {CRUISE_ROUTE_OPTIONS.filter(r => r.value !== 'all' && getUniqueCruiseRoutes().includes(r.value)).map((route) => {
-                      const count = allAvailableForType.filter(r => r.route === route.value).length
+                    {/* Every route the cruises actually sail — a route written
+                        in its own words is offered too, not hidden. */}
+                    {getUniqueCruiseRoutes().sort().map((value) => {
+                      const label = CRUISE_ROUTE_OPTIONS.find(o => o.value === value)?.label ?? value
+                      const count = allAvailableForType.filter(r => r.route === value).length
                       return (
-                        <option key={route.value} value={route.value}>
-                          {route.label} ({count})
+                        <option key={value} value={value}>
+                          {label} ({count})
                         </option>
                       )
                     })}
@@ -1040,33 +1196,83 @@ export default function ResourceAssignmentV2({
               )}
 
               {/* ===== RESOURCE SELECTION ===== */}
+              {activeTypeConfig.allowManual && manualMode ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="e.g. Ahmed Hassan"
+                      autoFocus
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone <span className="font-normal text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={manualPhone}
+                      onChange={(e) => setManualPhone(e.target.value)}
+                      placeholder="+20 100 000 0000"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    For this trip only — they won’t be added to your directory. WhatsApp notify isn’t available
+                    for them; use the staff link instead.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setManualMode(false)}
+                    className="text-sm font-medium text-primary-700 hover:underline"
+                  >
+                    ← Choose from your list instead
+                  </button>
+                </div>
+              ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select {activeTypeConfig.label.slice(0, -1)} *
-                </label>
-                <select
-                  value={addFormData.resource_id}
-                  onChange={(e) => setAddFormData({ ...addFormData, resource_id: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select {activeTypeConfig.label.slice(0, -1)} *
+                  </label>
+                  <select
+                    value={addFormData.resource_id}
+                    onChange={(e) => setAddFormData({ ...addFormData, resource_id: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  >
+                    <option value="">Choose...</option>
+                    {filteredAvailableResources.map((resource) => (
+                      <option key={resource.id} value={resource.id}>
+                        {activeTypeConfig.displayField(resource)}
+                      </option>
+                    ))}
+                  </select>
+                  {filteredAvailableResources.length === 0 && (
+                    <p className="text-sm text-orange-600 mt-2">
+                      No {activeTypeConfig.label.toLowerCase()} found for this filter. Try selecting a different option.
+                    </p>
+                  )}
+                  {(modalCityFilter !== 'all' || modalAirportFilter !== 'all' || modalRouteFilter !== 'all') && filteredAvailableResources.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Showing {filteredAvailableResources.length} of {allAvailableForType.length}
+                    </p>
+                  )}
+                </div>
+              )}
+              {activeTypeConfig.allowManual && !manualMode && (
+                <button
+                  type="button"
+                  onClick={() => { setManualMode(true); setAddFormData({ ...addFormData, resource_id: '' }) }}
+                  className="-mt-2 text-sm font-medium text-primary-700 hover:underline"
                 >
-                  <option value="">Choose...</option>
-                  {filteredAvailableResources.map((resource) => (
-                    <option key={resource.id} value={resource.id}>
-                      {activeTypeConfig.displayField(resource)}
-                    </option>
-                  ))}
-                </select>
-                {filteredAvailableResources.length === 0 && (
-                  <p className="text-sm text-orange-600 mt-2">
-                    No {activeTypeConfig.label.toLowerCase()} found for this filter. Try selecting a different option.
-                  </p>
-                )}
-                {(modalCityFilter !== 'all' || modalAirportFilter !== 'all' || modalRouteFilter !== 'all') && filteredAvailableResources.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Showing {filteredAvailableResources.length} of {allAvailableForType.length}
-                  </p>
-                )}
-              </div>
+                  Not in the list? Enter a name manually
+                </button>
+              )}
 
               {/* Date Range */}
               <div className="grid grid-cols-2 gap-4">
@@ -1077,7 +1283,12 @@ export default function ResourceAssignmentV2({
                   <input
                     type="date"
                     value={addFormData.start_date}
-                    onChange={(e) => setAddFormData({ ...addFormData, start_date: e.target.value })}
+                    onChange={(e) => {
+                      const start = e.target.value
+                      // One-day roles move with their start; nothing ends before it starts.
+                      const end = SINGLE_DAY_TYPES.has(activeTab) || addFormData.end_date < start ? start : addFormData.end_date
+                      setAddFormData({ ...addFormData, start_date: start, end_date: end })
+                    }}
                     min={startDate}
                     max={endDate}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
@@ -1138,7 +1349,7 @@ export default function ResourceAssignmentV2({
               </button>
               <button
                 onClick={handleAddResource}
-                disabled={saving || !addFormData.resource_id}
+                disabled={saving || (manualMode ? !manualName.trim() : !addFormData.resource_id)}
                 className={`px-6 py-2 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${activeColor.bg} hover:opacity-90`}
               >
                 {saving ? (
