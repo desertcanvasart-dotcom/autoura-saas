@@ -121,6 +121,10 @@ export async function PUT(
     if (body.num_children !== undefined) updateData.num_children = body.num_children
     if (body.total_cost !== undefined) updateData.total_cost = body.total_cost
     if (body.status !== undefined) updateData.status = body.status
+    // Cancelling records when and why; reopening clears both.
+    if (body.cancellation_reason !== undefined) updateData.cancellation_reason = body.cancellation_reason || null
+    if (body.status === 'cancelled') updateData.cancelled_at = new Date().toISOString()
+    else if (body.status !== undefined) { updateData.cancelled_at = null; updateData.cancellation_reason = null }
     if (body.notes !== undefined) updateData.notes = body.notes
 
     // Assignments consolidated (mig 289): the assigned_* columns are DERIVED
