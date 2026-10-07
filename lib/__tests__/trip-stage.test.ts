@@ -33,8 +33,22 @@ describe('the steps', () => {
     const steps = tripSteps(facts({ status: 'confirmed', hasBooking: true, hasInvoice: true, invoiced: 2349.5, paid: 0, startDate: '2026-10-01', endDate: '2026-10-04' }))
     expect(steps.map(s => [s.key, s.done, s.current])).toEqual([
       ['quoted', true, false], ['confirmed', true, false], ['booked', true, false],
-      ['invoiced', true, false], ['paid', false, true], ['operated', true, false],
+      ['invoiced', true, false], ['paid', false, true], ['operated', true, false], ['closed', false, false],
     ])
+  })
+
+  it('ran and paid in full: Closed is the next step; closing it out completes the row', () => {
+    const ran = { hasBooking: true, hasInvoice: true, invoiced: 2349.5, paid: 2349.5, startDate: '2026-10-01', endDate: '2026-10-04' }
+    expect(tripSteps(facts({ status: 'confirmed', ...ran })).find(s => s.current)?.key).toBe('closed')
+    const closed = tripSteps(facts({ status: 'completed', ...ran }))
+    expect(closed.every(s => s.done)).toBe(true)
+    expect(closed.some(s => s.current)).toBe(false)
+  })
+
+  it('closed but still owing: Paid stays open — closing says nothing about the money', () => {
+    const steps = tripSteps(facts({ status: 'completed', hasBooking: true, hasInvoice: true, invoiced: 1000, paid: 400, endDate: '2026-10-04' }))
+    expect(steps.find(s => s.key === 'paid')).toMatchObject({ done: false, current: true })
+    expect(steps.find(s => s.key === 'closed')?.done).toBe(true)
   })
 
   it('a booking means it was quoted and confirmed, even if the status lagged', () => {
