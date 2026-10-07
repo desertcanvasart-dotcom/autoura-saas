@@ -121,5 +121,7 @@ describe('an itinerary turned into a tour template', () => {
     expect(dayTripFromItineraryDay({ city: 'Alexandria', overnight_city: 'Cairo' }, 'none')).toBeNull()
     expect(dayTripFromItineraryDay({ city: 'Cairo', overnight_city: 'Cairo' }, 'hotel')).toBeNull()
     expect(dayTripFromItineraryDay({ city: 'Cairo', overnight_city: null }, 'hotel')).toBeNull()
+    // A hotel next door is the same city for a vehicle.
+    expect(dayTripFromItineraryDay({ city: 'Cairo', overnight_city: 'Giza' }, 'hotel')).toBeNull()
   })
 })
