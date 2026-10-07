@@ -228,3 +228,46 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
+
+/**
+ * PATCH /api/itinerary-resources?id=<assignment id>
+ * Change an assignment's dates — e.g. airport staff booked for the whole trip
+ * when they meet the arrival only. Body: { start_date, end_date? }; end
+ * defaults to start (one day). RLS scopes the row to the tenant; an update
+ * that matches nothing (not found, or not permitted) says so.
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    }
+    const { supabase } = authResult
+    if (!supabase) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
+
+    const id = new URL(request.url).searchParams.get('id')
+    const body = await request.json().catch(() => ({}))
+    const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
+    const start = body.start_date
+    const end = body.end_date || start
+    if (!id) return NextResponse.json({ success: false, error: 'Resource ID required' }, { status: 400 })
+    if (!isDay(start) || !isDay(end)) {
+      return NextResponse.json({ success: false, error: 'start_date and end_date must be dates (YYYY-MM-DD)' }, { status: 400 })
+    }
+    if (end < start) return NextResponse.json({ success: false, error: 'The end date is before the start date' }, { status: 400 })
+
+    const { data, error } = await supabase
+      .from('itinerary_resources')
+      .update({ start_date: start, end_date: end, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id, start_date, end_date')
+    if (error) throw error
+    if (!data || data.length === 0) {
+      return NextResponse.json({ success: false, error: 'Assignment not found, or you do not have permission to change it' }, { status: 404 })
+    }
+    return NextResponse.json({ success: true, data: data[0] })
+  } catch (error) {
+    console.error('❌ Error updating itinerary resource dates:', error)
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Failed to update the dates' }, { status: 500 })
+  }
+}

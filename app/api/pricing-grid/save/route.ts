@@ -11,6 +11,7 @@
 // grid asks /api/b2b/quote-from-itinerary for it after the save.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { isOwnAddress, loadOwnAddresses } from '@/lib/email/own-address'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { ratePin } from '@/lib/pricing/rate-pin'
 import { gridDayComponents } from '@/lib/pricing/grid-day-components'
@@ -139,6 +140,16 @@ export async function POST(request: NextRequest) {
     // server-computed figures so we never persist 0 when services exist.
     const finalSupplierTotal = (totals?.totalCost && totals.totalCost > 0) ? totals.totalCost : computedSupplierTotal
     const finalSellingTotal = (totals?.sellingPriceTotal && totals.sellingPriceTotal > 0) ? totals.sellingPriceTotal : computedSellingTotal
+
+    // The office's own address is never the client's: "Price in Grid" from a
+    // message the office sent fills the client's email with the office's
+    // (ITN-S-2026-8987 carried the admin's). Dropped — not saved on the trip,
+    // not used to find or create the client — and said so.
+    const warnings: string[] = []
+    if (config.clientEmail && isOwnAddress(await loadOwnAddresses(supabase, tenant_id, user), config.clientEmail)) {
+      warnings.push(`${config.clientEmail} is your own office's address, so it was not saved as the client's email.`)
+      config.clientEmail = ''
+    }
 
     // 0. The CRM client this trip belongs to: the one the grid was opened for,
     //    else a match by email/phone, else (direct travellers) a new Lead.
@@ -477,6 +488,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      ...(warnings.length ? { warnings } : {}),
       itineraryId,
       // A re-save keeps the itinerary's own code.
       itineraryCode: itinerary.itinerary_code ?? itineraryCode,
