@@ -1396,44 +1396,40 @@ export default function ViewItineraryPage() {
 
             {tab === 'messages' && (
               <div className="space-y-4">
-        {/* WHATSAPP ACTIONS */}
-        <div className="bg-white rounded-lg border border-green-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center"><span className="text-white text-lg">📱</span></div>
-            <div><h3 className="text-sm font-semibold text-gray-900">WhatsApp Actions</h3><p className="text-xs text-gray-600">Send updates to {itinerary.client_name}</p></div>
-          </div>
-          {/* Where the payment stands, before reminding or thanking anyone for it. */}
-          {actualPnl && (
-            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              {actualPnl.invoice_count === 0 ? (
-                <span className="text-gray-600">No invoice yet</span>
-              ) : (
-                <>
-                  <span className="text-gray-600">Invoiced <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_revenue.toFixed(2)}</span></span>
-                  <span className="text-gray-600">Paid <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_paid.toFixed(2)}</span></span>
-                  {actualPnl.total_revenue - actualPnl.total_paid > 0.005 ? (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Balance due {itinerary.currency} {(actualPnl.total_revenue - actualPnl.total_paid).toFixed(2)}</span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">Paid in full</span>
-                  )}
-                </>
-              )}
+        {/* WHATSAPP — the client's messages: where the payment stands, then
+            the templates as one row of small buttons. */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">WhatsApp to {itinerary.client_name || 'the client'}</h3>
+              <p className="text-xs text-gray-500">{itinerary.client_phone || 'No phone number'}{itinerary.status === 'sent' && ' · Quote sent'}</p>
             </div>
-          )}
-          {!itinerary.client_phone && <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md"><p className="text-yellow-800 text-xs">⚠️ Client phone number required. Add it in edit mode.</p></div>}
-          {itinerary.client_phone && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {itinerary.status === 'draft' && <WhatsAppButton itineraryId={itinerary.id} type="status" status="confirmed" onSuccess={() => { setSendSuccess('Booking confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} className="bg-blue-600 hover:bg-blue-700" />}
-            {itinerary.status !== 'completed' && <WhatsAppButton itineraryId={itinerary.id} type="status" status="pending_payment" onSuccess={() => { setSendSuccess('Payment reminder sent! ✅'); setTimeout(() => setSendSuccess(null), 5000) }} className="bg-yellow-600 hover:bg-yellow-700" />}
-            <WhatsAppButton itineraryId={itinerary.id} type="status" status="paid" onSuccess={() => { setSendSuccess('Payment confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} className="bg-emerald-600 hover:bg-emerald-700" />
-          </div>
-          )}
-          {itinerary.client_phone && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <div className="flex flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-700 rounded-full"><span>📱</span><span>{itinerary.client_phone}</span></div>
-                {itinerary.status === 'sent' && <div className="flex items-center gap-1.5 px-2 py-1 bg-primary-50 text-primary-700 rounded-full"><span>✅</span><span>Quote sent</span></div>}
+            {/* Where the payment stands, before reminding or thanking anyone for it. */}
+            {actualPnl && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                {actualPnl.invoice_count === 0 ? (
+                  <span className="text-gray-600">No invoice yet</span>
+                ) : (
+                  <>
+                    <span className="text-gray-600">Invoiced <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_revenue.toFixed(2)}</span></span>
+                    <span className="text-gray-600">Paid <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_paid.toFixed(2)}</span></span>
+                    {actualPnl.total_revenue - actualPnl.total_paid > 0.005 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Balance due {itinerary.currency} {(actualPnl.total_revenue - actualPnl.total_paid).toFixed(2)}</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">Paid in full</span>
+                    )}
+                  </>
+                )}
               </div>
+            )}
+          </div>
+          {!itinerary.client_phone ? (
+            <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">Add the client&apos;s phone number (Edit itinerary) to send WhatsApp messages.</p>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-start gap-2">
+              {itinerary.status === 'draft' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="confirmed" onSuccess={() => { setSendSuccess('Booking confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />}
+              {itinerary.status !== 'completed' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="pending_payment" onSuccess={() => { setSendSuccess('Payment reminder sent! ✅'); setTimeout(() => setSendSuccess(null), 5000) }} />}
+              <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="paid" onSuccess={() => { setSendSuccess('Payment confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />
             </div>
           )}
         </div>
