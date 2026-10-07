@@ -27,6 +27,7 @@ import TripTasksCard from '@/components/itineraries/TripTasksCard'
 import InvoicesPayments from '@/components/itineraries/InvoicesPayments'
 import CancelTripDialog from '@/components/itineraries/CancelTripDialog'
 import TripCommissions from '@/components/itineraries/TripCommissions'
+import PickupDetailsDialog from '@/components/itineraries/PickupDetailsDialog'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
@@ -120,6 +121,7 @@ export default function ViewItineraryPage() {
   const { tenant } = useTenant()
   const { user } = useAuth()
   const [showEmail, setShowEmail] = useState(false)
+  const [showPickup, setShowPickup] = useState(false)
   const params = useParams()
   const router = useRouter()
   const supabase = createClient()
@@ -1088,6 +1090,20 @@ export default function ViewItineraryPage() {
         />
       )}
 
+      {showPickup && (
+        <PickupDetailsDialog
+          itineraryId={itinerary.id}
+          days={days.map(d => ({ day_number: d.day_number, date: d.date }))}
+          today={facts.today}
+          onClose={() => setShowPickup(false)}
+          onSent={how => {
+            setShowPickup(false)
+            showToast('success', how === 'agency' ? 'Pickup details sent ✅' : 'Pickup details saved — finish sending in WhatsApp')
+            fetchItinerary()
+          }}
+        />
+      )}
+
       {showCancel && (
         <CancelTripDialog
           itineraryId={itinerary.id}
@@ -1581,6 +1597,11 @@ export default function ViewItineraryPage() {
               {itinerary.status === 'draft' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="confirmed" onSuccess={() => { setSendSuccess('Booking confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />}
               {itinerary.status !== 'completed' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="pending_payment" onSuccess={() => { setSendSuccess('Payment reminder sent! ✅'); setTimeout(() => setSendSuccess(null), 5000) }} />}
               <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="paid" onSuccess={() => { setSendSuccess('Payment confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />
+              {days.length > 0 && itinerary.status !== 'cancelled' && (
+                <button type="button" onClick={() => setShowPickup(true)} className="px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium flex items-center gap-1.5">
+                  <Send className="w-4 h-4" /> Pickup details
+                </button>
+              )}
             </div>
           )}
         </div>
