@@ -107,7 +107,8 @@ describe('a cruise night chooses a SHIP', () => {
   })
 
   it('re-reads when the night type changes, not only the city', () => {
-    expect(SOURCE).toMatch(/\}, \[dayCity, dayNight, tiers\]\)/)
+    // (and when a day trip moves the night to where the party stays)
+    expect(SOURCE).toMatch(/\}, \[dayCity, dayTripFromCity, dayTransportType, dayNight, tiers\]\)/)
   })
 
   it('says ship, not hotel, everywhere the operator reads it', () => {
