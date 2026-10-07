@@ -52,6 +52,8 @@ export interface CoverageDay {
 }
 
 export interface CoverageAssignment {
+  /** itinerary_resources.id */
+  id?: string
   resource_type: string
   resource_name?: string | null
   itinerary_day_id?: string | null
