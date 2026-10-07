@@ -9,7 +9,7 @@
 //
 // Derived, never stored. Pure: the page and the tests share it.
 
-export type StepKey = 'quoted' | 'confirmed' | 'booked' | 'invoiced' | 'paid' | 'operated'
+export type StepKey = 'quoted' | 'confirmed' | 'booked' | 'invoiced' | 'paid' | 'operated' | 'closed'
 
 export interface TripFacts {
   /** itineraries.status: draft | sent | confirmed | completed | cancelled */
@@ -40,6 +40,7 @@ const LABELS: Record<StepKey, string> = {
   invoiced: 'Invoiced',
   paid: 'Paid',
   operated: 'Operated',
+  closed: 'Closed',
 }
 
 const day = (d: string | null | undefined) => (d ? String(d).slice(0, 10) : null)
@@ -57,12 +58,17 @@ export function tripSteps(f: TripFacts): Step[] {
     booked: f.hasBooking,
     invoiced: f.hasInvoice,
     paid: isPaidInFull(f),
+    // The trip ran: its last day is behind us (a closed trip ran too).
     operated: status === 'completed' || (!!end && end < f.today),
+    // Closed out: the office marked it completed ("Close out trip").
+    closed: status === 'completed',
   }
   // A later step done means the earlier ones were passed, whatever was recorded.
-  const order: StepKey[] = ['quoted', 'confirmed', 'booked', 'invoiced', 'paid', 'operated']
+  const order: StepKey[] = ['quoted', 'confirmed', 'booked', 'invoiced', 'paid', 'operated', 'closed']
   for (let i = order.length - 1; i > 0; i--) {
-    if (done[order[i]] && order[i] !== 'operated' && order[i] !== 'paid') {
+    // Being paid, having run or being closed says nothing about invoicing or
+    // payment (a trip can run, and be closed, still owing money).
+    if (done[order[i]] && order[i] !== 'operated' && order[i] !== 'paid' && order[i] !== 'closed') {
       for (let j = 0; j < i; j++) done[order[j]] = true
     }
   }
