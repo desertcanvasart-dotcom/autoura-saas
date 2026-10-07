@@ -169,13 +169,26 @@ describe('is the night’s hotel or ship still in the rates?', () => {
     expect(propertyRateStatus({ kind: 'hotel', name: 'Sofitel Legend' }, catalog)).toBe('not_on_file')
     expect(propertyRateStatus({ kind: 'hotel', name: 'Twin' }, catalog)).toBe('on_file')
   })
+  it('a name that carries its city still finds the hotel — "Marriott Mena House | Cairo" is Marriott Mena House in Cairo', () => {
+    const rates = { hotels: [{ name: 'Marriott Mena House', city: 'Cairo', active: true }], ships: [] }
+    expect(propertyRateStatus({ kind: 'hotel', name: 'Marriott Mena House | Cairo' }, rates)).toBe('on_file')
+    expect(propertyRateStatus({ kind: 'hotel', name: 'Marriott Mena House Cairo' }, rates)).toBe('on_file')
+    expect(propertyRateStatus({ kind: 'hotel', name: 'Marriott Mena House, Giza' }, rates)).toBe('not_on_file')
+  })
+  it('a line pinned to its rate row is judged by that row, whatever its name says', () => {
+    const rates = { hotels: [{ id: 'r1', name: 'Mena House Hotel', city: 'Cairo', active: true }, { id: 'r2', name: 'Old Cataract', city: 'Aswan', active: false }], ships: [] }
+    const pinned = (rate_id: string) => ({ rate_table: 'accommodation_rates', rate_id })
+    expect(propertyRateStatus({ kind: 'hotel', name: 'Marriott Mena House | Cairo' }, rates, pinned('r1'))).toBe('on_file')
+    expect(propertyRateStatus({ kind: 'hotel', name: 'Old Cataract' }, rates, pinned('r2'))).toBe('switched_off')
+    expect(propertyRateStatus({ kind: 'hotel', name: 'Mena House Hotel' }, rates, pinned('gone'))).toBe('not_on_file')
+  })
   it('a ship is looked for among ships, never among hotels', () => {
     expect(propertyRateStatus({ kind: 'cruise', name: 'MS Nile Star' }, catalog)).toBe('on_file')
     expect(propertyRateStatus({ kind: 'cruise', name: 'Kempinski Nile Hotel' }, catalog)).toBe('not_on_file')
   })
   it('the days API reports it per night line, withholds it when a catalogue failed to load, and only staff pages read it', () => {
     const api = readFileSync(join(process.cwd(), 'app/api/itineraries/[id]/days/route.ts'), 'utf8')
-    expect(api).toContain('property && loadedFor[property.kind] ? propertyRateStatus(property, catalog) : null')
+    expect(api).toContain('property && loadedFor[property.kind] ? propertyRateStatus(property, catalog, service as RatePin) : null')
     expect(readFileSync(join(process.cwd(), 'app/itineraries/[id]/page.tsx'), 'utf8')).toContain('data-testid="overnight-stale"')
     for (const clientFacing of ['app/share/[token]/page.tsx', 'lib/pdf-generator.ts']) {
       expect(readFileSync(join(process.cwd(), clientFacing), 'utf8'), clientFacing).not.toContain('property_rate_status')

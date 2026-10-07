@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
           .select('id, itinerary_id, resource_type, resource_name, itinerary_day_id, start_date, end_date, status')
           .in('itinerary_id', c).order('id').range(a, b)).catch(() => null),
       // The rates catalogue, as the days API reads it; a kind that fails to load is not judged.
-      supabase.from('accommodation_rates').select('property_name, is_active'),
+      supabase.from('accommodation_rates').select('id, property_name, city, is_active'),
       supabase.from('nile_cruises').select('id, ship_name, sailing_days, is_active'),
       supabase.from('tenants').select('min_margin_percent').eq('id', tenant_id).maybeSingle(),
       loadTripPnls(supabase, itineraries, null),
@@ -90,8 +90,8 @@ export async function GET(request: NextRequest) {
 
     const loadedFor = { hotel: !hotels.error, cruise: !ships.error }
     const catalog = {
-      hotels: (hotels.data ?? []).map(r => ({ name: r.property_name, active: r.is_active })),
-      ships: (ships.data ?? []).map(r => ({ name: r.ship_name, active: r.is_active })),
+      hotels: (hotels.data ?? []).map(r => ({ id: r.id, name: r.property_name, city: r.city, active: r.is_active })),
+      ships: (ships.data ?? []).map(r => ({ id: r.id, name: r.ship_name, active: r.is_active })),
     }
     const shipById = new Map<string, CruiseShip>((ships.data ?? []).map(s => [s.id, { ship_name: s.ship_name, sailing_days: s.sailing_days }]))
     // Before migration 399 the column is not there: no minimum.
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
         date: d.date,
         services: (servicesByDay.get(d.id) ?? []).map(s => {
           const property = propertyFromService(s as never)
-          return { ...s, property_rate_status: property && loadedFor[property.kind] ? propertyRateStatus(property, catalog) : null }
+          return { ...s, property_rate_status: property && loadedFor[property.kind] ? propertyRateStatus(property, catalog, s) : null }
         }),
       }))
       const cruiseNotes = loadedFor.cruise
