@@ -14,10 +14,12 @@
 //   · meals         — lunch / dinner the block includes, at a restaurant in
 //                     its city (a meal on the ship, at the camp or at the
 //                     hotel is part of that night, not a meal line);
-//   · transport     — a day tour in the city; a road transfer from the city
-//                     to the next; a flight between them, with the airport
-//                     transfers at both ends; the airport transfer of an
-//                     arrival or a departure. The vehicle fits the party.
+//   · transport     — a day tour in the city, or — when the day's hotel is
+//                     in another city — the Intercity Day Trip there and
+//                     back; a road drop-off from the city to the next; a
+//                     flight between them, with the airport transfers at
+//                     both ends; the airport transfer of an arrival or a
+//                     departure. The vehicle fits the party.
 //   · the night     — a departure has none, so its hotel and cruise go; a
 //                     night the block includes (a camp) books no hotel. A
 //                     hotel for a night in a new city is the operator's pick.
@@ -28,6 +30,7 @@
 import type { AllRates, GridDay, RateOption, SelectedItem, SlotValue, Intercity } from '@/app/pricing-grid/types'
 import { DAY_TYPE_DEFAULTS } from '@/app/pricing-grid/types'
 import { airportCodeForCity } from '@/lib/ai/staff-rate-resolution'
+import { resolveCityCoordinates } from '@/lib/constants/egypt-city-coordinates'
 import type { DayBlock } from './blocks'
 
 export interface GridBlock extends DayBlock {
@@ -82,6 +85,27 @@ function route(rates: AllRates, pax: number, match: (o: RouteOption) => boolean)
   }
   const first = byRoute.values().next()
   return first.done ? null : vehicleFor(first.value, pax)
+}
+
+/** A road move to another city with the night there. */
+const ROAD_MOVE = new Set(['intercity_dropoff', 'intercity_transfer'])
+
+/** Where the party sleeps tonight: the city of the hotel the day already has. */
+function hotelCity(day: GridDay, rates: AllRates): string | null {
+  const hotel = day.slots.find(s => s.slotId === 'accommodation')?.selectedItems[0]
+  if (!hotel) return null
+  return rates.accommodation.find(o => o.id === hotel.rateId)?.city ?? null
+}
+
+/** Cities a day trip lies between: both known, and more than an hour's
+ *  drive or so apart (Cairo–Alexandria ~180 km; Cairo–Giza ~10 km is one). */
+function farApart(a: string, b: string): boolean {
+  const p = resolveCityCoordinates(a), q = resolveCityCoordinates(b)
+  if (!p || !q || p === q) return false
+  const rad = Math.PI / 180
+  const h = Math.sin((q.lat - p.lat) * rad / 2) ** 2 +
+    Math.cos(p.lat * rad) * Math.cos(q.lat * rad) * Math.sin((q.lng - p.lng) * rad / 2) ** 2
+  return 2 * 6371 * Math.asin(Math.sqrt(h)) > 40
 }
 
 const isFlight = (b: DayBlock) => /\b(flight|fly|flies|plane)\b/i.test(b.transport ?? '')
@@ -197,20 +221,44 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
     add(airport(block.city), `Airport transfer in ${block.city}`)
     add(airport(block.to_city), `Airport transfer in ${block.to_city}`)
   } else if (comps.intercity === 'road' && block.to_city) {
+    // A move by road and a night there: the agency's "Intercity Drop-off".
+    // ('intercity_transfer' is the name the rates used to carry — no row
+    // has it now, so every road transfer was left for the operator.)
     add(
-      route(rates, pax, o => o.service_type === 'intercity_transfer' && sameCity(o.origin_city ?? o.city, block.city) && sameCity(o.destination_city, block.to_city)),
+      route(rates, pax, o => ROAD_MOVE.has(String(o.service_type)) && sameCity(o.origin_city ?? o.city, block.city) && sameCity(o.destination_city, block.to_city)),
       `Road transfer ${block.city} → ${block.to_city}`,
     )
   } else if (block.day_type === 'arrival' || block.day_type === 'departure') {
     if (block.day_type === 'departure' || comps.airportArrival) add(airport(city), `Airport transfer in ${city || 'this city'}`)
   } else if (comps.hasSightseeing && block.day_type !== 'cruise') {
-    // A tour IN the city first; else one that goes TO it (a day trip out of town).
     const dayTour = (o: RouteOption) => o.service_type === 'day_tour'
-    add(
-      route(rates, pax, o => dayTour(o) && sameCity(o.origin_city ?? o.city, city) && (!norm(o.destination_city) || sameCity(o.destination_city, city)))
-        ?? route(rates, pax, o => dayTour(o) && sameCity(o.destination_city, city)),
-      `Day tour transport in ${city || 'this city'}`,
-    )
+    const dayTrip = (o: RouteOption) => o.service_type === 'intercity_day_trip'
+    const inCity = (o: RouteOption) => dayTour(o) && sameCity(o.origin_city ?? o.city, city) && (!norm(o.destination_city) || sameCity(o.destination_city, city))
+    const home = block.night === 'same' ? hotelCity(day, rates) : null
+    const outAndBack = home && !sameCity(home, city)
+      ? route(rates, pax, o => dayTrip(o) && sameCity(o.origin_city ?? o.city, home) && sameCity(o.destination_city, city))
+        ?? route(rates, pax, o => dayTour(o) && sameCity(o.origin_city ?? o.city, home) && sameCity(o.destination_city, city))
+      : null
+    if (outAndBack) {
+      // The party sightsees in one city and sleeps in another — a day trip
+      // out and back (Alexandria from a Cairo hotel): the agency's
+      // "Intercity Day Trip" from the hotel's city, or a day tour on that road.
+      add(outAndBack, '')
+    } else if (home && farApart(home, city)) {
+      // No rate for that road. A tour inside the city would price the driving
+      // around Alexandria and not the road there and back, so none is taken:
+      // the operator picks. (A hotel next door — Giza for a Cairo day — is no
+      // day trip, and takes the city's own tour below.)
+      add(null, `Day trip ${home} → ${city} and back (Intercity Day Trip)`)
+    } else {
+      // A tour IN the city first; else one that goes TO it (a day trip out of town).
+      add(
+        route(rates, pax, inCity)
+          ?? route(rates, pax, o => dayTrip(o) && sameCity(o.destination_city, city))
+          ?? route(rates, pax, o => dayTour(o) && sameCity(o.destination_city, city)),
+        `Day tour transport in ${city || 'this city'}`,
+      )
+    }
   }
   if (transport.length) {
     set('route', transport)

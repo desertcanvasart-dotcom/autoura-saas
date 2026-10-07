@@ -74,13 +74,17 @@ export type DayType = 'arrival' | 'tour' | 'transfer' | 'cruise' | 'free' | 'dep
 
 export const DAY_TYPES: DayType[] = ['arrival', 'tour', 'transfer', 'cruise', 'free', 'departure']
 
+// What the day IS, for the completeness gate — never a transport route. The
+// words keep clear of the transport service types (an "Intercity Overnight"
+// is a rate; a day that ends in a hotel is "hotel tonight"), so the two
+// lists are not read as one (operator, 2026-10-07).
 export const DAY_TYPE_LABELS: Record<DayType, string> = {
-  arrival:   'Arrival (airport in + hotel check-in)',
-  tour:      'Tour (overnight + sightseeing)',
-  transfer:  'Transfer (intercity by road)',
-  cruise:    'Cruise (on board)',
-  free:      'Free day (overnight, no sightseeing)',
-  departure: 'Departure (hotel check-out + airport out)',
+  arrival:   'Arrival day (airport in + hotel check-in)',
+  tour:      'Sightseeing day (hotel tonight)',
+  transfer:  'Travel day (move to another city)',
+  cruise:    'Cruise day (on board)',
+  free:      'Free day (hotel tonight, no sightseeing)',
+  departure: 'Departure day (hotel check-out + airport out)',
 }
 
 export const DEFAULT_DAY_TYPE: DayType = 'tour'

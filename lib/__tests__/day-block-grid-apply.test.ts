@@ -101,7 +101,58 @@ describe('a day trip out of town', () => {
   })
 })
 
+describe('a day trip from a hotel in another city', () => {
+  const cairoHotel = () => emptyDay({ slots: emptyDay().slots.map(s => s.slotId === 'accommodation' ? { ...s, selectedItems: [{ rateId: 'h-cai', name: 'Mena House', rateEur: 90, rateNonEur: 90 }] } : s) })
+  const alx = block({ code: 'CAI-ALX', city: 'Alexandria', attractions: ['Catacombs of Kom El Shoqafa'], guide: 'none' })
+  const withRoutes = (...route: unknown[]) => ({ ...rates, route: [...(rates.route as unknown[]), ...route] }) as unknown as AllRates
+
+  it('takes the Intercity Day Trip from the hotel’s city, not a tour inside Alexandria', () => {
+    const r = withRoutes(
+      ...vehicles('alx-tour', 'day_tour', 'Alexandria'),
+      ...vehicles('cai-alx-ovn', 'intercity_overnight', 'Cairo', 'Alexandria'),
+      ...vehicles('cai-alx-trip', 'intercity_day_trip', 'Cairo', 'Alexandria'),
+    )
+    const { day, toPick } = applyBlockToGridDay(cairoHotel(), alx, r, 2)
+    expect(ids(day, 'route')).toEqual(['cai-alx-trip__sedan'])
+    // The night stays in Cairo.
+    expect(ids(day, 'accommodation')).toEqual(['h-cai'])
+    expect(toPick).toEqual([])
+  })
+
+  it('falls back to a day tour on that road', () => {
+    const { day } = applyBlockToGridDay(cairoHotel(), alx, withRoutes(...vehicles('alx-tour', 'day_tour', 'Alexandria')), 2)
+    expect(ids(day, 'route')).toEqual(['cai-alx__sedan'])
+  })
+
+  it('with no rate for the road there and back, asks — never the overnight rate or a tour inside the city', () => {
+    const noRoad = { ...rates, route: [
+      ...vehicles('alx-tour', 'day_tour', 'Alexandria'),
+      ...vehicles('cai-alx-ovn', 'intercity_overnight', 'Cairo', 'Alexandria'),
+    ] } as unknown as AllRates
+    const { day, toPick } = applyBlockToGridDay(cairoHotel(), alx, noRoad, 2)
+    expect(ids(day, 'route')).toEqual([])
+    expect(toPick).toEqual(['Day trip Cairo → Alexandria and back (Intercity Day Trip)'])
+  })
+})
+
+describe('a hotel next door is no day trip', () => {
+  it('a Cairo tour from a Giza hotel takes the Cairo tour', () => {
+    const r = { ...rates, accommodation: [{ id: 'h-giz', name: 'Marriott Mena House | Giza', rateEur: 90, rateNonEur: 90, city: 'Giza' }] } as unknown as AllRates
+    const gizaHotel = emptyDay({ slots: emptyDay().slots.map(s => s.slotId === 'accommodation' ? { ...s, selectedItems: [{ rateId: 'h-giz', name: 'Mena House', rateEur: 90, rateNonEur: 90 }] } : s) })
+    const { day, toPick } = applyBlockToGridDay(gizaHotel, block({ city: 'Cairo', attractions: ['Grand Egyptian Museum'] }), r, 2)
+    expect(ids(day, 'route')).toEqual(['cai-tour__sedan'])
+    expect(toPick).toEqual([])
+  })
+})
+
 describe('a transfer', () => {
+  it('by road takes the agency’s Intercity Drop-off', () => {
+    const r = { ...rates, route: [...vehicles('lxr-asw-drop', 'intercity_dropoff', 'Luxor', 'Aswan')] } as unknown as AllRates
+    const { day, toPick } = applyBlockToGridDay(emptyDay(), block({ day_type: 'transfer', city: 'Luxor', to_city: 'Aswan', night: 'move', transport: 'road' }), r, 2)
+    expect(ids(day, 'route')).toEqual(['lxr-asw-drop__sedan'])
+    expect(toPick).toEqual(['Hotel in Aswan'])
+  })
+
   it('by road: the route from the city to the next, and the hotel there is the operator’s pick', () => {
     const withHotel = emptyDay({ slots: emptyDay().slots.map(s => s.slotId === 'accommodation' ? { ...s, selectedItems: [{ rateId: 'h-cai', name: 'Mena House', rateEur: 90, rateNonEur: 90 }] } : s) })
     const { day, toPick } = applyBlockToGridDay(withHotel, block({ day_type: 'transfer', city: 'Luxor', to_city: 'Aswan', night: 'move', transport: 'road Luxor-Aswan' }), rates, 2)

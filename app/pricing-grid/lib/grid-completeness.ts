@@ -70,6 +70,26 @@ const SEG_AIRPORT = 'airport_transfer'
 const SEG_DAY_TOUR = 'day_tour'
 const SEG_INTERCITY = 'intercity_transfer'
 
+/** The segment a picked route covers. The rates name the journey more
+ *  finely than the gate asks — four hours, eight or twelve; a day trip to
+ *  another city and back; one way or back the next day — so a line counts
+ *  for its family. Until this, an "Intercity Drop-off" never counted as the
+ *  road move and an "Intercity Day Trip" never as the day's sightseeing
+ *  transport, and the save was refused with the right vehicle picked. */
+const SEGMENT_OF: Record<string, string> = {
+  airport_transfer: SEG_AIRPORT,
+  day_tour: SEG_DAY_TOUR,
+  half_day: SEG_DAY_TOUR,
+  long_day_tour: SEG_DAY_TOUR,
+  multi_day: SEG_DAY_TOUR,
+  intercity_day_trip: SEG_DAY_TOUR,
+  intercity_dropoff: SEG_INTERCITY,
+  intercity_overnight: SEG_INTERCITY,
+  intercity_transfer: SEG_INTERCITY,
+}
+export const transportSegment = (serviceType: string | undefined): string | undefined =>
+  serviceType ? SEGMENT_OF[serviceType] : undefined
+
 const SEG_LABEL: Record<string, string> = {
   [SEG_AIRPORT]: 'airport transfer',
   [SEG_DAY_TOUR]: 'day-tour',
@@ -188,7 +208,7 @@ export function gridCompleteness(
       if (typeAware) {
         for (const seg of [SEG_AIRPORT, SEG_DAY_TOUR, SEG_INTERCITY]) {
           if (need[seg] === 0) continue
-          const have = routeItems.filter((s) => s.serviceType === seg && itemIsPriced(s)).length
+          const have = routeItems.filter((s) => transportSegment(s.serviceType) === seg && itemIsPriced(s)).length
           if (have < need[seg]) {
             issues.push({
               dayNumber: dn,

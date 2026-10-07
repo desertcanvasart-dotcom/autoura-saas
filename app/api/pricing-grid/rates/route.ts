@@ -36,6 +36,12 @@ export async function GET(request: NextRequest) {
     const directionLabel = (key: string | null | undefined) => labelFor(directions, key || 'both')
     const pricingTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'activity_pricing_type')
     const pricingTypeLabel = (key: string | null | undefined) => (key ? labelFor(pricingTypes, key) : '')
+    const transportTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'transport_service_type')
+    const transportTypeLabel = (key: string | null | undefined) => {
+      const label = key ? labelFor(transportTypes, key) : ''
+      // A key the agency's list does not hold reads as words, not a code.
+      return label === key ? label.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()) : label
+    }
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
@@ -119,11 +125,14 @@ export async function GET(request: NextRequest) {
         // buildTransportTierIndex can re-select the vehicle as group size grows.
         // Read-only — no schema change; uses the same grouping key as
         // travel-ops-pro migration 20260205_transportation_rates_restructure.
-        ...groupVehicleRowsToTiers(transportRates || []),
-        // Cruise transport packages (bundled sightseeing vehicle for cruise days)
+        ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel),
+        // Cruise transport packages (bundled sightseeing vehicle for cruise days).
+        // They live in the B2B packages list (B2B → Pricing rules), not in
+        // Rates → Transportation, so the name says where to find them; the
+        // grid offers them on cruise days only (DayRow).
         ...(cruiseTransportPkgs || []).map((r: any) => ({
           id: r.id,
-          name: `${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
+          name: `B2B package: ${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
           rateEur: toNum(r.sedan_rate),
           rateNonEur: toNum(r.sedan_rate),
           city: r.origin_city,
@@ -348,7 +357,7 @@ function vehicleSlug(v: any): string {
  * Each vehicle row keeps its own rate + capacity band (falling back to the
  * canonical tier band when the row's capacity columns are null).
  */
-export function groupVehicleRowsToTiers(rows: any[]): any[] {
+export function groupVehicleRowsToTiers(rows: any[], typeLabel?: (serviceType: string) => string): any[] {
   // One row per (route, vehicle) since migration 337 — nothing to expand.
   const groupKey = (r: any) =>
     [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
@@ -370,11 +379,16 @@ export function groupVehicleRowsToTiers(rows: any[]): any[] {
       return String(a.id) < String(b.id) ? -1 : 1
     })
     const keeper = sorted[0]
-    const label =
+    const routeLabel =
       keeper.route_name ||
       `${keeper.origin_city || keeper.city || ''}${keeper.destination_city ? ' → ' + keeper.destination_city : ''}`.trim() ||
       keeper.service_code ||
       `${keeper.city || ''} ${keeper.service_type || 'Transport'}`.trim()
+    // The kind of journey, in the agency's words (Day Tour, Intercity Day
+    // Trip …): two routes on the same road differ only by it, and without it
+    // an "Intercity Overnight" chip read like the day's whole programme.
+    const kind = keeper.service_type && typeLabel ? typeLabel(String(keeper.service_type)) : ''
+    const label = kind && !normLower(routeLabel).includes(normLower(kind)) ? `${routeLabel} · ${kind}` : routeLabel
 
     const usedTierKeys = new Map<string, number>()
     for (const r of sorted) {

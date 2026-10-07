@@ -87,6 +87,24 @@ describe('gridCompleteness — rich gate (consolidation Phase B)', () => {
     expect(r.issues.some((i) => i.code === 'missing-transport-day_tour')).toBe(true)
   })
 
+  it('counts a route by its family: an Intercity Day Trip is the day’s sightseeing transport', () => {
+    for (const serviceType of ['intercity_day_trip', 'half_day', 'long_day_tour']) {
+      const slots = [pricedSlot('accommodation'), pricedSlot('route', { serviceType }), pricedSlot('guide')]
+      expect(gridCompleteness([day(1, slots)], cfg({ withGuide: true })).complete).toBe(true)
+    }
+    // An overnight rate is a road move, not the day's sightseeing.
+    const slots = [pricedSlot('accommodation'), pricedSlot('route', { serviceType: 'intercity_overnight' }), pricedSlot('guide')]
+    expect(gridCompleteness([day(1, slots)], cfg({ withGuide: true })).issues.some(i => i.code === 'missing-transport-day_tour')).toBe(true)
+  })
+
+  it('counts an Intercity Drop-off or Overnight as the road move', () => {
+    for (const serviceType of ['intercity_dropoff', 'intercity_overnight']) {
+      const slots = [pricedSlot('accommodation'), pricedSlot('route', { serviceType })]
+      const r = gridCompleteness([day(1, slots, { dayType: 'transfer' })], cfg({ withGuide: false }))
+      expect(r.issues.some(i => i.code.startsWith('missing-transport'))).toBe(false)
+    }
+  })
+
   it('falls back to count-based transport check when selections lack serviceType', () => {
     const slots = [
       pricedSlot('accommodation'),

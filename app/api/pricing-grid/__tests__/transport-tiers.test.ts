@@ -85,4 +85,25 @@ describe('groupVehicleRowsToTiers — sibling per-vehicle rows → grid tier set
     const sorted = [...idx.get('c1')!].sort((a, b) => a.capMin - b.capMin)
     expect(sorted.map((t) => [t.capMin, t.capMax, t.rateEur])).toEqual([[1, 2, 40], [13, 24, 150]])
   })
+
+  it('names the kind of journey, so two routes on one road can be told apart', () => {
+    const label = (k: string) => ({ intercity_overnight: 'Intercity Overnight', intercity_day_trip: 'Intercity Day Trip' }[k] ?? k)
+    const row = (id: string, service_type: string, route_name: string | null) => ({
+      id, created_at: '2026-03-01', service_type, city: 'Cairo', origin_city: 'Cairo', destination_city: 'Alexandria', route_name,
+      vehicle_type: 'sedan', base_rate_eur: 190, base_rate_non_eur: 190, capacity_min: 1, capacity_max: 2,
+    })
+    const names = groupVehicleRowsToTiers([
+      row('o1', 'intercity_overnight', 'CAIRO-TO-ALEXANDRIA (Over Night)'),
+      row('d1', 'intercity_day_trip', null),
+      row('n1', 'intercity_day_trip', 'Alexandria Intercity Day Trip'),
+    ], label).map(o => o.name)
+    expect(names).toEqual([
+      'Sedan (1-2 pax) — CAIRO-TO-ALEXANDRIA (Over Night) · Intercity Overnight',
+      'Sedan (1-2 pax) — Cairo → Alexandria · Intercity Day Trip',
+      // Already says it: not said twice.
+      'Sedan (1-2 pax) — Alexandria Intercity Day Trip',
+    ])
+    // Without the agency's words, the names are as they were.
+    expect(groupVehicleRowsToTiers([row('o1', 'intercity_overnight', 'X')])[0].name).toBe('Sedan (1-2 pax) — X')
+  })
 })

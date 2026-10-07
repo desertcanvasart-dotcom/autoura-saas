@@ -101,3 +101,20 @@ describe('hydrateDayRates — the single supplement', () => {
     expect(hydrateDayRates([d], suppRates, 'missing').changed).toBe(0)
   })
 })
+
+describe('hydrateDayRates — a reloaded transport line', () => {
+  const routeRates = {
+    route: [{ id: 'cai-alx__sedan', name: 'Sedan (1-2 pax) — Cairo → Alexandria · Intercity Day Trip', rateEur: 120, rateNonEur: 120, service_type: 'intercity_day_trip' }],
+  } as unknown as AllRates
+
+  it('shows its rate’s current name, at the price it was saved at', () => {
+    const d = day(slot('route', { selectedItems: [{ rateId: 'cai-alx__sedan', name: 'Sedan — CAI-ALX (old)', rateEur: 93.38, rateNonEur: 93.38 }] }))
+    const item = find(hydrateDayRates([d], routeRates, 'missing').days[0], 'route').selectedItems[0]
+    expect(item).toMatchObject({ name: 'Sedan (1-2 pax) — Cairo → Alexandria · Intercity Day Trip', rateEur: 93.38 })
+  })
+
+  it('a line whose rate is gone keeps its saved name', () => {
+    const d = day(slot('route', { selectedItems: [{ rateId: 'gone', name: 'Old route', rateEur: 50, rateNonEur: 50 }] }))
+    expect(find(hydrateDayRates([d], routeRates, 'missing').days[0], 'route').selectedItems[0].name).toBe('Old route')
+  })
+})
