@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Plus, X, MapPin, Ticket, Calculator } from 'lucide-react'
 import CitySelect from '@/components/CitySelect'
+import { withPickedAttractions } from '@/lib/documents/voucher-lines'
 
 interface EntranceFee {
   id: string
@@ -34,6 +35,8 @@ export default function EditSupplierDocumentPage() {
   const params = useParams()
   const router = useRouter()
   const [document, setDocument] = useState<any>(null)
+  // The total as loaded: picked entrance fees are added to it, not put in its place.
+  const [baseTotal, setBaseTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,10 +60,7 @@ export default function EditSupplierDocumentPage() {
       const result = await response.json()
       if (result.success) {
         setDocument(result.data)
-        // Load existing selected attractions if present
-        if (result.data.selected_attractions) {
-          setSelectedAttractions(result.data.selected_attractions)
-        }
+        setBaseTotal(Number(result.data.total_cost) || 0)
       } else {
         setError('Document not found')
       }
@@ -89,18 +89,12 @@ export default function EditSupplierDocumentPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      // Include selected attractions in the document
+      // The picker ADDS entrance-fee lines; the voucher's own lines stay.
+      // (It used to replace `services` on every save, for every document
+      // type, and sent a selected_attractions column the table does not have.)
       const dataToSave = {
         ...document,
-        selected_attractions: selectedAttractions,
-        // Update services array with attraction names for backward compatibility
-        services: selectedAttractions.map(a => ({
-          service_name: a.attraction_name,
-          service_type: 'entrance_fee',
-          quantity: a.quantity,
-          unit_price: a.eur_rate,
-          total_price: a.eur_rate * a.quantity
-        }))
+        services: withPickedAttractions(document.services, selectedAttractions),
       }
       
       const response = await fetch(`/api/supplier-documents/${params.id}`, {
@@ -164,8 +158,8 @@ export default function EditSupplierDocumentPage() {
   useEffect(() => {
     if (document && (document.document_type === 'service_order' || document.document_type === 'activity_voucher')) {
       const attractionsTotal = calculateAttractionsTotal()
-      if (attractionsTotal > 0) {
-        setDocument((prev: any) => ({ ...prev, total_cost: attractionsTotal }))
+      if (attractionsTotal > 0 || selectedAttractions.length === 0) {
+        setDocument((prev: any) => prev ? { ...prev, total_cost: baseTotal + attractionsTotal } : prev)
       }
     }
   }, [selectedAttractions])

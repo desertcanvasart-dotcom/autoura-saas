@@ -12,10 +12,16 @@ export async function POST(request: NextRequest) {
     if (!authResult.supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json()
-    const { supplierPhone, supplierName, documentNumber, documentType, clientName, serviceDate, pdfBase64 } = body
+    const { documentId, supplierPhone, supplierName, documentNumber, documentType, clientName, serviceDate, pdfBase64 } = body
 
     if (!supplierPhone) return NextResponse.json({ success: false, error: 'Supplier phone number is required' }, { status: 400 })
     if (!pdfBase64) return NextResponse.json({ success: false, error: 'PDF attachment is required' }, { status: 400 })
+
+    // Only a voucher of the caller's own tenant (RLS on supplier_documents).
+    const { data: ownDocument } = documentId
+      ? await authResult.supabase.from('supplier_documents').select('id').eq('id', documentId).maybeSingle()
+      : { data: null }
+    if (!ownDocument) return NextResponse.json({ success: false, error: 'Document not found' }, { status: 404 })
 
     // Upload PDF to Supabase Storage (needs admin client for storage access)
     const adminClient = createAdminClient()
