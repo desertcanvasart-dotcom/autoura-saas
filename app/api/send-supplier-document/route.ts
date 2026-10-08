@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
+import { escapeHtml } from '@/lib/html-escape'
 
 // POST - Send supplier document via Gmail with PDF attachment
 export async function POST(request: Request) {
@@ -12,14 +13,22 @@ export async function POST(request: Request) {
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json()
-    const { supplierEmail, supplierName, documentNumber, documentType, clientName, pdfBase64 } = body
+    const { documentId, supplierEmail, supplierName, documentNumber, documentType, clientName, pdfBase64 } = body
 
     if (!supplierEmail) return NextResponse.json({ success: false, error: 'Supplier email is required' }, { status: 400 })
     if (!pdfBase64) return NextResponse.json({ success: false, error: 'PDF attachment is required' }, { status: 400 })
 
+    // Only a voucher of the caller's own tenant (RLS on supplier_documents):
+    // this was a "send any PDF to any address" endpoint for any signed-in user.
+    const { data: ownDocument } = documentId
+      ? await supabase.from('supplier_documents').select('id').eq('id', documentId).maybeSingle()
+      : { data: null }
+    if (!ownDocument) return NextResponse.json({ success: false, error: 'Document not found' }, { status: 404 })
+
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const businessName = senderTenant?.company_name || ''
-    const businessEmail = process.env.BUSINESS_EMAIL || process.env.GMAIL_USER || ''
+    // The tenant's own address — never the platform's GMAIL_USER.
+    const businessEmail = senderTenant?.contact_email || ''
 
     const emailSubject = `${documentType || 'Document'} - ${documentNumber || 'N/A'} | Guest: ${clientName || 'N/A'} | ${businessName}`
 
@@ -36,22 +45,22 @@ export async function POST(request: Request) {
 </head>
 <body>
   <div class="header">
-    <h2 style="margin: 0;">${businessName}</h2>
-    <p style="margin: 5px 0 0 0; opacity: 0.9;">${documentType || 'Supplier Document'}</p>
+    <h2 style="margin: 0;">${escapeHtml(businessName)}</h2>
+    <p style="margin: 5px 0 0 0; opacity: 0.9;">${escapeHtml(documentType || 'Supplier Document')}</p>
   </div>
   <div class="content">
-    <p>Dear <strong>${supplierName || 'Partner'}</strong>,</p>
-    <p>Please find the attached ${(documentType || 'document').toLowerCase()} for your reference.</p>
+    <p>Dear <strong>${escapeHtml(supplierName || 'Partner')}</strong>,</p>
+    <p>Please find the attached ${escapeHtml(String(documentType || 'document').toLowerCase())} for your reference.</p>
     <div class="details">
-      <p><strong>Document:</strong> ${documentNumber || 'N/A'}</p>
-      <p><strong>Type:</strong> ${documentType || 'N/A'}</p>
-      <p><strong>Guest:</strong> ${clientName || 'N/A'}</p>
+      <p><strong>Document:</strong> ${escapeHtml(documentNumber || 'N/A')}</p>
+      <p><strong>Type:</strong> ${escapeHtml(documentType || 'N/A')}</p>
+      <p><strong>Guest:</strong> ${escapeHtml(clientName || 'N/A')}</p>
     </div>
     <p>Please review the attached document and confirm at your earliest convenience.</p>
-    <p>Best regards,<br/><strong>${businessName} Team</strong></p>
+    <p>Best regards,<br/><strong>${escapeHtml(businessName)} Team</strong></p>
   </div>
   <div class="footer">
-    <p>${businessName} | ${businessEmail}</p>
+    <p>${escapeHtml(businessName)}${businessEmail ? ` | ${escapeHtml(businessEmail)}` : ''}</p>
   </div>
 </body>
 </html>`
@@ -83,7 +92,7 @@ export async function POST(request: Request) {
 
     // Build MIME email with PDF attachment
     const filename = `${(documentNumber || 'doc').replace(/\s+/g, '_')}_${(supplierName || 'supplier').replace(/\s+/g, '_')}.pdf`
-    const rawEmail = buildEmailWithAttachment(supplierEmail, emailSubject, emailBody, filename, pdfBase64, businessName)
+    const rawEmail = buildEmailWithAttachment(supplierEmail, emailSubject, emailBody, filename, pdfBase64)
 
     const response = await gmail.users.messages.send({
       userId: 'me',
@@ -101,18 +110,19 @@ export async function POST(request: Request) {
   }
 }
 
-function buildEmailWithAttachment(to: string, subject: string, body: string, filename: string, attachmentBase64: string, senderName: string = ''): string {
-  const fromAddress = process.env.GMAIL_USER || process.env.BUSINESS_EMAIL || ''
-  const fromName = senderName
+function buildEmailWithAttachment(to: string, subject: string, body: string, filename: string, attachmentBase64: string): string {
   const boundary = `boundary_${Date.now()}`
 
   // Strip CR/LF from header values to prevent header/Bcc injection.
   const stripHeader = (v: string) => String(v ?? '').replace(/[\r\n]+/g, ' ').trim()
+  const safeFilename = stripHeader(filename).replace(/"/g, '')
 
+  // No From: Gmail sends as the signed-in user's own account, and the copy is
+  // in its Sent folder. There used to be a From and a Bcc naming the
+  // platform-wide GMAIL_USER, which copied every tenant's vouchers to one
+  // mailbox and claimed an address the sending account does not own.
   const emailParts = [
-    `From: ${fromName} <${fromAddress}>`,
     `To: ${stripHeader(to)}`,
-    `Bcc: ${fromAddress}`,
     `Subject: ${stripHeader(subject)}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -123,9 +133,9 @@ function buildEmailWithAttachment(to: string, subject: string, body: string, fil
     '',
     Buffer.from(body).toString('base64'),
     `--${boundary}`,
-    `Content-Type: application/pdf; name="${filename}"`,
+    `Content-Type: application/pdf; name="${safeFilename}"`,
     'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="${filename}"`,
+    `Content-Disposition: attachment; filename="${safeFilename}"`,
     '',
     attachmentBase64,
     `--${boundary}--`,

@@ -6,6 +6,7 @@ import jsPDF from 'jspdf'
 import { brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
 import { formatDateOnly, daysBetween } from '@/lib/date-utils'
+import { voucherLines } from '@/lib/documents/voucher-lines'
 
 interface ServiceItem {
   date?: string
@@ -454,9 +455,10 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
 
   // ==================== SERVICES TABLE ====================
   
-  const hasServices = (doc.services && doc.services.length > 0) || (doc.selected_attractions && doc.selected_attractions.length > 0) || (doc.selected_routes && doc.selected_routes.length > 0) || (doc.selected_meals && doc.selected_meals.length > 0) || (doc.selected_guides && doc.selected_guides.length > 0)
-  
-  if (hasServices) {
+  // The voucher's lines: `services`, else another list with lines (lib/documents/voucher-lines).
+  const items = voucherLines(doc)
+
+  if (items.length > 0) {
     ensureSpace(32)
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'bold')
@@ -478,9 +480,6 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.text('Amount', pageWidth - margin - 4, y + 6.5, { align: 'right' })
     
     y += 12
-    
-    // Use selected_routes for transport, selected_meals for meals, selected_attractions for entrance fees, otherwise use services
-    const items = doc.selected_routes || doc.selected_meals || doc.selected_guides || doc.selected_attractions || doc.services || []
     
     items.forEach((item: any, idx: number) => {
       // Get item name

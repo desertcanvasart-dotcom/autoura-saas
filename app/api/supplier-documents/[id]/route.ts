@@ -71,8 +71,11 @@ export async function PUT(
     const body = await request.json()
 
 
-    // Remove fields that shouldn't be updated directly
-    const { itinerary, supplier, created_at, tenant_id, ...updateData } = body
+    // Remove fields that shouldn't be updated directly. Not itinerary_id
+    // either: a voucher stays on its trip (it could be pointed at another
+    // tenant's itinerary id).
+    const updateData = { ...body }
+    for (const key of ['itinerary', 'supplier', 'created_at', 'tenant_id', 'itinerary_id']) delete updateData[key]
 
     // Auto-set timestamps based on status changes
     if (updateData.status === 'sent' && !updateData.sent_at) {
