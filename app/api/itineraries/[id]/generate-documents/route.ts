@@ -1,4 +1,5 @@
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { docMappingFor, serviceCity, PlaceNames, entranceLineName, unassignedDocKey, requestedDocTypes } from '@/lib/documents/group-services'
@@ -18,15 +19,6 @@ const SUPPLIER_TO_DOC_TYPE: Record<string, string> = {
   dmc: 'service_order'
 }
 
-// Document number prefixes
-const DOC_PREFIXES: Record<string, string> = {
-  hotel_voucher: 'HV',
-  service_order: 'SO',
-  transport_voucher: 'TV',
-  guide_assignment: 'GA',
-  cruise_voucher: 'CV'
-}
-
 // Default supplier names by document type and category
 const DEFAULT_SUPPLIER_NAMES: Record<string, Record<string, string>> = {
   hotel_voucher: { default: 'Hotel' },
@@ -38,40 +30,6 @@ const DEFAULT_SUPPLIER_NAMES: Record<string, Record<string, string>> = {
     entrance: 'Entrance Fees',
     default: 'Ground Services'
   }
-}
-
-// Track offsets per document type during batch generation
-const typeOffsets: Record<string, number> = {}
-
-async function generateDocumentNumber(supabase: any, docType: string): Promise<string> {
-  const prefix = DOC_PREFIXES[docType] || 'SD'
-  const year = new Date().getFullYear()
-  const pattern = `${prefix}-${year}-%`
-
-  const { data } = await supabase
-    .from('supplier_documents')
-    .select('document_number')
-    .like('document_number', pattern)
-    .order('document_number', { ascending: false })
-    .limit(1)
-
-  let nextNum = 1
-  if (data && data.length > 0) {
-    const lastNum = data[0].document_number
-    const match = lastNum.match(/-(\d+)$/)
-    if (match) {
-      nextNum = parseInt(match[1], 10) + 1
-    }
-  }
-
-  // Add offset for batch generation (multiple docs of same type)
-  const offset = typeOffsets[docType] || 0
-  nextNum += offset
-
-  // Increment offset for next call of same type
-  typeOffsets[docType] = offset + 1
-
-  return `${prefix}-${year}-${String(nextNum).padStart(4, '0')}`
 }
 
 export async function POST(
@@ -88,9 +46,6 @@ export async function POST(
 
   const supabase = createAdminClient()
   const { id: itineraryId } = await params
-
-  // Reset offsets for each request
-  Object.keys(typeOffsets).forEach(key => delete typeOffsets[key])
 
   try {
     const body = await request.json().catch(() => ({}))
@@ -320,7 +275,6 @@ export async function POST(
         continue
       }
 
-      const docNumber = await generateDocumentNumber(supabase, group.docType)
 
       const formattedServices = group.services.map(s => ({
         service_type: s.service_type,
@@ -342,7 +296,7 @@ export async function POST(
         itinerary_id: itineraryId,
         supplier_id: supplierId,
         document_type: group.docType,
-        document_number: docNumber,
+        document_number: '', // numbered at insert (lib/documents/numberer)
         supplier_name: group.supplier.name,
         supplier_contact_name: group.supplier.contact_name,
         supplier_contact_email: group.supplier.contact_email,
@@ -378,7 +332,6 @@ export async function POST(
         continue
       }
 
-      const docNumber = await generateDocumentNumber(supabase, group.docType)
 
       const formattedServices = group.services.map(s => ({
         service_type: s.service_type,
@@ -402,7 +355,7 @@ export async function POST(
         itinerary_id: itineraryId,
         supplier_id: null, // No supplier assigned
         document_type: group.docType,
-        document_number: docNumber,
+        document_number: '', // numbered at insert (lib/documents/numberer)
         supplier_name: supplierName,
         supplier_contact_name: null,
         supplier_contact_email: null,
@@ -430,10 +383,13 @@ export async function POST(
     if (documentsToCreate.length > 0) {
 
 
-      const { data: createdDocs, error: createError } = await supabase
-        .from('supplier_documents')
-        .insert(documentsToCreate)
-        .select()
+      // Numbered as one batch, across every tenant's numbers; a number taken
+      // by an overlapping request in between is renumbered and retried.
+      const { data: createdDocs, error: createError } = await insertNumbered(
+        documentsToCreate,
+        supabase,
+        rows => supabase.from('supplier_documents').insert(rows).select()
+      )
 
       if (createError) {
         console.error('❌ Error creating documents:', createError)
@@ -442,11 +398,12 @@ export async function POST(
 
 
 
+      const created = createdDocs ?? []
       return NextResponse.json({
         success: true,
-        message: `Generated ${createdDocs.length} document(s)`,
-        count: createdDocs.length,
-        documents: createdDocs
+        message: `Generated ${created.length} document(s)`,
+        count: created.length,
+        documents: created
       })
     }
 
