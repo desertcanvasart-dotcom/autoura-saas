@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SERVICE_TO_DOC_TYPE, docMappingFor } from '@/lib/documents/group-services'
+import { KNOWN_SERVICE_TYPES, destinationOf } from '@/lib/documents/sync-plan'
 import fs from 'fs'
 import path from 'path'
 import { contractNumber, contractTravelers, contractDuration, contractDestinations } from '@/lib/contract-facts'
@@ -95,20 +95,20 @@ describe('PDFs sent by WhatsApp', () => {
 })
 
 describe('Generate Documents handles every service type the grid saves', () => {
-  it('each grid service type is mapped explicitly (a document, or none on purpose)', () => {
+  it('each grid service type is known to the document plan (a document, or none on purpose)', () => {
     const save = read('app/api/pricing-grid/save/route.ts')
     const fn = save.slice(save.indexOf('function getServiceType'))
     const gridTypes = new Set([...fn.slice(0, fn.indexOf('return map')).matchAll(/:\s*'(\w+)'/g)].map(m => m[1]))
     expect(gridTypes.size).toBeGreaterThan(5)
 
-    // The table lives in lib/documents/group-services, which the route uses.
-    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain('docMappingFor(')
-    for (const t of gridTypes) expect(Object.keys(SERVICE_TO_DOC_TYPE), `grid type '${t}' unmapped — skipped silently`).toContain(t)
+    // The rules live in lib/documents/sync-plan, which the route uses.
+    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain('planDocuments(')
+    for (const t of gridTypes) expect(KNOWN_SERVICE_TYPES, `grid type '${t}' unknown`).toContain(t)
   })
   it('entrance fees make a service order', () => {
-    expect(docMappingFor({ service_type: 'entrance_fee' })).toEqual({ docType: 'service_order', category: 'entrance' })
+    expect(destinationOf({ service_type: 'entrance_fee' })).toEqual({ docType: 'service_order', kind: 'entrance' })
   })
   it('a grid cruise line gets a cruise voucher, not a hotel voucher', () => {
-    expect(docMappingFor({ service_type: 'accommodation', description: '[pricing-grid:cruise] MS Nile' })?.docType).toBe('cruise_voucher')
+    expect(destinationOf({ service_type: 'accommodation', description: '[pricing-grid:cruise] MS Nile' })).toEqual({ docType: 'cruise_voucher' })
   })
 })

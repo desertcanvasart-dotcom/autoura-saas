@@ -14,7 +14,7 @@ interface GenerateDocumentsButtonProps {
 }
 
 const DOCUMENT_TYPES = [
-  { value: 'all', label: 'Generate All', icon: '📄' },
+  { value: 'all', label: 'Sync all documents', icon: '🔄' },
   { value: 'hotel_voucher', label: 'Hotel Vouchers', icon: '🏨' },
   { value: 'transport_voucher', label: 'Transport Vouchers', icon: '🚗' },
   { value: 'guide_assignment', label: 'Guide Assignments', icon: '👨‍🏫' },
@@ -70,12 +70,12 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
       const data = await response.json()
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to generate documents')
+        throw new Error(data.error || 'Failed to sync documents')
       }
 
       setResult({
         success: true,
-        message: data.message || `Generated ${data.documents?.length || 0} document(s)`
+        message: data.message || 'Documents synced'
       })
 
       // Navigate to documents page for this itinerary
@@ -87,7 +87,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
       console.error('Error generating documents:', error)
       setResult({
         success: false,
-        message: error.message || 'Failed to generate documents'
+        message: error.message || 'Failed to sync documents'
       })
     } finally {
       setGenerating(false)
@@ -115,7 +115,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
         {generating ? (
           <>
             <Loader2 size={16} className="animate-spin" />
-            <span>Generating...</span>
+            <span>Syncing…</span>
           </>
         ) : (
           <>
@@ -140,7 +140,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
 
           {/* Divider with label */}
           <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">
-            Generate New
+            Sync with the itinerary
           </div>
 
           {/* Generation Options */}

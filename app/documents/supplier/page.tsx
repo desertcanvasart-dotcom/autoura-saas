@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { withReturnTo } from '@/lib/nav/return-to'
+import TripDocumentsCoverage from '@/components/documents/TripDocumentsCoverage'
 import { 
   FileText, Send, Eye, Trash2, Pencil,
   Hotel, Car, Ship, MapPin, Users, CheckCircle,
@@ -243,6 +244,9 @@ export default function SupplierDocumentsPage() {
       </header>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* One trip: its documents checked against its itinerary, and Sync. */}
+        {itineraryFilter && <TripDocumentsCoverage itineraryId={itineraryFilter} onChanged={fetchDocuments} />}
+
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">

@@ -8151,6 +8151,8 @@ export interface Database {
           completed_at: string | null
           created_at: string | null
           updated_at: string | null
+          sync_key: string | null
+          synced_hash: string | null
         }
         Insert: {
           id?: string
@@ -8187,6 +8189,8 @@ export interface Database {
           completed_at?: string | null
           created_at?: string | null
           updated_at?: string | null
+          sync_key?: string | null
+          synced_hash?: string | null
         }
         Update: {
           id?: string
@@ -8223,6 +8227,8 @@ export interface Database {
           completed_at?: string | null
           created_at?: string | null
           updated_at?: string | null
+          sync_key?: string | null
+          synced_hash?: string | null
         }
         Relationships: [
           {
