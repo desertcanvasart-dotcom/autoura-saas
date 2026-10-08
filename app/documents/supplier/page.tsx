@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { withReturnTo } from '@/lib/nav/return-to'
 import { 
   FileText, Send, Eye, Trash2, Pencil,
   Hotel, Car, Ship, MapPin, Users, CheckCircle,
@@ -452,7 +453,8 @@ export default function SupplierDocumentsPage() {
                               <div className="flex items-center justify-end gap-1">
                                 {/* View */}
                                 <Link
-                                  href={`/documents/supplier/${doc.id}`}
+                                  // Back from the document returns to this list, still filtered to the trip.
+                                  href={itineraryFilter ? withReturnTo(`/documents/supplier/${doc.id}`, `/documents/supplier?itineraryId=${encodeURIComponent(itineraryFilter)}`) : `/documents/supplier/${doc.id}`}
                                   className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                                   title="View"
                                 >

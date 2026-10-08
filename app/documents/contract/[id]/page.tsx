@@ -8,8 +8,9 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import Link from 'next/link'
-import { ArrowLeft, Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
+import { Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
 import { contractNumber, contractTravelers, contractDuration, contractDestinations } from '@/lib/contract-facts'
 
 // The fields an itinerary actually has (the old shape named num_travelers,
@@ -258,19 +259,18 @@ export default function ContractPage() {
     )
   }
 
+  const tripRef = { id: itinerary.id, code: itinerary.itinerary_code, name: itinerary.trip_name ?? null }
+
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
         
+        <TripBreadcrumb itineraryId={itinerary.id} trip={tripRef} current="Contract" />
         {/* COMPACT HEADER */}
         <div className="flex items-center justify-between mb-4">
-          <Link
-            href="/itineraries"
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Itineraries
-          </Link>
+          {/* A contract is its trip's: back goes to the trip, or wherever the
+              user came from (the booking, the edit page). */}
+          <BackLink fallbackHref={`/itineraries/${itinerary.id}`} fallbackLabel={tripRef.code || 'Trip'} trip={tripRef} />
           
           <div className="flex gap-2">
             <button

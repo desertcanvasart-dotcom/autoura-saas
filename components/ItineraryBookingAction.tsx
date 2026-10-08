@@ -7,6 +7,7 @@ import { BookOpen, Loader2 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { showToast } from '@/app/contexts/ToastContext'
+import { withReturnTo } from '@/lib/nav/return-to'
 
 // The itinerary's booking step, in one place.
 //
@@ -28,6 +29,7 @@ export default function ItineraryBookingAction({
   variant = 'button',
   onStatusChange,
   className = '',
+  returnTo,
 }: {
   itineraryId: string
   status: string | null | undefined
@@ -35,8 +37,12 @@ export default function ItineraryBookingAction({
   /** Told when Convert confirms the itinerary, so the page's status agrees. */
   onStatusChange?: (status: string) => void
   className?: string
+  /** Where back from the booking goes; the trip page unless said. */
+  returnTo?: string
 }) {
   const router = useRouter()
+  // Back from the booking returns here (lib/nav/return-to).
+  const toBooking = (id: string) => withReturnTo(`/bookings/${id}`, returnTo ?? `/itineraries/${itineraryId}`)
   const { confirm } = useConfirmDialog()
   const [booking, setBooking] = useState<Booking | null>(null)
   const [checked, setChecked] = useState(false)
@@ -64,7 +70,7 @@ export default function ItineraryBookingAction({
   if (booking) {
     return variant === 'tag' ? (
       <Link
-        href={`/bookings/${booking.id}`}
+        href={toBooking(booking.id)}
         title="This itinerary is booked — open the booking"
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium bg-green-50 text-green-700 border-green-200 hover:bg-green-100 ${className}`}
       >
@@ -73,7 +79,7 @@ export default function ItineraryBookingAction({
       </Link>
     ) : (
       <Link
-        href={`/bookings/${booking.id}`}
+        href={toBooking(booking.id)}
         className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 bg-teal-600 text-white hover:bg-teal-700 transition-colors flex-shrink-0 ${className}`}
       >
         <BookOpen className="w-4 h-4" />
@@ -113,7 +119,7 @@ export default function ItineraryBookingAction({
       const made = data.booking as Booking | undefined
       if (made?.id) {
         showToast('success', `Booking ${made.booking_number} created`)
-        router.push(`/bookings/${made.id}`)
+        router.push(toBooking(made.id))
         return
       }
       // Confirmed, but no booking could be made (e.g. no price) — say why.
