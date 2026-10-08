@@ -1,39 +1,6 @@
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
-
-// Document number prefixes
-const DOC_PREFIXES: Record<string, string> = {
-  hotel_voucher: 'HV',
-  service_order: 'SO',
-  transport_voucher: 'TV',
-  activity_voucher: 'AV',
-  guide_assignment: 'GA',
-  cruise_voucher: 'CV'
-}
-
-async function generateDocumentNumber(supabase: any, docType: string): Promise<string> {
-  const prefix = DOC_PREFIXES[docType] || 'SD'
-  const year = new Date().getFullYear()
-  const pattern = `${prefix}-${year}-%`
-  
-  const { data } = await supabase
-    .from('supplier_documents')
-    .select('document_number')
-    .like('document_number', pattern)
-    .order('document_number', { ascending: false })
-    .limit(1)
-  
-  let nextNum = 1
-  if (data && data.length > 0) {
-    const lastNum = data[0].document_number
-    const match = lastNum.match(/-(\d+)$/)
-    if (match) {
-      nextNum = parseInt(match[1], 10) + 1
-    }
-  }
-  
-  return `${prefix}-${year}-${String(nextNum).padStart(4, '0')}`
-}
 
 export async function GET(request: NextRequest) {
   // Authenticate and get tenant context
@@ -153,11 +120,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Generate document number if not provided
-    if (!body.document_number) {
-      body.document_number = await generateDocumentNumber(supabase, body.document_type)
-    }
-
     // Add tenant_id for multi-tenancy
     body.tenant_id = tenant_id
 
@@ -193,11 +155,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase
-      .from('supplier_documents')
-      .insert([body])
-      .select()
-      .single()
+    // A number the caller chose is used as is. Otherwise number it against
+    // every tenant's numbers (the column is UNIQUE across the table; the
+    // caller's RLS client sees only its own), retrying on a clash.
+    const insert = (rows: typeof body[]) => supabase.from('supplier_documents').insert(rows).select().single()
+    const { data, error } = body.document_number
+      ? await insert([body])
+      : await insertNumbered([body], createAdminClient(), insert)
 
     if (error) {
       console.error('Error creating supplier document:', error)
