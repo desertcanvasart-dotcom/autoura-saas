@@ -8,8 +8,9 @@ import { useVocabulary } from '@/components/vocabulary'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Download, Send, Mail, MessageSquare, Printer, CheckCircle } from 'lucide-react'
+import { Download, Send, Mail, MessageSquare, Printer, CheckCircle } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
 
 interface SupplierDocument {
   id: string
@@ -281,19 +282,19 @@ export default function SupplierDocumentViewPage() {
     ? (PAYMENT_TERMS[document.payment_terms] || document.payment_terms.replace(/_/g, ' '))
     : 'As agreed'
 
+  const tripRef = document.itinerary
+    ? { id: document.itinerary.id, code: document.itinerary.itinerary_code, name: document.itinerary.trip_name }
+    : null
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
+          <TripBreadcrumb itineraryId={document.itinerary?.id} trip={tripRef} current={document.document_number} />
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Link
-                href="/documents/supplier"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
-              </Link>
+              <BackLink fallbackHref="/documents/supplier" fallbackLabel="Documents" trip={tripRef} />
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">{document.document_number}</h1>
                 <p className="text-sm text-gray-500">{DOCUMENT_TITLES[document.document_type]} • {document.supplier_name}</p>

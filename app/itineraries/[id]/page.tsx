@@ -2,6 +2,7 @@
 
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { todayLocal } from '@/lib/today'
+import { withReturnTo } from '@/lib/nav/return-to'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useAuth } from '@/app/contexts/AuthContext'
 import ComposeEmailModal from '@/components/unified/ComposeEmailModal'
@@ -123,6 +124,8 @@ export default function ViewItineraryPage() {
   const [showEmail, setShowEmail] = useState(false)
   const [showPickup, setShowPickup] = useState(false)
   const params = useParams()
+  // Pages this trip opens (booking, invoice, contract) go back to it (lib/nav/return-to).
+  const fromThisTrip = (href: string) => withReturnTo(href, `/itineraries/${params.id}`)
   const router = useRouter()
   const supabase = createClient()
   
@@ -426,7 +429,7 @@ export default function ViewItineraryPage() {
     if (!itinerary) return
 
     if (existingInvoice) {
-      router.push(`/invoices/${existingInvoice.id}`)
+      router.push(fromThisTrip(`/invoices/${existingInvoice.id}`))
       return
     }
 
@@ -517,7 +520,7 @@ export default function ViewItineraryPage() {
   
       if (response.ok) {
         const invoice = await response.json()
-        router.push(`/invoices/${invoice.id}`)
+        router.push(fromThisTrip(`/invoices/${invoice.id}`))
       } else {
         const error = await response.json()
         showToast('error', error.error || 'Failed to create invoice')
@@ -973,12 +976,12 @@ export default function ViewItineraryPage() {
                   )}
                   {/* Linked records are links, not actions. */}
                   {booking && (
-                    <Link href={`/bookings/${booking.id}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
+                    <Link href={fromThisTrip(`/bookings/${booking.id}`)} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
                       <BookOpen className="w-3 h-3" /> {booking.booking_number}
                     </Link>
                   )}
                   {existingInvoice && (
-                    <Link href={`/invoices/${existingInvoice.id}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
+                    <Link href={fromThisTrip(`/invoices/${existingInvoice.id}`)} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
                       <Receipt className="w-3 h-3" /> {existingInvoice.invoice_number}
                     </Link>
                   )}
@@ -1007,7 +1010,7 @@ export default function ViewItineraryPage() {
                     disabled: generatingPDF || days.length === 0,
                     title: days.length === 0 ? 'Add days to the itinerary first — an empty itinerary has nothing to print' : 'Preview and download the client itinerary PDF',
                   },
-                  { label: 'Contract', icon: <FileText className="w-4 h-4" />, href: `/documents/contract/${itinerary.id}` },
+                  { label: 'Contract', icon: <FileText className="w-4 h-4" />, href: fromThisTrip(`/documents/contract/${itinerary.id}`) },
                   {
                     label: existingInvoice ? `Invoice ${existingInvoice.invoice_number}` : generatingInvoice ? 'Creating invoice…' : 'Create invoice',
                     icon: <Receipt className="w-4 h-4" />,

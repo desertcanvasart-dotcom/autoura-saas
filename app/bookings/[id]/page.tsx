@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { use } from 'react'
 import {
-  BookOpen, User, Calendar, DollarSign, ArrowLeft, Edit2,
+  BookOpen, User, Calendar, DollarSign, Edit2,
   Users, CreditCard, FileText, CheckCircle2, Clock, Plane,
   PartyPopper, XCircle, Mail, MessageSquare, Plus, Trash2,
   Download, AlertCircle, X as XIcon
@@ -14,6 +14,7 @@ import BookingExtrasPanel from '@/components/BookingExtrasPanel'
 import BookingStatusControl, { type StatusOverride } from '@/components/booking/BookingStatusControl'
 import BookingSuppliersPanel from '@/components/booking/BookingSuppliersPanel'
 import { useRole } from '@/hooks/useRole'
+import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
 
 interface Booking {
   id: string
@@ -398,19 +399,19 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const statusConfig = STATUS_COLORS[booking.status] || STATUS_COLORS.pending_deposit
   const StatusIcon = statusConfig.icon
   const paymentProgress = (booking.total_paid / booking.total_amount) * 100
+  // The trip this booking belongs to, for the back link and breadcrumb.
+  const trip = booking.itineraries
+    ? { id: booking.itineraries.id, code: booking.itineraries.itinerary_code, name: booking.itineraries.trip_name }
+    : null
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
+          <TripBreadcrumb itineraryId={booking.itineraries?.id} trip={trip} current={booking.booking_number} />
           <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={() => router.push('/bookings')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
+            <BackLink fallbackHref="/bookings" fallbackLabel="Bookings" trip={trip} />
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-gray-900">{booking.booking_number}</h1>

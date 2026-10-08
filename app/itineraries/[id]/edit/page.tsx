@@ -5,6 +5,7 @@ import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 import { useState, useEffect, useCallback } from 'react'
 import { todayLocal } from '@/lib/today'
+import { withReturnTo } from '@/lib/nav/return-to'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import ServiceSupplierSelect from '@/components/itineraries/ServiceSupplierSelect'
@@ -203,6 +204,8 @@ export default function ItineraryEditorPage() {
   const router = useRouter()
   const params = useParams()
   const itineraryId = params?.id as string
+  // Pages opened from here (booking, invoice, contract) come back here (lib/nav/return-to).
+  const fromThisPage = (href: string) => withReturnTo(href, `/itineraries/${itineraryId}/edit`)
   const supabase = createClient()
 
   // ============================================
@@ -976,6 +979,7 @@ export default function ItineraryEditorPage() {
 
             <ItineraryBookingAction
               itineraryId={itineraryId}
+              returnTo={`/itineraries/${itineraryId}/edit`}
               status={itinerary.status}
               onStatusChange={status => setItinerary({ ...itinerary, status })}
               className="!px-2.5 !py-1 !text-xs"
@@ -1020,7 +1024,7 @@ export default function ItineraryEditorPage() {
             {/* Invoice Button */}
             {existingInvoice ? (
               <Link
-                href={`/invoices/${existingInvoice.id}`}
+                href={fromThisPage(`/invoices/${existingInvoice.id}`)}
                 className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1.5"
               >
                 <Receipt size={14} />
@@ -1051,7 +1055,7 @@ export default function ItineraryEditorPage() {
                   })
                   if (response.ok) {
                     const invoice = await response.json()
-                    router.push(`/invoices/${invoice.id}`)
+                    router.push(fromThisPage(`/invoices/${invoice.id}`))
                   }
                 }}
                 className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 flex items-center gap-1.5"
@@ -1069,7 +1073,7 @@ export default function ItineraryEditorPage() {
 
             {/* Contract Link */}
             <Link
-              href={`/documents/contract/${itinerary.id}`}
+              href={fromThisPage(`/documents/contract/${itinerary.id}`)}
               className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1.5"
             >
               <FileText size={14} />
