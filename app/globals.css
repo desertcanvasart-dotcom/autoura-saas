@@ -666,3 +666,23 @@ thead.bg-primary-600 th {
   font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
   font-size: 12px;
 }
+
+/* Blog post body — the public post page and the editor share it, so what the
+   writer sees is what the reader gets. */
+@layer components {
+  .blog-prose { @apply text-[17px] leading-8 text-gray-800; }
+  .blog-prose > * + * { @apply mt-5; }
+  .blog-prose h2 { @apply mt-10 text-2xl font-bold leading-snug text-gray-900; }
+  .blog-prose h3 { @apply mt-8 text-xl font-semibold leading-snug text-gray-900; }
+  .blog-prose h4 { @apply mt-6 text-lg font-semibold text-gray-900; }
+  .blog-prose a { @apply text-[#647C47] underline underline-offset-2 hover:text-[#4f6339]; }
+  .blog-prose ul { @apply list-disc pl-6 space-y-1.5; }
+  .blog-prose ol { @apply list-decimal pl-6 space-y-1.5; }
+  .blog-prose blockquote { @apply border-l-4 border-[#647C47]/40 pl-4 italic text-gray-600; }
+  .blog-prose code { @apply rounded bg-gray-100 px-1.5 py-0.5 text-[0.9em] font-mono; }
+  .blog-prose pre { @apply overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm leading-6 text-gray-100; }
+  .blog-prose pre code { @apply bg-transparent p-0 text-inherit; }
+  .blog-prose img { @apply my-8 h-auto max-w-full rounded-xl; }
+  .blog-prose hr { @apply my-10 border-gray-200; }
+  .blog-prose p.is-editor-empty:first-child::before { content: attr(data-placeholder); @apply pointer-events-none float-left h-0 text-gray-400; }
+}

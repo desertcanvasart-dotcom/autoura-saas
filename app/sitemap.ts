@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next'
+import { listPublishedPosts } from '@/lib/blog/posts'
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://getautoura.net'
 
@@ -12,8 +13,11 @@ const DOC_PAGES = [
   'resources-documents', 'team-settings', 'workflows',
 ]
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const top = ['', '/pricing', '/about', '/demo', '/contact', '/integrations', '/docs'].map((p) => ({
+// Rebuilt hourly so a newly published blog post is listed without a deploy.
+export const revalidate = 3600
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const top = ['', '/pricing', '/about', '/demo', '/contact', '/integrations', '/docs', '/blog'].map((p) => ({
     url: `${SITE_URL}${p}`,
     changeFrequency: 'weekly' as const,
     priority: p === '' ? 1 : 0.8,
@@ -28,5 +32,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: 'monthly' as const,
     priority: 0.5,
   }))
-  return [...top, ...legal, ...docs]
+  // Published posts; none (or no database at build time) is just no entries.
+  const posts = (await listPublishedPosts({ limit: 500 })).map((p) => ({
+    url: `${SITE_URL}/blog/${p.slug}`,
+    lastModified: p.updated_at,
+    changeFrequency: 'monthly' as const,
+    priority: 0.6,
+  }))
+  return [...top, ...legal, ...docs, ...posts]
 }

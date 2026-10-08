@@ -1456,6 +1456,57 @@ export interface Database {
           },
         ]
       }
+      blog_posts: {
+        Row: {
+          id: string
+          slug: string
+          language: string
+          title: string
+          excerpt: string | null
+          body_html: string
+          cover_image_url: string | null
+          author_name: string | null
+          tags: string[]
+          status: string
+          published_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          language?: string
+          title: string
+          excerpt?: string | null
+          body_html?: string
+          cover_image_url?: string | null
+          author_name?: string | null
+          tags?: string[]
+          status?: string
+          published_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          language?: string
+          title?: string
+          excerpt?: string | null
+          body_html?: string
+          cover_image_url?: string | null
+          author_name?: string | null
+          tags?: string[]
+          status?: string
+          published_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       booking_change_requests: {
         Row: {
           id: string
