@@ -153,6 +153,9 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = [
     '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
     '/about', '/contact', '/demo', '/docs', '/integrations', '/pricing', '/privacy', '/terms',
+    // The product blog (/blog, /blog/<slug>): published posts only, read
+    // server-side; writing is /super-admin/blog, behind login.
+    '/blog',
     // Crawler surfaces (Next metadata routes; .txt/.xml are NOT excluded by
     // the matcher the way images are). These redirected to /login, which
     // made organic discovery impossible.

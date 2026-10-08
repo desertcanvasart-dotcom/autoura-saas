@@ -24,7 +24,7 @@ export default function ClientShell({
   const pathname = usePathname()
 
   // Pages that should NOT show the sidebar (public pages)
-  const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/terms', '/privacy', '/contact', '/integrations', '/about', '/pricing', '/demo']
+  const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/terms', '/privacy', '/contact', '/integrations', '/about', '/pricing', '/demo', '/blog']
   // Customer-facing pages get no app chrome. /share is a traveller's itinerary
   // link — rendering the operator's sidebar ("Dashboard", "Sign out") around a
   // client's trip is both confusing and a claim they have an account here.
@@ -39,6 +39,7 @@ export default function ClientShell({
   const isPublicPage =
     publicPages.includes(pathname) ||
     pathname.startsWith('/docs') ||
+    pathname.startsWith('/blog/') ||
     isTokenPage
   const isSuperAdminPage = pathname.startsWith('/super-admin')
 
