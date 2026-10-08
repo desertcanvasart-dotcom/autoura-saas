@@ -142,6 +142,24 @@ export default function SupplierDocumentViewPage() {
     }
   }
 
+  // Marks the voucher sent (the route stamps sent_at). It used to send a
+  // sent_via column the table does not have, so the update always failed and
+  // nothing checked: no voucher ever reached "sent".
+  const markSent = async (documentId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/supplier-documents/${documentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'sent' })
+      })
+      if (!res.ok) showToast('error', 'Sent, but the voucher could not be marked as sent')
+      return res.ok
+    } catch {
+      showToast('error', 'Sent, but the voucher could not be marked as sent')
+      return false
+    }
+  }
+
   const handleSendEmail = async () => {
     if (!document || !document.supplier_contact_email) {
       showToast('error', 'Supplier email not available')
@@ -168,13 +186,8 @@ export default function SupplierDocumentViewPage() {
       })
       
       if (response.ok) {
-        // Update status to sent
-        await fetch(`/api/supplier-documents/${document.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'sent', sent_via: 'email' })
-        })
-        
+        await markSent(document.id)
+
         setActionSuccess('Email sent successfully!')
         fetchDocument()
         setTimeout(() => setActionSuccess(null), 5000)
@@ -207,12 +220,7 @@ export default function SupplierDocumentViewPage() {
     
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank')
     
-    // Update status
-    fetch(`/api/supplier-documents/${document.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'sent', sent_via: 'whatsapp' })
-    }).then(() => fetchDocument())
+    markSent(document.id).then(() => fetchDocument())
   }
 
   const handleMarkConfirmed = async () => {

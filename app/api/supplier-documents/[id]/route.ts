@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/supabase-server'
+import { editableSupplierDocumentFields } from '@/lib/documents/supplier-document-fields'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
@@ -71,11 +72,9 @@ export async function PUT(
     const body = await request.json()
 
 
-    // Remove fields that shouldn't be updated directly. Not itinerary_id
-    // either: a voucher stays on its trip (it could be pointed at another
-    // tenant's itinerary id).
-    const updateData = { ...body }
-    for (const key of ['itinerary', 'supplier', 'created_at', 'tenant_id', 'itinerary_id']) delete updateData[key]
+    // Only real, editable columns (lib/documents/supplier-document-fields):
+    // an unknown field used to fail the whole update.
+    const updateData = editableSupplierDocumentFields(body)
 
     // Auto-set timestamps based on status changes
     if (updateData.status === 'sent' && !updateData.sent_at) {
