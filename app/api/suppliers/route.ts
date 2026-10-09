@@ -120,6 +120,12 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json()
 
+    // Where the agency runs its trips (Settings → Organization), or none. Every
+    // supplier was stored as Egypt — the form has no country field — and every
+    // supplier document printed "…, Cairo, Egypt" whoever the agency was.
+    const { data: tenantRow } = await supabase.from('tenants').select('operating_country').eq('id', tenant_id).maybeSingle()
+    const operatingCountry = (tenantRow as { operating_country?: string | null } | null)?.operating_country?.trim() || null
+
     // One or more roles (340): `types` is the list, `type` the primary.
     const types: string[] = Array.isArray(body.types) && body.types.length
       ? body.types.map(String).filter(Boolean)
@@ -140,7 +146,7 @@ export async function POST(request: NextRequest) {
       types,
       // company_name is NOT NULL in the DB; mirror the legacy name column
       company_name: body.name,
-      country: body.country || 'Egypt',
+      country: body.country || operatingCountry,
       status: body.status || 'active'
     }
 

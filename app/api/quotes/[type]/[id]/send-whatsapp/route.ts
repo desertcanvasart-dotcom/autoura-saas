@@ -185,7 +185,6 @@ export async function POST(
     const senderTenant = await loadSenderTenant(tenant_id)
     const businessName = senderTenant?.company_name || ''
     const businessEmail = senderTenant?.contact_email || ''
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const tripName = quote.itineraries?.trip_name || 'Your tour'
     const day = (d: string | null | undefined) => {
       const t = d ? new Date(d) : null
@@ -220,7 +219,6 @@ export async function POST(
         `💳 *Ready to Book?*\n` +
         `Reply to this message${businessEmail ? ' or contact us:' : '.'}\n` +
         contactLines +
-        `🌐 View online: ${baseUrl}/quotes/b2c/${quote.id}\n\n` +
         `We look forward to creating unforgettable memories with you! ✨\n\n` +
         (businessName ? `Best regards,\n${businessName} Team` : 'Best regards,')
     } else {
@@ -245,8 +243,7 @@ export async function POST(
         (quote.season ? `🌞 *Season:* ${quote.season}\n` : '') +
         (quote.valid_from && quote.valid_until ?
           `📅 *Valid:* ${new Date(quote.valid_from).toLocaleDateString()} - ${new Date(quote.valid_until).toLocaleDateString()}\n\n` : '\n') +
-        `🌐 *View Full Rate Sheet Online:*\n` +
-        `${baseUrl}/quotes/b2b/${quote.id}\n\n` +
+        '\n' +
         (businessEmail ? `For bookings or questions, please contact:\n${contactLines}\n` : '') +
         `We look forward to working with you! 🤝\n\n` +
         (businessName ? `Best regards,\n${businessName} B2B Team` : 'Best regards,')

@@ -25,6 +25,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
     }
 
+    // Where the agency runs its trips (Settings → Organization), or none. Every
+    // supplier was stored as Egypt — the form has no country field — and every
+    // supplier document printed "…, Cairo, Egypt" whoever the agency was.
+    const { data: tenantRow } = await supabase.from('tenants').select('operating_country').eq('id', tenant_id).maybeSingle()
+    const operatingCountry = (tenantRow as { operating_country?: string | null } | null)?.operating_country?.trim() || null
+
     const body = await request.json()
     if (!body.csvData || typeof body.csvData !== 'string') {
       return NextResponse.json({ success: false, error: 'csvData is required' }, { status: 400 })
@@ -74,7 +80,7 @@ export async function POST(request: NextRequest) {
       notes: r.notes,
       website: r.website,
       default_commission_rate: r.default_commission_rate,
-      country: r.country || 'Egypt',
+      country: r.country || operatingCountry,
       status: r.status || 'active',
     }))
 

@@ -44,9 +44,16 @@ function rows<T>(data: T[]) {
   return chain
 }
 
+let tenantCountry: string | null = null
+let insertedSuppliers: Array<Record<string, unknown>> = []
+
 function stubDb() {
   return {
     from: (table: string) => {
+      // The agency's country, the default for a supplier's (none here).
+      if (table === 'tenants') {
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { operating_country: tenantCountry }, error: null }) }) }) }
+      }
       if (table === 'supplier_properties') {
         return {
           select: () => rows(existingProperties),
@@ -58,7 +65,7 @@ function stubDb() {
       }
       return {
         select: () => rows(existingSuppliers),
-        insert: (inserting: { name: string; type: string; types: string[] }[]) => ({
+        insert: (inserting: { name: string; type: string; types: string[] }[]) => (insertedSuppliers.push(...inserting), {
           select: async () => ({
             data: inserting.map((r, i) => ({ id: `supplier-${i}`, name: r.name, type: r.type, types: r.types })),
             error: null,
@@ -80,6 +87,8 @@ const placed = () => insertedProperties.map(p => `${p.property_type}:${p.name}`)
 beforeEach(() => {
   vi.clearAllMocks()
   insertedProperties = []
+  insertedSuppliers = []
+  tenantCountry = null
   existingSuppliers = []
   existingProperties = []
   mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT })
@@ -209,5 +218,17 @@ describe('a row with no Properties cell is untouched', () => {
     expect(res.propertiesCreated).toBe(0)
     expect(res.propertyWarnings).toEqual([])
     expect(insertedProperties).toEqual([])
+  })
+})
+
+describe('a supplier with no country', () => {
+  it('takes the agency’s country — never Egypt for everyone (supplier documents printed "…, Egypt")', async () => {
+    tenantCountry = 'Morocco'
+    await importCsv(['Sunboat Cruises,cruise,ship:MS Hapi'])
+    expect(insertedSuppliers[0]).toMatchObject({ country: 'Morocco' })
+  })
+  it('stays blank when the agency has not set one', async () => {
+    await importCsv(['Sunboat Cruises,cruise,ship:MS Hapi'])
+    expect(insertedSuppliers[0].country).toBeNull()
   })
 })

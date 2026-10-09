@@ -8,6 +8,7 @@ import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { requestedDocTypes } from '@/lib/documents/group-services'
+import { parseManualAssignee } from '@/lib/notify/assignment-message'
 import { planSupplierDocuments, staleSupplierDocuments, type PlanDay, type PlanGuide } from '@/lib/documents/plan-supplier-documents'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -45,20 +46,42 @@ async function planForItinerary(
     .eq('tenant_id', tenantId)
     .eq('resource_type', 'guide')
     .neq('status', 'cancelled')
-  const guideIds = [...new Set((assigned ?? []).map(a => a.resource_id))]
-  const { data: guideRows } = guideIds.length
-    ? await supabase.from('guides').select('id, name, full_name, languages, email, phone, whatsapp').in('id', guideIds).eq('tenant_id', tenantId)
-    : { data: [] }
-  const guideById = new Map((guideRows ?? []).map(g => [g.id, g]))
+  // Guides are SUPPLIERS (supplier_type 'guide') — what /api/guides lists and
+  // what assignment resource_ids point at; the standalone guides table is
+  // legacy (lib/staff-link). Read from guides alone, every assigned guide's
+  // assignment went out with no email, phone or languages, and sending it
+  // failed ("Supplier email is required").
+  const guideIds = [...new Set((assigned ?? []).map(a => a.resource_id).filter(Boolean))]
+  const [{ data: supplierGuides }, { data: legacyGuides }] = guideIds.length
+    ? await Promise.all([
+        supabase.from('suppliers').select('id, name, company_name, languages, email, contact_email, phone, contact_phone, whatsapp').in('id', guideIds).eq('tenant_id', tenantId),
+        supabase.from('guides').select('id, name, full_name, languages, email, phone, whatsapp').in('id', guideIds).eq('tenant_id', tenantId),
+      ])
+    : [{ data: [] }, { data: [] }]
+  type GuideContact = { name: string | null; languages: string[] | null; email: string | null; phone: string | null }
+  const guideById = new Map<string, GuideContact>()
+  for (const g of legacyGuides ?? []) {
+    guideById.set(g.id, { name: g.full_name || g.name, languages: g.languages, email: g.email, phone: g.whatsapp || g.phone })
+  }
+  for (const s of supplierGuides ?? []) {
+    guideById.set(s.id, {
+      name: s.name || s.company_name,
+      languages: s.languages,
+      email: s.email || s.contact_email,
+      phone: s.whatsapp || s.phone || s.contact_phone,
+    })
+  }
   const guides: PlanGuide[] = (assigned ?? []).flatMap(a => {
     const g = guideById.get(a.resource_id)
-    const name = g?.full_name || g?.name || a.resource_name
+    // A guide typed in by hand for this trip ("Name · +20 …"): its own phone.
+    const manual = g ? null : parseManualAssignee(a.resource_name)
+    const name = g?.name || manual?.name || a.resource_name
     return name ? [{
       resource_id: a.resource_id,
       name,
       languages: g?.languages ?? null,
       email: g?.email ?? null,
-      phone: g?.phone || g?.whatsapp || null,
+      phone: g?.phone ?? manual?.phone ?? null,
       itinerary_day_id: a.itinerary_day_id,
       start_date: a.start_date,
       end_date: a.end_date,

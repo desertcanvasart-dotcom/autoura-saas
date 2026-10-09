@@ -219,9 +219,9 @@ export async function POST(
       pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     }
 
-    // Prepare view quote URL (you can customize this based on your domain)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const viewQuoteUrl = `${baseUrl}/quotes/${type}/${quote.id}`
+    // No "view online" link: /quotes/… is the staff page, and every client and
+    // partner who clicked it landed on /login. The quote is the attached PDF.
+    const viewQuoteUrl = undefined
 
     // Render email HTML
     let emailHtml: string
