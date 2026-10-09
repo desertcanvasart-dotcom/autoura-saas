@@ -32,7 +32,7 @@ async function planForItinerary(
 
   const { data: existing } = await supabase
     .from('supplier_documents')
-    .select('supplier_id, document_type, supplier_name')
+    .select('supplier_id, document_type, supplier_name, check_in, check_out')
     .eq('itinerary_id', itinerary.id)
     .neq('status', 'cancelled')
 

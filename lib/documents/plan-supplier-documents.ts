@@ -17,10 +17,20 @@
 // A night's document checks out the morning AFTER its last night. It used to
 // check out on the last night itself: nights on Oct 1, 2 and 3 printed
 // "check-out Oct 3, 2 nights".
+//
+// And it is one STAY: the same property on consecutive nights. Nights were
+// grouped by city (or supplier) alone, so Cairo → Nile cruise → Cairo made
+// ONE "Cairo Hotel" voucher from the first Cairo night to the morning after
+// the last — the hotel booked straight through the cruise — and two Cairo
+// hotels shared one voucher. A stay is named after its property when the
+// lines name one. A document the trip already has covers a stay when its
+// dates overlap it, so vouchers made before this (named "Cairo Hotel") are
+// recognised rather than made again.
 
 import type { Database, Json } from '@/types/database.types'
 import { transportCrew } from './transport-crew'
 import { docMappingFor, serviceCity, PlaceNames, entranceLineName, unassignedDocKey } from './group-services'
+import { propertyFromService, propertyKey } from '@/lib/itineraries/overnight-property'
 
 /** Supplier type → the document its services go on. */
 export const SUPPLIER_TO_DOC_TYPE: Record<string, string> = {
@@ -68,7 +78,13 @@ export interface PlanInput {
   /** Suppliers named on the trip's services, by id. */
   suppliers: Record<string, any>
   /** The trip's documents that are not cancelled. */
-  existing: Array<{ supplier_id: string | null; document_type: string; supplier_name: string | null }>
+  existing: Array<{
+    supplier_id: string | null
+    document_type: string
+    supplier_name: string | null
+    check_in?: string | null
+    check_out?: string | null
+  }>
   /** Only these types; null = every type. */
   documentTypes: string[] | null
 }
@@ -92,6 +108,76 @@ interface Group {
   services: Array<Record<string, unknown>>
   dates: { min: string; max: string }
 }
+
+const NIGHTLY = new Set(['hotel_voucher', 'cruise_voucher'])
+
+/** A night group's stays: runs of consecutive nights at one property. A line
+ *  that names no property (a supplement, a placeholder) joins the stay its
+ *  night falls in, else the nearest one before it. */
+function splitStays(key: string, group: Group, named: boolean): Array<[string, Group]> {
+  type Night = { line: Record<string, unknown>; date: string; property: string | null; label: string | null }
+  const nights: Night[] = group.services.map(line => {
+    const p = propertyFromService(line as Parameters<typeof propertyFromService>[0])
+    return { line, date: String(line.date ?? ''), property: p ? propertyKey(p.name) : null, label: p?.name ?? null }
+  })
+  const dated = nights.filter(n => n.date).sort((a, b) => a.date.localeCompare(b.date))
+  if (dated.length === 0) return [[key, group]]
+
+  const stays: Array<{ first: string; last: string; property: string | null; label: string | null; lines: Night[] }> = []
+  for (const n of dated.filter(n => n.property)) {
+    const cur = stays[stays.length - 1]
+    if (cur && cur.property === n.property && (n.date === cur.last || n.date === dayAfter(cur.last))) {
+      cur.last = n.date
+      cur.lines.push(n)
+    } else {
+      stays.push({ first: n.date, last: n.date, property: n.property, label: n.label, lines: [n] })
+    }
+  }
+  // Nothing names a property: consecutive nights are one stay.
+  if (stays.length === 0) {
+    for (const n of dated) {
+      const cur = stays[stays.length - 1]
+      if (cur && (n.date === cur.last || n.date === dayAfter(cur.last))) { cur.last = n.date; cur.lines.push(n) }
+      else stays.push({ first: n.date, last: n.date, property: null, label: null, lines: [n] })
+    }
+  } else {
+    for (const n of nights.filter(n => !n.property)) {
+      const stay = stays.find(s => n.date && n.date >= s.first && n.date <= s.last)
+        ?? [...stays].reverse().find(s => n.date && s.first <= n.date)
+        ?? stays[0]
+      stay.lines.push(n)
+    }
+  }
+  if (stays.length === 1 && !named) return [[key, group]]
+
+  return stays.map(stay => {
+    const lines = nights.filter(n => stay.lines.includes(n)).map(n => n.line)
+    return [`${key}|${stay.first}`, {
+      ...group,
+      // A supplier's voucher keeps the supplier's name; otherwise the property's.
+      supplierName: group.supplierId ? group.supplierName : (stay.label || group.supplierName),
+      services: lines,
+      dates: { min: stay.first, max: stay.last },
+    }]
+  })
+}
+
+type Existing = PlanInput['existing'][number]
+
+/** Does a document the trip has cover this stay? Dates overlapping
+ *  [check-in, check-out) — or, for one with no dates, the key its whole
+ *  group (before the split into stays) had. */
+function covers(doc: Existing, group: Group, baseKey: string): boolean {
+  if (doc.document_type !== group.docType || (doc.supplier_id ?? null) !== group.supplierId) return false
+  const from = doc.check_in?.slice(0, 10)
+  if (!from) return docKey(doc) === baseKey
+  const to = doc.check_out?.slice(0, 10) || dayAfter(from)!
+  return group.dates.min < to && group.dates.max >= from
+}
+
+const docKey = (d: Existing): string => d.supplier_id
+  ? `${d.supplier_id}-${d.document_type}`
+  : unassignedDocKey(d.document_type, d.supplier_name || '')
 
 export type SupplierDocumentInsert = Database['public']['Tables']['supplier_documents']['Insert']
 
@@ -142,20 +228,25 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
     }
   }
 
+  // Nights: one document per stay, named after its property.
+  const planned: Array<[string, Group, string]> = []
+  for (const [key, group] of groups) {
+    if (NIGHTLY.has(group.docType)) planned.push(...splitStays(key, group, !group.supplierId).map(([k, g]) => [k, g, key] as [string, Group, string]))
+    else planned.push([key, group, key])
+  }
+
   // What the trip already has, keyed as the groups are.
-  const have = new Set(
-    existing.map(d => d.supplier_id
-      ? `${d.supplier_id}-${d.document_type}`
-      : unassignedDocKey(d.document_type, d.supplier_name || ''))
-  )
+  const have = new Set(existing.map(docKey))
 
   const rows: SupplierDocumentInsert[] = []
-  for (const [key, group] of groups) {
-    if (have.has(key)) continue
+  for (const [key, group, baseKey] of planned) {
+    if (NIGHTLY.has(group.docType)) {
+      if (existing.some(d => covers(d, group, baseKey))) continue
+    } else if (have.has(key)) continue
     if (documentTypes && !documentTypes.includes(group.docType)) continue
 
     const supplier = group.supplierId ? suppliers[group.supplierId] : null
-    const nightly = group.docType === 'hotel_voucher' || group.docType === 'cruise_voucher'
+    const nightly = NIGHTLY.has(group.docType)
     rows.push({
       tenant_id: tenantId,
       itinerary_id: itinerary.id,
