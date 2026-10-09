@@ -8,6 +8,7 @@ import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-p
 import { formatDateOnly } from '@/lib/date-utils'
 import { identityFooterLine, brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
+import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 
 // ============================================
 // TYPES
@@ -300,7 +301,7 @@ export function generateItineraryPDF(
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(40, 40, 40)
-    doc.text(itinerary.trip_name || 'Egypt Tour Package', margin, yPos)
+    doc.text(itinerary.trip_name || 'Tour Package', margin, yPos)
 
     yPos += 10
 
@@ -477,7 +478,13 @@ export function generateItineraryPDF(
     // ============================================
 
     yPos += 5
-    const totalPrice = itinerary.total_cost || 0
+    // The services' client total, as the itinerary page and the client email
+    // show it: the stored total_cost is a cache that is often 0, so the
+    // email said EUR 3,000 while the attached PDF said EUR 0.00.
+    const totalPrice = effectiveItineraryTotal(
+      { total_cost: itinerary.total_cost ?? null, margin_percent: (itinerary as { margin_percent?: unknown }).margin_percent },
+      days.flatMap(day => (day.services || []) as PricedService[])
+    )
     const totalPax = (itinerary.num_adults || 0) + (itinerary.num_children || 0)
 
     doc.setFillColor(...brand)
@@ -525,7 +532,7 @@ export function generateItineraryPDF(
 
     const inclusions = [
       'Private air-conditioned vehicle for all transfers and tours',
-      'Professional English-speaking Egyptologist guide',
+      'Professional English-speaking guide',
       'All entrance fees to sites mentioned in the itinerary',
       'Bottled water during tours',
       'All applicable taxes and service charges'

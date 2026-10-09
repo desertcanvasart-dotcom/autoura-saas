@@ -12,13 +12,15 @@ import {
   Column,
   Button,
 } from '@react-email/components'
+import { contactLine, emailDate, type QuoteEmailCompany } from './quote-email-company'
 
 interface B2BQuoteEmailProps {
   partnerName: string
   contactName?: string
   quoteNumber: string
   tripName: string
-  startDate: string
+  /** Null when the trip has no dates yet: the row is left out. */
+  startDate: string | null
   duration: number
   tier: string
   tourLeaderIncluded: boolean
@@ -28,6 +30,8 @@ interface B2BQuoteEmailProps {
   validUntil?: string
   season?: string
   viewQuoteUrl: string
+  /** The tenant sending it (Settings → Organization). */
+  company?: QuoteEmailCompany
 }
 
 export default function B2BQuoteEmail({
@@ -45,7 +49,10 @@ export default function B2BQuoteEmail({
   validUntil,
   season,
   viewQuoteUrl,
+  company,
 }: B2BQuoteEmailProps) {
+  const start = emailDate(startDate, { year: 'numeric', month: 'long', day: 'numeric' })
+  const contact = contactLine(company)
   // Get pax range
   const paxCounts = Object.keys(pricingTable).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b)
   const minPax = paxCounts[0]
@@ -59,7 +66,7 @@ export default function B2BQuoteEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Heading style={companyName}>AUTOURA</Heading>
+            {company?.name && <Heading style={companyName}>{company.name}</Heading>}
             <Text style={tagline}>B2B Rate Sheet</Text>
           </Section>
 
@@ -96,14 +103,12 @@ export default function B2BQuoteEmail({
             </Row>
 
             <Row>
-              <Column>
-                <Text style={label}>Start Date</Text>
-                <Text style={value}>{new Date(startDate).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}</Text>
-              </Column>
+              {start && (
+                <Column>
+                  <Text style={label}>Start Date</Text>
+                  <Text style={value}>{start}</Text>
+                </Column>
+              )}
               <Column>
                 <Text style={label}>Duration</Text>
                 <Text style={value}>{duration} days</Text>
@@ -223,12 +228,12 @@ export default function B2BQuoteEmail({
             <Text style={footerText}>
               Questions about this rate sheet? Contact your account manager or reply to this email.
             </Text>
-            <Text style={footerText}>
-              📧 hello@getautoura.net | 📱 +20 10 8091 6066
-            </Text>
-            <Text style={footerTextSmall}>
-              © {new Date().getFullYear()} Autoura by Online Era. All rights reserved.
-            </Text>
+            {contact && <Text style={footerText}>{contact}</Text>}
+            {company?.name && (
+              <Text style={footerTextSmall}>
+                © {new Date().getFullYear()} {company.name}
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>

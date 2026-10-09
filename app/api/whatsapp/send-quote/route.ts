@@ -9,6 +9,7 @@ import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,18 +32,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const { itineraryId, clientName, clientPhone } = body
+    const { itineraryId } = body
 
     if (!itineraryId) {
       return NextResponse.json(
         { success: false, error: 'Itinerary ID is required' },
-        { status: 400 }
-      )
-    }
-
-    if (!clientPhone) {
-      return NextResponse.json(
-        { success: false, error: 'Client phone number is required' },
         { status: 400 }
       )
     }
@@ -82,8 +76,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // The recipient is the trip's client, never a number the request names.
+    const clientPhone = itinerary.client_phone
+    const clientName = itinerary.client_name
+    if (!clientPhone) {
+      return NextResponse.json(
+        { success: false, error: 'Client phone number is required' },
+        { status: 400 }
+      )
+    }
+
+    // The total the itinerary page and the client email show (the services'
+    // client prices). The stored total_cost is a cache that is often 0.
+    const { data: days, error: daysError } = await supabase
+      .from('itinerary_days')
+      .select('id')
+      .eq('itinerary_id', itinerary.id)
+    const dayIds = (days || []).map((d: { id: string }) => d.id)
+    const { data: services, error: servicesError } = dayIds.length
+      ? await supabase.from('itinerary_services').select('total_cost, client_price').in('itinerary_day_id', dayIds)
+      : { data: [], error: null }
+    if (daysError || servicesError) {
+      return NextResponse.json({ success: false, error: 'Could not read the itinerary services' }, { status: 500 })
+    }
+    const total = effectiveItineraryTotal(itinerary, services || [])
+
     // Output gate (harness Layer 2): never send a non-deliverable price.
-    const priceCheck = checkAmountDeliverable(itinerary.total_cost, { currency: itinerary.currency })
+    const priceCheck = checkAmountDeliverable(total, { currency: itinerary.currency })
     if (!priceCheck.ok) {
       return NextResponse.json(
         { success: false, error: 'Quote price is not deliverable', violations: priceCheck.violations },
@@ -119,25 +138,21 @@ export async function POST(request: NextRequest) {
     const numChildren = itinerary.num_children ?? 0
     const message = (businessName ? `🌟 *${businessName}* 🌟\n\n` : '') +
       `Dear ${clientName || itinerary.client_name},\n\n` +
-      `Thank you for your interest in exploring Egypt with us! 🇪🇬\n\n` +
+      `Thank you for your interest in travelling with us!\n\n` +
       `📋 *Your Tour Quote*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
+      `🎯 *Tour:* ${itinerary.trip_name || 'Your tour'}\n` +
       `📅 *Dates:* ${startDate} - ${endDate}\n` +
       `👥 *Travelers:* ${itinerary.num_adults || 1} adult${(itinerary.num_adults || 1) > 1 ? 's' : ''}` +
       `${numChildren > 0 ? `, ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}\n` +
-      `💰 *Total Cost:* ${itinerary.currency || 'EUR'} ${(itinerary.total_cost || 0).toFixed(2)}\n\n` +
-      `✨ *What's Included:*\n` +
-      `✅ Professional tour guide\n` +
-      `✅ All entrance fees\n` +
-      `✅ Private transportation\n` +
-      `✅ Meals as specified\n` +
-      `✅ Hotel pickups\n\n` +
+      `💰 *Total Cost:* ${itinerary.currency || 'EUR'} ${total.toFixed(2)}\n\n` +
+      // No fixed "What's Included" list: it promised a guide, entrance fees,
+      // meals and pickups whatever the trip held.
       `💳 *Ready to Book?*\n` +
       `Reply to this message or contact us:\n` +
       (businessEmail ? `📧 ${businessEmail}\n` : '') +
       (businessWebsite ? `🌐 ${businessWebsite}\n` : '') + '\n' +
-      `We look forward to creating unforgettable memories with you! 🐪✨\n\n` +
+      `We look forward to creating unforgettable memories with you! ✨\n\n` +
       `Best regards,\n${businessName ? businessName + ' Team' : 'Your travel team'}`
 
 
@@ -155,14 +170,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update itinerary to mark quote as sent
-    await supabase
-      .from('itineraries')
-      .update({
-        status: 'sent',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', itineraryId)
+    // Mark the quote sent — only a trip still being quoted. Re-sending the
+    // quote for a confirmed (or later) trip moved it back to "sent".
+    if (!itinerary.status || itinerary.status === 'draft') {
+      const { error: statusError } = await supabase
+        .from('itineraries')
+        .update({ status: 'sent', updated_at: new Date().toISOString() })
+        .eq('id', itineraryId)
+        .eq('tenant_id', authResult.tenant_id)
+      if (statusError) console.error('send-quote: status not updated:', statusError.message)
+    }
 
 
 

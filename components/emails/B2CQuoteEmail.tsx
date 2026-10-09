@@ -12,12 +12,14 @@ import {
   Column,
   Button,
 } from '@react-email/components'
+import { contactLine, emailDate, type QuoteEmailCompany } from './quote-email-company'
 
 interface B2CQuoteEmailProps {
   clientName: string
   quoteNumber: string
   tripName: string
-  startDate: string
+  /** Null when the trip has no dates yet: the row is left out. */
+  startDate: string | null
   duration: number
   numTravelers: number
   pricePerPerson: number
@@ -26,6 +28,8 @@ interface B2CQuoteEmailProps {
   validUntil?: string
   clientNotes?: string
   viewQuoteUrl: string
+  /** The tenant sending it (Settings → Organization). */
+  company?: QuoteEmailCompany
 }
 
 export default function B2CQuoteEmail({
@@ -41,7 +45,10 @@ export default function B2CQuoteEmail({
   validUntil,
   clientNotes,
   viewQuoteUrl,
+  company,
 }: B2CQuoteEmailProps) {
+  const start = emailDate(startDate, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const contact = contactLine(company)
   return (
     <Html>
       <Head />
@@ -49,16 +56,16 @@ export default function B2CQuoteEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Heading style={companyName}>AUTOURA</Heading>
-            <Text style={tagline}>Your Journey, Perfectly Planned</Text>
+            {company?.name && <Heading style={companyName}>{company.name}</Heading>}
+            {company?.tagline && <Text style={tagline}>{company.tagline}</Text>}
           </Section>
 
           {/* Greeting */}
           <Section style={content}>
-            <Heading style={h1}>Your Egypt Travel Quote is Ready!</Heading>
+            <Heading style={h1}>Your Travel Quote is Ready!</Heading>
             <Text style={text}>Dear {clientName},</Text>
             <Text style={text}>
-              Thank you for your interest in exploring Egypt with us. We're excited to present your personalized travel quote.
+              Thank you for your interest in travelling with us. We&apos;re excited to present your personalized travel quote.
             </Text>
           </Section>
 
@@ -80,15 +87,12 @@ export default function B2CQuoteEmail({
             </Row>
 
             <Row>
-              <Column>
-                <Text style={label}>Start Date</Text>
-                <Text style={value}>{new Date(startDate).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}</Text>
-              </Column>
+              {start && (
+                <Column>
+                  <Text style={label}>Start Date</Text>
+                  <Text style={value}>{start}</Text>
+                </Column>
+              )}
               <Column>
                 <Text style={label}>Duration</Text>
                 <Text style={value}>{duration} days</Text>
@@ -166,14 +170,14 @@ export default function B2CQuoteEmail({
           <Section style={footer}>
             <Hr style={divider} />
             <Text style={footerText}>
-              Need assistance? Reply to this email or contact us at:
+              {contact ? 'Need assistance? Reply to this email or contact us at:' : 'Need assistance? Reply to this email.'}
             </Text>
-            <Text style={footerText}>
-              📧 hello@getautoura.net | 📱 +20 10 8091 6066
-            </Text>
-            <Text style={footerTextSmall}>
-              © {new Date().getFullYear()} Autoura by Online Era. All rights reserved.
-            </Text>
+            {contact && <Text style={footerText}>{contact}</Text>}
+            {company?.name && (
+              <Text style={footerTextSmall}>
+                © {new Date().getFullYear()} {company.name}
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
 
 /**
  * GET /api/quotes/b2b
@@ -145,6 +146,13 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Missing required fields: tier, pricing_table' },
         { status: 400 }
       );
+    }
+
+    // The partner must be this tenant's: the foreign key does not check, and
+    // the quote is later read and emailed to it (lib/quotes/partner-in-tenant).
+    const partnerCheck = await partnerInTenant(supabase, partner_id, authResult.tenant_id)
+    if (!partnerCheck.ok) {
+      return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
     }
 
     // Generate quote number using admin client (RPC needs admin)

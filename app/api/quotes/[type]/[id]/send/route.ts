@@ -10,6 +10,8 @@ import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 import B2CQuoteEmail from '@/components/emails/B2CQuoteEmail'
 import B2BQuoteEmail from '@/components/emails/B2BQuoteEmail'
+import { resolveSender } from '@/lib/tenant-email-domain'
+import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 // Lazy-initialized Resend client (avoids build-time errors when env vars unavailable)
 let _resend: Resend | null = null
@@ -160,6 +162,21 @@ export async function POST(
       )
     }
 
+    // The same completeness gate as the PDF download: a quote with services
+    // still at no price was emailed without a word. `allow_incomplete` is the
+    // operator saying they mean it (the page asks them first).
+    const completeness = quoteCompleteness(quote.services_snapshot)
+    if (!completeness.complete && !allowsIncomplete(body.allow_incomplete)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
+      )
+    }
+
     // Output gate (harness Layer 2): never email a non-deliverable price.
     const priceCheck = checkQuoteRowDeliverable(quote, type)
     if (!priceCheck.ok) {
@@ -173,13 +190,32 @@ export async function POST(
       )
     }
 
+    // Who it is from: the tenant (Settings → Organization). The email said
+    // "AUTOURA" and "Egypt", listed the platform's own email and phone, and
+    // went from the platform's address with no reply-to the agency. Pinned to
+    // the tenant requireAuth resolved, as loadSenderTenant is.
+    const { data: sender } = await supabaseAdmin
+      .from('tenants')
+      .select('company_name, tagline, contact_email, company_phone, company_website, email_domain, email_from_local, email_domain_status')
+      .eq('id', tenantId)
+      .maybeSingle()
+    const company = {
+      name: sender?.company_name,
+      tagline: sender?.tagline,
+      email: sender?.contact_email,
+      phone: sender?.company_phone,
+      website: sender?.company_website,
+    }
+    const tripName = quote.itineraries?.trip_name || 'Your tour'
+
     // Generate PDF
+    const identity = await loadDocumentIdentity(tenantId)
     let pdfBuffer: Buffer
     if (type === 'b2c') {
-      const pdfDoc = createElement(B2CQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
+      const pdfDoc = createElement(B2CQuotePDF, { quote, company: identity })
       pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     } else {
-      const pdfDoc = createElement(B2BQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
+      const pdfDoc = createElement(B2BQuotePDF, { quote, company: identity })
       pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     }
 
@@ -194,8 +230,9 @@ export async function POST(
         createElement(B2CQuoteEmail, {
           clientName: recipientName,
           quoteNumber: quote.quote_number,
-          tripName: quote.itineraries?.trip_name || 'Egypt Tour',
-          startDate: quote.itineraries?.start_date || new Date().toISOString(),
+          tripName,
+          // No dates yet: the row is left out, not filled with today.
+          startDate: quote.itineraries?.start_date ?? null,
           duration: quote.itineraries?.total_days || 0,
           numTravelers: quote.num_travelers,
           pricePerPerson: quote.price_per_person,
@@ -204,6 +241,7 @@ export async function POST(
           validUntil: quote.valid_until,
           clientNotes: quote.client_notes,
           viewQuoteUrl,
+          company,
         })
       )
     } else {
@@ -212,8 +250,9 @@ export async function POST(
           partnerName: quote.b2b_partners?.company_name || 'Partner',
           contactName: quote.b2b_partners?.contact_name,
           quoteNumber: quote.quote_number,
-          tripName: quote.itineraries?.trip_name || 'Egypt Tour',
-          startDate: quote.itineraries?.start_date || new Date().toISOString(),
+          tripName,
+          // No dates yet: the row is left out, not filled with today.
+          startDate: quote.itineraries?.start_date ?? null,
           duration: quote.itineraries?.total_days || 0,
           tier: quote.tier,
           tourLeaderIncluded: quote.tour_leader_included,
@@ -223,17 +262,21 @@ export async function POST(
           validUntil: quote.valid_until,
           season: quote.season,
           viewQuoteUrl,
+          company,
         })
       )
     }
 
     // Send email with Resend
     const emailSubject = type === 'b2c'
-      ? `Your Egypt Travel Quote - ${quote.quote_number}`
-      : `B2B Rate Sheet - ${quote.quote_number} - ${quote.itineraries?.trip_name || 'Egypt Tour'}`
+      ? `Your Travel Quote - ${quote.quote_number}`
+      : `B2B Rate Sheet - ${quote.quote_number} - ${tripName}`
 
     const { data: emailData, error: emailError } = await getResend().emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'Autoura <quotes@getautoura.net>',
+      // The tenant's own verified domain, else the platform address under
+      // the tenant's name (lib/tenant-email-domain) — as /api/send-email.
+      from: resolveSender(sender, process.env.RESEND_FROM_EMAIL || 'quotes@getautoura.net').from,
+      ...(sender?.contact_email ? { replyTo: sender.contact_email } : {}),
       to: toEmail,
       subject: emailSubject,
       html: emailHtml,

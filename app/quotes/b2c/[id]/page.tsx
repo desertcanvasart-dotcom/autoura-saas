@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { postQuoteSend } from '@/lib/quotes/send-quote-client'
 
 interface CostBreakdown {
   accommodation?: number
@@ -201,14 +202,10 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2c/${quote.id}/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2c/${quote.id}/send`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send quote')
@@ -239,14 +236,10 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2c/${quote.id}/send-whatsapp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2c/${quote.id}/send-whatsapp`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send quote')

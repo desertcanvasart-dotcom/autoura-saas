@@ -9,6 +9,7 @@ import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
+import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 /**
  * POST /api/quotes/[type]/[id]/send-whatsapp
@@ -145,6 +146,19 @@ export async function POST(
       )
     }
 
+    // The same completeness gate as the PDF download (see the email route).
+    const completeness = quoteCompleteness(quote.services_snapshot)
+    if (!completeness.complete && !allowsIncomplete(body.allow_incomplete)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
+      )
+    }
+
     // Output gate (harness Layer 2): never WhatsApp a non-deliverable price.
     const priceCheck = checkQuoteRowDeliverable(quote, type)
     if (!priceCheck.ok) {
@@ -158,11 +172,12 @@ export async function POST(
       )
     }
 
-    // Check if PDF already exists, generate if not
-    let pdfUrl = quote.pdf_url
-
-    if (!pdfUrl) {
-      // Generate PDF
+    // A fresh PDF for every send. It reused quote.pdf_url: a signed link that
+    // expires after 7 days (a resend after a week attached a dead link), that
+    // still showed the old prices after a re-price, or — written by
+    // generate-pdf — a public URL of the private bucket nobody can open.
+    let pdfUrl: string
+    {
       let pdfBuffer: Buffer
       if (type === 'b2c') {
         const pdfDoc = createElement(B2CQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
@@ -178,7 +193,9 @@ export async function POST(
       const shared = await uploadShareablePdf(supabaseAdmin, {
         tenantId,
         kind: 'quotes',
-        fileName: `${type}-${id}.pdf`,
+        // A new file per send: the link in an earlier message keeps showing
+        // what that message sent.
+        fileName: `${type}-${id}-${Date.now()}.pdf`,
         bytes: pdfBuffer,
         bucket: 'quote-pdfs',
       })
@@ -191,7 +208,7 @@ export async function POST(
       }
       pdfUrl = shared.url
 
-      // Update quote with PDF URL
+      // Recorded for reference; never reused as the attachment.
       const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
       await supabaseAdmin
         .from(tableName)
@@ -203,48 +220,49 @@ export async function POST(
     }
 
     // Build WhatsApp message
+    // The tenant's own name and email (Settings → Organization) — the email
+    // was the platform's (BUSINESS_EMAIL, else hello@getautoura.net).
     const senderTenant = await loadSenderTenant(tenant_id)
     const businessName = senderTenant?.company_name || ''
-    const businessEmail = process.env.BUSINESS_EMAIL || 'hello@getautoura.net'
+    const businessEmail = senderTenant?.contact_email || ''
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const tripName = quote.itineraries?.trip_name || 'Your tour'
+    const day = (d: string | null | undefined) => {
+      const t = d ? new Date(d) : null
+      return t && !Number.isNaN(t.getTime()) ? t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null
+    }
+    const contactLines = businessEmail ? `📧 ${businessEmail}\n` : ''
 
     let message = ''
 
     if (type === 'b2c') {
-      const startDate = new Date(quote.itineraries?.start_date || new Date()).toLocaleDateString('en-GB', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      })
-      const endDate = new Date(quote.itineraries?.end_date || new Date()).toLocaleDateString('en-GB', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      })
+      // No dates yet: no Dates line, never today's date.
+      const startDate = day(quote.itineraries?.start_date)
+      const endDate = day(quote.itineraries?.end_date)
 
-      message = `🌟 *${businessName}* 🌟\n\n` +
+      message = (businessName ? `🌟 *${businessName}* 🌟\n\n` : '') +
         `Dear ${recipientName},\n\n` +
-        `Thank you for your interest in exploring Egypt with us! 🇪🇬\n\n` +
+        `Thank you for your interest in travelling with us!\n\n` +
         `📋 *Your Travel Quote - ${quote.quote_number}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🎯 *Tour:* ${quote.itineraries?.trip_name || 'Egypt Tour'}\n` +
-        `📅 *Dates:* ${startDate} - ${endDate}\n` +
+        `🎯 *Tour:* ${tripName}\n` +
+        (startDate ? `📅 *Dates:* ${startDate}${endDate ? ` - ${endDate}` : ''}\n` : '') +
         `⏱️ *Duration:* ${quote.itineraries?.total_days || 0} days\n` +
         `👥 *Travelers:* ${quote.num_travelers} ${quote.num_travelers === 1 ? 'person' : 'people'}\n` +
         `🏆 *Service Level:* ${quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}\n\n` +
         `💰 *TOTAL PRICE: ${quote.currency} ${quote.selling_price.toLocaleString()}*\n` +
         `💵 *Per Person: ${quote.currency} ${quote.price_per_person.toLocaleString()}*\n\n` +
-        `📄 *Your detailed quote with full pricing breakdown is attached as a PDF.*\n\n` +
-        `✨ *What's Included:*\n` +
-        `✅ Professional tour guide\n` +
-        `✅ All entrance fees\n` +
-        `✅ Private transportation\n` +
-        `✅ Meals as specified\n` +
-        `✅ Hotel pickups\n\n` +
+        // What is included is in the attached quote — not a fixed list that
+        // promised a guide, entrance fees and meals whatever was quoted.
+        `📄 *Your detailed quote with what is included and the full pricing breakdown is attached as a PDF.*\n\n` +
         (quote.valid_until ? `⏰ *This quote is valid until:* ${new Date(quote.valid_until).toLocaleDateString()}\n\n` : '') +
         (quote.client_notes ? `📝 *Special Notes:* ${quote.client_notes}\n\n` : '') +
         `💳 *Ready to Book?*\n` +
-        `Reply to this message or contact us:\n` +
-        `📧 ${businessEmail}\n` +
+        `Reply to this message${businessEmail ? ' or contact us:' : '.'}\n` +
+        contactLines +
         `🌐 View online: ${baseUrl}/quotes/b2c/${quote.id}\n\n` +
-        `We look forward to creating unforgettable memories with you! 🐪✨\n\n` +
-        `Best regards,\n${businessName} Team`
+        `We look forward to creating unforgettable memories with you! ✨\n\n` +
+        (businessName ? `Best regards,\n${businessName} Team` : 'Best regards,')
     } else {
       // B2B message
       const paxCounts = Object.keys(quote.pricing_table).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b)
@@ -252,12 +270,12 @@ export async function POST(
       const maxPax = paxCounts[paxCounts.length - 1]
       const lowestPP = quote.pricing_table[maxPax]?.pp || 0
 
-      message = `🌟 *${businessName} - B2B Rate Sheet* 🌟\n\n` +
+      message = `🌟 *${businessName ? `${businessName} - ` : ''}B2B Rate Sheet* 🌟\n\n` +
         `Dear ${recipientName},\n\n` +
         `Please find below your customized B2B rate sheet.\n\n` +
         `📋 *Rate Sheet - ${quote.quote_number}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🎯 *Tour:* ${quote.itineraries?.trip_name || 'Egypt Tour'}\n` +
+        `🎯 *Tour:* ${tripName}\n` +
         `⏱️ *Duration:* ${quote.itineraries?.total_days || 0} days\n` +
         `🏆 *Service Tier:* ${quote.tier.toUpperCase()}\n` +
         `👥 *Pax Range:* ${minPax} - ${maxPax} pax\n` +
@@ -269,10 +287,9 @@ export async function POST(
           `📅 *Valid:* ${new Date(quote.valid_from).toLocaleDateString()} - ${new Date(quote.valid_until).toLocaleDateString()}\n\n` : '\n') +
         `🌐 *View Full Rate Sheet Online:*\n` +
         `${baseUrl}/quotes/b2b/${quote.id}\n\n` +
-        `For bookings or questions, please contact:\n` +
-        `📧 ${businessEmail}\n\n` +
+        (businessEmail ? `For bookings or questions, please contact:\n${contactLines}\n` : '') +
         `We look forward to working with you! 🤝\n\n` +
-        `Best regards,\n${businessName} B2B Team`
+        (businessName ? `Best regards,\n${businessName} B2B Team` : 'Best regards,')
     }
 
     // Send via WhatsApp
