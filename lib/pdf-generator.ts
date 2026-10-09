@@ -8,7 +8,7 @@ import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-p
 import { formatDateOnly } from '@/lib/date-utils'
 import { identityFooterLine, brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
-import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
+import { effectiveItineraryTotal, serviceClientPrice, type PricedService } from '@/lib/itinerary-client-total'
 
 // ============================================
 // TYPES
@@ -418,25 +418,31 @@ export function generateItineraryPDF(
 
     // Show service breakdown only if enabled
     if (opts.showPricingBreakdown && opts.showServiceDetails) {
-      // Aggregate services across all days
+      // Aggregate services across all days — at the CLIENT's price. This
+      // printed each line's total_cost, the supplier cost, under a TOTAL PRICE
+      // that is the client's: the lines summed to 2,400 under a 3,000 total,
+      // so the client could read the margin and every supplier rate.
+      const marginPercent = (itinerary as { margin_percent?: unknown }).margin_percent
       const serviceMap = new Map<string, AggregatedService>()
 
       days.forEach((day) => {
         if (!day.services || !Array.isArray(day.services)) return
 
         day.services
-          .filter((s) => s && (s.total_cost || 0) > 0)
+          .filter((s) => s && serviceClientPrice(s as PricedService, marginPercent) > 0)
           .forEach((service) => {
             const name = cleanServiceName(service.service_name, service.service_type)
             const key = `${service.service_type}-${name}`
+            const price = serviceClientPrice(service as PricedService, marginPercent)
 
             if (serviceMap.has(key)) {
               const existing = serviceMap.get(key)!
               existing.quantity += service.quantity || 0
-              existing.total += service.total_cost || 0
+              existing.total += price
+              existing.rate = existing.quantity > 0 ? existing.total / existing.quantity : existing.total
             } else {
               const qty = service.quantity || 1
-              const total = service.total_cost || 0
+              const total = price
               serviceMap.set(key, {
                 name,
                 type: service.service_type,

@@ -1,5 +1,7 @@
 // Email and WhatsApp integration utilities
 
+import { escapeHtml } from '@/lib/html-escape'
+
 // The signer of client emails. Was a hardcoded person at one company —
 // every tenant's itinerary emails were signed "Islam Mohamed, Travel2Egypt".
 // Callers pass the tenant's identity; blanks render nothing.
@@ -15,10 +17,21 @@ export function generateEmailTemplate(
   clientName: string,
   itineraryCode: string,
   tripName: string,
-  totalCost: string,
-  currency: string,
-  signer: EmailSignerInfo = {}
+  /** Already formatted for its currency ("$3,000.00", "¥450,000"). */
+  totalPrice: string,
+  signer: EmailSignerInfo = {},
+  /** Settings → Organization → deposit; omitted = no deposit sentence. */
+  depositPercent?: number | null
 ): string {
+  // Every value is the operator's or the client's text: escaped. The template
+  // named one company's destination and brand for every tenant ("Your Egypt
+  // Adventure Awaits!", "A 30% deposit secures your adventure!",
+  // "© Travel2Egypt.org") and printed the client's name as raw HTML.
+  const e = escapeHtml
+  const company = signer.company?.trim() || ''
+  const deposit = typeof depositPercent === 'number' && Number.isFinite(depositPercent) && depositPercent > 0
+    ? `A ${depositPercent}% deposit confirms your booking.`
+    : ''
   return `
 <html>
 <head>
@@ -62,53 +75,37 @@ export function generateEmailTemplate(
 </head>
 <body>
   <div class="header">
-    <h1 style="margin: 0;">🌟 Your Egypt Adventure Awaits!</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.9;">Professional Itinerary & Quote</p>
+    <h1 style="margin: 0;">Your itinerary${company ? ` from ${e(company)}` : ''}</h1>
+    <p style="margin: 10px 0 0 0; opacity: 0.9;">Itinerary &amp; quote</p>
   </div>
-  
+
   <div class="content">
-    <p>Dear <strong>${clientName}</strong>,</p>
-    
-    <p>Thank you for your interest in exploring the wonders of Egypt! We're excited to present your personalized itinerary.</p>
-    
+    <p>Dear <strong>${e(clientName)}</strong>,</p>
+
+    <p>Thank you for your interest. We're pleased to send you your personalised itinerary.</p>
+
     <div class="highlight">
-      <h3 style="margin-top: 0; color: #2563eb;">📋 Your Trip Details</h3>
-      <p><strong>Quote Reference:</strong> ${itineraryCode}</p>
-      <p><strong>Tour:</strong> ${tripName}</p>
-      <p><strong>Total Investment:</strong> ${currency} ${totalCost}</p>
+      <h3 style="margin-top: 0; color: #2563eb;">Your trip</h3>
+      <p><strong>Quote reference:</strong> ${e(itineraryCode)}</p>
+      <p><strong>Tour:</strong> ${e(tripName)}</p>
+      <p><strong>Total:</strong> ${e(totalPrice)}</p>
     </div>
-    
-    <p>Please find your complete itinerary attached as a PDF. This includes:</p>
-    
-    <ul>
-      <li>✅ Detailed day-by-day schedule</li>
-      <li>✅ All services and inclusions</li>
-      <li>✅ Complete pricing breakdown</li>
-      <li>✅ Payment and cancellation terms</li>
-      <li>✅ Contact information</li>
-    </ul>
-    
-    <p><strong>Ready to confirm your booking?</strong> We're here to make your Egypt dreams come true! Our team is available to answer any questions and assist with your reservation.</p>
-    
-    <p>To confirm your booking, simply reply to this email or contact us directly via WhatsApp or phone. A 30% deposit secures your adventure!</p>
-    
+
+    <p>Your itinerary is attached as a PDF, with the day-by-day programme and the price.</p>
+
+    <p><strong>Ready to book?</strong> Reply to this email or contact us and we'll take care of the rest.${deposit ? ` ${deposit}` : ''}</p>
+
     <div class="signature">
-      ${signer.company ? `<p style="margin: 5px 0;"><strong>${signer.company}</strong></p>` : ''}
-      
-      ${signer.email ? `<p style="margin: 5px 0;">✉️ ${signer.email}</p>` : ''}
-      ${signer.phone ? `<p style="margin: 5px 0;">📞 ${signer.phone}</p>` : ''}
-      ${signer.website ? `<p style="margin: 5px 0;">🌍 ${signer.website}</p>` : ''}
+      ${company ? `<p style="margin: 5px 0;"><strong>${e(company)}</strong></p>` : ''}
+      ${signer.email ? `<p style="margin: 5px 0;">✉️ ${e(signer.email)}</p>` : ''}
+      ${signer.phone ? `<p style="margin: 5px 0;">📞 ${e(signer.phone)}</p>` : ''}
+      ${signer.website ? `<p style="margin: 5px 0;">🌍 ${e(signer.website)}</p>` : ''}
     </div>
   </div>
-  
-  <div class="footer">
-    <p style="color: #6b7280; font-size: 14px; margin: 0;">
-      We look forward to showing you the wonders of Egypt! 🇪🇬✨
-    </p>
-    <p style="color: #9ca3af; font-size: 12px; margin: 10px 0 0 0;">
-      © ${new Date().getFullYear()} Travel2Egypt.org - Creating Unforgettable Memories
-    </p>
-  </div>
+
+  ${company ? `<div class="footer">
+    <p style="color: #9ca3af; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} ${e(company)}</p>
+  </div>` : ''}
 </body>
 </html>
   `.trim()
@@ -118,29 +115,22 @@ export function generateWhatsAppMessage(
   signer: EmailSignerInfo,
   clientName: string,
   tripName: string,
-  totalCost: string,
-  currency: string
+  /** Already formatted for its currency. */
+  totalPrice: string
 ): string {
+  // It promised "Everything is included: professional guide, transportation,
+  // entrance fees…" whatever the trip held, and an "Egypt adventure".
   return `Hi ${clientName}! 👋
 
-Thank you for your interest in ${tripName}! 
+Thank you for your interest in ${tripName}!
 
-I've prepared a complete itinerary for you with all the details, pricing, and inclusions.
+I've prepared your itinerary with the day-by-day programme and the price.
 
-💰 Total Investment: ${currency} ${totalCost}
+💰 Total: ${totalPrice}
 
-✅ Everything is included:
-- Professional guide
-- Transportation
-- Entrance fees
-- Meals as mentioned
-- All taxes and fees
+The itinerary PDF has been sent to your email.
 
-The complete itinerary PDF has been sent to your email with day-by-day breakdown!
-
-Ready to confirm? Just reply here${signer.phone ? ` or call me at ${signer.phone} 📞` : ''}
-
-Looking forward to making your Egypt adventure unforgettable! 🇪🇬✨
+Ready to confirm? Just reply here${signer.phone ? ` or call ${signer.phone} 📞` : ''}
 
 Best regards,
 ${signer.company || ''}`

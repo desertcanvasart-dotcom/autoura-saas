@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { generateEmailTemplate } from '@/lib/communication-utils'
+import { formatCurrency } from '@/lib/currency'
+import { currencyDecimals } from '@/lib/currency-totals'
+import { contractDepositPercent, contractSettingsFromTenant } from '@/lib/contract-terms'
 import { requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
@@ -24,7 +27,7 @@ export async function POST(request: Request) {
     // actually routes a client's reply back to the operator.
     const { data: tenant } = await auth.supabase!
       .from('tenants')
-      .select('company_name, contact_email, company_phone, company_website, email_domain, email_from_local, email_domain_status')
+      .select('company_name, contact_email, company_phone, company_website, email_domain, email_from_local, email_domain_status, deposit_percent')
       .eq('id', auth.tenant_id!)
       .maybeSingle()
 
@@ -124,14 +127,16 @@ export async function POST(request: Request) {
       recipientName,
       itineraryCode,
       tripName,
-      totalCost.toFixed(2),
-      currency,
+      // ¥450,000, not "JPY 450000.00".
+      formatCurrency(totalCost, currency, { decimals: currencyDecimals(currency) }),
       {
         company: tenant?.company_name || '',
         email: tenant?.contact_email || '',
         phone: tenant?.company_phone || '',
         website: tenant?.company_website || '',
-      }
+      },
+      // The deposit the operator asks for (Settings → Organization).
+      contractDepositPercent(contractSettingsFromTenant(tenant))
     )
 
     const result = await sendMail({

@@ -70,7 +70,8 @@ describe('itinerary email', () => {
     expect(res.status, JSON.stringify(json)).toBe(200)
     expect(json.success).toBe(true)
     expect(sent).toHaveLength(1)
-    expect(sent[0].html).toContain('EUR 1900.00')
+    // Formatted for its currency: 1,900.00 with the EUR symbol.
+    expect(sent[0].html).toContain('1,900.00')
     expect(sent[0].subject).toContain('Nile Week (IT-001)')
   })
 
@@ -79,8 +80,9 @@ describe('itinerary email', () => {
       itineraryId: 'it-1', clientEmail: 'ada@example.com', totalCost: '1.00', currency: 'USD',
     })
     expect(res.status).toBe(200)
-    expect(sent[0].html).toContain('EUR 1900.00')
+    expect(sent[0].html).toContain('1,900.00')
     expect(sent[0].html).not.toContain('USD')
+    expect(sent[0].html).not.toContain('$1.00')
   })
 
   it("does not find another tenant's itinerary", async () => {
