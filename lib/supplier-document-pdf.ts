@@ -7,6 +7,7 @@ import { brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
 import { formatDateOnly, daysBetween } from '@/lib/date-utils'
 import { voucherLines } from '@/lib/documents/voucher-lines'
+import { VOUCHER_VEHICLE_TYPES } from '@/lib/documents/vehicle-types'
 
 interface ServiceItem {
   date?: string
@@ -405,16 +406,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
 
     // Vehicle Type & Driver for transport
     if (doc.document_type === 'transport_voucher' && (doc.vehicle_type || doc.driver_name)) {
-      const vehicleTypeLabels: Record<string, string> = {
-        'sedan': 'Sedan (1-3 pax)',
-        'suv': 'SUV / 4x4 (1-4 pax)',
-        'minivan': 'Minivan (4-6 pax)',
-        'van': 'Van (7-10 pax)',
-        'minibus': 'Minibus (11-20 pax)',
-        'bus': 'Bus (21+ pax)',
-        'luxury_sedan': 'Luxury Sedan',
-        'luxury_van': 'Luxury Van / Sprinter'
-      }
+      const vehicleTypeLabels = VOUCHER_VEHICLE_TYPES
 
       const halfWidth = (contentWidth - 6) / 2
 

@@ -2,7 +2,8 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { withReturnTo } from '@/lib/nav/return-to'
+import { withReturnTo, safeReturnPath, FROM_PARAM } from '@/lib/nav/return-to'
+import { BackLink } from '@/components/nav/TripNav'
 import { 
   FileText, Send, Eye, Trash2, Pencil,
   Hotel, Car, Ship, MapPin, Users, CheckCircle,
@@ -74,9 +75,17 @@ export default function SupplierDocumentsPage() {
   // every document from every trip (reported 2026-10-06). Read off window,
   // as app/team-members does, so the page needs no Suspense boundary.
   const [itineraryFilter, setItineraryFilter] = useState<string | null>(null)
+  // Where this list was opened from (a trip, its booking): ?from=, kept through
+  // the list's own links so back from a document, then back again, gets there.
+  const [returnTo, setReturnTo] = useState<string | null>(null)
 
   useEffect(() => {
-    setItineraryFilter(new URLSearchParams(window.location.search).get('itineraryId'))
+    const params = new URLSearchParams(window.location.search)
+    setItineraryFilter(params.get('itineraryId'))
+    setReturnTo(safeReturnPath(params.get(FROM_PARAM)))
+    // The documents hub's cards link here with ?type=…; only a known type filters.
+    const type = params.get('type')
+    if (type && DOCUMENT_TYPES.some(d => d.value === type)) setTypeFilter(type)
     setMounted(true)
   }, [])
 
@@ -86,10 +95,17 @@ export default function SupplierDocumentsPage() {
     }
   }, [mounted, typeFilter, statusFilter, itineraryFilter])
 
+  const listPath = (id: string | null) =>
+    id ? `/documents/supplier?itineraryId=${encodeURIComponent(id)}` : '/documents/supplier'
+
   const showItinerary = (id: string | null) => {
     setItineraryFilter(id)
-    window.history.replaceState(null, '', id ? `/documents/supplier?itineraryId=${encodeURIComponent(id)}` : '/documents/supplier')
+    window.history.replaceState(null, '', withReturnTo(listPath(id), returnTo))
   }
+
+  // This list as it stands (trip filter and ?from=), for a document's back link.
+  const listHref = withReturnTo(listPath(itineraryFilter), returnTo)
+  const fromList = (href: string) => (listHref === '/documents/supplier' ? href : withReturnTo(href, listHref))
 
   const fetchDocuments = async () => {
     setLoading(true)
@@ -216,12 +232,8 @@ export default function SupplierDocumentsPage() {
             )}
             {itineraryFilter ? (
               <div className="flex items-center gap-4">
-                <Link
-                  href={`/itineraries/${itineraryFilter}`}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-                >
-                  ← Back to itinerary
-                </Link>
+                {/* Back to where it was opened from (the trip, or its booking). */}
+                <BackLink fallbackHref={`/itineraries/${itineraryFilter}`} fallbackLabel="Itinerary" />
                 <button
                   type="button"
                   onClick={() => showItinerary(null)}
@@ -231,12 +243,7 @@ export default function SupplierDocumentsPage() {
                 </button>
               </div>
             ) : (
-              <Link
-                href="/documents"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                ← Back to All Documents
-              </Link>
+              <BackLink fallbackHref="/documents" fallbackLabel="All Documents" />
             )}
           </div>
         </div>
@@ -454,7 +461,7 @@ export default function SupplierDocumentsPage() {
                                 {/* View */}
                                 <Link
                                   // Back from the document returns to this list, still filtered to the trip.
-                                  href={itineraryFilter ? withReturnTo(`/documents/supplier/${doc.id}`, `/documents/supplier?itineraryId=${encodeURIComponent(itineraryFilter)}`) : `/documents/supplier/${doc.id}`}
+                                  href={fromList(`/documents/supplier/${doc.id}`)}
                                   className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                                   title="View"
                                 >
@@ -464,7 +471,7 @@ export default function SupplierDocumentsPage() {
                                 {/* Edit - available for all statuses EXCEPT cancelled */}
                                 {doc.status !== 'cancelled' && (
                                   <Link
-                                    href={`/documents/supplier/${doc.id}/edit`}
+                                    href={fromList(`/documents/supplier/${doc.id}/edit`)}
                                     className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
                                     title="Edit"
                                   >

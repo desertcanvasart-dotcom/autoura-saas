@@ -1,5 +1,6 @@
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { insertNumbered } from '@/lib/documents/numberer'
+import { transportCrew } from '@/lib/documents/transport-crew'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { docMappingFor, serviceCity, PlaceNames, entranceLineName, unassignedDocKey, requestedDocTypes } from '@/lib/documents/group-services'
@@ -314,7 +315,9 @@ export async function POST(
         currency: itinerary.currency || 'EUR',
         total_cost: totalCost,
         payment_terms: group.supplier.payment_terms || 'commission',
-        status: 'draft'
+        status: 'draft',
+        // The vehicle and driver the trip's transport lines name (migration 402).
+        ...(group.docType === 'transport_voucher' ? transportCrew(group.services) : {}),
       })
 
 
@@ -373,7 +376,8 @@ export async function POST(
         currency: itinerary.currency || 'EUR',
         total_cost: totalCost,
         payment_terms: 'pay_direct',
-        status: 'draft'
+        status: 'draft',
+        ...(group.docType === 'transport_voucher' ? transportCrew(group.services) : {}),
       })
 
 

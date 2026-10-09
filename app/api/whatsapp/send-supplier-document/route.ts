@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
+import { markSupplierDocumentSent } from '@/lib/documents/mark-sent'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 // POST - Send supplier document via WhatsApp with PDF attachment
@@ -12,16 +13,29 @@ export async function POST(request: NextRequest) {
     if (!authResult.supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json()
-    const { documentId, supplierPhone, supplierName, documentNumber, documentType, clientName, serviceDate, pdfBase64 } = body
+    // The recipient, number and names come from the voucher row, not the
+    // request: the caller chooses only which voucher, its title and the PDF.
+    const { documentId, documentType: documentTitle, pdfBase64 } = body
 
-    if (!supplierPhone) return NextResponse.json({ success: false, error: 'Supplier phone number is required' }, { status: 400 })
     if (!pdfBase64) return NextResponse.json({ success: false, error: 'PDF attachment is required' }, { status: 400 })
 
     // Only a voucher of the caller's own tenant (RLS on supplier_documents).
     const { data: ownDocument } = documentId
-      ? await authResult.supabase.from('supplier_documents').select('id').eq('id', documentId).maybeSingle()
+      ? await authResult.supabase
+          .from('supplier_documents')
+          .select('id, document_type, document_number, supplier_name, supplier_contact_name, supplier_contact_phone, client_name, check_in, service_date')
+          .eq('id', documentId)
+          .maybeSingle()
       : { data: null }
     if (!ownDocument) return NextResponse.json({ success: false, error: 'Document not found' }, { status: 404 })
+
+    const supplierPhone = ownDocument.supplier_contact_phone
+    if (!supplierPhone) return NextResponse.json({ success: false, error: 'Supplier phone number is required' }, { status: 400 })
+    const supplierName = ownDocument.supplier_contact_name || ownDocument.supplier_name
+    const documentNumber = ownDocument.document_number
+    const clientName = ownDocument.client_name
+    const documentType = documentTitle || ownDocument.document_type
+    const serviceDate = ownDocument.check_in || ownDocument.service_date
 
     // Upload PDF to Supabase Storage (needs admin client for storage access)
     const adminClient = createAdminClient()
@@ -60,6 +74,10 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error }, { status: 500 })
     }
+
+    // The message has gone: record it here.
+    const marked = await markSupplierDocumentSent(authResult.supabase, { documentId: ownDocument.id })
+    if (marked.error) console.error('Supplier document sent but not marked sent:', marked.error)
 
     return NextResponse.json({
       success: true,

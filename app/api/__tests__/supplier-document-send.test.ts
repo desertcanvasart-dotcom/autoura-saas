@@ -6,11 +6,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => {
-  // What supplier_documents returns to the caller's RLS-scoped client.
-  const state = { ownDocument: null as null | { id: string } }
+  // What supplier_documents returns to the caller's RLS-scoped client, and
+  // the updates it receives (the route marking the voucher sent).
+  const state = { ownDocument: null as null | Record<string, unknown>, updates: [] as Record<string, unknown>[] }
   const rlsClient = {
     from: () => {
-      const b: any = { select: () => b, eq: () => b, maybeSingle: async () => ({ data: state.ownDocument, error: null }) }
+      const b: any = {
+        select: () => b,
+        eq: () => b,
+        maybeSingle: async () => ({ data: state.ownDocument, error: null }),
+        update: (u: Record<string, unknown>) => { state.updates.push(u); return b },
+        then: (r: (v: unknown) => void) => r({ error: null }),
+      }
       return b
     },
   }
@@ -39,7 +46,7 @@ vi.mock('@/lib/gmail', () => ({
   refreshAccessToken: async () => ({ access_token: 'a2' }),
 }))
 vi.mock('@/lib/storage/shareable-pdf', () => ({ uploadShareablePdf: async () => ({ ok: true, url: 'https://signed' }) }))
-vi.mock('@/lib/whatsapp', () => ({ sendWhatsAppMessage: () => h.whatsapp() }))
+vi.mock('@/lib/whatsapp', () => ({ sendWhatsAppMessage: (args: unknown) => (h.whatsapp as any)(args) }))
 
 import { POST as sendEmail } from '@/app/api/send-supplier-document/route'
 import { POST as sendWhatsApp } from '@/app/api/whatsapp/send-supplier-document/route'
@@ -47,6 +54,13 @@ import { POST as sendWhatsApp } from '@/app/api/whatsapp/send-supplier-document/
 const req = (body: unknown) => new Request('http://x', { method: 'POST', body: JSON.stringify(body) }) as any
 const email = { documentId: 'doc-1', supplierEmail: 'hotel@example.com', supplierName: 'Hotel', documentNumber: 'HV-1', documentType: 'Hotel Voucher', clientName: 'Guest', pdfBase64: 'JVBERi0=' }
 const wa = { documentId: 'doc-1', supplierPhone: '+201000000000', supplierName: 'Hotel', documentNumber: 'HV-1', documentType: 'Hotel Voucher', clientName: 'Guest', pdfBase64: 'JVBERi0=' }
+
+// The voucher row: the recipient, number and names come from here.
+const row = {
+  id: 'doc-1', status: 'draft', document_type: 'hotel_voucher', document_number: 'HV-1',
+  supplier_name: '<b>Hotel</b>', supplier_contact_name: 'Front desk', supplier_contact_email: 'hotel@example.com',
+  supplier_contact_phone: '+201000000000', client_name: 'Guest',
+}
 
 function sentEmail() {
   const raw = Buffer.from((h.gmailSend.mock.calls[0] as any[])[0].requestBody.raw, 'base64url').toString()
@@ -57,6 +71,7 @@ function sentEmail() {
 
 beforeEach(() => {
   h.state.ownDocument = null
+  h.state.updates.length = 0
   h.gmailSend.mockClear()
   h.whatsapp.mockClear()
   process.env.GMAIL_USER = 'platform@autoura.example'
@@ -72,8 +87,8 @@ describe('sending a supplier voucher', () => {
   })
 
   it('emails with no From or Bcc naming the platform address, names escaped', async () => {
-    h.state.ownDocument = { id: 'doc-1' }
-    const res = await sendEmail(req({ ...email, supplierName: '<b>Hotel</b>' }))
+    h.state.ownDocument = row
+    const res = await sendEmail(req(email))
     expect(res.status).toBe(200)
     const { headers, html } = sentEmail()
     expect(headers).not.toMatch(/^Bcc:/m)
@@ -83,10 +98,26 @@ describe('sending a supplier voucher', () => {
     expect(html).toContain('Nile &amp; Co | ops@nile.example')
   })
 
-  it('sends the tenant’s own voucher by WhatsApp', async () => {
-    h.state.ownDocument = { id: 'doc-1' }
-    expect((await sendWhatsApp(req(wa))).status).toBe(200)
+  it('sends to the voucher’s supplier, never an address the request names', async () => {
+    h.state.ownDocument = row
+    await sendEmail(req({ ...email, supplierEmail: 'attacker@evil.test' }))
+    expect(raw()).toMatch(/^To: hotel@example\.com$/m)
+    expect(raw()).not.toContain('attacker@evil.test')
+  })
+
+  it('marks the voucher sent itself once the email has gone', async () => {
+    h.state.ownDocument = row
+    await sendEmail(req(email))
+    expect(h.state.updates.at(-1)).toMatchObject({ status: 'sent' })
+    expect(typeof h.state.updates.at(-1)!.sent_at).toBe('string')
+  })
+
+  it('sends the tenant’s own voucher by WhatsApp to the voucher’s number, and marks it sent', async () => {
+    h.state.ownDocument = row
+    expect((await sendWhatsApp(req({ ...wa, supplierPhone: '+19999999999' }))).status).toBe(200)
     expect(h.whatsapp).toHaveBeenCalledOnce()
+    expect((h.whatsapp.mock.calls[0] as any[])[0].to).toBe('+201000000000')
+    expect(h.state.updates.at(-1)).toMatchObject({ status: 'sent' })
   })
 })
 
