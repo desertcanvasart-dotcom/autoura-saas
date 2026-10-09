@@ -162,7 +162,7 @@ export default function B2CQuoteEmail({
           <Section style={content}>
             <Heading style={h2}>What's Next?</Heading>
             <Text style={text}>
-              • Review your detailed itinerary and pricing breakdown
+              • Review your detailed itinerary and what is included
             </Text>
             <Text style={text}>
               • Ask us any questions - we're here to help!

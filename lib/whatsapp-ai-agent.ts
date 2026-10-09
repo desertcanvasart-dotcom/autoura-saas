@@ -6,6 +6,8 @@
 // Version: 2.0 - With Tool Calling Support
 // ============================================
 
+import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
+import { formatMoney } from '@/lib/currency-totals'
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { whatsappModel } from '@/lib/ai/models'
@@ -98,7 +100,7 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'get_quote_details',
-    description: 'Get detailed information about a specific quote including pricing breakdown. Use this when customer asks about a specific quote.',
+    description: 'Get detailed information about a specific quote (price and status). Use this when customer asks about a specific quote.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -390,8 +392,10 @@ export class ToolExecutor {
         return { success: false, error: `Quote ${input.quote_number} not found` }
       }
 
-      // Verify this quote belongs to the customer (if we have a client_id)
-      if (this.clientId && quote.client_id !== this.clientId) {
+      // The quote must be this customer's. With no client matched to the
+      // sender there is nothing to check against, and quote numbers are
+      // sequential — anyone could read another customer's quote by number.
+      if (!this.clientId || quote.client_id !== this.clientId) {
         return { success: false, error: 'Quote not found for this customer' }
       }
 
@@ -404,11 +408,12 @@ export class ToolExecutor {
           duration: quote.itineraries?.total_days,
           travelers: quote.num_travelers,
           tier: quote.tier,
-          total_price: `${quote.currency} ${quote.selling_price}`,
-          price_per_person: `${quote.currency} ${quote.price_per_person}`,
+          total_price: formatMoney(quote.selling_price, quote.currency),
+          price_per_person: formatMoney(quote.price_per_person, quote.currency),
           status: quote.status,
           valid_until: quote.valid_until,
-          cost_breakdown: quote.cost_breakdown
+          // No cost_breakdown: it is the operator's net cost per category, and
+          // the agent may quote the customer anything its tools return.
         }
       }
     } catch (error: any) {
@@ -642,8 +647,8 @@ export class ToolExecutor {
         `⏱️ Duration: ${quote.itineraries?.total_days} days\n` +
         `👥 Travelers: ${quote.num_travelers}\n` +
         `🏆 Service: ${quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}\n\n` +
-        `💰 *Total: ${quote.currency} ${quote.selling_price.toLocaleString()}*\n` +
-        `💵 Per Person: ${quote.currency} ${quote.price_per_person.toLocaleString()}\n\n` +
+        `💰 *Total: ${formatMoney(quote.selling_price, quote.currency)}*\n` +
+        `💵 Per Person: ${formatMoney(quote.price_per_person, quote.currency)}\n\n` +
         `📄 Detailed quote attached as PDF.\n\n` +
         `Reply to this message if you have any questions! ✨`
 
@@ -658,16 +663,16 @@ export class ToolExecutor {
         return { success: false, error: result.error || 'Failed to send WhatsApp message' }
       }
 
-      // Update quote status
-      await admin
-        .from('b2c_quotes')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          sent_via: 'whatsapp_ai'
-        })
-        .eq('id', input.quote_id)
-        .eq('tenant_id', this.tenantId)
+      // Record the send; only a draft becomes 'sent' — an accepted quote
+      // sent again must not be demoted (lib/quotes/quote-sent-update).
+      const sentUpdate = quoteSentUpdate('b2c', quote.status, 'whatsapp_ai')
+      if (sentUpdate) {
+        await admin
+          .from('b2c_quotes')
+          .update(sentUpdate)
+          .eq('id', input.quote_id)
+          .eq('tenant_id', this.tenantId)
+      }
 
       // Store the outbound message
       await this.supabase.from('whatsapp_messages').insert({
@@ -1225,7 +1230,7 @@ Email: ${this.businessEmail}
         const validUntil = q.validUntil
           ? new Date(q.validUntil).toLocaleDateString('en-GB')
           : 'No expiry'
-        systemPrompt += `- ${q.quoteNumber}: ${q.currency} ${q.sellingPrice.toLocaleString()} (Status: ${q.status}, Valid until: ${validUntil})\n`
+        systemPrompt += `- ${q.quoteNumber}: ${formatMoney(q.sellingPrice, q.currency)} (Status: ${q.status}, Valid until: ${validUntil})\n`
       })
     }
 

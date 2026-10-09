@@ -3,6 +3,8 @@ import type { CompanyIdentity } from '@/lib/company-identity'
 import { QuoteHeader, QuoteFooter, quotePalette, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 import { QUOTE_PDF_FONT } from '@/lib/pdf/quote-fonts'
+import { formatMoney } from '@/lib/currency-totals'
+import { formatDateOnly } from '@/lib/date-utils'
 
 // Styles take the agency's brand colour (Settings → Organization); they were
 // a fixed blue (B2C) / purple (B2B) whatever the agency's colours.
@@ -189,7 +191,14 @@ interface B2CQuotePDFProps {
 
 const B2CQuotePDF: React.FC<B2CQuotePDFProps> = ({ quote, company = { name: '' } }) => {
   const styles = makeStyles(quotePalette(company))
-  const costBreakdownEntries = Object.entries(quote.cost_breakdown || {}).filter(([_, value]) => value > 0)
+  // The categories the price covers, by name only.
+  const includedLabels = Object.entries(quote.cost_breakdown || {})
+    .filter(([, value]) => Number(value) > 0)
+    .map(([key]) => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))
+  const money = (n: unknown) => formatMoney(n, quote.currency)
+  // Calendar dates as dates: toLocaleDateString() with no locale printed
+  // "11/8/2026" on the server, and a UTC parse moves a date-only value.
+  const day = (d: string | null | undefined) => formatDateOnly(d, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <Document>
@@ -243,13 +252,13 @@ const B2CQuotePDF: React.FC<B2CQuotePDFProps> = ({ quote, company = { name: '' }
             {quote.itineraries.start_date && (
               <View style={styles.row}>
                 <Text style={styles.label}>Start Date:</Text>
-                <Text style={styles.value}>{new Date(quote.itineraries.start_date).toLocaleDateString()}</Text>
+                <Text style={styles.value}>{day(quote.itineraries.start_date)}</Text>
               </View>
             )}
             {quote.itineraries.end_date && (
               <View style={styles.row}>
                 <Text style={styles.label}>End Date:</Text>
-                <Text style={styles.value}>{new Date(quote.itineraries.end_date).toLocaleDateString()}</Text>
+                <Text style={styles.value}>{day(quote.itineraries.end_date)}</Text>
               </View>
             )}
             <View style={styles.row}>
@@ -263,34 +272,25 @@ const B2CQuotePDF: React.FC<B2CQuotePDFProps> = ({ quote, company = { name: '' }
           </View>
         )}
 
-        {/* Pricing Breakdown */}
+        {/* Price. The client's copy: what is included, and the price — never
+            the operator's cost per category. This table listed the net
+            supplier sums (cost_breakdown), which add up to total_cost, right
+            above the selling price: the margin, worked out for the client. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pricing Breakdown</Text>
+          <Text style={styles.sectionTitle}>Price</Text>
 
-          {/* Cost Items Table */}
-          <View style={styles.table}>
-            <View style={[styles.tableRow, styles.tableHeader]}>
-              <Text style={[styles.tableCellHeader, styles.col60]}>Item</Text>
-              <Text style={[styles.tableCellHeader, styles.col40]}>Amount</Text>
+          {includedLabels.length > 0 && (
+            <View style={styles.row}>
+              <Text style={styles.label}>Includes:</Text>
+              <Text style={styles.value}>{includedLabels.join(', ')}</Text>
             </View>
-
-            {costBreakdownEntries.map(([key, value]) => (
-              <View key={key} style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.col60]}>
-                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </Text>
-                <Text style={[styles.tableCell, styles.col40]}>
-                  {quote.currency} {value.toLocaleString()}
-                </Text>
-              </View>
-            ))}
-          </View>
+          )}
 
           {/* Total Price */}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Price</Text>
             <Text style={styles.totalValue}>
-              {quote.currency} {quote.selling_price.toLocaleString()}
+              {money(quote.selling_price)}
             </Text>
           </View>
 
@@ -300,7 +300,7 @@ const B2CQuotePDF: React.FC<B2CQuotePDFProps> = ({ quote, company = { name: '' }
               Price per person ({quote.num_travelers} traveler{quote.num_travelers > 1 ? 's' : ''})
             </Text>
             <Text style={styles.perPersonValue}>
-              {quote.currency} {quote.price_per_person.toLocaleString()}
+              {money(quote.price_per_person)}
             </Text>
           </View>
         </View>
@@ -320,12 +320,12 @@ const B2CQuotePDF: React.FC<B2CQuotePDFProps> = ({ quote, company = { name: '' }
           <Text style={styles.sectionTitle}>Quote Validity</Text>
           <View style={styles.row}>
             <Text style={styles.label}>Quote Date:</Text>
-            <Text style={styles.value}>{new Date(quote.created_at).toLocaleDateString()}</Text>
+            <Text style={styles.value}>{day(quote.created_at)}</Text>
           </View>
           {quote.valid_until && (
             <View style={styles.row}>
               <Text style={styles.label}>Valid Until:</Text>
-              <Text style={styles.value}>{new Date(quote.valid_until).toLocaleDateString()}</Text>
+              <Text style={styles.value}>{day(quote.valid_until)}</Text>
             </View>
           )}
         </View>

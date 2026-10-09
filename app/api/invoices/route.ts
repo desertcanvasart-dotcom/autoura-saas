@@ -8,6 +8,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { formatMoney, roundToCurrency } from '@/lib/currency-totals'
 import { includeAdditions, partitionAdditions, toLineItems, type Addition } from '@/lib/invoice-additions'
 import { extrasAdmin } from '@/lib/booking-extras-db'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
@@ -214,8 +215,10 @@ export async function POST(request: NextRequest) {
     billedExtraIds = parts.billable.filter(a => a.source === 'extra' && a.id).map(a => a.id as string)
 
     if (invoiceType === 'deposit') {
-      // Deposit invoice: calculate deposit amount
-      totalAmount = (fullTripCost * depositPercent) / 100
+      // Deposit invoice: calculate deposit amount, in the currency's own
+      // smallest unit — 20% of ¥1,854,367 is ¥370,873, not ¥370,873.40,
+      // which left a 0.40 balance the client could never pay off.
+      totalAmount = roundToCurrency((fullTripCost * depositPercent) / 100, currency)
       lineItems = [{
         description: `Booking Deposit (${depositPercent}%) - ${body.line_items?.[0]?.description || 'Tour Package'}`,
         quantity: 1,
@@ -224,8 +227,8 @@ export async function POST(request: NextRequest) {
       }]
     } else if (invoiceType === 'final') {
       // Final invoice: remaining balance after deposit
-      const depositAmount = (fullTripCost * depositPercent) / 100
-      totalAmount = fullTripCost - depositAmount
+      const depositAmount = roundToCurrency((fullTripCost * depositPercent) / 100, currency)
+      totalAmount = roundToCurrency(fullTripCost - depositAmount, currency)
       lineItems = [{
         description: `Balance Payment - ${body.line_items?.[0]?.description || 'Tour Package'}`,
         quantity: 1,
@@ -239,7 +242,7 @@ export async function POST(request: NextRequest) {
       }]
       // Adjust total to just show the balance
       lineItems = [{
-        description: `Final Balance - ${body.line_items?.[0]?.description || 'Tour Package'} (Total: ${body.currency || 'EUR'} ${fullTripCost.toFixed(2)} minus ${depositPercent}% deposit)`,
+        description: `Final Balance - ${body.line_items?.[0]?.description || 'Tour Package'} (Total: ${formatMoney(fullTripCost, currency)} minus ${depositPercent}% deposit)`,
         quantity: 1,
         unit_price: totalAmount,
         amount: totalAmount
@@ -250,9 +253,11 @@ export async function POST(request: NextRequest) {
     // deposit (a percentage on account against the tour), and appended LAST
     // because the type branches above rebuild lineItems from scratch.
     if (additionsTotal && includeAdditions(invoiceType)) {
-      totalAmount = Math.round((totalAmount + additionsTotal) * 100) / 100
+      totalAmount = totalAmount + additionsTotal
       lineItems = [...lineItems, ...additionLines]
     }
+    // Every invoice total in its currency's smallest unit (no ¥0.25).
+    totalAmount = roundToCurrency(totalAmount, currency)
 
     const baseInvoice = {
       tenant_id, // ✅ Explicit tenant_id
