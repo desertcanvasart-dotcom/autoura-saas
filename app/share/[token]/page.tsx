@@ -75,11 +75,18 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     // The night's hotel or ship. EXPLICIT columns: these rows also carry
     // costs and supplier ids, which must never reach this page's process.
     // Only the resolved NAME is put on the day below.
-    supabase
-      .from('itinerary_services')
-      .select('itinerary_day_id, service_type, service_name, supplier_name, description')
-      .eq('itinerary_id', share.itinerary_id)
-      .in('service_type', ['accommodation', 'hotel', 'cruise']),
+    // By the trip's DAYS: itinerary_services.itinerary_id is not set by the
+    // AI generator or the editor, so hotel and ship names went missing.
+    (async () => {
+      const { data: dayRows } = await supabase.from('itinerary_days').select('id').eq('itinerary_id', share.itinerary_id)
+      const dayIds = (dayRows ?? []).map((d: { id: string }) => d.id)
+      if (dayIds.length === 0) return { data: [] as Array<{ itinerary_day_id: string; service_type: string; service_name: string; supplier_name: string | null; description: string | null }> }
+      return supabase
+        .from('itinerary_services')
+        .select('itinerary_day_id, service_type, service_name, supplier_name, description')
+        .in('itinerary_day_id', dayIds)
+        .in('service_type', ['accommodation', 'hotel', 'cruise'])
+    })(),
     supabase
       .from('tenants')
       .select('company_name, logo_url, primary_color, contact_email, company_phone, company_website, timezone')
@@ -441,7 +448,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             <div>
               <p className="text-sm text-gray-500">Total for {travellers || 'your'} traveller{travellers === 1 ? '' : 's'}</p>
               <p className="text-2xl font-bold text-gray-900">
-                {formatMoney(it.totalPrice, it.currency || 'EUR')}
+                {it.currency ? formatMoney(it.totalPrice, it.currency) : it.totalPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}
               </p>
             </div>
             {it.code && <span className="text-xs text-gray-400">Ref: {it.code}</span>}

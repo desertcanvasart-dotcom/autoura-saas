@@ -1,3 +1,4 @@
+import { tripServices } from '@/lib/itineraries/trip-services'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { formatMoney } from '@/lib/currency-totals'
 import { depositDueDate } from '@/lib/template-placeholders'
@@ -94,11 +95,8 @@ export async function GET(
     // (itineraries.total_cost is a cache that can be 0 or stale).
     let latestItinerary = storedItinerary
     if (storedItinerary) {
-      const { data: priceLines } = await supabase
-        .from('itinerary_services')
-        .select('total_cost, client_price')
-        .eq('itinerary_id', storedItinerary.id)
-      latestItinerary = { ...storedItinerary, total_cost: effectiveItineraryTotal(storedItinerary, priceLines ?? []) }
+      const { rows: priceLines } = await tripServices<{ total_cost: number | null; client_price: number | null }>(supabase, storedItinerary.id, 'total_cost, client_price')
+      latestItinerary = { ...storedItinerary, total_cost: effectiveItineraryTotal(storedItinerary, priceLines) }
     }
 
     // Also fetch all itineraries for this client (for dropdown selection)

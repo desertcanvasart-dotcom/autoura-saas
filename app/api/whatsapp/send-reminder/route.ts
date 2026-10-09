@@ -89,11 +89,13 @@ export async function POST(request: NextRequest) {
       `✅ Don't forget your camera! 📸\n\n` +
       `Your guide will contact you shortly before pickup.\n\n` +
       `See you soon! ✨\n\n` +
-      `${businessName} Team`
+      (businessName ? `${businessName} Team` : '')
 
 
 
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: itinerary.client_phone,
       body: message
     })

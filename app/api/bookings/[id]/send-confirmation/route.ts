@@ -80,7 +80,7 @@ export async function POST(
     if (!to.whatsapp) {
       return NextResponse.json({ success: false, error: 'No WhatsApp or phone number for this client' }, { status: 400 })
     }
-    const result = await sendWhatsAppMessage({ to: to.whatsapp, body: confirmationText(b, company) })
+    const result = await sendWhatsAppMessage({ to: to.whatsapp, body: confirmationText(b, company), tenantId: tenant_id })
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error || 'WhatsApp send failed' }, { status: 502 })
     }

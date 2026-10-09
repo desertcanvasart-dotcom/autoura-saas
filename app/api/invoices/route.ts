@@ -21,6 +21,24 @@ import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-number
  * Query params: status, clientId, itineraryId, type
  * RLS policies automatically filter by tenant_id
  */
+/** Subtotal, tax and discount that add up to the invoice total. */
+function invoiceMoneyLines(
+  invoiceType: string,
+  total: number,
+  body: { tax_rate?: unknown; tax_amount?: unknown; discount_amount?: unknown },
+  currency: string
+): { subtotal: number; tax_rate: number; tax_amount: number; discount_amount: number } {
+  if (invoiceType !== 'standard') return { subtotal: total, tax_rate: 0, tax_amount: 0, discount_amount: 0 }
+  const tax = Number(body.tax_amount) || 0
+  const discount = Number(body.discount_amount) || 0
+  return {
+    subtotal: roundToCurrency(total - tax + discount, currency),
+    tax_rate: Number(body.tax_rate) || 0,
+    tax_amount: tax,
+    discount_amount: discount,
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Use authenticated client - RLS automatically filters by tenant
@@ -287,10 +305,12 @@ export async function POST(request: NextRequest) {
       client_name: body.client_name,
       client_email: body.client_email || null,
       line_items: lineItems,
-      subtotal: totalAmount,
-      tax_rate: body.tax_rate || 0,
-      tax_amount: body.tax_amount || 0,
-      discount_amount: body.discount_amount || 0,
+      // The figures must add up on the document: subtotal + tax − discount =
+      // total. The subtotal was stored as the TOTAL (tax already in it), so the
+      // PDF read "Subtotal 1,050 / Tax 100 / Discount −50 / Total 1,050". A
+      // deposit or final invoice is a server-computed share with no tax line
+      // of its own, so it carries none (it printed tax it did not charge).
+      ...invoiceMoneyLines(invoiceType, totalAmount, body, currency),
       total_amount: totalAmount,
       currency: body.currency || 'EUR',
       amount_paid: 0,

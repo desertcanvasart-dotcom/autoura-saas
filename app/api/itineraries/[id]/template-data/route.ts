@@ -1,3 +1,4 @@
+import { tripServices } from '@/lib/itineraries/trip-services'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
@@ -47,11 +48,8 @@ export async function GET(
     // The client total from the services (lib/itinerary-client-total), the
     // figure every other send quotes — itineraries.total_cost is a cache that
     // can be 0 or stale, and a template could quote a price nothing else did.
-    const { data: priceLines } = await supabase
-      .from('itinerary_services')
-      .select('total_cost, client_price')
-      .eq('itinerary_id', itineraryId)
-    const clientTotal = effectiveItineraryTotal(itinerary, priceLines ?? [])
+    const { rows: priceLines } = await tripServices<{ total_cost: number | null; client_price: number | null }>(supabase, itineraryId, 'total_cost, client_price')
+    const clientTotal = effectiveItineraryTotal(itinerary, priceLines)
 
     const placeholderData = (await (async () => {
       const senderTenant = await loadSenderTenant(authResult.tenant_id)

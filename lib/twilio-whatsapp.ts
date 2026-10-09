@@ -18,6 +18,8 @@ export interface WhatsAppMessage {
   body: string
   mediaUrl?: string // Optional: PDF or image URL
   statusCallback?: string // Optional: override the delivery-receipt URL (Twilio only)
+  /** The sending tenant: a local number (leading 0) takes ITS country's code. */
+  tenantId?: string | null
 }
 
 export interface QuoteMessage {

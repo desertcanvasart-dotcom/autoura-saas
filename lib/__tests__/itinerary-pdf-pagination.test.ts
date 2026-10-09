@@ -25,8 +25,18 @@ describe('itinerary PDF pagination', () => {
     const doc = generateItineraryPDF(itinerary as never, days as never, { showPricingBreakdown: false }) as unknown as jsPDF
     expect(doc.getNumberOfPages()).toBeGreaterThan(2)
     const pageHeight = doc.internal.pageSize.getHeight()
-    // Body text stays above the footer band (footer itself sits at pageHeight - 10).
-    const body = linesByPage(doc).filter(l => l.y < pageHeight - 12)
-    expect(body.every(l => l.y <= pageHeight - 20 + 0.5)).toBe(true)
+    // Every line is either the footer (pageHeight - 10) or above the footer band.
+    expect(linesByPage(doc).every(l => Math.abs(l.y - (pageHeight - 10)) < 1.5 || l.y <= pageHeight - 20 + 0.5)).toBe(true)
+  })
+
+  it('the TOTAL PRICE box never lands on the footer or off the page, however long the table', () => {
+    for (const n of [10, 11, 12, 13, 14, 15, 16, 17, 18]) {
+      const services = Array.from({ length: n }, (_, i) => ({ service_type: 'activity', service_name: `Visit ${i + 1}`, quantity: 1, total_cost: 100 + i }))
+      const itinerary = { id: 'i', itinerary_code: 'ITN-1', client_name: 'Tersa', trip_name: 'Many', start_date: '2026-10-01', end_date: '2026-10-02', num_adults: 2, num_children: 0, currency: 'EUR', total_cost: 0, margin_percent: 25 }
+      const doc = generateItineraryPDF(itinerary as never, [{ day_number: 1, date: '2026-10-01', title: 'Day 1', description: '', services }] as never, { showPricingBreakdown: true }) as unknown as jsPDF
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const lines = linesByPage(doc)
+      expect(lines.every(l => Math.abs(l.y - (pageHeight - 10)) < 1.5 || l.y <= pageHeight - 20 + 0.5), `n=${n}`).toBe(true)
+    }
   })
 })

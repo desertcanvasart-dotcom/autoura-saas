@@ -16,6 +16,7 @@ import {
   type WhatsAppMessage
 } from './twilio-whatsapp'
 import { sendViaMeta, isMetaConfigured } from './whatsapp-cloud-api'
+import { formatPhoneForWhatsApp } from './communication-utils'
 
 export type WhatsAppProvider = 'twilio' | 'meta'
 
@@ -34,10 +35,44 @@ export function getWhatsAppProvider(): WhatsAppProvider {
 export async function sendWhatsAppMessage(
   message: WhatsAppMessage
 ): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
+  const ready = { ...message, to: await internationalNumber(message.to, message.tenantId) }
   if (getWhatsAppProvider() === 'meta') {
-    return sendViaMeta(message)
+    return sendViaMeta(ready)
   }
-  return sendViaTwilio(message)
+  return sendViaTwilio(ready)
+}
+
+/**
+ * The number in international form, as both providers need it. Clients are
+ * stored as the agency typed them — "0100 123 4567", "0044 20 …" — and the
+ * providers only stripped non-digits and added "+", so every server send to a
+ * local number went to "+0100…" and was rejected. "00" is the international
+ * prefix; a leading 0 is a trunk prefix and takes the sending tenant's country
+ * code (lib/communication-utils, the rule the wa.me links already use).
+ */
+export async function internationalNumber(to: string, tenantId?: string | null): Promise<string> {
+  const raw = String(to ?? '').trim()
+  const compact = raw.replace(/[\s\-().]/g, '')
+  if (compact.startsWith('+')) return compact
+  if (compact.startsWith('00')) return '+' + compact.slice(2)
+  if (!compact.startsWith('0') || !tenantId) return raw
+  const country = await tenantCountry(tenantId)
+  const digits = formatPhoneForWhatsApp(compact, country)
+  return digits.startsWith('0') ? raw : '+' + digits
+}
+
+const countryCache = new Map<string, string | null>()
+async function tenantCountry(tenantId: string): Promise<string | null> {
+  if (countryCache.has(tenantId)) return countryCache.get(tenantId) ?? null
+  try {
+    const { createAdminClient } = await import('@/lib/supabase-server')
+    const { data } = await createAdminClient().from('tenants').select('operating_country').eq('id', tenantId).maybeSingle()
+    const country = (data as { operating_country?: string | null } | null)?.operating_country ?? null
+    countryCache.set(tenantId, country)
+    return country
+  } catch {
+    return null
+  }
 }
 
 export async function testWhatsAppConnection(
