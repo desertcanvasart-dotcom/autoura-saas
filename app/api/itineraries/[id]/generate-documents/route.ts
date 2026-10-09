@@ -8,12 +8,13 @@ import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { requestedDocTypes } from '@/lib/documents/group-services'
-import { planSupplierDocuments, type PlanDay } from '@/lib/documents/plan-supplier-documents'
+import { planSupplierDocuments, staleSupplierDocuments, type PlanDay, type PlanGuide } from '@/lib/documents/plan-supplier-documents'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-/** The trip's documents still to make: its suppliers and existing documents
- *  read here, the grouping in planSupplierDocuments. */
+/** The trip's documents still to make, and the ones it has that no longer
+ *  match it: suppliers, assigned guides and existing documents read here,
+ *  the grouping in lib/documents/plan-supplier-documents. */
 async function planForItinerary(
   supabase: Admin,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the row as selected
@@ -32,18 +33,43 @@ async function planForItinerary(
 
   const { data: existing } = await supabase
     .from('supplier_documents')
-    .select('supplier_id, document_type, supplier_name, check_in, check_out')
+    .select('id, document_number, supplier_id, document_type, supplier_name, check_in, check_out, services')
     .eq('itinerary_id', itinerary.id)
     .neq('status', 'cancelled')
 
-  return planSupplierDocuments({
-    tenantId,
-    itinerary,
-    days,
-    suppliers,
-    existing: existing ?? [],
-    documentTypes,
+  // The guides assigned to the trip, each on their own assignment.
+  const { data: assigned } = await supabase
+    .from('itinerary_resources')
+    .select('resource_id, resource_name, itinerary_day_id, start_date, end_date, status')
+    .eq('itinerary_id', itinerary.id)
+    .eq('tenant_id', tenantId)
+    .eq('resource_type', 'guide')
+    .neq('status', 'cancelled')
+  const guideIds = [...new Set((assigned ?? []).map(a => a.resource_id))]
+  const { data: guideRows } = guideIds.length
+    ? await supabase.from('guides').select('id, name, full_name, languages, email, phone, whatsapp').in('id', guideIds).eq('tenant_id', tenantId)
+    : { data: [] }
+  const guideById = new Map((guideRows ?? []).map(g => [g.id, g]))
+  const guides: PlanGuide[] = (assigned ?? []).flatMap(a => {
+    const g = guideById.get(a.resource_id)
+    const name = g?.full_name || g?.name || a.resource_name
+    return name ? [{
+      resource_id: a.resource_id,
+      name,
+      languages: g?.languages ?? null,
+      email: g?.email ?? null,
+      phone: g?.phone || g?.whatsapp || null,
+      itinerary_day_id: a.itinerary_day_id,
+      start_date: a.start_date,
+      end_date: a.end_date,
+      status: a.status,
+    }] : []
   })
+
+  return {
+    rows: planSupplierDocuments({ tenantId, itinerary, days, suppliers, existing: existing ?? [], guides, documentTypes }),
+    stale: staleSupplierDocuments(days, existing ?? []),
+  }
 }
 
 /** The trip and its days with their services, for the caller's tenant. */
@@ -83,9 +109,11 @@ export async function GET(
   try {
     const trip = await loadTrip(supabase, itineraryId, authResult.tenant_id)
     if (trip.error) return trip.error
-    const missing = await planForItinerary(supabase, trip.itinerary, trip.days, authResult.tenant_id, null)
+    const { rows: missing, stale } = await planForItinerary(supabase, trip.itinerary, trip.days, authResult.tenant_id, null)
     return NextResponse.json({
       success: true,
+      // Documents made before the trip changed and holding lines it no longer has.
+      stale,
       missing: missing.map(d => ({
         document_type: d.document_type,
         supplier_name: d.supplier_name,
@@ -134,7 +162,7 @@ export async function POST(
       )
     }
 
-    const documentsToCreate = await planForItinerary(supabase, itinerary, days, authResult.tenant_id, document_types)
+    const { rows: documentsToCreate } = await planForItinerary(supabase, itinerary, days, authResult.tenant_id, document_types)
 
     // Insert all documents
     if (documentsToCreate.length > 0) {

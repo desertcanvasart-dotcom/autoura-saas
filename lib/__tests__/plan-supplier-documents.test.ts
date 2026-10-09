@@ -5,7 +5,7 @@
 // driver's voucher, and — after the trip was saved again — no Cairo meals,
 // entrance-fee or guide document, with nothing saying so.
 import { describe, it, expect } from 'vitest'
-import { planSupplierDocuments, dayAfter, type PlanDay } from '@/lib/documents/plan-supplier-documents'
+import { planSupplierDocuments, staleSupplierDocuments, dayAfter, type PlanDay } from '@/lib/documents/plan-supplier-documents'
 
 const line = (service_type: string, service_name: string, slot?: string) => ({
   service_type,
@@ -61,6 +61,7 @@ describe('the documents ITN-S-2026-8987 needs', () => {
   it('one per kind and place, airport and hotel assist on their own order', () => {
     expect(plan().map(r => r.supplier_name).sort()).toEqual([
       'Alexandria Entrance Fees',
+      'Alexandria Guide Services',
       'Alexandria Restaurant & Meals',
       'Cairo Entrance Fees',
       'Cairo Guide Services',
@@ -93,7 +94,7 @@ describe('the documents ITN-S-2026-8987 needs', () => {
       { supplier_id: null, document_type: 'service_order', supplier_name: 'Alexandria Restaurant & Meals' },
     ])
     expect(missing.map(r => r.supplier_name).sort()).toEqual([
-      'Cairo Entrance Fees', 'Cairo Guide Services', 'Cairo Meet & Assist', 'Cairo Restaurant & Meals',
+      'Alexandria Guide Services', 'Cairo Entrance Fees', 'Cairo Guide Services', 'Cairo Meet & Assist', 'Cairo Restaurant & Meals',
     ])
   })
 })
@@ -171,6 +172,75 @@ describe('one hotel voucher per stay', () => {
       ['hotel_voucher', 'Kempinski Nile Hotel', '2026-11-06', '2026-11-07'],
       ['cruise_voucher', 'MS Nile Goddess', '2026-11-03', '2026-11-06'],
     ])
+  })
+})
+
+describe('what the trip already has, line by line', () => {
+  // The four documents live ITN-S-2026-8987 has, as Generate wrote them.
+  const generated = plan().map((r, i) => ({ ...r, id: `doc${i}`, document_number: `D-${i}` }))
+  const docs = (names: string[]) => generated.filter(d => names.includes(d.supplier_name as string))
+
+  it('a service already on a document goes on no other', () => {
+    expect(planSupplierDocuments({ tenantId: 't1', itinerary: ITINERARY, days: DAYS, suppliers: {}, existing: generated, documentTypes: null })).toEqual([])
+  })
+
+  it('a line added after Generate gets a document of its own; the rest are left alone', () => {
+    const days = structuredClone(DAYS)
+    days[1].services!.push(line('meal', 'Abou El Sid dinner', 'meals'))
+    const rows = planSupplierDocuments({ tenantId: 't1', itinerary: ITINERARY, days, suppliers: {}, existing: generated, documentTypes: null })
+    expect(rows.map(r => [r.supplier_name, (r.services as Array<{ service_name: string }>).map(s => s.service_name)])).toEqual([
+      ['Cairo Restaurant & Meals', ['Abou El Sid dinner']],
+    ])
+  })
+
+  it('the airport meet & assist already on the transport voucher is not put on a second document', () => {
+    // TV-2026-0001 as the old generator wrote it: the airport service on it.
+    const tv = { ...docs(['Cairo Transportation'])[0], services: [
+      { day_number: 1, service_type: 'transfer', service_name: 'full_service CAI' },
+      { day_number: 1, service_type: 'transportation', service_name: 'airport_transfer sedan Cairo' },
+      { day_number: 4, service_type: 'transfer', service_name: 'full_service CAI' },
+    ] }
+    const rows = planSupplierDocuments({ tenantId: 't1', itinerary: ITINERARY, days: DAYS, suppliers: {}, existing: [tv], documentTypes: null })
+    const assist = rows.find(r => r.supplier_name === 'Cairo Meet & Assist')!
+    expect((assist.services as Array<{ service_name: string }>).map(s => s.service_name)).toEqual(['checkin_assist', 'checkout_assist'])
+  })
+
+  it('a document whose lines left the trip is out of date; one made by hand never is', () => {
+    const days = structuredClone(DAYS)
+    days[2].services = days[2].services!.filter(s => s.service_name !== 'Catacombs')
+    const handMade = { id: 'manual', document_number: 'SO-9', supplier_id: null, document_type: 'service_order', supplier_name: 'Extra', services: [{ description: 'Felucca', quantity: 1 }] }
+    expect(staleSupplierDocuments(days, [...generated, handMade])).toEqual([
+      { id: expect.any(String), document_number: expect.any(String), supplier_name: 'Alexandria Entrance Fees', gone: 1 },
+    ])
+    expect(staleSupplierDocuments(DAYS, generated)).toEqual([])
+  })
+})
+
+describe('guide assignments', () => {
+  const withIds = DAYS.map(d => ({ ...d, id: `day${d.day_number}` }))
+  const guides = [
+    { resource_id: 'g1', name: 'Mona Hassan', languages: ['English', 'Japanese'], email: 'mona@example.com', phone: '+20 100', start_date: '2026-10-02', end_date: '2026-10-03', status: 'confirmed' },
+  ]
+  const run = (g: typeof guides) => planSupplierDocuments({ tenantId: 't1', itinerary: ITINERARY, days: withIds, suppliers: {}, existing: [], documentTypes: null, guides: g })
+    .filter(r => r.document_type === 'guide_assignment')
+
+  it('the guide assigned to the trip gets one assignment for every day they guide, with their languages', () => {
+    const [doc, ...rest] = run(guides)
+    expect(rest).toEqual([])
+    expect(doc.supplier_name).toBe('Mona Hassan')
+    expect(doc.supplier_contact_email).toBe('mona@example.com')
+    expect(doc.special_requests).toBe('Languages: English, Japanese')
+    expect((doc.services as Array<{ service_name: string }>).map(s => s.service_name)).toEqual(['English Cairo', 'English Alexandria'])
+  })
+
+  it('a guide assigned for one day only: the other day’s guiding stays unassigned, in its own city', () => {
+    expect(run([{ ...guides[0], start_date: undefined as unknown as string, end_date: undefined as unknown as string, itinerary_day_id: 'day2' } as typeof guides[0]]).map(d => d.supplier_name)).toEqual([
+      'Mona Hassan', 'Alexandria Guide Services',
+    ])
+  })
+
+  it('a cancelled assignment is nobody', () => {
+    expect(run([{ ...guides[0], status: 'cancelled' }]).map(d => d.supplier_name)).toEqual(['Cairo Guide Services', 'Alexandria Guide Services'])
   })
 })
 
