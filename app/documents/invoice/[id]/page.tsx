@@ -6,8 +6,11 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Download, Loader2, FileText, Calendar, CreditCard } from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { BackLink } from '@/components/nav/TripNav'
+import { paymentInvoiceShape } from '@/lib/payment-invoice'
+import { contractDepositPercent, contractSettingsFromTenant, paymentTermsText } from '@/lib/contract-terms'
 
 interface Payment {
   id: string
@@ -25,7 +28,11 @@ interface Payment {
   due_date?: string
   notes: string
   created_at: string
+  /** The trip's total (the itinerary's total_cost); null when unpriced. */
+  total_cost?: number | null
 }
+
+const PAYMENT_INSTRUCTIONS = 'Payment accepted via bank transfer or credit card.'
 
 export default function InvoicePage() {
   const { tenant } = useTenant()
@@ -55,6 +62,11 @@ export default function InvoicePage() {
     }
   }
 
+  // The operator's own deposit and country (Settings → Organization), as the
+  // contract states them — it said "30% … upon arrival" for everyone.
+  const settings = contractSettingsFromTenant(tenant)
+  const paymentTerms = paymentTermsText(contractDepositPercent(settings), settings)
+
   const handleDownloadPDF = async () => {
     if (!payment) return
     
@@ -62,15 +74,16 @@ export default function InvoicePage() {
     
     try {
       const invoiceNumber = `INV-${payment.itinerary_code}-${payment.id.slice(0, 4).toUpperCase()}`
-      
+      const shape = paymentInvoiceShape(payment.payment_type, payment.amount, payment.total_cost)
+
       // Build invoice object for PDF generator
       const invoiceData = {
         id: payment.id,
         invoice_number: invoiceNumber,
-        invoice_type: payment.payment_type === 'deposit' ? 'deposit' as const : 
-                      payment.payment_type === 'final' ? 'final' as const : 
-                      'standard' as const,
-        deposit_percent: payment.payment_type === 'deposit' ? 30 : undefined,
+        // From the payment and its trip's real total — not an assumed 30%.
+        invoice_type: shape.invoiceType,
+        deposit_percent: shape.depositPercent,
+        trip_total: shape.tripTotal,
         parent_invoice_id: null,
         client_name: payment.client_name,
         client_email: payment.client_email || '',
@@ -92,8 +105,8 @@ export default function InvoicePage() {
         issue_date: payment.created_at,
         due_date: payment.due_date || payment.payment_date || new Date().toISOString(),
         notes: payment.notes,
-        payment_terms: '30% deposit required to confirm booking. Balance due upon arrival.',
-        payment_instructions: 'Payment accepted via bank transfer or credit card.'
+        payment_terms: paymentTerms,
+        payment_instructions: PAYMENT_INSTRUCTIONS
       }
       
       const { downloadInvoicePDF } = await import('@/lib/invoice-pdf-generator')
@@ -144,19 +157,16 @@ export default function InvoicePage() {
 
   const invoiceNumber = `INV-${payment.itinerary_code}-${payment.id.slice(0, 4).toUpperCase()}`
   const isPaid = payment.payment_status === 'completed'
+  const shape = paymentInvoiceShape(payment.payment_type, payment.amount, payment.total_cost)
+  const money = (n: number) => `${payment.currency} ${n.toFixed(2)}`
 
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <Link
-            href="/payments"
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Payments
-          </Link>
+          {/* Back to wherever it was opened from (?from=), else its payment. */}
+          <BackLink fallbackHref={`/payments/${payment.id}`} fallbackLabel="Payment" />
           <button
             onClick={handleDownloadPDF}
             disabled={downloading}
@@ -246,6 +256,28 @@ export default function InvoicePage() {
             </div>
           </div>
 
+          {/* The trip this deposit or balance is part of — real figures only. */}
+          {shape.tripTotal !== undefined && (
+            <div className="mb-6 grid grid-cols-3 gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+              <div>
+                <p className="text-xs text-gray-500">Full trip cost</p>
+                <p className="font-semibold text-gray-900">{money(shape.tripTotal)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Deposit ({shape.depositPercent}%)</p>
+                <p className="font-semibold text-gray-900">
+                  {money(shape.invoiceType === 'deposit' ? payment.amount : shape.tripTotal - payment.amount)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Balance</p>
+                <p className="font-semibold text-gray-900">
+                  {money(shape.invoiceType === 'deposit' ? shape.tripTotal - payment.amount : payment.amount)}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Totals */}
           <div className="flex justify-end mb-8">
             <div className="w-64">
@@ -264,7 +296,7 @@ export default function InvoicePage() {
               {isPaid && (
                 <div className="mt-3 text-center">
                   <span className="inline-block bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-bold">
-                    ✓ PAID IN FULL
+                    ✓ PAID
                   </span>
                 </div>
               )}
@@ -275,8 +307,7 @@ export default function InvoicePage() {
           <div className="border-t border-gray-200 pt-6">
             <h4 className="text-sm font-semibold text-gray-900 mb-2">Payment Terms</h4>
             <p className="text-xs text-gray-600">
-              30% deposit required to confirm booking. Remaining balance due upon arrival.
-              Payment accepted via bank transfer or credit card.
+              {paymentTerms} {PAYMENT_INSTRUCTIONS}
             </p>
           </div>
 

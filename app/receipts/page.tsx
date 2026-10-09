@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { getCurrencySymbol } from '@/lib/currency'
+import { withReturnTo } from '@/lib/nav/return-to'
 
 interface UnifiedPayment {
   id: string
@@ -145,7 +146,7 @@ export default function ReceiptsPage() {
     // For itinerary payments, go to the receipt page
     // For invoice payments, go to the invoice page
     if (payment.source === 'itinerary') {
-      router.push(`/documents/receipt/${payment.id}`)
+      router.push(withReturnTo(`/documents/receipt/${payment.id}`, '/receipts'))
     } else {
       router.push(`/invoices/${payment.source_id}`)
     }

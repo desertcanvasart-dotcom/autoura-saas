@@ -28,8 +28,13 @@ export async function GET(
       .eq('booking_id', id)
       .order('uploaded_at', { ascending: true })
     if (error) {
-      // Table absent = migration 301 not applied yet.
-      return NextResponse.json({ success: true, documents: [] })
+      // Table absent = migration 301 not applied yet: nothing to list. Any
+      // other failure is a failure — it used to read as "Nothing uploaded yet".
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        return NextResponse.json({ success: true, documents: [] })
+      }
+      console.error('traveller-documents query failed:', error.message)
+      return NextResponse.json({ success: false, error: 'Failed to load documents' }, { status: 500 })
     }
 
     const admin = createAdminClient()
