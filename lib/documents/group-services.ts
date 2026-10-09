@@ -35,7 +35,7 @@
 import { citiesFarApart } from '@/lib/pricing/day-trip'
 import { resolveCityCoordinates } from '@/lib/constants/egypt-city-coordinates'
 
-export type DocCategory = 'meals' | 'entrance'
+export type DocCategory = 'meals' | 'entrance' | 'assistance'
 
 export interface ServiceMapping {
   docType: string | null
@@ -62,6 +62,10 @@ export const SERVICE_TO_DOC_TYPE: Record<string, ServiceMapping> = {
   accommodation: { docType: 'hotel_voucher' },
   hotel: { docType: 'hotel_voucher' },
   cruise: { docType: 'cruise_voucher' },
+  // Meet & assist at the airport and the hotel: the representative's own
+  // order, not the driver's voucher (what the AI builder writes).
+  airport_service: { docType: 'service_order', category: 'assistance' },
+  hotel_service: { docType: 'service_order', category: 'assistance' },
   // No document: tips, water, supplies, a flight (ticketed by the airline).
   tips: { docType: null },
   tip: { docType: null },
@@ -72,11 +76,20 @@ export const SERVICE_TO_DOC_TYPE: Record<string, ServiceMapping> = {
   service_fee: { docType: null },
 }
 
+const GRID_ASSISTANCE = /^\[pricing-grid:(airport_services|hotel_services)\]/
+
 /** What a service line goes on; undefined / docType null = no document. */
 export function docMappingFor(service: { service_type?: string | null; description?: string | null }): ServiceMapping | undefined {
   // The grid saves a cruise as 'accommodation' (its slot tag says cruise) —
   // that is a cruise voucher, not a hotel voucher.
-  if (String(service.description ?? '').startsWith('[pricing-grid:cruise]')) return SERVICE_TO_DOC_TYPE.cruise
+  const description = String(service.description ?? '')
+  if (description.startsWith('[pricing-grid:cruise]')) return SERVICE_TO_DOC_TYPE.cruise
+  // The grid saves its airport services as 'transfer' and its hotel services
+  // (check-in / check-out assist, porters) as 'other'. Typed by the type alone,
+  // the airport meet & assist went on the driver's transport voucher and the
+  // hotel assist on no document (live ITN-S-2026-8987). Both are the meet &
+  // assist representative's.
+  if (GRID_ASSISTANCE.test(description)) return SERVICE_TO_DOC_TYPE.airport_service
   return service.service_type ? SERVICE_TO_DOC_TYPE[service.service_type] : undefined
 }
 

@@ -7,7 +7,7 @@ import { BackLink } from '@/components/nav/TripNav'
 import { 
   FileText, Send, Eye, Trash2, Pencil,
   Hotel, Car, Ship, MapPin, Users, CheckCircle,
-  Clock, RotateCcw
+  Clock, RotateCcw, AlertTriangle
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -78,6 +78,12 @@ export default function SupplierDocumentsPage() {
   // Where this list was opened from (a trip, its booking): ?from=, kept through
   // the list's own links so back from a document, then back again, gets there.
   const [returnTo, setReturnTo] = useState<string | null>(null)
+  // The trip's services that are on no document yet. The documents are a
+  // snapshot of the trip when Generate ran; a trip saved again afterwards
+  // (the Pricing Grid rewrites every line) left services with no document and
+  // nothing here to say so (live ITN-S-2026-8987).
+  const [missing, setMissing] = useState<Array<{ document_type: string; supplier_name: string; lines: number }>>([])
+  const [generatingMissing, setGeneratingMissing] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -94,6 +100,41 @@ export default function SupplierDocumentsPage() {
       fetchDocuments()
     }
   }, [mounted, typeFilter, statusFilter, itineraryFilter])
+
+  const fetchMissing = async (id: string | null) => {
+    if (!id) { setMissing([]); return }
+    try {
+      const response = await fetch(`/api/itineraries/${encodeURIComponent(id)}/generate-documents`)
+      const result = response.ok ? await response.json() : null
+      setMissing(Array.isArray(result?.missing) ? result.missing : [])
+    } catch {
+      setMissing([])
+    }
+  }
+
+  useEffect(() => {
+    if (mounted) fetchMissing(itineraryFilter)
+  }, [mounted, itineraryFilter])
+
+  const generateMissing = async () => {
+    if (!itineraryFilter) return
+    setGeneratingMissing(true)
+    try {
+      const response = await fetch(`/api/itineraries/${encodeURIComponent(itineraryFilter)}/generate-documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !result?.success) {
+        await dialog.alert('Documents not generated', result?.error || 'Could not generate the missing documents.', 'warning')
+      }
+    } finally {
+      setGeneratingMissing(false)
+      fetchDocuments()
+      fetchMissing(itineraryFilter)
+    }
+  }
 
   const listPath = (id: string | null) =>
     id ? `/documents/supplier?itineraryId=${encodeURIComponent(id)}` : '/documents/supplier'
@@ -146,6 +187,7 @@ export default function SupplierDocumentsPage() {
       
       if (response.ok) {
         fetchDocuments()
+        fetchMissing(itineraryFilter)
       }
     } catch (error) {
       console.error('Error updating status:', error)
@@ -162,6 +204,7 @@ export default function SupplierDocumentsPage() {
       
       if (response.ok) {
         fetchDocuments()
+        fetchMissing(itineraryFilter)
       }
     } catch (error) {
       console.error('Error deleting document:', error)
@@ -259,6 +302,34 @@ export default function SupplierDocumentsPage() {
               className="mt-2 text-sm text-red-600 hover:text-red-800 font-medium"
             >
               Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Services on the trip that no document carries yet. */}
+        {itineraryFilter && missing.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  {missing.length === 1 ? 'One document is' : `${missing.length} documents are`} not generated yet
+                </p>
+                <p className="text-sm text-amber-800">
+                  {missing.map(m => m.supplier_name).join(' · ')}
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  The trip has services no document carries, usually because it changed after documents were generated.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={generateMissing}
+              disabled={generatingMissing}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 whitespace-nowrap"
+            >
+              {generatingMissing ? 'Generating…' : 'Generate missing'}
             </button>
           </div>
         )}
