@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadDocumentIdentity } from '@/lib/document-identity'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
-import { renderToBuffer } from '@react-pdf/renderer'
-import { createElement } from 'react'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
-import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
-import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
-import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
+import { freshQuotePdf } from '@/lib/quotes/fresh-quote-pdf'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 /**
@@ -172,52 +167,17 @@ export async function POST(
       )
     }
 
-    // A fresh PDF for every send. It reused quote.pdf_url: a signed link that
-    // expires after 7 days (a resend after a week attached a dead link), that
-    // still showed the old prices after a re-price, or — written by
-    // generate-pdf — a public URL of the private bucket nobody can open.
-    let pdfUrl: string
-    {
-      let pdfBuffer: Buffer
-      if (type === 'b2c') {
-        const pdfDoc = createElement(B2CQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
-        pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
-      } else {
-        const pdfDoc = createElement(B2BQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
-        pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
-      }
-
-      // quote-pdfs is PRIVATE (migration 004): a public URL for it cannot be
-      // opened, so the WhatsApp provider could never fetch the PDF. Signed
-      // link instead (lib/storage/shareable-pdf.ts).
-      const shared = await uploadShareablePdf(supabaseAdmin, {
-        tenantId,
-        kind: 'quotes',
-        // A new file per send: the link in an earlier message keeps showing
-        // what that message sent.
-        fileName: `${type}-${id}-${Date.now()}.pdf`,
-        bytes: pdfBuffer,
-        bucket: 'quote-pdfs',
-      })
-      if (!shared.ok) {
-        console.error('Error uploading PDF:', shared.error)
-        return NextResponse.json(
-          { success: false, error: 'Failed to generate PDF for WhatsApp' },
-          { status: 500 }
-        )
-      }
-      pdfUrl = shared.url
-
-      // Recorded for reference; never reused as the attachment.
-      const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
-      await supabaseAdmin
-        .from(tableName)
-        .update({
-          pdf_url: pdfUrl,
-          pdf_generated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
+    // A fresh PDF for every send (lib/quotes/fresh-quote-pdf): it reused
+    // quote.pdf_url, which expired after 7 days or showed old prices.
+    const fresh = await freshQuotePdf(supabaseAdmin, { type, quote, tenantId })
+    if (!fresh.ok) {
+      console.error('Error uploading PDF:', fresh.error)
+      return NextResponse.json(
+        { success: false, error: 'Failed to generate PDF for WhatsApp' },
+        { status: 500 }
+      )
     }
+    const pdfUrl = fresh.url
 
     // Build WhatsApp message
     // The tenant's own name and email (Settings → Organization) — the email

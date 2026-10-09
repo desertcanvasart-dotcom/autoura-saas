@@ -11,6 +11,13 @@ const securityHeaders = [
 ]
 
 const nextConfig = {
+  // The quote PDFs read their font from assets/fonts at run time
+  // (lib/pdf/quote-fonts.ts); file tracing cannot see a path built at run
+  // time, so the routes that render them include the folder explicitly.
+  outputFileTracingIncludes: {
+    '/api/quotes/**': ['./assets/fonts/**/*'],
+    '/api/b2b/**': ['./assets/fonts/**/*'],
+  },
   images: {
     remotePatterns: [
       {

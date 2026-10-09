@@ -11,6 +11,10 @@ import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyTe
 import { whatsappModel } from '@/lib/ai/models'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { loadSenderTenant } from '@/lib/sender-tenant'
+import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
+import { freshQuotePdf } from '@/lib/quotes/fresh-quote-pdf'
+import { createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // TYPES
@@ -245,7 +249,8 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
 // TOOL EXECUTOR CLASS
 // ============================================
 
-class ToolExecutor {
+// Exported for its tests; the agent is the only caller.
+export class ToolExecutor {
   private supabase: SupabaseClient
   private clientId: string | null
   private phoneNumber: string
@@ -579,13 +584,25 @@ class ToolExecutor {
         return { success: false, error: 'Quote not found' }
       }
 
+      // The webhook hands the agent the public (anon) client, under which RLS
+      // hides every quote — so this tool always answered "Quote not found".
+      // Reading the quote and storing its PDF need the service client; both
+      // are pinned to the conversation's tenant (and, below, its client).
+      const admin = createAdminClient()
+
       // Get the quote with related data
-      const { data: quote, error: quoteError } = await this.supabase
+      const { data: quote, error: quoteError } = await admin
         .from('b2c_quotes')
         .select(`
           *,
+          clients (
+            full_name,
+            email,
+            phone,
+            nationality
+          ),
           itineraries (
-            id, trip_name, start_date, end_date, total_days
+            id, itinerary_code, trip_name, start_date, end_date, total_days
           )
         `)
         .eq('id', input.quote_id)
@@ -601,18 +618,25 @@ class ToolExecutor {
         return { success: false, error: 'Quote does not belong to this customer' }
       }
 
-      // Check if PDF exists
-      if (!quote.pdf_url) {
-        return {
-          success: false,
-          error: 'Quote PDF not ready yet. Please ask the team to generate the PDF first.'
-        }
+      // The same price gate as the office's own send: never a non-deliverable
+      // price. (B2C quotes keep no per-service snapshot, so there is no
+      // unpriced-service list to check here.)
+      if (!checkQuoteRowDeliverable(quote, 'b2c').ok) {
+        return { success: false, error: 'This quote cannot be sent yet. Please ask the team to re-price it.' }
       }
 
-      // Build message
-      const businessName = process.env.BUSINESS_NAME || ''
-      const message = `🌟 *${businessName}* 🌟\n\n` +
-        `Here's your quote for ${quote.itineraries?.trip_name}!\n\n` +
+      // A fresh PDF (lib/quotes/fresh-quote-pdf), not quote.pdf_url: that link
+      // expired after 7 days, showed old prices after a re-price, or was an
+      // unopenable public URL of the private bucket.
+      const pdf = await freshQuotePdf(admin, { type: 'b2c', quote, tenantId: this.tenantId })
+      if (!pdf.ok) {
+        return { success: false, error: 'Could not prepare the quote PDF. Please ask the team to send it.' }
+      }
+
+      // The tenant's own name (Settings → Organization), not BUSINESS_NAME.
+      const businessName = (await loadSenderTenant(this.tenantId))?.company_name || ''
+      const message = (businessName ? `🌟 *${businessName}* 🌟\n\n` : '') +
+        `Here's your quote for ${quote.itineraries?.trip_name || 'your tour'}!\n\n` +
         `📋 *Quote ${quote.quote_number}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `⏱️ Duration: ${quote.itineraries?.total_days} days\n` +
@@ -621,13 +645,13 @@ class ToolExecutor {
         `💰 *Total: ${quote.currency} ${quote.selling_price.toLocaleString()}*\n` +
         `💵 Per Person: ${quote.currency} ${quote.price_per_person.toLocaleString()}\n\n` +
         `📄 Detailed quote attached as PDF.\n\n` +
-        `Reply to this message if you have any questions! 🐪✨`
+        `Reply to this message if you have any questions! ✨`
 
       // Send via WhatsApp
       const result = await sendWhatsAppMessage({
         to: this.phoneNumber,
         body: message,
-        mediaUrl: quote.pdf_url
+        mediaUrl: pdf.url
       })
 
       if (!result.success) {
@@ -635,7 +659,7 @@ class ToolExecutor {
       }
 
       // Update quote status
-      await this.supabase
+      await admin
         .from('b2c_quotes')
         .update({
           status: 'sent',
@@ -643,6 +667,7 @@ class ToolExecutor {
           sent_via: 'whatsapp_ai'
         })
         .eq('id', input.quote_id)
+        .eq('tenant_id', this.tenantId)
 
       // Store the outbound message
       await this.supabase.from('whatsapp_messages').insert({
@@ -650,7 +675,7 @@ class ToolExecutor {
         message_sid: result.messageId,
         direction: 'outbound',
         message_body: message,
-        media_url: quote.pdf_url,
+        media_url: pdf.url,
         status: 'sent',
         sent_at: new Date().toISOString(),
         metadata: {
