@@ -147,7 +147,9 @@ export async function POST(request: NextRequest) {
       `Thank you for your payment! Here are the details:\n\n` +
       `📋 *Receipt Number:* ${receiptNumber}\n` +
       `📅 *Date:* ${paymentDate}\n` +
-      `💳 *Payment Method:* ${receipt.paymentMethod?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}\n` +
+      (receipt.paymentMethod
+        ? `💳 *Payment Method:* ${String(receipt.paymentMethod).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}\n`
+        : '') +
       `💰 *Amount:* ${amount}\n` +
       `🎫 *${receipt.referenceLabel}:* ${receipt.reference}\n\n` +
       `This receipt confirms your payment has been received and processed.\n\n` +

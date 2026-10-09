@@ -44,8 +44,12 @@ export async function getTenantRunCurrency(db: object, tenantId: string): Promis
       .eq('id', tenantId)
       .maybeSingle()
     const row = data as Record<string, unknown> | null
+    // No row is not "this tenant runs in EUR": a client that RLS hides the
+    // tenant from (no session) sees none. Caching that answered EUR to every
+    // pricing run in the instance for a minute.
+    if (!row) return hit?.value ?? DEFAULT_RUN_CURRENCY
     const value =
-      row && typeof row.rates_currency === 'string' && row.rates_currency
+      typeof row.rates_currency === 'string' && row.rates_currency
         ? row.rates_currency
         : DEFAULT_RUN_CURRENCY
     cache.set(tenantId, { value, at: now })

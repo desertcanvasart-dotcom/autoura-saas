@@ -1033,21 +1033,27 @@ export default function ItineraryEditorPage() {
             ) : (
               <button
                 onClick={async () => {
+                  // The services on screen, as saveDraft totals them — the
+                  // stored total_cost can be stale (unsaved edits, an older
+                  // save), and the view page already bills the services.
+                  const live = services.filter(s => !s.isDeleted)
+                  const amount = live.length > 0 ? itineraryClientTotal(live, itinerary.margin_percent) : itinerary.total_cost
                   const response = await fetch('/api/invoices', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       itinerary_id: itinerary.id,
+                      client_id: itinerary.client_id,
                       client_name: itinerary.client_name,
                       client_email: itinerary.client_email,
                       line_items: [{
                         description: `${itinerary.trip_name} - ${itinerary.itinerary_code}`,
                         quantity: 1,
-                        unit_price: itinerary.total_cost,
-                        amount: itinerary.total_cost
+                        unit_price: amount,
+                        amount
                       }],
-                      subtotal: itinerary.total_cost,
-                      total_amount: itinerary.total_cost,
+                      subtotal: amount,
+                      total_amount: amount,
                       currency: itinerary.currency || 'EUR',
                       issue_date: todayLocal(),
                       due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
