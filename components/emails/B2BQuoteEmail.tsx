@@ -29,7 +29,9 @@ interface B2BQuoteEmailProps {
   validFrom?: string
   validUntil?: string
   season?: string
-  viewQuoteUrl: string
+  /** A page the recipient can open without an account. None exists yet:
+   *  the quote is the attached PDF, and the button is left out. */
+  viewQuoteUrl?: string
   /** The tenant sending it (Settings → Organization). */
   company?: QuoteEmailCompany
 }
@@ -215,12 +217,15 @@ export default function B2BQuoteEmail({
             </Section>
           )}
 
-          {/* CTA Button */}
-          <Section style={buttonSection}>
-            <Button style={button} href={viewQuoteUrl}>
-              View Complete Rate Sheet & Cost Breakdown
-            </Button>
-          </Section>
+          {/* CTA Button — only to a page the recipient can open. It linked the
+              staff quote page, which sent every client and partner to /login. */}
+          {viewQuoteUrl && (
+            <Section style={buttonSection}>
+              <Button style={button} href={viewQuoteUrl}>
+                View Complete Rate Sheet & Cost Breakdown
+              </Button>
+            </Section>
+          )}
 
           {/* Footer */}
           <Section style={footer}>
