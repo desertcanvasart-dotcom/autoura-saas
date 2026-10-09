@@ -16,6 +16,9 @@ interface Invoice {
   invoice_number: string
   invoice_type?: 'standard' | 'deposit' | 'final'
   deposit_percent?: number
+  /** The whole trip's cost, when known. The breakdown otherwise works it back
+   *  from deposit_percent — which was a guess for payment invoices (lib/payment-invoice). */
+  trip_total?: number | null
   parent_invoice_id?: string | null
   client_name: string
   client_email: string
@@ -151,11 +154,18 @@ export function generateInvoicePDF(
   // ============================================
 
   if (invoiceType !== 'standard' && invoice.deposit_percent) {
-    const fullTripCost = invoiceType === 'deposit'
+    const known = typeof invoice.trip_total === 'number' && invoice.trip_total > 0 ? invoice.trip_total : null
+    const fullTripCost = known ?? (invoiceType === 'deposit'
       ? (Number(invoice.total_amount) * 100) / invoice.deposit_percent
-      : Number(invoice.total_amount) + (Number(invoice.total_amount) * invoice.deposit_percent) / (100 - invoice.deposit_percent)
+      : Number(invoice.total_amount) + (Number(invoice.total_amount) * invoice.deposit_percent) / (100 - invoice.deposit_percent))
 
-    const depositAmount = (fullTripCost * invoice.deposit_percent) / 100
+    // With the real total, this invoice's own amount is the deposit (or the
+    // balance) — not a percentage of a total worked back from a guess.
+    const depositAmount = known !== null && invoiceType === 'deposit'
+      ? Number(invoice.total_amount)
+      : known !== null
+        ? known - Number(invoice.total_amount)
+        : (fullTripCost * invoice.deposit_percent) / 100
     const balanceAmount = fullTripCost - depositAmount
 
     // Background box
@@ -183,7 +193,7 @@ export function generateInvoicePDF(
     doc.setFont('helvetica', 'normal')
     doc.text('Full Trip Cost', col1X, y)
     doc.text(`Deposit (${invoice.deposit_percent}%)`, col2X, y)
-    doc.text('Balance on Arrival', col3X, y)
+    doc.text('Balance', col3X, y)
 
     y += 5
 

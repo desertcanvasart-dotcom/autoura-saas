@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Edit, Trash2, FileText, Calendar, DollarSign, CreditCard } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { withReturnTo } from '@/lib/nav/return-to'
 
 interface Payment {
   id: string
@@ -285,7 +286,7 @@ export default function PaymentDetailPage() {
             <div className="flex items-center gap-2">
               {payment.payment_status === 'completed' && (
                 <Link
-                  href={`/documents/receipt/${payment.id}`}
+                  href={withReturnTo(`/documents/receipt/${payment.id}`, `/payments/${payment.id}`)}
                   className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
@@ -294,7 +295,7 @@ export default function PaymentDetailPage() {
               )}
               
               <Link
-                href={`/documents/invoice/${payment.id}`}
+                href={withReturnTo(`/documents/invoice/${payment.id}`, `/payments/${payment.id}`)}
                 className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
               >
                 <FileText className="w-4 h-4" />

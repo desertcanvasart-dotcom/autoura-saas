@@ -84,6 +84,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     })
     if (!gate.ok) return NextResponse.json(gate.body, { status: gate.status })
 
+    // A body over the cap arrives cut short (the middleware buffers at most
+    // 10 MB), formData() then fails, and the traveller was told "No file
+    // selected." Say what is actually wrong, before reading it.
+    const declared = Number(request.headers.get('content-length') ?? 0)
+    if (declared > MAX_DOCUMENT_BYTES + 64 * 1024) {
+      return NextResponse.json({ success: false, error: REJECTION_MESSAGE.too_large }, { status: 413 })
+    }
+
     const form = await request.formData().catch(() => null)
     const file = form?.get('file')
     if (!form || !(file instanceof File)) {

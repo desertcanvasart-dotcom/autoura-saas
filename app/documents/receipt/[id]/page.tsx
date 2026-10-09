@@ -4,10 +4,10 @@ import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { BackLink } from '@/components/nav/TripNav'
 import { 
-  ArrowLeft, 
   Download, 
   Loader2, 
   Check, 
@@ -25,7 +25,7 @@ import { getCurrencySymbol } from '@/lib/currency'
 
 interface Payment {
   id: string
-  itinerary_id: string
+  itinerary_id: string | null
   itinerary_code: string
   client_name: string
   client_email?: string
@@ -43,7 +43,6 @@ interface Payment {
 export default function ReceiptPage() {
   const { tenant } = useTenant()
   const params = useParams()
-  const router = useRouter()
   const [payment, setPayment] = useState<Payment | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
@@ -174,13 +173,9 @@ export default function ReceiptPage() {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
+          {/* Browser-history "back" left the app from a shared link or a new tab:
+              back goes to where it was opened from (?from=), else Receipts. */}
+          <BackLink fallbackHref="/receipts" fallbackLabel="Receipts" />
           
           <div className="flex items-center gap-2">
             {/* WhatsApp Button */}
@@ -279,12 +274,17 @@ export default function ReceiptPage() {
                     year: 'numeric'
                   })}
                 </p>
-                <Link 
-                  href={`/itineraries/${payment.itinerary_id}`}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-mono"
-                >
-                  {payment.itinerary_code}
-                </Link>
+                {/* A payment need not have a trip: never link /itineraries/null. */}
+                {payment.itinerary_id ? (
+                  <Link
+                    href={`/itineraries/${payment.itinerary_id}`}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-mono"
+                  >
+                    {payment.itinerary_code}
+                  </Link>
+                ) : payment.itinerary_code ? (
+                  <p className="text-sm text-gray-600 font-mono">{payment.itinerary_code}</p>
+                ) : null}
               </div>
             </div>
 

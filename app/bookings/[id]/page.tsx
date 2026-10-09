@@ -149,15 +149,28 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   }
   const [travellerDocs, setTravellerDocs] = useState<TravellerDoc[]>([])
   const [travellerDocsLoaded, setTravellerDocsLoaded] = useState(false)
+  const [travellerDocsError, setTravellerDocsError] = useState(false)
   const fetchTravellerDocs = async () => {
     try {
       const res = await fetch(`/api/bookings/${resolvedParams.id}/traveller-documents`)
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.success) setTravellerDocs(data.documents)
-    } catch {} finally { setTravellerDocsLoaded(true) }
+      if (res.ok && data.success) {
+        setTravellerDocs(data.documents)
+        setTravellerDocsError(false)
+      } else {
+        setTravellerDocsError(true)
+      }
+    } catch {
+      setTravellerDocsError(true)
+    } finally { setTravellerDocsLoaded(true) }
   }
+  // The View links are signed for 10 minutes: reload them each time the tab
+  // opens and every 9 minutes while it stays open, so none is ever dead.
   useEffect(() => {
-    if (activeTab === 'documents' && !travellerDocsLoaded) fetchTravellerDocs()
+    if (activeTab !== 'documents') return
+    fetchTravellerDocs()
+    const timer = setInterval(fetchTravellerDocs, 9 * 60 * 1000)
+    return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
@@ -959,6 +972,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </p>
               {!travellerDocsLoaded ? (
                 <p className="text-sm text-gray-400">Loading…</p>
+              ) : travellerDocsError && travellerDocs.length === 0 ? (
+                <p className="text-sm text-red-600">
+                  Could not load the travellers&apos; documents.{' '}
+                  <button type="button" onClick={fetchTravellerDocs} className="underline">Try again</button>
+                </p>
               ) : travellerDocs.length === 0 ? (
                 <p className="text-sm text-gray-400">Nothing uploaded yet.</p>
               ) : (
