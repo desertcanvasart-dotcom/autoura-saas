@@ -2,6 +2,7 @@ import React from 'react'
 import type { CompanyIdentity } from '@/lib/company-identity'
 import { QuoteHeader, QuoteFooter, quotePalette, QuoteTopBar, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
+import { QUOTE_PDF_FONT } from '@/lib/pdf/quote-fonts'
 
 // Styles take the agency's brand colour (Settings → Organization); they were
 // a fixed blue (B2C) / purple (B2B) whatever the agency's colours.
@@ -11,7 +12,7 @@ const makeStyles = ({ main, light }: { main: string; light: string }) => StyleSh
     // Room for the letterhead footer on every page (QuoteLetterhead).
     paddingBottom: QUOTE_FOOTER_SPACE,
     fontSize: 10,
-    fontFamily: 'Helvetica',
+    fontFamily: QUOTE_PDF_FONT,
     backgroundColor: '#ffffff',
   },
   header: {
@@ -267,10 +268,13 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
               <Text style={styles.label}>Duration:</Text>
               <Text style={styles.value}>{quote.itineraries.total_days} days</Text>
             </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Start Date:</Text>
-              <Text style={styles.value}>{new Date(quote.itineraries.start_date).toLocaleDateString()}</Text>
-            </View>
+            {/* A trip with no dates yet: no row, never 1/1/1970. */}
+            {quote.itineraries.start_date && (
+              <View style={styles.row}>
+                <Text style={styles.label}>Start Date:</Text>
+                <Text style={styles.value}>{new Date(quote.itineraries.start_date).toLocaleDateString()}</Text>
+              </View>
+            )}
             <View style={styles.row}>
               <Text style={styles.label}>Service Tier:</Text>
               <Text style={styles.value}>{quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}</Text>

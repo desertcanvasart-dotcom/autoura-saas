@@ -79,12 +79,18 @@ describe('PDFs sent by WhatsApp', () => {
       'app/api/whatsapp/send-contract/route.ts',
       'app/api/whatsapp/send-invoice/route.ts',
       'app/api/whatsapp/send-supplier-document/route.ts',
-      'app/api/quotes/[type]/[id]/send-whatsapp/route.ts',
+      // The WhatsApp quote route and the AI agent render through this.
+      'lib/quotes/fresh-quote-pdf.ts',
     ]) {
       const src = code(read(f))
       expect(src, f).not.toMatch(/from\('documents'\)/)
       expect(src, f).not.toContain('getPublicUrl')
       expect(src, f).toContain('uploadShareablePdf(')
+    }
+    for (const f of ['app/api/quotes/[type]/[id]/send-whatsapp/route.ts', 'lib/whatsapp-ai-agent.ts']) {
+      const src = code(read(f))
+      expect(src, f).not.toContain('getPublicUrl')
+      expect(src, f).toContain('freshQuotePdf(')
     }
   })
   it('migration 387 creates the bucket, private', () => {

@@ -9,6 +9,7 @@
 import React from 'react'
 import { Text, View, Image, StyleSheet } from '@react-pdf/renderer'
 import { letterheadFooterLines, type CompanyIdentity } from '@/lib/company-identity'
+import { QUOTE_PDF_FONT } from '@/lib/pdf/quote-fonts'
 
 const FALLBACK = '#647C47'
 
@@ -36,15 +37,15 @@ const styles = StyleSheet.create({
   },
   brand: { flexDirection: 'row', alignItems: 'center', maxWidth: '62%' },
   logo: { width: 90, height: 42, objectFit: 'contain', marginRight: 12 },
-  name: { fontSize: 18, fontFamily: 'Helvetica-Bold' },
+  name: { fontSize: 18, fontFamily: QUOTE_PDF_FONT, fontWeight: 'bold' },
   tagline: { fontSize: 9, color: '#6b7280', marginTop: 3 },
   right: { alignItems: 'flex-end' },
-  title: { fontSize: 8, fontFamily: 'Helvetica-Bold', letterSpacing: 1.2 },
-  number: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#1f2937', marginTop: 3 },
+  title: { fontSize: 8, fontFamily: QUOTE_PDF_FONT, fontWeight: 'bold', letterSpacing: 1.2 },
+  number: { fontSize: 14, fontFamily: QUOTE_PDF_FONT, fontWeight: 'bold', color: '#1f2937', marginTop: 3 },
   date: { fontSize: 8, color: '#6b7280', marginTop: 3 },
   footer: { position: 'absolute', bottom: 22, left: 40, right: 40 },
   footerRule: { borderTopWidth: 1, marginBottom: 6 },
-  footerName: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#1f2937', textAlign: 'center' },
+  footerName: { fontSize: 8, fontFamily: QUOTE_PDF_FONT, fontWeight: 'bold', color: '#1f2937', textAlign: 'center' },
   footerLine: { fontSize: 7, color: '#6b7280', textAlign: 'center', marginTop: 2 },
   footerNote: { fontSize: 6.5, color: '#9ca3af', textAlign: 'center', marginTop: 3 },
   pageNo: { fontSize: 6.5, color: '#9ca3af', textAlign: 'right', marginTop: 4 },
