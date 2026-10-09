@@ -273,6 +273,14 @@ export class ToolExecutor {
     this.tenantId = tenantId
   }
 
+  /** The tenant's default currency (Settings), else EUR. */
+  private async tenantCurrency(): Promise<string> {
+    if (!this.tenantId) return 'EUR'
+    const { data } = await this.supabase.from('tenants').select('default_currency, rates_currency').eq('id', this.tenantId).maybeSingle()
+    const row = data as { default_currency?: string | null; rates_currency?: string | null } | null
+    return row?.default_currency || row?.rates_currency || 'EUR'
+  }
+
   async execute(toolName: string, toolInput: any): Promise<ToolResult> {
 
 
@@ -473,7 +481,8 @@ export class ToolExecutor {
           conversation_id: this.conversationId
         }),
         total_cost: 0,
-        currency: 'EUR'
+        // The agency's own currency, not EUR for everyone.
+        currency: await this.tenantCurrency()
       }
 
       const { data: itinerary, error } = await this.supabase
@@ -798,7 +807,7 @@ export class ToolExecutor {
                     available: true,
                     type: 'group_tour',
                     departures: departureInfo,
-                    message: `Great news! We have a ${firstDep.tour_name} departing on ${this.formatDateShort(firstDep.start_date)} with ${spotsText} available.${firstDep.price_per_person ? ` Price: ${firstDep.currency || 'EUR'} ${firstDep.price_per_person} per person.` : ''} Would you like to join this group?`
+                    message: `Great news! We have a ${firstDep.tour_name} departing on ${this.formatDateShort(firstDep.start_date)} with ${spotsText} available.${firstDep.price_per_person ? ` Price: ${formatMoney(firstDep.price_per_person, firstDep.currency || 'EUR')} per person.` : ''} Would you like to join this group?`
                   }
                 }
               } else {

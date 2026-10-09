@@ -174,46 +174,56 @@ function drawTable(
 ): number {
   const rowHeight = 8
   const headerHeight = 10
-  let y = startY
-
-  // Draw header background
-  doc.setFillColor(...brand)
-  doc.rect(margin, y, colWidths.reduce((a, b) => a + b, 0), headerHeight, 'F')
-
-  // Draw header text
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(255, 255, 255)
-
-  let x = margin + 2
-  headers.forEach((header, i) => {
-    doc.text(header, x, y + 7)
-    x += colWidths[i]
-  })
-
-  y += headerHeight
-
-  // Draw rows
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(60, 60, 60)
-
+  const width = colWidths.reduce((a, b) => a + b, 0)
   const pageHeight = doc.internal.pageSize.getHeight()
+  let y = startY
+  let segmentStart = startY
+  let x = margin + 2
+
+  // The header row, drawn again at the top of every page the table runs onto.
+  const drawHeader = () => {
+    doc.setFillColor(...brand)
+    doc.rect(margin, y, width, headerHeight, 'F')
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    x = margin + 2
+    headers.forEach((header, i) => {
+      doc.text(header, x, y + 7)
+      x += colWidths[i]
+    })
+    y += headerHeight
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+  }
+  // The border around the rows on the current page. It was drawn once, at the
+  // end, from the first page's top — a negative-height frame on the last page
+  // and none on the first when the table broke across pages.
+  const drawBorder = () => {
+    doc.setDrawColor(200, 200, 200)
+    doc.setLineWidth(0.3)
+    doc.rect(margin, segmentStart, width, y - segmentStart)
+  }
+
+  drawHeader()
+
   rows.forEach((row, rowIndex) => {
     // A long service list continues on a new page instead of running off it.
     if (y + rowHeight > pageHeight - 20) {
+      drawBorder()
       doc.addPage()
       y = margin
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
+      segmentStart = y
+      drawHeader()
     }
     // Alternate row background
     if (rowIndex % 2 === 0) {
       doc.setFillColor(...brandTintLight)
-      doc.rect(margin, y, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F')
+      doc.rect(margin, y, width, rowHeight, 'F')
     }
 
     x = margin + 2
+    doc.setFontSize(9)
     row.forEach((cell, i) => {
       // Truncate if too long
       const maxWidth = colWidths[i] - 4
@@ -231,10 +241,7 @@ function drawTable(
     y += rowHeight
   })
 
-  // Draw border
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.rect(margin, startY, colWidths.reduce((a, b) => a + b, 0), y - startY)
+  drawBorder()
 
   return y + 5
 }
@@ -523,6 +530,10 @@ export function generateItineraryPDF(
     // ============================================
 
     yPos += 5
+    // The total box (22 mm) and the per-person line below it stay on one page:
+    // they were drawn wherever the table ended, on top of the footer or off
+    // the page — a client PDF without its total.
+    ensureRoom(22 + 10)
     // The services' client total, as the itinerary page and the client email
     // show it: the stored total_cost is a cache that is often 0, so the
     // email said EUR 3,000 while the attached PDF said EUR 0.00.

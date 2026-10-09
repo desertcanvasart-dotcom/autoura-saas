@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     // The tenant's own address — never the platform's GMAIL_USER.
     const businessEmail = senderTenant?.contact_email || ''
 
-    const emailSubject = `${documentType || 'Document'} - ${documentNumber || 'N/A'} | Guest: ${clientName || 'N/A'} | ${businessName}`
+    const emailSubject = `${documentType || 'Document'} - ${documentNumber || 'N/A'} | Guest: ${clientName || 'N/A'}${businessName ? ` | ${businessName}` : ''}`
 
     const emailBody = `
 <html>
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 </head>
 <body>
   <div class="header">
-    <h2 style="margin: 0;">${escapeHtml(businessName)}</h2>
+    ${businessName ? `<h2 style="margin: 0;">${escapeHtml(businessName)}</h2>` : ''}
     <p style="margin: 5px 0 0 0; opacity: 0.9;">${escapeHtml(documentType || 'Supplier Document')}</p>
   </div>
   <div class="content">
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       <p><strong>Guest:</strong> ${escapeHtml(clientName || 'N/A')}</p>
     </div>
     <p>Please review the attached document and confirm at your earliest convenience.</p>
-    <p>Best regards,<br/><strong>${escapeHtml(businessName)} Team</strong></p>
+    <p>Best regards${businessName ? `,<br/><strong>${escapeHtml(businessName)} Team</strong>` : ','}</p>
   </div>
   <div class="footer">
     <p>${escapeHtml(businessName)}${businessEmail ? ` | ${escapeHtml(businessEmail)}` : ''}</p>

@@ -66,6 +66,8 @@ export async function POST(request: NextRequest) {
       `Best regards,\n${businessName} Team`
 
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: supplierPhone,
       body: message,
       mediaUrl: pdfUrl,

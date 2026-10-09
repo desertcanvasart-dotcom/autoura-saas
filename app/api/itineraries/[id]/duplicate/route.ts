@@ -33,11 +33,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const gate = await gateVolume(supabase, tenant_id, 'itineraries', 'itineraries this year')
   if (!gate.ok) return gate.response!
 
-  const [daysRes, servicesRes] = await Promise.all([
-    supabase.from('itinerary_days').select(DAY_SELECT).eq('itinerary_id', id).order('day_number'),
-    supabase.from('itinerary_services').select(SERVICE_SELECT).eq('itinerary_id', id),
-  ])
+  const daysRes = await supabase.from('itinerary_days').select(DAY_SELECT).eq('itinerary_id', id).order('day_number')
   if (daysRes.error) return NextResponse.json({ success: false, error: daysRes.error.message }, { status: 500 })
+  // The services by the trip's days: itinerary_services.itinerary_id is not
+  // set by the AI generator or the editor, so a copy by itinerary_id came out
+  // with no services at all.
+  const sourceDayIds = ((daysRes.data ?? []) as unknown as Array<{ id: string }>).map(d => d.id)
+  const servicesRes = sourceDayIds.length
+    ? await supabase.from('itinerary_services').select(SERVICE_SELECT).in('itinerary_day_id', sourceDayIds)
+    : { data: [], error: null }
   if (servicesRes.error) return NextResponse.json({ success: false, error: servicesRes.error.message }, { status: 500 })
 
   // The new itinerary; the code is unique, so a collision draws another.

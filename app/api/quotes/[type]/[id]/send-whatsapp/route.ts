@@ -257,6 +257,8 @@ export async function POST(
 
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: tenantId,
       to: toPhone,
       body: message,
       mediaUrl: pdfUrl

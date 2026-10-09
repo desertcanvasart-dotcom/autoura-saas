@@ -145,6 +145,8 @@ export async function POST(request: NextRequest) {
 
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: itinerary.client_phone,
       body: message
     })

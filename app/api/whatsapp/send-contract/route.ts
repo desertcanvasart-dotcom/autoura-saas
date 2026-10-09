@@ -1,3 +1,4 @@
+import { tripServices } from '@/lib/itineraries/trip-services'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
 import { NextRequest, NextResponse } from 'next/server'
@@ -81,11 +82,8 @@ export async function POST(request: NextRequest) {
     // No price yet = "To be confirmed", never 0.00.
     // The client total from the services (lib/itinerary-client-total), the
     // figure the quote sends use; the header cache can be 0 or stale.
-    const { data: priceLines } = await supabase
-      .from('itinerary_services')
-      .select('total_cost, client_price')
-      .eq('itinerary_id', itineraryId)
-    const clientTotal = effectiveItineraryTotal(itinerary, priceLines ?? [])
+    const { rows: priceLines } = await tripServices<{ total_cost: number | null; client_price: number | null }>(supabase, itineraryId, 'total_cost, client_price')
+    const clientTotal = effectiveItineraryTotal(itinerary, priceLines)
     const totalCost: number | null = edits.totalCost !== undefined
       ? edits.totalCost
       : clientTotal > 0 ? clientTotal : null
@@ -183,6 +181,8 @@ export async function POST(request: NextRequest) {
 
     // Send via WhatsApp WITH PDF attachment
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: itinerary.client_phone,
       body: message,
       mediaUrl: pdfUrl
