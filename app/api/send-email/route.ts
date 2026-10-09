@@ -140,7 +140,7 @@ export async function POST(request: Request) {
         ? { bcc: tenant.contact_email, replyTo: tenant.contact_email }
         : {}),
       from: resolveSender(tenant, process.env.RESEND_FROM_EMAIL || '').from,
-      subject: `Your Egypt Tour Itinerary - ${tripName} (${itineraryCode})`,
+      subject: `Your Tour Itinerary - ${tripName} (${itineraryCode})`,
       html: emailHtml,
       attachments: pdfBase64 ? [{
         filename: `${itineraryCode}_${recipientName.replace(/\s+/g, '_')}.pdf`,

@@ -27,6 +27,7 @@ type SavedQuoteLine = {
   issue?: string
 }
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { postQuoteSend } from '@/lib/quotes/send-quote-client'
 
 interface B2BQuote {
   id: string
@@ -251,14 +252,10 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2b/${quote.id}/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2b/${quote.id}/send`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send rate sheet')
@@ -290,14 +287,10 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2b/${quote.id}/send-whatsapp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2b/${quote.id}/send-whatsapp`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send rate sheet')

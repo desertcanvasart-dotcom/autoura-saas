@@ -7,6 +7,7 @@ import { getCurrencySymbol } from '@/lib/currency'
 import { repriceItineraryServices } from '@/lib/b2b/quote-from-itinerary-pricing'
 import type { Json } from '@/types/database.types'
 import { cleanSheetCosts, keyedPricingTable } from '@/app/pricing-grid/lib/b2b-rate-sheet'
+import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
 
 // POST /api/b2b/quote-from-itinerary
 // Creates a B2B quote from an itinerary. Lines the pricing grid already
@@ -48,12 +49,12 @@ export async function POST(request: NextRequest) {
     const { data: days } = await supabase
       .from('itinerary_days').select('*, itinerary_services!itinerary_services_itinerary_day_id_fkey(*)').eq('itinerary_id', itinerary_id).order('day_number')
 
-    // 3. Partner margin override
+    // 3. Partner margin override — the partner must be this tenant's
+    //    (lib/quotes/partner-in-tenant). A 0% default margin is a margin.
+    const partnerCheck = await partnerInTenant(supabase, partner_id, tenant_id)
+    if (!partnerCheck.ok) return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
     let effectiveMargin = margin_percent
-    if (partner_id) {
-      const { data: partner } = await supabase.from('b2b_partners').select('default_margin_percent').eq('id', partner_id).single()
-      if (partner?.default_margin_percent) effectiveMargin = Number(partner.default_margin_percent)
-    }
+    if (partnerCheck.partner?.default_margin_percent != null) effectiveMargin = Number(partnerCheck.partner.default_margin_percent)
 
     const tier = itinerary.tier || 'standard'
     const numPax = (itinerary.num_adults || 2) + (itinerary.num_children || 0)
