@@ -107,9 +107,17 @@ describe('Generate Documents handles every service type the grid saves', () => {
     const gridTypes = new Set([...fn.slice(0, fn.indexOf('return map')).matchAll(/:\s*'(\w+)'/g)].map(m => m[1]))
     expect(gridTypes.size).toBeGreaterThan(5)
 
-    // The table lives in lib/documents/group-services, which the route uses.
-    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain('docMappingFor(')
+    // The table lives in lib/documents/group-services, which the route's
+    // planner (lib/documents/plan-supplier-documents) uses.
+    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain('planSupplierDocuments(')
+    expect(read('lib/documents/plan-supplier-documents.ts')).toContain('docMappingFor(')
     for (const t of gridTypes) expect(Object.keys(SERVICE_TO_DOC_TYPE), `grid type '${t}' unmapped — skipped silently`).toContain(t)
+  })
+  it('the grid’s airport and hotel services go on the meet & assist order, not the transport voucher or none', () => {
+    expect(docMappingFor({ service_type: 'transfer', description: '[pricing-grid:airport_services] full_service CAI' })).toEqual({ docType: 'service_order', category: 'assistance' })
+    expect(docMappingFor({ service_type: 'other', description: '[pricing-grid:hotel_services] checkin_assist' })).toEqual({ docType: 'service_order', category: 'assistance' })
+    // A transfer that is not the grid's airport service is still transport.
+    expect(docMappingFor({ service_type: 'transfer', description: null })?.docType).toBe('transport_voucher')
   })
   it('entrance fees make a service order', () => {
     expect(docMappingFor({ service_type: 'entrance_fee' })).toEqual({ docType: 'service_order', category: 'entrance' })
