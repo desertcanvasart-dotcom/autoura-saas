@@ -18,11 +18,13 @@
 //
 // WHERE a service belongs:
 //   - a night (hotel, cruise) — where the bed is: the day's overnight city;
-//   - transport and the guide — where the party is based that day: the
-//     overnight city as well, so a day trip's vehicle and guide go with the
-//     stay they leave from (the agency's Cairo driver drives to Alexandria);
-//   - meals and entrance fees — where they are consumed: the day's own city
-//     (the Alexandria restaurant, the Alexandria sites).
+//   - transport — where the party is based that day: the overnight city as
+//     well, so a day trip's vehicle goes with the stay it leaves from (the
+//     agency's Cairo driver drives to Alexandria);
+//   - meals, entrance fees and a guide nobody is assigned to yet — where they
+//     happen: the day's own city (the Alexandria restaurant, the Alexandria
+//     sites, a local Alexandria guide). An assigned guide gets their own
+//     assignment wherever they go (lib/documents/plan-supplier-documents).
 // Cities a short drive apart (Giza and Cairo, ~10 km) are one place: the
 // first named on the trip names the group (lib/pricing/day-trip).
 //
@@ -97,9 +99,9 @@ const clean = (s: unknown): string => String(s ?? '').trim()
 const ON_BOARD = /^on board\b/i
 
 /**
- * The city a service belongs to, by what it is: a night, transport and the
- * guide go where the party is based (the overnight city); meals and sites
- * where they are.
+ * The city a service belongs to, by what it is: a night and transport go
+ * where the party is based (the overnight city); meals, sites and guiding
+ * where they happen.
  */
 export function serviceCity(
   mapping: ServiceMapping,
@@ -109,7 +111,7 @@ export function serviceCity(
   const city = clean(day.city)
   const night = clean(day.overnight_city)
   const based = night && !ON_BOARD.test(night) ? night : ''
-  if (mapping.category) return city || based || fallback
+  if (mapping.category || mapping.docType === 'guide_assignment') return city || based || fallback
   return based || city || fallback
 }
 

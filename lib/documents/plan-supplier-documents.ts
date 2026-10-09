@@ -23,13 +23,24 @@
 // ONE "Cairo Hotel" voucher from the first Cairo night to the morning after
 // the last — the hotel booked straight through the cruise — and two Cairo
 // hotels shared one voucher. A stay is named after its property when the
-// lines name one. A document the trip already has covers a stay when its
-// dates overlap it, so vouchers made before this (named "Cairo Hotel") are
-// recognised rather than made again.
+// lines name one.
+//
+// What the trip already has is matched LINE BY LINE (day, type, name): a
+// service already on a document is never put on another, so Generate after
+// an edit makes documents for the new lines only, and a document whose lines
+// are no longer on the trip is out of date (staleSupplierDocuments) — it was
+// silently left as it was. A document with no such lines (made by hand) is
+// matched as before: by its kind and title, or for a night, by its dates.
+//
+// Guides: one assignment per GUIDE assigned to the trip (itinerary_resources,
+// type guide), under the guide's name, with their languages. Guiding nobody
+// is assigned to yet is grouped by the city it happens in: the Cairo guide
+// and the Alexandria guide of ITN-S-2026-8987 shared one "Cairo Guide
+// Services" assignment.
 
 import type { Database, Json } from '@/types/database.types'
 import { transportCrew } from './transport-crew'
-import { docMappingFor, serviceCity, PlaceNames, entranceLineName, unassignedDocKey } from './group-services'
+import { docMappingFor, serviceCity, PlaceNames, entranceLineName, unassignedDocKey, type ServiceMapping } from './group-services'
 import { propertyFromService, propertyKey } from '@/lib/itineraries/overnight-property'
 
 /** Supplier type → the document its services go on. */
@@ -63,6 +74,7 @@ const DEFAULT_SUPPLIER_NAMES: Record<string, Record<string, string>> = {
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- rows as the database returns them */
 export interface PlanDay {
+  id?: string
   day_number: number
   date: string | null
   city?: string | null
@@ -79,16 +91,61 @@ export interface PlanInput {
   suppliers: Record<string, any>
   /** The trip's documents that are not cancelled. */
   existing: Array<{
+    id?: string
+    document_number?: string | null
     supplier_id: string | null
     document_type: string
     supplier_name: string | null
     check_in?: string | null
     check_out?: string | null
+    services?: unknown
   }>
+  /** The guides assigned to the trip (itinerary_resources, type guide). */
+  guides?: PlanGuide[]
   /** Only these types; null = every type. */
   documentTypes: string[] | null
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+export interface PlanGuide {
+  resource_id: string
+  name: string
+  languages?: string[] | null
+  email?: string | null
+  phone?: string | null
+  /** A one-day assignment; otherwise start_date..end_date. */
+  itinerary_day_id?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  status?: string | null
+}
+
+/** The guide assigned on a day, if any. */
+function guideOn(guides: PlanGuide[], day: PlanDay): PlanGuide | null {
+  const date = (day.date ?? '').slice(0, 10)
+  return guides.find(g => {
+    if (String(g.status ?? '').toLowerCase() === 'cancelled') return false
+    if (g.itinerary_day_id) return !!day.id && g.itinerary_day_id === day.id
+    const from = (g.start_date ?? '').slice(0, 10)
+    const to = (g.end_date ?? '').slice(0, 10) || from
+    return !!date && !!from && date >= from && date <= to
+  }) ?? null
+}
+
+const norm = (v: unknown): string => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+
+/** A service line as documents hold it: its day, type and name. */
+export function lineKey(s: { day_number?: unknown; service_type?: unknown; service_name?: unknown }): string {
+  return `${s.day_number ?? ''}|${norm(s.service_type)}|${norm(s.service_name)}`
+}
+
+/** The keyed lines a document holds — none for one made by hand. */
+function docLines(doc: { services?: unknown }): string[] {
+  if (!Array.isArray(doc.services)) return []
+  return doc.services
+    .filter((l): l is Record<string, unknown> => !!l && typeof l === 'object' && (l as Record<string, unknown>).day_number != null && !!(l as Record<string, unknown>).service_name)
+    .map(lineKey)
+}
 
 /** The day after a YYYY-MM-DD date, as YYYY-MM-DD. */
 export function dayAfter(date: string | null | undefined): string | null {
@@ -102,6 +159,7 @@ interface Group {
   docType: string
   category?: string
   supplierId: string | null
+  guide?: PlanGuide
   supplierName: string
   city: string
   cities: Set<string>
@@ -183,29 +241,65 @@ export type SupplierDocumentInsert = Database['public']['Tables']['supplier_docu
 
 /** The documents the trip should have and has not: rows ready to insert
  *  (document_number '' — numbered at insert by lib/documents/numberer). */
-export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[] {
-  const { tenantId, itinerary, days, suppliers, existing, documentTypes } = input
-  const groups = new Map<string, Group>()
-  const places = new PlaceNames()
-
+/** Every line of the trip that goes on a document, as documents key it. */
+function tripLines(days: PlanDay[]): Array<{ day: PlanDay; service: any; mapping: ServiceMapping & { docType: string }; key: string }> { // eslint-disable-line @typescript-eslint/no-explicit-any -- service rows
+  const out = []
   for (const day of days) {
     for (const raw of day.services ?? []) {
       // Tips, water, supplies, a flight… go on no document.
       const mapping = docMappingFor(raw)
       if (!mapping?.docType) continue
-
-      const date = day.date ?? ''
-      const city = places.name(serviceCity(mapping, day))
       // An entrance line names its sites, even when it was saved as the one
       // generic "Entrance Fees" line of the day.
       const service = mapping.category === 'entrance'
         ? { ...raw, service_name: entranceLineName(raw, day.attractions) }
         : raw
+      out.push({ day, service, mapping: mapping as ServiceMapping & { docType: string }, key: lineKey({ ...service, day_number: day.day_number }) })
+    }
+  }
+  return out
+}
 
+/**
+ * The trip's documents that no longer match it: lines on them that the trip
+ * does not have any more (removed, renamed, or moved to another day). A
+ * document made by hand (no keyed lines) is never reported.
+ */
+export function staleSupplierDocuments(days: PlanDay[], existing: PlanInput['existing']): Array<{ id: string; document_number: string | null; supplier_name: string | null; gone: number }> {
+  const current = new Set(tripLines(days).map(l => l.key))
+  return existing.flatMap(doc => {
+    const gone = docLines(doc).filter(k => !current.has(k)).length
+    return doc.id && gone > 0 ? [{ id: doc.id, document_number: doc.document_number ?? null, supplier_name: doc.supplier_name, gone }] : []
+  })
+}
+
+export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[] {
+  const { tenantId, itinerary, days, suppliers, documentTypes } = input
+  const guides = input.guides ?? []
+  const groups = new Map<string, Group>()
+  const places = new PlaceNames()
+
+  // A line already on one of the trip's documents goes on no other.
+  const onDocs = new Set(input.existing.flatMap(docLines))
+  // Documents made by hand hold no keyed lines: matched by title or dates.
+  const existing = input.existing.filter(d => docLines(d).length === 0)
+
+  for (const { day, service, mapping, key: lk } of tripLines(days)) {
+    {
+      // Named before the skip: which spelling names a place (Cairo, not Giza)
+      // is the trip's first, whether or not that line is already on a document.
+      const city = places.name(serviceCity(mapping, day))
+      if (onDocs.has(lk)) continue
+      const date = day.date ?? ''
       const supplier = service.supplier_id ? suppliers[service.supplier_id] : null
+      const guide = !supplier && mapping.docType === 'guide_assignment' ? guideOn(guides, day) : null
       let key: string
       let fresh: () => Group
-      if (supplier) {
+      if (guide) {
+        // The guide assigned that day: one assignment per guide.
+        key = `guide:${guide.resource_id}`
+        fresh = () => ({ docType: 'guide_assignment', supplierId: null, guide, supplierName: guide.name, city, cities: new Set(), services: [], dates: { min: date, max: date } })
+      } else if (supplier) {
         // A supplier's services go on one document of the supplier's kind.
         const docType = SUPPLIER_TO_DOC_TYPE[supplier.type] || mapping.docType
         key = `${supplier.id}-${docType}`
@@ -216,7 +310,7 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
         const names = DEFAULT_SUPPLIER_NAMES[mapping.docType] || { default: 'Services' }
         const supplierName = `${city} ${names[mapping.category || 'default'] || names.default || 'Services'}`
         key = unassignedDocKey(mapping.docType, supplierName)
-        fresh = () => ({ docType: mapping.docType!, category: mapping.category, supplierId: null, supplierName, city, cities: new Set(), services: [], dates: { min: date, max: date } })
+        fresh = () => ({ docType: mapping.docType, category: mapping.category, supplierId: null, supplierName, city, cities: new Set(), services: [], dates: { min: date, max: date } })
       }
 
       const group = groups.get(key) ?? fresh()
@@ -235,7 +329,7 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
     else planned.push([key, group, key])
   }
 
-  // What the trip already has, keyed as the groups are.
+  // What the trip already has by hand, keyed as the groups are.
   const have = new Set(existing.map(docKey))
 
   const rows: SupplierDocumentInsert[] = []
@@ -254,12 +348,12 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
       document_type: group.docType,
       document_number: '',
       supplier_name: group.supplierName,
-      supplier_contact_name: supplier?.contact_name ?? null,
-      supplier_contact_email: supplier?.contact_email ?? null,
-      supplier_contact_phone: supplier?.contact_phone ?? null,
+      supplier_contact_name: supplier?.contact_name ?? group.guide?.name ?? null,
+      supplier_contact_email: supplier?.contact_email ?? group.guide?.email ?? null,
+      supplier_contact_phone: supplier?.contact_phone ?? group.guide?.phone ?? null,
       supplier_address: supplier
         ? [supplier.address, supplier.city, supplier.country].filter(Boolean).join(', ')
-        : group.city,
+        : Array.from(group.cities).join(', '),
       client_name: itinerary.client_name,
       client_nationality: itinerary.nationality,
       num_adults: itinerary.num_adults || 1,
@@ -274,7 +368,9 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
         notes: s.notes,
         total_cost: s.total_cost,
       })) as Json,
-      city: supplier ? Array.from(group.cities).join(', ') : group.city,
+      city: supplier || group.guide ? Array.from(group.cities).join(', ') : group.city,
+      // What the guide needs beyond the lines: the languages to guide in.
+      ...(group.guide?.languages?.length ? { special_requests: `Languages: ${group.guide.languages.join(', ')}` } : {}),
       service_date: nightly ? null : (group.dates.min || (supplier ? null : itinerary.start_date) || null),
       check_in: nightly ? group.dates.min || null : null,
       // The morning after the last night.

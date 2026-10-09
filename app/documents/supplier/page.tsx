@@ -84,6 +84,9 @@ export default function SupplierDocumentsPage() {
   // nothing here to say so (live ITN-S-2026-8987).
   const [missing, setMissing] = useState<Array<{ document_type: string; supplier_name: string; lines: number }>>([])
   const [generatingMissing, setGeneratingMissing] = useState(false)
+  // Documents holding lines the trip no longer has (removed, renamed or moved
+  // to another day since Generate). They were left as they were, silently.
+  const [stale, setStale] = useState<Array<{ id: string; document_number: string | null; supplier_name: string | null; gone: number }>>([])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -102,13 +105,15 @@ export default function SupplierDocumentsPage() {
   }, [mounted, typeFilter, statusFilter, itineraryFilter])
 
   const fetchMissing = async (id: string | null) => {
-    if (!id) { setMissing([]); return }
+    if (!id) { setMissing([]); setStale([]); return }
     try {
       const response = await fetch(`/api/itineraries/${encodeURIComponent(id)}/generate-documents`)
       const result = response.ok ? await response.json() : null
       setMissing(Array.isArray(result?.missing) ? result.missing : [])
+      setStale(Array.isArray(result?.stale) ? result.stale : [])
     } catch {
       setMissing([])
+      setStale([])
     }
   }
 
@@ -331,6 +336,31 @@ export default function SupplierDocumentsPage() {
             >
               {generatingMissing ? 'Generating…' : 'Generate missing'}
             </button>
+          </div>
+        )}
+
+        {/* Documents the trip has changed under. */}
+        {itineraryFilter && stale.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                {stale.length === 1 ? 'One document no longer matches' : `${stale.length} documents no longer match`} the trip
+              </p>
+              <ul className="text-sm text-amber-800 mt-1 space-y-0.5">
+                {stale.map(d => (
+                  <li key={d.id}>
+                    <Link href={fromList(`/documents/supplier/${d.id}`)} className="font-medium underline hover:text-amber-900">
+                      {d.document_number || d.supplier_name}
+                    </Link>
+                    {' '}· {d.supplier_name} — {d.gone} line{d.gone === 1 ? '' : 's'} no longer on the trip
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-700 mt-1">
+                The trip changed after these were generated. Edit them, or cancel them and generate again; tell the supplier if one was already sent.
+              </p>
+            </div>
           </div>
         )}
 
