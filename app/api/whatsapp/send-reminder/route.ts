@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     const message = `⏰ *${businessName} - Tour Reminder* ⏰\n\n` +
       `Hi ${itinerary.client_name},\n\n` +
       `Reminder: Your tour is tomorrow! 🌟\n\n` +
-      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
+      `🎯 *Tour:* ${itinerary.trip_name || 'your trip'}\n` +
       `📅 *Date:* ${formatDate(itinerary.start_date)}\n` +
       `🕐 *Pickup Time:* ${itinerary.pickup_time || 'To be confirmed'}\n` +
       `📍 *Pickup Location:* ${itinerary.pickup_location || 'To be confirmed'}\n\n` +

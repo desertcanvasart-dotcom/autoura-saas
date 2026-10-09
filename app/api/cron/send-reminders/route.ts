@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { daysOverdueOrNull } from '@/lib/invoice-dates'
+import { daysOverdueOrNull, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { escapeHtml } from '@/lib/html-escape'
 import { createAdminClient } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
@@ -73,10 +74,10 @@ ${emailHeaderRow(company)}
 <p style="margin:0;color:#fff;text-align:center;font-size:14px;">${urgencyMessage}</p>
 </td></tr>
 <tr><td style="padding:40px;">
-<p style="color:#374151;font-size:16px;">Dear ${invoice.client_name},</p>
+<p style="color:#374151;font-size:16px;">Dear ${escapeHtml(invoice.client_name)},</p>
 <table width="100%" style="background:#f9fafb;border-radius:8px;margin:20px 0;">
 <tr><td style="padding:20px;">
-<p style="margin:5px 0;"><strong>Invoice:</strong> ${invoice.invoice_number}</p>
+<p style="margin:5px 0;"><strong>Invoice:</strong> ${escapeHtml(invoice.invoice_number)}</p>
 <p style="margin:5px 0;"><strong>Due Date:</strong> ${dueDate}</p>
 <p style="margin:15px 0 0;font-size:18px;"><strong>Balance Due: <span style="color:#ef4444;">${balanceDue}</span></strong></p>
 </td></tr>
@@ -121,7 +122,8 @@ async function getHandler(request: NextRequest) {
       // replies routed to them. This cron spans every tenant, so a single
       // platform reply-to would send every client's answer to the wrong place.
       .select('*, tenant:tenants(company_name, contact_email, company_phone, company_website, logo_url, primary_color, tagline, company_address, license_number, tax_number, document_footer_text, email_domain, email_from_local, email_domain_status)')
-      .not('status', 'in', '("paid","cancelled")')
+      .in('status', [...REMINDABLE_INVOICE_STATUSES])
+      .not('due_date', 'is', null)
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
       .lte('next_reminder_date', today)

@@ -22,3 +22,28 @@ export function daysOverdueOrNull(dueDate: unknown, now: number = Date.now()): n
   if (!Number.isFinite(t)) return null
   return Math.floor((now - t) / (1000 * 60 * 60 * 24))
 }
+
+// ============================================
+// WHICH INVOICES MAY BE CHASED
+// ============================================
+// The reminder paths (single, bulk, the daily cron) excluded only paid and
+// cancelled invoices, so a DRAFT — never sent to the client — got "Payment
+// Overdue" in the client's inbox. And a final invoice is created with no due
+// date: the single reminder computed new Date(null) and told the client the
+// payment was ~20,700 days overdue, due 1 January 1970.
+
+/** The statuses a client has been sent and still owes on. */
+export const REMINDABLE_INVOICE_STATUSES = ['sent', 'partial', 'overdue'] as const
+
+/** Why an invoice cannot be chased, or null when it can. */
+export function reminderBlocker(invoice: { status?: string | null; due_date?: unknown }): string | null {
+  if (!(REMINDABLE_INVOICE_STATUSES as readonly string[]).includes(String(invoice.status ?? ''))) {
+    return invoice.status === 'draft'
+      ? 'This invoice is still a draft. Send it to the client before sending a reminder.'
+      : 'Only sent, partly paid or overdue invoices get reminders.'
+  }
+  if (daysOverdueOrNull(invoice.due_date) === null) {
+    return 'This invoice has no due date. Set one before sending a reminder.'
+  }
+  return null
+}

@@ -467,7 +467,14 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.setFontSize(8)
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-    pdf.text('Description', margin + 4, y + 6.5)
+    // A voucher's lines span days (a guide on days 2, 4 and 6; a transport
+    // supplier's whole week), and only the page showed which line was which
+    // day: the PDF the supplier receives printed none.
+    const dated = items.some((item: { date?: unknown }) => !!item.date)
+    const descX = dated ? margin + 26 : margin + 4
+    const descWidth = contentWidth - 60 - (descX - margin - 4)
+    if (dated) pdf.text('Date', margin + 4, y + 6.5)
+    pdf.text('Description', descX, y + 6.5)
     pdf.text('Qty', pageWidth - margin - 40, y + 6.5, { align: 'center' })
     pdf.text('Amount', pageWidth - margin - 4, y + 6.5, { align: 'right' })
     
@@ -481,10 +488,10 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       // ran past the 60 characters this used to cut at — and the line's
       // notes under it ("Inside: … | Photo stops: …"), never printed before.
       pdf.setFontSize(8)
-      const nameLines: string[] = pdf.splitTextToSize(itemName + itemCity, contentWidth - 60).slice(0, 3)
+      const nameLines: string[] = pdf.splitTextToSize(itemName + itemCity, descWidth).slice(0, 3)
       pdf.setFontSize(7)
       const noteLines: string[] = item.notes && typeof item.notes === 'string'
-        ? pdf.splitTextToSize(item.notes, contentWidth - 60).slice(0, 2)
+        ? pdf.splitTextToSize(item.notes, descWidth).slice(0, 2)
         : []
       const rowHeight = Math.max(10, 4 + nameLines.length * 4 + noteLines.length * 3.5)
 
@@ -497,11 +504,14 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
       pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-      pdf.text(nameLines, margin + 4, y + 6.5)
+      if (dated && item.date) {
+        pdf.text(formatDateOnly(String(item.date), 'en-US', { day: 'numeric', month: 'short' }), margin + 4, y + 6.5)
+      }
+      pdf.text(nameLines, descX, y + 6.5)
       if (noteLines.length > 0) {
         pdf.setFontSize(7)
         pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
-        pdf.text(noteLines, margin + 4, y + 6.5 + nameLines.length * 4)
+        pdf.text(noteLines, descX, y + 6.5 + nameLines.length * 4)
         pdf.setFontSize(8)
         pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
       }
@@ -511,7 +521,8 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       pdf.text(qty.toString(), pageWidth - margin - 40, y + 6.5, { align: 'center' })
 
       // Amount
-      const amount = item.total_cost || item.total_price || item.eur_rate || item.unit_price || 0
+      // numeric columns arrive as strings: "100.00".toFixed threw.
+      const amount = Number(item.total_cost || item.total_price || item.eur_rate || item.unit_price || 0) || 0
       if (amount > 0) {
         pdf.text(`${doc.currency} ${amount.toFixed(2)}`, pageWidth - margin - 4, y + 6.5, { align: 'right' })
       } else {
@@ -591,7 +602,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.setFontSize(14)
   pdf.setFont('helvetica', 'bold')
   pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-  pdf.text(`${doc.currency} ${doc.total_cost.toFixed(2)}`, totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
+  pdf.text(`${doc.currency} ${(Number(doc.total_cost) || 0).toFixed(2)}`, totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
   
   y += 28
 

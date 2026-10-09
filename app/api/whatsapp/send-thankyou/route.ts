@@ -78,12 +78,12 @@ export async function POST(request: NextRequest) {
     const message = `🎉 *${businessName}* 🎉\n\n` +
       `Dear ${itinerary.client_name},\n\n` +
       `Thank you for traveling with us! 🙏\n\n` +
-      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
+      `🎯 *Tour:* ${itinerary.trip_name || 'your trip'}\n` +
       `📅 *Dates:* ${formatDate(itinerary.start_date)} - ${formatDate(itinerary.end_date)}\n\n` +
-      `We hope you had an incredible experience exploring Egypt! 🇪🇬\n\n` +
+      `We hope you had an incredible trip!\n\n` +
       `We'd love to hear your feedback. If you enjoyed your tour, please consider leaving us a review:\n` +
       `⭐ ${reviewUrl}\n\n` +
-      `Share your photos with us! We love seeing Egypt through your eyes. 📸\n\n` +
+      `Share your photos with us! We'd love to see them. 📸\n\n` +
       `We hope to see you again soon! 🌟\n\n` +
       `Best regards,\n${businessName} Team`
 

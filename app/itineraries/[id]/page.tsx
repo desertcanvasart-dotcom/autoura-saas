@@ -12,7 +12,7 @@ import Link from 'next/link'
 import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList, Copy, XCircle, RotateCcw } from 'lucide-react'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
-import { generateWhatsAppMessage, generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
+import { generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import AssigneeSelect from '@/components/AssigneeSelect'
 import ItineraryPL from '@/app/components/ItineraryPL'
@@ -664,7 +664,9 @@ export default function ViewItineraryPage() {
       // omitted them, so the ONE PDF a client actually receives was the only
       // unbranded one: blank header name, no logo, empty footer.
       const { generateItineraryPDF } = await import('@/lib/pdf-generator')
-      const pdf = generateItineraryPDF(itinerary, days, undefined, {
+      // The breakdown choice the operator made for Download and Preview —
+      // this always sent the breakdown, whatever they had chosen.
+      const pdf = generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown }, {
         ...identityFromTenant(tenant),
         logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url),
       })

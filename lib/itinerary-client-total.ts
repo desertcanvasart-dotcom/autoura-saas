@@ -27,14 +27,16 @@ export function resolveItineraryMargin(marginPercent: unknown): number {
   return Number.isFinite(raw) ? raw : 25
 }
 
-/** Sum of per-service client prices: an explicit client_price wins, else cost × (1 + margin). Rounded to cents. */
+/** One service's client price: an explicit client_price wins, else cost × (1 + margin). */
+export function serviceClientPrice(s: PricedService, marginPercent: unknown): number {
+  const supplier = Number(s.total_cost) || 0
+  return s.client_price != null ? Number(s.client_price) : supplier * (1 + resolveItineraryMargin(marginPercent) / 100)
+}
+
+/** Sum of per-service client prices (serviceClientPrice). Rounded to cents. */
 export function itineraryClientTotal(services: PricedService[], marginPercent: unknown): number {
-  const margin = resolveItineraryMargin(marginPercent)
   let total = 0
-  for (const s of services) {
-    const supplier = Number(s.total_cost) || 0
-    total += s.client_price != null ? Number(s.client_price) : supplier * (1 + margin / 100)
-  }
+  for (const s of services) total += serviceClientPrice(s, marginPercent)
   return Math.round(total * 100) / 100
 }
 
