@@ -12,6 +12,10 @@ import { Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
 import { contractNumber, contractTravelers, contractDuration, contractDestinations } from '@/lib/contract-facts'
+import {
+  cancellationLines, contractPrice, contractSettingsFromTenant, defaultContractTerms, governingLawNote,
+  paymentTermsText, standardTerms, type ContractTerms,
+} from '@/lib/contract-terms'
 
 // The fields an itinerary actually has (the old shape named num_travelers,
 // tour_name, destinations and parsed_data — none of which exist).
@@ -27,12 +31,12 @@ interface Itinerary {
   total_days?: number | null
   start_date: string
   end_date: string
-  total_cost: number
+  total_cost: number | null
   currency?: string | null
   itinerary_days?: { day_number?: number | null; city?: string | null; overnight_city?: string | null }[]
 }
 
-interface ContractData {
+interface ContractData extends ContractTerms {
   contractNumber: string
   contractDate: string
   serviceProvider: string
@@ -46,19 +50,8 @@ interface ContractData {
   endDate: string
   duration: string
   destinations: string
-  totalCost: number
-  depositPercentage: number
-  paymentTerms: string
-  inclusions: string[]
-  exclusions: string[]
-  cancellation45Days: string
-  cancellation44to30Days: string
-  cancellation29to15Days: string
-  cancellation14to0Days: string
-  flightCancellation: string
-  noShowPolicy: string
-  forceMajeure: string
-  specialNotes: string
+  /** null = the trip has no price yet ("To be confirmed"), never NaN. */
+  totalCost: number | null
 }
 
 export default function ContractPage() {
@@ -85,47 +78,30 @@ export default function ContractPage() {
     endDate: '',
     duration: '',
     destinations: '',
-    totalCost: 0,
-    depositPercentage: 10,
-    paymentTerms: 'A 10% deposit is required at the time of booking to secure the reservation. The remaining balance is to be paid in cash upon arrival in Egypt.',
-    inclusions: [
-      'Private transportation throughout: all airport transfers',
-      'Licensed private guiding: Egyptologist-naturalist for sightseeing',
-      'Entrance fees to all sites listed',
-      'Accommodation as specified in the itinerary',
-      'Domestic flights as per itinerary',
-      'Curated lunches in clean, reliable restaurants',
-      'Tips for drivers, porters, and hotel concierge',
-      'All taxes and service charges'
-    ],
-    exclusions: [
-      'International flights',
-      'Meals not specified in the itinerary',
-      'Gratuities for your guide (appreciated but not obligatory)',
-      'Travel insurance',
-      'Personal expenses',
-      'Visa fees (if applicable)',
-      'Optional activities not mentioned in the itinerary'
-    ],
-    cancellation45Days: 'Cancellations received 45 days before travel date are totally refundable.',
-    cancellation44to30Days: 'Cancellations received 44 days to 30 days before travel date are subject to 15% cancellation fees.',
-    cancellation29to15Days: 'Cancellations received 29 days to 15 days before travel date are subject to 40% cancellation fees.',
-    cancellation14to0Days: 'Cancellations received 14 days to 0 days before travel date are subject to 100% cancellation fees.',
-    flightCancellation: 'Any ticket cancellation (domestic and/or international) will be subject to a 50% fee from the flight price from day 1 of booking.',
-    noShowPolicy: 'Clients who fail to show up for departure without prior notification will forfeit 100% of the tour cost.',
-    forceMajeure: 'In case of cancellation due to force majeure events (natural disasters, political unrest, pandemic restrictions, etc.), the Service Provider will work with clients to reschedule or provide credit for future travel, subject to supplier policies.',
-    specialNotes: 'Safety & Comfort: Meet & assist at all airports, trusted vetted teams, 24/7 WhatsApp support.\nPractical: Bottled water provided daily, restaurants chosen for cleanliness and hygiene.'
+    totalCost: null,
+    // lib/contract-terms: the same defaults the PDF and the WhatsApp send
+    // use. The country, the governing law and the deposit come from
+    // Settings → Organization once the tenant loads (below).
+    ...defaultContractTerms({}),
   })
 
   // The tenant often loads after the first render: fill the provider's own
   // fields then, without overwriting anything already typed.
+  const settings = contractSettingsFromTenant(tenant)
+
   useEffect(() => {
     if (!tenant) return
+    // The operator's own deposit and country replace the generic defaults —
+    // but only where nothing has been typed over them yet.
+    const generic = defaultContractTerms({})
+    const own = defaultContractTerms(contractSettingsFromTenant(tenant))
     setContractData(prev => ({
       ...prev,
       serviceProvider: prev.serviceProvider || tenant.company_name || '',
       providerWebsite: prev.providerWebsite || tenant.company_website || '',
       providerLocation: prev.providerLocation || tenant.company_address || '',
+      ...(prev.depositPercentage === generic.depositPercentage ? { depositPercentage: own.depositPercentage } : {}),
+      ...(prev.paymentTerms === generic.paymentTerms ? { paymentTerms: own.paymentTerms } : {}),
     }))
   }, [tenant])
 
@@ -160,7 +136,7 @@ export default function ContractPage() {
           endDate: itin.end_date,
           duration: contractDuration(itin) ?? '',
           destinations: contractDestinations(itin.itinerary_days ?? []),
-          totalCost: itin.total_cost
+          totalCost: typeof itin.total_cost === 'number' ? itin.total_cost : null
         }))
       }
     } catch (error) {
@@ -172,6 +148,35 @@ export default function ContractPage() {
 
   const handleChange = (field: keyof ContractData, value: any) => {
     setContractData(prev => ({ ...prev, [field]: value }))
+  }
+
+  // The payment-terms sentence names the deposit: when it is still the
+  // sentence written for the old percentage, follow the new one.
+  const handleDepositChange = (raw: string) => {
+    const pct = Math.min(100, Math.max(0, parseInt(raw, 10) || 0))
+    setContractData(prev => ({
+      ...prev,
+      depositPercentage: pct,
+      paymentTerms: prev.paymentTerms === paymentTermsText(prev.depositPercentage, settings)
+        ? paymentTermsText(pct, settings)
+        : prev.paymentTerms,
+    }))
+  }
+
+  // What the PDF and the WhatsApp send print: everything set on this page.
+  const editedTerms: ContractTerms = {
+    depositPercentage: contractData.depositPercentage,
+    paymentTerms: contractData.paymentTerms,
+    inclusions: contractData.inclusions.filter(i => i.trim()),
+    exclusions: contractData.exclusions.filter(i => i.trim()),
+    cancellation45Days: contractData.cancellation45Days,
+    cancellation44to30Days: contractData.cancellation44to30Days,
+    cancellation29to15Days: contractData.cancellation29to15Days,
+    cancellation14to0Days: contractData.cancellation14to0Days,
+    flightCancellation: contractData.flightCancellation,
+    noShowPolicy: contractData.noShowPolicy,
+    forceMajeure: contractData.forceMajeure,
+    specialNotes: contractData.specialNotes,
   }
 
   const handleArrayChange = (field: 'inclusions' | 'exclusions', index: number, value: string) => {
@@ -214,7 +219,9 @@ export default function ContractPage() {
         endDate: contractData.endDate,
         destinations: contractData.destinations,
         totalCost: contractData.totalCost,
-        currency: itinerary?.currency || ''
+        currency: itinerary?.currency || '',
+        settings,
+        terms: editedTerms,
       })
       
       // Download the PDF
@@ -303,6 +310,7 @@ export default function ContractPage() {
               <WhatsAppButton 
                 itineraryId={params.id as string}
                 type="contract"
+                contractEdits={{ ...editedTerms, tourName: contractData.tourPackage, destinations: contractData.destinations, totalCost: contractData.totalCost }}
                 clientPhone={itinerary.client_phone}
                 clientName={itinerary.client_name}
                 onSuccess={() => {
@@ -512,8 +520,11 @@ export default function ContractPage() {
                   <label className="text-xs text-gray-600">Total Package Price ({itinerary?.currency || 'currency'})</label>
                   <input
                     type="number"
-                    value={contractData.totalCost}
-                    onChange={(e) => handleChange('totalCost', parseFloat(e.target.value))}
+                    value={contractData.totalCost ?? ''}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value)
+                      handleChange('totalCost', Number.isFinite(v) ? v : null)
+                    }}
                     className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
                     step="0.01"
                   />
@@ -523,7 +534,7 @@ export default function ContractPage() {
                   <input
                     type="number"
                     value={contractData.depositPercentage}
-                    onChange={(e) => handleChange('depositPercentage', parseInt(e.target.value))}
+                    onChange={(e) => handleDepositChange(e.target.value)}
                     className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
                     min="0"
                     max="100"
@@ -543,9 +554,9 @@ export default function ContractPage() {
               <>
                 <div className="bg-primary-50 border border-primary-200 rounded-md p-4 mb-3">
                   <p className="text-lg font-bold text-gray-900">
-                    Total Package Price: <span className="text-primary-600">{itinerary?.currency} {contractData.totalCost.toLocaleString()}</span>
+                    Total Package Price: <span className="text-primary-600">{contractPrice(contractData.totalCost, itinerary?.currency)}</span>
                   </p>
-                  {contractData.numTravelers > 0 && (
+                  {contractData.numTravelers > 0 && contractData.totalCost !== null && (
                     <p className="text-gray-600 text-xs mt-1">
                       ({itinerary?.currency} {(contractData.totalCost / contractData.numTravelers).toFixed(2)} per person × {contractData.numTravelers} {contractData.numTravelers === 1 ? 'traveler' : 'travelers'})
                     </p>
@@ -718,12 +729,7 @@ export default function ContractPage() {
                   <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">Standard Cancellation Policy</h3>
                   <div className="bg-gray-50 rounded-md p-3 space-y-1 text-xs text-gray-700">
                     <p>The following cancellation charges apply from the date written notice is received:</p>
-                    <p>• Domestic tickets are the only non-refundable part of the trip from day 1.</p>
-                    <p>• {contractData.cancellation45Days}</p>
-                    <p>• {contractData.cancellation44to30Days}</p>
-                    <p>• {contractData.cancellation29to15Days}</p>
-                    <p>• {contractData.cancellation14to0Days}</p>
-                    <p>• Cancellation fees will be applied on accommodation portions only.</p>
+                    {cancellationLines(contractData).map((l, i) => <p key={i}>• {l}</p>)}
                   </div>
                 </div>
 
@@ -755,57 +761,21 @@ export default function ContractPage() {
           <div>
             <h2 className="text-lg font-bold text-gray-900 mb-3">TERMS AND CONDITIONS</h2>
             
+            {/* lib/contract-terms: the same sections the PDF prints, naming the
+                country and governing law from Settings → Organization. */}
             <div className="space-y-3 text-xs">
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">1. BOOKING CONFIRMATION</h3>
-                <p className="text-gray-700">
-                  This contract becomes binding upon receipt of the required deposit and signed contract by {contractData.serviceProvider}.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">2. TRAVEL DOCUMENTS</h3>
-                <p className="text-gray-700">
-                  Clients are responsible for ensuring they have valid passports, visas, and any required health documentation for travel to Egypt.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">3. HEALTH AND SAFETY</h3>
-                <div className="text-gray-700 space-y-0.5">
-                  <p>• Clients must disclose any medical conditions that may affect their ability to participate in tour activities</p>
-                  <p>• Travel insurance is strongly recommended and may be required</p>
-                  <p>• Clients participate in all activities at their own risk</p>
+              {standardTerms(contractData.serviceProvider, settings).map((section, i) => (
+                <div key={section.title}>
+                  <h3 className="font-semibold text-gray-900 mb-1">{i + 1}. {section.title.toUpperCase()}</h3>
+                  {section.text.length > 1 ? (
+                    <div className="text-gray-700 space-y-0.5">
+                      {section.text.map((t, j) => <p key={j}>• {t}</p>)}
+                    </div>
+                  ) : (
+                    <p className="text-gray-700">{section.text[0]}</p>
+                  )}
                 </div>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">4. CHANGES TO ITINERARY</h3>
-                <p className="text-gray-700">
-                  {contractData.serviceProvider} reserves the right to modify the itinerary due to circumstances beyond our control. Every effort will be made to provide suitable alternatives of equal value. No refunds will be provided for missed activities due to client's personal circumstances.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">5. LIABILITY LIMITATIONS</h3>
-                <p className="text-gray-700">
-                  {contractData.serviceProvider}'s liability is limited to the cost of the tour package. We are not responsible for delays, cancellations, or changes made by third-party suppliers.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">6. DISPUTE RESOLUTION</h3>
-                <p className="text-gray-700">
-                  Any disputes arising from this contract shall be resolved through arbitration under Egyptian law.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">7. DATA PROTECTION</h3>
-                <p className="text-gray-700">
-                  Client information will be used solely for the purpose of providing travel services and will be handled in accordance with applicable privacy laws.
-                </p>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -863,7 +833,7 @@ export default function ContractPage() {
               <p className="text-xs text-gray-700">{new Date(contractData.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} (completion of tour services)</p>
               
               <p className="text-xs text-gray-500 italic mt-5">
-                This contract is governed by Egyptian law and any disputes will be subject to the jurisdiction of Egyptian courts.
+                {governingLawNote(settings)}
               </p>
             </div>
           </div>

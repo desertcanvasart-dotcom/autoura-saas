@@ -10,6 +10,10 @@ import jsPDF from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
 import { brandColorRgb, fetchLogoDataUrl, type CompanyIdentity } from '@/lib/company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from '@/lib/pdf-letterhead'
+import {
+  cancellationLines, contractPrice, defaultContractTerms, governingLawNote, standardTerms,
+  type ContractSettings, type ContractTerms,
+} from '@/lib/contract-terms'
 
 interface ContractData {
   /** The operator issuing the contract — the "Service Provider" party. This
@@ -33,27 +37,15 @@ interface ContractData {
   startDate: string
   endDate: string
   destinations: string
-  totalCost: number
+  /** null = no price yet: prints "To be confirmed". */
+  totalCost: number | null
   currency: string
-  inclusions?: string[]
-  exclusions?: string[]
+  /** Settings → Organization: the country and governing law the terms name. */
+  settings?: ContractSettings
+  /** What the operator set on the contract page. Each one left out falls
+   *  back to lib/contract-terms' default, as the page itself starts. */
+  terms?: Partial<ContractTerms>
 }
-
-const DEFAULT_INCLUSIONS = [
-  'Private transportation throughout',
-  'Licensed Egyptologist guide',
-  'Entrance fees to all sites',
-  'Accommodation as specified',
-  'Meals as mentioned',
-  'All taxes and service charges',
-]
-
-const DEFAULT_EXCLUSIONS = [
-  'International flights',
-  'Travel insurance',
-  'Personal expenses',
-  'Guide gratuities (optional)',
-]
 
 export async function generateContractPDF(data: ContractData): Promise<Uint8Array> {
   const c = data.company
@@ -76,6 +68,10 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   const pageHeight = pdf.internal.pageSize.getHeight()
   const margin = 18
   const contentWidth = pageWidth - margin * 2
+
+  const settings = data.settings ?? {}
+  const given = Object.fromEntries(Object.entries(data.terms ?? {}).filter(([, v]) => v !== undefined && v !== null))
+  const terms: ContractTerms = { ...defaultContractTerms(settings), ...given }
 
   const [br, bg, bb] = brandColorRgb(company, [100, 124, 71])
   const brand = { r: br, g: bg, b: bb }
@@ -144,9 +140,9 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   pdf.text('Total price', margin, y)
   pdf.setFontSize(13)
   pdf.setTextColor(br, bg, bb)
-  pdf.text(`${data.currency} ${data.totalCost.toLocaleString()}`, margin + 42, y + 0.5)
+  pdf.text(contractPrice(data.totalCost, data.currency), margin + 42, y + 0.5)
   y += 7
-  line('Payment', '10% deposit to confirm. Balance due upon arrival.')
+  line('Payment', terms.paymentTerms)
   y += 6
 
   const bullets = (title: string, items: string[]) => {
@@ -163,8 +159,41 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
     }
     y += 6
   }
-  bullets('Inclusions', data.inclusions?.length ? data.inclusions : DEFAULT_INCLUSIONS)
-  bullets('Exclusions', data.exclusions?.length ? data.exclusions : DEFAULT_EXCLUSIONS)
+  const paragraph = (text: string) => {
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9.5)
+    pdf.setTextColor(30, 30, 30)
+    for (const para of text.split('\n').filter(t => t.trim())) {
+      const wrapped = pdf.splitTextToSize(para, contentWidth) as string[]
+      ensureSpace(wrapped.length * 5)
+      pdf.text(wrapped, margin, y)
+      y += wrapped.length * 5 + 1
+    }
+    y += 5
+  }
+
+  if (terms.inclusions.length) bullets('Inclusions', terms.inclusions)
+  if (terms.exclusions.length) bullets('Exclusions', terms.exclusions)
+
+  bullets('Cancellation policy', cancellationLines(terms))
+  if (terms.flightCancellation.trim()) { heading('Flight cancellation'); paragraph(terms.flightCancellation) }
+  if (terms.noShowPolicy.trim()) { heading('No-show policy'); paragraph(terms.noShowPolicy) }
+  if (terms.forceMajeure.trim()) { heading('Force majeure'); paragraph(terms.forceMajeure) }
+
+  heading('Terms and conditions')
+  standardTerms(company.name, settings).forEach((section, i) => {
+    ensureSpace(12)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(9.5)
+    pdf.setTextColor(30, 30, 30)
+    pdf.text(`${i + 1}. ${section.title.toUpperCase()}`, margin, y)
+    y += 5
+    paragraph(section.text.length > 1 ? section.text.map(t => `• ${t}`).join('\n') : section.text[0])
+    y -= 3
+  })
+  y += 3
+
+  if (terms.specialNotes.trim()) { heading('Special notes'); paragraph(terms.specialNotes) }
 
   // Signatures
   heading('Signatures', 30)
@@ -181,6 +210,12 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   pdf.text('Client', pageWidth - margin - sigWidth, y + 5)
   pdf.text('Date: ______________', margin, y + 11)
   pdf.text('Date: ______________', pageWidth - margin - sigWidth, y + 11)
+  y += 20
+  const note = pdf.splitTextToSize(governingLawNote(settings), contentWidth) as string[]
+  ensureSpace(note.length * 4.5)
+  pdf.setFont('helvetica', 'italic')
+  pdf.setFontSize(8.5)
+  pdf.text(note, margin, y)
 
   drawFooters(pdf, company, brand, data.contractNumber, margin)
 

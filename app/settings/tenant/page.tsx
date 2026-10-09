@@ -86,6 +86,10 @@ export default function TenantSettingsPage() {
   // The org's deposit rule (mig 325): blank = the defaults (30% / 7 days).
   const [depositPercent, setDepositPercent] = useState('')
   const [depositDueDays, setDepositDueDays] = useState('')
+  // What travel contracts name (mig 403): '' = no country / the operator's
+  // own country's law (lib/contract-terms.ts).
+  const [operatingCountry, setOperatingCountry] = useState('')
+  const [governingLaw, setGoverningLaw] = useState('')
   // Run currency (C3.4): '' = EUR default. Reinterprets stored rate amounts;
   // the field warns about that.
   const [ratesCurrency, setRatesCurrency] = useState('')
@@ -120,6 +124,8 @@ export default function TenantSettingsPage() {
       setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
       setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
       setRatesCurrency((tenant as { rates_currency?: string | null }).rates_currency || '')
+      setOperatingCountry(tenant.operating_country || '')
+      setGoverningLaw(tenant.contract_governing_law || '')
     }
 
     if (features) {
@@ -328,6 +334,25 @@ export default function TenantSettingsPage() {
         else if (minError) throw minError
       }
 
+      // The contract's country and law arrive with migration 403: saved on
+      // their own, only when changed, like the minimum margin above.
+      let contractTermsMissing = false
+      const contractTerms = {
+        operating_country: operatingCountry.trim() || null,
+        contract_governing_law: governingLaw.trim() || null,
+      }
+      if (
+        contractTerms.operating_country !== (tenant.operating_country ?? null) ||
+        contractTerms.contract_governing_law !== (tenant.contract_governing_law ?? null)
+      ) {
+        const { error: termsError } = await supabase
+          .from('tenants')
+          .update(contractTerms)
+          .eq('id', tenant.id)
+        if (termsError && isMissingColumnError(termsError, Object.keys(contractTerms))) contractTermsMissing = true
+        else if (termsError) throw termsError
+      }
+
       // What we asked for vs what the database kept, field by field.
       const stored = saved[0] as Record<string, unknown>
       const notKept = letterheadMissing ? [] : Object.entries(letterhead)
@@ -337,6 +362,13 @@ export default function TenantSettingsPage() {
       // Refetch tenant data
       await refetchTenant()
 
+      if (contractTermsMissing) {
+        setMessage({
+          type: 'error',
+          text: 'Saved — except the contract country and governing law: the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
+        })
+        return
+      }
       if (minMarginMissing) {
         setMessage({
           type: 'error',
@@ -592,6 +624,46 @@ export default function TenantSettingsPage() {
               />
               <p className="mt-1 text-[10px] text-gray-400">
                 Days from booking creation until the deposit deadline.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Country you operate in
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+              </label>
+              <input
+                type="text"
+                maxLength={100}
+                value={operatingCountry}
+                onChange={(e) => setOperatingCountry(e.target.value)}
+                disabled={!isAdmin}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                placeholder="e.g. Egypt"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Contracts say the balance is paid on arrival here, and that clients need visas for travel here.
+                Blank: no country is named.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Governing law
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+              </label>
+              <input
+                type="text"
+                maxLength={255}
+                value={governingLaw}
+                onChange={(e) => setGoverningLaw(e.target.value)}
+                disabled={!isAdmin}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                placeholder="e.g. Egyptian law"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Disputes go to arbitration under this law. Blank: the law of the country you are registered in.
               </p>
             </div>
           </div>
