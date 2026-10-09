@@ -1,4 +1,5 @@
 import { formatMoney } from '@/lib/currency-totals'
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import jsPDF from 'jspdf'
 import { brandColorRgb, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
@@ -92,9 +93,12 @@ const getInvoiceTypeConfig = (type: string | undefined): { label: string; color:
 
 export function generateInvoicePDF(
   invoice: Invoice, 
-  company: CompanyInfo = DEFAULT_COMPANY
+  company: CompanyInfo = DEFAULT_COMPANY,
+  font?: JsPdfFont | null
 ): jsPDF {
   const doc = new jsPDF()
+  // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+  applyDocumentFont(doc, font)
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
   const contentWidth = pageWidth - (margin * 2)
@@ -571,8 +575,8 @@ export function generateInvoicePDF(
   return doc
 }
 
-export function downloadInvoicePDF(invoice: Invoice, company?: CompanyInfo): void {
-  const pdf = generateInvoicePDF(invoice, company)
+export function downloadInvoicePDF(invoice: Invoice, company?: CompanyInfo, font?: JsPdfFont | null): void {
+  const pdf = generateInvoicePDF(invoice, company, font)
   
   // Include invoice type in filename
   const typePrefix = invoice.invoice_type && invoice.invoice_type !== 'standard' 

@@ -114,18 +114,18 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'create_trip_inquiry',
-    description: 'Create a new trip inquiry/request based on customer requirements. Use this when customer wants to plan a new trip to Egypt.',
+    description: 'Create a new trip inquiry/request based on customer requirements. Use this when customer wants to plan a new trip.',
     input_schema: {
       type: 'object' as const,
       properties: {
         trip_name: {
           type: 'string',
-          description: 'Descriptive name for the trip (e.g., "7-Day Cairo & Luxor Adventure")'
+          description: 'Descriptive name for the trip (e.g., "7-Day Highlights Tour")'
         },
         destinations: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Cities/places they want to visit (e.g., ["Cairo", "Luxor", "Aswan"])'
+          description: 'Cities/places they want to visit, as the customer names them'
         },
         start_date: {
           type: 'string',
@@ -212,7 +212,7 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
         },
         tour_name: {
           type: 'string',
-          description: 'Name of specific tour to check (e.g., "Nile Cruise", "Cairo Pyramids"). Use this when customer asks about a specific tour.'
+          description: 'Name of specific tour to check (e.g., a tour name the customer mentions). Use this when customer asks about a specific tour.'
         },
         check_group_tours: {
           type: 'boolean',
@@ -1029,6 +1029,40 @@ function agentErrorMessage(error: unknown): string {
 // AI AGENT CLASS
 // ============================================
 
+interface AgentIdentity {
+  name: string
+  email: string
+  timezone: string | null
+  country: string | null
+}
+
+const EMPTY_AGENT_IDENTITY: AgentIdentity = { name: '', email: '', timezone: null, country: null }
+
+/** An IANA zone the runtime accepts, else null. */
+function validTimeZone(tz: string | null | undefined): string | null {
+  if (!tz) return null
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+    return tz
+  } catch {
+    return null
+  }
+}
+
+/** The tenant the agent answers for: its name, email, clock and destination. */
+async function loadAgentIdentity(supabase: SupabaseClient | undefined, tenantId: string | null | undefined): Promise<AgentIdentity> {
+  if (!tenantId) return EMPTY_AGENT_IDENTITY
+  const sender = await loadSenderTenant(tenantId)
+  let timezone: string | null = null
+  let country: string | null = null
+  if (supabase) {
+    const { data } = await supabase.from('tenants').select('timezone, operating_country').eq('id', tenantId).maybeSingle()
+    timezone = (data as { timezone?: string | null } | null)?.timezone ?? null
+    country = (data as { operating_country?: string | null } | null)?.operating_country ?? null
+  }
+  return { name: sender?.company_name || '', email: sender?.contact_email || '', timezone, country }
+}
+
 export class WhatsAppAIAgent {
   private businessName: string
   private businessEmail: string
@@ -1041,8 +1075,11 @@ export class WhatsAppAIAgent {
       throw new Error('ANTHROPIC_API_KEY not configured')
     }
 
-    this.businessName = process.env.BUSINESS_NAME || ''
-    this.businessEmail = process.env.BUSINESS_EMAIL || ''
+    // Who the agent speaks for is the tenant the conversation belongs to
+    // (loadAgentIdentity, per message) — BUSINESS_NAME / BUSINESS_EMAIL named
+    // one operator for every tenant's customers.
+    this.businessName = ''
+    this.businessEmail = ''
     this.modelId = whatsappModel()
     this.toolsEnabled = process.env.WHATSAPP_AI_TOOLS_ENABLED === 'true'
     this.maxToolIterations = 3 // Prevent infinite loops
@@ -1150,21 +1187,26 @@ export class WhatsAppAIAgent {
   // BUILD SYSTEM PROMPT
   // ============================================
 
-  private buildSystemPrompt(context: ConversationContext): string {
+  private buildSystemPrompt(context: ConversationContext, identity: AgentIdentity = EMPTY_AGENT_IDENTITY): string {
+    // The tenant's own clock and destination (Settings → Organization). The
+    // prompt said Egypt and Cairo time for every tenant.
+    const timeZone = validTimeZone(identity.timezone) ?? 'UTC'
     const currentTime = new Date().toLocaleString('en-US', {
-      timeZone: 'Africa/Cairo',
+      timeZone,
       dateStyle: 'full',
       timeStyle: 'short'
     })
+    const where = identity.country ? ` to ${identity.country}` : ''
+    const who = identity.name ? `${identity.name}'s` : 'a travel company\'s'
 
-    let systemPrompt = `You are ${this.businessName}'s friendly WhatsApp assistant for travel inquiries to Egypt.
+    let systemPrompt = `You are ${who} friendly WhatsApp assistant for travel inquiries${where}.
 
-CURRENT TIME: ${currentTime} (Cairo time)
+CURRENT TIME: ${currentTime} (${timeZone})
 
 YOUR ROLE:
-- Help customers with travel inquiries about Egypt tours
+- Help customers with travel inquiries${identity.country ? ` about ${identity.country} tours` : ''}
 - Provide information about their existing bookings and quotes
-- Answer general questions about Egypt travel
+- Answer general questions about ${identity.country ? `${identity.country} travel` : 'their travel'}
 - Be warm, helpful, and professional
 - Keep responses concise (suitable for WhatsApp - max 2-3 short paragraphs)
 - Use appropriate emojis sparingly to be friendly
@@ -1195,10 +1237,7 @@ TOOL USAGE GUIDELINES:
 - Use check_availability to verify dates work
 - Use escalate_to_human for complex issues or explicit human requests
 
-CONTACT FOR URGENT MATTERS:
-Email: ${this.businessEmail}
-
-`
+${identity.email ? `CONTACT FOR URGENT MATTERS:\nEmail: ${identity.email}\n\n` : ''}`
 
     // Add customer context
     if (context.clientInfo) {
@@ -1263,7 +1302,10 @@ Email: ${this.businessEmail}
         }
       }
 
-      const systemPrompt = this.buildSystemPrompt(context)
+      const identity = await loadAgentIdentity(supabase, tenantId)
+      this.businessName = identity.name
+      this.businessEmail = identity.email
+      const systemPrompt = this.buildSystemPrompt(context, identity)
 
       // Build messages array with conversation history
       const messages: Anthropic.Messages.MessageParam[] = []

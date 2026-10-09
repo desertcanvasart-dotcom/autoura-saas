@@ -1,4 +1,5 @@
 import { formatMoney } from '@/lib/currency-totals'
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import { brandColorRgb, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawFooters } from './pdf-letterhead'
 import { jsPDF } from 'jspdf'
@@ -7,6 +8,8 @@ import { formatDateOnly } from '@/lib/date-utils'
 interface ReceiptData {
   receiptNumber: string
   invoiceNumber: string
+  /** What invoiceNumber is: 'Invoice' (default) or 'Itinerary' for a trip payment. */
+  referenceLabel?: string
   clientName: string
   clientEmail: string
   paymentDate: string
@@ -24,12 +27,14 @@ interface Invoice {
   currency: string
 }
 
-export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }): jsPDF {
+export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }, font?: JsPdfFont | null): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
   })
+  // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+  applyDocumentFont(doc, font)
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
@@ -74,7 +79,8 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
 
   y += 10
   doc.setFont('helvetica', 'normal')
-  doc.text(`Invoice: ${receipt.invoiceNumber}`, margin + 10, y)
+  // A trip payment's reference is the itinerary code — it was labelled "Invoice".
+  doc.text(`${receipt.referenceLabel || 'Invoice'}: ${receipt.invoiceNumber}`, margin + 10, y)
   
   y += 7
   const methodLabel = receipt.paymentMethod.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -127,7 +133,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   return doc
 }
 
-export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }) {
-  const doc = generateReceiptPDF(receipt, invoice, company)
+export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }, font?: JsPdfFont | null) {
+  const doc = generateReceiptPDF(receipt, invoice, company, font)
   doc.save(`Receipt-${receipt.receiptNumber}.pdf`)
 }

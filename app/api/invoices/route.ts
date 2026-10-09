@@ -7,6 +7,7 @@
 // Security: Requires authentication for all operations
 // ============================================
 
+import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { NextRequest, NextResponse } from 'next/server'
 import { formatMoney, roundToCurrency } from '@/lib/currency-totals'
 import { includeAdditions, partitionAdditions, toLineItems, type Addition } from '@/lib/invoice-additions'
@@ -177,7 +178,17 @@ export async function POST(request: NextRequest) {
     // Calculate amounts based on invoice type
     let totalAmount = body.total_amount || 0
     let lineItems = body.line_items || []
-    const depositPercent = body.deposit_percent || 10
+    // The agency's own deposit rule (Settings → Payment terms) when the form
+    // sends none — it was a fixed 10% for every tenant.
+    let depositPercent = Number(body.deposit_percent)
+    if (!(depositPercent > 0 && depositPercent <= 100)) {
+      const { data: depositTenant } = await supabase
+        .from('tenants')
+        .select('deposit_percent, deposit_due_days')
+        .eq('id', tenant_id)
+        .maybeSingle()
+      depositPercent = resolveDepositRule({ tenant: depositTenant }).depositPercent
+    }
     const fullTripCost = body.full_trip_cost || totalAmount // Store original trip cost
     const currency = body.currency || 'EUR'
 

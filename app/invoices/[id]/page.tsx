@@ -1,5 +1,6 @@
 'use client'
 
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -288,7 +289,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     setGeneratingPDF(true)
     try {
       const { downloadInvoicePDF } = await import('@/lib/invoice-pdf-generator')
-      downloadInvoicePDF(invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      downloadInvoicePDF(invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(invoice, tenant?.company_name))
     } catch (error) {
       console.error('Error generating PDF:', error)
       showToast('error', 'Failed to generate PDF. Please try again.')
@@ -341,7 +342,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
     
     const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
-    downloadReceiptPDF(receiptData, invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+    downloadReceiptPDF(receiptData, invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(receiptData, tenant?.company_name))
   }
 
   const handleDeletePayment = async (paymentId: string) => {

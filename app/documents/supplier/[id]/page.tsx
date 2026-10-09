@@ -1,5 +1,6 @@
 'use client'
 
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter, brandColor } from '@/components/documents/Letterhead'
 import { formatDateOnly, daysBetween } from '@/lib/date-utils'
@@ -129,7 +130,8 @@ export default function SupplierDocumentViewPage() {
   const buildPdf = async (doc: SupplierDocument) => {
     const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
     const company = { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }
-    return generateSupplierDocumentPDF({ ...withLanguageLabels(doc), company })
+    const labelled = { ...withLanguageLabels(doc), company }
+    return generateSupplierDocumentPDF(labelled, await browserPdfFontFor(labelled))
   }
 
   const handleDownload = async () => {

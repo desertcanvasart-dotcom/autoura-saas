@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDateOnly } from '@/lib/date-utils'
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 import { useEffect, useState } from 'react'
@@ -384,39 +385,38 @@ export default function ResourcesPage() {
 
   const exportToCSV = () => {
     const currentResources = filteredResources[activeTab]
-    let csvContent = ''
-    
-    if (activeTab === 'guides') {
-      csvContent = 'Name,Email,Phone,Languages,Hourly Rate,Daily Rate,Active,Created\n'
-      currentResources.forEach((resource: any) => {
-        csvContent += `${resource.name},${resource.email || ''},${resource.phone || ''},"${(resource.languages || []).join(', ')}",${resource.hourly_rate || ''},${resource.daily_rate || ''},${resource.is_active ? 'Yes' : 'No'},${new Date(resource.created_at).toLocaleDateString()}\n`
-      })
-    } else if (activeTab === 'vehicles') {
-      csvContent = 'Name,Type,Make,Capacity,License Plate,Active,Created\n'
-      currentResources.forEach((resource: any) => {
-        csvContent += `${resource.name},${resource.vehicle_type},${resource.make || ''},${resource.passenger_capacity},${resource.license_plate || ''},${resource.is_active ? 'Yes' : 'No'},${new Date(resource.created_at).toLocaleDateString()}\n`
-      })
-    } else if (activeTab === 'hotels') {
-      csvContent = 'Name,Type,City,Stars,Contact Person,Phone,Email,Active\n'
-      currentResources.forEach((resource: any) => {
-        csvContent += `${resource.name},${resource.property_type || ''},${resource.city},${resource.star_rating || ''},${resource.contact_person || ''},${resource.phone || ''},${resource.email || ''},${resource.is_active ? 'Yes' : 'No'}\n`
-      })
-    } else if (activeTab === 'restaurants') {
-      csvContent = 'Name,Type,Cuisine,City,Contact Person,Phone,Capacity,Active\n'
-      currentResources.forEach((resource: any) => {
-        csvContent += `${resource.name},${resource.restaurant_type || ''},${resource.cuisine_type || ''},${resource.city},${resource.contact_person || ''},${resource.phone || ''},${resource.capacity || ''},${resource.is_active ? 'Yes' : 'No'}\n`
-      })
-    } else if (activeTab === 'airportStaff') {
-      csvContent = 'Name,Role,Location,Phone,Languages,Active\n'
-      currentResources.forEach((resource: any) => {
-        csvContent += `${resource.name},${resource.role || ''},${resource.airport_location},"${resource.phone}","${(resource.languages || []).join(', ')}",${resource.is_active ? 'Yes' : 'No'}\n`
-      })
-    } else if (activeTab === 'hotelStaff') {
-      csvContent = 'Name,Role,Hotel,Phone,Languages,Active\n'
-      currentResources.forEach((resource: any) => {
-        csvContent += `${resource.name},${resource.role || ''},${resource.hotel?.name || 'N/A'},${resource.phone},"${(resource.languages || []).join(', ')}",${resource.is_active ? 'Yes' : 'No'}\n`
-      })
+    // Every cell quoted (a name or city with a comma shifted the columns
+    // after it) and formula-guarded; dates as calendar days.
+    const cell = (v: unknown) => {
+      const t = String(v ?? '')
+      return `"${(/^[=+\-@\t\r]/.test(t) ? `'${t}` : t).replace(/"/g, '""')}"`
     }
+    const day = (d: unknown) => (d ? formatDateOnly(String(d), 'en-GB') : '')
+    const yes = (b: unknown) => (b ? 'Yes' : 'No')
+    const langs = (l: unknown) => (Array.isArray(l) ? l.join(', ') : '')
+    let header: string[] = []
+    let rows: unknown[][] = []
+
+    if (activeTab === 'guides') {
+      header = ['Name', 'Email', 'Phone', 'Languages', 'Hourly Rate', 'Daily Rate', 'Active', 'Created']
+      rows = currentResources.map((r: any) => [r.name, r.email, r.phone, langs(r.languages), r.hourly_rate, r.daily_rate, yes(r.is_active), day(r.created_at)])
+    } else if (activeTab === 'vehicles') {
+      header = ['Name', 'Type', 'Make', 'Capacity', 'License Plate', 'Active', 'Created']
+      rows = currentResources.map((r: any) => [r.name, r.vehicle_type, r.make, r.passenger_capacity, r.license_plate, yes(r.is_active), day(r.created_at)])
+    } else if (activeTab === 'hotels') {
+      header = ['Name', 'Type', 'City', 'Stars', 'Contact Person', 'Phone', 'Email', 'Active']
+      rows = currentResources.map((r: any) => [r.name, r.property_type, r.city, r.star_rating, r.contact_person, r.phone, r.email, yes(r.is_active)])
+    } else if (activeTab === 'restaurants') {
+      header = ['Name', 'Type', 'Cuisine', 'City', 'Contact Person', 'Phone', 'Capacity', 'Active']
+      rows = currentResources.map((r: any) => [r.name, r.restaurant_type, r.cuisine_type, r.city, r.contact_person, r.phone, r.capacity, yes(r.is_active)])
+    } else if (activeTab === 'airportStaff') {
+      header = ['Name', 'Role', 'Location', 'Phone', 'Languages', 'Active']
+      rows = currentResources.map((r: any) => [r.name, r.role, r.airport_location, r.phone, langs(r.languages), yes(r.is_active)])
+    } else if (activeTab === 'hotelStaff') {
+      header = ['Name', 'Role', 'Hotel', 'Phone', 'Languages', 'Active']
+      rows = currentResources.map((r: any) => [r.name, r.role, r.hotel?.name || 'N/A', r.phone, langs(r.languages), yes(r.is_active)])
+    }
+    const csvContent = [header, ...rows].map(line => line.map(cell).join(',')).join('\n') + '\n'
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')

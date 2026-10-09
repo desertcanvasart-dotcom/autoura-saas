@@ -75,9 +75,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const message = `⏰ *${businessName} - Tour Reminder* ⏰\n\n` +
+    const message = `⏰ *${businessName ? `${businessName} - ` : ''}Tour Reminder* ⏰\n\n` +
       `Hi ${itinerary.client_name},\n\n` +
-      `Reminder: Your tour is tomorrow! 🌟\n\n` +
+      // The date is below; this said "tomorrow" whatever the date was.
+      `Reminder: your tour is coming up! 🌟\n\n` +
       `🎯 *Tour:* ${itinerary.trip_name || 'your trip'}\n` +
       `📅 *Date:* ${formatDate(itinerary.start_date)}\n` +
       `🕐 *Pickup Time:* ${itinerary.pickup_time || 'To be confirmed'}\n` +
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       `✅ Comfortable shoes recommended\n` +
       `✅ Don't forget your camera! 📸\n\n` +
       `Your guide will contact you shortly before pickup.\n\n` +
-      `See you soon! 🐪✨\n\n` +
+      `See you soon! ✨\n\n` +
       `${businessName} Team`
 
 

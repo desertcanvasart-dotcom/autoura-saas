@@ -1,3 +1,4 @@
+import { encodeEmailHeader } from '@/lib/email/mime-header'
 import { google } from 'googleapis'
 import { escapeHtml } from './html-escape'
 
@@ -143,7 +144,8 @@ export async function sendEmail(
   // containing "\r\nBcc: victim@x.com" injects arbitrary MIME headers
   // (header/Bcc injection). Header values are single-line by definition.
   const toHeader = sanitizeHeaderValue(to)
-  const subjectHeader = sanitizeHeaderValue(subject)
+  // RFC 2047 when the subject is not plain ASCII (lib/email/mime-header).
+  const subjectHeader = encodeEmailHeader(sanitizeHeaderValue(subject))
 
   // Create email in RFC 2822 format
   const emailLines = [

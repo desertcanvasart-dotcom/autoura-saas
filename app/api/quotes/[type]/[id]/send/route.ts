@@ -207,7 +207,8 @@ export async function POST(
       phone: sender?.company_phone,
       website: sender?.company_website,
     }
-    const tripName = quote.itineraries?.trip_name || 'Your tour'
+    // A calculator quote has no itinerary: its own trip_name (the tour).
+    const tripName = quote.itineraries?.trip_name || quote.trip_name || 'Your tour'
 
     // Generate PDF
     const identity = await loadDocumentIdentity(tenantId)

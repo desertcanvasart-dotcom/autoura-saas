@@ -1,10 +1,10 @@
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { daysOverdueOrNull, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
 import { escapeHtml } from '@/lib/html-escape'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
-import { getCurrencySymbol } from '@/lib/currency'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
 
 // Sends a reminder email directly via the shared mail helper.
@@ -30,9 +30,10 @@ async function sendReminderEmail(params: {
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
   // The agency the invoice belongs to (joined as `tenant`), never a fixed brand.
   const company = emailIdentity(invoice.tenant)
-  const currencySymbol = getCurrencySymbol(invoice.currency)
-  const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
-  const totalAmount = `${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`
+  // The currency's own decimals and separators: "JPY120000.00" was how a
+  // yen balance read (JPY has no symbol of its own here).
+  const balanceDue = formatMoney(invoice.balance_due, invoice.currency)
+  const totalAmount = formatMoney(invoice.total_amount, invoice.currency)
   // Callers skip invoices with no due date, but this renderer must not be the
   // thing that trusts it: "Invalid Date" and "NaN days overdue" in a payment
   // demand is worse than any missing line.

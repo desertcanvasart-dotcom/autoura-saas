@@ -39,14 +39,16 @@ function getStatusMessage(
 
     case 'pending_payment':
       message += `Your booking for *${tourName}* is confirmed! We're just waiting for your payment to finalize everything.\n\n`
-      message += `💳 Payment details have been sent to your email.\n\n`
+      // Nothing is emailed by this message: it said the payment details had
+      // been, whether or not anyone had sent them.
+      message += `💳 We'll send you the payment details — just reply here if you need them again.\n\n`
       message += `Once payment is received, you're all set! 🎯`
       break
 
     case 'paid':
       message += `Thank you! We've received your payment for *${tourName}*. ✅\n\n`
       message += `Everything is confirmed and ready to go! Your guide will contact you 24 hours before your tour.\n\n`
-      message += `Get ready for an amazing adventure! 🐪✨`
+      message += `Get ready for an amazing adventure! ✨`
       break
 
     case 'completed':

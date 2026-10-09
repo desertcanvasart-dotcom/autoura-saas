@@ -6,6 +6,7 @@
 // and the agency's note at the foot of every page — all from Settings →
 // Organization. Was pdf-lib with its own header and a one-line footer.
 
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import jsPDF from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
 import { brandColorRgb, fetchLogoDataUrl, type CompanyIdentity } from '@/lib/company-identity'
@@ -45,6 +46,8 @@ interface ContractData {
   /** What the operator set on the contract page. Each one left out falls
    *  back to lib/contract-terms' default, as the page itself starts. */
   terms?: Partial<ContractTerms>
+  /** Noto Sans JP for non-Latin text (lib/pdf/jspdf-font); omitted = Helvetica. */
+  font?: JsPdfFont | null
 }
 
 export async function generateContractPDF(data: ContractData): Promise<Uint8Array> {
@@ -64,6 +67,8 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   }
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+  applyDocumentFont(pdf, data.font)
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
   const margin = 18

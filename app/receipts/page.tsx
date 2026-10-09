@@ -1,5 +1,6 @@
 'use client'
 
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
@@ -162,6 +163,7 @@ export default function ReceiptsPage() {
       downloadReceiptPDF({
         receiptNumber,
         invoiceNumber: payment.source_reference,
+        referenceLabel: payment.source === 'itinerary' ? 'Itinerary' : 'Invoice',
         clientName: payment.client_name,
         clientEmail: payment.client_email || '',
         paymentDate: payment.payment_date || new Date().toISOString(),
@@ -175,7 +177,7 @@ export default function ReceiptsPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(payment, tenant?.company_name))
     } catch (error) {
       console.error('Error downloading receipt:', error)
       showToast('error', 'Failed to download receipt')

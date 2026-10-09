@@ -96,10 +96,13 @@ export default function B2CQuoteEmail({
                   <Text style={value}>{start}</Text>
                 </Column>
               )}
-              <Column>
-                <Text style={label}>Duration</Text>
-                <Text style={value}>{duration} days</Text>
-              </Column>
+              {/* No duration known (a calculator quote has no trip): no row, never "0 days". */}
+              {duration > 0 && (
+                <Column>
+                  <Text style={label}>Duration</Text>
+                  <Text style={value}>{duration} days</Text>
+                </Column>
+              )}
             </Row>
 
             <Row>

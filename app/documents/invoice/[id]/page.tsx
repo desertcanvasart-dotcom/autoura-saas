@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMoney } from '@/lib/currency-totals'
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -32,7 +34,8 @@ interface Payment {
   total_cost?: number | null
 }
 
-const PAYMENT_INSTRUCTIONS = 'Payment accepted via bank transfer or credit card.'
+// No fixed payment instructions: "bank transfer or credit card" was printed
+// for every agency, whatever it accepts. The terms come from its settings.
 
 export default function InvoicePage() {
   const { tenant } = useTenant()
@@ -73,7 +76,9 @@ export default function InvoicePage() {
     setDownloading(true)
     
     try {
-      const invoiceNumber = `INV-${payment.itinerary_code}-${payment.id.slice(0, 4).toUpperCase()}`
+      // A payment's own reference, not an "INV-" number that no invoice in
+      // the Invoices list carries.
+      const invoiceNumber = payment.transaction_reference || `PAY-${payment.itinerary_code}-${payment.id.slice(0, 8).toUpperCase()}`
       const shape = paymentInvoiceShape(payment.payment_type, payment.amount, payment.total_cost)
 
       // Build invoice object for PDF generator
@@ -103,14 +108,15 @@ export default function InvoicePage() {
         balance_due: payment.payment_status === 'completed' ? 0 : payment.amount,
         status: payment.payment_status === 'completed' ? 'paid' : 'sent',
         issue_date: payment.created_at,
-        due_date: payment.due_date || payment.payment_date || new Date().toISOString(),
+        // Never "today": a payment with no dates shows the day it was recorded.
+        due_date: payment.due_date || payment.payment_date || payment.created_at,
         notes: payment.notes,
         payment_terms: paymentTerms,
-        payment_instructions: PAYMENT_INSTRUCTIONS
+        payment_instructions: ''
       }
       
       const { downloadInvoicePDF } = await import('@/lib/invoice-pdf-generator')
-      downloadInvoicePDF(invoiceData, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      downloadInvoicePDF(invoiceData, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(invoiceData, tenant?.company_name))
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download invoice')
@@ -158,7 +164,7 @@ export default function InvoicePage() {
   const invoiceNumber = `INV-${payment.itinerary_code}-${payment.id.slice(0, 4).toUpperCase()}`
   const isPaid = payment.payment_status === 'completed'
   const shape = paymentInvoiceShape(payment.payment_type, payment.amount, payment.total_cost)
-  const money = (n: number) => `${payment.currency} ${n.toFixed(2)}`
+  const money = (n: number) => formatMoney(n, payment.currency)
 
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
@@ -250,7 +256,7 @@ export default function InvoicePage() {
                   {payment.payment_method.replace('_', ' ')}
                 </div>
                 <div className="col-span-2 text-right font-semibold text-gray-900">
-                  {payment.currency} {payment.amount.toFixed(2)}
+                  {formatMoney(payment.amount, payment.currency)}
                 </div>
               </div>
             </div>
@@ -284,13 +290,13 @@ export default function InvoicePage() {
               <div className="flex justify-between py-2 border-b border-gray-200">
                 <span className="text-sm text-gray-600">Subtotal</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {payment.currency} {payment.amount.toFixed(2)}
+                  {formatMoney(payment.amount, payment.currency)}
                 </span>
               </div>
               <div className="flex justify-between py-3 bg-gray-50 px-3 rounded-lg mt-2">
                 <span className="text-base font-bold text-gray-900">Total</span>
                 <span className="text-xl font-bold text-primary-600">
-                  {payment.currency} {payment.amount.toFixed(2)}
+                  {formatMoney(payment.amount, payment.currency)}
                 </span>
               </div>
               {isPaid && (
@@ -307,7 +313,7 @@ export default function InvoicePage() {
           <div className="border-t border-gray-200 pt-6">
             <h4 className="text-sm font-semibold text-gray-900 mb-2">Payment Terms</h4>
             <p className="text-xs text-gray-600">
-              {paymentTerms} {PAYMENT_INSTRUCTIONS}
+              {paymentTerms}
             </p>
           </div>
 

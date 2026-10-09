@@ -1,3 +1,4 @@
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { NextRequest, NextResponse } from 'next/server'
 import { toApprovedGaps } from '@/lib/itineraries/share-approval'
 import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: itinerary, error } = await supabase!
     .from('itineraries')
-    .select('id, status, total_cost, currency, tenant_id')
+    .select('id, status, total_cost, currency, tenant_id, margin_percent')
     .eq('id', id)
     .eq('tenant_id', tenant_id!)
     .maybeSingle()
@@ -67,7 +68,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
   }
 
-  const priceCheck = checkAmountDeliverable(itinerary.total_cost, { currency: itinerary.currency })
+  // The client total from the services (lib/itinerary-client-total), as the
+  // email and WhatsApp sends use — the header cache can be 0 or stale, and a
+  // priced trip with a 0 cache was refused a link.
+  const clientTotal = effectiveItineraryTotal(itinerary, itineraryLines.services)
+  const priceCheck = checkAmountDeliverable(clientTotal, { currency: itinerary.currency })
   if (!priceCheck.ok) {
     return NextResponse.json(
       { success: false, error: 'Itinerary price is not deliverable', violations: priceCheck.violations },

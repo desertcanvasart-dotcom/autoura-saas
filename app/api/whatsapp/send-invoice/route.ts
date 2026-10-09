@@ -1,3 +1,4 @@
+import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant, type SenderTenant } from '@/lib/sender-tenant'
@@ -19,7 +20,7 @@ async function invoicePdfBytes(invoice: any, senderTenant: SenderTenant | null):
   const logoDataUrl = logoUrl && (await checkPublicHttpUrl(logoUrl)).ok
     ? await fetchLogoDataUrl(logoUrl)
     : undefined
-  const pdf = generateInvoicePDF(invoice, { ...identityFromTenant(senderTenant), logoDataUrl })
+  const pdf = generateInvoicePDF(invoice, { ...identityFromTenant(senderTenant), logoDataUrl }, await serverPdfFontFor(invoice, senderTenant?.company_name))
   return new Uint8Array(pdf.output('arraybuffer'))
 }
 

@@ -187,7 +187,8 @@ export async function POST(
     const senderTenant = await loadSenderTenant(tenant_id)
     const businessName = senderTenant?.company_name || ''
     const businessEmail = senderTenant?.contact_email || ''
-    const tripName = quote.itineraries?.trip_name || 'Your tour'
+    // A calculator quote has no itinerary: its own trip_name (the tour).
+    const tripName = quote.itineraries?.trip_name || quote.trip_name || 'Your tour'
     // "8 November 2026", never toLocaleDateString()'s bare "11/8/2026" (read
     // as 8 Nov or 11 Aug depending on who reads it); money in its currency's
     // decimals and separators, never "EUR 1,250.5".
@@ -211,7 +212,7 @@ export async function POST(
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `🎯 *Tour:* ${tripName}\n` +
         (startDate ? `📅 *Dates:* ${startDate}${endDate ? ` - ${endDate}` : ''}\n` : '') +
-        `⏱️ *Duration:* ${quote.itineraries?.total_days || 0} days\n` +
+        (quote.itineraries?.total_days ? `⏱️ *Duration:* ${quote.itineraries.total_days} days\n` : '') +
         `👥 *Travelers:* ${quote.num_travelers} ${quote.num_travelers === 1 ? 'person' : 'people'}\n` +
         `🏆 *Service Level:* ${quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}\n\n` +
         `💰 *TOTAL PRICE: ${formatMoney(quote.selling_price, quote.currency)}*\n` +
@@ -239,7 +240,7 @@ export async function POST(
         `📋 *Rate Sheet - ${quote.quote_number}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `🎯 *Tour:* ${tripName}\n` +
-        `⏱️ *Duration:* ${quote.itineraries?.total_days || 0} days\n` +
+        (quote.itineraries?.total_days ? `⏱️ *Duration:* ${quote.itineraries.total_days} days\n` : '') +
         `🏆 *Service Tier:* ${quote.tier.toUpperCase()}\n` +
         `👥 *Pax Range:* ${minPax} - ${maxPax} pax\n` +
         `${quote.tour_leader_included ? '✅ Tour Leader +1 Included\n' : ''}\n` +

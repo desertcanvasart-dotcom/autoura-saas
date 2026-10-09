@@ -1,9 +1,9 @@
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
-import { getCurrencySymbol } from '@/lib/currency'
 import { daysOverdueOrNull, reminderBlocker } from '@/lib/invoice-dates'
 import { escapeHtml } from '@/lib/html-escape'
 
@@ -11,9 +11,10 @@ import { escapeHtml } from '@/lib/html-escape'
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
   // The agency the invoice belongs to (joined as `tenant`), never a fixed brand.
   const company = emailIdentity(invoice.tenant)
-  const currencySymbol = getCurrencySymbol(invoice.currency)
-  const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
-  const totalAmount = `${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`
+  // The currency's own decimals and separators: "JPY120000.00" was how a
+  // yen balance read (JPY has no symbol of its own here).
+  const balanceDue = formatMoney(invoice.balance_due, invoice.currency)
+  const totalAmount = formatMoney(invoice.total_amount, invoice.currency)
   const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB', { 
     day: 'numeric', month: 'long', year: 'numeric' 
   })

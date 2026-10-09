@@ -3,11 +3,12 @@
 // File: lib/pdf-generator.ts
 // ============================================
 
+import { formatMoney } from '@/lib/currency-totals'
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import { jsPDF } from 'jspdf'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { formatDateOnly } from '@/lib/date-utils'
 import { identityFooterLine, brandColorRgb, tint, type CompanyIdentity } from './company-identity'
-import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
 import { effectiveItineraryTotal, serviceClientPrice, type PricedService } from '@/lib/itinerary-client-total'
 
 // ============================================
@@ -68,6 +69,8 @@ interface AggregatedService {
 interface PDFOptions {
   showPricingBreakdown?: boolean  // true = show service breakdown, false = total only
   showServiceDetails?: boolean    // show individual service lines
+  /** Noto Sans JP for non-Latin text (lib/pdf/jspdf-font); omitted = Helvetica. */
+  font?: JsPdfFont | null
 }
 
 const DEFAULT_OPTIONS: PDFOptions = {
@@ -148,18 +151,12 @@ function formatShortDate(dateStr: string): string {
 }
 
 /**
- * Get currency symbol
- */
-function getCurrencySymbol(currency: string): string {
-  return canonicalCurrencySymbol(currency)
-}
-
-/**
  * Format currency amount
  */
 function formatCurrency(amount: number, currency: string): string {
-  const symbol = getCurrencySymbol(currency)
-  return `${symbol}${Number(amount).toFixed(2)}`
+  // The currency's own decimals and separators — "JPY450000.00" was the yen
+  // total, beside an email body reading "¥450,000".
+  return formatMoney(Number(amount), currency)
 }
 
 /**
@@ -270,6 +267,8 @@ export function generateItineraryPDF(
       unit: 'mm',
       format: 'a4'
     })
+    // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+    applyDocumentFont(doc, opts.font)
 
     const pageWidth = doc.internal.pageSize.getWidth()
     const pageHeight = doc.internal.pageSize.getHeight()

@@ -1,5 +1,7 @@
 'use client'
 
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { todayLocal } from '@/lib/today'
@@ -21,6 +23,16 @@ import {
   paymentTermsText, standardTerms, type ContractTerms,
 } from '@/lib/contract-terms'
 
+/** The contract price: the services' client total, else the stored total; null = no price yet. */
+function contractTotal(itin: { total_cost?: unknown; margin_percent?: unknown; itinerary_days?: { itinerary_services?: { total_cost: number | string | null; client_price?: number | string | null }[] | null }[] }): number | null {
+  const services = (itin.itinerary_days ?? []).flatMap(d => d.itinerary_services ?? [])
+  const total = effectiveItineraryTotal(
+    { total_cost: typeof itin.total_cost === 'number' ? itin.total_cost : null, margin_percent: itin.margin_percent },
+    services
+  )
+  return total > 0 ? total : null
+}
+
 // The fields an itinerary actually has (the old shape named num_travelers,
 // tour_name, destinations and parsed_data — none of which exist).
 interface Itinerary {
@@ -37,7 +49,12 @@ interface Itinerary {
   end_date: string
   total_cost: number | null
   currency?: string | null
-  itinerary_days?: { day_number?: number | null; city?: string | null; overnight_city?: string | null }[]
+  itinerary_days?: {
+    day_number?: number | null
+    city?: string | null
+    overnight_city?: string | null
+    itinerary_services?: { total_cost: number | string | null; client_price?: number | string | null }[] | null
+  }[]
 }
 
 interface ContractData extends ContractTerms {
@@ -140,7 +157,9 @@ export default function ContractPage() {
           endDate: itin.end_date,
           duration: contractDuration(itin) ?? '',
           destinations: contractDestinations(itin.itinerary_days ?? []),
-          totalCost: typeof itin.total_cost === 'number' ? itin.total_cost : null
+          // The client total from the services, as the quote emails show
+          // it — itineraries.total_cost is a cache that can be 0 or stale.
+          totalCost: contractTotal(itin)
         }))
       }
     } catch (error) {
@@ -226,6 +245,7 @@ export default function ContractPage() {
         currency: itinerary?.currency || '',
         settings,
         terms: editedTerms,
+        font: await browserPdfFontFor(contractData, editedTerms, settings, tenant?.company_name),
       })
       
       // Download the PDF

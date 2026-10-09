@@ -1,3 +1,4 @@
+import { attachmentNameParams, encodeEmailHeader, singleLine } from '@/lib/email/mime-header'
 import { NextRequest, NextResponse } from 'next/server'
 import { claimSend, finishSend, threadConflict, replyBodyHash } from '@/lib/email/send-guard'
 import { replyHeaders, threadingLines, type ThreadingHeaders } from '@/lib/email/threading'
@@ -339,7 +340,7 @@ function stripHeader(value: string): string {
 function buildSimpleEmail(to: string, subject: string, body: string, threading: ThreadingHeaders = {}): string {
   const emailLines = [
     `To: ${stripHeader(to)}`,
-    `Subject: ${stripHeader(subject)}`,
+    `Subject: ${encodeEmailHeader(subject)}`,
     ...threadingLines(threading),
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
@@ -365,7 +366,7 @@ function buildEmailWithAttachments(
   
   const emailParts = [
     `To: ${stripHeader(to)}`,
-    `Subject: ${stripHeader(subject)}`,
+    `Subject: ${encodeEmailHeader(subject)}`,
     ...threadingLines(threading),
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -381,9 +382,9 @@ function buildEmailWithAttachments(
   for (const attachment of attachments) {
     emailParts.push(
       `--${boundary}`,
-      `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
+      `Content-Type: ${singleLine(attachment.mimeType)}; ${attachmentNameParams(attachment.filename).name}`,
       'Content-Transfer-Encoding: base64',
-      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      `Content-Disposition: attachment; ${attachmentNameParams(attachment.filename).disposition}`,
       '',
       attachment.data
     )

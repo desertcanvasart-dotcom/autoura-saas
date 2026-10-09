@@ -1,3 +1,5 @@
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
@@ -77,9 +79,16 @@ export async function POST(request: NextRequest) {
     const numAdults = itinerary.num_adults || 1
     const numChildren = itinerary.num_children || 0
     // No price yet = "To be confirmed", never 0.00.
+    // The client total from the services (lib/itinerary-client-total), the
+    // figure the quote sends use; the header cache can be 0 or stale.
+    const { data: priceLines } = await supabase
+      .from('itinerary_services')
+      .select('total_cost, client_price')
+      .eq('itinerary_id', itineraryId)
+    const clientTotal = effectiveItineraryTotal(itinerary, priceLines ?? [])
     const totalCost: number | null = edits.totalCost !== undefined
       ? edits.totalCost
-      : typeof itinerary.total_cost === 'number' ? itinerary.total_cost : null
+      : clientTotal > 0 ? clientTotal : null
     const tourName = edits.tourName?.trim() || itinerary.trip_name || 'Your tour'
 
     // Generate contract PDF
@@ -128,7 +137,7 @@ export async function POST(request: NextRequest) {
       terms: edits,
     }
 
-    const pdfBytes = await generateContractPDF(contractData)
+    const pdfBytes = await generateContractPDF({ ...contractData, font: await serverPdfFontFor(contractData) })
 
     // Upload to Supabase Storage
 
