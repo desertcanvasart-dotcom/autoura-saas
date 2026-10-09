@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { partnerInTenant } from '@/lib/quotes/partner-in-tenant';
 
 /**
  * POST /api/quotes/b2b/from-itinerary
@@ -37,6 +38,12 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Missing required fields: itinerary_id, tier' },
         { status: 400 }
       );
+    }
+
+    // The partner must be this tenant's (lib/quotes/partner-in-tenant).
+    const partnerCheck = await partnerInTenant(createAdminClient(), partner_id, authResult.tenant_id);
+    if (!partnerCheck.ok) {
+      return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status });
     }
 
     // Admin client with explicit tenant scoping (auth gate above is the security boundary)

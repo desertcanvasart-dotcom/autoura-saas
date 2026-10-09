@@ -1,5 +1,6 @@
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
+import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
@@ -243,7 +244,7 @@ export async function POST(
         `👥 *Pax Range:* ${minPax} - ${maxPax} pax\n` +
         `${quote.tour_leader_included ? '✅ Tour Leader +1 Included\n' : ''}\n` +
         `💰 *Best Rate (Per Person):* ${formatMoney(lowestPP, quote.currency)} @ ${maxPax} pax\n\n` +
-        `📄 *Complete multi-pax pricing table and cost breakdown attached as PDF.*\n\n` +
+        `📄 *Complete multi-pax pricing table attached as PDF.*\n\n` +
         (quote.season ? `🌞 *Season:* ${quote.season}\n` : '') +
         (quote.valid_from && quote.valid_until ?
           `📅 *Valid:* ${day(quote.valid_from)} - ${day(quote.valid_until)}\n\n` : '\n') +
@@ -267,18 +268,17 @@ export async function POST(
       )
     }
 
-    // Update quote status
-    const updateData: any = {
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      sent_via: 'whatsapp',
-    }
-
+    // Update quote status (lib/quotes/quote-sent-update: b2b_quotes has no
+    // sent_at/sent_via, and only a draft becomes 'sent').
+    const updateData = quoteSentUpdate(type, quote.status, 'whatsapp')
     const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
-    const { error: updateError } = await supabaseAdmin
-      .from(tableName)
-      .update(updateData)
-      .eq('id', id)
+    const { error: updateError } = updateData
+      ? await supabaseAdmin
+          .from(tableName)
+          .update(updateData)
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+      : { error: null }
 
     if (updateError) {
       console.error('Quote update error:', updateError)

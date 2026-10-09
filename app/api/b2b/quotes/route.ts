@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
+import { calculatorPricingTable, pickEditable } from '@/lib/quotes/calculator-pricing-table'
 
 // ============================================
 // B2B QUOTES API — calculator save/list/update
@@ -122,6 +124,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Pricing data is required' }, { status: 400 })
     }
 
+    // The partner must be this tenant's: the quote is later read and sent to
+    // it through the admin client (lib/quotes/partner-in-tenant).
+    const partnerCheck = await partnerInTenant(getSupabaseAdmin(), partner_id, authResult.tenant_id)
+    if (!partnerCheck.ok) {
+      return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
+    }
+
+    // NOT NULL, read by every partner page: the quote's own size plus the
+    // rate sheet generated on the calculator, when there is one.
+    const pricingTable = calculatorPricingTable(
+      { pax: (Number(num_adults) || 0) + (Number(num_children) || 0), sellingPrice: selling_price, pricePerPerson: price_per_person },
+      body.rate_sheet
+    )
+    if (!pricingTable) {
+      return NextResponse.json({ success: false, error: 'A group size, selling price and per-person price are required' }, { status: 400 })
+    }
+
     // Calculate valid_until date
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + valid_days)
@@ -151,7 +170,9 @@ export async function POST(request: NextRequest) {
         currency,
         tour_leader_included,
         tour_leader_cost,
-        single_supplement,
+        // NOT NULL: a quote with no supplement stores 0, never null.
+        single_supplement: Number(single_supplement) || 0,
+        pricing_table: pricingTable,
         // Store only non-default values (mig 326): NULL = egyptologist/spot.
         guide_grade: guide_grade === 'egyptologist' ? null : guide_grade,
         guide_mode: guide_mode === 'spot' ? null : guide_mode,
@@ -194,10 +215,21 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, tenant_id: _ignoredTenantId, ...updates } = body
+    const id = body?.id
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
+    }
+
+    // Only the editable fields — the body was spread into the update, so a
+    // request could set any column, prices and partner included.
+    const updates = pickEditable(body)
+    if (updates.partner_id !== undefined) {
+      const partnerCheck = await partnerInTenant(getSupabaseAdmin(), updates.partner_id, authResult.tenant_id)
+      if (!partnerCheck.ok) {
+        return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
+      }
+      updates.partner_id = updates.partner_id || null
     }
 
     updates.updated_at = new Date().toISOString()

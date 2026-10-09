@@ -1,5 +1,6 @@
 'use client'
 
+import { formatMoney } from '@/lib/currency-totals'
 import { Fragment, useState, useEffect, useMemo } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
@@ -167,6 +168,9 @@ export default function TourPriceCalculator() {
   const [availableExtras, setAvailableExtras] = useState<CatalogueExtraOption[]>([])
   const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([])
   const rateCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
+  // Prices are in the run's currency (the tenant's rates currency); they
+  // were all labelled in euros whatever the operator priced in.
+  const money = (n: unknown) => formatMoney(n, result?.currency || rateCurrency)
 
   // Save Quote state
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -384,7 +388,12 @@ export default function TourPriceCalculator() {
           // Store only non-default values — NULL means the defaults (mig 326).
           guide_grade: guideGrade === 'egyptologist' ? null : guideGrade,
           guide_mode: guideMode === 'spot' ? null : guideMode,
-          single_supplement: result.single_supplement || null,
+          single_supplement: result.single_supplement || 0,
+          // The prices are in the run's currency (the tenant's rates currency),
+          // not the column's EUR default.
+          currency: result.currency,
+          // The generated sheet becomes the partner's multi-pax table.
+          rate_sheet: rateSheet.map(row => ({ pax: row.pax, pp: row.price_per_person, total: row.selling_price })),
           is_eur_passport: isEurPassport,
           season: result.season,
           notes: quoteForm.notes || null
@@ -422,7 +431,8 @@ export default function TourPriceCalculator() {
     if (rateSheet.length === 0) return
     const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade === 'senior' ? ' Senior' : ''})` : ''
     const tourLeaderSuffix = (tourLeaderIncluded ? ' (+1 TL)' : ' (+0)') + guideSuffix
-    const headers = ['Passengers', 'Total Cost (€)', 'Margin (€)', 'Selling Price (€)', 'Per Person (€)']
+    const cur = result?.currency || rateCurrency
+    const headers = ['Passengers', `Total Cost (${cur})`, `Margin (${cur})`, `Selling Price (${cur})`, `Per Person (${cur})`]
     const rows = rateSheet.map(row => [
       row.pax,
       row.total_cost.toFixed(2),
@@ -790,7 +800,7 @@ export default function TourPriceCalculator() {
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
                     <strong>Group:</strong> {result.num_pax} total ({result.num_paying_pax} paying guests + 1 tour leader)
                     {typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
-                      <span className="ml-2">• <strong>TL Cost:</strong> €{result.tour_leader_cost.toFixed(2)}</span>
+                      <span className="ml-2">• <strong>TL Cost:</strong> {money(result.tour_leader_cost)}</span>
                     )}
                   </div>
                 )}
@@ -798,19 +808,19 @@ export default function TourPriceCalculator() {
                 <div className="grid grid-cols-4 gap-4">
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Total Cost</p>
-                    <p className="text-xl font-bold">€{result.total_cost.toFixed(2)}</p>
+                    <p className="text-xl font-bold">{money(result.total_cost)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Margin ({result.margin_percent}%)</p>
-                    <p className="text-xl font-bold text-green-600">€{result.margin_amount.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-green-600">{money(result.margin_amount)}</p>
                   </div>
                   <div className="bg-[#647C47]/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Selling Price</p>
-                    <p className="text-xl font-bold text-[#647C47]">€{result.selling_price.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-[#647C47]">{money(result.selling_price)}</p>
                   </div>
                   <div className="bg-[#647C47]/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Per Person</p>
-                    <p className="text-xl font-bold text-[#647C47]">€{result.price_per_person.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-[#647C47]">{money(result.price_per_person)}</p>
                   </div>
                 </div>
 
@@ -823,7 +833,7 @@ export default function TourPriceCalculator() {
                         Single Supplement (for solo travelers)
                       </span>
                       <span className="text-lg font-bold text-amber-700">
-                        €{result.single_supplement.toFixed(2)}
+                        {money(result.single_supplement)}
                       </span>
                     </div>
                     <p className="text-xs text-amber-600 mt-1">
@@ -904,8 +914,8 @@ export default function TourPriceCalculator() {
                         </td>
                         <td className="px-4 py-2 text-center text-gray-500">{service.quantity_mode}</td>
                         <td className="px-4 py-2 text-right">{service.quantity}</td>
-                        <td className="px-4 py-2 text-right">€{service.unit_cost.toFixed(2)}</td>
-                        <td className="px-4 py-2 text-right font-medium">€{service.line_total.toFixed(2)}</td>
+                        <td className="px-4 py-2 text-right">{money(service.unit_cost)}</td>
+                        <td className="px-4 py-2 text-right font-medium">{money(service.line_total)}</td>
                       </tr>
                         ))}
                       </Fragment>
@@ -914,21 +924,21 @@ export default function TourPriceCalculator() {
                   <tfoot className="bg-gray-50 font-medium">
                     <tr>
                       <td colSpan={5} className="px-4 py-2 text-right">Subtotal:</td>
-                      <td className="px-4 py-2 text-right">€{result.subtotal_cost.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">{money(result.subtotal_cost)}</td>
                     </tr>
                     {result.tour_leader_included && typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
                       <tr>
                         <td colSpan={5} className="px-4 py-2 text-right text-blue-600">Tour Leader Cost:</td>
-                        <td className="px-4 py-2 text-right text-blue-600">€{result.tour_leader_cost.toFixed(2)}</td>
+                        <td className="px-4 py-2 text-right text-blue-600">{money(result.tour_leader_cost)}</td>
                       </tr>
                     )}
                     <tr>
                       <td colSpan={5} className="px-4 py-2 text-right text-green-600">Margin ({result.margin_percent}%):</td>
-                      <td className="px-4 py-2 text-right text-green-600">€{result.margin_amount.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-green-600">{money(result.margin_amount)}</td>
                     </tr>
                     <tr className="text-lg">
                       <td colSpan={5} className="px-4 py-2 text-right text-[#647C47]">Total:</td>
-                      <td className="px-4 py-2 text-right text-[#647C47]">€{result.selling_price.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-[#647C47]">{money(result.selling_price)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1020,10 +1030,10 @@ export default function TourPriceCalculator() {
                         {row.pax}
                         {tourLeaderIncluded && <span className="text-xs text-blue-500 ml-1">(+1)</span>}
                       </td>
-                      <td className="px-4 py-2 text-right">€{row.total_cost.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right text-green-600">€{row.margin_amount.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right font-medium">€{row.selling_price.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right font-bold text-[#647C47]">€{row.price_per_person.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">{money(row.total_cost)}</td>
+                      <td className="px-4 py-2 text-right text-green-600">{money(row.margin_amount)}</td>
+                      <td className="px-4 py-2 text-right font-medium">{money(row.selling_price)}</td>
+                      <td className="px-4 py-2 text-right font-bold text-[#647C47]">{money(row.price_per_person)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1152,7 +1162,7 @@ export default function TourPriceCalculator() {
                 </div>
                 <div className="flex justify-between pt-2 border-t mt-2">
                   <span className="text-gray-600">Selling Price:</span>
-                  <span className="font-bold text-[#647C47]">€{result?.selling_price.toFixed(2)}</span>
+                  <span className="font-bold text-[#647C47]">{money(result?.selling_price)}</span>
                 </div>
               </div>
             </div>
