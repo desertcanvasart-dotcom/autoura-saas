@@ -79,6 +79,22 @@ const DEFAULT_OPTIONS: PDFOptions = {
 // HELPER FUNCTIONS
 // ============================================
 
+/** The inclusions a trip's services stand for, in a fixed order. */
+export function tripInclusions(services: Array<{ service_type?: string | null; service_name?: string | null }>): string[] {
+  const types = new Set(services.map(s => String(s.service_type ?? '').toLowerCase()))
+  const has = (...t: string[]) => t.some(x => types.has(x))
+  const out: string[] = []
+  if (has('accommodation', 'hotel')) out.push('Accommodation as listed in the itinerary')
+  if (has('cruise')) out.push('Cruise as listed in the itinerary')
+  if (has('transportation', 'transport', 'transfer')) out.push('Transport for the transfers and tours listed')
+  if (has('guide')) out.push('Guiding for the tours listed')
+  if (has('entrance', 'entrance_fee', 'activity', 'tour', 'excursion')) out.push('Entrance fees for the sites listed')
+  if (has('meal', 'breakfast', 'lunch', 'dinner')) out.push('Meals as listed in the itinerary')
+  if (has('flight')) out.push('Flights as listed in the itinerary')
+  if (services.some(s => /\bwater\b/i.test(String(s.service_name ?? '')) || String(s.service_type ?? '').toLowerCase() === 'water')) out.push('Bottled water')
+  return out
+}
+
 /**
  * Clean up service names for display
  */
@@ -526,30 +542,27 @@ export function generateItineraryPDF(
       yPos = margin
     }
 
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...brand)
-    doc.text('INCLUSIONS', margin, yPos)
-    yPos += 6
+    // What THIS trip includes, read off its services. The list was fixed —
+    // a private vehicle, an English-speaking guide, entrance fees, bottled
+    // water — printed on a hotel-only trip as much as a full tour.
+    const inclusions = tripInclusions(days.flatMap(d => (d.services || []) as Array<{ service_type?: string | null; service_name?: string | null }>))
 
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(60, 60, 60)
+    if (inclusions.length > 0) {
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...brand)
+      doc.text('INCLUSIONS', margin, yPos)
+      yPos += 6
 
-    const inclusions = [
-      'Private air-conditioned vehicle for all transfers and tours',
-      'Professional English-speaking guide',
-      'All entrance fees to sites mentioned in the itinerary',
-      'Bottled water during tours',
-      'All applicable taxes and service charges'
-    ]
-
-    inclusions.forEach(item => {
-      doc.text(`• ${item}`, margin + 3, yPos)
-      yPos += 5
-    })
-
-    yPos += 6
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      inclusions.forEach(item => {
+        doc.text(`• ${item}`, margin + 3, yPos)
+        yPos += 5
+      })
+      yPos += 6
+    }
 
     // ============================================
     // EXCLUSIONS
@@ -588,24 +601,23 @@ export function generateItineraryPDF(
       yPos = margin
     }
 
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...brand)
-    doc.text('PAYMENT TERMS', margin, yPos)
-    yPos += 6
+    if (company.paymentTerms) {
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...brand)
+      doc.text('PAYMENT TERMS', margin, yPos)
+      yPos += 6
+    }
 
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(60, 60, 60)
 
-    const terms = [
-      '30% deposit required to confirm booking',
-      'Remaining balance due 14 days before arrival',
-      'Payment accepted via bank transfer or credit card'
-    ]
-
+    // The agency's own deposit and terms (Settings → Organization). This
+    // printed "30% deposit… balance due 14 days before arrival" for everyone.
+    const terms = company.paymentTerms ? (doc.splitTextToSize(company.paymentTerms, contentWidth - 6) as string[]) : []
     terms.forEach(term => {
-      doc.text(`• ${term}`, margin + 3, yPos)
+      doc.text(term, margin + 3, yPos)
       yPos += 5
     })
 

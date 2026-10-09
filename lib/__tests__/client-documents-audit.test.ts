@@ -95,6 +95,66 @@ describe('the supplier voucher PDF dates its lines', () => {
     expect(text).toContain('Oct 2')
     expect(text).toContain('Oct 4')
     expect(text).toContain('Oct 6')
-    expect(text).toContain('EUR 300.00')
+    expect(text).toContain('TOTAL AMOUNT')
+    expect(text).toMatch(/300\.00/)
+  })
+})
+
+// ── Medium items of the same audit ────────────────────────────────────────
+import { formatMoney } from '@/lib/currency-totals'
+import { tripInclusions } from '@/lib/pdf-generator'
+import { identityFromTenant } from '@/lib/company-identity'
+import { generateInvoicePDF } from '@/lib/invoice-pdf-generator'
+
+describe('money as the client reads it', () => {
+  it('yen without decimals, separators, a space after a code', () => {
+    expect(formatMoney(450000, 'JPY')).toBe('JPY 450,000')
+    expect(formatMoney('1250.5', 'USD')).toBe('$1,250.50')
+    expect(formatMoney(3400, 'MAD')).toBe('MAD 3,400.00')
+  })
+})
+
+describe('the itinerary PDF says what this trip includes, on this agency’s terms', () => {
+  it('inclusions come from the trip’s services — no guide or vehicle a hotel-only trip lacks', () => {
+    expect(tripInclusions([{ service_type: 'accommodation' }])).toEqual(['Accommodation as listed in the itinerary'])
+    expect(tripInclusions([{ service_type: 'guide' }, { service_type: 'entrance_fee' }, { service_type: 'other', service_name: 'Water Bottles' }]))
+      .toEqual(['Guiding for the tours listed', 'Entrance fees for the sites listed', 'Bottled water'])
+  })
+  it('payment terms are the agency’s deposit and country', () => {
+    const t = identityFromTenant({ company_name: 'Atlas', deposit_percent: 20, operating_country: 'Morocco' }).paymentTerms
+    expect(t).toContain('20% deposit')
+    expect(t).toContain('Morocco')
+    expect(identityFromTenant(null).paymentTerms).toBeUndefined()
+  })
+})
+
+describe('a final invoice that bills extras with the balance', () => {
+  it('works the trip cost back from the balance alone: 1,000 trip, 10% deposit, 200 of extras', () => {
+    const text = pdfText(generateInvoicePDF({
+      id: 'i', invoice_number: 'INV-2', invoice_type: 'final', deposit_percent: 10, client_name: 'A', client_email: 'a@x',
+      line_items: [
+        { description: 'Balance Payment - Tour', quantity: 1, unit_price: 900, amount: 900 },
+        { description: 'Camel ride', quantity: 1, unit_price: 200, amount: 200, addition: true },
+      ],
+      subtotal: 1100, tax_rate: 0, tax_amount: 0, discount_amount: 0, total_amount: 1100, currency: 'USD',
+      amount_paid: 0, balance_due: 1100, status: 'sent', issue_date: '2026-10-01', due_date: '2026-10-20',
+      notes: null, payment_terms: null, payment_instructions: null,
+    } as never) as unknown as jsPDF)
+    expect(text).toContain('$1,000.00')
+    expect(text).toContain('$100.00')
+    expect(text).not.toContain('1,222.22')
+    expect(text).not.toMatch(/Cairo/)
+  })
+})
+
+describe('the supplier voucher prints every special request', () => {
+  it('a six-line request reaches the supplier whole', () => {
+    const lines = ['Vegetarian meals', 'Wheelchair access', 'Ground floor room', 'Late check-out', 'Japanese-speaking guide', 'Airport wheelchair assist']
+    const text = pdfText(generateSupplierDocumentPDF({
+      id: '1', document_type: 'hotel_voucher', document_number: 'HV-1', supplier_name: 'Mena House', client_name: 'Tersa',
+      num_adults: 2, num_children: 0, currency: 'EUR', total_cost: 100, created_at: '2026-10-02', services: [],
+      special_requests: lines.join('\n'),
+    } as never))
+    for (const l of lines) expect(text).toContain(l)
   })
 })

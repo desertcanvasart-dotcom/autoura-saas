@@ -2,6 +2,7 @@
 // API: SEND QUOTE VIA WHATSAPP
 // ============================================
 
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
 import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
       `📅 *Dates:* ${startDate} - ${endDate}\n` +
       `👥 *Travelers:* ${itinerary.num_adults || 1} adult${(itinerary.num_adults || 1) > 1 ? 's' : ''}` +
       `${numChildren > 0 ? `, ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}\n` +
-      `💰 *Total Cost:* ${itinerary.currency || 'EUR'} ${total.toFixed(2)}\n\n` +
+      `💰 *Total Cost:* ${formatMoney(total, itinerary.currency || 'EUR')}\n\n` +
       // No fixed "What's Included" list: it promised a guide, entrance fees,
       // meals and pickups whatever the trip held.
       `💳 *Ready to Book?*\n` +

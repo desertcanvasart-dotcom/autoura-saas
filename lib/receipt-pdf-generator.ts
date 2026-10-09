@@ -1,8 +1,8 @@
+import { formatMoney } from '@/lib/currency-totals'
 import { brandColorRgb, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawFooters } from './pdf-letterhead'
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
-import { getCurrencySymbol } from '@/lib/currency'
 
 interface ReceiptData {
   receiptNumber: string
@@ -88,7 +88,6 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   y += 25
 
   // Amount
-  const currencySymbol = getCurrencySymbol(receipt.currency)
   
   doc.setFillColor(br, bg, bb)
   doc.roundedRect(margin, y, pageWidth - 2 * margin, 25, 3, 3, 'F')
@@ -99,7 +98,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   doc.text('AMOUNT RECEIVED', margin + 10, y + 10)
   
   doc.setFontSize(18)
-  doc.text(`${currencySymbol}${Number(receipt.amount).toFixed(2)}`, pageWidth - margin - 10, y + 15, { align: 'right' })
+  doc.text(formatMoney(receipt.amount, receipt.currency), pageWidth - margin - 10, y + 15, { align: 'right' })
 
   y += 40
 

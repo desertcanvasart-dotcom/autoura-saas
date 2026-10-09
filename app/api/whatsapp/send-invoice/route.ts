@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant, type SenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
@@ -8,7 +9,6 @@ import { generateInvoicePDF } from '@/lib/invoice-pdf-generator'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
-import { getCurrencySymbol } from '@/lib/currency'
 
 // The invoice PDF a customer receives on WhatsApp is the SAME document the
 // app downloads (lib/invoice-pdf-generator.ts) on the agency's letterhead —
@@ -134,7 +134,6 @@ export async function POST(request: NextRequest) {
 
     const businessName = senderTenant?.company_name || ''
     const businessEmail = senderTenant?.contact_email || ''
-    const currencySymbol = getCurrencySymbol(invoice.currency)
 
     const issueDate = new Date(invoice.issue_date).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'long', year: 'numeric'
@@ -159,7 +158,7 @@ export async function POST(request: NextRequest) {
       `📋 *Invoice:* ${invoice.invoice_number}\n` +
       `📅 *Issue Date:* ${issueDate}\n` +
       `⏰ *Due Date:* ${dueDate}\n\n` +
-      `💰 *Balance Due: ${currencySymbol}${Number(invoice.balance_due).toFixed(2)}*\n\n` +
+      `💰 *Balance Due: ${formatMoney(invoice.balance_due, invoice.currency)}*\n\n` +
       `For questions, contact us:\n` +
       (businessEmail ? `📧 ${businessEmail}\n\n` : '') +
       `Thank you! 🙏\n${businessName ? businessName + ' Team' : 'Your travel team'}`

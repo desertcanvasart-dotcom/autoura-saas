@@ -306,7 +306,7 @@ export default function InvoicesContent() {
     } else if (type === 'final') {
       const depositAmount = (fullCost * depositPercent) / 100
       calculatedAmount = fullCost - depositAmount
-      paymentTerms = 'Balance payable in cash upon arrival or before first day of service.'
+      paymentTerms = 'Balance payable before the first day of service.'
       lineItemDescription = `Final Balance - ${baseDesc}`
     } else {
       lineItemDescription = `Tour Package - ${baseDesc}`

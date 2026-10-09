@@ -13,6 +13,8 @@
 // name on your invoice is not. There is no non-tenant default identity, and
 // there must never be one.
 
+import { contractSettingsFromTenant, contractDepositPercent, paymentTermsText } from '@/lib/contract-terms'
+
 export interface CompanyIdentity {
   name: string
   email?: string
@@ -33,6 +35,9 @@ export interface CompanyIdentity {
   taxNumber?: string
   /** The agency's own line — bank details, a legal note. May span lines. */
   footerText?: string
+  /** The payment sentence the agency's documents print, from its deposit and
+   *  country (lib/contract-terms paymentTermsText). Absent = no such section. */
+  paymentTerms?: string
 }
 
 /** The tenant fields documents render. All optional so partial rows degrade. */
@@ -48,6 +53,8 @@ export interface TenantIdentityFields {
   license_number?: string | null
   tax_number?: string | null
   document_footer_text?: string | null
+  deposit_percent?: number | string | null
+  operating_country?: string | null
 }
 
 export function identityFromTenant(
@@ -66,7 +73,15 @@ export function identityFromTenant(
     licenseNumber: tenant?.license_number?.trim() || undefined,
     taxNumber: tenant?.tax_number?.trim() || undefined,
     footerText: tenant?.document_footer_text?.trim() || undefined,
+    // The itinerary PDF said "30% deposit… balance due 14 days before
+    // arrival" for every agency, whatever its settings said.
+    paymentTerms: tenant ? tenantPaymentTerms(tenant) : undefined,
   }
+}
+
+function tenantPaymentTerms(tenant: TenantIdentityFields): string {
+  const settings = contractSettingsFromTenant(tenant)
+  return paymentTermsText(contractDepositPercent(settings), settings)
 }
 
 /**

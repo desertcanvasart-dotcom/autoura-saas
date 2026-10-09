@@ -201,7 +201,10 @@ export default function SupplierDocumentViewPage() {
         fetchDocument()
         setTimeout(() => setActionSuccess(null), 5000)
       } else {
-        showToast('error', 'Failed to send email')
+        // The route says why ("Gmail not connected…", no supplier email);
+        // this replaced it with a bare "Failed to send email".
+        const body = await response.json().catch(() => null)
+        showToast('error', body?.error || 'Failed to send email')
       }
     } catch (error) {
       console.error('Error sending email:', error)
