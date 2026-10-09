@@ -3,6 +3,10 @@
 import { identityFromTenant } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { todayLocal } from '@/lib/today'
+// A YYYY-MM-DD is a calendar day: new Date() read it as UTC midnight, so the
+// page said "October 11" for a 12 October trip west of Greenwich (the PDF
+// already used formatDateOnly).
+import { formatDateOnly } from '@/lib/date-utils'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -354,7 +358,7 @@ export default function ContractPage() {
             ) : (
               <div className="space-y-0.5 text-xs text-gray-600">
                 <p><strong>Contract Number:</strong> {contractData.contractNumber}</p>
-                <p><strong>Date:</strong> {new Date(contractData.contractDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p><strong>Date:</strong> {formatDateOnly(contractData.contractDate, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
             )}
           </div>
@@ -503,8 +507,8 @@ export default function ContractPage() {
             ) : (
               <div className="space-y-1 text-sm text-gray-700">
                 <p><strong>Tour Package:</strong> {contractData.tourPackage}</p>
-                <p><strong>Tour Start Date:</strong> {new Date(contractData.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                <p><strong>Tour End Date:</strong> {new Date(contractData.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p><strong>Tour Start Date:</strong> {formatDateOnly(contractData.startDate, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p><strong>Tour End Date:</strong> {formatDateOnly(contractData.endDate, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                 <p><strong>Total Duration:</strong> {contractData.duration}</p>
                 <p><strong>Destinations:</strong> {contractData.destinations}</p>
               </div>
@@ -830,7 +834,7 @@ export default function ContractPage() {
               <p className="text-xs text-gray-700">Upon receipt of signed contract and deposit payment</p>
               
               <p className="font-semibold text-gray-900 mb-1 mt-3 text-sm">Contract Expiration:</p>
-              <p className="text-xs text-gray-700">{new Date(contractData.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} (completion of tour services)</p>
+              <p className="text-xs text-gray-700">{formatDateOnly(contractData.endDate, 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })} (completion of tour services)</p>
               
               <p className="text-xs text-gray-500 italic mt-5">
                 {governingLawNote(settings)}

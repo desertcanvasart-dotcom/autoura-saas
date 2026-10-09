@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency-totals'
 import React from 'react'
 import {
   Html,
@@ -114,14 +115,14 @@ export default function B2CQuoteEmail({
             <Row>
               <Column>
                 <Text style={label}>Price Per Person</Text>
-                <Text style={priceText}>{currency} {pricePerPerson.toLocaleString()}</Text>
+                <Text style={priceText}>{formatMoney(pricePerPerson, currency)}</Text>
               </Column>
             </Row>
 
             <Row>
               <Column>
                 <Text style={label}>Total Price</Text>
-                <Text style={totalPriceText}>{currency} {totalPrice.toLocaleString()}</Text>
+                <Text style={totalPriceText}>{formatMoney(totalPrice, currency)}</Text>
               </Column>
             </Row>
 
