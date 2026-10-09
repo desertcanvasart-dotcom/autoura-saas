@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
     const businessName = senderTenant?.company_name || ''
 
     const message =
-      `*${businessName}*\n\n` +
+      (businessName ? `*${businessName}*\n\n` : '') +
       `Dear ${supplierName || 'Partner'},\n\n` +
       `Please find the attached *${documentType || 'Document'}* (${documentNumber || 'N/A'}) for our guest *${clientName || 'N/A'}*.\n\n` +
       (serviceDate ? `Date: ${serviceDate}\n\n` : '') +
       `Please review and confirm at your earliest convenience.\n\n` +
-      `Best regards,\n${businessName} Team`
+      (businessName ? `Best regards,\n${businessName} Team` : 'Best regards')
 
     const result = await sendWhatsAppMessage({
       // A local number takes this tenant's country code (lib/whatsapp).
