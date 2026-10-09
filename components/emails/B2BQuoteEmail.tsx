@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency-totals'
 import React from 'react'
 import {
   Html,
@@ -151,7 +152,7 @@ export default function B2BQuoteEmail({
               </Column>
               <Column align="right">
                 <Text style={highlightLabel}>Best Rate (Per Person)</Text>
-                <Text style={highlightValueLarge}>{currency} {lowestPP.toLocaleString()}</Text>
+                <Text style={highlightValueLarge}>{formatMoney(lowestPP, currency)}</Text>
                 <Text style={highlightSubtext}>at {maxPax} pax</Text>
               </Column>
             </Row>
@@ -173,10 +174,10 @@ export default function B2BQuoteEmail({
                     <Text style={tableCellText}>{pax} pax</Text>
                   </Column>
                   <Column style={tableCell} align="right">
-                    <Text style={tableCellText}>{currency} {pricing.pp.toLocaleString()} pp</Text>
+                    <Text style={tableCellText}>{formatMoney(pricing.pp, currency)} pp</Text>
                   </Column>
                   <Column style={tableCell} align="right">
-                    <Text style={tableCellTextBold}>{currency} {pricing.total.toLocaleString()}</Text>
+                    <Text style={tableCellTextBold}>{formatMoney(pricing.total, currency)}</Text>
                   </Column>
                 </Row>
               )
@@ -196,10 +197,10 @@ export default function B2BQuoteEmail({
                   <Text style={tableCellTextBold}>{maxPax} pax</Text>
                 </Column>
                 <Column style={tableCell} align="right">
-                  <Text style={tableCellTextBold}>{currency} {pricingTable[maxPax].pp.toLocaleString()} pp</Text>
+                  <Text style={tableCellTextBold}>{formatMoney(pricingTable[maxPax].pp, currency)} pp</Text>
                 </Column>
                 <Column style={tableCell} align="right">
-                  <Text style={tableCellTextBold}>{currency} {pricingTable[maxPax].total.toLocaleString()}</Text>
+                  <Text style={tableCellTextBold}>{formatMoney(pricingTable[maxPax].total, currency)}</Text>
                 </Column>
               </Row>
             )}

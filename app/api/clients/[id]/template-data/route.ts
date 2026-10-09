@@ -1,3 +1,4 @@
+import { depositDueDate } from '@/lib/template-placeholders'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
@@ -98,7 +99,9 @@ export async function GET(
 
     // Build the placeholder data
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
+    const { data: depositTerms } = await supabase.from('tenants').select('deposit_due_days').eq('id', authResult.tenant_id).maybeSingle()
     const placeholderData = buildPlaceholderData(clientWithName, latestItinerary, {
+      deposit_due_days: (depositTerms as { deposit_due_days?: number | null } | null)?.deposit_due_days ?? null,
       company_name: senderTenant?.company_name || '',
       agent_name: (authResult.user?.user_metadata?.full_name as string) || '',
       company_email: senderTenant?.contact_email || '',
@@ -123,7 +126,7 @@ function buildPlaceholderData(
   client: { name: string; email: string | null; phone?: string | null },
   itinerary?: any
 ,
-  identity: { company_name?: string; agent_name?: string; company_email?: string; company_phone?: string } = {}
+  identity: { company_name?: string; agent_name?: string; company_email?: string; company_phone?: string; deposit_due_days?: number | null } = {}
 ): Record<string, string> {
   const data: Record<string, string> = {}
   const currency = itinerary?.currency || 'EUR'
@@ -182,13 +185,9 @@ function buildPlaceholderData(
       data.payment_status = formatPaymentStatus(itinerary.payment_status)
     }
 
-    // Calculate final payment due date (14 days before trip)
-    if (itinerary.start_date) {
-      const startDate = new Date(itinerary.start_date)
-      const finalPaymentDue = new Date(startDate)
-      finalPaymentDue.setDate(finalPaymentDue.getDate() - 14)
-      data.final_payment_due = formatDate(finalPaymentDue)
-    }
+    // The balance is due before the tour starts (the agency's payment terms,
+    // lib/contract-terms) — not an invented 14 days before.
+    if (itinerary.start_date) data.final_payment_due = formatDate(itinerary.start_date)
   }
 
   // Identity comes in as a parameter: this helper is synchronous and the
@@ -202,9 +201,8 @@ function buildPlaceholderData(
   // Dynamic dates
   data.today = formatDate(new Date())
   
-  const depositDue = new Date()
-  depositDue.setDate(depositDue.getDate() + 7)
-  data.deposit_due_date = formatDate(depositDue)
+  // The agency's deposit days (Settings), not a fixed 7.
+  data.deposit_due_date = formatDate(depositDueDate(identity.deposit_due_days))
 
   return data
 }

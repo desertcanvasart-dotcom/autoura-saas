@@ -50,6 +50,8 @@ interface Operator {
   email: string | null
   phone: string | null
   website: string | null
+  /** IANA zone the trip's times are shown in. */
+  timeZone: string
 }
 
 async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator; team: ClientTeamMember[]; events: ClientTripEvent[]; messages: ClientTripMessage[] } | null> {
@@ -79,7 +81,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
       .in('service_type', ['accommodation', 'hotel', 'cruise']),
     supabase
       .from('tenants')
-      .select('company_name, logo_url, primary_color, contact_email, company_phone, company_website')
+      .select('company_name, logo_url, primary_color, contact_email, company_phone, company_website, timezone')
       .eq('id', share.tenant_id)
       .maybeSingle(),
     // CONFIRMED only — a pending assignment is an internal plan, not a promise.
@@ -192,8 +194,16 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
       email: tenant?.contact_email || null,
       phone: tenant?.company_phone || null,
       website: tenant?.company_website || null,
+      // The agency's own clock (Settings). This page renders on a UTC server:
+      // a 09:00 Cairo check-in showed as "07:00", and "today" was UTC's.
+      timeZone: validTimeZone((tenant as { timezone?: string | null } | null)?.timezone) ?? 'UTC',
     },
   }
+}
+
+function validTimeZone(tz: string | null | undefined): string | null {
+  if (!tz) return null
+  try { new Intl.DateTimeFormat('en-GB', { timeZone: tz }); return tz } catch { return null }
 }
 
 function fmtDate(d: string | null): string {
@@ -218,16 +228,19 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
     checked_in: 'Checked in', checked_out: 'Checked out',
     completed: 'Completed', delayed: 'Running late',
   }
+  const timeZone = op.timeZone
+  // YYYY-MM-DD on the agency's calendar.
+  const dayIn = (d: Date) => d.toLocaleDateString('en-CA', { timeZone })
   const fmtTime = (iso: string) => {
     try {
       const d = new Date(iso)
-      const sameDay = d.toISOString().slice(0, 10) === todayStr
+      const sameDay = dayIn(d) === todayStr
       return sameDay
-        ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-        : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+        ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone })
+        : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone })
     } catch { return iso }
   }
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = dayIn(new Date())
   const withYouToday = (m: ClientTeamMember) =>
     !!m.startDate && m.startDate <= todayStr && (!m.endDate || todayStr <= m.endDate)
   const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, '')}`

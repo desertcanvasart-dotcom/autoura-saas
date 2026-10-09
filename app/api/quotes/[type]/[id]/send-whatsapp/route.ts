@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
@@ -186,6 +187,9 @@ export async function POST(
     const businessName = senderTenant?.company_name || ''
     const businessEmail = senderTenant?.contact_email || ''
     const tripName = quote.itineraries?.trip_name || 'Your tour'
+    // "8 November 2026", never toLocaleDateString()'s bare "11/8/2026" (read
+    // as 8 Nov or 11 Aug depending on who reads it); money in its currency's
+    // decimals and separators, never "EUR 1,250.5".
     const day = (d: string | null | undefined) => {
       const t = d ? new Date(d) : null
       return t && !Number.isNaN(t.getTime()) ? t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null
@@ -209,12 +213,12 @@ export async function POST(
         `⏱️ *Duration:* ${quote.itineraries?.total_days || 0} days\n` +
         `👥 *Travelers:* ${quote.num_travelers} ${quote.num_travelers === 1 ? 'person' : 'people'}\n` +
         `🏆 *Service Level:* ${quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}\n\n` +
-        `💰 *TOTAL PRICE: ${quote.currency} ${quote.selling_price.toLocaleString()}*\n` +
-        `💵 *Per Person: ${quote.currency} ${quote.price_per_person.toLocaleString()}*\n\n` +
+        `💰 *TOTAL PRICE: ${formatMoney(quote.selling_price, quote.currency)}*\n` +
+        `💵 *Per Person: ${formatMoney(quote.price_per_person, quote.currency)}*\n\n` +
         // What is included is in the attached quote — not a fixed list that
         // promised a guide, entrance fees and meals whatever was quoted.
         `📄 *Your detailed quote with what is included and the full pricing breakdown is attached as a PDF.*\n\n` +
-        (quote.valid_until ? `⏰ *This quote is valid until:* ${new Date(quote.valid_until).toLocaleDateString()}\n\n` : '') +
+        (quote.valid_until ? `⏰ *This quote is valid until:* ${day(quote.valid_until)}\n\n` : '') +
         (quote.client_notes ? `📝 *Special Notes:* ${quote.client_notes}\n\n` : '') +
         `💳 *Ready to Book?*\n` +
         `Reply to this message${businessEmail ? ' or contact us:' : '.'}\n` +
@@ -238,11 +242,11 @@ export async function POST(
         `🏆 *Service Tier:* ${quote.tier.toUpperCase()}\n` +
         `👥 *Pax Range:* ${minPax} - ${maxPax} pax\n` +
         `${quote.tour_leader_included ? '✅ Tour Leader +1 Included\n' : ''}\n` +
-        `💰 *Best Rate (Per Person):* ${quote.currency} ${lowestPP.toLocaleString()} @ ${maxPax} pax\n\n` +
+        `💰 *Best Rate (Per Person):* ${formatMoney(lowestPP, quote.currency)} @ ${maxPax} pax\n\n` +
         `📄 *Complete multi-pax pricing table and cost breakdown attached as PDF.*\n\n` +
         (quote.season ? `🌞 *Season:* ${quote.season}\n` : '') +
         (quote.valid_from && quote.valid_until ?
-          `📅 *Valid:* ${new Date(quote.valid_from).toLocaleDateString()} - ${new Date(quote.valid_until).toLocaleDateString()}\n\n` : '\n') +
+          `📅 *Valid:* ${day(quote.valid_from)} - ${day(quote.valid_until)}\n\n` : '\n') +
         '\n' +
         (businessEmail ? `For bookings or questions, please contact:\n${contactLines}\n` : '') +
         `We look forward to working with you! 🤝\n\n` +

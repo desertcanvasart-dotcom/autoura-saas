@@ -61,14 +61,30 @@ export async function GET(
         break
 
       case 'guide':
-        const { data: guide, error: guideError } = await (adminClient as any)
+        // Suppliers (supplier_type 'guide') first — what /api/guides lists —
+        // then the legacy guides table.
+        const guideDb = adminClient as any
+        const { data: supplierGuide } = await guideDb
+          .from('suppliers')
+          .select('id, name, email, contact_email, phone, contact_phone, whatsapp, languages')
+          .eq('id', partnerId)
+          .eq('tenant_id', tenant_id)
+          .maybeSingle()
+        const { data: legacyGuide } = supplierGuide ? { data: null } : await guideDb
           .from('guides')
           .select('*')
           .eq('id', partnerId)
           .eq('tenant_id', tenant_id)
-          .single()
-        
-        if (guideError || !guide) {
+          .maybeSingle()
+        const guide = supplierGuide
+          ? {
+              ...supplierGuide,
+              email: supplierGuide.email || supplierGuide.contact_email,
+              phone: supplierGuide.whatsapp || supplierGuide.phone || supplierGuide.contact_phone,
+            }
+          : legacyGuide
+
+        if (!guide) {
           return NextResponse.json({ error: 'Guide not found' }, { status: 404 })
         }
         
