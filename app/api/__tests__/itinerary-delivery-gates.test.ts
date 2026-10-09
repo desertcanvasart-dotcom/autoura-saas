@@ -82,6 +82,6 @@ describe('the share link and its public page', () => {
   })
 
   it('a withheld price never reaches the traveller-facing projection', () => {
-    expect(page).toMatch(/priceDecision\.show \? itinerary : \{ \.\.\.itinerary, total_cost: null \}/)
+    expect(page).toMatch(/priceDecision\.show \? \{ \.\.\.itinerary, total_cost: clientTotal \} : \{ \.\.\.itinerary, total_cost: null \}/)
   })
 })

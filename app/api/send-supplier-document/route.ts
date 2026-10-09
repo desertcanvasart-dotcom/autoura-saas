@@ -1,3 +1,4 @@
+import { attachmentNameParams, encodeEmailHeader } from '@/lib/email/mime-header'
 import { NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -132,7 +133,8 @@ function buildEmailWithAttachment(to: string, subject: string, body: string, fil
 
   // Strip CR/LF from header values to prevent header/Bcc injection.
   const stripHeader = (v: string) => String(v ?? '').replace(/[\r\n]+/g, ' ').trim()
-  const safeFilename = stripHeader(filename).replace(/"/g, '')
+  // An ASCII name plus RFC 2231 filename* for a non-ASCII one (lib/email/mime-header).
+  const fileParams = attachmentNameParams(filename)
 
   // No From: Gmail sends as the signed-in user's own account, and the copy is
   // in its Sent folder. There used to be a From and a Bcc naming the
@@ -140,7 +142,8 @@ function buildEmailWithAttachment(to: string, subject: string, body: string, fil
   // mailbox and claimed an address the sending account does not own.
   const emailParts = [
     `To: ${stripHeader(to)}`,
-    `Subject: ${stripHeader(subject)}`,
+    // RFC 2047: the subject carries the guest's name, often Japanese.
+    `Subject: ${encodeEmailHeader(subject)}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
@@ -150,9 +153,9 @@ function buildEmailWithAttachment(to: string, subject: string, body: string, fil
     '',
     Buffer.from(body).toString('base64'),
     `--${boundary}`,
-    `Content-Type: application/pdf; name="${safeFilename}"`,
+    `Content-Type: application/pdf; ${fileParams.name}`,
     'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="${safeFilename}"`,
+    `Content-Disposition: attachment; ${fileParams.disposition}`,
     '',
     attachmentBase64,
     `--${boundary}--`,

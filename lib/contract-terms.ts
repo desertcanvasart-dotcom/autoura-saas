@@ -14,6 +14,7 @@
 // tenants.contract_governing_law; migration 403); left blank, the sentence
 // says nothing about a country.
 
+import { formatMoney } from '@/lib/currency-totals'
 import { DEFAULT_DEPOSIT_PERCENT } from '@/lib/bookings/deposit-rule'
 
 export interface ContractSettings {
@@ -171,7 +172,10 @@ export function governingLawNote(s: ContractSettings): string {
 /** "To be confirmed" for a trip with no price — never "NaN" or a crash. */
 export function contractPrice(total: number | null | undefined, currency: string | null | undefined): string {
   if (typeof total !== 'number' || !Number.isFinite(total)) return 'To be confirmed'
-  return `${currency ? `${currency} ` : ''}${total.toLocaleString()}`
+  // The currency's decimals and separators, the same on every reader's
+  // screen — toLocaleString() followed the browser's locale and dropped the
+  // cents ("EUR 1.234,5").
+  return currency ? formatMoney(total, currency) : total.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
 // ============================================

@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { todayLocal } from '@/lib/today'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
+import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 import { sumByCurrency, formatTotals, currencySymbol } from '@/lib/currency-totals'
 import { 
   Plus, 
@@ -96,6 +99,20 @@ interface FormData {
   payment_instructions: string
 }
 
+/** A trip's client total: its services' client prices, else the stored total. */
+async function itineraryClientTotalFor(itinerary: Itinerary): Promise<number> {
+  try {
+    const res = await fetch(`/api/itineraries/${itinerary.id}?include=days`)
+    const json = await res.json()
+    const data = json?.data ?? json
+    const services = ((data?.itinerary_days ?? []) as Array<{ itinerary_services?: PricedService[] | null }>)
+      .flatMap(d => d.itinerary_services ?? [])
+    return effectiveItineraryTotal({ total_cost: itinerary.total_cost, margin_percent: data?.margin_percent }, services)
+  } catch {
+    return Number(itinerary.total_cost) || 0
+  }
+}
+
 const initialFormData: FormData = {
   client_id: '',
   itinerary_id: '',
@@ -136,6 +153,9 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; ic
 
 export default function InvoicesContent() {
   const dialog = useConfirmDialog()
+  const { tenant } = useTenant()
+  // The agency's deposit rule (Settings → Payment terms), not a fixed 10%.
+  const tenantDepositPercent = resolveDepositRule({ tenant }).depositPercent
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [itineraries, setItineraries] = useState<Itinerary[]>([])
@@ -236,7 +256,7 @@ export default function InvoicesContent() {
     }))
   }
 
-  const handleItineraryChange = (itineraryId: string) => {
+  const handleItineraryChange = async (itineraryId: string) => {
     const itinerary = itineraries.find(i => i.id === itineraryId)
     if (itinerary) {
       const matchingClient = clients.find(c => 
@@ -244,7 +264,9 @@ export default function InvoicesContent() {
         c.email === itinerary.client_email
       )
       
-      const fullCost = itinerary.total_cost
+      // The trip's client total from its services (lib/itinerary-client-total)
+      // — itineraries.total_cost is a cache that can be 0 or stale.
+      const fullCost = await itineraryClientTotalFor(itinerary)
       const invoiceType = formData.invoice_type
       const depositPercent = formData.deposit_percent
 
@@ -266,6 +288,8 @@ export default function InvoicesContent() {
         client_id: matchingClient?.id || prev.client_id,
         client_name: itinerary.client_name || prev.client_name,
         client_email: itinerary.client_email || prev.client_email,
+        // The trip's own currency — the form stayed on EUR for a JPY trip.
+        currency: itinerary.currency || prev.currency,
         full_trip_cost: fullCost,
         line_items: [{
           description: lineItemDescription,
@@ -426,7 +450,7 @@ export default function InvoicesContent() {
   }
 
   const openAddModal = () => {
-    setFormData(initialFormData)
+    setFormData({ ...initialFormData, deposit_percent: tenantDepositPercent })
     setIsModalOpen(true)
   }
 

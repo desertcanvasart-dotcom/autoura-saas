@@ -8,6 +8,7 @@
 // the booking's CRM client, else the itinerary's own contact — a direct
 // booking often has no client row (live BK-2026-0003).
 
+import { formatMoney } from '@/lib/currency-totals'
 import { escapeHtml } from '@/lib/html-escape'
 
 export interface ConfirmationBooking {
@@ -46,7 +47,8 @@ export function confirmationRecipient(b: ConfirmationBooking): ConfirmationRecip
   }
 }
 
-const money = (currency: string, v: unknown) => `${currency} ${(Number(v) || 0).toFixed(2)}`
+// The currency's own decimals and separators ("JPY 450000.00" before).
+const money = (currency: string, v: unknown) => formatMoney(Number(v) || 0, currency)
 const day = (iso: string | null | undefined) =>
   iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : null
 

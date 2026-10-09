@@ -1,3 +1,4 @@
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import {
@@ -153,9 +154,15 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
   // again. The itinerary itself still shows. Fails closed: if the services
   // cannot be read, the price is withheld.
   const lines = await loadItineraryCompleteness(supabase, share.itinerary_id, share.tenant_id)
+  // The client total from the services — the same figure the email and
+  // WhatsApp sends quote. itineraries.total_cost is a cache that can be 0 or
+  // stale, so a traveller could see two different prices.
+  const clientTotal = lines.ok
+    ? effectiveItineraryTotal(itinerary as { total_cost: number | string | null; margin_percent: unknown }, lines.services)
+    : (itinerary as { total_cost?: unknown }).total_cost
   const priceDecision = sharePriceDecision({
     status: (itinerary as { status?: string | null }).status,
-    totalCost: (itinerary as { total_cost?: unknown }).total_cost,
+    totalCost: clientTotal,
     currency: (itinerary as { currency?: string | null }).currency,
     completeness: lines.ok ? lines.completeness : null,
     approvedGaps: (share as { incomplete_approved_gaps?: unknown }).incomplete_approved_gaps,
@@ -169,7 +176,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     itinerary: toClientItinerary(
       // A withheld price does not reach the projection at all, so it cannot
       // be rendered by accident.
-      priceDecision.show ? itinerary : { ...itinerary, total_cost: null },
+      priceDecision.show ? { ...itinerary, total_cost: clientTotal } : { ...itinerary, total_cost: null },
       (days ?? []).map(d => ({
         ...d,
         overnight_property:
@@ -251,7 +258,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
     hotel_staff: { emoji: '🛎', label: 'Hotel assistance' },
     hotel: { emoji: '🏨', label: 'Hotel' },
     restaurant: { emoji: '🍽', label: 'Restaurant' },
-    cruise: { emoji: '🚢', label: 'Nile cruise' },
+    cruise: { emoji: '🚢', label: 'Cruise' },
   }
   const sym = it.currency ? getCurrencySymbol(it.currency) : ''
   const travellers = it.numAdults + it.numChildren
@@ -334,7 +341,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
                   {(day.flightFrom || day.flightTo) && (
                     <span>🛫 {[day.flightFrom, day.flightTo].filter(Boolean).join(' → ')}</span>
                   )}
-                  {day.isCruiseDay && <span>🚢 Nile cruise</span>}
+                  {day.isCruiseDay && <span>🚢 Cruise</span>}
                   {day.isFreeDay && <span>🌴 Free day</span>}
                   {day.lunchIncluded && <span>🍽 Lunch included</span>}
                   {day.dinnerIncluded && <span>🌙 Dinner included</span>}

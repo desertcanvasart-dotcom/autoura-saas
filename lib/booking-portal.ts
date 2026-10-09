@@ -11,6 +11,8 @@
 
 import { createHmac, createHash } from 'crypto'
 import { sendMail } from '@/lib/email-send'
+import { escapeHtml } from '@/lib/html-escape'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 
 // ---------------------------------------------------------------------------
 // Tokens
@@ -284,15 +286,23 @@ export async function markSentAndDeliver(
   if (!pax?.email) return { sent: false }
 
   try {
+    // first_name is written by the portal's own visitors (TravellerForm), so it
+    // is escaped: raw, it put their HTML and links into a mail sent from the
+    // platform's domain. The mail is FROM the operator, with replies to them.
+    const operator = await loadSenderTenant(opts.tenantId)
+    const operatorName = operator?.company_name?.trim() || ''
+    const firstName = typeof pax.first_name === 'string' ? pax.first_name.trim() : ''
     const result = await sendMail({
       to: pax.email as string,
       subject: `Please complete your traveller details${opts.tripName ? ` — ${opts.tripName}` : ''}`,
       html:
-        `<p>${pax.first_name ? `Dear ${pax.first_name},` : 'Hello,'}</p>` +
+        `<p>${firstName ? `Dear ${escapeHtml(firstName)},` : 'Hello,'}</p>` +
         `<p>Please complete your traveller details for the upcoming trip using your personal link:</p>` +
-        `<p><a href="${opts.url}">${opts.url}</a></p>` +
-        `<p>For your security you will be asked to confirm your family name and date of birth.</p>`,
-      fromName: 'Traveller details',
+        `<p><a href="${escapeHtml(opts.url)}">${escapeHtml(opts.url)}</a></p>` +
+        `<p>For your security you will be asked to confirm your family name and date of birth.</p>` +
+        (operatorName ? `<p>${escapeHtml(operatorName)}</p>` : ''),
+      fromName: operatorName || 'Traveller details',
+      ...(operator?.contact_email ? { replyTo: operator.contact_email } : {}),
     })
     return { sent: !!result.success }
   } catch (e) {

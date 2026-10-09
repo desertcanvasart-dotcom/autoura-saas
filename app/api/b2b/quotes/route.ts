@@ -141,6 +141,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'A group size, selling price and per-person price are required' }, { status: 400 })
     }
 
+    // The tour this rate sheet is for: a calculator quote has no itinerary,
+    // so without its own trip_name the email, WhatsApp and PDF said "Your
+    // tour" and "0 days". From this tenant's own template.
+    const { data: variation } = await getSupabaseAdmin()
+      .from('tour_variations')
+      .select('variation_name, tour_templates!inner(template_name, tenant_id)')
+      .eq('id', variation_id)
+      .eq('tour_templates.tenant_id', authResult.tenant_id)
+      .maybeSingle()
+    const templateName = (variation?.tour_templates as { template_name?: string } | null | undefined)?.template_name
+    const tripName = [templateName, variation?.variation_name].filter(Boolean).join(' — ') || null
+
     // Calculate valid_until date
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + valid_days)
@@ -154,6 +166,7 @@ export async function POST(request: NextRequest) {
         tenant_id: authResult.tenant_id,
         variation_id,
         partner_id: partner_id || null,
+        trip_name: tripName,
         client_name,
         client_email,
         client_phone,

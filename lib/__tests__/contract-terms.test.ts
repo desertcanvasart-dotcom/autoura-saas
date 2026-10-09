@@ -87,7 +87,7 @@ describe('the contract PDF', () => {
     expect(text).toContain('To be confirmed')
     expect(text).not.toContain('NaN')
     expect(contractPrice(Number.NaN, 'USD')).toBe('To be confirmed')
-    expect(contractPrice(1500, 'USD')).toBe('USD 1,500')
+    expect(contractPrice(1500, 'USD')).toBe('$1,500.00')
   })
 })
 

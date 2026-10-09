@@ -32,11 +32,12 @@ describe('the itinerary PDF prices its lines at the client price', () => {
       { service_type: 'transportation', service_name: 'Sedan', quantity: 1, total_cost: 400 },
     ] }]
     const text = pdfText(generateItineraryPDF(itinerary as never, days as never, { showPricingBreakdown: true }) as unknown as jsPDF)
-    expect(text).toContain('1250.00')
-    expect(text).toContain('2500.00')
-    expect(text).toContain('3000.00')
-    expect(text).not.toContain('2000.00')
-    expect(text).not.toContain('400.00')
+    // formatMoney: thousands separators ("1,250.00").
+    expect(text).toContain('1,250.00')
+    expect(text).toContain('2,500.00')
+    expect(text).toContain('3,000.00')
+    expect(text).not.toContain('2,000.00')
+    expect(text).not.toContain(' 400.00')
   })
 })
 

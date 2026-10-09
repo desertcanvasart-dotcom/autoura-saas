@@ -2,6 +2,7 @@
 // Professional Supplier Document PDF Generator
 // Unified branding with Travel2Egypt / Autoura colors
 
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import { formatMoney } from '@/lib/currency-totals'
 import jsPDF from 'jspdf'
 import { brandColorRgb, tint, type CompanyIdentity } from './company-identity'
@@ -151,13 +152,15 @@ const DOCUMENT_ICONS: Record<string, string> = {
   entrance_fees: '🎟️'
 }
 
-export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
+export function generateSupplierDocumentPDF(doc: SupplierDocument, font?: JsPdfFont | null): jsPDF {
   ACTIVE = derivePalette(doc.company ?? undefined)
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
   })
+  // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+  applyDocumentFont(pdf, font)
 
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()

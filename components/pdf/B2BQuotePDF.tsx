@@ -181,6 +181,9 @@ interface B2BQuotePDFProps {
       email: string
       country: string
     } | null
+    /** A calculator quote's own trip (no itinerary). */
+    trip_name?: string | null
+    travel_date?: string | null
     itineraries: {
       itinerary_code: string
       trip_name: string
@@ -245,6 +248,27 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
             <View style={styles.row}>
               <Text style={styles.label}>Country:</Text>
               <Text style={styles.value}>{quote.b2b_partners.country}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* A calculator quote has no itinerary: its own tour name and date. */}
+        {!quote.itineraries && quote.trip_name && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Trip Details</Text>
+            <View style={styles.row}>
+              <Text style={styles.label}>Trip Name:</Text>
+              <Text style={styles.value}>{quote.trip_name}</Text>
+            </View>
+            {quote.travel_date && (
+              <View style={styles.row}>
+                <Text style={styles.label}>Travel Date:</Text>
+                <Text style={styles.value}>{day(quote.travel_date)}</Text>
+              </View>
+            )}
+            <View style={styles.row}>
+              <Text style={styles.label}>Service Tier:</Text>
+              <Text style={styles.value}>{quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}</Text>
             </View>
           </View>
         )}
