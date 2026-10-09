@@ -153,6 +153,23 @@ function amountsFor(prev: FormData, invoiceType: string, amount: number) {
   return { subtotal: m.subtotal, tax_amount: m.tax_amount, total_amount: m.total_amount }
 }
 
+/**
+ * The form's figures after a line, tax rate or discount edit — the same rule
+ * again, so a deposit or final invoice shows no tax or discount (the server
+ * drops them: it showed "Total 342" for a 300 deposit).
+ */
+function totalsOf(f: FormData) {
+  const m = invoiceMoney({
+    invoiceType: f.invoice_type,
+    total: f.line_items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+    lineItems: f.line_items,
+    taxRate: f.tax_rate,
+    discountAmount: f.discount_amount,
+    currency: f.currency,
+  })
+  return { ...f, subtotal: m.subtotal, tax_amount: m.tax_amount, total_amount: m.total_amount }
+}
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100' },
@@ -410,17 +427,7 @@ export default function InvoicesContent() {
         newItems[index].amount = newItems[index].quantity * newItems[index].unit_price
       }
       
-      const subtotal = newItems.reduce((sum, item) => sum + item.amount, 0)
-      const taxAmount = subtotal * (prev.tax_rate / 100)
-      const totalAmount = subtotal + taxAmount - prev.discount_amount
-      
-      return {
-        ...prev,
-        line_items: newItems,
-        subtotal,
-        tax_amount: taxAmount,
-        total_amount: totalAmount
-      }
+      return totalsOf({ ...prev, line_items: newItems })
     })
   }
 
@@ -435,33 +442,16 @@ export default function InvoicesContent() {
     if (formData.line_items.length <= 1) return
     setFormData(prev => {
       const newItems = prev.line_items.filter((_, i) => i !== index)
-      const subtotal = newItems.reduce((sum, item) => sum + item.amount, 0)
-      const taxAmount = subtotal * (prev.tax_rate / 100)
-      const totalAmount = subtotal + taxAmount - prev.discount_amount
-      
-      return {
-        ...prev,
-        line_items: newItems,
-        subtotal,
-        tax_amount: taxAmount,
-        total_amount: totalAmount
-      }
+      return totalsOf({ ...prev, line_items: newItems })
     })
   }
 
   const updateTaxRate = (rate: number) => {
-    setFormData(prev => {
-      const taxAmount = prev.subtotal * (rate / 100)
-      const totalAmount = prev.subtotal + taxAmount - prev.discount_amount
-      return { ...prev, tax_rate: rate, tax_amount: taxAmount, total_amount: totalAmount }
-    })
+    setFormData(prev => totalsOf({ ...prev, tax_rate: rate }))
   }
 
   const updateDiscount = (discount: number) => {
-    setFormData(prev => {
-      const totalAmount = prev.subtotal + prev.tax_amount - discount
-      return { ...prev, discount_amount: discount, total_amount: totalAmount }
-    })
+    setFormData(prev => totalsOf({ ...prev, discount_amount: discount }))
   }
 
   const openAddModal = () => {
@@ -1048,6 +1038,8 @@ export default function InvoicesContent() {
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium text-gray-900">{formatMoney(formData.subtotal, formData.currency)}</span>
                   </div>
+                  {/* A deposit or final invoice is a share of the trip with no tax or discount of its own (lib/invoices/invoice-money). */}
+                  {formData.invoice_type === 'standard' && (<>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Tax Rate (%)</span>
                     <input
@@ -1074,6 +1066,7 @@ export default function InvoicesContent() {
                       className="w-24 px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] shadow-sm"
                     />
                   </div>
+                  </>)}
                   <div className="flex justify-between pt-3 border-t border-gray-200">
                     <span className="font-semibold text-gray-900">Total</span>
                     <span className="font-bold text-xl text-gray-900">{formatMoney(formData.total_amount, formData.currency)}</span>

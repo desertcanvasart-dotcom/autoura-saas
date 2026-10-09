@@ -53,7 +53,7 @@ describe('tenant country for local numbers', () => {
 describe('AI agent trip currency', () => {
   it('labels the draft trip with the run currency the rates are in', () => {
     const agent = src('lib/whatsapp-ai-agent.ts')
-    expect(agent).toContain('getTenantRunCurrency(this.supabase, this.tenantId)')
+    expect(agent).toContain('getTenantRunCurrency(createAdminClient(), this.tenantId)')
     expect(agent).not.toContain("select('default_currency, rates_currency')")
   })
 })
@@ -67,5 +67,28 @@ describe('blank company name or email', () => {
     expect(receipt).toContain("(businessEmail ? `📧 ${businessEmail}\\n` : '')")
     const email = src('app/api/send-supplier-document/route.ts')
     expect(email).toContain("[businessName, businessEmail].filter(Boolean)")
+  })
+})
+
+describe('round 10', () => {
+  it('the editor invoice bills the services on screen, with the client', () => {
+    const edit = src('app/itineraries/[id]/edit/page.tsx')
+    expect(edit).toContain('itineraryClientTotal(live, itinerary.margin_percent) : itinerary.total_cost')
+    expect(edit).toContain('client_id: itinerary.client_id,')
+    expect(edit).not.toContain('unit_price: itinerary.total_cost,')
+  })
+  it('the invoice form totals every edit by the server rule, and hides tax/discount on a share', () => {
+    const form = src('app/invoices/invoices-content.tsx')
+    expect(form).not.toContain('prev.subtotal * (rate / 100)')
+    expect(form).not.toContain('subtotal * (prev.tax_rate / 100)')
+    expect(form).toContain("{formData.invoice_type === 'standard' && (<>")
+  })
+  it('generate-documents reads only this tenant\'s suppliers', () => {
+    expect(src('app/api/itineraries/[id]/generate-documents/route.ts')).toContain(".from('suppliers').select('*').in('id', supplierIds).eq('tenant_id', tenantId)")
+  })
+  it('a receipt with no payment method prints no "undefined"', () => {
+    const r = src('app/api/whatsapp/send-receipt/route.ts')
+    expect(r).not.toContain('receipt.paymentMethod?.replace')
+    expect(r).toContain('.replace(/_/g, \' \')')
   })
 })

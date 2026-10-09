@@ -279,10 +279,13 @@ export class ToolExecutor {
    * generate-itinerary labels its trips. The editor prices lines from the
    * rate tables in that currency and shows itinerary.currency beside them,
    * so a default_currency label put EUR rates under a USD sign.
+   *
+   * Read with the admin client: the webhook's client has no session, so RLS
+   * hides the tenant row from it and the answer was always EUR.
    */
   private async tenantCurrency(): Promise<string> {
     if (!this.tenantId) return DEFAULT_RUN_CURRENCY
-    return getTenantRunCurrency(this.supabase, this.tenantId)
+    return getTenantRunCurrency(createAdminClient(), this.tenantId)
   }
 
   async execute(toolName: string, toolInput: any): Promise<ToolResult> {

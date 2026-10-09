@@ -28,7 +28,9 @@ async function planForItinerary(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supplier rows
   let suppliers: Record<string, any> = {}
   if (supplierIds.length > 0) {
-    const { data } = await supabase.from('suppliers').select('*').in('id', supplierIds)
+    // Admin client: only this tenant's suppliers — a service's supplier_id is
+    // whatever was saved on it, and another tenant's would bring their contact.
+    const { data } = await supabase.from('suppliers').select('*').in('id', supplierIds).eq('tenant_id', tenantId)
     suppliers = Object.fromEntries((data ?? []).map(s => [s.id, s]))
   }
 
