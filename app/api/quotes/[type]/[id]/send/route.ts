@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
 import { loadDocumentIdentity } from '@/lib/document-identity'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
@@ -293,18 +294,17 @@ export async function POST(
       throw new Error(`Failed to send email: ${emailError.message}`)
     }
 
-    // Update quote status
-    const updateData: any = {
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      sent_via: 'email',
-    }
-
+    // Update quote status (lib/quotes/quote-sent-update: b2b_quotes has no
+    // sent_at/sent_via, and only a draft becomes 'sent').
+    const updateData = quoteSentUpdate(type, quote.status, 'email')
     const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
-    const { error: updateError } = await supabaseAdmin
-      .from(tableName)
-      .update(updateData)
-      .eq('id', id)
+    const { error: updateError } = updateData
+      ? await supabaseAdmin
+          .from(tableName)
+          .update(updateData)
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+      : { error: null }
 
     if (updateError) {
       console.error('Quote update error:', updateError)

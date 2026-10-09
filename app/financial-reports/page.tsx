@@ -209,8 +209,16 @@ export default function FinancialReportsPage() {
   }, [fetchData])
 
   const exportToCSV = (data: any[], filename: string) => {
-    const headers = Object.keys(data[0] || {}).join(',')
-    const rows = data.map(row => Object.values(row).join(','))
+    // Quoted cells: a name with a comma shifted every money column after it,
+    // and text starting with = + - @ runs as a formula in a spreadsheet.
+    // Numbers stay bare, so a negative amount is still a number.
+    const cell = (v: unknown) => {
+      if (typeof v === 'number') return Number.isFinite(v) ? String(v) : ''
+      const s = String(v ?? '')
+      return `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`
+    }
+    const headers = Object.keys(data[0] || {}).map(cell).join(',')
+    const rows = data.map(row => Object.values(row).map(cell).join(','))
     const csv = [headers, ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)

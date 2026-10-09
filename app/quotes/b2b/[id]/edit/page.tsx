@@ -5,9 +5,8 @@ import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ArrowLeft, Save, Loader2, AlertCircle, RefreshCw
+  ArrowLeft, Save, Loader2, AlertCircle
 } from 'lucide-react'
-import { showToast } from '@/app/contexts/ToastContext'
 
 interface B2BQuote {
   id: string
@@ -142,7 +141,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent, recalculate: boolean = false) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!quote) return
@@ -177,7 +176,6 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
           season: season || null,
           internal_notes: internalNotes,
           terms_and_conditions: termsAndConditions,
-          recalculate,
         }),
       })
 
@@ -187,14 +185,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
         throw new Error(data.error || 'Failed to update quote')
       }
 
-      // If recalculate, refresh the page to show new pricing table
-      if (recalculate) {
-        await fetchQuote()
-        showToast('success', 'Pricing table recalculated successfully!')
-      } else {
-        // Redirect to detail page
-        router.push(`/quotes/b2b/${quote.id}`)
-      }
+      router.push(`/quotes/b2b/${quote.id}`)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -278,7 +269,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
           </div>
         )}
 
-        <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-6">
+        <form onSubmit={(e) => handleSubmit(e)} className="space-y-6">
           {/* Basic Configuration */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Configuration</h2>
@@ -569,23 +560,14 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-purple-200">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleSubmit(e as any, true)
-                }}
-                disabled={saving}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Recalculate Full Pricing Table (2-30 pax)
-              </button>
-              <p className="text-xs text-purple-600 mt-2">
-                This will regenerate the pricing table for all passenger counts based on current values
-              </p>
-            </div>
+            {/* The "Recalculate" button sent recalculate:true, which the API never
+                read, and still said "recalculated successfully" — the partner
+                kept getting the old prices. Engine-priced quotes keep these
+                fields at 0, so rebuilding the table from them would zero it. */}
+            <p className="mt-4 pt-4 border-t border-purple-200 text-xs text-purple-700">
+              Saving these values does not change the multi-pax pricing table the partner receives.
+              To change partner prices, create a new quote from the itinerary or the B2B calculator.
+            </p>
           </div>
 
           {/* Status & Validity */}
