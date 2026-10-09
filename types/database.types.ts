@@ -9457,6 +9457,8 @@ export interface Database {
           license_number: string | null
           tax_number: string | null
           document_footer_text: string | null
+          operating_country: string | null
+          contract_governing_law: string | null
           company_phone: string | null
           tagline: string | null
           is_primary: boolean | null
@@ -9494,6 +9496,8 @@ export interface Database {
           license_number?: string | null
           tax_number?: string | null
           document_footer_text?: string | null
+          operating_country?: string | null
+          contract_governing_law?: string | null
           company_phone?: string | null
           tagline?: string | null
           is_primary?: boolean | null
@@ -9531,6 +9535,8 @@ export interface Database {
           license_number?: string | null
           tax_number?: string | null
           document_footer_text?: string | null
+          operating_country?: string | null
+          contract_governing_law?: string | null
           company_phone?: string | null
           tagline?: string | null
           is_primary?: boolean | null

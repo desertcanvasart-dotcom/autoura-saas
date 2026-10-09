@@ -41,6 +41,10 @@ interface Tenant {
   license_number?: string | null
   tax_number?: string | null
   document_footer_text?: string | null
+  // What travel contracts name (Settings → Organization, migration 403).
+  operating_country?: string | null
+  contract_governing_law?: string | null
+  deposit_percent?: number | null
   created_at: string | null
   updated_at: string | null
 }
