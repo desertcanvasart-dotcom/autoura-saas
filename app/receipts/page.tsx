@@ -1,5 +1,6 @@
 'use client'
 
+import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
 import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -157,7 +158,7 @@ export default function ReceiptsPage() {
     setDownloadingId(payment.id)
     
     try {
-      const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+      const receiptNumber = receiptNumberFor(payment)
 
       const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
       downloadReceiptPDF({
@@ -177,7 +178,7 @@ export default function ReceiptsPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(payment, tenant?.company_name))
+      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(payment, identityFromTenant(tenant)))
     } catch (error) {
       console.error('Error downloading receipt:', error)
       showToast('error', 'Failed to download receipt')
@@ -388,7 +389,7 @@ export default function ReceiptsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredPayments.map((payment) => {
-                    const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+                    const receiptNumber = receiptNumberFor(payment)
                     const isDownloading = downloadingId === payment.id
                     const isSending = sendingId === payment.id
                     const isSent = sentIds.includes(payment.id)

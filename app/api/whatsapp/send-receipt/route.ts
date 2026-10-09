@@ -1,3 +1,4 @@
+import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
       receipt = {
         clientName: inv?.client_name ?? null,
         clientPhone: phone,
-        receiptNumber: ip.transaction_reference || `RCP-${ip.id.slice(0, 8).toUpperCase()}`,
+        receiptNumber: receiptNumberFor(ip),
         amount: ip.amount,
         currency: ip.currency,
         paymentDate: ip.payment_date,
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
       receipt = {
         clientName: payment.itineraries?.client_name ?? null,
         clientPhone: payment.itineraries?.client_phone ?? null,
-        receiptNumber: payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`,
+        receiptNumber: receiptNumberFor(payment),
         amount: payment.amount,
         currency: payment.currency,
         paymentDate: payment.payment_date,

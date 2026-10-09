@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMoney } from '@/lib/currency-totals'
+import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
 import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
@@ -22,7 +24,6 @@ import {
   Phone
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
-import { getCurrencySymbol } from '@/lib/currency'
 
 interface Payment {
   id: string
@@ -79,7 +80,7 @@ export default function ReceiptPage() {
     try {
       const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
       downloadReceiptPDF({
-        receiptNumber: payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`,
+        receiptNumber: receiptNumberFor(payment),
         invoiceNumber: payment.itinerary_code,
         referenceLabel: 'Itinerary',
         clientName: payment.client_name,
@@ -95,7 +96,7 @@ export default function ReceiptPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(payment, tenant?.company_name))
+      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(payment, identityFromTenant(tenant)))
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download receipt')
@@ -136,7 +137,7 @@ export default function ReceiptPage() {
   }
 
   const formatCurrency = (amount: number, currency: string) => {
-    return `${getCurrencySymbol(currency)} ${amount.toFixed(2)}`
+    return formatMoney(amount, currency)
   }
 
   if (loading) {
@@ -165,7 +166,7 @@ export default function ReceiptPage() {
     )
   }
 
-  const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+  const receiptNumber = receiptNumberFor(payment)
   // Every payment links here, pending, failed and refunded ones included. Only
   // a completed payment has been received; the rest get no receipt to send.
   const received = payment.payment_status === 'completed'

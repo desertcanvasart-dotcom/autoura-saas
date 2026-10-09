@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
 
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const businessName = senderTenant?.company_name || ''
+    // With no company name set: "*Reservation Request*" and "Operations",
+    // never "* - Reservation Request*" and " Operations".
+    const titled = (title: string) => (businessName ? `${businessName} - ${title}` : title)
+    const signed = (team: string) => (businessName ? `${businessName} ${team}` : team)
 
     // Format dates
     const formatDate = (dateStr: string) => {
@@ -88,7 +92,7 @@ export async function POST(request: NextRequest) {
     let message = ''
 
     if (resourceType === 'restaurant') {
-      message = `🍽️ *${businessName} - Reservation Request*\n\n` +
+      message = `🍽️ *${titled('Reservation Request')}*\n\n` +
         `Hello ${resource.name || resourceName || "there"},\n\n` +
         `We would like to make a reservation:\n\n` +
         `📅 *Date:* ${formatDate(startDate)}\n` +
@@ -97,10 +101,10 @@ export async function POST(request: NextRequest) {
         `${notes ? `📝 *Special Requests:* ${notes}\n` : ''}\n` +
         `Please confirm availability.\n\n` +
         `Thank you!\n` +
-        `${businessName} Team`
+        signed('Team')
 
     } else if (resourceType === 'airport_staff') {
-      message = `✈️ *${businessName} - Airport Assignment*\n\n` +
+      message = `✈️ *${titled('Airport Assignment')}*\n\n` +
         `Hello ${resource.name || resourceName || "there"},\n\n` +
         `You have been assigned to airport duty:\n\n` +
         `📅 *Date:* ${formatDate(startDate)}\n` +
@@ -111,10 +115,10 @@ export async function POST(request: NextRequest) {
         `${itinerary.pickup_time ? `🕐 *Time:* ${itinerary.pickup_time}\n` : ''}` +
         `${notes ? `📝 *Notes:* ${notes}\n` : ''}\n` +
         `Please confirm receipt of this assignment.\n\n` +
-        `${businessName} Operations`
+        signed('Operations')
 
     } else if (resourceType === 'hotel_staff') {
-      message = `🏨 *${businessName} - Hotel Assignment*\n\n` +
+      message = `🏨 *${titled('Hotel Assignment')}*\n\n` +
         `Hello ${resource.name || resourceName || "there"},\n\n` +
         `You have been assigned to hotel duty:\n\n` +
         `📅 *Dates:* ${formatDate(startDate)}` +
@@ -124,10 +128,10 @@ export async function POST(request: NextRequest) {
         `👥 *Guests:* ${guestCount}\n` +
         `${notes ? `📝 *Notes:* ${notes}\n` : ''}\n` +
         `Please confirm receipt of this assignment.\n\n` +
-        `${businessName} Operations`
+        signed('Operations')
     } else {
       // Generic message for other resource types
-      message = `📋 *${businessName} - Assignment*\n\n` +
+      message = `📋 *${titled('Assignment')}*\n\n` +
         `Hello ${resource.name || resourceName || "there"},\n\n` +
         `You have been assigned:\n\n` +
         `📅 *Date:* ${formatDate(startDate)}` +
@@ -136,7 +140,7 @@ export async function POST(request: NextRequest) {
         `👥 *Guests:* ${guestCount}\n` +
         `${notes ? `📝 *Notes:* ${notes}\n` : ''}\n` +
         `Please confirm receipt.\n\n` +
-        `${businessName} Operations`
+        signed('Operations')
     }
 
 

@@ -20,7 +20,10 @@ async function invoicePdfBytes(invoice: any, senderTenant: SenderTenant | null):
   const logoDataUrl = logoUrl && (await checkPublicHttpUrl(logoUrl)).ok
     ? await fetchLogoDataUrl(logoUrl)
     : undefined
-  const pdf = generateInvoicePDF(invoice, { ...identityFromTenant(senderTenant), logoDataUrl }, await serverPdfFontFor(invoice, senderTenant?.company_name))
+  const company = { ...identityFromTenant(senderTenant), logoDataUrl }
+  // The letterhead's own text (address, footer, tagline) counts too: a
+  // Japanese address was drawn in Helvetica when only the invoice was checked.
+  const pdf = generateInvoicePDF(invoice, company, await serverPdfFontFor(invoice, identityFromTenant(senderTenant)))
   return new Uint8Array(pdf.output('arraybuffer'))
 }
 
@@ -114,7 +117,12 @@ export async function POST(request: NextRequest) {
     // Generate PDF
 
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
-    const pdfBytes = await invoicePdfBytes(invoice, senderTenant)
+    // The customer receives it SENT — the status flips to 'sent' below, after
+    // the PDF was built, so a draft went out stamped "DRAFT".
+    const pdfBytes = await invoicePdfBytes(
+      { ...invoice, status: invoice.status === 'draft' ? 'sent' : invoice.status },
+      senderTenant
+    )
 
     // Upload to Supabase Storage (use admin client for storage)
 
@@ -143,7 +151,8 @@ export async function POST(request: NextRequest) {
       ? new Date(invoice.due_date).toLocaleDateString('en-GB', {
           day: 'numeric', month: 'long', year: 'numeric'
         })
-      : 'On Arrival'
+      // No due date: the terms on the invoice say when — never "On Arrival".
+      : 'As per the payment terms on the invoice'
 
     const typeLabel = invoice.invoice_type === 'deposit' 
       ? `Deposit Invoice (${invoice.deposit_percent}%)`

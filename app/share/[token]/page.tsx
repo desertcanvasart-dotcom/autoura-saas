@@ -1,4 +1,5 @@
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { formatMoney } from '@/lib/currency-totals'
 import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import {
@@ -17,7 +18,6 @@ import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
 import { sharePriceDecision } from '@/lib/itineraries/share-approval'
 import ReportProblem from './ReportProblem'
 import TripChat from './TripChat'
-import { getCurrencySymbol } from '@/lib/currency'
 
 // ============================================
 // THE SHAREABLE ITINERARY PAGE — public, token-gated
@@ -260,7 +260,6 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
     restaurant: { emoji: '🍽', label: 'Restaurant' },
     cruise: { emoji: '🚢', label: 'Cruise' },
   }
-  const sym = it.currency ? getCurrencySymbol(it.currency) : ''
   const travellers = it.numAdults + it.numChildren
 
   return (
@@ -442,7 +441,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             <div>
               <p className="text-sm text-gray-500">Total for {travellers || 'your'} traveller{travellers === 1 ? '' : 's'}</p>
               <p className="text-2xl font-bold text-gray-900">
-                {sym}{it.totalPrice.toLocaleString()}
+                {formatMoney(it.totalPrice, it.currency || 'EUR')}
               </p>
             </div>
             {it.code && <span className="text-xs text-gray-400">Ref: {it.code}</span>}

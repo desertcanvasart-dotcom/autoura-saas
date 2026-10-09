@@ -116,7 +116,7 @@ export default function InvoicePage() {
       }
       
       const { downloadInvoicePDF } = await import('@/lib/invoice-pdf-generator')
-      downloadInvoicePDF(invoiceData, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(invoiceData, tenant?.company_name))
+      downloadInvoicePDF(invoiceData, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(invoiceData, identityFromTenant(tenant)))
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download invoice')

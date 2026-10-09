@@ -142,16 +142,31 @@ export function generateWhatsAppLink(phoneNumber: string, message: string): stri
   return `https://wa.me/${cleanPhone}?text=${encodedMessage}`
 }
 
-export function formatPhoneForWhatsApp(phone: string): string {
-  let cleaned = phone.replace(/[\s\-\(\)]/g, '')
-  
-  if (!cleaned.startsWith('+')) {
-    if (cleaned.startsWith('01')) {
-      cleaned = '+20' + cleaned.substring(1)
-    } else if (cleaned.startsWith('1') && cleaned.length === 11) {
-      cleaned = '+20' + cleaned
-    }
+/** Dialling codes for the countries operators run trips in (Settings → operating country). */
+const DIAL_CODES: Record<string, string> = {
+  egypt: '20', morocco: '212', jordan: '962', tunisia: '216', turkey: '90', türkiye: '90',
+  greece: '30', 'united arab emirates': '971', uae: '971', japan: '81', italy: '39',
+  spain: '34', france: '33', portugal: '351', 'united kingdom': '44', uk: '44',
+}
+
+/** The dialling code of a country name, or null when unknown. */
+export function dialCodeForCountry(country: string | null | undefined): string | null {
+  return DIAL_CODES[String(country ?? '').trim().toLowerCase()] ?? null
+}
+
+/**
+ * A phone number as wa.me wants it: digits with the country code, no "+".
+ * A local number (leading trunk 0) takes the agency's own country code. It
+ * used to take Egypt's whatever the agency — and any 11-digit number starting
+ * with 1 was made Egyptian too, which turned every US/Canadian "1 415 555 1234"
+ * into a wrong recipient. A number already in international form is kept.
+ */
+export function formatPhoneForWhatsApp(phone: string, operatingCountry?: string | null): string {
+  let cleaned = phone.replace(/[\s\-().]/g, '')
+  if (cleaned.startsWith('00')) cleaned = '+' + cleaned.slice(2)
+  if (!cleaned.startsWith('+') && cleaned.startsWith('0')) {
+    const code = dialCodeForCountry(operatingCountry)
+    if (code) cleaned = '+' + code + cleaned.substring(1)
   }
-  
   return cleaned.replace(/^\+/, '')
 }
