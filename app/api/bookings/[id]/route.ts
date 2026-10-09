@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
 import { checkStatusChange, normalizeStatusChoice, OPERATOR_STATUS_CHOICES } from '@/lib/bookings/booking-status'
+import { removeBookingDocumentFiles } from '@/lib/portal/traveller-documents'
 
 // GET single booking
 export async function GET(
@@ -322,6 +323,17 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: 'Cannot delete confirmed or in-progress bookings. Cancel them instead.' },
         { status: 400 }
+      )
+    }
+
+    // The cascade takes the passport rows with it, but not the files: remove
+    // those first, and keep the booking if that fails, so nothing is orphaned.
+    const filesError = await removeBookingDocumentFiles(adminClient, id)
+    if (filesError) {
+      console.error('❌ Error removing traveller documents:', filesError)
+      return NextResponse.json(
+        { success: false, error: 'Could not remove the travellers\' uploaded documents, so the booking was kept. Please try again.' },
+        { status: 500 }
       )
     }
 

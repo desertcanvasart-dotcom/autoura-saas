@@ -68,7 +68,8 @@ export default function ReceiptsPage() {
         const itineraryData = await itineraryPaymentsRes.json()
         const itineraryPayments = itineraryData.success ? itineraryData.data : (Array.isArray(itineraryData) ? itineraryData : [])
         
-        itineraryPayments.forEach((p: any) => {
+        // Receipts are for money received: not pending, failed or refunded.
+        itineraryPayments.filter((p: any) => p.status === 'completed').forEach((p: any) => {
           allPayments.push({
             id: p.id,
             source: 'itinerary',

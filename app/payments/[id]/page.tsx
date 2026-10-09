@@ -283,13 +283,15 @@ export default function PaymentDetailPage() {
             </button>
             
             <div className="flex items-center gap-2">
-              <Link
-                href={`/documents/receipt/${payment.id}`}
-                className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                View Receipt
-              </Link>
+              {payment.payment_status === 'completed' && (
+                <Link
+                  href={`/documents/receipt/${payment.id}`}
+                  className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  View Receipt
+                </Link>
+              )}
               
               <Link
                 href={`/documents/invoice/${payment.id}`}

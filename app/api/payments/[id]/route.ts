@@ -36,6 +36,8 @@ export async function GET(
         itineraries (
           itinerary_code,
           client_name,
+          client_phone,
+          client_email,
           total_cost
         )
       `)
@@ -46,8 +48,15 @@ export async function GET(
 
     const formattedPayment = {
       ...payment,
+      // The column is `status`; the payment, invoice and receipt pages and
+      // the edit form all read `payment_status` (parsePaymentInput accepts
+      // either on the way in). Without it they crashed on .replace().
+      payment_status: payment.status,
       itinerary_code: payment.itineraries?.itinerary_code,
       client_name: payment.itineraries?.client_name,
+      // The receipt's WhatsApp button and the email on both PDFs need these.
+      client_phone: payment.itineraries?.client_phone,
+      client_email: payment.itineraries?.client_email,
       total_cost: payment.itineraries?.total_cost
     }
 
