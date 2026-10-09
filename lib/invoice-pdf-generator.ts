@@ -263,7 +263,9 @@ export function generateInvoicePDF(
   doc.text('Due Date:', leftColX, y)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...darkGray)
-  const dueDateText = invoice.due_date ? formatDate(invoice.due_date) : (invoiceType === 'final' ? 'On Arrival' : '-')
+  // No due date: the payment terms below say when. "On Arrival" contradicted
+  // a final invoice's own "payable before the first day of service".
+  const dueDateText = invoice.due_date ? formatDate(invoice.due_date) : (invoiceType === 'final' ? 'See payment terms' : '-')
   doc.text(dueDateText, leftColX + 35, y)
 
   // Client email

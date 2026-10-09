@@ -1,5 +1,7 @@
 'use client'
 
+import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
+import { formatDateOnly } from '@/lib/date-utils'
 import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { todayLocal } from '@/lib/today'
@@ -289,7 +291,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     setGeneratingPDF(true)
     try {
       const { downloadInvoicePDF } = await import('@/lib/invoice-pdf-generator')
-      downloadInvoicePDF(invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(invoice, tenant?.company_name))
+      downloadInvoicePDF(invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(invoice, identityFromTenant(tenant)))
     } catch (error) {
       console.error('Error generating PDF:', error)
       showToast('error', 'Failed to generate PDF. Please try again.')
@@ -329,7 +331,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     if (!invoice) return
     
     const receiptData = {
-      receiptNumber: `RCP-${invoice.invoice_number}-${payments.indexOf(payment) + 1}`,
+      receiptNumber: receiptNumberFor(payment),
       invoiceNumber: invoice.invoice_number,
       clientName: invoice.client_name,
       clientEmail: invoice.client_email,
@@ -342,7 +344,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
     
     const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
-    downloadReceiptPDF(receiptData, invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(receiptData, tenant?.company_name))
+    downloadReceiptPDF(receiptData, invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(receiptData, identityFromTenant(tenant)))
   }
 
   const handleDeletePayment = async (paymentId: string) => {
@@ -685,7 +687,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <div>
                     <p className="text-xs text-gray-500">Due Date</p>
                     <p className={`text-sm font-medium ${displayStatus === 'overdue' ? 'text-red-600' : 'text-gray-900'}`}>
-                      {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'On Arrival'}
+                      {invoice.due_date ? formatDateOnly(invoice.due_date, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'See payment terms'}
                     </p>
                   </div>
                 </div>

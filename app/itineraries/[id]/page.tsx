@@ -589,7 +589,7 @@ export default function ViewItineraryPage() {
       // Open a preview first; the modal exposes Download / Print / Email and a
       // breakdown toggle. The current breakdown choice is preserved.
       const { generateItineraryPDF } = await import('@/lib/pdf-generator')
-      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown, font: await browserPdfFontFor(itinerary, days, tenant?.company_name) }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown, font: await browserPdfFontFor(itinerary, days, identityFromTenant(tenant)) }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
       setShowPdfPreview(true)
     } catch (error) {
@@ -606,7 +606,7 @@ export default function ViewItineraryPage() {
     if (!itinerary || days.length === 0) return
     try {
       const { generateItineraryPDF } = await import('@/lib/pdf-generator')
-      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show, font: await browserPdfFontFor(itinerary, days, tenant?.company_name) }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show, font: await browserPdfFontFor(itinerary, days, identityFromTenant(tenant)) }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
     } catch (error) {
       console.error('Error regenerating PDF preview:', error)
@@ -670,7 +670,7 @@ export default function ViewItineraryPage() {
       const { generateItineraryPDF } = await import('@/lib/pdf-generator')
       // The breakdown choice the operator made for Download and Preview —
       // this always sent the breakdown, whatever they had chosen.
-      const pdf = generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown, font: await browserPdfFontFor(itinerary, days, tenant?.company_name) }, {
+      const pdf = generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown, font: await browserPdfFontFor(itinerary, days, identityFromTenant(tenant)) }, {
         ...identityFromTenant(tenant),
         logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url),
       })
@@ -1268,7 +1268,7 @@ export default function ViewItineraryPage() {
                     </button>
                   )}
                   {itinerary.client_phone && <a
-                    href={`https://wa.me/${formatPhoneForWhatsApp(itinerary.client_phone)}`}
+                    href={`https://wa.me/${formatPhoneForWhatsApp(itinerary.client_phone, tenant?.operating_country)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-2 py-1 text-xs font-medium rounded-md border border-green-300 text-green-700 hover:bg-green-50"

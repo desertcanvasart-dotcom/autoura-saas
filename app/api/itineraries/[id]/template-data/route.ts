@@ -1,7 +1,8 @@
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
-import { getCurrencySymbol } from '@/lib/currency'
 
 // GET /api/itineraries/[id]/template-data
 // Returns itinerary data formatted for template placeholder replacement
@@ -43,9 +44,18 @@ export async function GET(
       .eq('itinerary_id', itineraryId)
       .order('day_number', { ascending: true })
 
+    // The client total from the services (lib/itinerary-client-total), the
+    // figure every other send quotes — itineraries.total_cost is a cache that
+    // can be 0 or stale, and a template could quote a price nothing else did.
+    const { data: priceLines } = await supabase
+      .from('itinerary_services')
+      .select('total_cost, client_price')
+      .eq('itinerary_id', itineraryId)
+    const clientTotal = effectiveItineraryTotal(itinerary, priceLines ?? [])
+
     const placeholderData = (await (async () => {
       const senderTenant = await loadSenderTenant(authResult.tenant_id)
-      return buildPlaceholderData(itinerary, days || [], senderTenant?.company_name || '')
+      return buildPlaceholderData({ ...itinerary, total_cost: clientTotal }, days || [], senderTenant?.company_name || '')
     })())
 
     return NextResponse.json({
@@ -138,7 +148,8 @@ function buildPlaceholderData(itinerary: any, days: any[], companyName: string =
 function fmtCurrency(amount: number | string, currency: string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
   if (isNaN(num)) return ''
-  return `${getCurrencySymbol(currency)}${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  // The currency's own decimals and separators, as on every other document.
+  return formatMoney(num, currency)
 }
 
 function fmtDate(date: string | Date): string {

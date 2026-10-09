@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
         *,
         itineraries (
           client_phone
+        ),
+        clients (
+          phone
         )
       `)
       .order('created_at', { ascending: false })
@@ -89,8 +92,12 @@ export async function GET(request: NextRequest) {
     // Flatten the response to include client_phone at the top level
     const formattedData = (data || []).map((invoice: any) => ({
       ...invoice,
-      client_phone: invoice.itineraries?.client_phone || null,
-      itineraries: undefined // Remove nested object
+      // The number a WhatsApp send actually uses: the client's, else the trip's
+      // (send-invoice / send-receipt). Showing only the trip's meant the screen
+      // named one number while the message went to another.
+      client_phone: invoice.clients?.phone || invoice.itineraries?.client_phone || null,
+      itineraries: undefined, // Remove nested objects
+      clients: undefined
     }))
 
     return NextResponse.json(formattedData)

@@ -1,8 +1,9 @@
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { formatMoney } from '@/lib/currency-totals'
 import { depositDueDate } from '@/lib/template-placeholders'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
-import { getCurrencySymbol } from '@/lib/currency'
 
 // GET /api/clients/[id]/template-data
 // Returns client info + their latest itinerary for template placeholder replacement
@@ -71,6 +72,7 @@ export async function GET(
         balance_due,
         total_paid,
         currency,
+        margin_percent,
         payment_status,
         status
       `)
@@ -87,7 +89,17 @@ export async function GET(
 
     const { data: itineraries, error: itineraryError } = await itineraryQuery
 
-    const latestItinerary = itineraries && itineraries.length > 0 ? itineraries[0] : null
+    const storedItinerary = itineraries && itineraries.length > 0 ? itineraries[0] : null
+    // The client total from the services, as every other send quotes it
+    // (itineraries.total_cost is a cache that can be 0 or stale).
+    let latestItinerary = storedItinerary
+    if (storedItinerary) {
+      const { data: priceLines } = await supabase
+        .from('itinerary_services')
+        .select('total_cost, client_price')
+        .eq('itinerary_id', storedItinerary.id)
+      latestItinerary = { ...storedItinerary, total_cost: effectiveItineraryTotal(storedItinerary, priceLines ?? []) }
+    }
 
     // Also fetch all itineraries for this client (for dropdown selection)
     const { data: allItineraries } = await supabase
@@ -211,8 +223,8 @@ function formatCurrency(amount: number | string | undefined, currency: string = 
   if (amount === undefined || amount === null) return ''
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
   if (isNaN(num)) return ''
-  
-  return `${getCurrencySymbol(currency)}${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  // The currency's own decimals and separators, as on every other document.
+  return formatMoney(num, currency)
 }
 
 function formatDate(date: string | Date | undefined): string {

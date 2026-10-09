@@ -137,3 +137,13 @@ export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   const doc = generateReceiptPDF(receipt, invoice, company, font)
   doc.save(`Receipt-${receipt.receiptNumber}.pdf`)
 }
+/**
+ * A payment's receipt number — ONE rule wherever a receipt is made (the
+ * invoice page, the receipts page, the receipt page, WhatsApp): its
+ * transaction reference, else RCP- and the payment id. The invoice page
+ * numbered receipts by position in a newest-first list, so each new payment
+ * renumbered the older receipts, and WhatsApp sent yet another number.
+ */
+export function receiptNumberFor(payment: { id: string; transaction_reference?: string | null }): string {
+  return payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+}

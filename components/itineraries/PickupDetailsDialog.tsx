@@ -6,6 +6,7 @@
 // written from those (lib/notify/pickup-message) and can be edited before it
 // goes: from the agency's WhatsApp, or the operator's own (wa.me).
 
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { buildPickupMessage, type PickupMessageInput } from '@/lib/notify/pickup-message'
@@ -25,6 +26,8 @@ export default function PickupDetailsDialog({ itineraryId, days, today, onClose,
   onClose: () => void
   onSent: (how: 'agency' | 'mine') => void
 }) {
+  // The agency's country, for a local number's dialling code.
+  const { tenant } = useTenant()
   const sorted = useMemo(() => [...days].filter(d => d.date).sort((a, b) => a.day_number - b.day_number), [days])
   const [date, setDate] = useState(() => (sorted.find(d => d.date.slice(0, 10) >= today) ?? sorted[0])?.date.slice(0, 10) ?? today)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -83,7 +86,7 @@ export default function PickupDetailsDialog({ itineraryId, days, today, onClose,
     setBusy(true); setError(null)
     try {
       await save(false)
-      const url = generateWhatsAppLink(formatPhoneForWhatsApp(draft.clientPhone), text)
+      const url = generateWhatsAppLink(formatPhoneForWhatsApp(draft.clientPhone, tenant?.operating_country), text)
       if (tab) tab.location.href = url
       else window.location.href = url
       onSent('mine')

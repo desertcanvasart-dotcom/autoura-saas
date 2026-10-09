@@ -1,5 +1,6 @@
 'use client'
 
+import { formatMoney } from '@/lib/currency-totals'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant } from '@/lib/company-identity'
@@ -245,7 +246,7 @@ export default function ContractPage() {
         currency: itinerary?.currency || '',
         settings,
         terms: editedTerms,
-        font: await browserPdfFontFor(contractData, editedTerms, settings, tenant?.company_name),
+        font: await browserPdfFontFor(contractData, editedTerms, settings, identityFromTenant(tenant)),
       })
       
       // Download the PDF
@@ -582,7 +583,7 @@ export default function ContractPage() {
                   </p>
                   {contractData.numTravelers > 0 && contractData.totalCost !== null && (
                     <p className="text-gray-600 text-xs mt-1">
-                      ({itinerary?.currency} {(contractData.totalCost / contractData.numTravelers).toFixed(2)} per person × {contractData.numTravelers} {contractData.numTravelers === 1 ? 'traveler' : 'travelers'})
+                      ({formatMoney(contractData.totalCost / contractData.numTravelers, itinerary?.currency || 'EUR')} per person × {contractData.numTravelers} {contractData.numTravelers === 1 ? 'traveler' : 'travelers'})
                     </p>
                   )}
                 </div>
