@@ -61,14 +61,18 @@ export async function internationalNumber(to: string, tenantId?: string | null):
   return digits.startsWith('0') ? raw : '+' + digits
 }
 
-const countryCache = new Map<string, string | null>()
+// Only a country that is set is kept, and for a minute: a send that failed
+// for want of one must work once the agency sets it in Settings.
+const COUNTRY_CACHE_MS = 60_000
+const countryCache = new Map<string, { country: string; at: number }>()
 async function tenantCountry(tenantId: string): Promise<string | null> {
-  if (countryCache.has(tenantId)) return countryCache.get(tenantId) ?? null
+  const hit = countryCache.get(tenantId)
+  if (hit && Date.now() - hit.at < COUNTRY_CACHE_MS) return hit.country
   try {
     const { createAdminClient } = await import('@/lib/supabase-server')
     const { data } = await createAdminClient().from('tenants').select('operating_country').eq('id', tenantId).maybeSingle()
-    const country = (data as { operating_country?: string | null } | null)?.operating_country ?? null
-    countryCache.set(tenantId, country)
+    const country = (data as { operating_country?: string | null } | null)?.operating_country || null
+    if (country) countryCache.set(tenantId, { country, at: Date.now() })
     return country
   } catch {
     return null

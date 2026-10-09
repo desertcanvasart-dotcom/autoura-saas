@@ -6,6 +6,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 import { sumByCurrency, formatTotals, currencySymbol, formatMoney } from '@/lib/currency-totals'
+import { invoiceMoney } from '@/lib/invoices/invoice-money'
 import { 
   Plus, 
   Eye,
@@ -133,6 +134,23 @@ const initialFormData: FormData = {
   notes: '',
   payment_terms: 'Payment due within 14 days',
   payment_instructions: ''
+}
+
+/**
+ * Subtotal, tax and total for a one-line amount, as the server will store
+ * them (lib/invoices/invoice-money). Picking a trip, switching the type or
+ * changing the deposit percentage reset the line but kept the old tax.
+ */
+function amountsFor(prev: FormData, invoiceType: string, amount: number) {
+  const m = invoiceMoney({
+    invoiceType,
+    total: amount,
+    lineItems: [{ amount }],
+    taxRate: prev.tax_rate,
+    discountAmount: prev.discount_amount,
+    currency: prev.currency,
+  })
+  return { subtotal: m.subtotal, tax_amount: m.tax_amount, total_amount: m.total_amount }
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -297,8 +315,7 @@ export default function InvoicesContent() {
           unit_price: calculatedAmount,
           amount: calculatedAmount
         }],
-        subtotal: calculatedAmount,
-        total_amount: calculatedAmount
+        ...amountsFor({ ...prev, currency: itinerary.currency || prev.currency }, invoiceType, calculatedAmount),
       }))
     } else {
       setFormData(prev => ({
@@ -346,8 +363,7 @@ export default function InvoicesContent() {
         unit_price: calculatedAmount,
         amount: calculatedAmount
       }],
-      subtotal: calculatedAmount,
-      total_amount: calculatedAmount
+      ...amountsFor(prev, type, calculatedAmount),
     }))
   }
 
@@ -381,8 +397,7 @@ export default function InvoicesContent() {
         unit_price: calculatedAmount,
         amount: calculatedAmount
       }],
-      subtotal: calculatedAmount,
-      total_amount: calculatedAmount
+      ...amountsFor(prev, invoiceType, calculatedAmount),
     }))
   }
 

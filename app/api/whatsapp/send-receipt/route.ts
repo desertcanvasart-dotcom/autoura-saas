@@ -151,10 +151,11 @@ export async function POST(request: NextRequest) {
       `💰 *Amount:* ${amount}\n` +
       `🎫 *${receipt.referenceLabel}:* ${receipt.reference}\n\n` +
       `This receipt confirms your payment has been received and processed.\n\n` +
-      `For any questions, please contact us:\n` +
-      `📧 ${businessEmail}\n` +
-      (businessWebsite ? `🌐 ${businessWebsite}\n\n` : '') +
-      `Best regards,\n*${businessName} Team*`
+      (businessEmail || businessWebsite ? `For any questions, please contact us:\n` : '') +
+      (businessEmail ? `📧 ${businessEmail}\n` : '') +
+      (businessWebsite ? `🌐 ${businessWebsite}\n` : '') +
+      (businessEmail || businessWebsite ? '\n' : '') +
+      (businessName ? `Best regards,\n*${businessName} Team*` : 'Best regards')
 
 
 

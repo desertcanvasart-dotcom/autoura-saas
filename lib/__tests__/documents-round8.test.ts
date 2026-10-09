@@ -45,10 +45,9 @@ describe('server WhatsApp numbers', () => {
 })
 
 describe('invoice figures add up', () => {
-  it('stores the subtotal before tax, and no tax line on a deposit/final share', () => {
+  it('the route stores the figures lib/invoices/invoice-money works out', () => {
     const route = src('app/api/invoices/route.ts')
     expect(route).not.toContain('subtotal: totalAmount,')
-    expect(route).toContain('subtotal: roundToCurrency(total - tax + discount, currency)')
-    expect(route).toContain("if (invoiceType !== 'standard') return { subtotal: total, tax_rate: 0, tax_amount: 0, discount_amount: 0 }")
+    expect(route).toContain('...money,')
   })
 })

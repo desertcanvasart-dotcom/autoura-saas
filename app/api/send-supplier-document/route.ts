@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     <p>Best regards${businessName ? `,<br/><strong>${escapeHtml(businessName)} Team</strong>` : ','}</p>
   </div>
   <div class="footer">
-    <p>${escapeHtml(businessName)}${businessEmail ? ` | ${escapeHtml(businessEmail)}` : ''}</p>
+    <p>${[businessName, businessEmail].filter(Boolean).map(v => escapeHtml(String(v))).join(' | ')}</p>
   </div>
 </body>
 </html>`

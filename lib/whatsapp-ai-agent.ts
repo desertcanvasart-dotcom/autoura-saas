@@ -8,6 +8,7 @@
 
 import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
 import { formatMoney } from '@/lib/currency-totals'
+import { DEFAULT_RUN_CURRENCY, getTenantRunCurrency } from '@/lib/rates/run-currency'
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { whatsappModel } from '@/lib/ai/models'
@@ -273,12 +274,15 @@ export class ToolExecutor {
     this.tenantId = tenantId
   }
 
-  /** The tenant's default currency (Settings), else EUR. */
+  /**
+   * The currency the trip is priced in: the tenant's run currency, as
+   * generate-itinerary labels its trips. The editor prices lines from the
+   * rate tables in that currency and shows itinerary.currency beside them,
+   * so a default_currency label put EUR rates under a USD sign.
+   */
   private async tenantCurrency(): Promise<string> {
-    if (!this.tenantId) return 'EUR'
-    const { data } = await this.supabase.from('tenants').select('default_currency, rates_currency').eq('id', this.tenantId).maybeSingle()
-    const row = data as { default_currency?: string | null; rates_currency?: string | null } | null
-    return row?.default_currency || row?.rates_currency || 'EUR'
+    if (!this.tenantId) return DEFAULT_RUN_CURRENCY
+    return getTenantRunCurrency(this.supabase, this.tenantId)
   }
 
   async execute(toolName: string, toolInput: any): Promise<ToolResult> {
@@ -481,7 +485,7 @@ export class ToolExecutor {
           conversation_id: this.conversationId
         }),
         total_cost: 0,
-        // The agency's own currency, not EUR for everyone.
+        // The run currency the rate tables price this trip in.
         currency: await this.tenantCurrency()
       }
 
