@@ -223,7 +223,7 @@ export default function B2BQuoteEmail({
           {viewQuoteUrl && (
             <Section style={buttonSection}>
               <Button style={button} href={viewQuoteUrl}>
-                View Complete Rate Sheet & Cost Breakdown
+                View Complete Rate Sheet
               </Button>
             </Section>
           )}

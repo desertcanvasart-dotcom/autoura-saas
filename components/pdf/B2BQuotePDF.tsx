@@ -4,6 +4,7 @@ import { QuoteHeader, QuoteFooter, quotePalette, QUOTE_FOOTER_SPACE } from './Qu
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { QUOTE_PDF_FONT } from '@/lib/pdf/quote-fonts'
 import { formatMoney } from '@/lib/currency-totals'
+import { formatDateOnly } from '@/lib/date-utils'
 import { partnerSingleSupplement } from '@/lib/quotes/partner-rate-sheet'
 
 // Styles take the agency's brand colour (Settings → Organization); they were
@@ -195,6 +196,7 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
   // operator's net costs (per-night rates, transport, guide, tour leader)
   // and the single supplement at cost.
   const supplement = partnerSingleSupplement(quote)
+  const day = (d: string | null | undefined) => formatDateOnly(d, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   // Sort pax counts
   const sortedPax = Object.keys(quote.pricing_table)
     .map(Number)
@@ -263,7 +265,7 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
             {quote.itineraries.start_date && (
               <View style={styles.row}>
                 <Text style={styles.label}>Start Date:</Text>
-                <Text style={styles.value}>{new Date(quote.itineraries.start_date).toLocaleDateString()}</Text>
+                <Text style={styles.value}>{day(quote.itineraries.start_date)}</Text>
               </View>
             )}
             <View style={styles.row}>
@@ -335,18 +337,18 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
           <Text style={styles.sectionTitle}>Validity</Text>
           <View style={styles.row}>
             <Text style={styles.label}>Quote Date:</Text>
-            <Text style={styles.value}>{new Date(quote.created_at).toLocaleDateString()}</Text>
+            <Text style={styles.value}>{day(quote.created_at)}</Text>
           </View>
           {quote.valid_from && (
             <View style={styles.row}>
               <Text style={styles.label}>Valid From:</Text>
-              <Text style={styles.value}>{new Date(quote.valid_from).toLocaleDateString()}</Text>
+              <Text style={styles.value}>{day(quote.valid_from)}</Text>
             </View>
           )}
           {quote.valid_until && (
             <View style={styles.row}>
               <Text style={styles.label}>Valid Until:</Text>
-              <Text style={styles.value}>{new Date(quote.valid_until).toLocaleDateString()}</Text>
+              <Text style={styles.value}>{day(quote.valid_until)}</Text>
             </View>
           )}
         </View>

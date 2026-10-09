@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { daysOverdueOrNull, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { daysOverdueOrNull, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
 import { escapeHtml } from '@/lib/html-escape'
 import { createAdminClient } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
@@ -126,8 +126,12 @@ async function getHandler(request: NextRequest) {
       .not('due_date', 'is', null)
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
-      .lte('next_reminder_date', today)
+      // No next date yet = never reminded. Only the reminder senders set the
+      // column, so `lte` alone meant the cron never sent a FIRST reminder
+      // (the manual bulk route already reads it this way).
+      .or(`next_reminder_date.lte.${today},next_reminder_date.is.null`)
       .not('client_email', 'is', null)
+      .order('due_date', { ascending: true })
       .limit(50) // Process max 50 per run
 
     if (error) throw error
@@ -154,6 +158,13 @@ async function getHandler(request: NextRequest) {
       // overdue". Skip instead: no due date means nothing is owed *yet*.
       const daysOverdue = daysOverdueOrNull(invoice.due_date)
       if (daysOverdue === null) {
+        skipped++
+        continue
+      }
+
+      // A first reminder starts a week before the due date — not the day an
+      // invoice due in two months is raised.
+      if (!isFirstReminderDue(invoice.next_reminder_date, daysOverdue)) {
         skipped++
         continue
       }

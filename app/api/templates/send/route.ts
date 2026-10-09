@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { escapeHtml } from '@/lib/html-escape'
 
 export async function POST(request: NextRequest) {
   try {
@@ -128,6 +129,11 @@ export async function POST(request: NextRequest) {
 // EMAIL SENDING (via Gmail API)
 // ============================================
 
+/** A plain-text template as an HTML email body. */
+function plainTextEmailHtml(text: string): string {
+  return `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${escapeHtml(text)}</div>`
+}
+
 async function sendEmail(to: string, subject: string, body: string, userId: string): Promise<{ success: boolean; error?: string }> {
   try {
     // Gmail tokens for the signed-in user.
@@ -145,32 +151,16 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
       .single()
 
     if (!tokens) {
-      // Fallback: Try internal email API if exists
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-cron-secret': process.env.CRON_SECRET || '',
-        },
-        body: JSON.stringify({
-          to,
-          subject,
-          body,
-          isHtml: false,
-        }),
-      })
-
-      if (response.ok) {
-        return { success: true }
-      }
-
-      return { 
-        success: false, 
-        error: 'Gmail not connected. Please connect your Gmail account in Settings.' 
+      return {
+        success: false,
+        error: 'Gmail not connected. Please connect your Gmail account in Settings.'
       }
     }
 
-    // Use Gmail API
+    // /api/gmail/send sends from the mailbox of `userId` and refuses a request
+    // without one ("Missing required fields") — it was never passed, so every
+    // template email failed. It sends HTML: the template's plain text is
+    // escaped and its line breaks kept.
     const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
       method: 'POST',
       headers: {
@@ -178,16 +168,17 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
         'x-cron-secret': process.env.CRON_SECRET || '',
       },
       body: JSON.stringify({
+        userId,
         to,
         subject,
-        body,
-        isHtml: false,
+        body: plainTextEmailHtml(body),
+        body_text: body,
       }),
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      return { success: false, error: error.message || 'Failed to send email' }
+      const error = await response.json().catch(() => ({}))
+      return { success: false, error: error.error || error.message || 'Failed to send email' }
     }
 
     return { success: true }

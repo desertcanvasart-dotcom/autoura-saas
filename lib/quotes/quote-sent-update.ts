@@ -8,7 +8,7 @@
 export function quoteSentUpdate(
   type: 'b2c' | 'b2b',
   currentStatus: unknown,
-  via: 'email' | 'whatsapp',
+  via: 'email' | 'whatsapp' | 'whatsapp_ai',
   now: Date = new Date()
 ): Record<string, string> | null {
   const status = String(currentStatus ?? '')

@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDateOnly } from '@/lib/date-utils'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { todayLocal } from '@/lib/today'
 import { withReturnTo } from '@/lib/nav/return-to'
@@ -514,7 +515,9 @@ export default function ViewItineraryPage() {
           issue_date: todayLocal(),
           due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           payment_terms: 'Payment due within 14 days',
-          notes: `Trip dates: ${new Date(itinerary.start_date).toLocaleDateString()} - ${new Date(itinerary.end_date).toLocaleDateString()}`
+          // Calendar days (a UTC parse printed the day before, west of UTC) in a
+          // format every reader reads the same way — never "10/9/2026".
+          notes: `Trip dates: ${formatDateOnly(itinerary.start_date, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} - ${formatDateOnly(itinerary.end_date, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`
         })
       })
   
@@ -705,7 +708,7 @@ export default function ViewItineraryPage() {
 
   const markAsSent = async (method: string) => {
     try {
-      await fetch(`/api/itineraries/${params.id}/mark-sent`, {
+      const res = await fetch(`/api/itineraries/${params.id}/mark-sent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -713,8 +716,11 @@ export default function ViewItineraryPage() {
           recipientEmail: itinerary?.client_email
         })
       })
-      
-      if (itinerary) {
+      const result = await res.json().catch(() => null)
+
+      // Only a trip still at the quote stage moves to 'sent' — a confirmed
+      // one keeps its status (the route changes nothing then).
+      if (itinerary && result?.statusChanged) {
         setItinerary({ ...itinerary, status: 'sent' })
       }
     } catch (error) {

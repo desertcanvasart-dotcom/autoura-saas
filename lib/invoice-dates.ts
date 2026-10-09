@@ -47,3 +47,13 @@ export function reminderBlocker(invoice: { status?: string | null; due_date?: un
   }
   return null
 }
+
+/**
+ * Whether the reminder cron may send now. An invoice already on the ladder
+ * (next_reminder_date set and reached) is due; one never reminded starts a
+ * week before its due date — or at once if that is already past.
+ */
+export function isFirstReminderDue(nextReminderDate: unknown, daysOverdue: number): boolean {
+  if (nextReminderDate != null && nextReminderDate !== '') return true
+  return daysOverdue >= -7
+}

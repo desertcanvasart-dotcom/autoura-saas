@@ -36,6 +36,9 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
+/** No job sends scheduled_sends yet; the Schedule option stays hidden until one does. */
+const SCHEDULED_SENDS_PROCESSED = false
+
 // ============================================
 // TYPES
 // ============================================
@@ -1681,7 +1684,10 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Schedule Mode Toggle */}
+            {/* Schedule Mode Toggle — hidden: nothing sends scheduled_sends
+                rows (no job reads them), so "Message scheduled for …" was a
+                message that never went out. Restore with a processor. */}
+            {SCHEDULED_SENDS_PROCESSED && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -1696,6 +1702,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
               />
               <span className="text-sm text-gray-600">Schedule</span>
             </label>
+            )}
             {/* Bulk Mode Toggle */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input

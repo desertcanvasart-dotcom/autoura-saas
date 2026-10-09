@@ -218,7 +218,7 @@ export async function POST(
         `💵 *Per Person: ${formatMoney(quote.price_per_person, quote.currency)}*\n\n` +
         // What is included is in the attached quote — not a fixed list that
         // promised a guide, entrance fees and meals whatever was quoted.
-        `📄 *Your detailed quote with what is included and the full pricing breakdown is attached as a PDF.*\n\n` +
+        `📄 *Your detailed quote with what is included is attached as a PDF.*\n\n` +
         (quote.valid_until ? `⏰ *This quote is valid until:* ${day(quote.valid_until)}\n\n` : '') +
         (quote.client_notes ? `📝 *Special Notes:* ${quote.client_notes}\n\n` : '') +
         `💳 *Ready to Book?*\n` +
