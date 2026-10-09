@@ -19,6 +19,7 @@ export const EDITABLE_SUPPLIER_DOCUMENT_FIELDS = [
   'client_name', 'client_nationality', 'num_adults', 'num_children',
   'city', 'service_date', 'check_in', 'check_out',
   'pickup_time', 'pickup_location', 'dropoff_location',
+  'vehicle_type', 'driver_name',
   'services', 'currency', 'total_cost', 'payment_terms',
   'special_requests', 'internal_notes',
   'status', 'sent_at', 'confirmed_at', 'completed_at',

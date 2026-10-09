@@ -8,6 +8,9 @@ import Link from 'next/link'
 import { ArrowLeft, Save, Plus, X, MapPin, Ticket, Calculator } from 'lucide-react'
 import CitySelect from '@/components/CitySelect'
 import { withPickedAttractions } from '@/lib/documents/voucher-lines'
+import { VOUCHER_VEHICLE_TYPES } from '@/lib/documents/vehicle-types'
+import { TripBreadcrumb } from '@/components/nav/TripNav'
+import { withReturnTo, safeReturnPath, FROM_PARAM } from '@/lib/nav/return-to'
 
 interface EntranceFee {
   id: string
@@ -35,6 +38,13 @@ export default function EditSupplierDocumentPage() {
   const params = useParams()
   const router = useRouter()
   const [document, setDocument] = useState<any>(null)
+  // ?from= (where the document page was opened from): back and save return to
+  // the document page with it, so its back link still reaches the trip.
+  const [returnTo, setReturnTo] = useState<string | null>(null)
+  useEffect(() => {
+    setReturnTo(safeReturnPath(new URLSearchParams(window.location.search).get(FROM_PARAM)))
+  }, [])
+  const documentHref = withReturnTo(`/documents/supplier/${params.id}`, returnTo)
   // The total as loaded: picked entrance fees are added to it, not put in its place.
   const [baseTotal, setBaseTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -104,7 +114,7 @@ export default function EditSupplierDocumentPage() {
       })
       
       if (response.ok) {
-        router.push(`/documents/supplier/${params.id}`)
+        router.push(documentHref)
       } else {
         setError('Failed to save')
       }
@@ -189,7 +199,7 @@ export default function EditSupplierDocumentPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
-          <Link href="/documents/supplier" className="text-primary-600">← Back</Link>
+          <Link href={returnTo ?? '/documents/supplier'} className="text-primary-600">← Back</Link>
         </div>
       </div>
     )
@@ -201,9 +211,10 @@ export default function EditSupplierDocumentPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
+          <TripBreadcrumb itineraryId={document.itinerary?.id ?? document.itinerary_id} current={document.document_number} />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href={`/documents/supplier/${params.id}`} className="p-2 hover:bg-gray-100 rounded-lg">
+              <Link href={documentHref} className="p-2 hover:bg-gray-100 rounded-lg">
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </Link>
               <div>
@@ -418,6 +429,35 @@ export default function EditSupplierDocumentPage() {
                     type="text"
                     value={document.dropoff_location || ''}
                     onChange={(e) => setDocument({ ...document, dropoff_location: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                {/* Printed on the voucher's vehicle / driver block (migration 402). */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Type</label>
+                  <select
+                    value={document.vehicle_type || ''}
+                    onChange={(e) => setDocument({ ...document, vehicle_type: e.target.value || null })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    title="Vehicle Type"
+                  >
+                    <option value="">Select vehicle…</option>
+                    {Object.entries(VOUCHER_VEHICLE_TYPES).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                    {/* A class from the trip that is not on the list stays selectable. */}
+                    {document.vehicle_type && !VOUCHER_VEHICLE_TYPES[document.vehicle_type] && (
+                      <option value={document.vehicle_type}>{document.vehicle_type}</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Driver Name</label>
+                  <input
+                    type="text"
+                    value={document.driver_name || ''}
+                    onChange={(e) => setDocument({ ...document, driver_name: e.target.value })}
+                    placeholder="To be assigned"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>

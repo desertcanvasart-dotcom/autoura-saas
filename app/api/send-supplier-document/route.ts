@@ -3,6 +3,7 @@ import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { escapeHtml } from '@/lib/html-escape'
+import { markSupplierDocumentSent } from '@/lib/documents/mark-sent'
 
 // POST - Send supplier document via Gmail with PDF attachment
 export async function POST(request: Request) {
@@ -13,17 +14,29 @@ export async function POST(request: Request) {
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json()
-    const { documentId, supplierEmail, supplierName, documentNumber, documentType, clientName, pdfBase64 } = body
+    // The recipient, number and names come from the voucher row, not the
+    // request: the page chooses only which voucher, its display title and the
+    // PDF it rendered from that row.
+    const { documentId, documentType: documentTitle, pdfBase64 } = body
 
-    if (!supplierEmail) return NextResponse.json({ success: false, error: 'Supplier email is required' }, { status: 400 })
     if (!pdfBase64) return NextResponse.json({ success: false, error: 'PDF attachment is required' }, { status: 400 })
 
-    // Only a voucher of the caller's own tenant (RLS on supplier_documents):
-    // this was a "send any PDF to any address" endpoint for any signed-in user.
+    // Only a voucher of the caller's own tenant (RLS on supplier_documents).
     const { data: ownDocument } = documentId
-      ? await supabase.from('supplier_documents').select('id').eq('id', documentId).maybeSingle()
+      ? await supabase
+          .from('supplier_documents')
+          .select('id, document_type, document_number, supplier_name, supplier_contact_email, client_name')
+          .eq('id', documentId)
+          .maybeSingle()
       : { data: null }
     if (!ownDocument) return NextResponse.json({ success: false, error: 'Document not found' }, { status: 404 })
+
+    const supplierEmail = ownDocument.supplier_contact_email
+    if (!supplierEmail) return NextResponse.json({ success: false, error: 'Supplier email is required' }, { status: 400 })
+    const supplierName = ownDocument.supplier_name
+    const documentNumber = ownDocument.document_number
+    const clientName = ownDocument.client_name
+    const documentType = documentTitle || ownDocument.document_type
 
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const businessName = senderTenant?.company_name || ''
@@ -98,6 +111,10 @@ export async function POST(request: Request) {
       userId: 'me',
       requestBody: { raw: rawEmail },
     })
+
+    // The email has gone: record it here, not in a second request from the page.
+    const marked = await markSupplierDocumentSent(supabase, { documentId: ownDocument.id })
+    if (marked.error) console.error('Supplier document sent but not marked sent:', marked.error)
 
     return NextResponse.json({
       success: true,

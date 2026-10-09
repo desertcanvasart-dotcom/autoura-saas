@@ -210,6 +210,20 @@ export async function PUT(
 
     if (error) throw error
 
+    // A cancelled trip's DRAFT supplier vouchers are cancelled with it (no
+    // supplier has seen them), so they stop showing as work to send. Vouchers
+    // already sent stay as they are: the supplier holds them, and marking them
+    // cancelled here would hide that someone still has to tell the supplier.
+    // The caller's client is RLS-scoped to the tenant.
+    if (body.status === 'cancelled' && data) {
+      const { error: voucherError } = await supabase
+        .from('supplier_documents')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('itinerary_id', id)
+        .eq('status', 'draft')
+      if (voucherError) console.warn('[itinerary] cancelling draft vouchers failed:', voucherError.message)
+    }
+
     if (newAssignee && newAssignee !== previousAssignee) {
       const row = data as { itinerary_code?: string | null; trip_name?: string | null }
       await notifyTripAssignment({

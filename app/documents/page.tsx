@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { FileText, Hotel, Car, Ship, MapPin, Users, Building, ArrowRight, FileCheck } from 'lucide-react'
+import { FileText, Hotel, Car, Ship, Users, Building, ArrowRight, FileCheck } from 'lucide-react'
 
 const DOCUMENT_SECTIONS = [
   {
@@ -50,13 +50,9 @@ const DOCUMENT_SECTIONS = [
         icon: Ship,
         color: 'bg-cyan-100 text-cyan-700'
       },
-      {
-        name: 'Activity Vouchers',
-        description: 'Tours and excursion confirmations',
-        href: '/documents/supplier?type=activity_voucher',
-        icon: MapPin,
-        color: 'bg-green-100 text-green-700'
-      },
+      // No Activity Vouchers card: this app puts entrance fees and activities
+      // on service orders (lib/documents/group-services), so Generate never
+      // makes one and the card always opened an empty list.
       {
         name: 'Guide Assignments',
         description: 'Guide briefings and assignments',
