@@ -49,6 +49,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Payment not found' }, { status: 404 })
     }
 
+    // A receipt says the money arrived; never send one for a pending,
+    // failed or refunded payment.
+    if (payment.status !== 'completed') {
+      return NextResponse.json(
+        { success: false, error: `This payment is ${payment.status ?? 'not completed'}; a receipt is only sent once it is completed.` },
+        { status: 409 }
+      )
+    }
+
     const clientPhone = payment.itineraries?.client_phone
     if (!clientPhone) {
       return NextResponse.json({ success: false, error: 'Client phone not found' }, { status: 400 })

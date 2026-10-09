@@ -28,7 +28,8 @@ const BATCH = 50
 async function getHandler(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // No secret configured = refuse, like the other crons: /api/cron/ is public.
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

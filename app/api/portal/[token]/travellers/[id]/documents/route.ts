@@ -129,27 +129,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Upload failed — please try again shortly.' }, { status: 500 })
     }
 
-    // Passport = one replaceable slot. Retire the previous row and object
-    // AFTER the new one is safely stored, so a failed upload never leaves
-    // the traveller with nothing.
+    // Passport = one replaceable slot, and the traveller must never be left
+    // with none. Stand the previous one aside (stamped, which frees the
+    // one-live-passport index) BEFORE the new row goes in; if the insert then
+    // fails, put it back. Its file goes only once the new row is in.
+    let prior: { id: string; storage_path: string } | null = null
     if (kind === 'passport') {
-      const { data: prior } = await db
+      const { data } = await db
         .from('booking_passenger_documents')
         .select('id, storage_path')
         .eq('passenger_id', id)
         .eq('kind', 'passport')
         .is('purged_at', null)
         .maybeSingle()
+      prior = data
       if (prior) {
-        // If retiring the old slot fails, the one-live-passport index would
-        // reject the new row anyway — surface it now and remove the fresh
-        // object rather than half-replacing somebody's passport.
-        const { error: priorObjErr } = await db.storage.from(TRAVELLER_DOCS_BUCKET).remove([prior.storage_path])
-        const { error: priorRowErr } = priorObjErr
-          ? { error: priorObjErr }
-          : await db.from('booking_passenger_documents').delete().eq('id', prior.id)
-        if (priorRowErr) {
-          console.error('[portal] passport slot replacement failed:', priorRowErr.message)
+        const { error: asideError } = await db
+          .from('booking_passenger_documents')
+          .update({ purged_at: new Date().toISOString() })
+          .eq('id', prior.id)
+        if (asideError) {
+          console.error('[portal] passport slot replacement failed:', asideError.message)
           await db.storage.from(TRAVELLER_DOCS_BUCKET).remove([storagePath])
           return NextResponse.json({ success: false, error: 'Upload failed — please try again shortly.' }, { status: 500 })
         }
@@ -182,9 +182,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .select('id, kind, label, original_filename, size_bytes, uploaded_at')
       .single()
     if (insertError) {
-      // The object exists but the index write failed — remove the orphan.
+      // The object exists but the index write failed — remove the orphan,
+      // and give the traveller their previous passport back.
       await db.storage.from(TRAVELLER_DOCS_BUCKET).remove([storagePath])
+      if (prior) {
+        await db.from('booking_passenger_documents').update({ purged_at: null }).eq('id', prior.id)
+      }
       return NextResponse.json({ success: false, error: 'Upload failed — please try again shortly.' }, { status: 500 })
+    }
+
+    if (prior) {
+      // The new passport is on file; now the old one's file goes. If that
+      // removal fails, its row stays (stamped) so the path is not lost.
+      const { error: priorObjErr } = await db.storage.from(TRAVELLER_DOCS_BUCKET).remove([prior.storage_path])
+      if (priorObjErr) console.error('[portal] old passport file not removed:', prior.id, priorObjErr.message)
+      else await db.from('booking_passenger_documents').delete().eq('id', prior.id)
     }
 
     return NextResponse.json({ success: true, document: publicShape(row) })

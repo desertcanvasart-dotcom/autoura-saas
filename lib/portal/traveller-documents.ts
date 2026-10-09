@@ -130,3 +130,35 @@ export const REJECTION_MESSAGE: Record<UploadRejection, string> = {
   content_mismatch: 'The file contents do not match its format. Please try a different file.',
   too_many: `You can attach up to ${MAX_OTHER_DOCUMENTS} supporting documents.`,
 }
+
+// ============================================
+// Before a booking goes
+// ============================================
+// Deleting a booking cascades its document ROWS away, and the purge cron
+// finds objects only through those rows — so a file still in the bucket at
+// that moment would stay there forever, with nothing pointing to it. Remove
+// the objects first; the caller deletes the booking only if this succeeded.
+
+type StorageRemover = {
+  from: (table: 'booking_passenger_documents') => any
+  storage: { from: (bucket: string) => { remove: (paths: string[]) => PromiseLike<{ error: { message: string } | null }> } }
+}
+
+/** Removes every live document file of a booking. Returns an error message, or null. */
+export async function removeBookingDocumentFiles(db: StorageRemover, bookingId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('booking_passenger_documents')
+    .select('storage_path')
+    .eq('booking_id', bookingId)
+    .is('purged_at', null)
+  if (error) {
+    // Table absent = migration 301 pending: no documents to remove.
+    return error.code === '42P01' ? null : error.message
+  }
+  const paths = ((data ?? []) as { storage_path: string }[]).map(d => d.storage_path)
+  for (let i = 0; i < paths.length; i += 50) {
+    const { error: removeError } = await db.storage.from(TRAVELLER_DOCS_BUCKET).remove(paths.slice(i, i + 50))
+    if (removeError) return removeError.message
+  }
+  return null
+}
