@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
+import { recordsInTenant } from '@/lib/quotes/records-in-tenant'
 
 /**
  * GET /api/quotes/b2b
@@ -154,6 +155,9 @@ export async function POST(request: NextRequest) {
     if (!partnerCheck.ok) {
       return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
     }
+    // And the trip (lib/quotes/records-in-tenant).
+    const refs = await recordsInTenant(supabase, authResult.tenant_id, { itinerary_id })
+    if (!refs.ok) return NextResponse.json({ success: false, error: refs.error }, { status: refs.status })
 
     // Generate quote number using admin client (RPC needs admin)
     const { data: quoteNumber, error: seqError } = await (supabase as any)

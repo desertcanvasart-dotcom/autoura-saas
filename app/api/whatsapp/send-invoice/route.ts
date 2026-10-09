@@ -169,8 +169,7 @@ export async function POST(request: NextRequest) {
       `📅 *Issue Date:* ${issueDate}\n` +
       `⏰ *Due Date:* ${dueDate}\n\n` +
       `💰 *Balance Due: ${formatMoney(invoice.balance_due, invoice.currency)}*\n\n` +
-      `For questions, contact us:\n` +
-      (businessEmail ? `📧 ${businessEmail}\n\n` : '') +
+      (businessEmail ? `For questions, contact us:\n📧 ${businessEmail}\n\n` : '') +
       `Thank you! 🙏\n${businessName ? businessName + ' Team' : 'Your travel team'}`
 
 

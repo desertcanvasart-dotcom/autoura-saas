@@ -461,6 +461,12 @@ export default function InvoicesContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // A deposit or final invoice is a share of the trip's full cost, which the
+    // server works it out from — without a trip it saved 10% of the typed line.
+    if (formData.invoice_type !== 'standard' && !(formData.full_trip_cost > 0)) {
+      showToast('error', 'Pick the trip for a deposit or final invoice')
+      return
+    }
     setSaving(true)
 
     try {
@@ -996,6 +1002,8 @@ export default function InvoicesContent() {
                               type="number"
                               value={item.quantity}
                               onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                              // A deposit/final line is the server's share of the trip; an edit here was not saved.
+                              readOnly={formData.invoice_type !== 'standard'}
                               min="1"
                               className="w-full px-3 py-2 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
                             />
@@ -1005,6 +1013,7 @@ export default function InvoicesContent() {
                               type="number"
                               value={item.unit_price}
                               onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                              readOnly={formData.invoice_type !== 'standard'}
                               step="0.01"
                               min="0"
                               className="w-full px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"

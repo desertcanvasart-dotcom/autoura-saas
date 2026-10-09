@@ -47,7 +47,7 @@ import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useRole } from '@/hooks/useRole'
 import ItineraryBookingAction from '@/components/ItineraryBookingAction'
-import { itineraryClientTotal } from '@/lib/itinerary-client-total'
+import { effectiveItineraryTotal, itineraryClientTotal } from '@/lib/itinerary-client-total'
 import { dayBookings, includesFromLines, type DayBooking } from '@/lib/itineraries/day-bookings'
 import { hotelRateIdOf, nightFromBooking, tripChecks, tripStays, type CheckDay } from '@/lib/itineraries/trip-checks'
 
@@ -1037,7 +1037,7 @@ export default function ItineraryEditorPage() {
                   // stored total_cost can be stale (unsaved edits, an older
                   // save), and the view page already bills the services.
                   const live = services.filter(s => !s.isDeleted)
-                  const amount = live.length > 0 ? itineraryClientTotal(live, itinerary.margin_percent) : itinerary.total_cost
+                  const amount = effectiveItineraryTotal(itinerary, live)
                   const response = await fetch('/api/invoices', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

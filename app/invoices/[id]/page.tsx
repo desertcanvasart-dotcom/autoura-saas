@@ -1010,15 +1010,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1.5">Currency</label>
-                  <select
-                    value={paymentForm.currency}
-                    onChange={(e) => setPaymentForm(prev => ({ ...prev, currency: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
-                  >
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="GBP">GBP (£)</option>
-                  </select>
+                  {/* The invoice's own currency: its balance is in it (lib/payment-currency). */}
+                  <div className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                    {paymentForm.currency} ({getCurrencySymbol(paymentForm.currency)})
+                  </div>
                 </div>
               </div>
 

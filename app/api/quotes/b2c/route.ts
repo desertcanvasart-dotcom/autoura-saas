@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { recordsInTenant } from '@/lib/quotes/records-in-tenant'
 
 /**
  * GET /api/quotes/b2c
@@ -133,6 +134,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // The client and trip must be this tenant's (lib/quotes/records-in-tenant).
+    const refs = await recordsInTenant(supabase, authResult.tenant_id, { client_id, itinerary_id })
+    if (!refs.ok) return NextResponse.json({ success: false, error: refs.error }, { status: refs.status })
 
     // Generate quote number using admin client (RPC needs admin)
     const { data: quoteNumber, error: seqError } = await (supabase as any)

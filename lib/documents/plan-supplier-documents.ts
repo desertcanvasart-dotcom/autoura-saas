@@ -350,7 +350,9 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
       supplier_name: group.supplierName,
       supplier_contact_name: supplier?.contact_name ?? group.guide?.name ?? null,
       supplier_contact_email: supplier?.contact_email ?? group.guide?.email ?? null,
-      supplier_contact_phone: supplier?.contact_phone ?? group.guide?.phone ?? null,
+      // The WhatsApp number first, as for guides: a hotel with only WhatsApp
+      // filled in got a voucher it could not be sent.
+      supplier_contact_phone: supplier?.whatsapp || supplier?.contact_phone || group.guide?.phone || null,
       supplier_address: supplier
         ? [supplier.address, supplier.city, supplier.country].filter(Boolean).join(', ')
         : Array.from(group.cities).join(', '),

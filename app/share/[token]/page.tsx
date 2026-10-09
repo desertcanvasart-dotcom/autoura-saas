@@ -128,7 +128,9 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
   const fetchContacts = async (table: string, cols: string, ids: string[]): Promise<Array<Record<string, unknown>>> =>
     ids.length === 0
       ? []
-      : (((await supabase.from(table).select(cols).in('id', ids)).data ?? []) as unknown as Array<Record<string, unknown>>)
+      // This share's tenant only: an assignment's resource_id is whatever was
+      // saved on it, and another tenant's guide would bring their phone.
+      : (((await supabase.from(table).select(cols).in('id', ids).eq('tenant_id', share.tenant_id)).data ?? []) as unknown as Array<Record<string, unknown>>)
   // Guides live in SUPPLIERS (supplier_type='guide') — the guides table is
   // legacy. Assignment ids may reference either, so fetch both and let the
   // sanitizer's id-match pick whichever exists; supplier rows are mapped to
