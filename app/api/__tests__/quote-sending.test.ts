@@ -178,7 +178,7 @@ describe('POST /api/whatsapp/send-quote (itinerary)', () => {
     h.services = [{ total_cost: 2000, client_price: 2400 }]
     expect((await sendItineraryQuote(post({ itineraryId: 'it-1', clientPhone: '+19999999999' }))).status).toBe(200)
     expect(h.whatsapp[0].to).toBe('+212600000000')
-    expect(h.whatsapp[0].body).toContain('EUR 2400.00')
+    expect(h.whatsapp[0].body).toContain('2,400.00')
     expect(h.whatsapp[0].body).not.toMatch(PLATFORM)
     expect(h.updates.some(u => u.table === 'itineraries' && u.data.status === 'sent')).toBe(true)
   })

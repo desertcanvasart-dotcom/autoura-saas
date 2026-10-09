@@ -25,6 +25,8 @@ export interface AdditionLine {
   quantity: number
   unit_price: number
   amount: number
+  /** An extra or upgrade, not the trip itself. */
+  addition: true
 }
 
 /**
@@ -69,6 +71,9 @@ export function toLineItems(additions: Addition[], invoiceCurrency: string): Add
     quantity: quantityOf(a),
     unit_price: roundToCurrency(a.unit_price, invoiceCurrency),
     amount: amountOf(a, invoiceCurrency),
+    // Marked, so a final invoice's PDF can tell the trip's balance from the
+    // extras billed with it (lib/invoice-pdf-generator).
+    addition: true,
   }))
 }
 

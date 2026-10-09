@@ -328,7 +328,8 @@ export default function EditSupplierDocumentPage() {
                 <input
                   type="number"
                   value={document.num_adults || 1}
-                  onChange={(e) => setDocument({ ...document, num_adults: parseInt(e.target.value) })}
+                  // A cleared field is NaN, sent as null: the save failed on NOT NULL.
+                  onChange={(e) => setDocument({ ...document, num_adults: Math.max(1, parseInt(e.target.value) || 1) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
@@ -337,7 +338,7 @@ export default function EditSupplierDocumentPage() {
                 <input
                   type="number"
                   value={document.num_children || 0}
-                  onChange={(e) => setDocument({ ...document, num_children: parseInt(e.target.value) })}
+                  onChange={(e) => setDocument({ ...document, num_children: Math.max(0, parseInt(e.target.value) || 0) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
@@ -513,7 +514,8 @@ export default function EditSupplierDocumentPage() {
                   type="number"
                   step="0.01"
                   value={document.total_cost || 0}
-                  onChange={(e) => setDocument({ ...document, total_cost: parseFloat(e.target.value) })}
+                  // Cleared = 0, never NaN (saved as null, which broke the voucher's PDF).
+                  onChange={(e) => setDocument({ ...document, total_cost: parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>

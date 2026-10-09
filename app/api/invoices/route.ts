@@ -323,7 +323,7 @@ function getDefaultPaymentTerms(invoiceType: string): string {
     case 'deposit':
       return 'Deposit required to confirm booking. Non-refundable once services are confirmed.'
     case 'final':
-      return 'Balance payable in cash upon arrival or before first day of service.'
+      return 'Balance payable before the first day of service.'
     default:
       return 'Payment due within 14 days'
   }

@@ -393,7 +393,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           currency: invoice.currency,
           issue_date: todayLocal(),
           due_date: null,
-          payment_terms: 'Balance payable in cash upon arrival or before first day of service.',
+          payment_terms: 'Balance payable before the first day of service.',
           notes: `Related Deposit Invoice: ${invoice.invoice_number}`
         })
       })

@@ -1,14 +1,16 @@
+import { formatMoney } from '@/lib/currency-totals'
 import jsPDF from 'jspdf'
 import { brandColorRgb, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
 import { formatDateOnly } from '@/lib/date-utils'
-import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
 
 interface LineItem {
   description: string
   quantity: number
   unit_price: number
   amount: number
+  /** An extra billed with the balance (lib/invoice-additions). */
+  addition?: boolean
 }
 
 interface Invoice {
@@ -65,10 +67,8 @@ function letterheadIdentity(company: CompanyInfo): CompanyIdentity {
 // identity (lib/company-identity.ts).
 const DEFAULT_COMPANY: CompanyInfo = { name: '' }
 
-const getCurrencySymbol = (currency: string): string => canonicalCurrencySymbol(currency)
-
 const formatCurrency = (amount: number, currency: string): string => {
-  return `${getCurrencySymbol(currency)}${Number(amount).toFixed(2)}`
+  return formatMoney(amount, currency)
 }
 
 const formatDate = (dateString: string): string => {
@@ -155,16 +155,24 @@ export function generateInvoicePDF(
 
   if (invoiceType !== 'standard' && invoice.deposit_percent) {
     const known = typeof invoice.trip_total === 'number' && invoice.trip_total > 0 ? invoice.trip_total : null
+    // A final invoice carries the extras billed with the balance. They are not
+    // part of the trip's cost: worked back WITH them, a 1,000 trip with a 100
+    // deposit and 200 of extras printed "Full Trip Cost 1,222.22, Deposit
+    // 122.22". The extras stay on their own lines below.
+    const extras = (invoice.line_items || [])
+      .filter(l => l.addition)
+      .reduce((sum, l) => sum + (Number(l.amount) || 0), 0)
+    const tripPart = Number(invoice.total_amount) - (invoiceType === 'final' ? extras : 0)
     const fullTripCost = known ?? (invoiceType === 'deposit'
-      ? (Number(invoice.total_amount) * 100) / invoice.deposit_percent
-      : Number(invoice.total_amount) + (Number(invoice.total_amount) * invoice.deposit_percent) / (100 - invoice.deposit_percent))
+      ? (tripPart * 100) / invoice.deposit_percent
+      : tripPart + (tripPart * invoice.deposit_percent) / (100 - invoice.deposit_percent))
 
     // With the real total, this invoice's own amount is the deposit (or the
     // balance) — not a percentage of a total worked back from a guess.
     const depositAmount = known !== null && invoiceType === 'deposit'
-      ? Number(invoice.total_amount)
+      ? tripPart
       : known !== null
-        ? known - Number(invoice.total_amount)
+        ? known - tripPart
         : (fullTripCost * invoice.deposit_percent) / 100
     const balanceAmount = fullTripCost - depositAmount
 
@@ -520,7 +528,7 @@ export function generateInvoicePDF(
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(146, 64, 14)
-    doc.text('This deposit is required to confirm your booking. The remaining balance is payable upon arrival.', margin + 5, y + 14)
+    doc.text('This deposit is required to confirm your booking. The remaining balance is due as set out in the payment terms.', margin + 5, y + 14)
     
     y += 25
   }
@@ -541,7 +549,8 @@ export function generateInvoicePDF(
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(6, 95, 70)
-    doc.text('This invoice represents the remaining balance after your deposit. Payable in cash upon arrival in Cairo.', margin + 5, y + 14)
+    // It said "Payable in cash upon arrival in Cairo" on every agency's invoice.
+    doc.text('This invoice is the remaining balance after your deposit, payable as set out in the payment terms.', margin + 5, y + 14)
     
     y += 25
   }

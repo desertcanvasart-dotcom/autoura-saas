@@ -40,10 +40,10 @@ describe('the invoice PDF breakdown', () => {
   it('prints the trip’s real total, deposit and balance', () => {
     const shape = paymentInvoiceShape('deposit', 500, 3000)
     const t = text(generateInvoicePDF(invoice({ invoice_type: shape.invoiceType, deposit_percent: shape.depositPercent, trip_total: shape.tripTotal }) as never))
-    expect(t).toContain('3000.00')
-    expect(t).toContain('2500.00')
-    expect(t).not.toContain('1666.67')
-    expect(t).not.toContain('1166.67')
+    expect(t).toContain('3,000.00')
+    expect(t).toContain('2,500.00')
+    expect(t).not.toContain('1,666.67')
+    expect(t).not.toContain('1,166.67')
   })
 })
 

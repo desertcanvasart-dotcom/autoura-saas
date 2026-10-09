@@ -2,6 +2,7 @@
 // Professional Supplier Document PDF Generator
 // Unified branding with Travel2Egypt / Autoura colors
 
+import { formatMoney } from '@/lib/currency-totals'
 import jsPDF from 'jspdf'
 import { brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
@@ -524,7 +525,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       // numeric columns arrive as strings: "100.00".toFixed threw.
       const amount = Number(item.total_cost || item.total_price || item.eur_rate || item.unit_price || 0) || 0
       if (amount > 0) {
-        pdf.text(`${doc.currency} ${amount.toFixed(2)}`, pageWidth - margin - 4, y + 6.5, { align: 'right' })
+        pdf.text(formatMoney(amount, doc.currency), pageWidth - margin - 4, y + 6.5, { align: 'right' })
       } else {
         pdf.text('—', pageWidth - margin - 4, y + 6.5, { align: 'right' })
       }
@@ -541,24 +542,36 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   // ==================== SPECIAL REQUESTS ====================
   
   if (doc.special_requests) {
-    ensureSpace(28)
-    pdf.setFillColor(255, 250, 240)
-    pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-    pdf.setLineWidth(0.5)
-    pdf.roundedRect(margin, y, contentWidth, 22, 3, 3, 'FD')
-    
-    pdf.setFontSize(7)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-    pdf.text('SPECIAL REQUESTS', margin + 4, y + 5)
-    
+    // Every line of it, the box sized to the text and broken across pages.
+    // It printed three lines in a fixed box: a dietary note, an access need
+    // or a guide's languages past the third line never reached the supplier.
     pdf.setFontSize(9)
-    pdf.setFont('helvetica', 'normal')
-    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-    const requestLines = pdf.splitTextToSize(doc.special_requests, contentWidth - 8)
-    pdf.text(requestLines.slice(0, 3), margin + 4, y + 12)
-    
-    y += 28
+    const requestLines: string[] = pdf.splitTextToSize(doc.special_requests, contentWidth - 8)
+    const lineHeight = 4.2
+    let start = 0
+    while (start < requestLines.length) {
+      ensureSpace(12 + lineHeight * Math.min(3, requestLines.length - start))
+      const room = Math.max(1, Math.floor((bottomLimit - y - 12) / lineHeight))
+      const chunk = requestLines.slice(start, start + room)
+      const boxHeight = 10 + chunk.length * lineHeight
+      pdf.setFillColor(255, 250, 240)
+      pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
+      pdf.setLineWidth(0.5)
+      pdf.roundedRect(margin, y, contentWidth, boxHeight, 3, 3, 'FD')
+
+      pdf.setFontSize(7)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
+      pdf.text(start === 0 ? 'SPECIAL REQUESTS' : 'SPECIAL REQUESTS (CONTINUED)', margin + 4, y + 5)
+
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
+      pdf.text(chunk, margin + 4, y + 10.5, { lineHeightFactor: 1.32 })
+
+      y += boxHeight + 6
+      start += chunk.length
+    }
   }
 
   // ==================== TOTAL & PAYMENT ====================
@@ -602,7 +615,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.setFontSize(14)
   pdf.setFont('helvetica', 'bold')
   pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-  pdf.text(`${doc.currency} ${(Number(doc.total_cost) || 0).toFixed(2)}`, totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
+  pdf.text(formatMoney(doc.total_cost, doc.currency), totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
   
   y += 28
 

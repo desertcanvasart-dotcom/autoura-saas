@@ -141,3 +141,19 @@ export function roundToCurrency(amount: unknown, currency: unknown): number {
   const factor = currencyDecimals(code) === 0 ? 1 : 100
   return Math.round(value * factor) / factor
 }
+
+/**
+ * Money as a client reads it: the currency's symbol, thousands separators and
+ * the currency's own decimals — ¥450,000, $1,250.00, MAD 3,400.00. Documents
+ * printed `${symbol}${n.toFixed(2)}`: "JPY450000.00", "MAD3400.00".
+ */
+export function formatMoney(amount: unknown, currency: unknown): string {
+  const code = String(currency ?? '').trim().toUpperCase() || 'EUR'
+  const n = typeof amount === 'number' ? amount : parseFloat(String(amount ?? ''))
+  const value = Number.isFinite(n) ? n : 0
+  const decimals = currencyDecimals(code)
+  const number = new Intl.NumberFormat('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
+  const symbol = getCurrencySymbol(code)
+  // A code used as its own symbol ("MAD", "JPY") reads as a word: give it a space.
+  return /^[A-Z]{2,4}$/.test(symbol) ? `${symbol} ${number}` : `${symbol}${number}`
+}
