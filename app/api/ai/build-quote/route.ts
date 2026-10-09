@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
       // Request summary
       request: {
         tour_requested,
-        cities: cities.length > 0 ? cities : (templateData?.template?.cities_covered || ['Cairo']),
+        cities: cities.length > 0 ? cities : (templateData?.template?.cities_covered || []),
         duration_days,
         num_adults,
         num_children,

@@ -5,7 +5,7 @@ import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
-import { sumByCurrency, formatTotals, currencySymbol } from '@/lib/currency-totals'
+import { sumByCurrency, formatTotals, currencySymbol, formatMoney } from '@/lib/currency-totals'
 import { 
   Plus, 
   Eye,
@@ -857,15 +857,15 @@ export default function InvoicesContent() {
                     <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="text-amber-600">Full Trip Cost</p>
-                        <p className="font-semibold text-amber-800">{formData.currency} {formData.full_trip_cost.toFixed(2)}</p>
+                        <p className="font-semibold text-amber-800">{formatMoney(formData.full_trip_cost, formData.currency)}</p>
                       </div>
                       <div>
                         <p className="text-amber-600">Deposit ({formData.deposit_percent}%)</p>
-                        <p className="font-semibold text-amber-800">{formData.currency} {((formData.full_trip_cost * formData.deposit_percent) / 100).toFixed(2)}</p>
+                        <p className="font-semibold text-amber-800">{formatMoney(((formData.full_trip_cost * formData.deposit_percent) / 100), formData.currency)}</p>
                       </div>
                       <div>
                         <p className="text-amber-600">Balance</p>
-                        <p className="font-semibold text-amber-800">{formData.currency} {(formData.full_trip_cost - (formData.full_trip_cost * formData.deposit_percent) / 100).toFixed(2)}</p>
+                        <p className="font-semibold text-amber-800">{formatMoney((formData.full_trip_cost - (formData.full_trip_cost * formData.deposit_percent) / 100), formData.currency)}</p>
                       </div>
                     </div>
                   )}
@@ -1006,7 +1006,7 @@ export default function InvoicesContent() {
                             />
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                            {currencySymbol(formData.currency)}{item.amount.toFixed(2)}
+                            {formatMoney(item.amount, formData.currency)}
                           </td>
                           <td className="px-3 py-3">
                             {formData.line_items.length > 1 && (
@@ -1031,7 +1031,7 @@ export default function InvoicesContent() {
                 <div className="w-72 bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium text-gray-900">{currencySymbol(formData.currency)}{formData.subtotal.toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">{formatMoney(formData.subtotal, formData.currency)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Tax Rate (%)</span>
@@ -1046,7 +1046,7 @@ export default function InvoicesContent() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tax Amount</span>
-                    <span className="text-gray-900">{currencySymbol(formData.currency)}{formData.tax_amount.toFixed(2)}</span>
+                    <span className="text-gray-900">{formatMoney(formData.tax_amount, formData.currency)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Discount</span>
@@ -1061,7 +1061,7 @@ export default function InvoicesContent() {
                   </div>
                   <div className="flex justify-between pt-3 border-t border-gray-200">
                     <span className="font-semibold text-gray-900">Total</span>
-                    <span className="font-bold text-xl text-gray-900">{currencySymbol(formData.currency)}{formData.total_amount.toFixed(2)}</span>
+                    <span className="font-bold text-xl text-gray-900">{formatMoney(formData.total_amount, formData.currency)}</span>
                   </div>
                 </div>
               </div>
