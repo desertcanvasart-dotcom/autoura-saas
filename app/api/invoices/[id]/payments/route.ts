@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { paymentCurrencyFor } from '@/lib/payment-currency'
 
 /**
  * GET /api/invoices/[id]/payments
@@ -101,6 +102,11 @@ export async function POST(
       )
     }
 
+    // In the invoice's currency (lib/payment-currency): the balance trigger
+    // sums amounts with no currency of their own.
+    const paid = paymentCurrencyFor(body.currency, invoice.currency)
+    if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: 400 })
+
     // Check if payment exceeds balance (allow small overpayment for rounding)
     if (body.amount > Number(invoice.balance_due) + 0.01) {
       return NextResponse.json(
@@ -113,7 +119,7 @@ export async function POST(
       tenant_id, // ✅ Explicit tenant_id (also auto-populated by trigger)
       invoice_id: id,
       amount: body.amount,
-      currency: body.currency || invoice.currency || 'EUR',
+      currency: paid.currency,
       payment_method: body.payment_method || 'bank_transfer',
       payment_date: body.payment_date || new Date().toISOString().split('T')[0],
       transaction_reference: body.transaction_reference || null,

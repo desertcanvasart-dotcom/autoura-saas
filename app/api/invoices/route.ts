@@ -197,7 +197,15 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
       depositPercent = resolveDepositRule({ tenant: depositTenant }).depositPercent
     }
-    const fullTripCost = body.full_trip_cost || totalAmount // Store original trip cost
+    // A deposit or final invoice is a share of the trip's full cost. Without it
+    // the typed total stood in for the trip, and a 300 deposit saved as 30.
+    if ((invoiceType === 'deposit' || invoiceType === 'final') && !(Number(body.full_trip_cost) > 0)) {
+      return NextResponse.json(
+        { success: false, error: 'A deposit or final invoice needs the trip and its full cost' },
+        { status: 400 }
+      )
+    }
+    const fullTripCost = Number(body.full_trip_cost) || totalAmount // Store original trip cost
     const currency = body.currency || 'EUR'
 
     // Extras and upgrades sold after the trip was priced (migration 321) are

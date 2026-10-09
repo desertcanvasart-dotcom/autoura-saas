@@ -10,6 +10,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parsePaymentInput } from '@/lib/payment-input'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { paymentCurrencyFor } from '@/lib/payment-currency'
+import { tripServices } from '@/lib/itineraries/trip-services'
+import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 
 export async function GET(
   request: NextRequest,
@@ -38,13 +41,23 @@ export async function GET(
           client_name,
           client_phone,
           client_email,
-          total_cost
+          total_cost,
+          margin_percent
         )
       `)
       .eq('id', id)
       .single()
 
     if (error) throw error
+
+    // The trip's client total from its services, as every other document
+    // shows it — the stored total_cost can be 0 or stale, and the payment
+    // invoice prints "Full trip cost / Balance" from it.
+    let tripTotal = payment.itineraries?.total_cost ?? null
+    if (payment.itinerary_id && payment.itineraries) {
+      const services = await tripServices<PricedService>(supabase, payment.itinerary_id, 'total_cost, client_price')
+      if (services.ok) tripTotal = effectiveItineraryTotal(payment.itineraries, services.rows)
+    }
 
     const formattedPayment = {
       ...payment,
@@ -57,7 +70,7 @@ export async function GET(
       // The receipt's WhatsApp button and the email on both PDFs need these.
       client_phone: payment.itineraries?.client_phone,
       client_email: payment.itineraries?.client_email,
-      total_cost: payment.itineraries?.total_cost
+      total_cost: tripTotal
     }
 
     return NextResponse.json({
@@ -95,6 +108,21 @@ export async function PUT(
         { success: false, error: parsed.errors[0].message, errors: parsed.errors },
         { status: 400 }
       )
+    }
+
+    // As POST: the trip must be this tenant's, and the payment in its currency.
+    if (parsed.value.itinerary_id) {
+      const { data: itinerary } = await supabase
+        .from('itineraries')
+        .select('id, currency')
+        .eq('id', parsed.value.itinerary_id) // RLS: this tenant's trips only
+        .maybeSingle()
+      if (!itinerary) {
+        return NextResponse.json({ success: false, error: 'Itinerary not found or access denied' }, { status: 404 })
+      }
+      const paid = paymentCurrencyFor(body.currency, itinerary.currency)
+      if (!paid.ok) return NextResponse.json({ success: false, error: paid.error }, { status: 400 })
+      parsed.value.currency = paid.currency
     }
 
     const { data, error } = await supabase

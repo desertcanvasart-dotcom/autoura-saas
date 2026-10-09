@@ -73,7 +73,7 @@ describe('blank company name or email', () => {
 describe('round 10', () => {
   it('the editor invoice bills the services on screen, with the client', () => {
     const edit = src('app/itineraries/[id]/edit/page.tsx')
-    expect(edit).toContain('itineraryClientTotal(live, itinerary.margin_percent) : itinerary.total_cost')
+    expect(edit).toContain('const amount = effectiveItineraryTotal(itinerary, live)')
     expect(edit).toContain('client_id: itinerary.client_id,')
     expect(edit).not.toContain('unit_price: itinerary.total_cost,')
   })

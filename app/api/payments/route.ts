@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parsePaymentInput } from '@/lib/payment-input'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { paymentCurrencyFor } from '@/lib/payment-currency'
 
 /**
  * GET /api/payments
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
     if (parsed.value.itinerary_id) {
       const { data: itinerary, error: itineraryError } = await supabase
         .from('itineraries')
-        .select('id, tenant_id')
+        .select('id, tenant_id, currency')
         .eq('id', parsed.value.itinerary_id)
         .single()
 
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         )
       }
+
+      // In the trip's currency (lib/payment-currency) — the receipt says so.
+      const paid = paymentCurrencyFor(body.currency, itinerary.currency)
+      if (!paid.ok) return NextResponse.json({ success: false, error: paid.error }, { status: 400 })
+      parsed.value.currency = paid.currency
     }
 
     // tenant_id last is deliberate: it cannot be overridden by the payload,
