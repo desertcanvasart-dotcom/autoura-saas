@@ -197,7 +197,16 @@ function drawTable(
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(60, 60, 60)
 
+  const pageHeight = doc.internal.pageSize.getHeight()
   rows.forEach((row, rowIndex) => {
+    // A long service list continues on a new page instead of running off it.
+    if (y + rowHeight > pageHeight - 20) {
+      doc.addPage()
+      y = margin
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+    }
     // Alternate row background
     if (rowIndex % 2 === 0) {
       doc.setFillColor(...brandTintLight)
@@ -376,6 +385,17 @@ export function generateItineraryPDF(
     // DAY DETAILS
     // ============================================
 
+    // A new page when the next line would cross the footer. Only the start of
+    // each block was checked, so a long day description or a long list ran
+    // past the footer and off the page — text the client never saw.
+    const FOOTER_SPACE = 20
+    const ensureRoom = (height: number) => {
+      if (yPos + height > pageHeight - FOOTER_SPACE) {
+        doc.addPage()
+        yPos = margin
+      }
+    }
+
     days.forEach((day, index) => {
       if (yPos > pageHeight - 60) {
         doc.addPage()
@@ -407,9 +427,13 @@ export function generateItineraryPDF(
         doc.setFont('helvetica', 'normal')
         doc.setTextColor(60, 60, 60)
 
-        const lines = doc.splitTextToSize(day.description, contentWidth - 10)
-        doc.text(lines, margin + 5, yPos)
-        yPos += lines.length * 4 + 5
+        const lines = doc.splitTextToSize(day.description, contentWidth - 10) as string[]
+        for (const line of lines) {
+          ensureRoom(4)
+          doc.text(line, margin + 5, yPos)
+          yPos += 4
+        }
+        yPos += 5
       }
 
       yPos += 5
@@ -557,6 +581,7 @@ export function generateItineraryPDF(
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(60, 60, 60)
       inclusions.forEach(item => {
+        ensureRoom(5)
         doc.text(`• ${item}`, margin + 3, yPos)
         yPos += 5
       })
@@ -567,6 +592,7 @@ export function generateItineraryPDF(
     // EXCLUSIONS
     // ============================================
 
+    ensureRoom(6 + 4 * 5)
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...brand)
@@ -585,6 +611,7 @@ export function generateItineraryPDF(
     ]
 
     exclusions.forEach(item => {
+      ensureRoom(5)
       doc.text(`• ${item}`, margin + 3, yPos)
       yPos += 5
     })
@@ -616,6 +643,7 @@ export function generateItineraryPDF(
     // printed "30% deposit… balance due 14 days before arrival" for everyone.
     const terms = company.paymentTerms ? (doc.splitTextToSize(company.paymentTerms, contentWidth - 6) as string[]) : []
     terms.forEach(term => {
+      ensureRoom(5)
       doc.text(term, margin + 3, yPos)
       yPos += 5
     })

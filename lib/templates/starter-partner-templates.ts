@@ -32,7 +32,7 @@ export const STARTER_PARTNER_TEMPLATES: StarterTemplate[] = [
     body: t`
 Dear {{partner_name}},
 
-I'm {{agent_name}} from {{company_name}}. We're a local operator handling the full ground arrangements for agencies and tour operators: hotels, Nile cruises, guides, transport and private touring, with our own team on the ground and support around the clock.
+I'm {{agent_name}} from {{company_name}}. We're a local operator handling the full ground arrangements for agencies and tour operators: hotels, guides, transport, cruises and private touring, with our own team on the ground and support around the clock.
 
 I'd be glad to send you our current rates and a few sample programmes for {{partner_company}}'s clients. Would a short call next week suit you?
 

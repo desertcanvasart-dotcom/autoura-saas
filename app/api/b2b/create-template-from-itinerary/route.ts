@@ -68,7 +68,8 @@ export async function POST(request: NextRequest) {
         title: day.title || `Day ${day.day_number}`,
         description: day.description || '',
         meals,
-        city: day.city || 'Cairo',
+        // The day's own place — never Cairo for a day that names none.
+        city: day.city || day.overnight_city || '',
         is_cruise_day: isCruiseDay,
         attractions: day.attractions || [],
         overnight_city: day.overnight_city || null,
