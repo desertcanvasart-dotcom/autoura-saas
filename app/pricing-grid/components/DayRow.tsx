@@ -280,6 +280,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
       options={getFilteredOptions(def.slotId)}
       allOptions={getAllOptions(def.slotId)}
       passport={config.passport}
+      pax={config.pax}
       onChange={(val) => onUpdateSlot(def.slotId, val)}
       onApplyToAllDays={onApplyToAllDays && APPLY_TO_ALL_SLOTS.has(def.slotId) && allDays.length > 1
         ? () => onApplyToAllDays(def.slotId, getSlotValue(def.slotId))
