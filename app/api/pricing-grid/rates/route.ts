@@ -42,6 +42,14 @@ export async function GET(request: NextRequest) {
       // A key the agency's list does not hold reads as words, not a code.
       return label === key ? label.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()) : label
     }
+    // A transport rate files its vehicle under a vocabulary KEY; the agency
+    // may since have renamed it (key "minivan" now reads "Coach"), so the
+    // option names the vehicle in today's word, never the stored slug.
+    const vehicleTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'vehicle_type')
+    const vehicleTypeLabel = (key: string) => {
+      const item = vehicleTypes.find(i => i.key === key || normLower(i.key) === normLower(key))
+      return item?.label ?? ''
+    }
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
@@ -125,7 +133,7 @@ export async function GET(request: NextRequest) {
         // buildTransportTierIndex can re-select the vehicle as group size grows.
         // Read-only — no schema change; uses the same grouping key as
         // travel-ops-pro migration 20260205_transportation_rates_restructure.
-        ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel),
+        ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel, vehicleTypeLabel),
         // Cruise transport packages (bundled sightseeing vehicle for cruise days).
         // They live in the B2B packages list (B2B → Pricing rules), not in
         // Rates → Transportation, so the name says where to find them; the
@@ -357,7 +365,11 @@ function vehicleSlug(v: any): string {
  * Each vehicle row keeps its own rate + capacity band (falling back to the
  * canonical tier band when the row's capacity columns are null).
  */
-export function groupVehicleRowsToTiers(rows: any[], typeLabel?: (serviceType: string) => string): any[] {
+export function groupVehicleRowsToTiers(
+  rows: any[],
+  typeLabel?: (serviceType: string) => string,
+  vehicleLabel?: (vehicleType: string) => string,
+): any[] {
   // One row per (route, vehicle) since migration 337 — nothing to expand.
   const groupKey = (r: any) =>
     [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
@@ -408,7 +420,10 @@ export function groupVehicleRowsToTiers(rows: any[], typeLabel?: (serviceType: s
 
       const capMin = r.capacity_min != null ? Number(r.capacity_min) : (tier ? tier.capMin : 1)
       const capMax = r.capacity_max != null ? Number(r.capacity_max) : (tier ? tier.capMax : 99)
-      const vlabel = String(r.vehicle_type || 'Vehicle').replace(/_/g, ' ').replace(/\b\w/g, (ch: string) => ch.toUpperCase())
+      // The agency's word for the vehicle; a key its list no longer holds
+      // reads as words, not a slug.
+      const vlabel = (r.vehicle_type && vehicleLabel ? vehicleLabel(String(r.vehicle_type)) : '') ||
+        String(r.vehicle_type || 'Vehicle').replace(/_/g, ' ').replace(/\b\w/g, (ch: string) => ch.toUpperCase())
 
       options.push({
         id: `${keeper.id}__${tierKey}`,
