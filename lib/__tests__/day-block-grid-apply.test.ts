@@ -82,6 +82,21 @@ describe('a day tour block', () => {
     expect(toPick).toEqual([])
   })
 
+  it('picks the guide in the trip’s language when the city has one', () => {
+    const withSpanish = {
+      ...rates,
+      guide: [
+        { id: 'g-cai-es', name: 'Spanish (Egyptologist)', rateEur: 55, rateNonEur: 55, city: 'Cairo', language: 'Spanish', category: 'Egyptologist' },
+        { id: 'g-cai-en', name: 'English (Egyptologist)', rateEur: 50, rateNonEur: 50, city: 'Cairo', language: 'English', category: 'Egyptologist' },
+      ],
+    }
+    // Without a language: the first listed — how one trip got Spanish on one day, English on another.
+    expect(ids(applyBlockToGridDay(emptyDay(), giza, withSpanish, 4).day, 'guide')).toEqual(['g-cai-es'])
+    expect(ids(applyBlockToGridDay(emptyDay(), giza, withSpanish, 4, { guideLanguage: 'English' }).day, 'guide')).toEqual(['g-cai-en'])
+    // A language the city has no guide in: the city's guide still comes.
+    expect(ids(applyBlockToGridDay(emptyDay(), giza, withSpanish, 4, { guideLanguage: 'German' }).day, 'guide')).toEqual(['g-cai-es'])
+  })
+
   it('remembers which block the day was built from', () => {
     expect(applyBlockToGridDay(emptyDay(), giza, rates, 4).day.blockCode).toBe(giza.code)
   })

@@ -9,6 +9,8 @@ interface GridHeaderProps {
   config: GridConfig
   onChange: (config: GridConfig) => void
   totals?: GridTotals
+  /** The languages the agency has guides in, for the trip's guide language. */
+  guideLanguages?: string[]
 }
 
 interface B2BPartner {
@@ -27,7 +29,7 @@ const DEFAULT_MARGINS: Record<ClientType, number> = {
   b2c: 25,
 }
 
-export default function GridHeader({ config, onChange, totals }: GridHeaderProps) {
+export default function GridHeader({ config, onChange, totals, guideLanguages = [] }: GridHeaderProps) {
   const [partners, setPartners] = useState<B2BPartner[]>([])
   const update = (partial: Partial<GridConfig>) => onChange({ ...config, ...partial })
   const sym = getCurrencySymbol(config.currency)
@@ -196,6 +198,21 @@ export default function GridHeader({ config, onChange, totals }: GridHeaderProps
           >
             {config.guideMode === 'throughout' ? 'Throughout +1' : 'Spot'}
           </button>
+
+          {/* One guide language for the whole trip (lib/guide-language.ts):
+              changing it moves every day's guide to that language. */}
+          {config.withGuide && guideLanguages.length > 1 && (
+            <select
+              value={config.guideLanguage ?? ''}
+              onChange={(e) => update({ guideLanguage: e.target.value })}
+              aria-label="Guide language"
+              title="The guide language for the whole trip: every day's guide is picked in it"
+              className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:ring-1 focus:ring-blue-200"
+            >
+              <option value="">Guide language…</option>
+              {guideLanguages.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          )}
 
           <div className="w-px h-5 bg-gray-200" />
 
