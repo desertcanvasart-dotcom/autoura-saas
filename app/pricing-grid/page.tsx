@@ -14,6 +14,7 @@ import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
+import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
 import { preParseRawItinerary } from '@/lib/ai/parsing-utils'
 import type { BlockNote } from './components/DayRow'
 import GridHeader from './components/GridHeader'
@@ -121,6 +122,9 @@ function PricingGridContent() {
   const [rates, setRates] = useState<AllRates | null>(null)
   // The agency's day blocks (Settings → Day blocks); empty until imported.
   const [blocks, setBlocks] = useState<GridBlock[]>([])
+  // May this user add to the catalog ("Save as a block")?
+  const [canWriteBlocks, setCanWriteBlocks] = useState(false)
+  const [savingBlockDayId, setSavingBlockDayId] = useState<string | null>(null)
   // Per day: what the last block laid on it left for the operator to pick.
   const [blockNotes, setBlockNotes] = useState<Record<string, BlockNote>>({})
   const [loading, setLoading] = useState(true)
@@ -182,14 +186,25 @@ function PricingGridContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Fetch rates
-  const fetchRates = useCallback(async (tier: string) => {
+  // Fetch rates. A tier or date change starts a new request while an older
+  // one may still be in flight; only the latest may land — a late answer for
+  // the old tier put that tier's hotels in the list (operator, 2026-10-10:
+  // the budget hotel missing on one device). The tier the rates were fetched
+  // for travels with them, so the hotel swap below never reads another tier's.
+  const ratesRequestRef = useRef(0)
+  const [ratesTier, setRatesTier] = useState<string | null>(null)
+  const fetchRates = useCallback(async (tier: string, startDate: string) => {
+    const requestId = ++ratesRequestRef.current
     try {
       setLoading(true)
-      const res = await fetch(`/api/pricing-grid/rates?tier=${tier}`)
+      const params = new URLSearchParams({ tier })
+      if (startDate) params.set('date', startDate)
+      const res = await fetch(`/api/pricing-grid/rates?${params}`)
       const data = await res.json()
+      if (requestId !== ratesRequestRef.current) return
       if (data.success) {
         setRates(data.data)
+        setRatesTier(tier)
         // A draft restored from this browser may hold items with no price, or
         // water as a hidden amount (hydrate-rates.ts) — fill them from the rates.
         setDays(prev => hydrateDayRates(prev, data.data, 'missing').days)
@@ -197,21 +212,25 @@ function PricingGridContent() {
     } catch (err) {
       console.error('Failed to fetch rates:', err)
     } finally {
-      setLoading(false)
+      if (requestId === ratesRequestRef.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchRates(config.tier)
-  }, [config.tier, fetchRates])
+    fetchRates(config.tier, config.startDate)
+  }, [config.tier, config.startDate, fetchRates])
 
   // Auto-swap accommodation and cruise when tier changes
+  // Runs on the rates OF the new tier (ratesTier), never on a list still
+  // held from the old one. A tier set by opening a saved itinerary is not a
+  // change: that itinerary's hotels are its own (loadItinerary sets the ref).
   const prevTierRef = useRef(config.tier)
   useEffect(() => {
-    if (!rates || days.length === 0) return
+    if (!rates || !ratesTier || ratesTier !== config.tier) return
     // Only run when tier actually changed (not on initial load)
-    if (prevTierRef.current === config.tier) return
-    prevTierRef.current = config.tier
+    if (prevTierRef.current === ratesTier) return
+    prevTierRef.current = ratesTier
+    if (days.length === 0) return
 
     setDays(prevDays => prevDays.map(day => ({
       ...day,
@@ -258,7 +277,7 @@ function PricingGridContent() {
       }),
     })))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rates])
+  }, [rates, ratesTier])
 
   // Pre-fetch all exchange rates once on mount, then currency switching is instant
   const exchangeRatesCache = useRef<Record<string, number> | null>(null)
@@ -425,7 +444,9 @@ function PricingGridContent() {
     fetch('/api/day-blocks')
       .then(res => res.json())
       .then(json => {
-        if (live && json?.success) setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+        if (!live || !json?.success) return
+        setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+        setCanWriteBlocks(json.data.canWrite === true)
       })
       // No library (or no table yet): the Grid simply offers no blocks.
       .catch(() => {})
@@ -451,6 +472,15 @@ function PricingGridContent() {
     setDays(prev => prev.map(d => (d.id === dayId ? day : d)))
     setBlockNotes(prev => ({ ...prev, [dayId]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${target.dayNumber} ← ${blockSummary(block.code, filled, toPick)}`)
+  }
+
+  // A day kept as a new block: it joins the catalog, and the day is now from it.
+  const blockSaved = (dayId: string, block: GridBlock) => {
+    setBlocks(prev => [...prev.filter(b => b.code !== block.code), block].sort((a, b) => a.code.localeCompare(b.code)))
+    setDays(prev => prev.map(d => (d.id === dayId ? { ...d, blockCode: block.code } : d)))
+    setBlockNotes(prev => { const next = { ...prev }; delete next[dayId]; return next })
+    setSavingBlockDayId(null)
+    showToast('success', `Saved to your catalog as day block ${block.code}`)
   }
 
   const removeDay = (dayId: string) => {
@@ -662,6 +692,8 @@ function PricingGridContent() {
       }
 
       const itn = headerData.data
+      // The itinerary's tier comes with its own hotels: not a change to swap for.
+      prevTierRef.current = itn.tier || 'standard'
 
       // Update config from itinerary
       setConfig(prev => ({
@@ -714,6 +746,7 @@ function PricingGridContent() {
             // Columns may be undefined for pre-migration rows — that's fine,
             // resolveComponents() falls back to DAY_TYPE_DEFAULTS[DEFAULT_DAY_TYPE].
             dayType: dayData.day_type ?? undefined,
+            blockCode: dayData.block_code ?? null,
             overnight: dayData.overnight ?? undefined,
             hasSightseeing: dayData.has_sightseeing ?? undefined,
             airportArrival: dayData.airport_arrival ?? undefined,
@@ -1039,9 +1072,27 @@ function PricingGridContent() {
                 onApplyBlock={(block) => applyBlockToDay(day.id, block)}
                 blockNote={blockNotes[day.id]}
                 onDismissBlockNote={() => setBlockNotes(prev => { const next = { ...prev }; delete next[day.id]; return next })}
+                onSaveAsBlock={canWriteBlocks ? () => setSavingBlockDayId(day.id) : undefined}
               />
             ))}
           </div>
+
+          {/* Save a day to the catalog as a new block */}
+          {(() => {
+            const idx = savingBlockDayId ? days.findIndex(d => d.id === savingBlockDayId) : -1
+            if (idx < 0) return null
+            const target = days[idx]
+            return (
+              <SaveAsBlockDialog
+                key={target.id}
+                day={target}
+                nextDay={days[idx + 1] ?? null}
+                takenCodes={blocks.map(b => b.code)}
+                onClose={() => setSavingBlockDayId(null)}
+                onSaved={(block) => blockSaved(target.id, block)}
+              />
+            )
+          })()}
 
           {/* Grand Summary + Save */}
           <GridSummary

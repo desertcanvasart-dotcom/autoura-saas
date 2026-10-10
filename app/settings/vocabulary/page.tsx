@@ -118,9 +118,18 @@ export default function VocabularySettingsPage() {
   }
 
   const remove = async (item: VocabularyItem) => {
-    const ok = await dialog.confirmDelete(item.label, `Remove "${item.label}" from ${info.title.toLowerCase()}? Rows already filed under it keep the word until you re-file them.`)
+    // A vehicle rates still use: say how many, and offer the safer moves.
+    let warning: string | null = null
+    if (kind === 'vehicle_type') {
+      const json = await fetch(`/api/vocabulary/${item.id}`).then(r => r.json()).catch(() => null)
+      warning = json?.success ? json.data?.warning ?? null : null
+    }
+    const ok = warning
+      ? await dialog.confirm({ title: `"${item.label}" is in use`, message: warning, confirmText: 'Delete anyway', variant: 'warning' })
+      : await dialog.confirmDelete(item.label, `Remove "${item.label}" from ${info.title.toLowerCase()}? Rows already filed under it keep the word until you re-file them.`)
     if (!ok) return
-    await call(item.id, () => fetch(`/api/vocabulary/${item.id}`, { method: 'DELETE' }), `"${item.label}" removed`)
+    const url = warning ? `/api/vocabulary/${item.id}?confirm_in_use=1` : `/api/vocabulary/${item.id}`
+    await call(item.id, () => fetch(url, { method: 'DELETE' }), `"${item.label}" removed`)
   }
 
   const reset = async () => {

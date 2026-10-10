@@ -82,6 +82,10 @@ describe('a day tour block', () => {
     expect(toPick).toEqual([])
   })
 
+  it('remembers which block the day was built from', () => {
+    expect(applyBlockToGridDay(emptyDay(), giza, rates, 4).day.blockCode).toBe(giza.code)
+  })
+
   it('keeps the hotel the day already had: a day tour books no bed', () => {
     const withHotel = emptyDay({ slots: emptyDay().slots.map(s => s.slotId === 'accommodation' ? { ...s, selectedItems: [{ rateId: 'h-cai', name: 'Mena House', rateEur: 90, rateNonEur: 90 }] } : s) })
     expect(ids(applyBlockToGridDay(withHotel, giza, rates, 2).day, 'accommodation')).toEqual(['h-cai'])

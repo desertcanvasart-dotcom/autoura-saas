@@ -207,6 +207,10 @@ export interface GridDay {
   hotelCheckIn?: boolean
   hotelCheckOut?: boolean
   intercity?: Intercity
+  /** The code of the day block this day was built from (migration 405);
+   *  null/undefined = not built from one. Saved with the itinerary, so a
+   *  reload or another device still knows the day is from the catalog. */
+  blockCode?: string | null
 }
 
 // --- Rate Options (fetched from DB, used in dropdowns) ---
@@ -219,6 +223,10 @@ export interface RateOption {
   city?: string
   category?: string
   details?: string  // e.g., "4★", "Standard cabin", "Aswan → Luxor"
+  /** Guides: the language, in the agency's word (a dropdown filter). */
+  language?: string
+  /** Hotels: the board basis (BB, HB …) — a dropdown filter. */
+  board_basis?: string
   // Optional metadata used by the rich gate. Transport rates carry
   // service_type (airport_transfer / day_tour / intercity_transfer / etc.);
   // entrance fees carry pricing_class (mandatory / optional / free). Slot

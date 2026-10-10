@@ -1,4 +1,4 @@
-// GET /api/pricing-grid/rates?tier=standard
+// GET /api/pricing-grid/rates?tier=standard&date=YYYY-MM-DD
 // Fetches all available rate options from existing Supabase tables,
 // structured by grid slot for dropdown population.
 //
@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cruisePpdNightEur, cruisePpdNightNonEur } from '@/lib/rates/cruise-ppd'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
+import { gridHotelRate } from '@/lib/rates/grid-hotel-rate'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { DEFAULT_WATER_PER_PERSON_PER_DAY, isWaterCostType } from '@/lib/fixed-costs'
@@ -42,9 +43,20 @@ export async function GET(request: NextRequest) {
       // A key the agency's list does not hold reads as words, not a code.
       return label === key ? label.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()) : label
     }
+    // A transport rate files its vehicle under a vocabulary KEY; the agency
+    // may since have renamed it (key "minivan" now reads "Coach"), so the
+    // option names the vehicle in today's word, never the stored slug.
+    const vehicleTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'vehicle_type')
+    const vehicleTypeLabel = (key: string) => {
+      const item = vehicleTypes.find(i => i.key === key || normLower(i.key) === normLower(key))
+      return item?.label ?? ''
+    }
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
+    // The trip's start date: a hotel is priced from the period covering it.
+    const dateParam = searchParams.get('date')
+    const startDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null
 
     // Fetch all rate tables in parallel
     const [
@@ -125,7 +137,7 @@ export async function GET(request: NextRequest) {
         // buildTransportTierIndex can re-select the vehicle as group size grows.
         // Read-only — no schema change; uses the same grouping key as
         // travel-ops-pro migration 20260205_transportation_rates_restructure.
-        ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel),
+        ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel, vehicleTypeLabel),
         // Cruise transport packages (bundled sightseeing vehicle for cruise days).
         // They live in the B2B packages list (B2B → Pricing rules), not in
         // Rates → Transportation, so the name says where to find them; the
@@ -154,6 +166,9 @@ export async function GET(request: NextRequest) {
         rateNonEur: toNum(r.base_rate_non_eur || r.rate_non_eur || r.base_rate_eur || r.rate_eur),
         city: r.city,
         details: guideLanguageLabel(r.guide_language),
+        // The dropdown filters by language and by kind of guide.
+        language: r.guide_language ? guideLanguageLabel(r.guide_language) : undefined,
+        category: r.guide_type || 'Egyptologist',
       })),
 
       airport_services: (airportRates || []).map((r: any) => ({
@@ -207,21 +222,27 @@ export async function GET(request: NextRequest) {
           ...basisOf(r),
         })),
 
-      accommodation: (accommodationRates || []).map((r: any) => ({
-        id: r.id,
-        name: `${r.property_name} ${r.city} (${r.tier} | ${r.board_basis || 'BB'})`,
-        rateEur: toNum(r.pp_double_eur),
-        rateNonEur: toNum(r.pp_double_non_eur),
-        city: r.city,
-        details: `${r.tier} | ${r.board_basis || 'BB'}`,
-        board_basis: r.board_basis || 'BB',
-        single_supp_eur: toNum(r.single_supp_eur),
-        single_supp_non_eur: toNum(r.single_supp_non_eur),
-        // The throughout guide's bed: the FIRST period's guide rate — the
-        // same period the headline PP-Double mirrors (B-item 3). Null = no
-        // concession on file; the grid shows an amber unpriced night.
-        guide_rate_eur: firstPeriodGuideRate(r.seasons, 'accommodation'),
-      })),
+      accommodation: (accommodationRates || []).map((r: any) => {
+        // Priced from the hotel's periods, whichever column family it was
+        // saved in (lib/rates/grid-hotel-rate.ts).
+        const price = gridHotelRate(r, startDate)
+        const board = r.board_basis || 'BB'
+        const note = price.gapDate ? ` | no rate period covers ${price.gapDate}` : price.periodName ? ` | ${price.periodName}` : ''
+        return {
+          id: r.id,
+          name: `${r.property_name} ${r.city} (${r.tier} | ${board})`,
+          rateEur: price.ppdEur,
+          rateNonEur: price.ppdNonEur,
+          city: r.city,
+          details: `${r.tier} | ${board}${note}`,
+          board_basis: board,
+          single_supp_eur: price.singleSuppEur,
+          single_supp_non_eur: price.singleSuppNonEur,
+          // The throughout guide's bed, from the same period as the price.
+          // Null = no concession on file; the grid shows an amber unpriced night.
+          guide_rate_eur: price.guideRateEur,
+        }
+      }),
 
       entrance_fees: (entranceFees || []).map((r: any) => ({
         id: r.id,
@@ -357,7 +378,11 @@ function vehicleSlug(v: any): string {
  * Each vehicle row keeps its own rate + capacity band (falling back to the
  * canonical tier band when the row's capacity columns are null).
  */
-export function groupVehicleRowsToTiers(rows: any[], typeLabel?: (serviceType: string) => string): any[] {
+export function groupVehicleRowsToTiers(
+  rows: any[],
+  typeLabel?: (serviceType: string) => string,
+  vehicleLabel?: (vehicleType: string) => string,
+): any[] {
   // One row per (route, vehicle) since migration 337 — nothing to expand.
   const groupKey = (r: any) =>
     [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
@@ -408,7 +433,10 @@ export function groupVehicleRowsToTiers(rows: any[], typeLabel?: (serviceType: s
 
       const capMin = r.capacity_min != null ? Number(r.capacity_min) : (tier ? tier.capMin : 1)
       const capMax = r.capacity_max != null ? Number(r.capacity_max) : (tier ? tier.capMax : 99)
-      const vlabel = String(r.vehicle_type || 'Vehicle').replace(/_/g, ' ').replace(/\b\w/g, (ch: string) => ch.toUpperCase())
+      // The agency's word for the vehicle; a key its list no longer holds
+      // reads as words, not a slug.
+      const vlabel = (r.vehicle_type && vehicleLabel ? vehicleLabel(String(r.vehicle_type)) : '') ||
+        String(r.vehicle_type || 'Vehicle').replace(/_/g, ' ').replace(/\b\w/g, (ch: string) => ch.toUpperCase())
 
       options.push({
         id: `${keeper.id}__${tierKey}`,

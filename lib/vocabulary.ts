@@ -724,3 +724,17 @@ export function resolveRecordKeys(
   }
   return { record: out, errors }
 }
+
+/** Rows still filed under a vehicle key (lib/vocabulary-server.ts). */
+export interface VehicleTypeUsage { transport_rates: number; transport_packages: number }
+
+/** The warning shown before deleting a vehicle rows still use; null when
+ *  nothing does. */
+export function vehicleInUseWarning(label: string, usage: VehicleTypeUsage): string | null {
+  const parts: string[] = []
+  const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
+  if (usage.transport_rates > 0) parts.push(n(usage.transport_rates, 'transport rate', 'transport rates'))
+  if (usage.transport_packages > 0) parts.push(n(usage.transport_packages, 'B2B transport package', 'B2B transport packages'))
+  if (parts.length === 0) return null
+  return `"${label}" is still used by ${parts.join(' and ')}. Deleting it leaves them filed under a vehicle your list no longer has — quotes will show its old key instead of your word. Rename the vehicle or hide it instead, or re-file those rates first in Rates → Transportation.`
+}

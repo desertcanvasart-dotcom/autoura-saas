@@ -16,6 +16,7 @@ import {
   wouldBreakMinimum,
   groupByKind,
   type VocabularyItem,
+  vehicleInUseWarning,
 } from '@/lib/vocabulary'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -224,5 +225,19 @@ describe('the agency ladder vs the preset', () => {
     expect(resolveRecordKeys({ class_type: 'Second Class AC' }, trains).record.class_type).toBe('second_class_ac')
     expect(resolveRecordKeys({ class_type: 'first_class' }, trains).record.class_type).toBe('first_class')
     expect(resolveRecordKeys({ class_type: 'Platinum' }, trains).errors).toHaveLength(1)
+  })
+})
+
+describe('vehicleInUseWarning', () => {
+  it('is null when nothing is filed under the vehicle', () => {
+    expect(vehicleInUseWarning('Minivan', { transport_rates: 0, transport_packages: 0 })).toBeNull()
+  })
+
+  it('counts the rates and packages that would be left without a vehicle', () => {
+    const one = vehicleInUseWarning('Minivan', { transport_rates: 1, transport_packages: 0 })
+    expect(one).toContain('"Minivan" is still used by 1 transport rate.')
+    const both = vehicleInUseWarning('Minivan', { transport_rates: 72, transport_packages: 2 })
+    expect(both).toContain('72 transport rates and 2 B2B transport packages')
+    expect(both).toContain('Rename the vehicle or hide it instead')
   })
 })

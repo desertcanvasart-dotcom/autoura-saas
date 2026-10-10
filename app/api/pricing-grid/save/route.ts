@@ -354,6 +354,8 @@ export async function POST(request: NextRequest) {
         // default). The grid's reload and completeness gate read these back;
         // they were never stored, so every reload reset every day to "tour".
         ...gridDayComponents(day),
+        // The day block it was built from (405); an older database ignores it.
+        block_code: typeof day.blockCode === 'string' && day.blockCode.trim() ? day.blockCode.trim().slice(0, 60) : null,
         services,
       })
     }

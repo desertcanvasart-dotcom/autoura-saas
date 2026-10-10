@@ -1,8 +1,11 @@
 // ============================================
 // /api/vocabulary/[id] — one entry
 // ============================================
+// GET    — what still uses the entry (vehicle types: transport rates and
+//          B2B packages), so the settings screen can warn before a delete
 // PATCH  — { label?, description?, behavior?, meta?, is_active?, rank? }
-// DELETE — remove the entry (a kind never drops below its minimum)
+// DELETE — remove the entry (a kind never drops below its minimum; a vehicle
+//          rows still use needs ?confirm_in_use=1)
 //
 // Admin-only; the row is fetched with the caller's RLS client first, so an
 // entry outside the caller's tenant is simply not found.
@@ -14,12 +17,35 @@ import {
   validateVocabularyItem,
   wouldBreakMinimum,
   VOCABULARY_KIND_INFO,
+  vehicleInUseWarning,
 } from '@/lib/vocabulary'
+import { vehicleTypeUsage } from '@/lib/vocabulary-server'
 import { COLS, WRITE_ROLES, WRITE_DENIED } from '../route'
 
 export const dynamic = 'force-dynamic'
 
 type Params = { params: Promise<{ id: string }> }
+
+export async function GET(_request: NextRequest, { params }: Params) {
+  try {
+    const auth = await requireAuth()
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    const { supabase } = auth
+    if (!supabase) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
+
+    const { id } = await params
+    const { data: current } = await supabase.from('tenant_vocabularies').select('id, tenant_id, kind, key, label').eq('id', id).maybeSingle()
+    if (!current || !isVocabularyKind(current.kind)) return NextResponse.json({ success: false, error: 'Entry not found' }, { status: 404 })
+
+    const usage = current.kind === 'vehicle_type' && current.tenant_id
+      ? await vehicleTypeUsage(supabase, current.tenant_id, current.key)
+      : null
+    return NextResponse.json({ success: true, data: { usage, warning: usage ? vehicleInUseWarning(current.label, usage) : null } })
+  } catch (error) {
+    console.error('GET vocabulary usage error:', error)
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
+  }
+}
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
@@ -69,7 +95,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const auth = await requireAuth()
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
@@ -78,8 +104,16 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: WRITE_DENIED }, { status: 403 })
 
     const { id } = await params
-    const { data: current } = await supabase.from('tenant_vocabularies').select('id, kind').eq('id', id).maybeSingle()
+    const { data: current } = await supabase.from('tenant_vocabularies').select('id, tenant_id, kind, key, label').eq('id', id).maybeSingle()
     if (!current || !isVocabularyKind(current.kind)) return NextResponse.json({ success: false, error: 'Entry not found' }, { status: 404 })
+
+    // A vehicle rates still use: deleting it orphans them (they keep a key
+    // the list no longer holds), so only on an explicit go-ahead.
+    if (current.kind === 'vehicle_type' && current.tenant_id && new URL(request.url).searchParams.get('confirm_in_use') !== '1') {
+      const usage = await vehicleTypeUsage(supabase, current.tenant_id, current.key)
+      const warning = vehicleInUseWarning(current.label, usage)
+      if (warning) return NextResponse.json({ success: false, error: warning, usage }, { status: 409 })
+    }
 
     const { data: siblings } = await supabase.from('tenant_vocabularies').select('id, is_active').eq('kind', current.kind)
     if (wouldBreakMinimum(current.kind, siblings ?? [], id)) {

@@ -6167,6 +6167,7 @@ export interface Database {
           updated_at: string | null
           tenant_id: string
           attractions: string[] | null
+          block_code: string | null
           lunch_included: boolean | null
           dinner_included: boolean | null
           hotel_included: boolean | null
@@ -6205,6 +6206,7 @@ export interface Database {
           updated_at?: string | null
           tenant_id: string
           attractions?: string[] | null
+          block_code?: string | null
           lunch_included?: boolean | null
           dinner_included?: boolean | null
           hotel_included?: boolean | null
@@ -6243,6 +6245,7 @@ export interface Database {
           updated_at?: string | null
           tenant_id?: string
           attractions?: string[] | null
+          block_code?: string | null
           lunch_included?: boolean | null
           dinner_included?: boolean | null
           hotel_included?: boolean | null

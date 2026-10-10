@@ -106,4 +106,21 @@ describe('groupVehicleRowsToTiers — sibling per-vehicle rows → grid tier set
     // Without the agency's words, the names are as they were.
     expect(groupVehicleRowsToTiers([row('o1', 'intercity_overnight', 'X')])[0].name).toBe('Sedan (1-2 pax) — X')
   })
+
+  it('names the vehicle in the agency’s current word, not the key the rate was filed under', () => {
+    // Live 2026-10-10: a 21–45 pax rate filed under key "minivan" read
+    // "Minivan (21-45 pax)" after the agency renamed that vehicle.
+    const rows = [
+      { id: 'c1', created_at: '2026-03-01', service_type: 'airport_transfer', city: 'Cairo', route_name: 'CAIRO-AIRPORT', vehicle_type: 'minivan', base_rate_eur: 247.05, base_rate_non_eur: 247.05, capacity_min: 21, capacity_max: 45 },
+      { id: 'c2', created_at: '2026-03-02', service_type: 'airport_transfer', city: 'Cairo', route_name: 'CAIRO-AIRPORT', vehicle_type: 'retired_van', base_rate_eur: 90, base_rate_non_eur: 90, capacity_min: 8, capacity_max: 12 },
+    ]
+    const vehicle = (k: string) => ({ minivan: 'Coach' }[k] ?? '')
+    const [renamed, unknown] = groupVehicleRowsToTiers(rows, undefined, vehicle)
+    expect(renamed.name).toBe('Coach (21-45 pax) — CAIRO-AIRPORT')
+    expect(renamed.details).toBe('Coach | airport_transfer')
+    // The option id still carries the key, so saved selections keep resolving.
+    expect(renamed.id).toBe('c1__minivan')
+    // A key the list no longer holds reads as words.
+    expect(unknown.name).toBe('Retired Van (8-12 pax) — CAIRO-AIRPORT')
+  })
 })

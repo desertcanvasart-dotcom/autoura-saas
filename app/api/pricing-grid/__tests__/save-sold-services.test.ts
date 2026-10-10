@@ -140,6 +140,13 @@ describe('the save is one transaction and keeps each day\'s settings (migration 
     expect(second).toMatchObject({ day_type: 'tour', intercity: null, has_sightseeing: null })
   })
 
+  it('each day carries the day block it was built from; none is null', async () => {
+    await save(true, [{ ...day(), blockCode: 'CAI-ARR' } as GridDay, { ...day(), id: 'd2', dayNumber: 2 }])
+    const [first, second] = inserted.itinerary_days ?? []
+    expect(first).toMatchObject({ block_code: 'CAI-ARR' })
+    expect(second).toMatchObject({ block_code: null })
+  })
+
   it('a failed save answers 500 — never success — and removes the empty new itinerary', async () => {
     rpcError = { message: 'boom' }
     const body = await save(true)
