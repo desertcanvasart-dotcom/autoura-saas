@@ -7,8 +7,9 @@ import { supplementItem } from '../lib/single-supplement'
 import { citiesOf, facetsOf, filterOptions, humanize, onePerRoute, optionCities, routeKey, routeLabel, vehicleLabel, FACET_LABEL, type FacetField } from '../lib/option-filters'
 
 /** Single-choice services picked from the filtered list rather than a plain
- *  select: their lists run long (every hotel of the tier, every guide). */
-const PICKER_SLOTS = new Set(['accommodation', 'guide'])
+ *  select: every hotel of the tier, every guide, every cruise and cabin —
+ *  and water, so every service reads the same way. */
+const PICKER_SLOTS = new Set(['accommodation', 'guide', 'cruise', 'water'])
 
 /** Rates reach the grid in the run currency (EUR); one place writes them. */
 const money = (n: number) => `€${n.toFixed(2)}`
@@ -244,6 +245,16 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                 )}
                 {allPool.length === 0 && !selected && (
                   <span className="text-[11px] text-gray-300 px-1 italic">No options</span>
+                )}
+                {onApplyToAllDays && selected && (
+                  <button
+                    type="button"
+                    onClick={onApplyToAllDays}
+                    className="ml-1 text-[11px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                    title="Put this on every day of the trip"
+                  >
+                    Apply to all days
+                  </button>
                 )}
                 {isDropdownOpen && renderPanel(opt => { selectSingle(opt); setIsDropdownOpen(false) }, false)}
               </div>
