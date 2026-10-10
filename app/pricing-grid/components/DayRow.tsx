@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
+import { BookmarkPlus, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import type { GridDay, GridConfig, AllRates, SlotValue, DayCalc, SelectedItem, DayType, Intercity, SlotDefinition } from '../types'
 import { GROUP_SLOTS, PP_SLOTS, DAY_TYPES, DAY_TYPE_LABELS, DEFAULT_DAY_TYPE, DAY_TYPE_DEFAULTS } from '../types'
 import { calculateDay, convertAmount } from '../lib/calculator'
@@ -38,12 +38,15 @@ interface DayRowProps {
   /** What a day block did (or would do) for this day. */
   blockNote?: BlockNote
   onDismissBlockNote?: () => void
+  /** Keep this day as a new block in the catalog; offered only on a day not
+   *  already from it, and only to those who may change the catalog. */
+  onSaveAsBlock?: () => void
 }
 
 /** Services offered "Apply to all days" — a daily item, not a one-off. */
 const APPLY_TO_ALL_SLOTS = new Set(['water'])
 
-export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote }: DayRowProps) {
+export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote, onSaveAsBlock }: DayRowProps) {
   const calc: DayCalc = calculateDay(day, config)
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
   const sym = config.currency === 'EUR' ? '€' : config.currency === 'USD' ? '$' : config.currency === 'GBP' ? '£' : config.currency
@@ -373,7 +376,19 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 compact
               />
             ) : (
-              <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
+              <>
+                <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
+                {onSaveAsBlock && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onSaveAsBlock() }}
+                    className="p-1.5 text-gray-400 hover:text-green-700 rounded-md hover:bg-green-50 transition-colors"
+                    title="New day: save it to your catalog as a day block"
+                  >
+                    <BookmarkPlus className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
             )
           })()}
           <button

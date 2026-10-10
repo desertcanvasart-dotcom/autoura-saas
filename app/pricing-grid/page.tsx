@@ -14,6 +14,7 @@ import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
+import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
 import { preParseRawItinerary } from '@/lib/ai/parsing-utils'
 import type { BlockNote } from './components/DayRow'
 import GridHeader from './components/GridHeader'
@@ -121,6 +122,9 @@ function PricingGridContent() {
   const [rates, setRates] = useState<AllRates | null>(null)
   // The agency's day blocks (Settings → Day blocks); empty until imported.
   const [blocks, setBlocks] = useState<GridBlock[]>([])
+  // May this user add to the catalog ("Save as a block")?
+  const [canWriteBlocks, setCanWriteBlocks] = useState(false)
+  const [savingBlockDayId, setSavingBlockDayId] = useState<string | null>(null)
   // Per day: what the last block laid on it left for the operator to pick.
   const [blockNotes, setBlockNotes] = useState<Record<string, BlockNote>>({})
   const [loading, setLoading] = useState(true)
@@ -440,7 +444,9 @@ function PricingGridContent() {
     fetch('/api/day-blocks')
       .then(res => res.json())
       .then(json => {
-        if (live && json?.success) setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+        if (!live || !json?.success) return
+        setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+        setCanWriteBlocks(json.data.canWrite === true)
       })
       // No library (or no table yet): the Grid simply offers no blocks.
       .catch(() => {})
@@ -466,6 +472,15 @@ function PricingGridContent() {
     setDays(prev => prev.map(d => (d.id === dayId ? day : d)))
     setBlockNotes(prev => ({ ...prev, [dayId]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${target.dayNumber} ← ${blockSummary(block.code, filled, toPick)}`)
+  }
+
+  // A day kept as a new block: it joins the catalog, and the day is now from it.
+  const blockSaved = (dayId: string, block: GridBlock) => {
+    setBlocks(prev => [...prev.filter(b => b.code !== block.code), block].sort((a, b) => a.code.localeCompare(b.code)))
+    setDays(prev => prev.map(d => (d.id === dayId ? { ...d, blockCode: block.code } : d)))
+    setBlockNotes(prev => { const next = { ...prev }; delete next[dayId]; return next })
+    setSavingBlockDayId(null)
+    showToast('success', `Saved to your catalog as day block ${block.code}`)
   }
 
   const removeDay = (dayId: string) => {
@@ -1057,9 +1072,27 @@ function PricingGridContent() {
                 onApplyBlock={(block) => applyBlockToDay(day.id, block)}
                 blockNote={blockNotes[day.id]}
                 onDismissBlockNote={() => setBlockNotes(prev => { const next = { ...prev }; delete next[day.id]; return next })}
+                onSaveAsBlock={canWriteBlocks ? () => setSavingBlockDayId(day.id) : undefined}
               />
             ))}
           </div>
+
+          {/* Save a day to the catalog as a new block */}
+          {(() => {
+            const idx = savingBlockDayId ? days.findIndex(d => d.id === savingBlockDayId) : -1
+            if (idx < 0) return null
+            const target = days[idx]
+            return (
+              <SaveAsBlockDialog
+                key={target.id}
+                day={target}
+                nextDay={days[idx + 1] ?? null}
+                takenCodes={blocks.map(b => b.code)}
+                onClose={() => setSavingBlockDayId(null)}
+                onSaved={(block) => blockSaved(target.id, block)}
+              />
+            )
+          })()}
 
           {/* Grand Summary + Save */}
           <GridSummary
