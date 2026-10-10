@@ -418,6 +418,7 @@ Match the origin_city and destination_city of each transport entry to the day's 
 - For entrance fees: use EU or non-EU rates based on passport type
 - Multi-select slots (route, entrance_fees, meals, etc.) use arrays of IDs
 - Single-select slots (guide, accommodation, cruise) use a single ID string
+- Guides: ONE language for the whole trip — the language the text asks for ("Spanish-speaking guide"), else the same language on every day; pick each day's guide in that language from the day's city
 - Custom slots (water, other_group, other_pp) use a number (EUR amount) or null
 - Set water to 1 EUR per person per day by default
 - For cruise days: set the cruise slot, suppress route (transport included in cruise)

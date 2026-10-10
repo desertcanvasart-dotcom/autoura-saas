@@ -34,6 +34,10 @@ export interface GridConfig {
    *  needs no control — the guide slot's dropdown lists every guide-rate
    *  row (senior and Meet & Assist included). */
   guideMode?: 'spot' | 'throughout'
+  /** The trip's guide language (a guide rate's language, in the agency's
+   *  word). Every guide pick follows it; '' or unset = taken from the guides
+   *  most days already have (lib/guide-language.ts). */
+  guideLanguage?: string
   currency: string
   marginPercent: number
   exchangeRate: number | null  // EUR → target currency

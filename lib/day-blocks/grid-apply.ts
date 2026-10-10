@@ -32,6 +32,7 @@ import { DAY_TYPE_DEFAULTS } from '@/app/pricing-grid/types'
 import { airportCodeForCity } from '@/lib/ai/staff-rate-resolution'
 import { citiesFarApart as farApart } from '@/lib/pricing/day-trip'
 import type { DayBlock } from './blocks'
+import { preferLanguage } from '@/app/pricing-grid/lib/guide-language'
 
 export interface GridBlock extends DayBlock {
   /** From /api/day-blocks: each paid attraction and the fee(s) it lands on. */
@@ -118,7 +119,13 @@ function components(b: DayBlock): Partial<GridDay> {
   }
 }
 
-export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRates, pax: number): BlockApplied {
+export interface ApplyOptions {
+  /** The trip's guide language: the block's guide is picked in it when the
+   *  city has one (app/pricing-grid/lib/guide-language.ts). */
+  guideLanguage?: string | null
+}
+
+export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRates, pax: number, opts: ApplyOptions = {}): BlockApplied {
   const filled: string[] = []
   const toPick: string[] = []
   const city = block.city ?? day.city
@@ -155,7 +162,7 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
     set('guide', [])
   } else {
     const inCity = rates.guide.filter(o => sameCity(o.city, city))
-    const pool = inCity.length ? inCity : rates.guide.filter(o => !o.city)
+    const pool = preferLanguage(inCity.length ? inCity : rates.guide.filter(o => !o.city), opts.guideLanguage)
     const kind = block.guide === 'assistant' ? /assistant/i : block.guide === 'spot' ? /spot/i : null
     const opt = kind ? pool.find(o => kind.test(o.name)) : pool.find(o => !/assistant|meet|spot/i.test(o.name)) ?? pool[0]
     const label = block.guide === 'assistant' ? 'English-speaking assistant' : block.guide === 'spot' ? 'Spot guide' : 'Guide'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
@@ -19,6 +19,7 @@ import { preParseRawItinerary } from '@/lib/ai/parsing-utils'
 import type { BlockNote } from './components/DayRow'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
+import { alignGuideLanguage, guideLanguages, majorityGuideLanguage } from './lib/guide-language'
 import InputPanel from './components/InputPanel'
 import DayRow from './components/DayRow'
 import GridSummary from './components/GridSummary'
@@ -120,6 +121,7 @@ function PricingGridContent() {
     loadFromStorage(STORAGE_KEY_DAYS, [])
   )
   const [rates, setRates] = useState<AllRates | null>(null)
+  const guideLanguageList = useMemo(() => guideLanguages(rates?.guide ?? []), [rates])
   // The agency's day blocks (Settings → Day blocks); empty until imported.
   const [blocks, setBlocks] = useState<GridBlock[]>([])
   // May this user add to the catalog ("Save as a block")?
@@ -459,7 +461,7 @@ function PricingGridContent() {
   const addDayFromBlock = (block: GridBlock) => {
     if (!rates) return
     const fresh = createEmptyDay(days.length + 1)
-    const { day, filled, toPick } = applyBlockToGridDay(fresh, block, rates, config.pax)
+    const { day, filled, toPick } = applyBlockToGridDay(fresh, block, rates, config.pax, { guideLanguage: tripGuideLanguage() })
     setDays(prev => [...prev, { ...day, dayNumber: prev.length + 1, isExpanded: true }])
     setBlockNotes(prev => ({ ...prev, [day.id]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${days.length + 1} from ${blockSummary(block.code, filled, toPick)}`)
@@ -468,7 +470,7 @@ function PricingGridContent() {
   const applyBlockToDay = (dayId: string, block: GridBlock) => {
     const target = days.find(d => d.id === dayId)
     if (!rates || !target) return
-    const { day, filled, toPick } = applyBlockToGridDay(target, block, rates, config.pax)
+    const { day, filled, toPick } = applyBlockToGridDay(target, block, rates, config.pax, { guideLanguage: tripGuideLanguage() })
     setDays(prev => prev.map(d => (d.id === dayId ? day : d)))
     setBlockNotes(prev => ({ ...prev, [dayId]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${target.dayNumber} ← ${blockSummary(block.code, filled, toPick)}`)
@@ -481,6 +483,24 @@ function PricingGridContent() {
     setBlockNotes(prev => { const next = { ...prev }; delete next[dayId]; return next })
     setSavingBlockDayId(null)
     showToast('success', `Saved to your catalog as day block ${block.code}`)
+  }
+
+  // The trip's guide language: the header's choice, else the one most days' guides speak.
+  const tripGuideLanguage = () =>
+    config.guideLanguage || (rates ? majorityGuideLanguage(days, rates.guide) : null)
+
+  // The header's guide language changed: every day's guide moves to it.
+  const changeConfig = (next: GridConfig) => {
+    if (rates && next.guideLanguage && next.guideLanguage !== config.guideLanguage) {
+      const { days: aligned, changed, unmatched } = alignGuideLanguage(days, rates.guide, next.guideLanguage)
+      if (changed.length) setDays(aligned)
+      if (unmatched.length) {
+        showToast('warning', `No ${next.guideLanguage} guide in the city of day ${unmatched.join(', ')} — those days keep their guide.`)
+      } else if (changed.length) {
+        showToast('success', `${next.guideLanguage} guide on day ${changed.join(', ')}`)
+      }
+    }
+    setConfig(next)
   }
 
   const removeDay = (dayId: string) => {
@@ -572,7 +592,7 @@ function PricingGridContent() {
   }
 
   // --- Day blocks for a parsed itinerary ---
-  const matchParsedDaysToBlocks = async (text: string, parsed: GridDay[], pax: number) => {
+  const matchParsedDaysToBlocks = async (text: string, parsed: GridDay[], pax: number, guideLanguage: string | null) => {
     if (!rates) return
     try {
       // The day's own words, when the text is split into D1 / Day 1 parts.
@@ -597,7 +617,7 @@ function PricingGridContent() {
         if (!day) continue
         const block = m.code ? byCode.get(m.code) : undefined
         if (block && m.confidence === 'high') {
-          const result = applyBlockToGridDay(day, block, rates, pax)
+          const result = applyBlockToGridDay(day, block, rates, pax, { guideLanguage })
           applied.set(day.id, result.day)
           notes[day.id] = { kind: 'applied', code: block.code, by: m.by === 'shorthand' ? 'shorthand' : 'ai', toPick: result.toPick, reason: m.reason }
         } else if (block) {
@@ -641,13 +661,20 @@ function PricingGridContent() {
         const parsedDays: GridDay[] = parsedDaysToGrid(data.days, () => crypto.randomUUID())
         // The parser's prices are its own derivation (a seasonal hotel came in
         // at 0); the grid's rate list is the authority (hydrate-rates.ts).
-        const hydrated = rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays
+        let hydrated = rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays
+        // One guide language for the trip: the one set in the header, else
+        // the one most days came back with (guide-language.ts).
+        const guideLanguage = rates ? (config.guideLanguage || majorityGuideLanguage(hydrated, rates.guide)) : null
+        if (rates && guideLanguage) {
+          hydrated = alignGuideLanguage(hydrated, rates.guide, guideLanguage).days
+          if (!config.guideLanguage) setConfig(prev => ({ ...prev, guideLanguage }))
+        }
         setDays(hydrated)
         // Which of the agency's day blocks is each day? The blocks then supply
         // the services (lib/day-blocks/match.ts); the AI's reading stays only
         // where no block fits, and is flagged.
         if (rates && blocks.length > 0) {
-          void matchParsedDaysToBlocks(text, hydrated, data.metadata?.pax ?? config.pax)
+          void matchParsedDaysToBlocks(text, hydrated, data.metadata?.pax ?? config.pax, guideLanguage)
         }
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
@@ -718,6 +745,9 @@ function PricingGridContent() {
         partnerId: itn.partner_id || null,
         itineraryId: itn.id,
         itineraryCode: itn.itinerary_code,
+        // A saved trip's guides are its own; the language follows them
+        // (guide-language.ts), not the last trip's choice.
+        guideLanguage: '',
       }))
       setSavedSellingTotal(typeof itn.total_cost === 'number' ? itn.total_cost : Number(itn.total_cost) || null)
 
@@ -941,7 +971,7 @@ function PricingGridContent() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-8 bg-gray-50 min-h-screen">
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-3 pb-2 bg-gray-50">
-        <GridHeader config={config} onChange={setConfig} totals={totals} />
+        <GridHeader config={config} onChange={changeConfig} totals={totals} guideLanguages={guideLanguageList} />
       </div>
 
       {/* Client Info */}
