@@ -8,7 +8,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
-import { activeInOrder, type VocabularyItem, type VocabularyKind } from '@/lib/vocabulary'
+import { activeInOrder, type VehicleTypeUsage, type VocabularyItem, type VocabularyKind } from '@/lib/vocabulary'
 
 type Client = SupabaseClient<Database>
 
@@ -86,4 +86,18 @@ export async function vehicleBandsForTenant(admin: Client, tenantId: string): Pr
   return activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'vehicle_type'))
     .map(i => ({ key: i.key, min_pax: Number(i.meta?.min_pax ?? 0), max_pax: Number(i.meta?.max_pax ?? 0) }))
     .filter(v => v.max_pax > 0)
+}
+
+/** What a vehicle key is still filed under in one tenant: transport rates
+ *  (one row per route and vehicle) and B2B transport packages (their
+ *  vehicles list). Deleting the key leaves these rows naming a vehicle the
+ *  list no longer holds, so the settings screen warns first. */
+export async function vehicleTypeUsage(supabase: Client, tenantId: string, key: string): Promise<VehicleTypeUsage> {
+  const [rates, packages] = await Promise.all([
+    supabase.from('transportation_rates').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).ilike('vehicle_type', key.replace(/[\\%_]/g, ch => `\\${ch}`)),
+    supabase.from('b2b_transport_packages').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).contains('vehicles', [{ vehicle_type: key }]),
+  ])
+  return { transport_rates: rates.count ?? 0, transport_packages: packages.count ?? 0 }
 }
