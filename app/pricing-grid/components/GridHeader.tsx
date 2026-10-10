@@ -200,16 +200,21 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
           </button>
 
           {/* One guide language for the whole trip (lib/guide-language.ts):
-              changing it moves every day's guide to that language. */}
-          {config.withGuide && guideLanguages.length > 1 && (
+              changing it moves every day's guide to that language. Shown
+              whenever the trip has a guide — with no language on any guide
+              rate it says so, rather than hiding (operator, 2026-10-10). */}
+          {config.withGuide && (
             <select
-              value={config.guideLanguage ?? ''}
+              value={guideLanguages.length > 0 ? (config.guideLanguage ?? '') : ''}
               onChange={(e) => update({ guideLanguage: e.target.value })}
+              disabled={guideLanguages.length === 0}
               aria-label="Guide language"
-              title="The guide language for the whole trip: every day's guide is picked in it"
-              className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:ring-1 focus:ring-blue-200"
+              title={guideLanguages.length > 0
+                ? "The guide language for the whole trip: every day's guide is picked in it"
+                : 'No guide rate has a language yet: set one on your guide rates (Rates → Guides)'}
+              className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:ring-1 focus:ring-blue-200 disabled:text-gray-400 disabled:bg-gray-50"
             >
-              <option value="">Guide language…</option>
+              <option value="">{guideLanguages.length > 0 ? 'Guide language…' : 'No guide languages'}</option>
               {guideLanguages.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           )}
