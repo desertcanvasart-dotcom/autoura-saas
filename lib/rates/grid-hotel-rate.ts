@@ -5,7 +5,7 @@
 // periods editor writes `seasons` and mirrors the first period onto ppd_eur /
 // single_supplement_eur (legacyColumnMirror); the CSV importer writes
 // pp_double_eur / single_supp_eur. The grid read only the importer family, so
-// a hotel added through the form showed €0.00 in the day builder (operator,
+// a hotel added through the form showed 0.00 in the day builder (operator,
 // 2026-10-10: the one budget hotel added for a tour).
 //
 // The grid now prices a hotel the way the engine does: the period covering

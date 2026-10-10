@@ -13,7 +13,7 @@ const formHotel = {
 }
 
 describe('gridHotelRate', () => {
-  it('prices a hotel saved through the periods form (was €0.00 in the grid)', () => {
+  it('prices a hotel saved through the periods form (was 0.00 in the grid)', () => {
     const r = gridHotelRate(formHotel)
     expect(r).toMatchObject({ ppdEur: 40, ppdNonEur: 45, singleSuppEur: 25, singleSuppNonEur: 28, guideRateEur: 15, periodName: 'Summer', gapDate: null })
   })
