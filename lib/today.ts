@@ -14,10 +14,11 @@
 // This formats from the LOCAL calendar fields, which is what a date input
 // means by a date: no instant, no zone, just the day the user is having.
 //
-// ONLY CORRECT IN THE BROWSER. On the server `new Date()` is the host's clock
-// — UTC on Railway — and "local" there is not the operator's timezone but the
-// datacentre's. Server-side defaults need an organisation timezone, which this
-// app does not model yet; those sites are deliberately left alone.
+// todayLocal is ONLY CORRECT IN THE BROWSER. On the server `new Date()` is
+// the host's clock — UTC on Railway — and "local" there is the datacentre's
+// timezone, not the operator's. Server-side dates use the company's timezone
+// (tenants.timezone, Settings → Organization) through todayInTimeZone /
+// lib/tenant-today.
 
 /** Today as YYYY-MM-DD in the runtime's local timezone. */
 export function todayLocal(date: Date = new Date()): string {
@@ -30,4 +31,32 @@ export function toLocalDateString(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+/**
+ * Today as YYYY-MM-DD in a named IANA timezone — safe on the server, where the
+ * host clock is UTC. Falls back to the UTC date for a missing or unknown zone.
+ */
+export function todayInTimeZone(timeZone: string | null | undefined, date: Date = new Date()): string {
+  if (!timeZone) return date.toISOString().slice(0, 10)
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+  } catch {
+    return date.toISOString().slice(0, 10)
+  }
+}
+
+/** A YYYY-MM-DD date moved by whole days (calendar arithmetic, no time zone). */
+export function shiftDateISO(iso: string, days: number): string {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** First and last day (YYYY-MM-DD) of the month a YYYY-MM-DD date is in. */
+export function monthBounds(iso: string): { start: string; end: string } {
+  const [y, m] = iso.slice(0, 10).split('-').map(Number)
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  const mm = String(m).padStart(2, '0')
+  return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(last).padStart(2, '0')}` }
 }

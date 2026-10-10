@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/email-send'
 import { createClient } from '@supabase/supabase-js'
 import { withJobRun } from '@/lib/support/job-runs'
+import { shiftDateISO, todayInTimeZone } from '@/lib/today'
+import { resolveTimeZone } from '@/lib/tenant-today'
+import { daysOverdue, reminderChannels, taskReminderKind, type NotificationPreferences } from '@/lib/tasks/task-reminders'
 
 // Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
 let _supabase: ReturnType<typeof createClient> | null = null
@@ -43,108 +46,92 @@ async function getHandler(request: NextRequest) {
       errors: [] as string[]
     }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    
-    const todayStr = today.toISOString().split('T')[0]
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
-
-    // =========================================
-    // 1. Find tasks due tomorrow (24h warning)
-    // =========================================
-    const { data: dueSoonTasks, error: dueSoonError } = await (getSupabase() as any)
+    const db = getSupabase() as any
+    // Everything due by the day after tomorrow in UTC — the furthest-ahead
+    // timezone's tomorrow — and not done; each task is then judged on its own
+    // company's day (tenants.timezone, lib/tenant-today).
+    const horizon = shiftDateISO(new Date().toISOString().slice(0, 10), 2)
+    const { data: tasks, error: tasksError } = await db
       .from('tasks')
       .select(`
         *,
-        assigned_member:team_members(id, name, email)
+        assigned_member:team_members(id, name, email, user_id, is_active)
       `)
-      .eq('due_date', tomorrowStr)
+      .lte('due_date', horizon)
       .neq('status', 'done')
       .not('assigned_to', 'is', null)
+      // An archived task is off the board; it must not keep reminding anyone.
+      .or('archived.eq.false,archived.is.null')
 
-    if (dueSoonError) {
-      results.errors.push(`Due soon query error: ${dueSoonError.message}`)
-    } else if (dueSoonTasks && dueSoonTasks.length > 0) {
-      for (const task of dueSoonTasks) {
-        if (!task.assigned_member?.id) continue
+    if (tasksError) {
+      results.errors.push(`Task query error: ${tasksError.message}`)
+    }
 
-        // Check if we already sent this notification today
-        const { data: existing } = await (getSupabase() as any)
-          .from('notifications')
-          .select('id')
-          .eq('related_task_id', task.id)
-          .eq('type', 'task_due_soon')
-          .gte('created_at', todayStr)
-          .limit(1)
+    const rows = (tasks ?? []) as any[]
+    const tenantIds = [...new Set(rows.map(t => t.tenant_id).filter(Boolean))]
+    const zones = new Map<string, string>()
+    if (tenantIds.length) {
+      const { data: tenants } = await db.from('tenants').select('id, timezone').in('id', tenantIds)
+      for (const t of tenants ?? []) zones.set(t.id, resolveTimeZone(t.timezone))
+    }
+    const userIds = [...new Set(rows.map(t => t.assigned_member?.user_id).filter(Boolean))]
+    const prefsByUser = new Map<string, NotificationPreferences>()
+    if (userIds.length) {
+      const { data: settings } = await db.from('user_settings').select('user_id, notification_preferences').in('user_id', userIds)
+      for (const s of settings ?? []) if (s.notification_preferences) prefsByUser.set(s.user_id, s.notification_preferences)
+    }
 
-        if (existing && existing.length > 0) continue // Already notified
+    for (const task of rows) {
+      const member = task.assigned_member
+      // A removed (deactivated) team member is not reminded.
+      if (!member?.id || member.is_active === false) continue
 
-        // Create notification
+      const todayStr = todayInTimeZone(zones.get(task.tenant_id) ?? resolveTimeZone(null))
+      const kind = taskReminderKind(task.due_date, todayStr)
+      if (!kind) continue
+
+      const channels = reminderChannels(member.user_id ? prefsByUser.get(member.user_id) : null, kind)
+      if (!channels.remind) continue
+
+      // Not again: due-soon once a day, overdue once every three days.
+      const since = kind === 'task_due_soon'
+        ? todayStr
+        : new Date(Date.now() - 3 * 86_400_000).toISOString()
+      const { data: existing } = await db
+        .from('notifications')
+        .select('id')
+        .eq('related_task_id', task.id)
+        .eq('type', kind)
+        .gte('created_at', since)
+        .limit(1)
+      if (existing && existing.length > 0) continue
+
+      if (kind === 'task_due_soon') {
         await createNotification({
-          team_member_id: task.assigned_member.id,
-          type: 'task_due_soon',
+          team_member_id: member.id,
+          type: kind,
           title: `Task due tomorrow: ${task.title}`,
           message: `Your task "${task.title}" is due tomorrow (${formatDate(task.due_date)}). Please complete it soon.`,
           link: `/tasks`,
           related_task_id: task.id,
-          email: task.assigned_member.email,
-          name: task.assigned_member.name
+          email: channels.email ? member.email : undefined,
+          name: member.name,
+          inApp: channels.inApp,
         })
-        
         results.dueSoon++
-      }
-    }
-
-    // =========================================
-    // 2. Find overdue tasks
-    // =========================================
-    const { data: overdueTasks, error: overdueError } = await (getSupabase() as any)
-      .from('tasks')
-      .select(`
-        *,
-        assigned_member:team_members(id, name, email)
-      `)
-      .lt('due_date', todayStr)
-      .neq('status', 'done')
-      .not('assigned_to', 'is', null)
-
-    if (overdueError) {
-      results.errors.push(`Overdue query error: ${overdueError.message}`)
-    } else if (overdueTasks && overdueTasks.length > 0) {
-      for (const task of overdueTasks) {
-        if (!task.assigned_member?.id) continue
-
-        // Check if we already sent overdue notification in last 3 days
-        const threeDaysAgo = new Date()
-        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
-        
-        const { data: existing } = await (getSupabase() as any)
-          .from('notifications')
-          .select('id')
-          .eq('related_task_id', task.id)
-          .eq('type', 'task_overdue')
-          .gte('created_at', threeDaysAgo.toISOString())
-          .limit(1)
-
-        if (existing && existing.length > 0) continue // Already notified recently
-
-        const daysOverdue = Math.floor((today.getTime() - new Date(task.due_date).getTime()) / (1000 * 60 * 60 * 24))
-
-        // Create notification
+      } else {
+        const days = daysOverdue(task.due_date, todayStr)
         await createNotification({
-          team_member_id: task.assigned_member.id,
-          type: 'task_overdue',
+          team_member_id: member.id,
+          type: kind,
           title: `Overdue task: ${task.title}`,
-          message: `Your task "${task.title}" is ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} overdue (was due ${formatDate(task.due_date)}). Please complete it as soon as possible.`,
+          message: `Your task "${task.title}" is ${days} day${days > 1 ? 's' : ''} overdue (was due ${formatDate(task.due_date)}). Please complete it as soon as possible.`,
           link: `/tasks`,
           related_task_id: task.id,
-          email: task.assigned_member.email,
-          name: task.assigned_member.name
+          email: channels.email ? member.email : undefined,
+          name: member.name,
+          inApp: channels.inApp,
         })
-        
         results.overdue++
       }
     }
@@ -178,7 +165,8 @@ async function createNotification({
   link,
   related_task_id,
   email,
-  name
+  name,
+  inApp = true,
 }: {
   team_member_id: string
   type: string
@@ -188,6 +176,9 @@ async function createNotification({
   related_task_id: string
   email?: string
   name?: string
+  /** Off in the person's settings: the row is still written — it is what
+   *  stops the reminder repeating — but already read, so it does not show. */
+  inApp?: boolean
 }) {
   // Insert notification
   const { data: notification, error } = await (getSupabase() as any)
@@ -199,7 +190,7 @@ async function createNotification({
       message,
       link,
       related_task_id,
-      is_read: false,
+      is_read: !inApp,
       email_sent: false
     })
     .select()

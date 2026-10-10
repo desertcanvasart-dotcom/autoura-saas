@@ -3,7 +3,7 @@
 import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { formatDateOnly } from '@/lib/date-utils'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
-import { todayLocal } from '@/lib/today'
+import { shiftDateISO, todayLocal } from '@/lib/today'
 import { withReturnTo } from '@/lib/nav/return-to'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useAuth } from '@/app/contexts/AuthContext'
@@ -511,7 +511,7 @@ export default function ViewItineraryPage() {
           total_amount: effectiveTotalCost,
           currency: itinerary.currency || 'EUR',
           issue_date: todayLocal(),
-          due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          due_date: shiftDateISO(todayLocal(), 14),
           payment_terms: 'Payment due within 14 days',
           // Calendar days (a UTC parse printed the day before, west of UTC) in a
           // format every reader reads the same way — never "10/9/2026".

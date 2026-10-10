@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import { DayBandBlock, groupByDay } from '@/components/pricing/DayBand'
 import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
-import { todayLocal } from '@/lib/today'
+import { shiftDateISO, todayLocal } from '@/lib/today'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -114,11 +114,9 @@ export default function TourDetailPage() {
   
   // Pricing state
   const [selectedPax, setSelectedPax] = useState(2)
-  const [travelDate, setTravelDate] = useState(() => {
-    const date = new Date()
-    date.setDate(date.getDate() + 14) // Default 2 weeks from now
-    return date.toISOString().split('T')[0]
-  })
+  // Two weeks from the visitor's own today: through UTC it was 13 days ahead
+  // on mornings east of UTC.
+  const [travelDate, setTravelDate] = useState(() => shiftDateISO(todayLocal(), 14))
   const [isEurPassport, setIsEurPassport] = useState(true)
   const [pricing, setPricing] = useState<PricingResult | null>(null)
   const [pricingLoading, setPricingLoading] = useState(false)

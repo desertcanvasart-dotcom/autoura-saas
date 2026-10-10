@@ -32,8 +32,11 @@ export function daysOverdueOrNull(dueDate: unknown, now: number = Date.now()): n
 // date: the single reminder computed new Date(null) and told the client the
 // payment was ~20,700 days overdue, due 1 January 1970.
 
-/** The statuses a client has been sent and still owes on. */
-export const REMINDABLE_INVOICE_STATUSES = ['sent', 'partial', 'overdue'] as const
+/** The statuses a client has been sent and still owes on. A part-paid
+ *  invoice is 'partially_paid' (the invoices status check); 'partial' alone
+ *  matched nothing, so part-paid invoices were never chased. 'viewed' is a
+ *  sent invoice the client opened. */
+export const REMINDABLE_INVOICE_STATUSES = ['sent', 'viewed', 'partially_paid', 'partial', 'overdue'] as const
 
 /** Why an invoice cannot be chased, or null when it can. */
 export function reminderBlocker(invoice: { status?: string | null; due_date?: unknown }): string | null {
@@ -56,4 +59,17 @@ export function reminderBlocker(invoice: { status?: string | null; due_date?: un
 export function isFirstReminderDue(nextReminderDate: unknown, daysOverdue: number): boolean {
   if (nextReminderDate != null && nextReminderDate !== '') return true
   return daysOverdue >= -7
+}
+
+/**
+ * Whole days from a due date to a calendar day (YYYY-MM-DD) — negative before
+ * it is due. Calendar arithmetic, so the company's "today" (lib/tenant-today)
+ * decides, not the server's UTC instant. Null without a usable due date.
+ */
+export function daysOverdueOn(dueDate: unknown, todayISO: string): number | null {
+  if (dueDate === null || dueDate === undefined || dueDate === '') return null
+  const due = Date.parse(`${String(dueDate).slice(0, 10)}T00:00:00Z`)
+  const today = Date.parse(`${todayISO.slice(0, 10)}T00:00:00Z`)
+  if (!Number.isFinite(due) || !Number.isFinite(today)) return null
+  return Math.round((today - due) / 86_400_000)
 }

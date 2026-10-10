@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { shiftDateISO } from '@/lib/today'
+import { tenantToday } from '@/lib/tenant-today'
 
 // ============================================
 // TOUR DEPARTURES API
@@ -102,7 +104,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (upcoming === 'true') {
-      const today = new Date().toISOString().split('T')[0]
+      // The company's own today (lib/tenant-today), not the UTC server's.
+      const today = await tenantToday(supabase, tenant_id)
       query = query.gte('start_date', today)
     }
 
@@ -228,10 +231,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate end_date
-    const startDateObj = new Date(start_date)
-    const endDateObj = new Date(startDateObj)
-    endDateObj.setDate(endDateObj.getDate() + finalDurationDays - 1)
-    const end_date = endDateObj.toISOString().split('T')[0]
+    // Calendar arithmetic: local-clock setDate slipped a day across a
+    // daylight-saving change on a host that is not on UTC.
+    const end_date = shiftDateISO(String(start_date), finalDurationDays - 1)
 
     // Validate status
     const validStatuses = ['draft', 'open', 'limited', 'full', 'guaranteed', 'cancelled']

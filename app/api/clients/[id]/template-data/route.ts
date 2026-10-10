@@ -2,6 +2,8 @@ import { tripServices } from '@/lib/itineraries/trip-services'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { formatMoney } from '@/lib/currency-totals'
 import { depositDueDate } from '@/lib/template-placeholders'
+import { todayInTimeZone } from '@/lib/today'
+import { resolveTimeZone } from '@/lib/tenant-today'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
@@ -109,9 +111,13 @@ export async function GET(
 
     // Build the placeholder data
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
-    const { data: depositTerms } = await supabase.from('tenants').select('deposit_due_days').eq('id', authResult.tenant_id).maybeSingle()
+    const { data: depositTerms } = await supabase.from('tenants').select('deposit_due_days, timezone').eq('id', authResult.tenant_id).maybeSingle()
+    const terms = depositTerms as { deposit_due_days?: number | null; timezone?: string | null } | null
     const placeholderData = buildPlaceholderData(clientWithName, latestItinerary, {
-      deposit_due_days: (depositTerms as { deposit_due_days?: number | null } | null)?.deposit_due_days ?? null,
+      deposit_due_days: terms?.deposit_due_days ?? null,
+      // The company's own day: on the UTC server, {{today}} was yesterday in
+      // Tokyo until 09:00.
+      today: todayInTimeZone(resolveTimeZone(terms?.timezone)),
       company_name: senderTenant?.company_name || '',
       agent_name: (authResult.user?.user_metadata?.full_name as string) || '',
       company_email: senderTenant?.contact_email || '',
@@ -136,7 +142,7 @@ function buildPlaceholderData(
   client: { name: string; email: string | null; phone?: string | null },
   itinerary?: any
 ,
-  identity: { company_name?: string; agent_name?: string; company_email?: string; company_phone?: string; deposit_due_days?: number | null } = {}
+  identity: { company_name?: string; agent_name?: string; company_email?: string; company_phone?: string; deposit_due_days?: number | null; today?: string } = {}
 ): Record<string, string> {
   const data: Record<string, string> = {}
   const currency = itinerary?.currency || 'EUR'
@@ -209,10 +215,12 @@ function buildPlaceholderData(
   data.company_phone = identity.company_phone || ''
 
   // Dynamic dates
-  data.today = formatDate(new Date())
+  // A calendar day (YYYY-MM-DD) read at UTC midnight, so it formats as itself.
+  const today = new Date(`${identity.today ?? new Date().toISOString().slice(0, 10)}T00:00:00Z`)
+  data.today = formatDate(today)
   
   // The agency's deposit days (Settings), not a fixed 7.
-  data.deposit_due_date = formatDate(depositDueDate(identity.deposit_due_days))
+  data.deposit_due_date = formatDate(depositDueDate(identity.deposit_due_days, today))
 
   return data
 }
@@ -229,10 +237,13 @@ function formatDate(date: string | Date | undefined): string {
   if (!date) return ''
   const d = new Date(date)
   if (isNaN(d.getTime())) return ''
+  // In UTC: the dates here are calendar days stored as YYYY-MM-DD, which
+  // parse as UTC midnight — formatted in another zone they move a day.
   return d.toLocaleDateString('en-US', { 
     month: 'long', 
     day: 'numeric', 
-    year: 'numeric' 
+    year: 'numeric',
+    timeZone: 'UTC',
   })
 }
 

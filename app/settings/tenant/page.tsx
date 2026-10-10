@@ -1,5 +1,6 @@
 'use client'
 
+import { TIMEZONES } from '@/lib/timezones'
 import { useState, useEffect, useRef } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { createClient } from '@/app/supabase'
@@ -89,6 +90,7 @@ export default function TenantSettingsPage() {
   // What travel contracts name (mig 403): '' = no country / the operator's
   // own country's law (lib/contract-terms.ts).
   const [operatingCountry, setOperatingCountry] = useState('')
+  const [companyTimezone, setCompanyTimezone] = useState('')
   const [governingLaw, setGoverningLaw] = useState('')
   // Run currency (C3.4): '' = EUR default. Reinterprets stored rate amounts;
   // the field warns about that.
@@ -125,6 +127,7 @@ export default function TenantSettingsPage() {
       setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
       setRatesCurrency((tenant as { rates_currency?: string | null }).rates_currency || '')
       setOperatingCountry(tenant.operating_country || '')
+      setCompanyTimezone(tenant.timezone || '')
       setGoverningLaw(tenant.contract_governing_law || '')
     }
 
@@ -286,6 +289,8 @@ export default function TenantSettingsPage() {
         // Blank -> NULL -> resolveDepositRule falls back to the defaults.
         deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
         deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
+        // Blank -> NULL -> UTC (lib/tenant-today).
+        timezone: companyTimezone || null,
         ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
           ? { rates_currency: ratesCurrency || null }
           : {}),
@@ -624,6 +629,31 @@ export default function TenantSettingsPage() {
               />
               <p className="mt-1 text-[10px] text-gray-400">
                 Days from booking creation until the deposit deadline.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Company timezone
+              </label>
+              <select
+                value={companyTimezone}
+                onChange={(e) => setCompanyTimezone(e.target.value)}
+                disabled={!isAdmin}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white disabled:bg-gray-50"
+              >
+                <option value="">Not set (UTC)</option>
+                {TIMEZONES.filter(tz => tz.value !== 'UTC').map(tz => (
+                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                ))}
+                {companyTimezone && !TIMEZONES.some(tz => tz.value === companyTimezone) && (
+                  <option value={companyTimezone}>{companyTimezone}</option>
+                )}
+              </select>
+              <p className="mt-1 text-[10px] text-gray-400">
+                What &ldquo;today&rdquo; means for due dates, reminders and emails sent by the system.
               </p>
             </div>
           </div>

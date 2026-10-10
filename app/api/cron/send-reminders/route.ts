@@ -1,6 +1,8 @@
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
-import { daysOverdueOrNull, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { daysOverdueOn, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { shiftDateISO, todayInTimeZone } from '@/lib/today'
+import { resolveTimeZone } from '@/lib/tenant-today'
 import { escapeHtml } from '@/lib/html-escape'
 import { createAdminClient } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
@@ -30,7 +32,7 @@ async function sendReminderEmail(params: {
   return { success: result.success, error: result.error }
 }
 
-function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
+function generateReminderEmail(invoice: any, reminderType: string, daysOverdueToday?: number): { subject: string; html: string } {
   // The agency the invoice belongs to (joined as `tenant`), never a fixed brand.
   const company = emailIdentity(invoice.tenant)
   // The currency's own decimals and separators: "JPY120000.00" was how a
@@ -39,7 +41,8 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
   const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB', { 
     day: 'numeric', month: 'long', year: 'numeric' 
   })
-  const daysOverdue = Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
+  // The count the ladder used — the company's own day — when given.
+  const daysOverdue = daysOverdueToday ?? Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
 
   let subject: string
   let urgencyMessage: string
@@ -112,9 +115,10 @@ async function getHandler(request: NextRequest) {
     // Every run reported "No reminders to send" and no dunning email has
     // ever gone out.
     const supabase = createAdminClient()
-    const today = new Date().toISOString().split('T')[0]
-
-
+    // Each invoice is judged on its own company's "today" (tenants.timezone,
+    // lib/tenant-today). The query takes everything due by tomorrow in UTC —
+    // the furthest-ahead timezone's today — and the loop narrows it.
+    const latestToday = shiftDateISO(new Date().toISOString().slice(0, 10), 1)
 
     // Get invoices due for reminders today
     const { data: invoices, error } = await supabase
@@ -122,7 +126,7 @@ async function getHandler(request: NextRequest) {
       // The tenant is joined so each reminder can be sent AS that operator with
       // replies routed to them. This cron spans every tenant, so a single
       // platform reply-to would send every client's answer to the wrong place.
-      .select('*, tenant:tenants(company_name, contact_email, company_phone, company_website, logo_url, primary_color, tagline, company_address, license_number, tax_number, document_footer_text, email_domain, email_from_local, email_domain_status)')
+      .select('*, tenant:tenants(company_name, contact_email, company_phone, company_website, logo_url, primary_color, tagline, company_address, license_number, tax_number, document_footer_text, email_domain, email_from_local, email_domain_status, timezone)')
       .in('status', [...REMINDABLE_INVOICE_STATUSES])
       .not('due_date', 'is', null)
       .gt('balance_due', 0)
@@ -130,9 +134,14 @@ async function getHandler(request: NextRequest) {
       // No next date yet = never reminded. Only the reminder senders set the
       // column, so `lte` alone meant the cron never sent a FIRST reminder
       // (the manual bulk route already reads it this way).
-      .or(`next_reminder_date.lte.${today},next_reminder_date.is.null`)
+      .or(`next_reminder_date.lte.${latestToday},next_reminder_date.is.null`)
       .not('client_email', 'is', null)
-      .order('due_date', { ascending: true })
+      // Longest-waiting first, never-reminded first of all. Ordered by due
+      // date, the same overdue rows came back every run — and a failed send
+      // left its row due — so 50 invoices of one company whose sends fail
+      // starved every other company's reminders.
+      .order('next_reminder_date', { ascending: true, nullsFirst: true })
+      .order('id', { ascending: true })
       .limit(50) // Process max 50 per run
 
     if (error) throw error
@@ -153,11 +162,18 @@ async function getHandler(request: NextRequest) {
     let skipped = 0
 
     for (const invoice of invoices) {
+      const today = todayInTimeZone(resolveTimeZone(invoice.tenant?.timezone))
+      if (invoice.next_reminder_date && String(invoice.next_reminder_date) > today) {
+        // Due tomorrow in this company's timezone, not yet today.
+        skipped++
+        continue
+      }
+
       // due_date is nullable. new Date(null).getTime() is NaN, every
       // comparison below is false, and the ladder falls through to the
       // harshest rung — the client receives "Final Notice ... now NaN days
       // overdue". Skip instead: no due date means nothing is owed *yet*.
-      const daysOverdue = daysOverdueOrNull(invoice.due_date)
+      const daysOverdue = daysOverdueOn(invoice.due_date, today)
       if (daysOverdue === null) {
         skipped++
         continue
@@ -166,6 +182,12 @@ async function getHandler(request: NextRequest) {
       // A first reminder starts a week before the due date — not the day an
       // invoice due in two months is raised.
       if (!isFirstReminderDue(invoice.next_reminder_date, daysOverdue)) {
+        // Too early: looked at again a week before it falls due, rather than
+        // taking a place in every run until then.
+        await supabase
+          .from('invoices')
+          .update({ next_reminder_date: shiftDateISO(String(invoice.due_date).slice(0, 10), -7) })
+          .eq('id', invoice.id)
         skipped++
         continue
       }
@@ -183,7 +205,7 @@ async function getHandler(request: NextRequest) {
       else if (daysOverdue <= 14) reminderType = 'overdue_14'
       else reminderType = 'overdue_30'
 
-      const { subject, html } = generateReminderEmail(invoice, reminderType)
+      const { subject, html } = generateReminderEmail(invoice, reminderType, daysOverdue)
 
       const result = await sendReminderEmail({
         to: invoice.client_email,
@@ -196,15 +218,12 @@ async function getHandler(request: NextRequest) {
       })
 
       if (result.success) {
-        const nextDate = new Date()
-        nextDate.setDate(nextDate.getDate() + 7)
-
         await supabase
           .from('invoices')
           .update({
             last_reminder_sent: new Date().toISOString(),
             reminder_count: (invoice.reminder_count || 0) + 1,
-            next_reminder_date: nextDate.toISOString().split('T')[0]
+            next_reminder_date: shiftDateISO(today, 7)
           })
           .eq('id', invoice.id)
 
@@ -222,6 +241,13 @@ async function getHandler(request: NextRequest) {
         sent++
 
       } else {
+        // Retried tomorrow, behind everything that has waited longer. Left
+        // due, it came back first in every run.
+        await supabase
+          .from('invoices')
+          .update({ next_reminder_date: shiftDateISO(today, 1) })
+          .eq('id', invoice.id)
+
         await supabase
           .from('invoice_reminders')
           .insert({
