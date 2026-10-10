@@ -1,4 +1,4 @@
-// GET /api/pricing-grid/rates?tier=standard
+// GET /api/pricing-grid/rates?tier=standard&date=YYYY-MM-DD
 // Fetches all available rate options from existing Supabase tables,
 // structured by grid slot for dropdown population.
 //
@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cruisePpdNightEur, cruisePpdNightNonEur } from '@/lib/rates/cruise-ppd'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
+import { gridHotelRate } from '@/lib/rates/grid-hotel-rate'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { DEFAULT_WATER_PER_PERSON_PER_DAY, isWaterCostType } from '@/lib/fixed-costs'
@@ -53,6 +54,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
+    // The trip's start date: a hotel is priced from the period covering it.
+    const dateParam = searchParams.get('date')
+    const startDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null
 
     // Fetch all rate tables in parallel
     const [
@@ -215,21 +219,27 @@ export async function GET(request: NextRequest) {
           ...basisOf(r),
         })),
 
-      accommodation: (accommodationRates || []).map((r: any) => ({
-        id: r.id,
-        name: `${r.property_name} ${r.city} (${r.tier} | ${r.board_basis || 'BB'})`,
-        rateEur: toNum(r.pp_double_eur),
-        rateNonEur: toNum(r.pp_double_non_eur),
-        city: r.city,
-        details: `${r.tier} | ${r.board_basis || 'BB'}`,
-        board_basis: r.board_basis || 'BB',
-        single_supp_eur: toNum(r.single_supp_eur),
-        single_supp_non_eur: toNum(r.single_supp_non_eur),
-        // The throughout guide's bed: the FIRST period's guide rate — the
-        // same period the headline PP-Double mirrors (B-item 3). Null = no
-        // concession on file; the grid shows an amber unpriced night.
-        guide_rate_eur: firstPeriodGuideRate(r.seasons, 'accommodation'),
-      })),
+      accommodation: (accommodationRates || []).map((r: any) => {
+        // Priced from the hotel's periods, whichever column family it was
+        // saved in (lib/rates/grid-hotel-rate.ts).
+        const price = gridHotelRate(r, startDate)
+        const board = r.board_basis || 'BB'
+        const note = price.gapDate ? ` | no rate period covers ${price.gapDate}` : price.periodName ? ` | ${price.periodName}` : ''
+        return {
+          id: r.id,
+          name: `${r.property_name} ${r.city} (${r.tier} | ${board})`,
+          rateEur: price.ppdEur,
+          rateNonEur: price.ppdNonEur,
+          city: r.city,
+          details: `${r.tier} | ${board}${note}`,
+          board_basis: board,
+          single_supp_eur: price.singleSuppEur,
+          single_supp_non_eur: price.singleSuppNonEur,
+          // The throughout guide's bed, from the same period as the price.
+          // Null = no concession on file; the grid shows an amber unpriced night.
+          guide_rate_eur: price.guideRateEur,
+        }
+      }),
 
       entrance_fees: (entranceFees || []).map((r: any) => ({
         id: r.id,
