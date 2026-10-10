@@ -44,6 +44,10 @@ export async function POST(
     if (itinError || !itinerary) {
       return NextResponse.json({ success: false, error: 'Itinerary not found' }, { status: 404 })
     }
+    // A cancelled trip earns and owes no commission (documents audit, round 12).
+    if (itinerary.status === 'cancelled') {
+      return NextResponse.json({ success: false, error: 'The trip is cancelled — no commissions to generate' }, { status: 409 })
+    }
 
     // select('*') everywhere: sold_by_supplier_id (migration 303) must ride
     // along when it exists without 500ing when it does not.

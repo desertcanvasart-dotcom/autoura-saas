@@ -34,7 +34,7 @@ import {
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { getCurrencySymbol } from '@/lib/currency'
+import { formatMoney, formatTotals, type CurrencyTotals } from '@/lib/currency-totals'
 
 interface Commission {
   id: string
@@ -63,15 +63,16 @@ interface Commission {
   client?: { id: string; first_name: string; last_name: string; email: string } | null
 }
 
+/** Per currency (lib/currency-totals): never added across currencies. */
 interface Summary {
-  total_receivable: number
-  total_payable: number
-  pending_receivable: number
-  pending_payable: number
-  received: number
-  paid: number
-  net_commission: number
-  by_category: Record<string, { receivable: number; payable: number; count: number }>
+  total_receivable: CurrencyTotals
+  total_payable: CurrencyTotals
+  pending_receivable: CurrencyTotals
+  pending_payable: CurrencyTotals
+  received: CurrencyTotals
+  paid: CurrencyTotals
+  net_commission: CurrencyTotals
+  by_category: Record<string, { receivable: CurrencyTotals; payable: CurrencyTotals; count: number }>
 }
 
 interface Supplier {
@@ -319,9 +320,7 @@ export default function CommissionsPage() {
     )
   })
 
-  const formatCurrency = (amount: number, currency: string = 'EUR') => {
-    return `${getCurrencySymbol(currency)}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
+  const formatCurrency = (amount: number, currency: string = 'EUR') => formatMoney(amount, currency)
 
   if (loading) {
     return (
@@ -361,50 +360,50 @@ export default function CommissionsPage() {
               <TrendingUp className="h-4 w-4 text-green-500" />
               <span className="text-xs text-gray-500">Receivable</span>
             </div>
-            <p className="text-xl font-bold text-green-600">{formatCurrency(summary.total_receivable)}</p>
+            <p className="text-xl font-bold text-green-600">{formatTotals(summary.total_receivable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="h-4 w-4 text-red-500" />
               <span className="text-xs text-gray-500">Payable</span>
             </div>
-            <p className="text-xl font-bold text-red-600">{formatCurrency(summary.total_payable)}</p>
+            <p className="text-xl font-bold text-red-600">{formatTotals(summary.total_payable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="h-4 w-4 text-amber-500" />
               <span className="text-xs text-gray-500">Pending In</span>
             </div>
-            <p className="text-xl font-bold text-amber-600">{formatCurrency(summary.pending_receivable)}</p>
+            <p className="text-xl font-bold text-amber-600">{formatTotals(summary.pending_receivable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="h-4 w-4 text-orange-500" />
               <span className="text-xs text-gray-500">Pending Out</span>
             </div>
-            <p className="text-xl font-bold text-orange-600">{formatCurrency(summary.pending_payable)}</p>
+            <p className="text-xl font-bold text-orange-600">{formatTotals(summary.pending_payable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Check className="h-4 w-4 text-emerald-500" />
               <span className="text-xs text-gray-500">Received</span>
             </div>
-            <p className="text-xl font-bold text-emerald-600">{formatCurrency(summary.received)}</p>
+            <p className="text-xl font-bold text-emerald-600">{formatTotals(summary.received)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Check className="h-4 w-4 text-blue-500" />
               <span className="text-xs text-gray-500">Paid Out</span>
             </div>
-            <p className="text-xl font-bold text-blue-600">{formatCurrency(summary.paid)}</p>
+            <p className="text-xl font-bold text-blue-600">{formatTotals(summary.paid)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <DollarSign className="h-4 w-4 text-purple-500" />
               <span className="text-xs text-gray-500">Net</span>
             </div>
-            <p className={`text-xl font-bold ${summary.net_commission >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(summary.net_commission)}
+            <p className={`text-xl font-bold ${Object.values(summary.net_commission).every(v => v >= 0) ? 'text-green-600' : 'text-red-600'}`}>
+              {formatTotals(summary.net_commission)}
             </p>
           </div>
         </div>

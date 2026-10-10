@@ -33,7 +33,9 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { formatMoney } from '@/lib/currency-totals'
 import { getCurrencySymbol } from '@/lib/currency'
+import { tripCostBreakdown } from '@/lib/invoices/trip-cost-breakdown'
 import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
 
 interface Invoice {
@@ -370,8 +372,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
     setCreatingFinalInvoice(true)
     try {
-      const fullTripCost = (Number(invoice.total_amount) * 100) / invoice.deposit_percent
-      const balanceAmount = fullTripCost - Number(invoice.total_amount)
+      // In the currency's own units: ¥33,333.33 is not an amount of yen.
+      const { fullTripCost, balanceAmount } = tripCostBreakdown({
+        invoiceType: 'deposit',
+        totalAmount: invoice.total_amount,
+        depositPercent: invoice.deposit_percent,
+        currency: invoice.currency,
+      })
 
       const response = await fetch('/api/invoices', {
         method: 'POST',
@@ -472,11 +479,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const typeConfig = TYPE_CONFIG[invoice.invoice_type] || TYPE_CONFIG.standard
   const TypeIcon = typeConfig.icon
 
-  const fullTripCost = invoice.invoice_type === 'deposit' 
-    ? (Number(invoice.total_amount) * 100) / invoice.deposit_percent
-    : invoice.invoice_type === 'final' && linkedInvoice
-      ? (Number(linkedInvoice.total_amount) * 100) / linkedInvoice.deposit_percent
-      : Number(invoice.total_amount)
+  // The same figures as the PDF (lib/invoices/trip-cost-breakdown), in the
+  // currency's own decimals.
+  const trip = tripCostBreakdown({
+    invoiceType: invoice.invoice_type,
+    totalAmount: invoice.total_amount,
+    depositPercent: invoice.deposit_percent,
+    currency: invoice.currency,
+    lineItems: invoice.line_items,
+  })
 
   return (
     <div className="p-6">
@@ -598,8 +609,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 </p>
                 <p className={`text-xs ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-emerald-600'}`}>
                   {linkedInvoice?.invoice_number || childInvoice?.invoice_number} • 
-                  {' '}{getCurrencySymbol(linkedInvoice?.currency || childInvoice?.currency || 'EUR')}
-                  {Number(linkedInvoice?.total_amount || childInvoice?.total_amount).toFixed(2)} • 
+                  {' '}{formatMoney(linkedInvoice?.total_amount || childInvoice?.total_amount, linkedInvoice?.currency || childInvoice?.currency || 'EUR')} • 
                   {' '}{STATUS_CONFIG[linkedInvoice?.status || childInvoice?.status || 'draft'].label}
                 </p>
               </div>
@@ -627,13 +637,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <div>
               <p className="text-xs text-gray-500">Full Trip Cost</p>
               <p className="text-lg font-bold text-gray-900">
-                {getCurrencySymbol(invoice.currency)}{fullTripCost.toFixed(2)}
+                {formatMoney(trip.fullTripCost, invoice.currency)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Deposit ({invoice.deposit_percent}%)</p>
               <p className="text-lg font-bold text-amber-600">
-                {getCurrencySymbol(invoice.currency)}{((fullTripCost * invoice.deposit_percent) / 100).toFixed(2)}
+                {formatMoney(trip.depositAmount, invoice.currency)}
                 {invoice.invoice_type === 'deposit' && linkedInvoice === null && childInvoice === null && invoice.status === 'paid' && (
                   <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Paid</span>
                 )}
@@ -642,7 +652,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <div>
               <p className="text-xs text-gray-500">Balance Due on Arrival</p>
               <p className="text-lg font-bold text-emerald-600">
-                {getCurrencySymbol(invoice.currency)}{(fullTripCost - (fullTripCost * invoice.deposit_percent) / 100).toFixed(2)}
+                {formatMoney(trip.balanceAmount, invoice.currency)}
               </p>
             </div>
           </div>
@@ -712,10 +722,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     <td className="px-5 py-4 text-sm text-gray-900">{item.description}</td>
                     <td className="px-5 py-4 text-sm text-gray-600 text-center">{item.quantity}</td>
                     <td className="px-5 py-4 text-sm text-gray-600 text-right">
-                      {getCurrencySymbol(invoice.currency)}{Number(item.unit_price).toFixed(2)}
+                      {formatMoney(item.unit_price, invoice.currency)}
                     </td>
                     <td className="px-5 py-4 text-sm font-medium text-gray-900 text-right">
-                      {getCurrencySymbol(invoice.currency)}{Number(item.amount).toFixed(2)}
+                      {formatMoney(item.amount, invoice.currency)}
                     </td>
                   </tr>
                 ))}
@@ -724,7 +734,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <tr className="border-t border-gray-200">
                   <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">Subtotal</td>
                   <td className="px-5 py-3 text-sm font-medium text-gray-900 text-right">
-                    {getCurrencySymbol(invoice.currency)}{Number(invoice.subtotal).toFixed(2)}
+                    {formatMoney(invoice.subtotal, invoice.currency)}
                   </td>
                 </tr>
                 {Number(invoice.tax_amount) > 0 && (
@@ -733,7 +743,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       Tax ({invoice.tax_rate}%)
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-900 text-right">
-                      {getCurrencySymbol(invoice.currency)}{Number(invoice.tax_amount).toFixed(2)}
+                      {formatMoney(invoice.tax_amount, invoice.currency)}
                     </td>
                   </tr>
                 )}
@@ -741,7 +751,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <tr>
                     <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">Discount</td>
                     <td className="px-5 py-3 text-sm text-green-600 text-right">
-                      -{getCurrencySymbol(invoice.currency)}{Number(invoice.discount_amount).toFixed(2)}
+                      -{formatMoney(invoice.discount_amount, invoice.currency)}
                     </td>
                   </tr>
                 )}
@@ -751,7 +761,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                      invoice.invoice_type === 'final' ? 'Balance Due' : 'Total'}
                   </td>
                   <td className="px-5 py-4 text-lg font-bold text-gray-900 text-right">
-                    {getCurrencySymbol(invoice.currency)}{Number(invoice.total_amount).toFixed(2)}
+                    {formatMoney(invoice.total_amount, invoice.currency)}
                   </td>
                 </tr>
               </tfoot>
@@ -791,20 +801,20 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                    invoice.invoice_type === 'final' ? 'Balance Amount' : 'Total Amount'}
                 </span>
                 <span className="text-sm font-medium text-gray-900">
-                  {getCurrencySymbol(invoice.currency)}{Number(invoice.total_amount).toFixed(2)}
+                  {formatMoney(invoice.total_amount, invoice.currency)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Amount Paid</span>
                 <span className="text-sm font-medium text-green-600">
-                  {getCurrencySymbol(invoice.currency)}{Number(invoice.amount_paid).toFixed(2)}
+                  {formatMoney(invoice.amount_paid, invoice.currency)}
                 </span>
               </div>
               <div className="pt-3 border-t border-gray-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-900">Balance Due</span>
                   <span className={`text-xl font-bold ${Number(invoice.balance_due) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {getCurrencySymbol(invoice.currency)}{Number(invoice.balance_due).toFixed(2)}
+                    {formatMoney(invoice.balance_due, invoice.currency)}
                   </span>
                 </div>
               </div>
@@ -879,7 +889,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-900">
-                          {getCurrencySymbol(payment.currency)}{Number(payment.amount).toFixed(2)}
+                          {formatMoney(payment.amount, payment.currency)}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
                           {new Date(payment.payment_date).toLocaleDateString()} • {payment.payment_method?.replace('_', ' ')}
@@ -988,7 +998,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <form onSubmit={handleRecordPayment} className="p-5 space-y-4">
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  Balance Due: <span className="font-bold">{getCurrencySymbol(invoice.currency)}{Number(invoice.balance_due).toFixed(2)}</span>
+                  Balance Due: <span className="font-bold">{formatMoney(invoice.balance_due, invoice.currency)}</span>
                 </p>
               </div>
 

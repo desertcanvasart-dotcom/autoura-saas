@@ -1,4 +1,5 @@
 import { formatMoney } from '@/lib/currency-totals'
+import { tripCostBreakdown } from '@/lib/invoices/trip-cost-breakdown'
 import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import jsPDF from 'jspdf'
 import { brandColorRgb, type CompanyIdentity } from './company-identity'
@@ -158,27 +159,14 @@ export function generateInvoicePDF(
   // ============================================
 
   if (invoiceType !== 'standard' && invoice.deposit_percent) {
-    const known = typeof invoice.trip_total === 'number' && invoice.trip_total > 0 ? invoice.trip_total : null
-    // A final invoice carries the extras billed with the balance. They are not
-    // part of the trip's cost: worked back WITH them, a 1,000 trip with a 100
-    // deposit and 200 of extras printed "Full Trip Cost 1,222.22, Deposit
-    // 122.22". The extras stay on their own lines below.
-    const extras = (invoice.line_items || [])
-      .filter(l => l.addition)
-      .reduce((sum, l) => sum + (Number(l.amount) || 0), 0)
-    const tripPart = Number(invoice.total_amount) - (invoiceType === 'final' ? extras : 0)
-    const fullTripCost = known ?? (invoiceType === 'deposit'
-      ? (tripPart * 100) / invoice.deposit_percent
-      : tripPart + (tripPart * invoice.deposit_percent) / (100 - invoice.deposit_percent))
-
-    // With the real total, this invoice's own amount is the deposit (or the
-    // balance) — not a percentage of a total worked back from a guess.
-    const depositAmount = known !== null && invoiceType === 'deposit'
-      ? tripPart
-      : known !== null
-        ? known - tripPart
-        : (fullTripCost * invoice.deposit_percent) / 100
-    const balanceAmount = fullTripCost - depositAmount
+    const { fullTripCost, depositAmount, balanceAmount } = tripCostBreakdown({
+      invoiceType,
+      totalAmount: invoice.total_amount,
+      depositPercent: invoice.deposit_percent,
+      currency: invoice.currency,
+      lineItems: invoice.line_items,
+      tripTotal: invoice.trip_total,
+    })
 
     // Background box
     doc.setFillColor(250, 250, 250)

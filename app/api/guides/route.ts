@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
+import { sumByCurrency } from '@/lib/currency-totals'
 
 export async function GET(request: NextRequest) {
   try {
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
         guides.map(async (guide) => {
           const { data: bookings } = await supabase
             .from('itineraries')
-            .select('id, start_date, end_date, total_cost')
+            .select('id, start_date, end_date, total_cost, currency')
             .eq('tenant_id', tenant_id)
             .eq('assigned_guide_id', guide.id)
 
@@ -120,7 +121,8 @@ export async function GET(request: NextRequest) {
             b.start_date !== null && new Date(b.start_date) > now
           ).length || 0
 
-          const totalRevenue = bookings?.reduce((sum, b) => sum + (b.total_cost || 0), 0) || 0
+          // Per currency: trips in yen and euros were added into one number.
+          const totalRevenue = sumByCurrency(bookings, b => b.total_cost, b => b.currency)
 
           return {
             ...guide,
