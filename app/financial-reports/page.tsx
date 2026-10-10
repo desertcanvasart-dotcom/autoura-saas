@@ -213,7 +213,8 @@ export default function FinancialReportsPage() {
     // and text starting with = + - @ runs as a formula in a spreadsheet.
     // Numbers stay bare, so a negative amount is still a number.
     const cell = (v: unknown) => {
-      if (typeof v === 'number') return Number.isFinite(v) ? String(v) : ''
+      // Two places at most: summed floats printed 1234.5600000001.
+      if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v * 100) / 100) : ''
       const s = String(v ?? '')
       return `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`
     }

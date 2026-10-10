@@ -5,6 +5,7 @@ import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import type { Tables, TablesInsert } from '@/types/database.types'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
+import { roundToCurrency } from '@/lib/currency-totals'
 
 export async function POST(request: NextRequest) {
   try {
@@ -263,7 +264,8 @@ export async function POST(request: NextRequest) {
       total_amount = total.value
     }
 
-    const deposit_amount = (total_amount * deposit_percent) / 100
+    // In the currency's own units: 20% of ¥1,854,367 is not ¥370,873.4.
+    const deposit_amount = roundToCurrency((total_amount * deposit_percent) / 100, quote.currency || 'EUR')
     const balance_due = total_amount
 
     // Trip facts: from the itinerary when there is one, else (calculator

@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { invoiceBalance, sumPayments } from '@/lib/invoices/invoice-balance'
 
 export async function DELETE(
   _request: NextRequest,
@@ -56,33 +57,24 @@ export async function DELETE(
       .select('amount')
       .eq('invoice_id', id)
 
-    const totalPaid = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0)
-
     // Get invoice (RLS filters to tenant's invoices only)
     const { data: invoice } = await supabase
       .from('invoices')
-      .select('total_amount')
+      .select('total_amount, status, currency, paid_at')
       .eq('id', id)
       .single()
 
     if (invoice) {
-      const balanceDue = Number(invoice.total_amount) - totalPaid
-      let status = 'sent'
-      if (totalPaid >= Number(invoice.total_amount)) {
-        status = 'paid'
-      } else if (totalPaid > 0) {
-        status = 'partially_paid'
-      }
-
+      const balance = invoiceBalance({
+        total: invoice.total_amount,
+        paid: sumPayments(payments, invoice.currency),
+        currency: invoice.currency,
+        status: invoice.status,
+        paidAt: invoice.paid_at,
+      })
       await supabase
         .from('invoices')
-        .update({
-          amount_paid: totalPaid,
-          balance_due: balanceDue,
-          status: status,
-          paid_at: status === 'paid' ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString()
-        })
+        .update({ ...balance, updated_at: new Date().toISOString() })
         .eq('id', id)
     }
 

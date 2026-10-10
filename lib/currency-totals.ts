@@ -111,13 +111,12 @@ export function formatTotals(totals: CurrencyTotals, opts?: { defaultCurrency?: 
   const entries = Object.entries(totals).filter(([, v]) => v !== 0)
   if (entries.length === 0) {
     const code = opts?.defaultCurrency ?? 'EUR'
-    return `${currencySymbol(code)}0.00`
+    return formatMoney(0, code)
   }
-  // Largest first, so the dominant currency leads.
+  // Largest first, so the dominant currency leads. Each as formatMoney writes
+  // it, in its own decimals: yen tiles read JPY120,000.00 before.
   entries.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-  return entries
-    .map(([code, v]) => `${currencySymbol(code)}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
-    .join(' + ')
+  return entries.map(([code, v]) => formatMoney(v, code)).join(' + ')
 }
 
 // ---------------------------------------------------------------------------
@@ -156,4 +155,24 @@ export function formatMoney(amount: unknown, currency: unknown): string {
   const symbol = getCurrencySymbol(code)
   // A code used as its own symbol ("MAD", "JPY") reads as a word: give it a space.
   return /^[A-Z]{2,4}$/.test(symbol) ? `${symbol} ${number}` : `${symbol}${number}`
+}
+
+/**
+ * Amounts rounded to the currency so they still add up to their rounded sum
+ * (largest remainder). Each line rounded on its own drifts: three yen lines of
+ * 333.4 print ¥333 ×3 = ¥999 under a ¥1,000 total.
+ */
+export function roundLinesToTotal(amounts: number[], currency: unknown): number[] {
+  const factor = currencyDecimals(String(currency ?? '').trim().toUpperCase()) === 0 ? 1 : 100
+  const units = amounts.map(a => (Number.isFinite(a) ? a : 0) * factor)
+  const target = Math.round(units.reduce((s, u) => s + u, 0))
+  const floors = units.map(u => Math.floor(u + 1e-9))
+  let left = target - floors.reduce((s, f) => s + f, 0)
+  const order = units.map((u, i) => ({ i, rem: u - floors[i] })).sort((a, b) => b.rem - a.rem)
+  for (const { i } of order) {
+    if (left <= 0) break
+    floors[i] += 1
+    left -= 1
+  }
+  return floors.map(f => f / factor)
 }

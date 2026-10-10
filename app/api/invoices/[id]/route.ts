@@ -9,6 +9,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { invoiceBalance } from '@/lib/invoices/invoice-balance'
+import { roundToCurrency } from '@/lib/currency-totals'
 
 export async function GET(
   request: NextRequest,
@@ -80,17 +82,49 @@ export async function PUT(
       }
     }
 
-    // If total_amount is updated, recalculate balance_due
-    if (updateData.total_amount !== undefined) {
-      const { data: currentInvoice } = await supabase
+    // A new total or currency re-derives what is due and the paid / part-paid
+    // status from the payments (lib/invoices/invoice-balance). Only
+    // balance_due moved before — unrounded, with the status left as it was —
+    // and an empty or negative total, or a currency change after payments
+    // were taken in the old one, went through.
+    if (updateData.total_amount !== undefined || updateData.currency !== undefined) {
+      const { data: current } = await supabase
         .from('invoices')
-        .select('amount_paid')
+        .select('total_amount, amount_paid, currency, status, paid_at')
         .eq('id', id)
         .single()
-
-      if (currentInvoice) {
-        updateData.balance_due = updateData.total_amount - (currentInvoice.amount_paid || 0)
+      if (!current) {
+        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
       }
+      if (updateData.total_amount !== undefined) {
+        const total = Number(updateData.total_amount)
+        if (updateData.total_amount === null || updateData.total_amount === '' || !Number.isFinite(total) || total <= 0) {
+          return NextResponse.json({ error: 'The total must be a positive amount' }, { status: 400 })
+        }
+      }
+      const currency = updateData.currency ?? current.currency
+      if (
+        updateData.currency !== undefined &&
+        String(updateData.currency || '').toUpperCase() !== String(current.currency || '').toUpperCase() &&
+        Number(current.amount_paid || 0) > 0
+      ) {
+        return NextResponse.json(
+          { error: 'Payments were recorded in the current currency — delete them before changing it' },
+          { status: 409 }
+        )
+      }
+      const total = updateData.total_amount ?? current.total_amount
+      if (updateData.total_amount !== undefined) updateData.total_amount = roundToCurrency(Number(total), currency)
+      const balance = invoiceBalance({
+        total,
+        paid: current.amount_paid,
+        currency,
+        status: updateData.status ?? current.status,
+        paidAt: current.paid_at,
+      })
+      updateData.balance_due = balance.balance_due
+      updateData.status = balance.status
+      updateData.paid_at = balance.paid_at
     }
 
     const { data, error } = await supabase

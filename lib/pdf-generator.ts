@@ -3,7 +3,7 @@
 // File: lib/pdf-generator.ts
 // ============================================
 
-import { formatMoney } from '@/lib/currency-totals'
+import { formatMoney, roundLinesToTotal } from '@/lib/currency-totals'
 import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import { jsPDF } from 'jspdf'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
@@ -500,11 +500,15 @@ export function generateItineraryPDF(
           })
       })
 
-      const serviceRows = Array.from(serviceMap.values()).map(s => [
+      // Rounded together, so the rows add up to the total box: rounded one by
+      // one, yen rows summed to a few yen off the TOTAL PRICE.
+      const services = Array.from(serviceMap.values())
+      const rowTotals = roundLinesToTotal(services.map(s => s.total), currency)
+      const serviceRows = services.map((s, i) => [
         s.name,
         s.quantity.toString(),
-        formatCurrency(s.rate, currency),
-        formatCurrency(s.total, currency)
+        formatCurrency(s.quantity > 0 ? rowTotals[i] / s.quantity : rowTotals[i], currency),
+        formatCurrency(rowTotals[i], currency)
       ])
 
       if (serviceRows.length > 0) {

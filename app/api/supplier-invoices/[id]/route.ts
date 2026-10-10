@@ -1,6 +1,7 @@
 // GET/PATCH/DELETE /api/supplier-invoices/[id]
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { isMatchable } from '@/lib/supplier-invoices/match-state'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -41,15 +42,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // and their state guards. Allowlist enforces that only descriptive metadata
     // can move through this endpoint; status transitions go through the
     // dedicated routes that own them.
+    // Named after the table's columns: 'invoice_number', 'subtotal' and
+    // 'total_amount' are not supplier_invoices columns, so an edit naming them
+    // failed. The amount is not editable here at all.
     const allowedFields = [
       'supplier_id',
-      'invoice_number',
+      'supplier_name',
+      'supplier_invoice_number',
       'invoice_date',
       'due_date',
       'currency',
-      'subtotal',
       'tax_amount',
-      'total_amount',
+      'description',
       'notes',
       'document_url',
     ]
@@ -58,13 +62,36 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (body[field] !== undefined) updateData[field] = body[field]
     }
 
-    const { data, error } = await supabase
+    // The currency is what was matched and approved: changing it afterwards
+    // re-labels the money (documents audit, round 12).
+    let guardStatus: string | null = null
+    if ('currency' in updateData) {
+      const { data: current } = await supabase
+        .from('supplier_invoices').select('status, currency, matched_amount').eq('id', id).maybeSingle()
+      if (!current) return NextResponse.json({ success: false, error: 'Supplier invoice not found' }, { status: 404 })
+      const changes = String(updateData.currency || 'EUR').toUpperCase() !== String(current.currency || 'EUR').toUpperCase()
+      if (changes) {
+        if (!isMatchable(current.status)) {
+          return NextResponse.json({ success: false, error: `Cannot change the currency of an invoice with status '${current.status}'` }, { status: 409 })
+        }
+        if (Number(current.matched_amount || 0) > 0) {
+          return NextResponse.json({ success: false, error: 'Unmatch its expenses before changing the invoice currency' }, { status: 409 })
+        }
+        guardStatus = current.status
+      }
+    }
+
+    let query = supabase
       .from('supplier_invoices')
       .update(updateData)
       .eq('id', id)
-      .select()
-      .single()
+    // Approved or paid between the read and this write: refused, not applied.
+    if (guardStatus) query = query.eq('status', guardStatus)
+    const { data, error } = await query.select().single()
 
+    if (error?.code === 'PGRST116' && guardStatus) {
+      return NextResponse.json({ success: false, error: 'The invoice changed meanwhile — reload and try again' }, { status: 409 })
+    }
     if (error) return NextResponse.json({ success: false, error: 'Failed to update' }, { status: 500 })
     return NextResponse.json({ success: true, data })
   } catch (e: any) {

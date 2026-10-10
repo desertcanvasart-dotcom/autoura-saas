@@ -13,6 +13,8 @@ import { requireAuth } from '@/lib/supabase-server'
 import { extrasAdmin } from '@/lib/booking-extras-db'
 import { nextStatus, isPriced, lineAmount, type ExtraAction, type BookingExtraLine } from '@/lib/booking-extras'
 import { recomputeBookingExtras } from '../recompute'
+import { manifestCost } from '@/lib/bookings/extra-supplier-cost'
+import type { ExchangeRate } from '@/lib/currency'
 
 export const dynamic = 'force-dynamic'
 
@@ -211,14 +213,20 @@ async function addToSupplierManifest(tenantId: string, bookingId: string, extra:
     ? await admin.from('suppliers').select('name').eq('id', String(extra.supplier_id)).maybeSingle()
     : { data: null }
 
+  const [{ data: booking }, { data: rates }] = await Promise.all([
+    admin.from('bookings').select('currency').eq('id', bookingId).maybeSingle(),
+    admin.from('exchange_rates').select('base_currency, target_currency, rate, is_active').eq('is_active', true),
+  ])
+  const { quotedCost, note } = manifestCost(extra, booking?.currency, (rates ?? []) as ExchangeRate[])
+
   const { error } = await admin.from('booking_supplier_status').insert({
     tenant_id: tenantId,
     booking_id: bookingId,
     supplier_id: typeof extra.supplier_id === 'string' ? extra.supplier_id : null,
     supplier_type: 'other',
     supplier_name: supplier?.name || String(extra.title),
-    service_description: `Extra: ${String(extra.title)}`,
-    quoted_cost: typeof extra.supplier_cost === 'number' ? extra.supplier_cost : null,
+    service_description: `Extra: ${String(extra.title)}${note}`,
+    quoted_cost: quotedCost,
     status: 'pending',
   })
   if (error) console.error('extras: could not add to supplier manifest', error)

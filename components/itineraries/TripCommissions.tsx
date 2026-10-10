@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Handshake, Loader2 } from 'lucide-react'
+import { formatMoney } from '@/lib/currency-totals'
 
 interface Commission {
   id: string
@@ -62,7 +63,7 @@ export default function TripCommissions({ itineraryId, currency, refreshSignal =
   const earned = sum('receivable')
   const owed = sum('payable')
   const otherCurrency = live.some(r => (r.currency ?? currency) !== currency)
-  const money = (n: number, c = currency) => `${c} ${n.toFixed(2)}`
+  const money = (n: number, c = currency) => formatMoney(n, c)
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm">

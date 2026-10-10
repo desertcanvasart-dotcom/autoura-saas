@@ -18,6 +18,8 @@
 //
 // Balance preserves whatever has been paid: new_balance = old_balance + delta.
 
+import { roundToCurrency } from '@/lib/currency-totals'
+
 export type AddTravellerReprice =
   | { method: 'manual'; reason: string }
   | {
@@ -33,9 +35,6 @@ export type AddTravellerReprice =
       newBaseTotalCost?: number
     }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
-}
 
 export function computeAddTravellerReprice(input: {
   oldTotal: number | null | undefined
@@ -48,7 +47,11 @@ export function computeAddTravellerReprice(input: {
   addedPax: number
   depositPercent: number | null | undefined
   oldBalanceDue: number | null | undefined
+  /** The booking's currency: amounts are rounded to its own units — a yen
+   *  booking came out at ¥33,333.33 per head. Absent means two decimals. */
+  currency?: string | null
 }): AddTravellerReprice {
+  const round = (n: number) => roundToCurrency(n, input.currency || 'EUR')
   const oldTotal = Number(input.oldTotal)
   const oldPax = Math.floor(input.oldPax)
   const addedPax = Math.floor(input.addedPax)
@@ -66,20 +69,20 @@ export function computeAddTravellerReprice(input: {
   const base = hasBase ? rawBase : oldTotal
   const perPerson = base / oldPax
   const newPax = oldPax + addedPax
-  const newBase = round2(perPerson * newPax)
-  const delta = round2(newBase - base)
+  const newBase = round(perPerson * newPax)
+  const delta = round(newBase - base)
   // The extras ride along in the total untouched.
-  const newTotal = round2(oldTotal + delta)
+  const newTotal = round(oldTotal + delta)
   const depositPercent = Number(input.depositPercent) || 0
-  const newDepositAmount = round2(newBase * (depositPercent / 100))
+  const newDepositAmount = round(newBase * (depositPercent / 100))
   const oldBalance = Number(input.oldBalanceDue)
   // Preserve payments: the outstanding balance rises by exactly the delta.
-  const newBalanceDue = round2((Number.isFinite(oldBalance) ? oldBalance : oldTotal) + delta)
+  const newBalanceDue = round((Number.isFinite(oldBalance) ? oldBalance : oldTotal) + delta)
 
   return {
     method: 'per_person',
-    perPerson: round2(perPerson),
-    oldTotal: round2(oldTotal),
+    perPerson: round(perPerson),
+    oldTotal: round(oldTotal),
     newTotal,
     delta,
     newDepositAmount,

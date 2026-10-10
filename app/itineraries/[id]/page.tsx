@@ -32,7 +32,8 @@ import CancelTripDialog from '@/components/itineraries/CancelTripDialog'
 import TripCommissions from '@/components/itineraries/TripCommissions'
 import PickupDetailsDialog from '@/components/itineraries/PickupDetailsDialog'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
-import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
+import { effectiveItineraryTotal, itineraryClientTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
+import { roundToCurrency } from '@/lib/currency-totals'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
 import { buildTripAttention } from '@/lib/itineraries/attention'
@@ -369,18 +370,14 @@ export default function ViewItineraryPage() {
         return day
       }))
 
-      // Sum the (supplier) service costs, then store the CLIENT/selling total in
-      // total_cost — consistent with the grid save and how the header/invoice/PDF
-      // consume the field (previously this persisted the raw supplier sum).
-      let supplierSum = 0
-      days.forEach(day => {
-        day.services.forEach(s => {
-          supplierSum += s.id === serviceId ? newCost : s.total_cost
-        })
-      })
-      // Same source as the display, so the header and the stored cache can
-      // never disagree about the margin.
-      const newTotalCost = Math.round(supplierSum * (1 + marginPercent / 100) * 100) / 100
+      // Store the CLIENT total — the same figure the header shows: each
+      // service's own client price where it has one, else cost × margin.
+      // Re-deriving it as (all supplier costs) × margin threw away every
+      // per-line client price the grid had set (documents audit, round 12).
+      const services = days.flatMap(day => day.services.map(s =>
+        s.id === serviceId ? { ...s, total_cost: newCost } : s
+      )) as PricedService[]
+      const newTotalCost = roundToCurrency(itineraryClientTotal(services, marginPercent), itinerary?.currency)
 
       await supabase
         .from('itineraries')

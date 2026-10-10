@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { recordsInTenant } from '@/lib/quotes/records-in-tenant'
 
 export async function GET(
   request: NextRequest,
@@ -92,6 +93,14 @@ export async function PUT(
     for (const field of allowedFields) {
       if (body[field] !== undefined) updateData[field] = body[field]
     }
+
+    // The client and trip must be this tenant's: the foreign key does not
+    // check the tenant (documents audit, round 12).
+    const refs = await recordsInTenant(supabase, authResult.tenant_id, {
+      client_id: updateData.client_id,
+      itinerary_id: updateData.itinerary_id,
+    })
+    if (!refs.ok) return NextResponse.json({ success: false, error: refs.error }, { status: refs.status })
 
     // If marking as received/paid, set the paid_date if caller didn't.
     if ((updateData.status === 'received' || updateData.status === 'paid') && !updateData.paid_date) {

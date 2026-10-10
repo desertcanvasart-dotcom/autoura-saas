@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { addToTotals, emptyTotals, sumByCurrency, type CurrencyTotals } from '@/lib/currency-totals'
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,37 +59,36 @@ export async function GET(request: NextRequest) {
     const receivable = (data || []).filter(c => c.commission_type === 'receivable')
     const payable = (data || []).filter(c => c.commission_type === 'payable')
 
+    // Per currency (lib/currency-totals): commissions in yen, euros and
+    // dollars were added together and the sum labelled as euros (documents audit,
+    // round 12).
+    const totals = (rows: typeof receivable) => sumByCurrency(rows, c => c.commission_amount, c => c.currency)
+    const receivableTotals = totals(receivable)
+    const payableTotals = totals(payable)
+    const net = { ...receivableTotals }
+    for (const [code, v] of Object.entries(payableTotals)) net[code] = (net[code] ?? 0) - v
     const summary = {
-      total_receivable: receivable.reduce((sum, c) => sum + Number(c.commission_amount), 0),
-      total_payable: payable.reduce((sum, c) => sum + Number(c.commission_amount), 0),
-      pending_receivable: receivable
-        .filter(c => c.status === 'pending' || c.status === 'invoiced')
-        .reduce((sum, c) => sum + Number(c.commission_amount), 0),
-      pending_payable: payable
-        .filter(c => c.status === 'pending')
-        .reduce((sum, c) => sum + Number(c.commission_amount), 0),
-      received: receivable
-        .filter(c => c.status === 'received')
-        .reduce((sum, c) => sum + Number(c.commission_amount), 0),
-      paid: payable
-        .filter(c => c.status === 'paid')
-        .reduce((sum, c) => sum + Number(c.commission_amount), 0),
-      net_commission: receivable.reduce((sum, c) => sum + Number(c.commission_amount), 0) -
-                      payable.reduce((sum, c) => sum + Number(c.commission_amount), 0),
-      by_category: {} as Record<string, { receivable: number; payable: number; count: number }>
+      total_receivable: receivableTotals,
+      total_payable: payableTotals,
+      pending_receivable: totals(receivable.filter(c => c.status === 'pending' || c.status === 'invoiced')),
+      pending_payable: totals(payable.filter(c => c.status === 'pending')),
+      received: totals(receivable.filter(c => c.status === 'received')),
+      paid: totals(payable.filter(c => c.status === 'paid')),
+      net_commission: net,
+      by_category: {} as Record<string, { receivable: CurrencyTotals; payable: CurrencyTotals; count: number }>
     }
 
     // Group by category
     ;(data || []).forEach(c => {
       if (!summary.by_category[c.category]) {
-        summary.by_category[c.category] = { receivable: 0, payable: 0, count: 0 }
+        summary.by_category[c.category] = { receivable: emptyTotals(), payable: emptyTotals(), count: 0 }
       }
       summary.by_category[c.category].count++
-      if (c.commission_type === 'receivable') {
-        summary.by_category[c.category].receivable += Number(c.commission_amount)
-      } else {
-        summary.by_category[c.category].payable += Number(c.commission_amount)
-      }
+      addToTotals(
+        summary.by_category[c.category][c.commission_type === 'receivable' ? 'receivable' : 'payable'],
+        c.commission_amount,
+        c.currency
+      )
     })
 
     return NextResponse.json({

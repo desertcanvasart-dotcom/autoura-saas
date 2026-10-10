@@ -1,4 +1,4 @@
-import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { effectiveItineraryTotal, totalWithBookingExtras } from '@/lib/itinerary-client-total'
 import { formatMoney } from '@/lib/currency-totals'
 import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
@@ -166,9 +166,16 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
   // The client total from the services — the same figure the email and
   // WhatsApp sends quote. itineraries.total_cost is a cache that can be 0 or
   // stale, so a traveller could see two different prices.
-  const clientTotal = lines.ok
+  const tripTotal = lines.ok
     ? effectiveItineraryTotal(itinerary as { total_cost: number | string | null; margin_percent: unknown }, lines.services)
     : (itinerary as { total_cost?: unknown }).total_cost
+  // Plus the confirmed extras on the trip's booking (bookings.extras_total).
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('status, currency, extras_total')
+    .eq('itinerary_id', share.itinerary_id)
+    .eq('tenant_id', share.tenant_id)
+  const clientTotal = totalWithBookingExtras(tripTotal, (itinerary as { currency?: string | null }).currency, bookings)
   const priceDecision = sharePriceDecision({
     status: (itinerary as { status?: string | null }).status,
     totalCost: clientTotal,
