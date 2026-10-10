@@ -314,6 +314,10 @@ export async function GET(request: NextRequest) {
         single_rate_non_eur: toNum(r.single_supplement_non_eur),
         duration_nights: r.duration_nights,
         ship_category: r.ship_category,
+        // The dropdown filters by the ports and the cabin.
+        origin_city: r.embark_city || undefined,
+        destination_city: r.disembark_city || undefined,
+        category: r.cabin_type || undefined,
         // The throughout guide's cabin per night, first-period rate (B3).
         guide_rate_eur: firstPeriodGuideRate(r.seasons, 'cruise'),
       })),
