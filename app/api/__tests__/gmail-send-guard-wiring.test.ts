@@ -42,7 +42,7 @@ describe('the send route', () => {
   })
 
   it('only skips the conflict check when the sender explicitly allows it', () => {
-    expect(route).toMatch(/if \(threadId && !allowDuplicate\)/)
+    expect(route).toMatch(/if \(gmailThreadId && !allowDuplicate\)/)
   })
 })
 
@@ -70,7 +70,7 @@ describe('the reply composer', () => {
 
 describe('threading', () => {
   it('reads the thread’s headers before building the message', () => {
-    expect(route).toContain('replyHeaders(gmail, String(threadId))')
+    expect(route).toContain('replyHeaders(gmail, gmailThreadId)')
     expect(route.indexOf('replyHeaders(')).toBeLessThan(route.indexOf('buildSimpleEmail(to'))
   })
 
@@ -80,6 +80,6 @@ describe('threading', () => {
   })
 
   it('asks for them only when there is a thread to answer', () => {
-    expect(route).toMatch(/threadId \? await replyHeaders\(/)
+    expect(route).toMatch(/gmailThreadId \? await replyHeaders\(/)
   })
 })

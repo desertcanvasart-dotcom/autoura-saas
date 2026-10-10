@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { recordsInTenant } from '@/lib/quotes/records-in-tenant';
 
 /**
  * POST /api/quotes/b2c/from-itinerary
@@ -57,6 +58,15 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Itinerary not found' },
         { status: 404 }
       );
+    }
+
+    // A client named in the body must be this tenant's own: the insert below
+    // uses the admin client, its embed would return another tenant's client
+    // name, email and phone, and the quote's sends would go to that client
+    // (documents audit, round 12 — the B2C POST already checks this).
+    const clientCheck = await recordsInTenant(supabase, authResult.tenant_id, { client_id })
+    if (!clientCheck.ok) {
+      return NextResponse.json({ success: false, error: clientCheck.error }, { status: clientCheck.status });
     }
 
     // 2. Calculate costs from services
