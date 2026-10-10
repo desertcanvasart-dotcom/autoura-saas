@@ -261,13 +261,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { conversation_id, action, agent_id, ...updates } = body
+    const { conversation_id, action, agent_id } = body
 
     if (!conversation_id) {
       return NextResponse.json({ error: 'Conversation ID required' }, { status: 400 })
     }
 
-    let updateData: any = { updated_at: new Date().toISOString() }
+    const updateData: any = { updated_at: new Date().toISOString() }
 
     if (action === 'mark_read') {
       updateData.unread_count = 0
@@ -280,7 +280,10 @@ export async function PATCH(request: NextRequest) {
       updateData.hidden_at = null
       updateData.hidden_by = null
     } else {
-      updateData = { ...updateData, ...updates }
+      // Only the actions above. Any other body was written to the row as-is,
+      // so a request could re-point a conversation's phone number, client or
+      // assignee (documents audit, round 12); assigning has its own route.
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     }
 
     const { data, error } = await supabase
@@ -304,7 +307,7 @@ export async function PATCH(request: NextRequest) {
           agent_id,
           team_member_id: agent_id,
           action_type: 'status_changed',
-          action_details: { action, updates }
+          action_details: { action }
         })
     }
 

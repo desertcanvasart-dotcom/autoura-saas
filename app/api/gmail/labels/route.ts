@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
-import { refreshAccessToken } from '@/lib/gmail'
+import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
-// Lazy-initialized OAuth2 client
-let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null
-
-function getOAuth2Client() {
-  if (!_oauth2Client) {
-    _oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    )
-  }
-  return _oauth2Client
-}
+// One Gmail client per request (lib/gmail getGmailClient). A module-level
+// OAuth2 client used to be shared by every request: setCredentials() for user
+// A, then user B's request set B's tokens before A's Gmail call ran, so A
+// could act in — or send from — B's mailbox (documents audit, round 12).
 
 // GET - Fetch all labels
 export async function GET(request: NextRequest) {
@@ -67,8 +57,7 @@ export async function GET(request: NextRequest) {
         .eq('user_id', userId)
     }
 
-    getOAuth2Client().setCredentials({ access_token, refresh_token })
-    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
+    const gmail = getGmailClient(access_token, refresh_token)
 
     const response = await gmail.users.labels.list({ userId: 'me' })
     
@@ -127,8 +116,7 @@ export async function POST(request: NextRequest) {
       access_token = newTokens.access_token!
     }
 
-    getOAuth2Client().setCredentials({ access_token, refresh_token })
-    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
+    const gmail = getGmailClient(access_token, refresh_token)
 
     const response = await gmail.users.labels.create({
       userId: 'me',
@@ -192,8 +180,7 @@ export async function DELETE(request: NextRequest) {
       access_token = newTokens.access_token!
     }
 
-    getOAuth2Client().setCredentials({ access_token, refresh_token })
-    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
+    const gmail = getGmailClient(access_token, refresh_token)
 
     await gmail.users.labels.delete({
       userId: 'me',

@@ -28,6 +28,7 @@ import {
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { whatsappModel } from '@/lib/ai/models'
 import { notifyTeam, bellSnippet } from '@/lib/notifications'
+import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbound-client'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
@@ -368,17 +369,33 @@ async function processInboundWhatsAppMessage({
   const supabase = createClient()
 
   // ============================================
-  // STEP 1: Find or create client
+  // STEP 1a: The conversation — it says whose contact this is
   // ============================================
+  const { data: existingConversation } = await supabase
+    .from('whatsapp_conversations')
+    .select('id, tenant_id, client_id')
+    .eq('phone_number', phoneNumber)
+    .single()
+
+  // ============================================
+  // STEP 1b: The client — of that conversation's tenant
+  // ============================================
+  // The phone used to be matched against EVERY tenant's clients, and the hit
+  // linked into this conversation whatever its tenant: tenant A's thread got
+  // tenant B's client, name and history (documents audit, round 12). With a
+  // conversation, only its tenant's clients count; without one, a number known
+  // to more than one tenant is nobody's to guess.
   let clientId = null
   let clientName = null
   let clientTenantId = null
 
-  const { data: existingClient } = await supabase
+  let clientQuery = supabase
     .from('clients')
     .select('id, full_name, tenant_id')
     .eq('phone', phoneNumber)
-    .single()
+  if (existingConversation?.tenant_id) clientQuery = clientQuery.eq('tenant_id', existingConversation.tenant_id)
+  const { data: clientMatches } = await clientQuery.limit(10)
+  const existingClient = pickInboundClient((clientMatches ?? []) as InboundClientMatch[])
 
   if (existingClient) {
     clientId = existingClient.id
@@ -391,12 +408,6 @@ async function processInboundWhatsAppMessage({
   // ============================================
   let conversationId = null
   let tenantId = null
-
-  const { data: existingConversation } = await supabase
-    .from('whatsapp_conversations')
-    .select('id, tenant_id, client_id')
-    .eq('phone_number', phoneNumber)
-    .single()
 
   if (existingConversation) {
     conversationId = existingConversation.id

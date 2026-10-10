@@ -2,24 +2,14 @@ import { attachmentNameParams, encodeEmailHeader, singleLine } from '@/lib/email
 import { NextRequest, NextResponse } from 'next/server'
 import { claimSend, finishSend, threadConflict, replyBodyHash } from '@/lib/email/send-guard'
 import { replyHeaders, threadingLines, type ThreadingHeaders } from '@/lib/email/threading'
-import { refreshAccessToken } from '@/lib/gmail'
-import { google } from 'googleapis'
+import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { indexEmailReply } from '@/lib/copilot-indexer'
 
-// Lazy-initialized OAuth2 client
-let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null
-
-function getOAuth2Client() {
-  if (!_oauth2Client) {
-    _oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    )
-  }
-  return _oauth2Client
-}
+// One Gmail client per request (lib/gmail getGmailClient). A module-level
+// OAuth2 client used to be shared by every request: setCredentials() for user
+// A, then user B's request set B's tokens before A's Gmail call ran, so A
+// could act in — or send from — B's mailbox (documents audit, round 12).
 
 interface Attachment {
   filename: string
@@ -82,6 +72,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
+    // The Gmail thread this reply goes into. The unified inbox has no Gmail
+    // thread id of its own: a conversation is one CONTACT and can span several
+    // Gmail threads, and the composer sent the conversation's own id as
+    // `threadId` (its "legacy alias"). Gmail could not thread on that, so the
+    // reply lost In-Reply-To / References (the customer saw a new email) and
+    // the copy below stored the conversation id as gmail_thread_id (documents
+    // audit, round 12). A named conversation replies in its newest real
+    // thread; a caller without one (the Gmail inbox) passes Gmail's own id.
+    let gmailThreadId: string | null = threadId ? String(threadId) : null
+    if (conversationId && authClient) {
+      const { data: latest } = await authClient
+        .from('email_messages')
+        .select('gmail_thread_id')
+        .eq('unified_conversation_id', conversationId)
+        .not('gmail_thread_id', 'is', null)
+        .neq('gmail_thread_id', String(conversationId))
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      gmailThreadId = latest?.gmail_thread_id ?? null
+    }
+
     // Get user's tokens
     const { data: tokenData, error: tokenError } = await (supabase as any)
       .from('gmail_tokens')
@@ -121,7 +133,7 @@ export async function POST(request: NextRequest) {
     if (requestKey && user) {
       const claim = await claimSend(supabase, String(requestKey), {
         userId: user.id,
-        threadId: threadId ? String(threadId) : null,
+        threadId: gmailThreadId,
         bodyHash,
       })
       if (!claim.ok) {
@@ -141,9 +153,9 @@ export async function POST(request: NextRequest) {
       claimed = true
     }
 
-    if (threadId && !allowDuplicate) {
+    if (gmailThreadId && !allowDuplicate) {
       const conflict = await threadConflict(supabase, {
-        threadId: String(threadId),
+        threadId: gmailThreadId,
         requestKey: requestKey ? String(requestKey) : null,
         seenUpTo: seenUpTo === undefined ? undefined : (seenUpTo as string | null),
         bodyHash,
@@ -166,17 +178,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Set credentials
-    getOAuth2Client().setCredentials({
-      access_token,
-      refresh_token,
-    })
-
-    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
+    const gmail = getGmailClient(access_token, refresh_token)
 
     // What the customer's mail client threads on. Gmail's threadId keeps the
     // conversation together for US; In-Reply-To and References keep it
     // together for THEM.
-    const threading = threadId ? await replyHeaders(gmail, String(threadId)) : {}
+    const threading = gmailThreadId ? await replyHeaders(gmail, gmailThreadId) : {}
 
     // Build email with or without attachments
     let rawEmail: string
@@ -194,7 +201,7 @@ export async function POST(request: NextRequest) {
         userId: 'me',
         requestBody: {
           raw: rawEmail,
-          threadId,
+          threadId: gmailThreadId ?? undefined,
         },
       })
     } catch (sendError) {
@@ -207,7 +214,7 @@ export async function POST(request: NextRequest) {
       await finishSend(supabase, String(requestKey), {
         ok: true,
         gmailMessageId: response.data.id ?? null,
-        gmailThreadId: response.data.threadId ?? threadId ?? null,
+        gmailThreadId: response.data.threadId ?? gmailThreadId,
       })
     }
 
@@ -236,7 +243,8 @@ export async function POST(request: NextRequest) {
               tenant_id: conv.tenant_id,
               unified_conversation_id: conv.id,
               gmail_message_id: response.data.id,
-              gmail_thread_id: threadId || null,
+              // Gmail's thread, as Gmail reports it — never the conversation id.
+              gmail_thread_id: response.data.threadId ?? gmailThreadId,
               direction: 'outbound',
               // Attribution (mig 269): the staff member sending.
               sent_by: user.id,

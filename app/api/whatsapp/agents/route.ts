@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
+// Who runs the team. Any signed-in account could create team members,
+// rewrite one's role or email, or deactivate one (documents audit, round 12).
+// Everyone may still flip availability — the inbox's own toggle.
+const MANAGER_ROLES = ['owner', 'admin', 'manager']
+const isManager = (role: string | null) => MANAGER_ROLES.includes(role || '')
+const MANAGER_FIELDS = ['name', 'email', 'phone', 'role', 'is_active', 'is_available', 'max_conversations'] as const
+const ANYONE_FIELDS = ['is_available'] as const
+const FORBIDDEN = { error: 'Only an owner, admin or manager can change the team.' }
+
 // GET /api/whatsapp/agents - List all team members (for WhatsApp assignment)
 export async function GET(request: NextRequest) {
   try {
@@ -80,6 +89,7 @@ export async function POST(request: NextRequest) {
       }, { status: authResult.status })
     }
     const { supabase, tenant_id } = authResult
+    if (!isManager(authResult.role)) return NextResponse.json(FORBIDDEN, { status: 403 })
 
     const body = await request.json()
 
@@ -131,20 +141,29 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - prevents unauthorized agent modification
-    const supabase = await createAuthenticatedClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({
-        error: 'Not authenticated'
-      }, { status: 401 })
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
+    const { supabase } = authResult
 
     const body = await request.json()
-    const { id, ...updates } = body
+    const { id, ...requested } = body as Record<string, unknown>
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
+    }
+
+    // Only the team member's own fields, and only those this role may change:
+    // the whole body used to be written, tenant_id and user_id included.
+    const allowed: readonly string[] = isManager(authResult.role) ? MANAGER_FIELDS : ANYONE_FIELDS
+    const updates: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(requested)) {
+      if (allowed.includes(key)) updates[key] = value
+      else if ((MANAGER_FIELDS as readonly string[]).includes(key)) return NextResponse.json(FORBIDDEN, { status: 403 })
+    }
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
     }
 
     const { data, error } = await supabase
@@ -174,14 +193,12 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - prevents unauthorized agent deactivation
-    const supabase = await createAuthenticatedClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({
-        error: 'Not authenticated'
-      }, { status: 401 })
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
+    if (!isManager(authResult.role)) return NextResponse.json(FORBIDDEN, { status: 403 })
+    const { supabase } = authResult
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

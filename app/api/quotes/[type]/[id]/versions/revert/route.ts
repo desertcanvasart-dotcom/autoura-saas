@@ -29,7 +29,7 @@ export async function POST(
       );
     }
 
-    const { user, role } = authResult;
+    const { user, role, tenant_id } = authResult;
 
     // Only managers and above can revert quotes
     if (!['owner', 'admin', 'manager'].includes(role || '')) {
@@ -51,6 +51,45 @@ export async function POST(
 
     // Use admin client for RPC call
     const supabaseAdmin = createAdminClient();
+    const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes';
+
+    // The caller's own quote only. The revert functions find the version and
+    // update by quote id alone, and run as the service role — so a manager could
+    // revert ANY tenant's quote by its id and read it back in full (documents
+    // audit, round 12).
+    const { data: ownQuote, error: ownError } = await supabaseAdmin
+      .from(tableName)
+      .select('id')
+      .eq('id', id)
+      .eq('tenant_id', tenant_id)
+      .maybeSingle();
+    if (ownError) throw ownError;
+    if (!ownQuote) {
+      return NextResponse.json({ success: false, error: 'Quote not found' }, { status: 404 });
+    }
+
+    // A booked quote keeps its price: the booking, its deposit and its
+    // invoices were made from it. Reverting brought back an older price (and
+    // status) under a live booking.
+    const { data: booking, error: bookingError } = await supabaseAdmin
+      .from('bookings')
+      .select('id, booking_number')
+      .eq('quote_id', id)
+      .eq('quote_type', type)
+      .eq('tenant_id', tenant_id)
+      .neq('status', 'cancelled')
+      .limit(1)
+      .maybeSingle();
+    if (bookingError) throw bookingError;
+    if (booking) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote is booked${booking.booking_number ? ` (${booking.booking_number})` : ''}: an older version can no longer be restored. Change the booking instead, or cancel it first.`,
+        },
+        { status: 409 }
+      );
+    }
 
     // Call the appropriate revert function based on quote type
     const functionName = type === 'b2c'
@@ -73,12 +112,12 @@ export async function POST(
       );
     }
 
-    // Fetch the updated quote
-    const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes';
+    // Fetch the updated quote (the caller's tenant's, as checked above)
     const { data: updatedQuote, error: fetchError } = await supabaseAdmin
       .from(tableName)
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenant_id)
       .single();
 
     if (fetchError) {
