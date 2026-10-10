@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { citiesOf, facetOf, filterOptions, onePerRoute, routeLabel, vehicleLabel } from '@/app/pricing-grid/lib/option-filters'
+import { citiesOf, facetsOf, filterOptions, onePerRoute, routeLabel, vehicleLabel } from '@/app/pricing-grid/lib/option-filters'
 import type { RateOption } from '@/app/pricing-grid/types'
 
 const tier = (route: string, vehicle: string, min: number, max: number, rate: number, extra: Record<string, unknown> = {}): RateOption => ({
@@ -37,22 +37,43 @@ describe('onePerRoute', () => {
 describe('filterOptions', () => {
   const all = onePerRoute(routes, 4)
   const day = all.filter(o => o.city === 'Cairo')
-  const facet = facetOf(all)
+  const f = (city: string, search = '', facets = {}) => filterOptions(day, all, { city, facets, search })
 
   it('offers the cities the options run in or to, and the transport types', () => {
     expect(citiesOf(all)).toEqual(['Alexandria', 'Cairo', 'Luxor'])
-    expect(facet).toEqual({ field: 'service_type', values: ['airport_transfer', 'day_tour', 'intercity_day_trip'] })
+    expect(facetsOf(all)).toEqual([{ field: 'service_type', values: ['airport_transfer', 'day_tour', 'intercity_day_trip'] }])
   })
 
   it("the day's own list by default; a city or a search looks in everything", () => {
-    expect(filterOptions(day, all, { city: '', facet: '', search: '' }, facet)).toHaveLength(2)
-    expect(filterOptions(day, all, { city: 'Luxor', facet: '', search: '' }, facet).map(o => o.id)).toEqual(['Luxor East Bank__van'])
-    expect(filterOptions(day, all, { city: 'alexandria', facet: '', search: '' }, facet)).toHaveLength(1)
-    expect(filterOptions(day, all, { city: '*', facet: '', search: '' }, facet)).toHaveLength(3)
-    expect(filterOptions(day, all, { city: '', facet: '', search: 'east bank' }, facet)).toHaveLength(1)
+    expect(f('')).toHaveLength(2)
+    expect(f('Luxor').map(o => o.id)).toEqual(['Luxor East Bank__van'])
+    expect(f('alexandria')).toHaveLength(1)
+    expect(f('*')).toHaveLength(3)
+    expect(f('', 'east bank')).toHaveLength(1)
   })
 
   it('narrows by type', () => {
-    expect(filterOptions(day, all, { city: '*', facet: 'airport_transfer', search: '' }, facet).map(o => o.id)).toEqual(['CAIRO-AIRPORT__van'])
+    expect(f('*', '', { service_type: 'airport_transfer' }).map(o => o.id)).toEqual(['CAIRO-AIRPORT__van'])
+  })
+})
+
+describe('facets for hotels and guides', () => {
+  const guides = [
+    { id: 'g1', name: 'English (Egyptologist)', rateEur: 50, rateNonEur: 50, city: 'Cairo', language: 'English', category: 'Egyptologist' },
+    { id: 'g2', name: 'Spanish (Egyptologist)', rateEur: 55, rateNonEur: 55, city: 'Cairo', language: 'Spanish', category: 'Egyptologist' },
+    { id: 'g3', name: 'English (Assistant)', rateEur: 20, rateNonEur: 20, city: 'Luxor', language: 'English', category: 'Assistant' },
+  ] as RateOption[]
+
+  it('one select per field with more than one value', () => {
+    expect(facetsOf(guides).map(x => x.field)).toEqual(['category', 'language'])
+    expect(filterOptions(guides, guides, { city: '*', facets: { language: 'English', category: 'Assistant' }, search: '' }).map(o => o.id)).toEqual(['g3'])
+  })
+
+  it('hotels narrow by board basis', () => {
+    const hotels = [
+      { id: 'h1', name: 'Barcelo', rateEur: 40, rateNonEur: 40, city: 'Cairo', board_basis: 'BB' },
+      { id: 'h2', name: 'Pyramids Inn', rateEur: 45, rateNonEur: 45, city: 'Cairo', board_basis: 'HB' },
+    ] as RateOption[]
+    expect(facetsOf(hotels)).toEqual([{ field: 'board_basis', values: ['BB', 'HB'] }])
   })
 })

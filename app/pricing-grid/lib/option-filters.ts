@@ -68,15 +68,26 @@ export function citiesOf(options: RateOption[]): string[] {
 
 export const inCity = (o: RateOption, city: string) => optionCities(o).some(c => norm(c) === norm(city))
 
-/** What a list can be narrowed by besides city: transport type, else category. */
-export type Facet = { field: 'service_type' | 'category'; values: string[] }
+/** What a list can be narrowed by besides city: one select per field that
+ *  holds more than one value (transport type, category, guide language,
+ *  board basis). */
+export type FacetField = 'service_type' | 'category' | 'language' | 'board_basis'
+export type Facet = { field: FacetField; values: string[] }
+const FACET_FIELDS: FacetField[] = ['service_type', 'category', 'language', 'board_basis']
 
-export function facetOf(options: RateOption[]): Facet | null {
-  for (const field of ['service_type', 'category'] as const) {
-    const values = [...new Set(options.map(o => String(o[field] ?? '').trim()).filter(Boolean))].sort()
-    if (values.length > 1) return { field, values }
+const facetValue = (o: RateOption, field: FacetField) => String((o as unknown as Record<string, unknown>)[field] ?? '').trim()
+
+export function facetsOf(options: RateOption[]): Facet[] {
+  const out: Facet[] = []
+  for (const field of FACET_FIELDS) {
+    const values = [...new Set(options.map(o => facetValue(o, field)).filter(Boolean))].sort()
+    if (values.length > 1) out.push({ field, values })
   }
-  return null
+  return out
+}
+
+export const FACET_LABEL: Record<FacetField, string> = {
+  service_type: 'type', category: 'category', language: 'language', board_basis: 'board',
 }
 
 /** "intercity_day_trip" → "Intercity Day Trip". */
@@ -85,8 +96,8 @@ export const humanize = (v: string) => v.replace(/_/g, ' ').replace(/\b\w/g, ch 
 export interface OptionFilter {
   /** '' = the day's own list; '*' = every city; else one city. */
   city: string
-  /** '' = any. */
-  facet: string
+  /** Per facet field, the value chosen ('' or absent = any). */
+  facets: Partial<Record<FacetField, string>>
   search: string
 }
 
@@ -99,12 +110,13 @@ export function filterOptions(
   dayOptions: RateOption[],
   allOptions: RateOption[],
   filter: OptionFilter,
-  facet: Facet | null,
 ): RateOption[] {
   const q = norm(filter.search)
   let pool = filter.city === '' && !q ? dayOptions : allOptions
   if (filter.city && filter.city !== '*') pool = pool.filter(o => inCity(o, filter.city))
-  if (facet && filter.facet) pool = pool.filter(o => String(o[facet.field] ?? '') === filter.facet)
-  if (q) pool = pool.filter(o => `${o.name} ${optionCities(o).join(' ')}`.toLowerCase().includes(q))
+  for (const [field, value] of Object.entries(filter.facets) as [FacetField, string | undefined][]) {
+    if (value) pool = pool.filter(o => facetValue(o, field) === value)
+  }
+  if (q) pool = pool.filter(o => `${o.name} ${o.details ?? ''} ${optionCities(o).join(' ')}`.toLowerCase().includes(q))
   return pool
 }

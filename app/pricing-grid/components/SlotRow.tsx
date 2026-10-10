@@ -4,7 +4,14 @@ import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { SlotDefinition, SlotValue, RateOption, SelectedItem, PassportType } from '../types'
 import { supplementItem } from '../lib/single-supplement'
-import { citiesOf, facetOf, filterOptions, humanize, onePerRoute, optionCities, routeKey, routeLabel, vehicleLabel } from '../lib/option-filters'
+import { citiesOf, facetsOf, filterOptions, humanize, onePerRoute, optionCities, routeKey, routeLabel, vehicleLabel, FACET_LABEL, type FacetField } from '../lib/option-filters'
+
+/** Single-choice services picked from the filtered list rather than a plain
+ *  select: their lists run long (every hotel of the tier, every guide). */
+const PICKER_SLOTS = new Set(['accommodation', 'guide'])
+
+/** Rates reach the grid in the run currency (EUR); one place writes them. */
+const money = (n: number) => `€${n.toFixed(2)}`
 
 interface SlotRowProps {
   definition: SlotDefinition
@@ -23,7 +30,7 @@ interface SlotRowProps {
 export default function SlotRow({ definition, value, options, allOptions, passport, onChange, hidden, onApplyToAllDays, pax = 2 }: SlotRowProps) {
   const [search, setSearch] = useState('')
   const [cityFilter, setCityFilter] = useState('')
-  const [facetFilter, setFacetFilter] = useState('')
+  const [facetFilters, setFacetFilters] = useState<Partial<Record<FacetField, string>>>({})
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   if (hidden) return null
@@ -38,8 +45,8 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
   const isRoute = definition.slotId === 'route'
   const dayPool = isRoute ? onePerRoute(options, pax) : options
   const allPool = isRoute ? onePerRoute(allOptions || options, pax) : (allOptions || options)
-  const facet = facetOf(allPool)
-  const dropdownOptions = filterOptions(dayPool, allPool, { city: cityFilter, facet: facetFilter, search }, facet)
+  const facets = facetsOf(allPool)
+  const dropdownOptions = filterOptions(dayPool, allPool, { city: cityFilter, facets: facetFilters, search })
   const showCity = cityFilter === '*' || !!search
   // A route is chosen whatever vehicle it was saved with.
   const sameEntry = (rateId: string, opt: RateOption) =>
@@ -97,6 +104,90 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
     onChange({ ...value, selectedItems: items, customAmount: 0 })
   }
 
+  // The filter panel shared by every list: city, the list's own filters
+  // (type, category, language, board), search (option-filters.ts).
+  const renderPanel = (onPick: (opt: RateOption) => void, multi: boolean) => (
+              <div className="border border-gray-200 rounded-md bg-white shadow-lg mt-1">
+                <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border-b border-gray-100">
+                  <select
+                    value={cityFilter}
+                    onChange={(e) => setCityFilter(e.target.value)}
+                    aria-label="City"
+                    className="px-1.5 py-0.5 text-[11px] border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  >
+                    <option value="">This day&rsquo;s cities</option>
+                    <option value="*">All cities</option>
+                    {citiesOf(allPool).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {facets.map(f => (
+                    <select
+                      key={f.field}
+                      value={facetFilters[f.field] ?? ''}
+                      onChange={(e) => setFacetFilters(prev => ({ ...prev, [f.field]: e.target.value }))}
+                      aria-label={FACET_LABEL[f.field]}
+                      className="px-1.5 py-0.5 text-[11px] border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
+                    >
+                      <option value="">Any {FACET_LABEL[f.field]}</option>
+                      {f.values.map(v => <option key={v} value={v}>{f.field === 'service_type' ? humanize(v) : v}</option>)}
+                    </select>
+                  ))}
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search…"
+                    aria-label="Search"
+                    className="flex-1 min-w-[8rem] px-1.5 py-0.5 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  />
+                </div>
+                {isRoute && (
+                  <div className="px-2 py-1 text-[10px] text-gray-400 border-b border-gray-50">
+                    Each route once, at the vehicle for {pax} pax — the vehicle follows the group size.
+                  </div>
+                )}
+                <div className="max-h-[280px] overflow-y-auto">
+                  {dropdownOptions.length === 0 && (
+                    <div className="text-[11px] text-gray-400 px-2 py-2">No matching options — try All cities</div>
+                  )}
+                  {dropdownOptions.slice(0, 100).map(opt => {
+                    const isSelected = isChosen(opt)
+                    const vehicle = isRoute ? vehicleLabel(opt.name) : null
+                    const kind = isRoute && opt.service_type ? humanize(opt.service_type) : null
+                    const where = showCity ? optionCities(opt).filter((c, i, a) => a.findIndex(x => x.toLowerCase() === c.toLowerCase()) === i).join(' → ') : ''
+                    return (
+                      <label
+                        key={opt.id}
+                        className={`flex items-start gap-2 px-2 py-1 text-[11px] cursor-pointer hover:bg-blue-50 ${
+                          isSelected ? 'bg-blue-50/70 font-medium' : ''
+                        }`}
+                      >
+                        <input
+                          type={multi ? 'checkbox' : 'radio'}
+                          checked={isSelected}
+                          onChange={() => onPick(opt)}
+                          className="w-3 h-3 mt-0.5 text-blue-600 rounded"
+                        />
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate" title={opt.name}>{isRoute ? routeLabel(opt.name) : opt.name}</span>
+                          {(vehicle || kind || where || (!multi && opt.details)) && (
+                            <span className="block truncate text-[10px] text-gray-400 font-normal">
+                              {[vehicle, kind, !multi ? opt.details : null, where].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-gray-500 whitespace-nowrap">{money(opt[rateKey])}</span>
+                      </label>
+                    )
+                  })}
+                  {dropdownOptions.length > 100 && (
+                    <div className="text-[11px] text-gray-400 px-2 py-1 border-t border-gray-100">
+                      +{dropdownOptions.length - 100} more — narrow by city, type or search
+                    </div>
+                  )}
+                </div>
+              </div>
+  )
+
   const unselectedCount = dayPool.filter(o => !isChosen(o)).length
   const hasValue = slotCost > 0
 
@@ -124,6 +215,40 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
             placeholder="Enter amount..."
             className="w-full px-2 py-0.5 text-xs border border-gray-200 rounded-md bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all"
           />
+        ) : PICKER_SLOTS.has(definition.slotId) ? (
+          /* Single choice from the filtered list (hotel, guide) */
+          (() => {
+            const selected = value.selectedItems[0]
+            return (
+              <div className="space-y-0.5">
+                {selected && (
+                  <span
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-blue-50 text-blue-700 rounded cursor-pointer hover:bg-red-50 hover:text-red-600 transition-colors"
+                    onClick={() => selectSingle(null)}
+                    title={`${selected.name} — click to remove`}
+                  >
+                    {selected.name.length > 60 ? selected.name.substring(0, 60) + '…' : selected.name}
+                    {' '}{money(selected[rateKey])}
+                    <span className="font-bold ml-0.5 text-[10px]">×</span>
+                  </span>
+                )}
+                {allPool.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsDropdownOpen(!isDropdownOpen); setSearch('') }}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  >
+                    {isDropdownOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    {selected ? `Change (${dayPool.length} here)` : `Select… (${dayPool.length} here)`}
+                  </button>
+                )}
+                {allPool.length === 0 && !selected && (
+                  <span className="text-[11px] text-gray-300 px-1 italic">No options</span>
+                )}
+                {isDropdownOpen && renderPanel(opt => { selectSingle(opt); setIsDropdownOpen(false) }, false)}
+              </div>
+            )
+          })()
         ) : definition.selectionMode === 'single' || definition.selectionMode === 'auto' ? (
           (() => {
             const selected = value.selectedItems[0]
@@ -148,7 +273,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                 <option value="">— Select —</option>
                 {displayOpts.map(opt => (
                   <option key={opt.id} value={opt.id}>
-                    {opt.name} — €{opt[rateKey].toFixed(2)}
+                    {opt.name} — {money(opt[rateKey])}
                     {opt.details ? ` (${opt.details})` : ''}
                   </option>
                 ))}
@@ -182,7 +307,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                       const shown = isRoute ? routeLabel(item.name) : item.name
                       return shown.length > 48 ? shown.substring(0, 48) + '…' : shown
                     })()}
-                    {' '}€{item[rateKey].toFixed(2)}
+                    {' '}{money(item[rateKey])}
                     {item.pricingBasis === 'per_person' && <span className="opacity-70">/person</span>}
                     {item.pricingBasis === 'per_unit' && (
                       <span className="opacity-70">/unit{item.unitCapacity ? ` of ${item.unitCapacity}` : ''}</span>
@@ -208,84 +333,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
             )}
 
             {isDropdownOpen && (
-              <div className="border border-gray-200 rounded-md bg-white shadow-lg mt-1">
-                <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border-b border-gray-100">
-                  <select
-                    value={cityFilter}
-                    onChange={(e) => setCityFilter(e.target.value)}
-                    aria-label="City"
-                    className="px-1.5 py-0.5 text-[11px] border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
-                  >
-                    <option value="">This day&rsquo;s cities</option>
-                    <option value="*">All cities</option>
-                    {citiesOf(allPool).map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  {facet && (
-                    <select
-                      value={facetFilter}
-                      onChange={(e) => setFacetFilter(e.target.value)}
-                      aria-label={facet.field === 'service_type' ? 'Type' : 'Category'}
-                      className="px-1.5 py-0.5 text-[11px] border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
-                    >
-                      <option value="">{facet.field === 'service_type' ? 'Any type' : 'Any category'}</option>
-                      {facet.values.map(v => <option key={v} value={v}>{humanize(v)}</option>)}
-                    </select>
-                  )}
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search…"
-                    aria-label="Search"
-                    className="flex-1 min-w-[8rem] px-1.5 py-0.5 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-                  />
-                </div>
-                {isRoute && (
-                  <div className="px-2 py-1 text-[10px] text-gray-400 border-b border-gray-50">
-                    Each route once, at the vehicle for {pax} pax — the vehicle follows the group size.
-                  </div>
-                )}
-                <div className="max-h-[280px] overflow-y-auto">
-                  {dropdownOptions.length === 0 && (
-                    <div className="text-[11px] text-gray-400 px-2 py-2">No matching options — try All cities</div>
-                  )}
-                  {dropdownOptions.slice(0, 100).map(opt => {
-                    const isSelected = isChosen(opt)
-                    const vehicle = isRoute ? vehicleLabel(opt.name) : null
-                    const kind = isRoute && opt.service_type ? humanize(opt.service_type) : null
-                    const where = showCity ? optionCities(opt).filter((c, i, a) => a.findIndex(x => x.toLowerCase() === c.toLowerCase()) === i).join(' → ') : ''
-                    return (
-                      <label
-                        key={opt.id}
-                        className={`flex items-start gap-2 px-2 py-1 text-[11px] cursor-pointer hover:bg-blue-50 ${
-                          isSelected ? 'bg-blue-50/70 font-medium' : ''
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleItem(opt)}
-                          className="w-3 h-3 mt-0.5 text-blue-600 rounded"
-                        />
-                        <span className="flex-1 min-w-0">
-                          <span className="block truncate" title={opt.name}>{isRoute ? routeLabel(opt.name) : opt.name}</span>
-                          {(vehicle || kind || where) && (
-                            <span className="block truncate text-[10px] text-gray-400 font-normal">
-                              {[vehicle, kind, where].filter(Boolean).join(' · ')}
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-gray-500 whitespace-nowrap">€{opt[rateKey].toFixed(2)}</span>
-                      </label>
-                    )
-                  })}
-                  {dropdownOptions.length > 100 && (
-                    <div className="text-[11px] text-gray-400 px-2 py-1 border-t border-gray-100">
-                      +{dropdownOptions.length - 100} more — narrow by city, type or search
-                    </div>
-                  )}
-                </div>
-              </div>
+              renderPanel(toggleItem, true)
             )}
           </div>
         )}
@@ -296,7 +344,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
         <span className={`text-xs font-bold tabular-nums ${
           slotCost > 0 ? 'text-green-600' : 'text-gray-200'
         }`}>
-          €{slotCost.toFixed(2)}
+          {money(slotCost)}
         </span>
       </div>
     </div>

@@ -21,7 +21,7 @@
   "app/payments/new/page.tsx": 8,
   "app/payments/record/page.tsx": 9,
   "app/pricing-grid/components/DayRow.tsx": 1,
-  "app/pricing-grid/components/SlotRow.tsx": 4,
+  "app/pricing-grid/components/SlotRow.tsx": 1,
   "app/pricing-grid/lib/grid-completeness.ts": 2,
   "app/quotes/b2b/[id]/edit/page.tsx": 1,
   "app/quotes/b2c/[id]/edit/page.tsx": 1,

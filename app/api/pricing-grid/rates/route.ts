@@ -166,6 +166,9 @@ export async function GET(request: NextRequest) {
         rateNonEur: toNum(r.base_rate_non_eur || r.rate_non_eur || r.base_rate_eur || r.rate_eur),
         city: r.city,
         details: guideLanguageLabel(r.guide_language),
+        // The dropdown filters by language and by kind of guide.
+        language: r.guide_language ? guideLanguageLabel(r.guide_language) : undefined,
+        category: r.guide_type || 'Egyptologist',
       })),
 
       airport_services: (airportRates || []).map((r: any) => ({
