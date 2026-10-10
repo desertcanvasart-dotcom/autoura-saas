@@ -731,6 +731,7 @@ function PricingGridContent() {
             // Columns may be undefined for pre-migration rows — that's fine,
             // resolveComponents() falls back to DAY_TYPE_DEFAULTS[DEFAULT_DAY_TYPE].
             dayType: dayData.day_type ?? undefined,
+            blockCode: dayData.block_code ?? null,
             overnight: dayData.overnight ?? undefined,
             hasSightseeing: dayData.has_sightseeing ?? undefined,
             airportArrival: dayData.airport_arrival ?? undefined,

@@ -278,6 +278,7 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
       description: block.description ?? day.description,
       ...comps,
       slots: day.slots.map(s => slots.get(s.slotId) ?? s),
+      blockCode: block.code,
     },
     filled,
     toPick,

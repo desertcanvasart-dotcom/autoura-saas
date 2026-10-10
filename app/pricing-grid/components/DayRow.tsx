@@ -357,9 +357,25 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
-          {blocks && onApplyBlock && (
-            <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
-          )}
+          {blocks && onApplyBlock && (() => {
+            // A day built from a block in the catalog says which one — it is
+            // already a catalog day, so no "use a block" offer (operator,
+            // 2026-10-10). A code the catalog no longer holds (block renamed
+            // or deleted since) reads as a new day again.
+            const fromBlock = day.blockCode ? blocks.find(b => b.code === day.blockCode) : undefined
+            return fromBlock ? (
+              <BlockPicker
+                blocks={blocks}
+                onPick={onApplyBlock}
+                label="Use a block"
+                current={fromBlock.code}
+                title={`Built from your day block ${fromBlock.code} — ${fromBlock.name}. Click to switch to another block.`}
+                compact
+              />
+            ) : (
+              <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
+            )
+          })()}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemoveDay() }}

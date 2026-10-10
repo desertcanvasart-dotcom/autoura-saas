@@ -207,6 +207,10 @@ export interface GridDay {
   hotelCheckIn?: boolean
   hotelCheckOut?: boolean
   intercity?: Intercity
+  /** The code of the day block this day was built from (migration 405);
+   *  null/undefined = not built from one. Saved with the itinerary, so a
+   *  reload or another device still knows the day is from the catalog. */
+  blockCode?: string | null
 }
 
 // --- Rate Options (fetched from DB, used in dropdowns) ---

@@ -40,6 +40,7 @@ beforeAll(async () => {
       rate_table text, rate_id uuid);`)
   await db.exec(mig('385_itinerary_services_one_day_link.sql'))
   await db.exec(mig('391_pricing_grid_day_components_atomic_save.sql'))
+  await db.exec(mig('405_itinerary_day_block_code.sql'))
   await db.query(`insert into itineraries values ($1, $2)`, [IT, T])
 }, 60_000) // booting PGlite under a full parallel run can exceed the 10 s default
 
@@ -124,6 +125,13 @@ describe('save_pricing_grid_days', () => {
     await save([day(1, { intercity: 'none' }), day(2, { intercity: 'road' }), day(3, { intercity: 'flight' })])
     expect((await daysNow()).map(d => d.intercity)).toEqual(['none', 'road', 'flight'])
     await expect(save([day(1, { intercity: 'teleport' })])).rejects.toThrow(/intercity/)
+  })
+
+  it('each day keeps the day block it was built from (405); no block stores NULL', async () => {
+    await save([day(1, { block_code: 'CAI-ARR' }), day(2), day(3, { block_code: '' })])
+    const codes = (await db.query<{ block_code: string | null }>(
+      `select block_code from itinerary_days where itinerary_id = $1 order by day_number`, [IT])).rows
+    expect(codes.map(r => r.block_code)).toEqual(['CAI-ARR', null, null])
   })
 
   it('an itinerary the caller cannot see is refused, not created', async () => {
