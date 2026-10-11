@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupVehicleRowsToTiers } from '@/app/api/pricing-grid/rates/route'
+import { groupVehicleRowsToTiers } from '@/lib/pricing/grid-rates'
 import { buildTransportTierIndex } from '@/app/pricing-grid/lib/calculator'
 
 // Option B: this app stores transportation_rates as ONE ROW PER VEHICLE.

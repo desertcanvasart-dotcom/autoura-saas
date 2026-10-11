@@ -101,7 +101,11 @@ describe('one B2B quote per grid save', () => {
     expect(route).toMatch(/pricing_table: keyedPricingTable\(/)
     expect(route).not.toMatch(/pricing_table: \[/)
   })
-  it('the grid sends its sheet with the quote request', () => {
-    expect(read('app', 'pricing-grid', 'page.tsx')).toMatch(/rate_sheet_costs: gridSheetCosts\(/)
+  it('the grid sends its picks; the route works out the sheet from today\'s rates', () => {
+    expect(read('app', 'pricing-grid', 'page.tsx')).toContain('grid: { days, config },')
+    const route = read('app', 'api', 'b2b', 'quote-from-itinerary', 'route.ts')
+    expect(route).not.toContain('rate_sheet_costs')
+    expect(route).toContain('repriceGridDays(grid.days as GridDay[]')
+    expect(route).toContain('sheetCosts = gridSheetCosts(')
   })
 })

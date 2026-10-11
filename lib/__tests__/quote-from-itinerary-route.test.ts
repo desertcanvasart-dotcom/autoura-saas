@@ -21,7 +21,8 @@ describe('quote-from-itinerary route', () => {
     expect(ROUTE).toMatch(/holes\.length > 0[\s\S]{0,400}status: 422/)
   })
   it('the grid save records the pin for every recognised slot', () => {
-    expect(SAVE).toMatch(/\.\.\.ratePin\(slot\.slotId, item\.rateId\)/)
+    expect(SAVE).toContain('const pin = ratePin(slot.slotId, item.rateId)')
+    expect(SAVE).toMatch(/\.\.\.pin,/)
   })
 })
 

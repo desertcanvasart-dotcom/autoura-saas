@@ -73,6 +73,8 @@ vi.mock('@/lib/supabase-server', () => ({
   requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from, rpc } }),
   createAdminClient: () => ({ rpc: adminRpc, from }),
 }))
+// No rates on file: each pick keeps the price it carries.
+vi.mock('@/lib/pricing/grid-rates', () => ({ loadGridRates: async () => ({}) }))
 vi.mock('@/lib/grid-client-link', () => ({
   resolveGridClient: async () => ({ clientId: null, how: 'none' }),
 }))
@@ -95,7 +97,6 @@ async function save(config: Row, days = water()) {
         startDate: '2026-11-01', clientName: 'Smith', tourName: 'Cairo', tier: 'standard', ...config,
       },
       days,
-      totals: {},
     }),
   }) as never)
   return { status: res.status, ...(await res.json()) }

@@ -5,8 +5,7 @@ import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
 import { SLOT_DEFINITIONS } from './types'
-import { calculateGrandTotals, calculateDay, convertAmount, buildTransportTierIndex } from './lib/calculator'
-import { gridSheetCosts } from './lib/b2b-rate-sheet'
+import { calculateGrandTotals, calculateDay, convertAmount } from './lib/calculator'
 import { getCurrencySymbol } from '@/lib/currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
@@ -195,7 +194,7 @@ function PricingGridContent() {
   // for travels with them, so the hotel swap below never reads another tier's.
   const ratesRequestRef = useRef(0)
   const [ratesTier, setRatesTier] = useState<string | null>(null)
-  const fetchRates = useCallback(async (tier: string, startDate: string) => {
+  const fetchRates = useCallback(async (tier: string, startDate: string, mode: 'missing' | 'all' = 'missing') => {
     const requestId = ++ratesRequestRef.current
     try {
       setLoading(true)
@@ -209,7 +208,8 @@ function PricingGridContent() {
         setRatesTier(tier)
         // A draft restored from this browser may hold items with no price, or
         // water as a hidden amount (hydrate-rates.ts) — fill them from the rates.
-        setDays(prev => hydrateDayRates(prev, data.data, 'missing').days)
+        // After a save that repriced ('all'), every item takes today's rate.
+        setDays(prev => hydrateDayRates(prev, data.data, mode).days)
       }
     } catch (err) {
       console.error('Failed to fetch rates:', err)
@@ -826,29 +826,28 @@ function PricingGridContent() {
       const res = await fetch('/api/pricing-grid/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          config,
-          days,
-          totals,
-          // Synthetic group rows carrying the throughout guide's money onto
-          // the saved itinerary (B-item 3); the reload parser skips them.
-          throughout_extras: config.guideMode === 'throughout' ? throughoutGuide.extras : [],
-        })
+        // The picks only: the save prices them from the rates as they are now
+        // and works out the totals and the throughout guide itself.
+        body: JSON.stringify({ config, days })
       })
 
       const data = await res.json()
 
       if (data.success) {
-        // An office address offered as the client's was dropped by the save.
-        const warned = Array.isArray(data.warnings) && data.warnings.length > 0
-        if (warned) for (const w of data.warnings as string[]) showToast('error', w)
+        // What the save changed: an office address offered as the client's
+        // was dropped; a rate changed since it was picked was saved at
+        // today's figure; a line with no current rate kept its price.
+        if (Array.isArray(data.warnings)) for (const w of data.warnings as string[]) showToast('error', w)
         setConfig(prev => ({
           ...prev,
           itineraryId: data.itineraryId,
           itineraryCode: data.itineraryCode,
           clientId: data.clientId ?? prev.clientId,
-          ...(warned ? { clientEmail: '' } : {}),
+          ...(data.clientEmailDropped ? { clientEmail: '' } : {}),
         }))
+        // The trip was saved at today's rates: show them, so the grid's total
+        // is the one stored.
+        if (data.repricedLines > 0) fetchRates(config.tier, config.startDate, 'all')
         if (typeof data.sellingTotal === 'number') setSavedSellingTotal(data.sellingTotal)
 
         // For B2B: create quote + template, then redirect to /tours/manage
@@ -866,12 +865,9 @@ function PricingGridContent() {
                 language: 'English',
                 // Stored via B1's columns, non-default only.
                 guide_mode: config.guideMode === 'throughout' ? 'throughout' : undefined,
-                // The partner price list: the grid's cost at each group size
-                // (b2b-rate-sheet.ts); the route applies the quote's margin.
-                rate_sheet_costs: gridSheetCosts(
-                  days, config, buildTransportTierIndex(rates?.route ?? []),
-                  { groupExtraEur: throughoutGuide.totalEur },
-                ),
+                // The partner price list (b2b-rate-sheet.ts) is worked out by
+                // the route from these picks, priced from today's rates.
+                grid: { days, config },
               })
             })
             const quoteData = await quoteRes.json()
