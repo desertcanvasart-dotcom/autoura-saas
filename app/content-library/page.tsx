@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
+import { CATEGORY_SCHEMAS } from '@/lib/content-library/category-schemas'
 import {
   Plus,
   Landmark,
@@ -87,6 +88,7 @@ export default function ContentLibraryPage() {
   const [error, setError] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [addingCategories, setAddingCategories] = useState(false)
 
   const supabase = createClient()
 
@@ -109,6 +111,37 @@ export default function ContentLibraryPage() {
     } catch (err) {
       console.error('Error fetching categories:', err)
       setError('Failed to load categories')
+    }
+  }
+
+  // The standard category types (each with its own editor fields) this
+  // company does not have yet. There was no way to create a category at all,
+  // and content needs one.
+  const missingCategories = Object.values(CATEGORY_SCHEMAS).filter(
+    schema => !categories.some(c => c.slug === schema.slug)
+  )
+
+  async function addStandardCategories() {
+    setAddingCategories(true)
+    try {
+      const base = categories.length
+      for (const [i, schema] of missingCategories.entries()) {
+        const res = await fetch('/api/content-library/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: schema.label, slug: schema.slug, icon: schema.icon, sort_order: base + i + 1 }),
+        })
+        // 409 = it exists already; anything else stops and says so.
+        if (!res.ok && res.status !== 409) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Could not add the categories')
+        }
+      }
+      await fetchCategories()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add the categories')
+    } finally {
+      setAddingCategories(false)
     }
   }
 
@@ -168,6 +201,17 @@ export default function ContentLibraryPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {missingCategories.length > 0 && (
+                <button
+                  onClick={addStandardCategories}
+                  disabled={addingCategories}
+                  title={`Adds: ${missingCategories.map(c => c.label).join(', ')}`}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  {addingCategories ? 'Adding…' : categories.length === 0 ? 'Add categories' : `Add ${missingCategories.length} more categor${missingCategories.length === 1 ? 'y' : 'ies'}`}
+                </button>
+              )}
               <Link
                 href="/content-library/rules"
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"

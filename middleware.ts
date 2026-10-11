@@ -95,6 +95,16 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/tasks': ['admin', 'manager', 'member'],
   '/inbox': ['admin', 'manager', 'member'],
   '/whatsapp-inbox': ['admin', 'manager', 'member'],
+  // The rest of the Communicate group, and Documents: the sidebar hides them
+  // from viewers, but a viewer with the link got in (no entry here = open).
+  '/conversations': ['admin', 'manager', 'member'],
+  '/concierge-briefs': ['admin', 'manager', 'member'],
+  '/copilot': ['admin', 'manager', 'member'],
+  '/copilot-knowledge': ['admin', 'manager', 'member'],
+  '/templates': ['admin', 'manager', 'member'],
+  '/content-library': ['admin', 'manager'],
+  // Receipts, invoices and contracts open from Payments and Itineraries.
+  '/documents': ['admin', 'manager', 'member'],
   '/whatsapp-parser': ['admin', 'manager', 'member'],
   '/communications': ['admin', 'manager', 'member'],
   '/followups': ['admin', 'manager', 'member'],

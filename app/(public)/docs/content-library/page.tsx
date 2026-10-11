@@ -29,6 +29,7 @@ export default function ContentLibraryPage() {
           <li><strong>Search</strong> &mdash; Find entries by name, description, or location</li>
           <li><strong>Cards</strong> &mdash; The category, name, location, short description and tags, with <strong>All tiers</strong> or <strong>2/4 tiers</strong> and a badge per tier (grey when that tier is still missing)</li>
           <li><strong>Add Content</strong> &mdash; Opens the editor; click an entry&apos;s name or the pencil to edit it, or the bin to delete it with all its tiers</li>
+          <li><strong>Add categories</strong> &mdash; Creates the standard categories you don&apos;t have yet, each with its own fields in the editor. A new library starts here: content needs a category.</li>
         </ul>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Editor</h3>

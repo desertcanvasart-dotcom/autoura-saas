@@ -102,10 +102,30 @@ export async function GET(request: NextRequest) {
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
 
+  // A draft approved in Copilot ("Approve & hand off") waits here to be sent:
+  // the composer opens with it filled in, with the reviewer's edits.
+  const { data: approvedRows } = await supabase
+    .from('communication_drafts')
+    .select('id, draft_body, edited_body, ai_flags')
+    .eq('tenant_id', tenant_id)
+    .eq('inbox_message_id', inbox.id)
+    .eq('status', 'approved')
+    .order('reviewed_at', { ascending: false })
+    .limit(1)
+  const approvedRow = approvedRows?.[0]
+  const approved = approvedRow
+    ? {
+        id: approvedRow.id,
+        body: approvedRow.edited_body || approvedRow.draft_body,
+        subject: (approvedRow.ai_flags as { subject?: string } | null)?.subject ?? null,
+      }
+    : null
+
   return NextResponse.json({
     success: true,
     thread_id: thread.id,
     inbox_message_id: inbox.id,
     drafts: drafts || [],
+    approved,
   })
 }

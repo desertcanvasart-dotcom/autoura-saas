@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: thread, error: tErr } = await supabase
       .from('communication_threads')
-      .select('id, channel, contact_info')
+      .select('id, channel, contact_info, unified_conversation_id')
       .eq('id', draft.thread_id)
       .single()
     if (tErr || !thread) {
@@ -61,15 +61,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: true, sent: true, message_id: res.messageId || null })
     }
 
-    // Email — approve and hand off to the Inbox composer for threaded sending.
+    // Email — approve and hand off. The email is sent from Conversations,
+    // whose reply box opens with this approved draft filled in
+    // (/api/ai/suggest-email-reply) and threads the reply in Gmail. Nothing
+    // used to carry the text across: the draft was approved and the operator
+    // retyped it.
     await supabase.from('communication_drafts').update({
       status: 'approved', reviewed_by: user.id, reviewed_at: nowIso, ...editPatch,
     }).eq('id', id)
+    const conversationId = (thread as { unified_conversation_id?: string | null }).unified_conversation_id ?? null
     return NextResponse.json({
       success: true,
       sent: false,
       requiresManualSend: true,
-      message: 'Draft approved. Open the conversation in the Inbox to send the email reply.',
+      open_url: conversationId ? `/conversations?id=${conversationId}` : null,
+      message: conversationId
+        ? 'Draft approved. Open the conversation to send it — the reply is filled in for you.'
+        : 'Draft approved. Open the conversation in Conversations to send the email reply.',
     })
   } catch (e: any) {
     console.error('copilot draft send error:', e?.message)

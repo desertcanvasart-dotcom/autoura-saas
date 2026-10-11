@@ -402,6 +402,15 @@ function EmailCompose({
     fetch(`/api/ai/suggest-email-reply?unified_conversation_id=${conversation.id}`)
       .then((r) => r.json())
       .then((data) => {
+        // Approved in Copilot: the reply opens with it, ready to check and
+        // send; sending marks the draft sent (draft_id).
+        if (data?.success && data.approved?.body) {
+          const draftHtml = plainTextToHtml(data.approved.body)
+          setBodyHtml(sig ? `${draftHtml}${sigToHtml(sig)}` : draftHtml)
+          if (data.approved.subject) setSubject(data.approved.subject)
+          setAcceptedDraftId(data.approved.id)
+          return
+        }
         if (data?.success && data.drafts?.length > 0) {
           setDrafts(data.drafts)
           setLastParentId(data.drafts[0]?.id || null)

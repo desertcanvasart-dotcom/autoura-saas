@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   // ---------- Pull all drafts for the period ----------
   let draftsQuery = supabase
     .from('communication_drafts')
-    .select('id, status, send_channel, ai_flags, ai_confidence, context_used, was_edited, reviewed_by, created_at, sent_at')
+    .select('id, status, send_channel, ai_flags, ai_confidence, context_used, was_edited, reviewed_by, created_at, sent_at, communication_threads(channel)')
     .eq('tenant_id', tenant_id)
     .order('created_at', { ascending: false })
     .limit(5000)
@@ -63,7 +63,10 @@ export async function GET(request: NextRequest) {
   // ---------- By channel ----------
   const byChannel: Record<string, { generated: number; sent: number }> = { whatsapp: { generated: 0, sent: 0 }, email: { generated: 0, sent: 0 } }
   for (const r of rows) {
-    const ch = r.send_channel || 'whatsapp'
+    // The channel it was sent on, else its conversation's: send_channel is
+    // set only on send, so every unsent email draft counted as WhatsApp.
+    const thread = (r as { communication_threads?: { channel?: string | null } | null }).communication_threads
+    const ch = r.send_channel || thread?.channel || 'unknown'
     if (!byChannel[ch]) byChannel[ch] = { generated: 0, sent: 0 }
     byChannel[ch].generated += 1
     if (r.status === 'sent') byChannel[ch].sent += 1

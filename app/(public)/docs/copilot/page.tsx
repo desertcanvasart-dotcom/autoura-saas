@@ -46,6 +46,7 @@ export default function CopilotPage() {
           <li><strong>Customer message</strong> &mdash; The latest message to answer, with a link to the client</li>
           <li><strong>Context card</strong> (collapsible) &mdash; The client&apos;s details with a VIP star, contact, nationality and language, and their <strong>Recent trips</strong>, <strong>Invoices</strong> and <strong>Payments</strong></li>
           <li><strong>AI draft reply</strong> &mdash; The draft, which you can edit, with a <strong>high</strong>, <strong>medium</strong> or <strong>low confidence</strong> badge</li>
+          <li><strong>A red banner</strong> &mdash; <em>&ldquo;AI flagged this for escalation&rdquo;</em>, with the reason, when the message needs a person before anything is sent: a complaint, a refund or cancellation demand, an emergency, a legal threat</li>
         </ul>
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Actions</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
@@ -53,7 +54,7 @@ export default function CopilotPage() {
           <li><strong>Regenerate</strong> &mdash; Opens an optional instruction (&ldquo;offer a 10% discount&rdquo;); click <strong>Generate</strong> for a new draft</li>
           <li><strong>Approve</strong> &mdash; Saves the draft with your edits, without sending it</li>
           <li><strong>Send</strong> (WhatsApp) &mdash; Sends the text in the editor straight away and marks the conversation resolved</li>
-          <li><strong>Approve &amp; hand off</strong> (email) &mdash; Email drafts are never sent from here: the draft is marked approved, and you send the reply from the <strong>Inbox</strong>. Copy the approved text into your reply there.</li>
+          <li><strong>Approve &amp; hand off</strong> (email) &mdash; Email drafts are sent from <strong>Conversations</strong>, so the reply stays in the email thread: click <strong>Open conversation</strong>, and the reply box is already filled in with the approved draft and its subject. Check it and send.</li>
         </ul>
         <p className="text-gray-600 mt-3">
           A conversation with no draft says <em>&ldquo;No AI draft yet for this thread.&rdquo;</em> Drafts are written in advance only when <strong>Proactive draft pre-generation</strong> is on (Copilot Settings); otherwise ask for one with <strong>Suggest Reply</strong> in the WhatsApp page or Conversations.

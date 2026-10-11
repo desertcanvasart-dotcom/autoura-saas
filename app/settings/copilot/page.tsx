@@ -53,7 +53,8 @@ export default function CopilotSettingsPage() {
     setSaving(null)
   }
 
-  const isAdmin = role === 'admin'
+  // An owner is an admin here, as the API already treats them (it allows owner and admin); the page made owners read-only.
+  const isAdmin = role === 'admin' || role === 'owner'
 
   return (
     <div className="max-w-3xl mx-auto p-6">
