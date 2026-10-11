@@ -6,6 +6,8 @@ import type { Tables, TablesInsert } from '@/types/database.types'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
 import { roundToCurrency } from '@/lib/currency-totals'
+import { shiftDateISO } from '@/lib/today'
+import { tenantToday } from '@/lib/tenant-today'
 
 export async function POST(request: NextRequest) {
   try {
@@ -321,6 +323,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create booking
+    const today = await tenantToday(adminClient, tenant_id)
     const bookingData: TablesInsert<'bookings'> = {
       tenant_id,
       itinerary_id: itinerary_id ?? null,
@@ -332,7 +335,7 @@ export async function POST(request: NextRequest) {
       client_id: b2cQuote?.client_id ?? itinerary?.client_id ?? null,
       partner_id: b2bQuote?.partner_id ?? null,
       booking_number,
-      booking_date: new Date().toISOString().split('T')[0],
+      booking_date: today,
       trip_name: tripFacts.trip_name,
       start_date: tripFacts.start_date,
       end_date: tripFacts.end_date,
@@ -348,11 +351,8 @@ export async function POST(request: NextRequest) {
       total_paid: 0,
       balance_due,
       status: 'pending_deposit',
-      payment_deadline: (() => {
-        const d = new Date()
-        d.setDate(d.getDate() + depositRule.depositDueDays)
-        return d.toISOString().split('T')[0]
-      })(),
+      // In the company's timezone (lib/tenant-today), not the UTC server's.
+      payment_deadline: shiftDateISO(today, depositRule.depositDueDays),
       created_by: user?.id
     }
 

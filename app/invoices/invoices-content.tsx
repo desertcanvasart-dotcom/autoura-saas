@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { todayLocal } from '@/lib/today'
+import { shiftDateISO, todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
@@ -130,7 +130,7 @@ const initialFormData: FormData = {
   total_amount: 0,
   currency: 'EUR',
   issue_date: todayLocal(),
-  due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  due_date: shiftDateISO(todayLocal(), 14),
   notes: '',
   payment_terms: 'Payment due within 14 days',
   payment_instructions: ''

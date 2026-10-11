@@ -2,7 +2,8 @@ import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { daysOverdueOrNull, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
 import { escapeHtml } from '@/lib/html-escape'
-import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { requireAuth } from '@/lib/supabase-server'
+import { tenantToday } from '@/lib/tenant-today'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
@@ -216,21 +217,21 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 export async function GET(request: NextRequest) {
   try {
     // Authenticate user
-    const supabase = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const authResult = await requireAuth()
+    if (authResult.error !== null || !authResult.supabase) {
       return NextResponse.json({
         success: false,
-        error: 'Not authenticated'
-      }, { status: 401 })
+        error: authResult.error || 'Not authenticated'
+      }, { status: authResult.status || 401 })
     }
+    const { supabase, tenant_id } = authResult
 
     const { searchParams } = new URL(request.url)
     const preview = searchParams.get('preview') === 'true'
 
-    // Get invoices that need reminders - RLS automatically filters by tenant
-    const today = new Date().toISOString().split('T')[0]
+    // Get invoices that need reminders - RLS automatically filters by tenant.
+    // "Today" in the company's timezone (lib/tenant-today), not the server's.
+    const today = await tenantToday(supabase, tenant_id)
 
     const { data: invoices, error } = await supabase
       .from('invoices')
@@ -240,8 +241,10 @@ export async function GET(request: NextRequest) {
       .in('status', [...REMINDABLE_INVOICE_STATUSES])
       .not('due_date', 'is', null)
       .gt('balance_due', 0)
-      .eq('reminder_paused', false)
-      .or(`next_reminder_date.lte.${today},next_reminder_date.is.null`)
+      // Paused invoices are listed too, marked: this list is the only place a
+      // paused reminder can be resumed, and it used to leave them out. Sending
+      // (POST, the daily job) still skips them.
+      .or(`next_reminder_date.lte.${today},next_reminder_date.is.null,reminder_paused.eq.true`)
       .not('client_email', 'is', null)
       .order('due_date', { ascending: true })
 
@@ -271,7 +274,8 @@ export async function GET(request: NextRequest) {
         days_until_due: daysUntilDue,
         reminder_type: reminderType,
         reminder_count: invoice.reminder_count || 0,
-        last_reminder_sent: invoice.last_reminder_sent
+        last_reminder_sent: invoice.last_reminder_sent,
+        reminder_paused: invoice.reminder_paused === true
       }
     })
 
@@ -329,7 +333,7 @@ export async function POST(request: NextRequest) {
     if (invoiceIds && invoiceIds.length > 0) {
       query = query.in('id', invoiceIds)
     } else if (sendAll) {
-      const today = new Date().toISOString().split('T')[0]
+      const today = await tenantToday(supabase, tenant_id)
       query = query.or(`next_reminder_date.lte.${today},next_reminder_date.is.null`)
     } else {
       return NextResponse.json(

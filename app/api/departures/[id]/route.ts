@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { shiftDateISO } from '@/lib/today'
 
 // ============================================
 // SINGLE TOUR DEPARTURE API
@@ -143,10 +144,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         const startDate = (updateData.start_date as string) || current.start_date
         const durationDays = (updateData.duration_days as number) || current.duration_days
 
-        const startDateObj = new Date(startDate)
-        const endDateObj = new Date(startDateObj)
-        endDateObj.setDate(endDateObj.getDate() + durationDays - 1)
-        updateData.end_date = endDateObj.toISOString().split('T')[0]
+        // Calendar arithmetic, immune to daylight-saving changes.
+        updateData.end_date = shiftDateISO(String(startDate), durationDays - 1)
       }
     }
 

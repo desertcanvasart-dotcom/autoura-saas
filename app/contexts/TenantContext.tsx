@@ -45,6 +45,9 @@ interface Tenant {
   operating_country?: string | null
   contract_governing_law?: string | null
   deposit_percent?: number | null
+  /** The company's IANA timezone (Settings → Organization). Server-side
+   *  "today" follows it (lib/tenant-today). NULL / 'UTC' by default. */
+  timezone?: string | null
   created_at: string | null
   updated_at: string | null
 }

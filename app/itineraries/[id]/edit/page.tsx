@@ -4,7 +4,7 @@ import { VocabSelect } from '@/components/vocabulary'
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 import { useState, useEffect, useCallback } from 'react'
-import { todayLocal } from '@/lib/today'
+import { shiftDateISO, todayLocal } from '@/lib/today'
 import { withReturnTo } from '@/lib/nav/return-to'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -1056,7 +1056,7 @@ export default function ItineraryEditorPage() {
                       total_amount: amount,
                       currency: itinerary.currency || 'EUR',
                       issue_date: todayLocal(),
-                      due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                      due_date: shiftDateISO(todayLocal(), 14)
                     })
                   })
                   if (response.ok) {
