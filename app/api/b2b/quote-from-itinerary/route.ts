@@ -6,7 +6,12 @@ import { getTieredActivityRate } from '@/lib/rates/activity-tiers'
 import { getCurrencySymbol } from '@/lib/currency'
 import { repriceItineraryServices } from '@/lib/b2b/quote-from-itinerary-pricing'
 import type { Json } from '@/types/database.types'
-import { cleanSheetCosts, keyedPricingTable } from '@/app/pricing-grid/lib/b2b-rate-sheet'
+import { gridSheetCosts, keyedPricingTable, type SheetCost } from '@/app/pricing-grid/lib/b2b-rate-sheet'
+import { buildTransportTierIndex } from '@/app/pricing-grid/lib/calculator'
+import { buildGuideRateIndex, computeThroughoutGuideExtras } from '@/app/pricing-grid/lib/throughout-guide'
+import type { GridConfig, GridDay, RateOption } from '@/app/pricing-grid/types'
+import { loadGridRates } from '@/lib/pricing/grid-rates'
+import { repriceGridDays } from '@/lib/pricing/grid-reprice'
 import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
 
 // POST /api/b2b/quote-from-itinerary
@@ -16,9 +21,12 @@ import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
 // Any remaining hole REFUSES the quote (422) — never a quote priced at 0.
 // Rules: lib/b2b/quote-from-itinerary-pricing.ts.
 //
-// The Pricing Grid sends `rate_sheet_costs` — its cost at each group size
-// (app/pricing-grid/lib/b2b-rate-sheet.ts). The quote stores them, at its
-// margin, as the price list partners see; without them it lists its own size.
+// The Pricing Grid sends its picks (`grid`: days + config). The partner price
+// list — the trip's cost at each group size (app/pricing-grid/lib/
+// b2b-rate-sheet.ts) — is worked out HERE from them, each pick priced from
+// the rates as they are now (lib/pricing/grid-reprice), and stored at the
+// quote's margin. The grid's own figures are never taken. Without `grid` the
+// quote lists its own size.
 
 function getSeason(date: Date): 'low' | 'high' | 'peak' {
   const month = date.getMonth() + 1
@@ -37,8 +45,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { itinerary_id, partner_id = null, margin_percent = 25, tour_leader_included = false, is_eur_passport = true, language = 'English', guide_mode = null, guide_grade = null } = body
     if (!itinerary_id) return NextResponse.json({ success: false, error: 'itinerary_id is required' }, { status: 400 })
-    const sheetCosts = body.rate_sheet_costs === undefined ? [] : cleanSheetCosts(body.rate_sheet_costs)
-    if (!sheetCosts) return NextResponse.json({ success: false, error: 'rate_sheet_costs must be whole group sizes with their costs' }, { status: 400 })
+    const grid = body.grid
+    if (grid !== undefined && (typeof grid !== 'object' || !grid || !Array.isArray(grid.days) || typeof grid.config !== 'object' || !grid.config)) {
+      return NextResponse.json({ success: false, error: 'grid must carry the days and config' }, { status: 400 })
+    }
 
     // 1. Fetch itinerary
     const { data: itinerary, error: itinError } = await supabase
@@ -60,6 +70,25 @@ export async function POST(request: NextRequest) {
     const numPax = (itinerary.num_adults || 2) + (itinerary.num_children || 0)
     const travelDate = itinerary.start_date ? new Date(itinerary.start_date) : new Date()
     const season = getSeason(travelDate)
+
+    // The partner price list, from the grid's picks priced from today's rates.
+    let sheetCosts: SheetCost[] = []
+    if (grid) {
+      // The lists the grid priced from: its tier and its date.
+      const gridRates = await loadGridRates(supabase, tenant_id, { tier: grid.config.tier || tier, startDate: grid.config.startDate || null })
+      const pricedDays = repriceGridDays(grid.days as GridDay[], gridRates as Record<string, RateOption[]>).days
+      const gridConfig = {
+        ...grid.config,
+        pax: numPax,
+        passport: is_eur_passport ? 'eu' : 'non_eu',
+        withGuide: grid.config.withGuide !== false,
+      } as GridConfig
+      const throughout = computeThroughoutGuideExtras(pricedDays, gridConfig, buildGuideRateIndex(gridRates as Record<string, RateOption[]>))
+      sheetCosts = gridSheetCosts(
+        pricedDays, gridConfig, buildTransportTierIndex((gridRates.route ?? []) as RateOption[]),
+        { groupExtraEur: throughout.totalEur },
+      )
+    }
 
     // 4–6. Price the lines, the tour leader and the single supplement
     //       through the engine (pinned row → tier lookup → hole).

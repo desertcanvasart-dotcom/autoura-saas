@@ -245,6 +245,9 @@ export interface RateOption {
   // vehicle as group size grows — the one cost that is non-linear in pax.
   capacity_min?: number
   capacity_max?: number
+  /** Transport only: the vehicle's own transportation_rates row (the option
+   *  id is the route's keeper row + the vehicle). */
+  row_id?: string
   /** The throughout guide's rate on this option (B-item 3): a hotel/cruise
    *  option's FIRST-period guide bed (null = no concession — an amber
    *  unpriced night, never a silent zero), or a flight's negotiated guide
