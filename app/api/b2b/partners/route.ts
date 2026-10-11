@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { gateStructural } from '@/lib/usage-enforcement'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // ============================================
 // B2B PARTNERS API
@@ -62,6 +63,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
     if (!supabase) {

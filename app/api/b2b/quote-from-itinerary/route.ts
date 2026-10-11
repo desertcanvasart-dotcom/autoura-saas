@@ -13,6 +13,7 @@ import type { GridConfig, GridDay, RateOption } from '@/app/pricing-grid/types'
 import { loadGridRates } from '@/lib/pricing/grid-rates'
 import { repriceGridDays } from '@/lib/pricing/grid-reprice'
 import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // POST /api/b2b/quote-from-itinerary
 // Creates a B2B quote from an itinerary. Lines the pricing grid already
@@ -39,6 +40,8 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 

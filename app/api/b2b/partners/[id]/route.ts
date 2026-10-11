@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
 
 // ============================================
 // B2B PARTNERS INDIVIDUAL API
@@ -81,6 +82,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage')
+    if (gate) return gate
     const { id } = await params
 
     // Use authenticated client - RLS will automatically filter by tenant
@@ -111,6 +114,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage')
+    if (gate) return gate
     const { id } = await params
 
     // Use authenticated client - RLS will automatically filter by tenant

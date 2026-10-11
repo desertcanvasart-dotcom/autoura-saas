@@ -14,6 +14,7 @@ import { Loader2, Plus, Check, X, Sparkles, ArrowUpRight, Trash2, AlertTriangle,
 import { currencySymbol } from '@/lib/currency-totals'
 import { extraQuantityFor } from '@/lib/extras-catalog'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useRole } from '@/hooks/useRole'
 
 type Extra = {
   id: string
@@ -67,6 +68,11 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const dialog = useConfirmDialog()
+  // Viewers read; confirming (the step that moves money) is managers' and
+  // admins' — the same lines the API draws.
+  const { isAdmin, isManager, isViewer } = useRole()
+  const canConfirm = isAdmin || isManager
+  const canAct = !isViewer
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/bookings/${bookingId}/extras`)
@@ -129,10 +135,12 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
             <span className="text-sm font-normal text-gray-500">— {money(data.confirmed_total, currency)} sold</span>
           ) : null}
         </h3>
+{canAct && (
         <button type="button" onClick={() => { setAdding(v => !v); setError(null) }}
           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47] rounded-lg hover:bg-[#e8ede3]">
           <Plus className="w-3.5 h-3.5" /> Add
         </button>
+        )}
       </div>
 
       {notice && <p className="text-sm text-[#4a5c35] bg-[#e8ede3] rounded-lg px-3 py-2 mb-3">{notice}</p>}
@@ -180,13 +188,13 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
               </p>
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0">
+            {canAct && <div className="flex items-center gap-1 flex-shrink-0">
               {busy === e.id && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
               {e.status === 'requested' && (
                 <PriceButton disabled={busy === e.id} currency={currency}
                   onPrice={(price, cur) => act(e, 'price', { unit_price: price, currency: cur })} />
               )}
-              {(e.status === 'offered' || e.status === 'accepted') && (
+              {canConfirm && (e.status === 'offered' || e.status === 'accepted') && (
                 <button type="button" onClick={() => act(e, 'confirm')} disabled={busy === e.id}
                   className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-40">
                   <Check className="w-3.5 h-3.5" /> Confirm
@@ -198,7 +206,7 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
                   Decline
                 </button>
               )}
-              {(e.status === 'confirmed' || e.status === 'accepted') && !e.invoiced_at && (
+              {(e.status === 'accepted' || (canConfirm && e.status === 'confirmed')) && !e.invoiced_at && (
                 <button type="button" onClick={() => act(e, 'withdraw')} disabled={busy === e.id}
                   className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">
                   <X className="w-3.5 h-3.5" /> Withdraw
@@ -210,7 +218,7 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
-            </div>
+            </div>}
           </div>
         ))}
       </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * PUT /api/quotes/b2b/bulk-update
@@ -8,6 +9,8 @@ import { createAuthenticatedClient } from '@/lib/supabase-server';
  */
 export async function PUT(request: NextRequest) {
   try {
+    const gate = await gateRole('manage')
+    if (gate) return gate
     // Use authenticated client - RLS will enforce tenant isolation
     const supabase = await createAuthenticatedClient();
 

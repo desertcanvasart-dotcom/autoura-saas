@@ -448,7 +448,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             {/* Action Buttons */}
             {/* A direct booking often has no CRM client: its itinerary's own
                 contact is used then (same rule as the send route). */}
-            {booking.quote_type !== 'b2b' && (booking.clients?.email || booking.itineraries?.client_email || booking.clients?.whatsapp || booking.clients?.phone || booking.itineraries?.client_phone) && (
+            {(isAdmin || isManager) && booking.quote_type !== 'b2b' && (booking.clients?.email || booking.itineraries?.client_email || booking.clients?.whatsapp || booking.clients?.phone || booking.itineraries?.client_phone) && (
               <div className="flex gap-2">
                 {(booking.clients?.email || booking.itineraries?.client_email) && (
                   <button
@@ -804,6 +804,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <h3 className="text-lg font-semibold text-gray-900">
                 Payment History ({payments.length})
               </h3>
+              {/* Recording a payment is managers' and admins' (the API's rule). */}
+              {(isAdmin || isManager) && (
               <button
                 onClick={() => setShowAddPayment(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
@@ -811,6 +813,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <Plus className="w-4 h-4" />
                 Record Payment
               </button>
+              )}
             </div>
 
             {/* Add Payment Form */}

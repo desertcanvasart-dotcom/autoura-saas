@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { roleDenied } from '@/lib/api-role-gate'
 
 /**
  * GET /api/quotes/b2b
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const supabase = createAdminClient();
 

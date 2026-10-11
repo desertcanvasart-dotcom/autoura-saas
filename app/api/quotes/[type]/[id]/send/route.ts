@@ -13,6 +13,7 @@ import B2CQuoteEmail from '@/components/emails/B2CQuoteEmail'
 import B2BQuoteEmail from '@/components/emails/B2BQuoteEmail'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
+import { gateRole } from '@/lib/api-role-gate'
 
 // Lazy-initialized Resend client (avoids build-time errors when env vars unavailable)
 let _resend: Resend | null = null
@@ -39,6 +40,9 @@ export async function POST(
 ) {
   try {
     const { type, id } = await params
+    // B2B quotes are managers' and admins'; viewers send nothing.
+    const gate = await gateRole(type === 'b2b' ? 'manage' : 'staff')
+    if (gate) return gate
 
     if (type !== 'b2c' && type !== 'b2b') {
       return NextResponse.json(

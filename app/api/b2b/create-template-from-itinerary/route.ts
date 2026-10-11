@@ -1,6 +1,7 @@
 import { dayTripFromItineraryDay } from '@/lib/pricing/day-trip'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // POST /api/b2b/create-template-from-itinerary
 // Converts a parsed itinerary into tour_template + tour_variation for B2B pricing
@@ -8,6 +9,8 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 

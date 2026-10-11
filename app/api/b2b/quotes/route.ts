@@ -4,6 +4,7 @@ import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
 import { calculatorPricingTable, pickEditable, rateSheetFromPaxTable } from '@/lib/quotes/calculator-pricing-table'
 import { priceVariation } from '@/lib/b2b/price-variation'
 import { isBookableLine } from '@/lib/pricing/breakdown-order'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // ============================================
 // B2B QUOTES API — calculator save/list/update
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -83,6 +86,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const body = await request.json()
     const {
@@ -234,6 +239,8 @@ export async function PUT(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const body = await request.json()
     const id = body?.id
@@ -279,6 +286,8 @@ export async function DELETE(request: NextRequest) {
       { status: authResult.status }
     )
   }
+  const denied = roleDenied(authResult.role, 'manage')
+  if (denied) return denied
 
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient, createAdminClient, requireAuth } from '@/lib/supabase-server';
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * GET /api/quotes/b2b/[id]
@@ -11,6 +12,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage');
+    if (gate) return gate;
     const { id } = await params;
 
     // Use authenticated client - RLS will enforce tenant isolation
@@ -94,6 +97,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage')
+    if (gate) return gate
     // Require authentication to get user info for versioning
     const authResult = await requireAuth();
     if (authResult.error !== null) {
@@ -221,6 +226,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage');
+    if (gate) return gate;
     const { id } = await params;
 
     // Use authenticated client - RLS will enforce tenant isolation and role permission

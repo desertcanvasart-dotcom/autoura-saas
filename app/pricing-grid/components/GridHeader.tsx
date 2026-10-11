@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { GridConfig, GridTotals, ClientType, PassportType } from '../types'
 import { VocabSelect } from '@/components/vocabulary'
 import { convertAmount } from '../lib/calculator'
+import { useRole } from '@/hooks/useRole'
 
 interface GridHeaderProps {
   config: GridConfig
@@ -31,6 +32,9 @@ const DEFAULT_MARGINS: Record<ClientType, number> = {
 
 export default function GridHeader({ config, onChange, totals, guideLanguages = [] }: GridHeaderProps) {
   const [partners, setPartners] = useState<B2BPartner[]>([])
+  // B2B pricing is managers' and admins' (the B2B APIs refuse anyone else).
+  const { isAdmin, isManager } = useRole()
+  const canB2b = isAdmin || isManager
   const update = (partial: Partial<GridConfig>) => onChange({ ...config, ...partial })
   const sym = getCurrencySymbol(config.currency)
   const fmt = (n: number) => n.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -146,7 +150,9 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
           <button
             type="button"
             onClick={toggleClientType}
-            className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap ${
+            disabled={!canB2b && config.clientType === 'b2c'}
+            title={!canB2b && config.clientType === 'b2c' ? 'B2B quotes are made by managers and admins' : undefined}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-70 ${
               config.clientType === 'b2b'
                 ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
                 : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'

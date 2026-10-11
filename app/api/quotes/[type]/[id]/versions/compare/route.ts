@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
 import { attachChangerEmails } from '@/lib/quotes/attach-changer-emails';
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * GET /api/quotes/[type]/[id]/versions/compare?from=1&to=2
@@ -12,6 +13,9 @@ export async function GET(
 ) {
   try {
     const { type, id } = await params;
+    // B2B quotes are managers' and admins'.
+    const gate = type === 'b2b' ? await gateRole('manage') : null;
+    if (gate) return gate;
     const { searchParams } = new URL(request.url);
     const fromVersion = parseInt(searchParams.get('from') || '0');
     const toVersion = parseInt(searchParams.get('to') || '0');

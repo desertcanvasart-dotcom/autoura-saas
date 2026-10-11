@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { mintOrReusePassengerLink } from '@/lib/booking-portal'
+import { roleDenied } from '@/lib/api-role-gate'
 
 export async function POST(
   _request: Request,
@@ -17,6 +18,8 @@ export async function POST(
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
     const { supabase, tenant_id, user } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })

@@ -7,6 +7,7 @@ import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
 import { freshQuotePdf } from '@/lib/quotes/fresh-quote-pdf'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * POST /api/quotes/[type]/[id]/send-whatsapp
@@ -19,6 +20,9 @@ export async function POST(
 ) {
   try {
     const { type, id } = await params
+    // B2B quotes are managers' and admins'; viewers send nothing.
+    const gate = await gateRole(type === 'b2b' ? 'manage' : 'staff')
+    if (gate) return gate
 
     if (type !== 'b2c' && type !== 'b2b') {
       return NextResponse.json(
