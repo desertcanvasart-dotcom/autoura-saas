@@ -49,6 +49,7 @@ import { useRole } from '@/hooks/useRole'
 import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import { effectiveItineraryTotal, itineraryClientTotal } from '@/lib/itinerary-client-total'
 import { dayBookings, includesFromLines, type DayBooking } from '@/lib/itineraries/day-bookings'
+import { daySavePlan, isSavedDayId, renumberDays } from '@/lib/itineraries/day-save-plan'
 import { hotelRateIdOf, nightFromBooking, tripChecks, tripStays, type CheckDay } from '@/lib/itineraries/trip-checks'
 
 // ============================================
@@ -83,6 +84,8 @@ interface ItineraryDay {
   attractions: string[]
   services: DayService
   flight_from?: string | null
+  /** The number the database holds for this day (day-save-plan.ts). */
+  saved_number?: number
 }
 
 interface Itinerary {
@@ -217,6 +220,8 @@ export default function ItineraryEditorPage() {
   const [calculating, setCalculating] = useState(false)
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [days, setDays] = useState<ItineraryDay[]>([])
+  // Saved days removed since the last save: the save deletes them.
+  const [removedDayIds, setRemovedDayIds] = useState<string[]>([])
   // A cruise that boards on a day its ship does not sail (migration 382),
   // computed on the saved itinerary — a note, never a blocker.
   const [cruiseSailingNotes, setCruiseSailingNotes] = useState<string[]>([])
@@ -345,10 +350,12 @@ export default function ItineraryEditorPage() {
           water: true,
           tips: true
         },
-        flight_from: day.flight_from
+        flight_from: day.flight_from,
+        saved_number: day.day_number,
       }))
 
       setDays(transformedDays)
+      setRemovedDayIds([])
 
       // The cruise sailing-day check runs on the SAVED itinerary (this screen
       // does not run the day engine); the route computes it from each cruise
@@ -567,9 +574,17 @@ export default function ItineraryEditorPage() {
   }
 
   const removeDay = (dayId: string) => {
-    const newDays = days.filter(d => d.id !== dayId)
-    newDays.forEach((day, index) => { day.day_number = index + 1 })
+    const newDays = renumberDays(days.filter(d => d.id !== dayId))
     setDays(newDays)
+    // Saved, it is deleted on save (it used to come back on reload), and its
+    // service lines go with it.
+    if (isSavedDayId(dayId)) setRemovedDayIds(prev => [...prev, dayId])
+    if (services.some(s => s.itinerary_day_id === dayId)) {
+      setServices(prev => prev
+        .filter(s => !(s.itinerary_day_id === dayId && s.isNew))
+        .map(s => (s.itinerary_day_id === dayId ? { ...s, isDeleted: true } : s)))
+      setServicesChanged(true)
+    }
     if (itinerary) setItinerary({ ...itinerary, total_days: newDays.length })
   }
 
@@ -661,6 +676,15 @@ export default function ItineraryEditorPage() {
     setServicesChanged(true)
   }
 
+  /** A service as its row: without the page's own markers. */
+  const serviceRow = (service: ItineraryService) => {
+    const row: Partial<ItineraryService> = { ...service }
+    delete row.isNew
+    delete row.isDeleted
+    delete row.day_number
+    return row as Omit<ItineraryService, 'isNew' | 'isDeleted' | 'day_number'>
+  }
+
   const calculateServiceTotal = (service: ItineraryService) => {
     const rate = service.rate_non_eur || service.rate_eur || 0
     return (service.quantity ?? 0) * rate
@@ -691,8 +715,8 @@ export default function ItineraryEditorPage() {
     const newDays = [...days]
     const [removed] = newDays.splice(dragIndex, 1)
     newDays.splice(dropIndex, 0, removed)
-    newDays.forEach((day, index) => { day.day_number = index + 1 })
-    setDays(newDays)
+    // The save moves each day's date with its new place (day-save-plan.ts).
+    setDays(renumberDays(newDays))
     setDraggedDay(null)
   }
 
@@ -715,6 +739,7 @@ export default function ItineraryEditorPage() {
       // this wrote 0 over a priced trip — live ITN-S-2026-6386.)
       const liveServices = services.filter(s => !s.isDeleted)
       const clientTotal = itineraryClientTotal(liveServices, itinerary.margin_percent)
+      const plan = daySavePlan({ days, removedIds: removedDayIds, startDate: itinerary.start_date })
 
       const { error: itinError } = await supabase
         .from('itineraries')
@@ -722,7 +747,9 @@ export default function ItineraryEditorPage() {
           trip_name: itinerary.trip_name,
           tier: itinerary.tier,
           package_type: itinerary.package_type,
-          total_days: days.length,
+          // Never 0 from days that did not load; the end date follows the days.
+          ...(days.length > 0 ? { total_days: days.length } : {}),
+          ...(days.length > 0 && plan.endDate ? { end_date: plan.endDate } : {}),
           ...(liveServices.length > 0 ? { total_cost: clientTotal } : {}),
           status: itinerary.status, // Preserve the current status
           updated_at: new Date().toISOString()
@@ -732,14 +759,30 @@ export default function ItineraryEditorPage() {
       if (itinError) throw itinError
 
 
-      // 2. Update each day
-      for (const day of days) {
+      // 2. The days (day-save-plan.ts): removed ones deleted with their
+      //    services, renumbered ones parked out of the way, then every day
+      //    written with its number and date — saved days first, so a new day
+      //    never takes a number a saved one still holds.
+      for (const id of plan.toDelete) {
+        const { error } = await supabase.from('itinerary_days').delete().eq('id', id)
+        if (error) throw error
+      }
+      for (const { id, parkNumber } of plan.toPark) {
+        const { error } = await supabase.from('itinerary_days').update({ day_number: parkNumber }).eq('id', id)
+        if (error) throw error
+      }
+      // A new day's placeholder id → the id it was saved under.
+      const savedDayId = new Map<string, string>()
+      const ordered = [...days.filter(d => isSavedDayId(d.id)), ...days.filter(d => !isSavedDayId(d.id))]
+      for (const day of ordered) {
         // A priced itinerary's flags are read from its lines, so the share
         // page and the tasks say what is booked; an unpriced one keeps the
         // boxes as ticked.
         const booked = isPriced ? includesFromLines(linesOf(day.id)) : null
+        const date = plan.dateOf(day.day_number)
         const dayData = {
           day_number: day.day_number,
+          ...(date ? { date } : {}),
           title: day.title,
           city: day.city,
           description: day.description,
@@ -752,9 +795,7 @@ export default function ItineraryEditorPage() {
           hotel_included: booked ? booked.hotel : day.services?.hotel ?? false
         }
 
-        const isRealUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(day.id)
-
-        if (!isRealUUID) {
+        if (!isSavedDayId(day.id)) {
           const { data: newDay, error: insertError } = await supabase
             .from('itinerary_days')
             .insert({ ...dayData, itinerary_id: itineraryId, tenant_id: itinerary.tenant_id })
@@ -762,7 +803,7 @@ export default function ItineraryEditorPage() {
             .single()
 
           if (insertError) throw insertError
-          if (newDay) day.id = newDay.id
+          if (newDay) savedDayId.set(day.id, newDay.id)
 
         } else {
           const { error: updateError } = await supabase
@@ -789,15 +830,16 @@ export default function ItineraryEditorPage() {
         // Insert new services
         const toInsert = services.filter(s => s.isNew && !s.isDeleted)
         for (const service of toInsert) {
-          const { isNew, isDeleted, day_number, ...serviceData } = service
+          const serviceData = serviceRow(service)
           // The placeholder `new-…` id is not a valid uuid and must not reach the insert.
           delete (serviceData as { id?: unknown }).id
-          // Make sure we have a valid day ID
-          const day = days.find(d => d.day_number === day_number)
-          if (day) {
+          // Filed by the day it was added to — by id, not by a day number a
+          // reorder may have changed since.
+          const dayId = savedDayId.get(service.itinerary_day_id ?? '') ?? service.itinerary_day_id ?? ''
+          if (isSavedDayId(dayId)) {
             const { data: newService, error } = await supabase
               .from('itinerary_services')
-              .insert({ ...serviceData, itinerary_day_id: day.id, tenant_id: itinerary.tenant_id })
+              .insert({ ...serviceData, itinerary_day_id: dayId, tenant_id: itinerary.tenant_id })
               .select()
               .single()
 
@@ -814,7 +856,7 @@ export default function ItineraryEditorPage() {
         // Update existing services
         const toUpdate = services.filter(s => !s.isNew && !s.isDeleted)
         for (const service of toUpdate) {
-          const { isNew, isDeleted, day_number, ...serviceData } = service
+          const serviceData = serviceRow(service)
           const { error } = await supabase
             .from('itinerary_services')
             .update(serviceData)
@@ -832,6 +874,17 @@ export default function ItineraryEditorPage() {
         setServicesChanged(false)
       }
 
+      // The page now holds what was saved: new days under their ids, every
+      // day at its saved number, nothing left to delete.
+      setDays(prev => prev.map(d => ({ ...d, id: savedDayId.get(d.id) ?? d.id, saved_number: d.day_number })))
+      setRemovedDayIds([])
+      if (savedDayId.size > 0) {
+        setServices(prev => prev.map(sv => {
+          const id = sv.itinerary_day_id ? savedDayId.get(sv.itinerary_day_id) : undefined
+          return id ? { ...sv, itinerary_day_id: id } : sv
+        }))
+        setExpandedDays(prev => new Set([...prev].map(id => savedDayId.get(id) ?? id)))
+      }
 
       return true
 

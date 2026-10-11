@@ -54,7 +54,7 @@ export default function ItinerariesPage() {
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Days</strong> &mdash; Each has a title; click <strong>Edit</strong> on a day for its city, description and where the night is spent (<strong>Overnight in</strong>, or <strong>No overnight</strong>). A night with a hotel booked takes the hotel&apos;s city.</li>
-          <li><strong>Reorder</strong> &mdash; Drag a day card by its grip</li>
+          <li><strong>Reorder</strong> &mdash; Drag a day card by its grip; the dates follow the new order when you save</li>
           <li><strong>Add Another Day</strong> and <strong>Remove this day</strong></li>
           <li><strong>Services &amp; Pricing</strong> &mdash; <strong>Add Service</strong> on a day: Transportation, Guide, Entrance Fee, Meal, Accommodation, Activity, Tips, Supplies or Service Fee, with its supplier, quantity and rate</li>
           <li><strong>Price in Grid</strong> &mdash; Saves and opens the trip in the Quote Builder, which prices every service from your rates</li>

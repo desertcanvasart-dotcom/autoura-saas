@@ -27,6 +27,8 @@ import { soldAccommodationItems } from '@/app/pricing-grid/lib/single-supplement
 import { loadGridRates } from '@/lib/pricing/grid-rates'
 import { repriceGridDays, repriceWarnings } from '@/lib/pricing/grid-reprice'
 import { calculateGrandTotals } from '@/app/pricing-grid/lib/calculator'
+import { repickVehicles } from '@/app/pricing-grid/lib/option-filters'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from '@/app/pricing-grid/lib/throughout-guide'
 import type { GridConfig, GridDay, RateOption } from '@/app/pricing-grid/types'
 import type { Json, TablesInsert } from '@/types/database.types'
@@ -101,7 +103,11 @@ export async function POST(request: NextRequest) {
     // same lists the grid's dropdowns read, for this trip's tier and date.
     // The grid's own date: none when the trip has none, as its dropdowns read them.
     const gridRates = await loadGridRates(supabase, tenant_id, { tier: config.tier, startDate: config.startDate || null })
-    const priced = repriceGridDays(body.days as GridDay[], gridRates as Record<string, RateOption[]>)
+    // The vehicle for the travellers saved, whatever the tab last showed: a
+    // pax changed after the route was picked kept the old vehicle's price.
+    const routeOptions = ((gridRates as Record<string, RateOption[]>).route) ?? []
+    const sized = repickVehicles(body.days as GridDay[], routeOptions, pax)
+    const priced = repriceGridDays(sized, gridRates as Record<string, RateOption[]>)
     const days = priced.days
 
     // `resolveMarginPercent`, not `|| 25`: 0 is an at-cost grid, and `0 || 25`
@@ -122,6 +128,13 @@ export async function POST(request: NextRequest) {
     const totals = calculateGrandTotals(days, gridConfig, { throughoutGroupExtraEur: throughout.totalEur })
     const finalSupplierTotal = totals.totalCost
     const finalSellingTotal = totals.sellingPriceTotal
+    // Every figure above is in the tenant's run currency — the rates' own
+    // (lib/rates/run-currency.ts). The grid's Currency is a display choice
+    // only, so the record is labelled with the currency its amounts are in:
+    // stamping config.currency saved a EUR 2,500 trip as "USD 2,500". The
+    // itinerary page reprices its lines from the same rates, so it stays in
+    // the run currency too.
+    const recordCurrency = await getTenantRunCurrency(supabase, tenant_id)
 
     // The office's own address is never the client's: "Price in Grid" from a
     // message the office sent fills the client's email with the office's
@@ -176,7 +189,7 @@ export async function POST(request: NextRequest) {
       // its own total.
       margin_percent: marginPct,
       profit: round2(finalSellingTotal - finalSupplierTotal),
-      currency: config.currency || 'EUR',
+      currency: recordCurrency,
       status: 'draft',
       notes: `Created via Pricing Grid | ${config.clientType?.toUpperCase()} | ${pax} pax`,
     }
@@ -403,7 +416,7 @@ export async function POST(request: NextRequest) {
         .from('b2c_quotes')
         .update({
           ...quotePriceFields({
-            pax, tier: config.tier || 'standard', currency: config.currency || 'EUR',
+            pax, tier: config.tier || 'standard', currency: recordCurrency,
             supplierTotal: finalSupplierTotal, sellingTotal: finalSellingTotal, marginPercent: marginPct,
           }),
           ...(linkedClientId ? { client_id: linkedClientId } : {}),
@@ -448,7 +461,7 @@ export async function POST(request: NextRequest) {
             quote_number: quoteNum || `B2C-${Date.now()}`,
             num_travelers: pax,
             tier: config.tier,
-            currency: config.currency || 'EUR',
+            currency: recordCurrency,
             status: 'draft',
             total_cost: finalSupplierTotal,
             // The SAME resolved value the price was computed from above.
@@ -493,6 +506,7 @@ export async function POST(request: NextRequest) {
       quoteAction,
       previousSellingTotal,
       sellingTotal: finalSellingTotal,
+      currency: recordCurrency,
       clientId: linkedClientId,
       clientLinkedBy: clientLink.how,
       redirectUrl: redirectUrl || `/itineraries/${itineraryId}`,

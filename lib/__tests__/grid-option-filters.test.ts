@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { citiesOf, facetsOf, filterOptions, onePerRoute, routeLabel, vehicleLabel } from '@/app/pricing-grid/lib/option-filters'
-import type { RateOption } from '@/app/pricing-grid/types'
+import { citiesOf, facetsOf, filterOptions, onePerRoute, repickVehicles, routeLabel, vehicleLabel } from '@/app/pricing-grid/lib/option-filters'
+import type { GridDay, RateOption } from '@/app/pricing-grid/types'
 
 const tier = (route: string, vehicle: string, min: number, max: number, rate: number, extra: Record<string, unknown> = {}): RateOption => ({
   id: `${route}__${vehicle.toLowerCase()}`, name: `${vehicle} (${min}-${max} pax) — ${route}`,
@@ -89,5 +89,35 @@ describe('cruises narrow by port and cabin', () => {
     expect(citiesOf(cruises)).toEqual(['Aswan', 'Luxor'])
     expect(facetsOf(cruises)).toEqual([{ field: 'category', values: ['Standard', 'Suite'] }])
     expect(filterOptions(cruises, cruises, { city: '*', facets: { category: 'Suite' }, search: '' }).map(o => o.id)).toEqual(['c2'])
+  })
+})
+
+// Changing the travellers in the Quote Builder kept the vehicle picked for the
+// old group: 2 pax in a sedan, raised to 10, still priced the sedan.
+describe('repickVehicles', () => {
+  const day = (rateId: string, extra: Record<string, unknown> = {}): GridDay => ({
+    id: 'd1', dayNumber: 1, title: 'Cairo', city: 'Cairo',
+    slots: [
+      { slotId: 'route', selectedItems: [{ rateId, name: 'x', rateEur: 30, rateNonEur: 30, ...extra }], customAmount: 0 },
+      { slotId: 'water', selectedItems: [{ rateId: 'w', name: 'Water', rateEur: 2, rateNonEur: 2 }], customAmount: 0 },
+    ],
+  } as GridDay)
+
+  it('moves a picked route to the vehicle that seats the new group', () => {
+    const [d] = repickVehicles([day('CAIRO-AIRPORT__sedan')], routes, 10)
+    const item = d.slots[0].selectedItems[0]
+    expect(item.rateId).toBe('CAIRO-AIRPORT__van')
+    expect(item.rateEur).toBe(60)
+    expect(item.name).toBe('Van (3-12 pax) — CAIRO-AIRPORT')
+  })
+
+  it('returns the same days when every vehicle already fits', () => {
+    const days = [day('CAIRO-AIRPORT__van')]
+    expect(repickVehicles(days, routes, 5)).toBe(days)
+  })
+
+  it('leaves untiered transport (a cruise package) alone', () => {
+    const days = [day('cruise-pkg-1')]
+    expect(repickVehicles(days, routes, 30)).toBe(days)
   })
 })

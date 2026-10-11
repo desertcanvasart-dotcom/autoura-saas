@@ -74,7 +74,7 @@ export default function B2CPricingPage() {
           <li><strong>Each day</strong> &mdash; Its own cost, also in the day bar</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          The <strong>Currency</strong> setting shows the prices in any of 12 currencies.
+          The <strong>Currency</strong> setting shows the prices in any of 12 currencies. The itinerary and its quote are saved in the currency your rates are in.
         </p>
         <DocScreenshot src="/docs/b2c-pricing/pricing-grid.jpg" alt="The Quote Builder" />
       </section>

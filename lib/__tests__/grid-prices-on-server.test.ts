@@ -83,7 +83,8 @@ describe('repriceGridDays', () => {
 describe('where the grid’s prices come from', () => {
   it('the save prices from the rates and its own engine — never the browser’s totals', () => {
     const save = src('app/api/pricing-grid/save/route.ts')
-    expect(save).toContain('const priced = repriceGridDays(body.days as GridDay[]')
+    expect(save).toContain('const sized = repickVehicles(body.days as GridDay[], routeOptions, pax)')
+    expect(save).toContain('const priced = repriceGridDays(sized,')
     expect(save).toContain('const totals = calculateGrandTotals(days, gridConfig, { throughoutGroupExtraEur: throughout.totalEur })')
     expect(save).not.toContain('totals?.sellingPriceTotal')
     expect(save).not.toContain('body.throughout_extras')

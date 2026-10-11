@@ -189,6 +189,37 @@ function foldExtras(
   }
 }
 
+/**
+ * The engine's price with the programme's option rows on top: each option
+ * listed, the chosen ones in the cost, margin and selling price exactly as the
+ * rows path counts them (composeQuoteTotals). The rate sheet stays the
+ * programme's own — options are bought on top of it.
+ */
+export function withProgrammeOptions(
+  result: PriceCalculationResult,
+  options: CalculatedService[],
+  chosen: OptionalContribution[],
+  marginPercent: number,
+  optionHoles: { kind?: string; message: string }[],
+): PriceCalculationResult {
+  if (options.length === 0 && optionHoles.length === 0) return result
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const t = composeQuoteTotals({ subtotalCost: 0, optionals: chosen, marginPercent })
+  const selling = r2(result.selling_price + t.baseSellingPrice)
+  const holes = [...result.holes, ...optionHoles]
+  return {
+    ...result,
+    optional_services: [...result.optional_services, ...options],
+    optional_total: r2(result.optional_total + t.optionalSellingTotal),
+    total_cost: r2(result.total_cost + t.costTotal),
+    margin_amount: r2(result.margin_amount + t.marginAmount),
+    selling_price: selling,
+    price_per_person: result.num_pax > 0 ? r2(selling / result.num_pax) : 0,
+    holes,
+    complete: holes.length === 0,
+  }
+}
+
 // Get transport package for cruise sightseeing (kept for package deals)
 async function getTransportPackage(packageType: string, originCity: string, destCity: string, tenantId?: string): Promise<any | null> {
   const admin = getSupabaseAdmin()
@@ -443,146 +474,13 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
       return json({ error: 'Failed to fetch services' }, { status: 500 })
     }
 
-    // ============================================
-    // AUTO-PRICING FALLBACK
-    // If no services AND template uses day builder, use auto-pricing
-    // ============================================
-    if ((!services || services.length === 0) && templateId) {
+    // Which engine prices this variation. Option rows alone do not make a
+    // programme of rows: a day-built programme given an option used to fall
+    // into the row path with nothing but that option to price, and came out
+    // at 0. The rows path is for variations that list their own services.
+    const variationRows = (services || []) as any[]
+    const useEngine = !!templateId && !variationRows.some((s) => !s.is_optional)
 
-
-
-      // Determine effective margin (partner override)
-      let effectiveMargin = margin_percent
-      if (partner_id) {
-        const { data: partner } = await (getSupabaseAdmin() as any)
-          .from('b2b_partners')
-          .select('default_margin_percent')
-          .eq('id', partner_id)
-          .eq('tenant_id', tenantId)
-          .single()
-
-        if ((partner as any)?.default_margin_percent) {
-          effectiveMargin = (partner as any).default_margin_percent
-        }
-      }
-
-      // Call auto-pricing service. travelDate MUST be forwarded: it was
-      // dropped here for months, so every dated hotel/cruise period and the
-      // operator's seasonal uplift were silently ignored — a Christmas and an
-      // August departure priced identically while the response stamped
-      // `season` beside the number. (mealPlan/includeAccommodation were
-      // removed from PricingParams: the engine never read them.)
-      const autoPriceResult = await calculateAutoPricing({
-        templateId,
-        tenantId,
-        tier: effectiveTier,
-        numPax: num_pax,
-        isEurPassport: is_eur_passport,
-        language,
-        travelDate: travel_date,
-        marginPercent: effectiveMargin,
-        tourLeaderIncluded: tour_leader_included,
-        guideGrade: guide_grade,
-        guideMode: guide_mode
-      })
-
-      if (!autoPriceResult.success) {
-        return json({ 
-          error: 'Auto-pricing failed', 
-          warnings: autoPriceResult.warnings 
-        }, { status: 500 })
-      }
-
-      // Convert auto-pricing result to B2B format
-      const travelDate = new Date(travel_date)
-      const season = getSeason(travelDate)
-
-      // THE ROWS MUST ADD UP TO THE SUBTOTAL. The engine emits a per-person
-      // line ONCE — quantity 1, lineTotal = the per-person amount — and scales
-      // it by the group when it totals. Passed through as-is, the calculator
-      // showed "Lunch · per_pax · Qty 1 · 10.00" under a subtotal that had
-      // charged it for every passenger: reported from production 2026-09-21,
-      // rows summing to 112.47 above a subtotal of 124.48 for two people. The
-      // app's other two pricing paths (the variation-services path below, and
-      // quote-from-itinerary) already send a per-person line as quantity =
-      // passengers and total = unit × passengers; this one now does too, so a
-      // saved quote's lines also add up to its total.
-      const perPaxQuantity = (s: { isPerPax?: boolean; quantity?: number }): number =>
-        scaleForGroup(s, num_pax).quantity
-      const perPaxTotal = (s: { isPerPax?: boolean; lineTotal?: number }): number =>
-        scaleForGroup(s, num_pax).lineTotal
-
-      const convertedServices: CalculatedService[] = autoPriceResult.services.map((s: any) => ({
-        service_id: s.id,
-        service_name: s.serviceName,
-        service_category: s.serviceType,
-        rate_type: s.serviceType,
-        rate_source: s.rateSource,
-        quantity_mode: s.quantityMode,
-        quantity: perPaxQuantity(s),
-        unit_cost: s.unitCost,
-        line_total: perPaxTotal(s),
-        is_optional: s.isOptional,
-        day_number: s.dayNumber,
-        pricing_note: s.notes,
-        unpriced: s.unpriced,
-        included: s.included,
-        issue: s.issue,
-      }))
-
-      const convertedOptional: CalculatedService[] = autoPriceResult.optionalServices.map((s: any) => ({
-        service_id: s.id,
-        service_name: s.serviceName,
-        service_category: s.serviceType,
-        rate_type: s.serviceType,
-        rate_source: s.rateSource,
-        quantity_mode: s.quantityMode,
-        quantity: s.quantity,
-        unit_cost: s.unitCost,
-        line_total: s.lineTotal,
-        is_optional: true,
-        day_number: s.dayNumber,
-        pricing_note: s.notes
-      }))
-
-      const result: PriceCalculationResult = {
-        variation_id: v.id,
-        variation_name: v.variation_name,
-        template_name: template?.template_name || '',
-        num_pax,
-        travel_date,
-        season,
-        is_eur_passport,
-        tour_leader_included,  // NEW
-        guide_grade,
-        guide_mode,
-        services: convertedServices,
-        optional_services: convertedOptional,
-        subtotal_cost: autoPriceResult.subtotalCost,
-        optional_total: autoPriceResult.optionalTotal,
-        total_cost: autoPriceResult.totalCost,
-        tour_leader_cost: autoPriceResult.tourLeaderCost,  // NEW
-        margin_percent: autoPriceResult.marginPercent,
-        margin_amount: autoPriceResult.marginAmount,
-        selling_price: autoPriceResult.sellingPrice,
-        price_per_person: autoPriceResult.pricePerPerson,
-        single_supplement: autoPriceResult.singleSupplement || 0,  // NEW
-        currency: autoPriceResult.currency,
-        pax_pricing_table: autoPriceResult.paxPricingTable,  // NEW - for rate sheet
-        // Harness: propagate completeness from the hardened engine.
-        complete: autoPriceResult.complete,
-        holes: (autoPriceResult.holes || []).map((h) => ({ kind: h.kind, message: h.message })),
-        // Notes that do not stop a price but the operator should see — a cruise
-        // whose sailing days do not match the travel date, a sleeper with no
-        // single cabin. They were computed and then dropped here.
-        warnings: autoPriceResult.warnings || [],
-      }
-
-      return json({
-        success: true,
-        data: foldExtras(result, extrasCatalogue, extraSelections),
-      })
-    }
 
     // ============================================
     // ORIGINAL LOGIC: Process tour_variation_services
@@ -637,7 +535,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
     const chosenOptionals: OptionalContribution[] = []
 
     // Process each service
-    for (const svc of (services || [])) {
+    for (const svc of variationRows) {
       const service = svc as any
       let unitCost = 0
       let lineTotal = 0
@@ -931,6 +829,127 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
         calculatedServices.push(calculatedService)
         subtotalCost += lineTotal
       }
+    }
+
+    // ============================================
+    // THE DAY ENGINE
+    // A day-built programme with no service rows of its own is priced by the
+    // engine; its option rows (Tour Manager) are priced above and added on.
+    // ============================================
+    if (useEngine) {
+      // Call auto-pricing service. travelDate MUST be forwarded: it was
+      // dropped here for months, so every dated hotel/cruise period and the
+      // operator's seasonal uplift were silently ignored — a Christmas and an
+      // August departure priced identically while the response stamped
+      // `season` beside the number. (mealPlan/includeAccommodation were
+      // removed from PricingParams: the engine never read them.)
+      const autoPriceResult = await calculateAutoPricing({
+        templateId,
+        tenantId,
+        tier: effectiveTier,
+        numPax: num_pax,
+        isEurPassport: is_eur_passport,
+        language,
+        travelDate: travel_date,
+        marginPercent: effectiveMargin,
+        tourLeaderIncluded: tour_leader_included,
+        guideGrade: guide_grade,
+        guideMode: guide_mode
+      })
+
+      if (!autoPriceResult.success) {
+        return json({ 
+          error: 'Auto-pricing failed', 
+          warnings: autoPriceResult.warnings 
+        }, { status: 500 })
+      }
+
+      // Convert auto-pricing result to B2B format
+      // THE ROWS MUST ADD UP TO THE SUBTOTAL. The engine emits a per-person
+      // line ONCE — quantity 1, lineTotal = the per-person amount — and scales
+      // it by the group when it totals. Passed through as-is, the calculator
+      // showed "Lunch · per_pax · Qty 1 · 10.00" under a subtotal that had
+      // charged it for every passenger: reported from production 2026-09-21,
+      // rows summing to 112.47 above a subtotal of 124.48 for two people. The
+      // app's other two pricing paths (the variation-services path below, and
+      // quote-from-itinerary) already send a per-person line as quantity =
+      // passengers and total = unit × passengers; this one now does too, so a
+      // saved quote's lines also add up to its total.
+      const perPaxQuantity = (s: { isPerPax?: boolean; quantity?: number }): number =>
+        scaleForGroup(s, num_pax).quantity
+      const perPaxTotal = (s: { isPerPax?: boolean; lineTotal?: number }): number =>
+        scaleForGroup(s, num_pax).lineTotal
+
+      const convertedServices: CalculatedService[] = autoPriceResult.services.map((s: any) => ({
+        service_id: s.id,
+        service_name: s.serviceName,
+        service_category: s.serviceType,
+        rate_type: s.serviceType,
+        rate_source: s.rateSource,
+        quantity_mode: s.quantityMode,
+        quantity: perPaxQuantity(s),
+        unit_cost: s.unitCost,
+        line_total: perPaxTotal(s),
+        is_optional: s.isOptional,
+        day_number: s.dayNumber,
+        pricing_note: s.notes,
+        unpriced: s.unpriced,
+        included: s.included,
+        issue: s.issue,
+      }))
+
+      const convertedOptional: CalculatedService[] = autoPriceResult.optionalServices.map((s: any) => ({
+        service_id: s.id,
+        service_name: s.serviceName,
+        service_category: s.serviceType,
+        rate_type: s.serviceType,
+        rate_source: s.rateSource,
+        quantity_mode: s.quantityMode,
+        quantity: s.quantity,
+        unit_cost: s.unitCost,
+        line_total: s.lineTotal,
+        is_optional: true,
+        day_number: s.dayNumber,
+        pricing_note: s.notes
+      }))
+
+      const result: PriceCalculationResult = {
+        variation_id: v.id,
+        variation_name: v.variation_name,
+        template_name: template?.template_name || '',
+        num_pax,
+        travel_date,
+        season,
+        is_eur_passport,
+        tour_leader_included,  // NEW
+        guide_grade,
+        guide_mode,
+        services: convertedServices,
+        optional_services: convertedOptional,
+        subtotal_cost: autoPriceResult.subtotalCost,
+        optional_total: autoPriceResult.optionalTotal,
+        total_cost: autoPriceResult.totalCost,
+        tour_leader_cost: autoPriceResult.tourLeaderCost,  // NEW
+        margin_percent: autoPriceResult.marginPercent,
+        margin_amount: autoPriceResult.marginAmount,
+        selling_price: autoPriceResult.sellingPrice,
+        price_per_person: autoPriceResult.pricePerPerson,
+        single_supplement: autoPriceResult.singleSupplement || 0,  // NEW
+        currency: autoPriceResult.currency,
+        pax_pricing_table: autoPriceResult.paxPricingTable,  // NEW - for rate sheet
+        // Harness: propagate completeness from the hardened engine.
+        complete: autoPriceResult.complete,
+        holes: (autoPriceResult.holes || []).map((h) => ({ kind: h.kind, message: h.message })),
+        // Notes that do not stop a price but the operator should see — a cruise
+        // whose sailing days do not match the travel date, a sleeper with no
+        // single cabin. They were computed and then dropped here.
+        warnings: autoPriceResult.warnings || [],
+      }
+
+      return json({
+        success: true,
+        data: foldExtras(withProgrammeOptions(result, optionalServices, chosenOptionals, effectiveMargin, holes), extrasCatalogue, extraSelections),
+      })
     }
 
     // Calculate totals. An option the operator has priced is added AFTER

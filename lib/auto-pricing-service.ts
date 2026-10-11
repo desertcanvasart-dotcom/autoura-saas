@@ -4759,7 +4759,9 @@ export async function calculateDayBasedPricing(
     // The tour leader pays CUSTOMER fare on tickets (B-item 2).
     tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax + staffPerPax,
     paxFrom: PAX_COUNTS[0],
-    paxTo: PAX_COUNTS[PAX_COUNTS.length - 1],
+    // A group larger than the sheet is priced at its own size: 50 travellers
+    // used to be priced as the 40-pax row and that total split 50 ways.
+    paxTo: Math.max(PAX_COUNTS[PAX_COUNTS.length - 1], Math.floor(Number(requestedPax) || 0)),
   })
 
   // ============================================
@@ -4799,7 +4801,9 @@ export async function calculateDayBasedPricing(
     paxPricing,
     complete: holes.length === 0,
     holes,
-    currency: 'EUR',
+    // Every rate above was normalized into the tenant's run currency; the
+    // result said 'EUR' whatever that was.
+    currency: await getTenantRunCurrency(getSupabaseAdmin(), catalogScope.tenantId),
     marginPercent,
     warnings
   }
@@ -4978,6 +4982,21 @@ export interface PricingResult {
   holes: PricingHole[]
 }
 
+/** One rate-sheet block with the seasonal premium in its price and margin. */
+export function withSeason<B extends { marginAmount: number; sellingPrice: number; pricePerPerson: number }>(
+  block: B, numPax: number, season: Parameters<typeof computeUplift>[0]['season'],
+): B {
+  const amount = Math.round(computeUplift({ sellingPrice: block.sellingPrice, season }).amount * 100) / 100
+  if (amount === 0) return block
+  const sellingPrice = Math.round((block.sellingPrice + amount) * 100) / 100
+  return {
+    ...block,
+    marginAmount: Math.round((block.marginAmount + amount) * 100) / 100,
+    sellingPrice,
+    pricePerPerson: numPax > 0 ? Math.round((sellingPrice / numPax) * 100) / 100 : 0,
+  }
+}
+
 /**
  * BACKWARD COMPATIBLE FUNCTION
  */
@@ -5113,6 +5132,14 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
   const upliftAmount = Math.round(uplift.amount * 100) / 100
   const sellingWithSeason = Math.round((pricing.sellingPrice + upliftAmount) * 100) / 100
   const perPersonWithSeason = numPax > 0 ? Math.round((sellingWithSeason / numPax) * 100) / 100 : 0
+  // The premium is ours, so it is margin; and the rate sheet carries it at
+  // every group size. It used to be in the selling price alone — the margin
+  // and the partner's price table read as if the departure were ordinary.
+  const paxPricingTable = dayResult.paxPricing.map(row => ({
+    ...row,
+    withoutLeader: withSeason(row.withoutLeader, row.numPax, season),
+    withLeader: withSeason(row.withLeader, row.numPax, season),
+  }))
 
   return {
     success: true,
@@ -5137,7 +5164,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     totalCost: pricing.totalCost,
     tourLeaderCost: tourLeaderIncluded ? paxResult.withLeader.tourLeaderCost : 0,
     marginPercent: dayResult.marginPercent,
-    marginAmount: pricing.marginAmount,
+    marginAmount: Math.round((pricing.marginAmount + upliftAmount) * 100) / 100,
     sellingPriceBeforeSeason: pricing.sellingPrice,
     seasonUplift: upliftAmount,
     seasonName: uplift.seasonName,
@@ -5147,7 +5174,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     currency: dayResult.currency,
     ratesUsed,
     warnings: dayResult.warnings,
-    paxPricingTable: dayResult.paxPricing,
+    paxPricingTable,
     singleSupplement: dayResult.singleSupplement,
     tripleReduction: dayResult.tripleReduction,
     complete: dayResult.complete,
