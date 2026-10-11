@@ -45,16 +45,17 @@ export async function GET(request: NextRequest) {
     const { data: reminders, error } = await query
     if (error) throw error
 
-    const { count: totalCount } = await supabase
-      .from('invoice_reminders')
-      .select('id', { count: 'exact', head: true })
-
-    const { data: stats } = await supabase
-      .from('invoice_reminders')
-      .select('status')
-
-      const sentCount = stats?.filter((r: any) => r.status === 'sent').length || 0
-      const failedCount = stats?.filter((r: any) => r.status === 'failed').length || 0
+    // Counted, not read: the stats read every row (capped by PostgREST at
+    // 1000), and "has more" compared against the UNFILTERED total, so Failed
+    // Only kept offering Load More with nothing left.
+    const countOf = async (only?: string) => {
+      let q = supabase.from('invoice_reminders').select('id', { count: 'exact', head: true })
+      if (only) q = q.eq('status', only)
+      const { count } = await q
+      return count || 0
+    }
+    const [allCount, sentCount, failedCount] = await Promise.all([countOf(), countOf('sent'), countOf('failed')])
+    const totalCount = status && status !== 'all' ? (status === 'sent' ? sentCount : status === 'failed' ? failedCount : await countOf(status)) : allCount
 
     return NextResponse.json({
       success: true,
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
         hasMore: (offset + limit) < (totalCount || 0)
       },
       stats: {
-        total: stats?.length || 0,
+        total: allCount,
         sent: sentCount,
         failed: failedCount
       }

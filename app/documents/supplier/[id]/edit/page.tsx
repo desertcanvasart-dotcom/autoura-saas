@@ -7,7 +7,11 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Plus, X, MapPin, Ticket, Calculator } from 'lucide-react'
 import CitySelect from '@/components/CitySelect'
-import { withPickedAttractions } from '@/lib/documents/voucher-lines'
+import { attractionUnitRate, withPickedAttractions } from '@/lib/documents/voucher-lines'
+import type { ExchangeRate } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { createClient } from '@/app/supabase'
+import { showToast } from '@/app/contexts/ToastContext'
 import { VOUCHER_VEHICLE_TYPES } from '@/lib/documents/vehicle-types'
 import { TripBreadcrumb } from '@/components/nav/TripNav'
 import { withReturnTo, safeReturnPath, FROM_PARAM } from '@/lib/nav/return-to'
@@ -30,6 +34,8 @@ interface SelectedAttraction {
   eur_rate: number
   non_eur_rate: number
   rate_currency?: string | null
+  /** For the guests' passport, in the document's currency. */
+  unit_rate: number
   quantity: number
 }
 
@@ -58,6 +64,21 @@ export default function EditSupplierDocumentPage() {
   const [showAttractionPicker, setShowAttractionPicker] = useState(false)
   const [attractionSearch, setAttractionSearch] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
+  // The guests' passport (from the linked itinerary; non-EU, the grid's
+  // default, without one) and the rates to convert a fee into the
+  // document's currency.
+  const [euPassport, setEuPassport] = useState(false)
+  const [fxRates, setFxRates] = useState<ExchangeRate[]>([])
+  const { tenant } = useTenant()
+  const runCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
+  const documentCurrency = (document?.currency as string | undefined) || runCurrency
+  const unitFor = (fee: { eur_rate: number; non_eur_rate?: number | null; rate_currency?: string | null }) =>
+    attractionUnitRate(fee, { euPassport, runCurrency, documentCurrency, rates: fxRates })
+  useEffect(() => {
+    fetch('/api/exchange-rates').then(r => r.json()).then(d => {
+      if (d?.success && Array.isArray(d.data)) setFxRates(d.data)
+    }).catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     fetchDocument()
@@ -71,6 +92,11 @@ export default function EditSupplierDocumentPage() {
       if (result.success) {
         setDocument(result.data)
         setBaseTotal(Number(result.data.total_cost) || 0)
+        if (result.data.itinerary_id) {
+          const { data: itn } = await createClient()
+            .from('itineraries').select('is_euro_passport').eq('id', result.data.itinerary_id).maybeSingle()
+          if (itn?.is_euro_passport != null) setEuPassport(itn.is_euro_passport === true)
+        }
       } else {
         setError('Document not found')
       }
@@ -131,8 +157,14 @@ export default function EditSupplierDocumentPage() {
     if (selectedAttractions.find(a => a.id === fee.id)) {
       return
     }
+    const unit = unitFor(fee)
+    if (unit === null) {
+      showToast('error', `No exchange rate from ${(fee.rate_currency || runCurrency).toUpperCase()} to ${documentCurrency} — add one in Settings, or change the document's currency.`)
+      return
+    }
     
     const newAttraction: SelectedAttraction = {
+      unit_rate: unit,
       id: fee.id,
       attraction_name: fee.attraction_name,
       city: fee.city,
@@ -160,9 +192,18 @@ export default function EditSupplierDocumentPage() {
   }
 
   // Calculate total for selected attractions
+  // Every row is in the document's currency (unitFor), so they add up.
   const calculateAttractionsTotal = () => {
-    return selectedAttractions.reduce((sum, a) => sum + (a.eur_rate * a.quantity), 0)
+    return Math.round(selectedAttractions.reduce((sum, a) => sum + (a.unit_rate * a.quantity), 0) * 100) / 100
   }
+
+  // A change of passport or currency re-rates the fees already picked.
+  useEffect(() => {
+    setSelectedAttractions(prev => prev.map(a => {
+      const unit = attractionUnitRate(a, { euPassport, runCurrency, documentCurrency, rates: fxRates })
+      return unit === null ? a : { ...a, unit_rate: unit }
+    }))
+  }, [euPassport, runCurrency, documentCurrency, fxRates])
 
   // Auto-update document total when attractions change
   useEffect(() => {
@@ -172,7 +213,7 @@ export default function EditSupplierDocumentPage() {
         setDocument((prev: any) => prev ? { ...prev, total_cost: baseTotal + attractionsTotal } : prev)
       }
     }
-  }, [selectedAttractions])
+  }, [selectedAttractions, baseTotal])
 
   // Get unique cities from entrance fees
   const cities = Array.from(new Set(entranceFees.map(f => f.city))).sort()
@@ -543,6 +584,17 @@ export default function EditSupplierDocumentPage() {
                   <Ticket className="w-5 h-5 text-primary-600" />
                   <h2 className="text-lg font-semibold text-gray-900">Entrance Fees</h2>
                 </div>
+                <div className="flex items-center gap-2">
+                {/* The guests' passport picks the fee's EU or non-EU price. */}
+                <select
+                  value={euPassport ? 'eu' : 'non_eu'}
+                  onChange={(e) => setEuPassport(e.target.value === 'eu')}
+                  className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+                  title="The guests' passport: EU or non-EU prices"
+                >
+                  <option value="non_eu">Non-EU passport</option>
+                  <option value="eu">EU passport</option>
+                </select>
                 <button
                   onClick={() => setShowAttractionPicker(true)}
                   className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center gap-1.5"
@@ -550,6 +602,7 @@ export default function EditSupplierDocumentPage() {
                   <Plus className="w-4 h-4" />
                   Add Attraction
                 </button>
+                </div>
               </div>
 
               {/* Selected Attractions Table */}
@@ -560,7 +613,7 @@ export default function EditSupplierDocumentPage() {
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Attraction</th>
                         <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Rate (EUR)</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Rate ({documentCurrency})</th>
                         <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Qty</th>
                         <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Total</th>
                         <th className="px-4 py-2 w-10"></th>
@@ -579,7 +632,7 @@ export default function EditSupplierDocumentPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className="text-sm text-gray-700">{fmtRate(attraction.eur_rate, attraction, 2)}</span>
+                            <span className="text-sm text-gray-700">{documentCurrency} {attraction.unit_rate.toFixed(2)}</span>
                           </td>
                           <td className="px-4 py-3 text-center">
                             <input
@@ -592,7 +645,7 @@ export default function EditSupplierDocumentPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <span className="text-sm font-semibold text-primary-600">
-                              {fmtRate(attraction.eur_rate * attraction.quantity, attraction, 2)}
+                              {documentCurrency} {(attraction.unit_rate * attraction.quantity).toFixed(2)}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -616,15 +669,7 @@ export default function EditSupplierDocumentPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className="text-lg font-bold text-primary-600">
-                            {(() => {
-                              // A total is only honest when every row shares one
-                              // currency — raw numbers in different currencies
-                              // must never be summed under one symbol (A-item 3).
-                              const currencies = new Set(selectedAttractions.map(a => a.rate_currency || ''))
-                              return currencies.size > 1
-                                ? '\u2014 (mixed currencies)'
-                                : fmtRate(calculateAttractionsTotal(), selectedAttractions[0], 2)
-                            })()}
+                            {documentCurrency} {calculateAttractionsTotal().toFixed(2)}
                           </span>
                         </td>
                         <td></td>

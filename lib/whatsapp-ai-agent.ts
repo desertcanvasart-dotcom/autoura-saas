@@ -907,12 +907,14 @@ export class ToolExecutor {
             .order('date', { ascending: true })
 
           if (!error && capacityData && capacityData.length > 0) {
-            const capacityMap = new Map<string, { status: string; available_slots: number; reason?: string }>()
+            const capacityMap = new Map<string, { status: string; available_slots: number; max_groups: number; reason?: string }>()
 
             capacityData.forEach(entry => {
+              const max = Number(entry.max_groups) || 0
               capacityMap.set(entry.date, {
                 status: entry.status,
-                available_slots: entry.max_groups - entry.booked_groups,
+                available_slots: max - (Number(entry.booked_groups) || 0),
+                max_groups: max,
                 reason: entry.reason
               })
             })
@@ -928,9 +930,15 @@ export class ToolExecutor {
             }
 
             const blackoutDates = dates.filter(d => capacityMap.get(d)?.status === 'blackout')
+            // Busy is the operator's call: a date marked Busy is not offered,
+            // whatever its counts — it used to be offered unless Booked Groups
+            // had also reached Max Groups. A date that is full (counts set,
+            // none left) is busy whatever its status says.
             const busyDates = dates.filter(d => {
               const cap = capacityMap.get(d)
-              return cap?.status === 'busy' && cap.available_slots <= 0
+              if (!cap) return false
+              const full = Number.isFinite(cap.available_slots) && cap.max_groups > 0 && cap.available_slots <= 0
+              return cap.status === 'busy' || (cap.status !== 'blackout' && full)
             })
             const limitedDates = dates.filter(d => capacityMap.get(d)?.status === 'limited')
 

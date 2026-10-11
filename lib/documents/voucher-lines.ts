@@ -15,6 +15,8 @@
 //     lost its lines. The picker cannot be loaded back (there is no column
 //     for it), so what it holds is lines to ADD.
 
+import { convertCurrency, type ExchangeRate } from '@/lib/currency'
+
 type Line = Record<string, unknown>
 
 function nonEmpty(list: unknown): list is Line[] {
@@ -37,6 +39,9 @@ export interface PickedAttraction {
   attraction_name: string
   city?: string | null
   eur_rate: number
+  /** The rate for the guests' passport, in the voucher's own currency
+   *  (attractionUnitRate). eur_rate is the fallback for older callers. */
+  unit_rate?: number
   quantity: number
 }
 
@@ -50,8 +55,27 @@ export function withPickedAttractions(services: unknown, picked: PickedAttractio
       service_type: 'entrance_fee',
       city: a.city ?? null,
       quantity: a.quantity,
-      unit_rate: a.eur_rate,
-      total_cost: a.eur_rate * a.quantity,
+      unit_rate: a.unit_rate ?? a.eur_rate,
+      total_cost: Math.round((a.unit_rate ?? a.eur_rate) * a.quantity * 100) / 100,
     })),
   ]
+}
+
+/**
+ * An entrance fee's rate for the voucher: the EU or non-EU price by the
+ * guests' passport (non-EU when the fee has none of its own), converted from
+ * the rate's currency into the voucher's. Null when there is no rate to
+ * convert with — the picker then refuses it rather than add, say, an EGP fee
+ * to a USD total. It used to take the EU price in its own currency, always.
+ */
+export function attractionUnitRate(
+  fee: { eur_rate: number; non_eur_rate?: number | null; rate_currency?: string | null },
+  opts: { euPassport: boolean; runCurrency: string; documentCurrency: string; rates: ExchangeRate[] },
+): number | null {
+  const nonEu = Number(fee.non_eur_rate) || 0
+  const base = opts.euPassport || nonEu <= 0 ? Number(fee.eur_rate) || 0 : nonEu
+  const from = (fee.rate_currency || opts.runCurrency || 'EUR').toUpperCase()
+  const to = (opts.documentCurrency || opts.runCurrency || 'EUR').toUpperCase()
+  const converted = convertCurrency(base, from, to, opts.rates)
+  return converted === null ? null : Math.round(converted * 100) / 100
 }

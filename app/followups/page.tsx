@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { dueBucket, dueThisWeek, followupTypeOf, formatDueDay } from '@/lib/followups/followup-rules'
+import { shiftDateISO, todayLocal } from '@/lib/today'
 
 const supabase = createClient()
 
@@ -29,23 +31,8 @@ interface Followup {
   } | null
 }
 
-// client_followups has no type column: AddFollowupModal encodes the type as a
-// label prefix in description ("Phone Call - <client>"). Reverse that mapping.
-const DESCRIPTION_LABEL_TO_TYPE: Record<string, string> = {
-  'Phone Call': 'call',
-  'Email': 'email',
-  'WhatsApp Message': 'whatsapp',
-  'Meeting': 'meeting',
-  'Send Quote': 'quote',
-  'Booking Confirmation': 'booking_confirmation',
-  'Payment Reminder': 'payment_reminder',
-  'Request Feedback': 'feedback',
-}
-
-const getFollowupType = (description: string): string => {
-  const label = description.split(' - ')[0]
-  return DESCRIPTION_LABEL_TO_TYPE[label] || 'other'
-}
+// The type and the day of a follow-up: lib/followups/followup-rules.ts.
+const getFollowupType = followupTypeOf
 
 export default function FollowupDashboard() {
   const [followups, setFollowups] = useState<Followup[]>([])
@@ -110,13 +97,11 @@ export default function FollowupDashboard() {
 
   const snoozeFollowup = async (id: string, days: number) => {
     try {
-      const newDate = new Date()
-      newDate.setDate(newDate.getDate() + days)
-
+      // From the user's own today — toISOString() gave the UTC date.
       const { error } = await supabase
         .from('client_followups')
-        .update({ 
-          due_date: newDate.toISOString().split('T')[0]
+        .update({
+          due_date: shiftDateISO(todayLocal(), days)
         })
         .eq('id', id)
 
@@ -135,12 +120,19 @@ export default function FollowupDashboard() {
     if (!(await dialog.confirm({ message: 'Are you sure you want to delete this follow-up?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
-      const { error } = await supabase
+      const { data: gone, error } = await supabase
         .from('client_followups')
         .delete()
         .eq('id', id)
+        .select('id')
 
       if (error) throw error
+      // Deleting is for managers and admins (RLS). A member's delete removed
+      // nothing and still said "deleted".
+      if (!gone || gone.length === 0) {
+        showToast('error', 'Only managers and admins can delete follow-ups')
+        return
+      }
 
       showToast('success', 'Follow-up deleted successfully!')
       loadFollowups()
@@ -150,25 +142,13 @@ export default function FollowupDashboard() {
     }
   }
 
+  const today = todayLocal()
+
   const getFilteredFollowups = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const weekFromNow = new Date()
-    weekFromNow.setDate(weekFromNow.getDate() + 7)
-    weekFromNow.setHours(23, 59, 59, 999)
-
     let filtered = followups.filter(f => {
-      const dueDate = new Date(f.due_date)
-      dueDate.setHours(0, 0, 0, 0)
-
-      if (filter === 'today') {
-        return dueDate.getTime() === today.getTime()
-      } else if (filter === 'week') {
-        return dueDate >= today && dueDate <= weekFromNow
-      } else if (filter === 'overdue') {
-        return dueDate < today
-      }
+      if (filter === 'today') return dueBucket(f.due_date, today) === 'today'
+      if (filter === 'week') return dueThisWeek(f.due_date, today)
+      if (filter === 'overdue') return dueBucket(f.due_date, today) === 'overdue'
       return true
     })
 
@@ -185,53 +165,17 @@ export default function FollowupDashboard() {
 
   const filteredFollowups = getFilteredFollowups()
 
+  // The cards count exactly what their filters show.
   const stats = {
-    today: followups.filter(f => {
-      const dueDate = new Date(f.due_date)
-      const today = new Date()
-      dueDate.setHours(0, 0, 0, 0)
-      today.setHours(0, 0, 0, 0)
-      return dueDate.getTime() === today.getTime()
-    }).length,
-    week: followups.filter(f => {
-      const dueDate = new Date(f.due_date)
-      const today = new Date()
-      const weekFromNow = new Date()
-      weekFromNow.setDate(weekFromNow.getDate() + 7)
-      return dueDate >= today && dueDate <= weekFromNow
-    }).length,
-    overdue: followups.filter(f => {
-      const dueDate = new Date(f.due_date)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      return dueDate < today
-    }).length,
+    today: followups.filter(f => dueBucket(f.due_date, today) === 'today').length,
+    week: followups.filter(f => dueThisWeek(f.due_date, today)).length,
+    overdue: followups.filter(f => dueBucket(f.due_date, today) === 'overdue').length,
     total: followups.length
   }
 
-  const isOverdue = (dateString: string) => {
-    const dueDate = new Date(dateString)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return dueDate < today
-  }
-
-  const isToday = (dateString: string) => {
-    const dueDate = new Date(dateString)
-    const today = new Date()
-    dueDate.setHours(0, 0, 0, 0)
-    today.setHours(0, 0, 0, 0)
-    return dueDate.getTime() === today.getTime()
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
+  const isOverdue = (dateString: string) => dueBucket(dateString, today) === 'overdue'
+  const isToday = (dateString: string) => dueBucket(dateString, today) === 'today'
+  const formatDate = (dateString: string) => formatDueDay(dateString)
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {

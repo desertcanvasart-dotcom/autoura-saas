@@ -4,10 +4,13 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
 import { markSupplierDocumentSent } from '@/lib/documents/mark-sent'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { gateRole } from '@/lib/api-role-gate'
 
 // POST - Send supplier document via WhatsApp with PDF attachment
 export async function POST(request: NextRequest) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     if (!authResult.supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })

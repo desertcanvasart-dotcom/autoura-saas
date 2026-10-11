@@ -92,7 +92,7 @@ const STATUS_CONFIG = {
     label: 'Busy',
     color: 'bg-orange-100 text-orange-800 border-orange-200',
     dotColor: 'bg-orange-500',
-    description: 'Nearly at capacity'
+    description: 'Fully booked — not offered'
   },
   blackout: {
     label: 'Blackout',
@@ -1085,7 +1085,7 @@ export default function CapacityPage() {
                 <ul className="text-xs text-blue-800 space-y-1.5">
                   <li>• <strong>Available:</strong> WhatsApp AI confirms dates work</li>
                   <li>• <strong>Limited:</strong> AI suggests booking soon</li>
-                  <li>• <strong>Busy:</strong> AI may suggest alternatives</li>
+                  <li>• <strong>Busy</strong> (or Booked Groups at Max Groups): AI says you are fully booked and offers other dates</li>
                   <li>• <strong>Blackout:</strong> AI tells customer those dates are unavailable</li>
                 </ul>
                 <p className="text-xs text-blue-700 mt-3">

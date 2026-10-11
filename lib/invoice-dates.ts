@@ -73,3 +73,15 @@ export function daysOverdueOn(dueDate: unknown, todayISO: string): number | null
   if (!Number.isFinite(due) || !Number.isFinite(today)) return null
   return Math.round((today - due) / 86_400_000)
 }
+
+/**
+ * The reminder the daily job sends for an invoice this many days overdue
+ * (negative before it is due) — one ladder, read by the job and by the
+ * Payment Reminders list, which used to guess with its own.
+ */
+export function autoReminderType(daysOverdue: number): 'before_due_7' | 'on_due' | 'overdue_14' | 'overdue_30' {
+  if (daysOverdue <= -7) return 'before_due_7'
+  if (daysOverdue <= 0) return 'on_due'
+  if (daysOverdue <= 14) return 'overdue_14'
+  return 'overdue_30'
+}

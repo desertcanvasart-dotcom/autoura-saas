@@ -78,12 +78,15 @@ interface HistoryStats {
 }
 
 const REMINDER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  before_due_7: { label: '7 Days Before', color: 'bg-blue-100 text-blue-700' },
+  // The daily job's ladder (lib/invoice-dates autoReminderType): what the
+  // email says, not a day count — 'on_due' covers the whole last week.
+  before_due_7: { label: 'Upcoming', color: 'bg-blue-100 text-blue-700' },
+  on_due: { label: 'Due soon', color: 'bg-amber-100 text-amber-700' },
+  overdue_14: { label: 'Overdue', color: 'bg-red-100 text-red-700' },
+  overdue_30: { label: 'Long overdue', color: 'bg-red-100 text-red-800' },
+  // Earlier reminders (and bulk sends) kept their own types.
   before_due_3: { label: '3 Days Before', color: 'bg-blue-100 text-blue-700' },
-  on_due: { label: 'Due Today', color: 'bg-amber-100 text-amber-700' },
   overdue_7: { label: '7 Days Overdue', color: 'bg-orange-100 text-orange-700' },
-  overdue_14: { label: '14 Days Overdue', color: 'bg-red-100 text-red-700' },
-  overdue_30: { label: '30+ Days Overdue', color: 'bg-red-100 text-red-800' },
   manual: { label: 'Manual', color: 'bg-gray-100 text-gray-700' }
 }
 
@@ -116,10 +119,12 @@ export default function PaymentRemindersPage() {
     }
   }, [])
 
-  const fetchReminderHistory = useCallback(async (reset = false) => {
+  const fetchReminderHistory = useCallback(async (reset = false, from?: number) => {
     setHistoryLoading(true)
     try {
-      const offset = reset ? 0 : historyPage * 50
+      // Load More passes how many rows are shown: the page number it bumped
+      // had not updated yet, so the first click fetched page one again.
+      const offset = reset ? 0 : (from ?? historyPage * 50)
       const status = historyFilter === 'all' ? '' : `&status=${historyFilter}`
       
       const historyRes = await fetch(`/api/reminders/history?limit=50&offset=${offset}${status}`)
@@ -287,7 +292,7 @@ export default function PaymentRemindersPage() {
 
   const loadMoreHistory = () => {
     setHistoryPage(prev => prev + 1)
-    fetchReminderHistory(false)
+    fetchReminderHistory(false, reminderHistory.length)
   }
 
   const getReminderTypeConfig = (type: string) => {

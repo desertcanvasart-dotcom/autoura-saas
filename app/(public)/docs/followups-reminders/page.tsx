@@ -46,7 +46,7 @@ export default function FollowupsRemindersPage() {
           <li><strong>Due Today</strong>, <strong>This Week</strong> (the next seven days), <strong>Overdue</strong> and <strong>All Pending</strong> &mdash; click one to show it</li>
           <li><strong>Filters</strong> by priority and by type (Phone Call, Email, WhatsApp, Meeting, Send Quote)</li>
           <li><strong>Each follow-up</strong> &mdash; the client (click to open), priority, type, due date (marked Today or Overdue), notes, and the client&apos;s phone and email to call or write</li>
-          <li><strong>Complete</strong>, <strong>Snooze 1 day</strong> or <strong>Snooze 1 week</strong> (from today), and <strong>Delete</strong></li>
+          <li><strong>Complete</strong>, <strong>Snooze 1 day</strong> or <strong>Snooze 1 week</strong> (from today), and <strong>Delete</strong> (managers and admins)</li>
         </ul>
         <p className="text-gray-600">
           New follow-ups are made from the client, not here. A follow-up is overdue once its day has passed &mdash; there is no status to set. With nothing to show: <em>&ldquo;All Caught Up!&rdquo;</em>

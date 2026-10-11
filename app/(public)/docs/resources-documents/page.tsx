@@ -90,7 +90,7 @@ export default function ResourcesDocumentsPage() {
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li><strong>Email</strong> sends the PDF to the supplier from your connected Gmail (Settings &rarr; Email) and marks it Sent</li>
-          <li><strong>WhatsApp</strong> opens a chat with the supplier with the details as a message &mdash; attach the PDF yourself &mdash; then asks whether to mark it Sent</li>
+          <li><strong>WhatsApp</strong> sends the PDF to the supplier from your company&apos;s WhatsApp number and marks it Sent. If that cannot send, it offers to open the chat in your own WhatsApp instead &mdash; attach the PDF yourself &mdash; and then asks whether to mark it Sent.</li>
           <li>Each appears when the document has the supplier&apos;s email or phone</li>
         </ul>
         <p className="text-gray-600">

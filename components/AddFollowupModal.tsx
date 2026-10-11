@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { X, Clock, AlertCircle, Trash2 } from 'lucide-react'
+import { dueDay, followupTitle, followupTypeOf } from '@/lib/followups/followup-rules'
+import { todayLocal } from '@/lib/today'
 
 const supabase = createClient()
 
@@ -42,8 +44,10 @@ export default function AddFollowupModal({
   useEffect(() => {
     if (editFollowup) {
       setFormData({
-        followup_type: editFollowup.followup_type || 'call',
-        due_date: editFollowup.due_date || '',
+        // The type is the description's prefix, and the date box takes
+        // "YYYY-MM-DD" — not the stored timestamp (followup-rules.ts).
+        followup_type: followupTypeOf(editFollowup.description),
+        due_date: dueDay(editFollowup.due_date),
         priority: editFollowup.priority || 'medium',
         notes: editFollowup.notes || ''
       })
@@ -69,20 +73,7 @@ export default function AddFollowupModal({
         throw new Error('Please select a due date')
       }
 
-      // Generate a title based on the follow-up type
-      const followupTypeLabels: { [key: string]: string } = {
-        'call': 'Phone Call',
-        'email': 'Email',
-        'whatsapp': 'WhatsApp Message',
-        'meeting': 'Meeting',
-        'quote': 'Send Quote',
-        'booking_confirmation': 'Booking Confirmation',
-        'payment_reminder': 'Payment Reminder',
-        'feedback': 'Request Feedback',
-        'other': 'Follow-up'
-      }
-
-      const title = `${followupTypeLabels[formData.followup_type] || 'Follow-up'} - ${clientName}`
+      const title = followupTitle(formData.followup_type, clientName)
 
       if (isEditMode) {
         // Update existing followup
@@ -143,12 +134,15 @@ export default function AddFollowupModal({
     setError(null)
 
     try {
-      const { error: deleteError } = await supabase
+      const { data: gone, error: deleteError } = await supabase
         .from('client_followups')
         .delete()
         .eq('id', editFollowup.id)
+        .select('id')
 
       if (deleteError) throw deleteError
+      // RLS lets managers and admins delete; anyone else removed nothing.
+      if (!gone || gone.length === 0) throw new Error('Only managers and admins can delete follow-ups')
 
       // Success
       onSuccess()
@@ -239,7 +233,9 @@ export default function AddFollowupModal({
                 type="date"
                 value={formData.due_date}
                 onChange={(e) => handleChange('due_date', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                // A new one is due today or later (the user's today); an overdue
+                // one being edited keeps its date without blocking the save.
+                min={isEditMode ? undefined : todayLocal()}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />

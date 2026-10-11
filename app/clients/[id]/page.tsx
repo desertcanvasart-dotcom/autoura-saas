@@ -17,6 +17,9 @@ import {
 import { useTenant } from '@/app/contexts/TenantContext'
 import { formatCurrency } from '@/lib/currency'
 import { clientStageBadge, clientStageLabel } from '@/lib/client-stage'
+import { dueBucket, formatDueDay } from '@/lib/followups/followup-rules'
+import { todayLocal } from '@/lib/today'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface Client {
   id: string
@@ -149,6 +152,7 @@ export default function ClientProfilePage() {
       fetchClientData() // Reload data
     } catch (error) {
       console.error('Error marking followup complete:', error)
+      showToast('error', 'Could not mark the follow-up complete')
     }
   }
 
@@ -258,7 +262,8 @@ export default function ClientProfilePage() {
   const getStatusColor = (status: string | null) => clientStageBadge(status)
   
   const pendingFollowups = followups.filter(f => f.status === 'pending')
-  const overdueFollowups = pendingFollowups.filter(f => new Date(f.due_date) < new Date())
+  // Overdue once its day has passed — due today is not overdue (followup-rules.ts).
+  const overdueFollowups = pendingFollowups.filter(f => dueBucket(f.due_date, todayLocal()) === 'overdue')
 
   return (
     <>
@@ -875,7 +880,7 @@ export default function ClientProfilePage() {
             ) : (
               <div className="space-y-3">
                 {followups.map((followup) => {
-                  const isOverdue = followup.status === 'pending' && new Date(followup.due_date) < new Date()
+                  const isOverdue = followup.status === 'pending' && dueBucket(followup.due_date, todayLocal()) === 'overdue'
                   return (
                     <div
                       key={followup.id}
@@ -908,7 +913,7 @@ export default function ClientProfilePage() {
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
                               <span className={isOverdue ? 'text-red-600 font-semibold' : ''}>
-                                Due: {new Date(followup.due_date).toLocaleDateString()}
+                                Due: {formatDueDay(followup.due_date)}
                               </span>
                             </div>
                           </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
-import { completeChecklist, type ChecklistItem } from '@/lib/tasks/itinerary-tasks'
+import { reopenRefusal, completeChecklist, type ChecklistItem } from '@/lib/tasks/itinerary-tasks'
 import { gateRole } from '@/lib/api-role-gate'
 
 // GET - Fetch single task
@@ -111,6 +111,18 @@ export async function PUT(
           }
           updateData.checklist = done.items
         }
+      }
+      if (body.status !== 'done') {
+        const { data: current, error: readError } = await supabase
+          .from('tasks')
+          .select('checklist')
+          .eq('id', id)
+          .maybeSingle()
+        if (readError) throw readError
+        const refusal = Array.isArray(current?.checklist)
+          ? reopenRefusal(current.checklist as unknown as ChecklistItem[])
+          : null
+        if (refusal) return NextResponse.json({ error: refusal }, { status: 409 })
       }
       if (body.status === 'done') {
         updateData.completed_at = new Date().toISOString()

@@ -1,6 +1,6 @@
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
-import { daysOverdueOrNull, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { REMINDABLE_INVOICE_STATUSES, autoReminderType, daysOverdueOn, daysOverdueOrNull, isFirstReminderDue } from '@/lib/invoice-dates'
 import { escapeHtml } from '@/lib/html-escape'
 import { requireAuth } from '@/lib/supabase-server'
 import { tenantToday } from '@/lib/tenant-today'
@@ -251,18 +251,19 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    // Categorize by reminder type
-    const reminders = (invoices || []).map((invoice: any) => {
-      const dueDate = new Date(invoice.due_date)
-      const daysUntilDue = Math.floor((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      
-      let reminderType: string
-      if (daysUntilDue > 5) reminderType = 'before_due_7'
-      else if (daysUntilDue > 1) reminderType = 'before_due_3'
-      else if (daysUntilDue >= 0) reminderType = 'on_due'
-      else if (daysUntilDue >= -7) reminderType = 'overdue_7'
-      else if (daysUntilDue >= -14) reminderType = 'overdue_14'
-      else reminderType = 'overdue_30'
+    // The days and the type by the company's calendar and the daily job's
+    // own ladder (lib/invoice-dates). They used the server's clock and a
+    // ladder the job never sends: an invoice due today read "1 days overdue".
+    // An invoice never reminded is listed once its first reminder is due — a
+    // week before its due date — not months ahead; a paused one always is.
+    const reminders = (invoices || []).filter((invoice: any) => {
+      if (invoice.reminder_paused === true) return true
+      const daysOverdue = daysOverdueOn(invoice.due_date, today)
+      return daysOverdue !== null && isFirstReminderDue(invoice.next_reminder_date, daysOverdue)
+    }).map((invoice: any) => {
+      const daysOverdue = daysOverdueOn(invoice.due_date, today) ?? 0
+      const daysUntilDue = -daysOverdue
+      const reminderType = autoReminderType(daysOverdue)
 
       return {
         invoice_id: invoice.id,

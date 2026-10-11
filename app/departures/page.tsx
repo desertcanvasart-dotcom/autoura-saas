@@ -489,7 +489,9 @@ export default function DeparturesPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1">
-                      {departure.status !== 'cancelled' && departure.status !== 'full' && (
+                      {/* Every status can be changed: a Full or Cancelled one had no
+                          menu, so it could not be reopened. */}
+                      {(
                         <select
                           value={departure.status}
                           onChange={(e) => updateStatus(departure.id, e.target.value)}

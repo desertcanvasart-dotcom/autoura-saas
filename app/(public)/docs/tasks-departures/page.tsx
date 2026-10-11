@@ -52,6 +52,7 @@ export default function TasksDeparturesPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li>Each is due a set number of days before the trip (two weeks for hotels and flights, a week for transport and guides, fewer for the rest), and goes to the person you pick for each department</li>
           <li>The task holds a <strong>Checklist</strong>: day, date, city, service and supplier for each line, with a box to tick and the supplier&apos;s confirmation number. Its status follows the ticks.</li>
+          <li>A task whose bookings are all ticked is reopened by unticking the booking to redo, not by changing its status</li>
           <li><strong>Sync tasks</strong> after the trip changes: new lines are added, ticks and confirmation numbers are kept, and a line that left the trip is marked <em>&ldquo;No longer on the itinerary &mdash; cancel this booking&rdquo;</em> until you mark it <strong>Cancelled</strong></li>
           <li>Kinds with no department set up are skipped, and said so</li>
         </ul>
@@ -64,7 +65,7 @@ export default function TasksDeparturesPage() {
           Scheduled group departures &mdash; a tour on a date that travellers join. The list opens on <strong>Upcoming</strong>; the filter also offers All, Open, Limited, Full, Guaranteed and Cancelled, and <strong>Search tours&hellip;</strong> finds a tour by name or code. Each row shows the tour, its date and length, <strong>booked/max (N left)</strong> with a bar (yellow from 80%, red when full), the price per person, and its status.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li><strong>Status</strong> &mdash; change it from the row. As bookings come in it turns <strong>Limited</strong> at 80% and <strong>Full</strong> at 100% by itself, and <strong>Guaranteed</strong> once a guaranteed departure reaches its minimum.</li>
+          <li><strong>Status</strong> &mdash; change it from the row. As bookings come in it turns <strong>Limited</strong> at 80% and <strong>Full</strong> at 100% by itself, and <strong>Guaranteed</strong> once a guaranteed departure reaches its minimum; when bookings drop it goes back to Limited or Open. Draft and Cancelled are never changed for you.</li>
           <li><strong>Clone</strong> &mdash; the same tour on a new date</li>
           <li><strong>Delete</strong> &mdash; only while it has no pending or confirmed bookings</li>
         </ul>
@@ -93,7 +94,7 @@ export default function TasksDeparturesPage() {
         </ul>
         <DocScreenshot src="/docs/tasks-departures/capacity.jpg" alt="Capacity calendar in General Capacity view showing a month with date statuses (available/limited/busy/blackout) and per-date capacity settings" />
         <Tip>
-          <strong>What the WhatsApp AI does with it:</strong> on a <strong>Blackout</strong> date it tells the client you are not operating, with your reason; when a date is full (<strong>Booked Groups</strong> at <strong>Max Groups</strong>) it says the dates are busy and offers others; otherwise it says the dates work. For a trip starting within three days it does not check the calendar and answers that the notice is short.
+          <strong>What the WhatsApp AI does with it:</strong> on a <strong>Blackout</strong> date it tells the client you are not operating, with your reason; on a <strong>Busy</strong> date &mdash; or one that is full, <strong>Booked Groups</strong> at <strong>Max Groups</strong> &mdash; it says you are fully booked and offers other dates; on a <strong>Limited</strong> one it suggests booking soon; otherwise it says the dates work. For a trip starting within three days it does not check the calendar and answers that the notice is short.
         </Tip>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Tour Departures</h3>

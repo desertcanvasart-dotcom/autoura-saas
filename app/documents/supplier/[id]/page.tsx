@@ -15,6 +15,7 @@ import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
 import { withReturnTo, safeReturnPath, FROM_PARAM } from '@/lib/nav/return-to'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VOUCHER_VEHICLE_TYPES } from '@/lib/documents/vehicle-types'
+import { formatPhoneForWhatsApp } from '@/lib/communication-utils'
 
 interface SupplierDocument {
   id: string
@@ -216,25 +217,61 @@ export default function SupplierDocumentViewPage() {
     }
   }
 
-  // wa.me opens a chat with the text filled in; nothing is attached and this
-  // page cannot see whether it was sent. It used to mark the voucher sent the
-  // moment the chat opened. Now it asks.
+  // Sent from the company's WhatsApp number WITH the PDF attached
+  // (/api/whatsapp/send-supplier-document marks it sent). The button only
+  // opened a wa.me chat with text — no voucher — and a local number like
+  // 010… made a dead link. If the company's WhatsApp cannot send, the chat
+  // can still be opened from the user's own WhatsApp, the PDF attached by hand.
   const handleSendWhatsApp = async () => {
     if (!document || !document.supplier_contact_phone) {
       showToast('error', 'Supplier phone not available')
       return
     }
-    
-    const phone = document.supplier_contact_phone.replace(/\D/g, '')
+
+    setActionLoading('whatsapp')
+    try {
+      const pdf = await buildPdf(document)
+      const pdfBase64 = pdf.output('datauristring').split(',')[1]
+      const response = await fetch('/api/whatsapp/send-supplier-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: document.id,
+          documentType: DOCUMENT_TITLES[document.document_type],
+          pdfBase64,
+        }),
+      })
+      if (response.ok) {
+        setActionSuccess('Sent on WhatsApp with the PDF')
+        fetchDocument()
+        setTimeout(() => setActionSuccess(null), 5000)
+        return
+      }
+      const body = await response.json().catch(() => null)
+      const openOwn = await dialog.confirm({
+        title: 'WhatsApp',
+        message: `${body?.error || 'It could not be sent from your company’s WhatsApp.'}\n\nOpen the chat in your own WhatsApp instead? Download the PDF first to attach it.`,
+        confirmText: 'Open WhatsApp',
+        cancelText: 'Cancel',
+      })
+      if (!openOwn) return
+    } catch {
+      showToast('error', 'Could not send on WhatsApp')
+      return
+    } finally {
+      setActionLoading(null)
+    }
+
+    const phone = formatPhoneForWhatsApp(document.supplier_contact_phone, tenant?.operating_country)
+    const day = document.check_in || document.service_date
     const message = encodeURIComponent(
       `Dear ${document.supplier_contact_name || document.supplier_name},\n\n` +
       `${DOCUMENT_TITLES[document.document_type]} #${document.document_number}\n\n` +
       `Guest: ${document.client_name}\n` +
-      `Date: ${document.check_in || document.service_date || 'As specified'}\n\n` +
+      `Date: ${day ? new Date(`${String(day).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'As specified'}\n\n` +
       `Please confirm receipt.\n\n` +
       `Best regards,\n${tenant?.company_name || ''}`
     )
-    
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank')
 
     const sent = await dialog.confirm({
@@ -383,10 +420,11 @@ export default function SupplierDocumentViewPage() {
               {document.supplier_contact_phone && (
                 <button
                   onClick={handleSendWhatsApp}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center gap-1.5"
+                  disabled={actionLoading === 'whatsapp'}
+                  className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  WhatsApp
+                  {actionLoading === 'whatsapp' ? 'Sending...' : 'WhatsApp'}
                 </button>
               )}
               {document.status === 'sent' && (

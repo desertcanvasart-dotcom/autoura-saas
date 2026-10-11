@@ -652,6 +652,18 @@ export function completeChecklist(items: ChecklistItem[], now: string):
   }
 }
 
+/**
+ * Why a checklist task cannot be moved back to To Do / In Progress, or null.
+ * Its status follows its rows: reopening one whose every booking is ticked
+ * left "To Do · 2 of 2 booked", and the next Sync moved it back to Done. The
+ * booking to redo is unticked in the checklist instead — that reopens it.
+ */
+export function reopenRefusal(items: ChecklistItem[]): string | null {
+  return checklistProgress(items).complete
+    ? 'Every booking on this task is ticked. To reopen it, open the task and untick the booking to redo — the task reopens with it.'
+    : null
+}
+
 export type ChecklistChange =
   | { key: string; booked: boolean }
   | { key: string; confirmation: string | null }

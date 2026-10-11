@@ -1,6 +1,6 @@
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
-import { daysOverdueOn, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { daysOverdueOn, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES, autoReminderType } from '@/lib/invoice-dates'
 import { shiftDateISO, todayInTimeZone } from '@/lib/today'
 import { resolveTimeZone } from '@/lib/tenant-today'
 import { escapeHtml } from '@/lib/html-escape'
@@ -199,11 +199,7 @@ async function getHandler(request: NextRequest) {
         continue
       }
 
-      let reminderType = 'reminder'
-      if (daysOverdue <= -7) reminderType = 'before_due_7'
-      else if (daysOverdue <= 0) reminderType = 'on_due'
-      else if (daysOverdue <= 14) reminderType = 'overdue_14'
-      else reminderType = 'overdue_30'
+      const reminderType = autoReminderType(daysOverdue)
 
       const { subject, html } = generateReminderEmail(invoice, reminderType, daysOverdue)
 
