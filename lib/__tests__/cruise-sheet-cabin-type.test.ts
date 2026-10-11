@@ -77,6 +77,6 @@ describe('an older file cannot wipe a cabin', () => {
   // reset it to the default on an existing cruise.
   it('the import writes only the cells that hold something', () => {
     const route = readFileSync(join(process.cwd(), 'app/api/rates/bulk/import/route.ts'), 'utf8')
-    expect(route).toMatch(/if \(raw === '' \|\| raw === 'null'\) continue/)
+    expect(route).toMatch(/if \(isBlankCsvCell\(raw\)\) continue/)
   })
 })

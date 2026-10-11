@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { clearFixedCostsCache } from '@/lib/fixed-costs'
 
 // GET - List fixed daily costs
@@ -32,6 +33,10 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -63,6 +68,10 @@ export async function PUT(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -99,6 +108,10 @@ export async function DELETE(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 

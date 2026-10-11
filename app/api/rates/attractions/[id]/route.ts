@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // GET - Fetch single attraction
 export async function GET(
@@ -97,6 +98,10 @@ export async function PUT(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(
@@ -192,6 +197,10 @@ export async function DELETE(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(

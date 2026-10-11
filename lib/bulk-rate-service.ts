@@ -3,6 +3,7 @@ import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns, legacyColumn
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 import { formatSailingDaysCell, parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
 import { dateShapeIsReal } from '@/lib/rates/calendar-date'
+import { formatTiersCell, parseTiersCell } from '@/lib/rates/activity-tiers'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -325,6 +326,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('unit_label', 'Unit Label', 'text', false),
       col('min_capacity', 'Min Capacity', 'number', false),
       col('max_capacity', 'Max Capacity', 'number', false),
+      // Group-size bands for a tiered activity: "1-4:25; 5-8:40".
+      col('tiers', 'Tiers', 'text', false),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(),
       col('supplier_name', 'Supplier Name', 'text', false),
@@ -624,6 +627,21 @@ for (const [table, link] of Object.entries(RATE_PROPERTY_LINK)) {
 // VALIDATION
 // ============================================
 
+/** A yes/no cell, as the validator AND the writer read it — one rule, so a
+ *  "Y" the preview accepted is not then stored as false. null = not yes/no. */
+export function parseCsvBoolean(raw: string): boolean | null {
+  const lower = raw.trim().toLowerCase()
+  if (['true', '1', 'yes', 'y'].includes(lower)) return true
+  if (['false', '0', 'no', 'n'].includes(lower)) return false
+  return null
+}
+
+/** A cell that means "nothing": blank, or the word null in any case. */
+export function isBlankCsvCell(raw: string): boolean {
+  const v = raw.trim()
+  return v === '' || v.toLowerCase() === 'null'
+}
+
 /**
  * Parse a cell value based on the column type.
  */
@@ -631,7 +649,7 @@ function parseCell(value: string | undefined | null, colDef: ColumnDef): { parse
   const raw = (value ?? '').trim()
 
   // Empty value
-  if (raw === '' || raw === 'null' || raw === 'NULL') {
+  if (isBlankCsvCell(raw)) {
     if (colDef.required) {
       return { parsed: null, error: `${colDef.label} is required` }
     }
@@ -642,15 +660,14 @@ function parseCell(value: string | undefined | null, colDef: ColumnDef): { parse
     case 'number': {
       const num = Number(raw)
       if (isNaN(num)) {
-        return { parsed: null, error: `${colDef.label} must be a number` }
+        return { parsed: null, error: `${colDef.label} "${raw}" must be a number` }
       }
       return { parsed: num, error: null }
     }
     case 'boolean': {
-      const lower = raw.toLowerCase()
-      if (['true', '1', 'yes', 'y'].includes(lower)) return { parsed: true, error: null }
-      if (['false', '0', 'no', 'n'].includes(lower)) return { parsed: false, error: null }
-      return { parsed: null, error: `${colDef.label} must be true/false` }
+      const parsed = parseCsvBoolean(raw)
+      if (parsed !== null) return { parsed, error: null }
+      return { parsed: null, error: `${colDef.label} "${raw}" must be true or false` }
     }
     case 'date': {
       // Accept ISO dates or common formats — but only real days: the shape
@@ -704,6 +721,17 @@ export function validateImportData(
         errors.push({ row: rowNum, column: colDef.name, message: error })
         rowValid = false
       } else if (parsed !== null) {
+        // Activity bands: "1-4:25; 5-8:40".
+        if (colDef.name === 'tiers' && config.tableName === 'activity_rates') {
+          const res = parseTiersCell(String(parsed))
+          if ('error' in res) {
+            errors.push({ row: rowNum, column: colDef.name, message: res.error })
+            rowValid = false
+          } else {
+            parsedRow[colDef.name] = res.tiers
+          }
+          continue
+        }
         // Sailing days: weekday words only ("mon;fri", "any").
         if (colDef.name === 'sailing_days') {
           const { days, bad } = parseSailingDaysCell(parsed)
@@ -883,6 +911,7 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 /** Export cell: the named column, else its alias partner. */
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
   if (column === 'sailing_days') return formatSailingDaysCell(row.sailing_days)
+  if (column === 'tiers' && table === 'activity_rates') return formatTiersCell(row.tiers)
   const direct = row[column]
   if (direct !== null && direct !== undefined && direct !== 0) return direct
   if (table === 'nile_cruises') {
@@ -1037,6 +1066,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'board_basis') return 'bb'
   if (name === 'tier') return 'standard'
   if (name === 'sailing_days') return 'mon;fri'
+  if (name === 'tiers') return ''
   if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'

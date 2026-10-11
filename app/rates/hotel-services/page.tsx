@@ -14,6 +14,7 @@ import PricingBasisField from '@/components/rates/PricingBasisField'
 import { pricingBasisLabel, toPricingBasis, type PricingBasis } from '@/lib/pricing/pricing-basis'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
+import { uniqueServiceCode } from '@/lib/rates/unique-code'
 
 // ============================================
 // CONSTANTS
@@ -277,7 +278,8 @@ export default function HotelServicesPage() {
   const generateCode = () => {
     const svc = formData.service_type.replace('_', '').toUpperCase().substring(0, 6)
     const cat = formData.hotel_category.toUpperCase().substring(0, 3)
-    return `HOTEL-${svc}-${cat}`
+    // Steps past a code another rate has (two suppliers' porter rates).
+    return uniqueServiceCode(`HOTEL-${svc}-${cat}`, rates.filter(r => r.id !== editingRate?.id).map(r => r.service_code))
   }
 
   const handleAddNew = () => {

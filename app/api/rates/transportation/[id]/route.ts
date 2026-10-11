@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // ============================================
 // TRANSPORTATION RATES API - Single Record
@@ -64,6 +65,10 @@ export async function PUT(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(
@@ -128,6 +133,10 @@ export async function DELETE(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(

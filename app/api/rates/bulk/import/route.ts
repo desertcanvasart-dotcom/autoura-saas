@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons, propertyLinkFor } from '@/lib/bulk-rate-service'
+import { roleDenied } from '@/lib/api-role-gate'
+import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons, propertyLinkFor, parseCsvBoolean, isBlankCsvCell, EXAMPLE_ROW_KEY } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES, keepStoredPeriods } from '@/lib/rates/periods-csv'
 import { usesOneSheet, detectOneSheet, parseOneSheet, oneSheetEntity } from '@/lib/rates/rate-sheet'
 import { parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
+import { parseTiersCell } from '@/lib/rates/activity-tiers'
 import { sanitizeSeasons, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { linkRowsBySupplierName, supplierNameGapMessage } from '@/lib/rates/link-supplier-by-name'
 import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { clearPreferredSiblings, describeScope, isPreferredTable, PREFERRED_SCOPES } from '@/lib/rates/preferred'
 
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -175,6 +182,9 @@ export async function POST(request: NextRequest) {
     for (const kind of new Set(Object.values(vocabColumns))) vocab[kind] = await loadVocabulary(supabase, kind)
     const vocabErrors: Array<{ row: number; column: string; message: string }> = []
     const resolvedRows = importRows.map((row, i) => {
+      // The sample's example row is skipped below; its words ("standard",
+      // "bb") must not refuse the file for an agency that renamed them.
+      if (isExampleRow(row[config.uniqueKey[0]])) return row
       const { record, errors } = resolveRecordKeys(row, vocab, vocabColumns)
       for (const message of errors) vocabErrors.push({ row: lineOf(i), column: message.split(':')[0], message })
       return record as Record<string, string>
@@ -224,12 +234,23 @@ export async function POST(request: NextRequest) {
       const record: Record<string, any> = { tenant_id }
       for (const colDef of importableColumns) {
         const raw = (row[colDef.name] ?? '').trim()
-        if (raw === '' || raw === 'null') continue
+        // The validator's rules, exactly: "NULL" is blank there, so it must be
+        // blank here too (it was written as NaN → null over the stored value),
+        // and a "Y" it accepted is yes (it was stored as false).
+        if (isBlankCsvCell(raw)) continue
         switch (colDef.type) {
           case 'number': record[colDef.name] = Number(raw); break
-          case 'boolean': record[colDef.name] = ['true', '1', 'yes'].includes(raw.toLowerCase()); break
+          case 'boolean': record[colDef.name] = parseCsvBoolean(raw) === true; break
           default: record[colDef.name] = colDef.name === 'rate_currency' ? raw.toUpperCase() : raw
         }
+      }
+
+      // Activity bands arrive as the cell ("1-4:25; 5-8:40"); the table stores
+      // the list. (A bad cell was refused by validateImportData already.)
+      if (config.tableName === 'activity_rates' && typeof record.tiers === 'string') {
+        const res = parseTiersCell(record.tiers)
+        if ('tiers' in res) record.tiers = res.tiers
+        else delete record.tiers
       }
 
       // Sailing days arrive as the cell's words ("mon;fri"); the table stores
@@ -268,6 +289,14 @@ export async function POST(request: NextRequest) {
       rowsToUpsert.push(record)
     }
 
+    if (rowsToUpsert.length === 0 && exampleRowsSkipped > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `Every row is still the sample's example row (${EXAMPLE_ROW_KEY}). Fill in your own rates, delete the example row, and import again.`,
+        totalRows: importRows.length, validRows: 0, invalidRows: 0, inserted: 0, updated: 0, exampleRowsSkipped,
+      }, { status: 400 })
+    }
+
     // supplier_code is the portable cross-install key. Resolve it to THIS
     // tenant's supplier_id FIRST — it wins over the incoming supplier_id, which
     // is the other install's UUID and meaningless here. A code that matches no
@@ -279,13 +308,16 @@ export async function POST(request: NextRequest) {
     {
       const codes = [...new Set(rowsToUpsert.map(r => String(r.supplier_code ?? '').trim()).filter(Boolean))]
       if (codes.length > 0) {
-        const { data: byCode } = await (supabase
-          .from('suppliers') as unknown as {
-            select(c: string): { in(c: string, v: string[]): { eq(c: string, v: string): PromiseLike<{ data: Array<{ id: string; supplier_code: string | null }> | null }> } }
-          })
+        // Every code of this tenant's, matched whatever its case: an exact
+        // .in() found no "SUP-0001" for a sheet saying "sup-0001", and the
+        // row was refused as an unknown supplier. Paged past 1,000.
+        const { data: byCode } = await fetchAllPages((from, to) => supabase
+          .from('suppliers')
           .select('id, supplier_code')
-          .in('supplier_code', codes)
           .eq('tenant_id', tenant_id)
+          .not('supplier_code', 'is', null)
+          .order('id', { ascending: true })
+          .range(from, to)) as { data: Array<{ id: string; supplier_code: string | null }> | null }
         const idByCode = new Map((byCode ?? []).filter(s => s.supplier_code).map(s => [String(s.supplier_code).toLowerCase(), s.id]))
         const survivors: Record<string, any>[] = []
         for (const r of rowsToUpsert) {
@@ -430,34 +462,85 @@ export async function POST(request: NextRequest) {
     ]
     const BATCH_SIZE = 50
 
+    // Existence is checked on the FULL key, scoped to THIS tenant, and
+    // whatever the case: the key compares lower-cased (importRowKey), so the
+    // stored rows are read whole and the update is aimed at the STORED values
+    // — an exact .in()/.eq() on the file's "luxor" missed the stored "Luxor"
+    // and counted an update that wrote nothing, or inserted a twin. Paged.
+    // Two stored rates sharing one key are not updated at all: one row of the
+    // file would have overwritten both.
+    const storedByKey = new Map<string, Array<Record<string, unknown>>>()
+    {
+      const { data: existing } = await fetchAllPages((from, to) => (supabase
+        .from(config.tableName as 'accommodation_rates') as unknown as {
+          select(c: string): { eq(c: string, v: string): { order(c: string, o: { ascending: boolean }): { range(a: number, b: number): PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }> } } }
+        })
+        .select(['id', ...uniqueKey, ...(periodsTarget ? ['seasons'] : [])].join(', '))
+        .eq('tenant_id', tenant_id)
+        .order('id', { ascending: true })
+        .range(from, to))
+      for (const row of existing ?? []) {
+        const key = importRowKey(row, uniqueKey)
+        if (key === null) continue
+        const list = storedByKey.get(key)
+        if (list) list.push(row)
+        else storedByKey.set(key, [row])
+      }
+    }
+
+    // One preferred rate per scope (migration 354's unique index): the star
+    // toggle clears a row's siblings first, the import did not — a sheet
+    // marking a second preferred restaurant for a tier and meal failed its
+    // whole batch on the index. Now the same as the toggle: the file's
+    // preferred row clears the stored one; two in one file, the second is
+    // imported without the star and named.
+    if (isPreferredTable(config.tableName)) {
+      const table = config.tableName
+      const scopeCols = PREFERRED_SCOPES[table].columns
+      const scopeOf = (r: Record<string, unknown>) => scopeCols.map(c => String(r[c] ?? '').trim().toLowerCase()).join('\u0000')
+      const claimed = new Set<string>()
+      for (const r of partition.rows) {
+        if (r.is_preferred !== true) continue
+        const scope = scopeOf(r)
+        if (claimed.has(scope)) {
+          r.is_preferred = false
+          importErrors.push({
+            row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '),
+            operation: 'imported without the star',
+            message: `Another row in this file is already the preferred one for ${describeScope(table, r) || 'this scope'} — only one can be.`,
+          })
+          continue
+        }
+        claimed.add(scope)
+        const k = importRowKey(r, uniqueKey)
+        const stored = k !== null ? storedByKey.get(k) : undefined
+        const ownId = stored?.length === 1 ? String(stored[0].id) : '00000000-0000-0000-0000-000000000000'
+        const cleared = await clearPreferredSiblings(supabase, table, tenant_id, r, ownId)
+        if (cleared.error) importErrors.push({ row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '), message: cleared.error })
+      }
+    }
+
     for (let i = 0; i < partition.rows.length; i += BATCH_SIZE) {
       const batch = partition.rows.slice(i, i + BATCH_SIZE)
-      const keyValues = batch.map(r => r[uniqueKeyColumn]).filter(Boolean)
-
-      // Existence is checked on the FULL key, scoped to THIS tenant — the
-      // old lookup matched one column with no tenant filter, so a
-      // global-catalog row visible to the tenant classified the row as
-      // "existing" and the tenant-scoped update then silently did nothing.
-      const existingKeys = new Set<string>()
       // Hotels/cruises: the periods each existing row holds now (see below).
       const storedPeriods = new Map<string, unknown>()
-      if (keyValues.length > 0) {
-        const { data: existing } = await dynTable()
-          .select([...uniqueKey, ...(periodsTarget ? ['seasons'] : [])].join(', '))
-          .in(uniqueKeyColumn, keyValues)
-          .eq('tenant_id', tenant_id)
-        for (const row of existing ?? []) {
-          const key = importRowKey(row, uniqueKey)
-          if (key !== null) {
-            existingKeys.add(key)
-            if (periodsTarget) storedPeriods.set(key, row.seasons)
-          }
-        }
+      for (const r of batch) {
+        const k = importRowKey(r, uniqueKey)
+        const stored = k !== null ? storedByKey.get(k) : undefined
+        if (k !== null && stored?.length === 1 && periodsTarget) storedPeriods.set(k, stored[0].seasons)
       }
 
       const keyOf = (r: Record<string, unknown>) => importRowKey(r, uniqueKey)
-      const toInsert = batch.filter(r => { const k = keyOf(r); return k === null || !existingKeys.has(k) })
-      const toUpdate = batch.filter(r => { const k = keyOf(r); return k !== null && existingKeys.has(k) })
+      const matchesOf = (r: Record<string, unknown>) => { const k = keyOf(r); return k === null ? [] : storedByKey.get(k) ?? [] }
+      const toInsert = batch.filter(r => matchesOf(r).length === 0)
+      const toUpdate = batch.filter(r => matchesOf(r).length === 1)
+      for (const r of batch.filter(r => matchesOf(r).length > 1)) {
+        importErrors.push({
+          row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '),
+          operation: 'refused',
+          message: `${matchesOf(r).length} of your rates share this ${uniqueKey.join(' + ')} — give each its own code in the app first, so one row cannot overwrite them all.`,
+        })
+      }
 
       if (toInsert.length > 0) {
         const { error } = await dynTable().insert(toInsert)
@@ -490,8 +573,9 @@ export async function POST(request: NextRequest) {
             })
           }
         }
-        let updateQuery = dynTable().update(updateData).eq('tenant_id', tenant_id)
-        for (const col of uniqueKey) updateQuery = updateQuery.eq(col, record[col])
+        // Aimed at the one stored row this key matched, by its id.
+        const target = matchesOf(record)[0]
+        const updateQuery = dynTable().update(updateData).eq('tenant_id', tenant_id).eq('id', target.id)
         const { error } = await updateQuery
         if (error) importErrors.push({ row: uniqueKey.map(c => `${c}=${String(record[c])}`).join(', '), message: error.message })
         else updated++

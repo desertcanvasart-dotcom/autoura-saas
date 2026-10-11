@@ -26,9 +26,19 @@ let inserted: Record<string, unknown>[]
 let updated: Array<{ data: Record<string, unknown>; where: Record<string, unknown> }>
 let existing: Record<string, unknown>[]
 
+// A select chain: any filters, then await or .range() — the route reads
+// whole tables in pages now.
+const selectChain = (rows: () => unknown[]) => {
+  const chain: Record<string, unknown> = {}
+  for (const m of ['eq', 'in', 'not', 'order', 'ilike']) chain[m] = () => chain
+  chain.range = async () => ({ data: rows(), error: null })
+  chain.then = (ok: (v: unknown) => unknown) => ok({ data: rows(), error: null })
+  return chain
+}
+
 function stubDb() {
   const rateTable = {
-    select: () => ({ in: () => ({ eq: async () => ({ data: existing }) }) }),
+    select: () => selectChain(() => existing),
     insert: async (rows: Record<string, unknown>[]) => { inserted.push(...rows); return { error: null } },
     update: (data: Record<string, unknown>) => {
       const rec = { data, where: {} as Record<string, unknown> }
@@ -54,7 +64,7 @@ async function importCsv(csv: string, dryRun = false, table = 'accommodation_rat
 
 beforeEach(() => {
   inserted = []; updated = []; existing = []
-  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: 'tenant-1' })
+  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: 'tenant-1', role: 'manager' })
 })
 
 describe('importing the one hotel sheet', () => {

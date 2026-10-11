@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { parseSuppliersCsv, splitAgainstExisting, resolveImportTypes } from '@/lib/suppliers/import-csv'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { planNamedProperties, type NamedPropertyEntry, type SupplierRef, type ExistingProperty } from '@/lib/suppliers/property-csv-plan'
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })

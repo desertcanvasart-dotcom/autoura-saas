@@ -77,8 +77,7 @@
   ],
   "activity_rates": [
     "addon_note",
-    "is_addon",
-    "tiers"
+    "is_addon"
   ],
   "airport_staff_rates": [
     "airport_name",

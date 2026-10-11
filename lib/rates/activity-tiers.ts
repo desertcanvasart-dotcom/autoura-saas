@@ -146,3 +146,30 @@ export async function getTieredActivityRate(
   }
   return null
 }
+
+// ---- The CSV cell -----------------------------------------------------------
+// The activity sheet had no column for the bands, so an exported tiered
+// activity came back from a re-import as "tiered" with nothing to price from.
+// One cell, "min-max:rate" per band, separated by semicolons: "1-4:25; 5-8:40".
+
+/** The bands as one sheet cell; '' when there are none. */
+export function formatTiersCell(value: unknown): string {
+  const tiers = parseTiers(value)
+  if (!tiers) return ''
+  return tiers.map(t => `${t.min_pax}-${t.max_pax}:${t.rate_eur}`).join('; ')
+}
+
+/** A sheet cell back to bands, or an error naming what is wrong. */
+export function parseTiersCell(cell: string): { tiers: ActivityTier[] } | { error: string } {
+  const parts = cell.split(';').map(p => p.trim()).filter(Boolean)
+  const raw = parts.map(p => {
+    const m = /^(\d+)\s*-\s*(\d+)\s*:\s*(\d+(?:\.\d+)?)$/.exec(p)
+    return m ? { min_pax: Number(m[1]), max_pax: Number(m[2]), rate_eur: Number(m[3]) } : null
+  })
+  if (raw.length === 0 || raw.some(r => r === null)) {
+    return { error: `Tiers "${cell}" — write each band as min-max:price, separated by semicolons (1-4:25; 5-8:40)` }
+  }
+  const tiers = sanitizeTiers(raw)
+  if (!tiers) return { error: `Tiers "${cell}" — bands need a price above 0, a max of at least their min, and must not overlap` }
+  return { tiers }
+}

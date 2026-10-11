@@ -14,6 +14,7 @@ import PricingBasisField from '@/components/rates/PricingBasisField'
 import { pricingBasisLabel, toPricingBasis, type PricingBasis } from '@/lib/pricing/pricing-basis'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
+import { uniqueServiceCode } from '@/lib/rates/unique-code'
 
 // ============================================
 // CONSTANTS
@@ -287,7 +288,8 @@ export default function AirportServicesPage() {
 
   const generateCode = () => {
     const svc = formData.service_type.replace('_', '').toUpperCase().substring(0, 6)
-    return `AIR-${formData.airport_code}-${svc}-${formData.direction.substring(0, 3).toUpperCase()}`
+    // Steps past a code another rate has (two handlers at one airport).
+    return uniqueServiceCode(`AIR-${formData.airport_code}-${svc}-${formData.direction.substring(0, 3).toUpperCase()}`, rates.filter(r => r.id !== editingRate?.id).map(r => r.service_code))
   }
 
   const handleAddNew = () => {

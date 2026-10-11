@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import {
   SUPPLIER_CONTRACTS_BUCKET,
   isContractDocumentType,
@@ -80,6 +81,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const auth = await requireAuth()
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(auth.role, 'manage')
+    if (denied) return denied
     const { supabase } = auth
     if (!supabase) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
 
@@ -140,6 +145,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const auth = await requireAuth()
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(auth.role, 'manage')
+    if (denied) return denied
     const { supabase } = auth
     if (!supabase) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
 

@@ -91,7 +91,7 @@ beforeEach(() => {
   tenantCountry = null
   existingSuppliers = []
   existingProperties = []
-  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT })
+  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT, role: 'manager' })
   mockVocab.mockResolvedValue(VOCAB)
 })
 
