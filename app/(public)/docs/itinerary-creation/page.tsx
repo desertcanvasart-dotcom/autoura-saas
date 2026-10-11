@@ -44,7 +44,7 @@ export default function ItineraryCreationPage() {
           <li><strong>Tier</strong> &mdash; Your tiers (Budget, Standard, Deluxe, Luxury, or your own names); it picks the hotels and cruises offered</li>
           <li><strong>Guide</strong> / <strong>No Guide</strong> &mdash; No Guide removes the guide and the guide&apos;s tips. <strong>Spot</strong> or <strong>Throughout +1</strong> (one guide for the whole trip, with his bed, meals and flight seats), and the <strong>Guide language</strong>, which every day&apos;s guide follows.</li>
           <li><strong>B2C</strong> / <strong>B2B</strong> (Pricing) &mdash; Switching resets the markup to 25% or 10%; in B2B, <strong>Select Partner&hellip;</strong> takes the partner&apos;s default margin</li>
-          <li><strong>Currency</strong> &mdash; Any of 12 currencies, for display</li>
+          <li><strong>Currency</strong> &mdash; Shows the prices in any of 12 currencies; the trip is saved in your rates&apos; currency</li>
           <li><strong>Markup %</strong> &mdash; Your margin on cost</li>
         </ul>
         <p className="text-gray-600 mt-3">

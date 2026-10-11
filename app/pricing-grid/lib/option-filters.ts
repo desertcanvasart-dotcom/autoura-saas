@@ -11,7 +11,7 @@
 //
 // Pure: SlotRow and the tests share it.
 
-import type { RateOption } from '../types'
+import type { GridDay, RateOption } from '../types'
 
 type Located = RateOption & { origin_city?: string | null; destination_city?: string | null }
 
@@ -119,4 +119,44 @@ export function filterOptions(
   }
   if (q) pool = pool.filter(o => `${o.name} ${o.details ?? ''} ${optionCities(o).join(' ')}`.toLowerCase().includes(q))
   return pool
+}
+
+/** Every picked transport re-picked for `pax`: a tiered route's selection
+ *  moves to the vehicle that seats the group (vehicleForPax), so changing the
+ *  travellers changes the vehicle in the list, the live price and the save
+ *  alike. A route with no tiers in `routeOptions` (a cruise package, a typed
+ *  amount) is left as it is. Returns the same days when nothing moved. */
+export function repickVehicles(days: GridDay[], routeOptions: RateOption[], pax: number): GridDay[] {
+  const tiersByRoute = new Map<string, RateOption[]>()
+  for (const o of routeOptions) {
+    if (o.id.indexOf('__') === -1) continue
+    const k = routeKey(o)
+    const g = tiersByRoute.get(k)
+    if (g) g.push(o)
+    else tiersByRoute.set(k, [o])
+  }
+  let changed = false
+  const next = days.map(day => {
+    let dayChanged = false
+    const slots = day.slots.map(slot => {
+      if (slot.slotId !== 'route' || slot.selectedItems.length === 0) return slot
+      let slotChanged = false
+      const selectedItems = slot.selectedItems.map(item => {
+        const sep = item.rateId.indexOf('__')
+        const tiers = sep === -1 ? undefined : tiersByRoute.get(item.rateId.slice(0, sep))
+        if (!tiers) return item
+        const pick = vehicleForPax(tiers, pax)
+        if (pick.id === item.rateId) return item
+        slotChanged = true
+        return { ...item, rateId: pick.id, name: pick.name, rateEur: pick.rateEur, rateNonEur: pick.rateNonEur }
+      })
+      if (!slotChanged) return slot
+      dayChanged = true
+      return { ...slot, selectedItems }
+    })
+    if (!dayChanged) return day
+    changed = true
+    return { ...day, slots }
+  })
+  return changed ? next : days
 }

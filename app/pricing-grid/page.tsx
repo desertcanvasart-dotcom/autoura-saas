@@ -11,6 +11,7 @@ import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/through
 import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
+import { repickVehicles } from './lib/option-filters'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
 import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
@@ -280,6 +281,15 @@ function PricingGridContent() {
     })))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rates, ratesTier])
+
+  // The vehicle follows the group: a change of travellers moves every picked
+  // route to the vehicle that seats them (option-filters.ts), as the list and
+  // the B2B rate sheet already do. Nothing moves when nothing needs to.
+  useEffect(() => {
+    const routes = rates?.route
+    if (!routes?.length) return
+    setDays(prev => repickVehicles(prev, routes, config.pax))
+  }, [config.pax, rates])
 
   // Pre-fetch all exchange rates once on mount, then currency switching is instant
   const exchangeRatesCache = useRef<Record<string, number> | null>(null)
