@@ -15,8 +15,9 @@ export default function TransportPackagesDocsPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Transport Packages</h1>
       <p className="text-gray-600 mb-8">
-        A transport package is one price per vehicle for a whole route: the vehicle that stays with a
-        cruise group for its sightseeing, or the transfers around a sailing. Find it under{' '}
+        A transport package is one price per vehicle for a stretch of a trip: the vehicle that stays
+        with a cruise group for its sightseeing, the transfers around a sailing, a day tour, or a
+        multi-day road journey. Find it under{' '}
         <strong>Tours &rarr; Transport Packages</strong> (admins and managers). Ordinary transfers and
         day tours are priced from <strong>Rates &rarr; Transportation</strong> instead (see{' '}
         <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>).
@@ -93,9 +94,27 @@ export default function TransportPackagesDocsPage() {
             none is, or more than one is, the line is priced from your vehicles instead.
           </li>
         </ul>
-        <p className="text-gray-600">
-          Multi-Day Tour and Day Tour packages are stored but not priced anywhere yet.
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-2">Day Tour and Multi-Day Tour packages</h3>
+        <p className="text-gray-600 mb-3">
+          These price road days the same way, wherever a tour is priced from its days and in the Quote
+          Builder (offered on road days that start in the package&rsquo;s origin):
         </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li>
+            A <strong>Day Tour</strong> package covers one day with sightseeing in its origin city
+            &mdash; or, with a destination, a day trip from the origin to there.
+          </li>
+          <li>
+            A <strong>Multi-Day Tour</strong> package covers as many consecutive road days as its
+            duration: the first in the origin (or leaving it), the last in the destination.
+          </li>
+          <li>
+            The covered days take the package&rsquo;s vehicle price instead of their per-day transport
+            rates, listed once on the first day with &ldquo;Included&rdquo; on the others. A cruise
+            night, a flight or train day, or a day with its own transport list breaks the stretch.
+          </li>
+          <li>Two packages fitting the same days show a gap rather than one being chosen.</li>
+        </ul>
         <Tip>
           <strong>See it in action:</strong> the calculator and its partner rate sheets are on{' '}
           <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Pricing</Link>;

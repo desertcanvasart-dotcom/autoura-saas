@@ -119,7 +119,7 @@ export const CATEGORIES: DocCategory[] = [
     items: [
       { href: '/docs/tour-programs', icon: ClipboardList, title: 'Tour Manager', description: 'Your tour catalogue: create, duplicate or import tours, edit their days, add variations by tier, and browse them in Tour Inventory.' },
       { href: '/docs/importing-tours', icon: Upload, title: 'Importing Tours', description: 'The two-sheet procedure — the tour and its day-by-day itinerary — in order, with the rules the import enforces: every meal and every day\'s sightseeing stated, nothing guessed.' },
-      { href: '/docs/b2b-pricing-rules', icon: PackageSearch, title: 'Transport Packages', description: 'One price per vehicle for a cruise route, from your own vehicle types; the group size picks the vehicle.' },
+      { href: '/docs/b2b-pricing-rules', icon: PackageSearch, title: 'Transport Packages', description: 'One price per vehicle for a cruise, a day tour or a multi-day road journey, from your own vehicle types; the group size picks the vehicle.' },
     ],
   },
   {

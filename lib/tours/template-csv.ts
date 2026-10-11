@@ -281,6 +281,14 @@ const HEADER_MAP: Record<string, string> = (() => {
   return m
 })()
 
+// What a blank cell writes: an empty list, no value — or 0 nights, the one
+// optional number the table will not hold empty (duration_nights NOT NULL).
+function clearedValue(col: TemplateCsvColumn): unknown {
+  if (col.kind === 'list') return []
+  if (col.name === 'duration_nights') return 0
+  return null
+}
+
 const truthy = (v: string) => ['true', '1', 'yes', 'y', 'active', 'featured'].includes(v.trim().toLowerCase())
 const falsy = (v: string) => ['false', '0', 'no', 'n', 'inactive'].includes(v.trim().toLowerCase())
 
@@ -340,9 +348,16 @@ export function parseTemplatesCsv(
       const field = HEADER_MAP[slug(header)]
       if (!field || field === '_ignore') continue
       const v = (value ?? '').trim()
-      if (v === '') continue
       const col = TEMPLATE_CSV_COLUMNS.find(c => c.name === field)!
       if (col.readOnly) continue
+      if (v === '') {
+        // A column the sheet HAS, left blank, clears the field: that is how an
+        // exported sheet says "no image any more". A column the sheet does not
+        // have is never touched. A required column refuses a blank (below); a
+        // yes/no has nothing to clear to, so a blank leaves it as it is.
+        if (!col.required && col.kind !== 'bool') rec[field] = clearedValue(col)
+        continue
+      }
       if (col.kind === 'int') {
         const n = Number(v)
         if (Number.isInteger(n) && n >= 0) rec[field] = n

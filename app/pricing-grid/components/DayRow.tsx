@@ -218,6 +218,13 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
         if (selectedIds.has(o.id)) return true
         // Always show cruise transport packages on cruise-related days
         if ((o as any).service_type === 'cruise_transport_package') return isCruiseDay
+        // Day Tour / Multi-Day packages: road days starting in their origin
+        const pkgOpt = o as { service_type?: string; origin_city?: string | null }
+        if (pkgOpt.service_type === 'road_transport_package') {
+          if (isCruiseDay) return false
+          const from = pkgOpt.origin_city?.toLowerCase().trim() || ''
+          return from !== '' && relevantCities.has(from)
+        }
         // On pure cruise sailing days (not flight/transfer), hide individual transport
         if (isCruiseDay && !isFlightDay && !isTransferDay) return false
         if (relevantCities.size === 0) return false

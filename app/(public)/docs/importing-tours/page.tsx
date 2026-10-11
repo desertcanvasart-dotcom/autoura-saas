@@ -207,7 +207,7 @@ export default function ImportingToursPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">What the import will and will not do</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Tour rows update by code.</strong> An existing code is updated; a new code is created. Codes match whatever their letter case. Re-importing never touches days you have already built.</li>
-          <li><strong>A blank cell leaves the stored value alone.</strong> Clearing a cell in an exported sheet does not clear it on the tour; edit the tour in the Tour Manager instead.</li>
+          <li><strong>A blank cell clears the field; a missing column leaves it alone.</strong> Clear Image URL in an exported sheet and the tour loses its image; leave the column out of the sheet and the image stays. (A blank Duration Nights reads as 0; a blank yes/no column keeps its value.)</li>
           <li><strong>A days sheet replaces the whole itinerary</strong> of every tour it names, and leaves every tour it does not name alone. Export fresh before editing rather than reusing an old file.</li>
           <li><strong>One refused day refuses its whole tour.</strong> Writing the other days would delete the refused one, so that tour keeps its current itinerary until the sheet is fixed.</li>
           <li><strong>Nothing is guessed.</strong> A row with a problem is refused with the reason, and the rest of the file still imports. The result names the first reason; fix it and import again to see the next.</li>

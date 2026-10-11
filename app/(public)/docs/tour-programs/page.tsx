@@ -100,8 +100,8 @@ export default function TourProgramsPage() {
         <Tip>
           <strong>Note:</strong> the tour holds the trip&rsquo;s day structure &mdash; cities, meals,
           cruise days and nights &mdash; not its hotels or prices. Saving the trip again in B2B mode
-          rewrites that tour&rsquo;s name, type, duration, cities, days and short description from the
-          trip and makes it active again, so make lasting changes in the Quote Builder, not here. Saving
+          refreshes the tour&rsquo;s days, duration and cities from the trip (the B2B quote is priced
+          from them); its name, type, description and Active / Featured stay as you set them here. Saving
           at another tier adds a variation for it.
         </Tip>
 
@@ -151,6 +151,7 @@ export default function TourProgramsPage() {
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
           <li>the <strong>variation name</strong>, coloured by its tier</li>
           <li><strong>private or shared</strong>, and the <strong>passenger range</strong></li>
+          <li>an <strong>edit</strong> icon &mdash; change or delete the variation</li>
           <li>a <strong>calculator</strong> icon &mdash; opens the B2B Calculator on this variation</li>
           <li><strong>Options</strong> &mdash; the optional services and upgrades this variation sells</li>
         </ul>
@@ -161,7 +162,11 @@ export default function TourProgramsPage() {
           tier the tour already has is skipped, and the message says so.
         </p>
         <p className="text-gray-600">
-          Variations cannot be edited or deleted from this page.
+          The <strong>edit</strong> icon on a variation changes its name, private or shared, passenger
+          range and Active, or deletes it (its options and pricing go with it). If B2B quotes or
+          departures were made from it, you are told how many and asked again: they keep their own
+          prices but no longer link to it. The tier cannot be changed &mdash; add a variation at the
+          other tier instead.
         </p>
       </section>
 

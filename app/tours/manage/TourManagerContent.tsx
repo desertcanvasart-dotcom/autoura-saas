@@ -1456,6 +1456,134 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
 }
 
 // ============================================
+// EDIT VARIATION MODAL
+// ============================================
+// A variation could be added but never changed or removed anywhere: a wrong
+// passenger range or a tier sold by mistake stayed for good. The tier itself
+// is what the variation is, so it is shown, not edited.
+interface EditVariationModalProps {
+  variation: TourVariation
+  tierLabel: string
+  onClose: () => void
+  onSaved: () => void
+  showToast: (type: 'success' | 'error' | 'info', message: string) => void
+}
+
+function EditVariationModal({ variation, tierLabel, onClose, onSaved, showToast }: EditVariationModalProps) {
+  const dialog = useConfirmDialog()
+  const [name, setName] = useState(variation.variation_name)
+  const [groupType, setGroupType] = useState<'private' | 'shared'>(variation.group_type)
+  const [minPax, setMinPax] = useState(String(variation.min_pax ?? 1))
+  const [maxPax, setMaxPax] = useState(String(variation.max_pax ?? 1))
+  const [active, setActive] = useState(variation.is_active !== false)
+  const [busy, setBusy] = useState(false)
+
+  const save = async () => {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/tours/variations/${variation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variation_name: name, group_type: groupType, min_pax: Number(minPax), max_pax: Number(maxPax), is_active: active }),
+      })
+      const data = await res.json()
+      if (!data.success) { showToast('error', data.error || 'Failed to save the variation'); return }
+      showToast('success', 'Variation saved')
+      onSaved()
+      onClose()
+    } catch {
+      showToast('error', 'Failed to save the variation')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!(await dialog.confirmDelete(variation.variation_name, `Delete "${variation.variation_name}"? Its options and pricing are deleted with it.`))) return
+    setBusy(true)
+    try {
+      let res = await fetch(`/api/tours/variations/${variation.id}`, { method: 'DELETE' })
+      let data = await res.json()
+      if (res.status === 409 && data.in_use) {
+        const { quotes, departures } = data.in_use as { quotes: number; departures: number }
+        const uses = [quotes ? `${quotes} B2B quote(s)` : '', departures ? `${departures} departure(s)` : ''].filter(Boolean).join(' and ')
+        const ok = await dialog.confirm({
+          title: 'This variation is in use',
+          message: `${uses} were made from it. They keep their own prices but will no longer link to it. Delete anyway?`,
+          confirmText: 'Delete anyway',
+          cancelText: 'Keep it',
+          variant: 'danger',
+        })
+        if (!ok) return
+        res = await fetch(`/api/tours/variations/${variation.id}?confirm_in_use=1`, { method: 'DELETE' })
+        data = await res.json()
+      }
+      if (!data.success) { showToast('error', data.error || 'Failed to delete the variation'); return }
+      showToast('success', 'Variation deleted')
+      onSaved()
+      onClose()
+    } catch {
+      showToast('error', 'Failed to delete the variation')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Edit Variation</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{tierLabel} · {variation.variation_code}</p>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 mb-1">Name</span>
+            <input value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+          </label>
+          <div className="flex gap-4">
+            {(['private', 'shared'] as const).map(g => (
+              <label key={g} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="radio" name="edit-group-type" checked={groupType === g} onChange={() => setGroupType(g)} />
+                {g === 'private' ? 'Private' : 'Shared'}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <label className="flex-1">
+              <span className="block text-sm font-medium text-gray-700 mb-1">Min travellers</span>
+              <input type="number" min={1} value={minPax} onChange={e => setMinPax(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+            </label>
+            <label className="flex-1">
+              <span className="block text-sm font-medium text-gray-700 mb-1">Max travellers</span>
+              <input type="number" min={1} value={maxPax} onChange={e => setMaxPax(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />
+            Active
+          </label>
+        </div>
+        <div className="px-4 py-3 border-t flex items-center justify-between">
+          <button type="button" onClick={remove} disabled={busy} className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded-lg disabled:opacity-60">
+            <Trash2 className="w-4 h-4" /> Delete
+          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+            <button type="button" onClick={save} disabled={busy} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // ADD VARIATION MODAL COMPONENT
 // ============================================
 interface AddVariationModalProps {
@@ -1721,6 +1849,7 @@ export default function TourManagerContent() {
   
   // ADD VARIATION MODAL STATE
   const [addVariationTemplate, setAddVariationTemplate] = useState<TourTemplate | null>(null)
+  const [editVariation, setEditVariation] = useState<TourVariation | null>(null)
   
   // DAY BUILDER MODAL STATE
   
@@ -2826,6 +2955,14 @@ export default function TourManagerContent() {
                                         <p className="text-xs opacity-75">{variation.group_type} • {variation.min_pax}-{variation.max_pax} pax</p>
                                       </div>
                                       <div className="flex items-center gap-1 ml-2">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); setEditVariation(variation) }}
+                                          className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                          title="Edit or delete this variation"
+                                        >
+                                          <Edit className="w-4 h-4" />
+                                        </button>
                                         <Link
                                           href={`/b2b/calculator/${variation.id}`}
                                           className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
@@ -3604,6 +3741,16 @@ export default function TourManagerContent() {
             </form>
           </div>
         </div>
+      )}
+
+      {editVariation && (
+        <EditVariationModal
+          variation={editVariation}
+          tierLabel={tierConfigs[editVariation.tier]?.label ?? editVariation.tier}
+          onClose={() => setEditVariation(null)}
+          onSaved={fetchTemplates}
+          showToast={showToast}
+        />
       )}
 
       {/* ADD VARIATION MODAL (for existing templates) */}

@@ -60,6 +60,7 @@ import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDay
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
+import { roadPackageCoverage } from '@/lib/pricing/road-package'
 import { guideLanguageKey, pickGuideRateRow, type GuideRateRow } from '@/lib/guides/guide-language'
 import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
 import { dayTripFrom } from '@/lib/pricing/day-trip'
@@ -2672,6 +2673,25 @@ async function loadCruisePackages(scope: CatalogScope): Promise<Array<PackageVeh
   })
 }
 
+/** The agency's active Day Tour and Multi-Day transport packages (Tours →
+ *  Transport Packages), in the run's currency. Read once per calculation. */
+async function loadRoadPackages(scope: CatalogScope): Promise<Array<PackageVehicleRates & {
+  id: string; package_name: string; package_type: string; origin_city: string | null; destination_city: string | null; duration_days: number | null
+}>> {
+  return memoRead(`road-packages|${scope.tenantId}`, async () => {
+    const { data } = await getSupabaseAdmin()
+      .from('b2b_transport_packages')
+      .select('id, package_name, package_type, origin_city, destination_city, duration_days, vehicles, sedan_rate, sedan_capacity, minivan_rate, minivan_capacity, van_rate, van_capacity, minibus_rate, minibus_capacity, bus_rate, bus_capacity, rate_currency, tenant_id')
+      .or(catalogOrExpr(scope))
+      .in('package_type', ['day_tour', 'multi_day'])
+      .eq('is_active', true)
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    return (rows ?? []) as unknown as Array<PackageVehicleRates & {
+      id: string; package_name: string; package_type: string; origin_city: string | null; destination_city: string | null; duration_days: number | null
+    }>
+  })
+}
+
 /** The activity_rates rows a day's activities point at (the motorboat at
  *  Philae, a felucca), in the run currency, keyed by id. Read once per
  *  calculation; only the tenant's own active rows come back, so a foreign or
@@ -4390,6 +4410,8 @@ export async function calculateDayBasedPricing(
   }
 
   const transportInfoByDay: DayTransportInfo[] = []
+  // Days with sightseeing: a Day Tour package is the vehicle for one (8c).
+  const sightseeingDaySet = new Set<number>()
 
   for (let i = 0; i < itinerary.length; i++) {
     const day = itinerary[i]
@@ -4397,6 +4419,7 @@ export async function calculateDayBasedPricing(
     const nextDay = groundedNeighbour(itinerary, i, 1)
 
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
+    if (hasSightseeing) sightseeingDaySet.add(day.day)
     const hasAirportService = day.services.airport_arrival || day.services.airport_departure
     // A day travelling by ticket (B-item 2) is NOT an intercity ROAD day —
     // the ticket is the day's transport (and no station transfers are
@@ -4488,6 +4511,38 @@ export async function calculateDayBasedPricing(
       for (const info of transportInfoByDay) {
         const day = itinerary.find(d => d.day === info.day)
         if (covered.has(info.day) && !day?.transport_lines) info.requiresTransport = false
+      }
+    }
+  }
+
+  // ============================================
+  // STEP 8c: DAY-TOUR AND MULTI-DAY PACKAGES
+  // ============================================
+  // The road counterpart of 8b (lib/pricing/road-package): a stretch of road
+  // days a Day Tour or Multi-Day package fits is priced once from the package
+  // and its days list "Transport — Included"; with no package fitting, the
+  // per-day rates apply as before. These two kinds were stored and never read.
+  const roadPackages = await loadRoadPackages(catalogScope)
+  const roadCovered: Array<{ pkg: (typeof roadPackages)[number]; days: number[] }> = []
+  if (roadPackages.length > 0) {
+    const taken = new Set(sailingPackages.flatMap(({ sailing }) =>
+      [...sailing.nightDays, ...(sailing.disembarkDay != null ? [sailing.disembarkDay] : [])]))
+    const { covered, ambiguous } = roadPackageCoverage(itinerary, roadPackages, { taken, sightseeingDays: sightseeingDaySet })
+    for (const a of ambiguous) {
+      addHole({
+        kind: 'transport', reason: 'missing', tier, dayNumber: a.days[0],
+        lookupAttempted: `transport package for day${a.days.length > 1 ? 's' : ''} ${a.days.join(', ')}`,
+        message: `${a.count} transport packages fit day${a.days.length > 1 ? 's' : ''} ${a.days.join(', ')} — pricing will not choose between them. Keep one active in Tours → Transport Packages.`,
+      })
+    }
+    for (const c of covered) {
+      roadCovered.push(c)
+      const days = new Set(c.days)
+      for (const info of transportInfoByDay) if (days.has(info.day)) info.requiresTransport = false
+      // The package is the road move too: no "included in the overnight
+      // return" line beside it.
+      for (let k = services.length - 1; k >= 0; k--) {
+        if (c.days.some(d => services[k].id === `day${d}-road-return-included`)) services.splice(k, 1)
       }
     }
   }
@@ -4616,6 +4671,35 @@ export async function calculateDayBasedPricing(
     if (sailing.disembarkDay != null) included(sailing.disembarkDay, 'Transfer off the ship')
   }
 
+  // Each road package (8c): one line on its first day, "Included" on the rest.
+  for (const { pkg, days } of roadCovered) {
+    const vehicle = selectVehicleFromPackage(pkg, shownSeats, vehicleBands)
+    const firstDay = days[0]
+    if (vehicle) {
+      services.push({
+        id: `day${firstDay}-road-package-${pkg.id}`, dayNumber: firstDay, serviceType: 'transportation',
+        serviceName: `${pkg.package_name} (${days.length > 1 ? `${days.length} days, ` : ''}${vehicle.vehicle})`,
+        quantity: 1, quantityMode: 'fixed', unitCost: vehicle.rate, lineTotal: vehicle.rate,
+        rateSource: 'b2b_transport_packages', isPerPax: false, isOptional: false,
+        notes: `${pkg.package_type === 'day_tour' ? 'day tour' : 'multi-day'} transport package`,
+      })
+    } else {
+      addHole({
+        kind: 'transport', reason: 'missing', tier, dayNumber: firstDay,
+        lookupAttempted: `${pkg.package_name}: vehicle for ${shownSeats}`,
+        message: `${pkg.package_name} has no vehicle price for a group of ${shownSeats}. Fill it in Tours → Transport Packages.`,
+      })
+    }
+    for (const d of days.slice(1)) {
+      services.push({
+        id: `day${d}-included-${pkg.id}`, dayNumber: d, serviceType: 'transportation',
+        serviceName: `Transport — Included in ${pkg.package_name}`,
+        quantity: 1, quantityMode: 'fixed', unitCost: 0, lineTotal: 0,
+        rateSource: 'b2b_transport_packages', isPerPax: false, isOptional: false, notes: 'included in the package',
+      })
+    }
+  }
+
   // The transfers a day needs BESIDES its sightseeing: dinner out, and the
   // local transfer the operator ticked. Priced per day, at the day's city.
   for (let i = 0; i < itinerary.length; i++) {
@@ -4672,7 +4756,7 @@ export async function calculateDayBasedPricing(
     let transportCost = 0
     // Each sailing's package, at this group's size (the hole for a missing
     // vehicle price is recorded once, with the lines above).
-    for (const { pkg } of sailingPackages) {
+    for (const { pkg } of [...sailingPackages, ...roadCovered]) {
       const vehicle = selectVehicleFromPackage(pkg, pax, vehicleBands)
       if (vehicle) transportCost += vehicle.rate
     }

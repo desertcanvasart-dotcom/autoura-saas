@@ -481,14 +481,15 @@ export function packageVehicleTiers(
         id: `${r.id}__${t.key}`,
         row_id: r.id,
         // They live in Tours → Transport Packages, not in Rates → Transportation,
-        // so the name says where to find them; the grid offers them on cruise
-        // days only (DayRow).
+        // so the name says where to find them.
         name: `${t.vlabel} (${t.capMin}-${t.capMax} pax) — Transport package: ${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
         rateEur: t.rate,
         rateNonEur: t.rate,
         city: r.origin_city,
         details: `cruise_package | ${t.vlabel}`,
-        service_type: 'cruise_transport_package',
+        // The two cruise kinds go on cruise days; Day Tour and Multi-Day on
+        // road days (DayRow).
+        service_type: r.package_type === 'day_tour' || r.package_type === 'multi_day' ? 'road_transport_package' : 'cruise_transport_package',
         package_type: r.package_type,
         capacity_min: t.capMin,
         capacity_max: t.capMax,

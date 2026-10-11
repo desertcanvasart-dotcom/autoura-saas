@@ -108,24 +108,34 @@ export async function POST(request: NextRequest) {
     // code that could also collide with one already there.
     const templateCode = `TPL-${itinerary.itinerary_code}`.slice(0, 50)
     const tripName = itinerary.trip_name || 'Custom Tour'
-    const templateFields = {
-        template_name: tripName,
-        tour_type: totalDays <= 1 ? 'day_tour' : 'multi_day',
+    // What the trip defines: its days, and the length and cities they make.
+    // A re-save refreshes only these — the B2B quote is priced from them.
+    const structureFields = {
         duration_days: totalDays,
         duration_nights: Math.max(totalDays - 1, 0),
         cities_covered: cities,
-        short_description: 'Custom tour created from itinerary',
         itinerary: templateItinerary,
-        is_active: true,
     }
     const { data: existingTemplate } = await supabase
       .from('tour_templates').select('id')
       .eq('tenant_id', tenant_id).eq('template_code', templateCode)
       .maybeSingle()
+    // The name, type, description and Active / Featured belong to the Tour
+    // Manager once the tour exists: a re-save rewrote them from the trip and
+    // switched a tour the operator had deactivated back on.
     const { data: template, error: templateError } = existingTemplate
-      ? await supabase.from('tour_templates').update(templateFields).eq('id', existingTemplate.id).select().single()
+      ? await supabase.from('tour_templates').update(structureFields).eq('id', existingTemplate.id).select().single()
       : await supabase.from('tour_templates')
-          .insert({ ...templateFields, tenant_id, template_code: templateCode, is_featured: false })
+          .insert({
+            ...structureFields,
+            tenant_id,
+            template_code: templateCode,
+            template_name: tripName,
+            tour_type: totalDays <= 1 ? 'day_tour' : 'multi_day',
+            short_description: 'Custom tour created from itinerary',
+            is_active: true,
+            is_featured: false,
+          })
           .select().single()
 
     if (templateError || !template) {
@@ -136,10 +146,12 @@ export async function POST(request: NextRequest) {
     const variationName = `${tripName} - ${tier.charAt(0).toUpperCase() + tier.slice(1)}`
     const variationCode = `${templateCode}-${tier.toUpperCase()}`
 
+    // One variation per tier, however it was made (here or in the Tour
+    // Manager, whose codes may differ): matched by tier, not by code.
     const { data: existingVariation } = await supabase
-      .from('tour_variations').select('id')
-      .eq('tenant_id', tenant_id).eq('template_id', template.id).eq('variation_code', variationCode)
-      .maybeSingle()
+      .from('tour_variations').select('id, variation_code, variation_name')
+      .eq('tenant_id', tenant_id).eq('template_id', template.id).eq('tier', tier)
+      .limit(1).maybeSingle()
     const { data: variation, error: varError } = existingVariation
       ? { data: existingVariation, error: null }
       : await supabase
@@ -166,10 +178,10 @@ export async function POST(request: NextRequest) {
       data: {
         template_id: template.id,
         template_code: templateCode,
-        template_name: tripName,
+        template_name: template.template_name,
         variation_id: variation.id,
-        variation_code: variationCode,
-        variation_name: variationName,
+        variation_code: (variation as { variation_code?: string }).variation_code ?? variationCode,
+        variation_name: (variation as { variation_name?: string }).variation_name ?? variationName,
         itinerary_id,
       },
     }, { status: 201 })

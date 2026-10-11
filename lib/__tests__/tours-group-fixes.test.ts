@@ -8,6 +8,8 @@ import { parseTemplatesCsv } from '@/lib/tours/template-csv'
 import { pickTransportPackage } from '@/lib/b2b/price-variation'
 import { packageVehicleTiers } from '@/lib/pricing/grid-rates'
 import { buildTransportTierIndex } from '@/app/pricing-grid/lib/calculator'
+import { roadPackageCoverage } from '@/lib/pricing/road-package'
+import { parseVariationEdit } from '@/lib/tours/variation-edit'
 
 const papa = (csv: string) => {
   const p = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() })
@@ -157,5 +159,98 @@ describe('who may change the catalogue', () => {
     const src = read('app/api/b2b/transport-packages/[id]/route.ts')
     expect(src).toContain('if (body[key] !== undefined) update[key] = body[key]')
     expect(src).toContain('if (body.vehicles !== undefined) update.vehicles')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Second round: the four items left open in the first.
+// ---------------------------------------------------------------------------
+describe('Day Tour and Multi-Day packages are priced', () => {
+  const road = (day: number, city: string, extra: Record<string, unknown> = {}) => ({ day, city, accommodation_type: 'hotel', ...extra })
+  const luxorDay = { id: 'd', package_type: 'day_tour', origin_city: 'Luxor', destination_city: '', duration_days: 1 }
+  const cairoToAswan = { id: 'm', package_type: 'multi_day', origin_city: 'Cairo', destination_city: 'Aswan', duration_days: 3 }
+
+  it('a Day Tour package covers each sightseeing day in its city', () => {
+    const days = [road(1, 'Luxor'), road(2, 'Luxor'), road(3, 'Aswan')]
+    const { covered } = roadPackageCoverage(days, [luxorDay], { sightseeingDays: new Set([1, 2, 3]) })
+    expect(covered.map(c => c.days)).toEqual([[1], [2]])
+  })
+
+  it('not a day with no sightseeing (an arrival transfer is not a day tour)', () => {
+    const { covered } = roadPackageCoverage([road(1, 'Luxor')], [luxorDay], { sightseeingDays: new Set() })
+    expect(covered).toEqual([])
+  })
+
+  it('a day trip: staying in the origin, touring the destination', () => {
+    const toDendera = { ...luxorDay, destination_city: 'Dendera' }
+    const days = [road(1, 'Luxor', { day_trip_to: 'Dendera' })]
+    expect(roadPackageCoverage(days, [toDendera], { sightseeingDays: new Set([1]) }).covered).toHaveLength(1)
+  })
+
+  it('a Multi-Day package covers its length of consecutive road days, origin to destination', () => {
+    const days = [road(1, 'Cairo'), road(2, 'Luxor'), road(3, 'Edfu'), road(4, 'Aswan'), road(5, 'Aswan')]
+    // Day 2 leaves Cairo (day 1 was there) and day 4 ends in Aswan.
+    expect(roadPackageCoverage(days, [cairoToAswan]).covered.map(c => c.days)).toEqual([[2, 3, 4]])
+  })
+
+  it('a cruise night, a flight, the operator\'s own transport or a covered day breaks the stretch', () => {
+    const base = [road(1, 'Cairo'), road(2, 'Luxor'), road(3, 'Edfu'), road(4, 'Aswan')]
+    const broken = (k: number, extra: Record<string, unknown>) => base.map((d, i) => (i === k ? { ...d, ...extra } : d))
+    expect(roadPackageCoverage(broken(2, { accommodation_type: 'cruise' }), [cairoToAswan]).covered).toEqual([])
+    expect(roadPackageCoverage(broken(2, { transport_type: 'flight' }), [cairoToAswan]).covered).toEqual([])
+    expect(roadPackageCoverage(broken(2, { transport_lines: [] }), [cairoToAswan]).covered).toEqual([])
+    expect(roadPackageCoverage(base, [cairoToAswan], { taken: new Set([3]) }).covered).toEqual([])
+  })
+
+  it('two packages fitting the same days are reported, not chosen between', () => {
+    const { covered, ambiguous } = roadPackageCoverage([road(1, 'Luxor')], [luxorDay, { ...luxorDay, id: 'd2' }], { sightseeingDays: new Set([1]) })
+    expect(covered).toEqual([])
+    expect(ambiguous).toEqual([{ days: [1], count: 2 }])
+  })
+
+  it('the cruise kinds are not road packages', () => {
+    const cruise = { ...luxorDay, package_type: 'cruise_sightseeing' }
+    expect(roadPackageCoverage([road(1, 'Luxor')], [cruise], { sightseeingDays: new Set([1]) }).covered).toEqual([])
+  })
+
+  it('the engine reads them and the grid offers them on road days', () => {
+    const engine = read('lib/auto-pricing-service.ts')
+    expect(engine).toContain(".in('package_type', ['day_tour', 'multi_day'])")
+    expect(engine).toContain('for (const { pkg } of [...sailingPackages, ...roadCovered])')
+    expect(read('app/pricing-grid/components/DayRow.tsx')).toContain("service_type === 'road_transport_package'")
+    const opts = packageVehicleTiers([{ id: 'p', package_type: 'multi_day', vehicles: [{ vehicle_type: 'van', rate: 9 }] }], [])
+    expect(opts[0].service_type).toBe('road_transport_package')
+  })
+})
+
+describe('variations can be edited and deleted', () => {
+  it('checks what an edit may change; the tier is not one of them', () => {
+    expect(parseVariationEdit({ variation_name: ' X ', group_type: 'shared', min_pax: 2, max_pax: 8, is_active: false, tier: 'luxury' }))
+      .toEqual({ update: { variation_name: 'X', group_type: 'shared', min_pax: 2, max_pax: 8, is_active: false } })
+    expect(parseVariationEdit({ min_pax: 9, max_pax: 2 })).toEqual({ error: 'Minimum travellers cannot be more than the maximum' })
+    expect(parseVariationEdit({ group_type: 'vip' })).toEqual({ error: 'Group type is private or shared' })
+    expect(parseVariationEdit({ variation_name: '' })).toEqual({ error: 'The variation needs a name' })
+    expect(parseVariationEdit({ tier: 'luxury' })).toEqual({ error: 'Nothing to save' })
+  })
+
+  it('the route edits and deletes as a manager, and asks before deleting one in use', () => {
+    const src = read('app/api/tours/variations/[id]/route.ts')
+    for (const m of ['PATCH', 'DELETE']) {
+      const body = src.slice(src.indexOf(`export async function ${m}(`)).split(/\nexport async function /)[0]
+      expect(body).toContain("roleDenied(authResult.role, 'manage')")
+    }
+    expect(src).toContain("searchParams.get('confirm_in_use') === '1'")
+    expect(read('app/tours/manage/TourManagerContent.tsx')).toContain('function EditVariationModal(')
+  })
+})
+
+describe('a Quote Builder re-save leaves the Tour Manager\'s fields alone', () => {
+  it('updates only the days, length and cities; name, type and Active only on create', () => {
+    const src = read('app/api/b2b/create-template-from-itinerary/route.ts')
+    const update = src.slice(src.indexOf('const structureFields = {'), src.indexOf('const { data: existingTemplate }'))
+    expect(update).toContain('itinerary: templateItinerary')
+    expect(update).not.toMatch(/template_name|tour_type|is_active|short_description/)
+    expect(src).toContain(".update(structureFields)")
+    expect(src).toContain(".eq('tier', tier)")
   })
 })
