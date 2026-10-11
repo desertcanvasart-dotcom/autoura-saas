@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { createClient } from '@/app/supabase'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -10,17 +9,9 @@ import {
 } from 'lucide-react'
 import { CityDatalist } from '@/components/CitySelect'
 import { useTenant } from '@/app/contexts/TenantContext'
+import { SUPPORTED_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/currency'
+import { LEAD_SOURCES } from '@/lib/clients/client-fields'
 
-const LEAD_SOURCES = [
-  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-  { value: 'email', label: 'Email', icon: '✉️' },
-  { value: 'website', label: 'Website', icon: '🌐' },
-  { value: 'referral', label: 'Referral', icon: '👥' },
-  { value: 'phone', label: 'Phone', icon: '📞' },
-  { value: 'social_media', label: 'Social Media', icon: '📱' },
-  { value: 'trade_show', label: 'Trade Show', icon: '🎪' },
-  { value: 'other', label: 'Other', icon: '➕' }
-]
 
 export default function NewClientPage() {
   const router = useRouter()
@@ -47,7 +38,7 @@ export default function NewClientPage() {
     postal_code: '',
     preferred_contact_method: 'whatsapp' as 'email' | 'whatsapp' | 'phone' | 'sms',
     best_time_to_contact: 'morning',
-    timezone: 'Africa/Cairo',
+    timezone: '',
     preferred_accommodation_level: 'moderate' as 'budget' | 'moderate' | 'luxury' | 'ultra_luxury',
     dietary_restrictions: [] as string[],
     accessibility_needs: [] as string[],
@@ -64,33 +55,58 @@ export default function NewClientPage() {
     sms_consent: false,
     tags: [] as string[],
     internal_notes: '',
-    currency_preference: 'EUR' as 'EUR' | 'USD' | 'GBP'
+    currency_preference: ''
   })
 
-  const supabase = createClient()
+  // The agency's timezone and currency, once known (they were Cairo and EUR
+  // for every agency), and the phone a WhatsApp chat's "Create" passes in.
+  useEffect(() => {
+    if (!tenant) return
+    setFormData(prev => ({
+      ...prev,
+      timezone: prev.timezone || tenant.timezone || '',
+      currency_preference: prev.currency_preference || tenant.default_currency || 'EUR',
+    }))
+  }, [tenant])
+  useEffect(() => {
+    const phone = new URLSearchParams(window.location.search).get('phone')
+    if (phone) {
+      const p = phone.trim().startsWith('+') ? phone.trim() : `+${phone.trim()}`
+      setFormData(prev => ({ ...prev, phone: prev.phone || p, lead_source: prev.lead_source || 'whatsapp' }))
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
+    // The steps can be skipped, and a step's inputs are not on the page while
+    // another is shown, so their "required" marks checked nothing: a client
+    // saved from step 5 with no name failed with a database error.
+    if (!formData.first_name.trim()) {
+      setCurrentStep(1)
+      setError('First name is required')
+      setLoading(false)
+      return
+    }
+
     try {
-      if (!tenant) throw new Error('Tenant not loaded yet. Please try again.')
+      // Through the API, which checks every field and stores blanks as
+      // nothing, and lets only staff create clients (viewers read only).
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          // A WhatsApp chat's phone links that chat to the new client.
+          ...(new URLSearchParams(window.location.search).get('phone') ? { link_whatsapp_phone: new URLSearchParams(window.location.search).get('phone') } : {}),
+        }),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create client')
+      const data = result.data as { id: string }
 
-      // Convert empty strings to null for date fields
-      const cleanedData = {
-        ...formData,
-        date_of_birth: formData.date_of_birth || null,
-        tenant_id: tenant.id,
-      }
-
-      const { data, error: insertError } = await supabase
-        .from('clients')
-        .insert([cleanedData])
-        .select()
-        .single()
-
-      if (insertError) throw insertError
             // Keep the button in its saving state THROUGH the navigation:
       // router.push() does not await the destination, so a finally{} here
       // re-enabled the submit button while this page was still on screen —
@@ -217,10 +233,9 @@ export default function NewClientPage() {
               </div>
 
               <div>
-                <label className={labelClass}>Last Name *</label>
+                <label className={labelClass}>Last Name</label>
                 <input
                   type="text"
-                  required
                   value={formData.last_name}
                   onChange={(e) => handleInputChange('last_name', e.target.value)}
                   className={inputClass}
@@ -231,11 +246,10 @@ export default function NewClientPage() {
               <div>
   <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
     <Mail className="w-3.5 h-3.5" />
-    Email Address *
+    Email Address
   </label>
   <input
     type="email"
-    required
     value={formData.email}
     onChange={(e) => handleInputChange('email', e.target.value)}
     className={inputClass}
@@ -578,9 +592,7 @@ export default function NewClientPage() {
                   onChange={(e) => handleInputChange('currency_preference', e.target.value)}
                   className={selectClass}
                 >
-                  <option value="EUR">EUR (€)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="GBP">GBP (£)</option>
+                  {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c} ({CURRENCY_SYMBOLS[c]})</option>)}
                 </select>
               </div>
             </div>

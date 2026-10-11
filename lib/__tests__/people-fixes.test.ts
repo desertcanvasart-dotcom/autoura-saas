@@ -3,6 +3,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { parseTeamMemberWrite, teamMemberSaveError, staffTypeForRole } from '../team/team-member-fields'
 import { parsePartnerWrite, nextPartnerCode } from '../b2b/partner-fields'
+import { parseClientWrite, clientLeadSource, orSearchTerm, clientFullName } from '../clients/client-fields'
 
 // ============================================================================
 // People group: team members and partners take only the fields their forms
@@ -78,5 +79,72 @@ describe('partner writes', () => {
   it('the calculator applies the partner\'s default margin', () => {
     const calc = src('app/b2b/calculator/[id]/page.tsx')
     expect(calc).toMatch(/setMarginPercent\(Number\(picked\.default_margin_percent\)\)/)
+  })
+})
+
+describe('client writes', () => {
+  it('a new client needs only a first name; blanks are stored as nothing', () => {
+    expect(parseClientWrite({ last_name: 'Smith' }, 'create')).toEqual({ error: 'First name is required' })
+    const r = parseClientWrite({ first_name: ' Ahmed ', last_name: '', email: '', date_of_birth: '' }, 'create')
+    expect(r).toEqual({ data: { first_name: 'Ahmed', last_name: null, email: null, date_of_birth: null } })
+  })
+
+  it('takes the passport types the forms offer', () => {
+    expect(parseClientWrite({ first_name: 'A', passport_type: 'euro_passport' }, 'create')).toHaveProperty('data')
+    expect(parseClientWrite({ first_name: 'A', passport_type: 'martian' }, 'create')).toHaveProperty('error')
+    expect(src('supabase/migrations/411_client_passport_type_and_full_name.sql')).toMatch(/'euro_passport', 'other_passport'/)
+  })
+
+  it('never writes columns outside the forms — the booking counters, the tenant', () => {
+    const r = parseClientWrite({ total_bookings_count: 99, tenant_id: 'x', id: 'y', vip_status: true }, 'update')
+    expect(r).toEqual({ data: { vip_status: true } })
+  })
+
+  it('checks email, stage, currency, lists and commission', () => {
+    expect(parseClientWrite({ email: 'not-an-email' }, 'update')).toHaveProperty('error')
+    expect(parseClientWrite({ status: 'vip' }, 'update')).toHaveProperty('error')
+    expect(parseClientWrite({ status: 'prospect' }, 'update')).toEqual({ data: { status: 'lead' } })
+    expect(parseClientWrite({ currency_preference: 'egp' }, 'update')).toEqual({ data: { currency_preference: 'EGP' } })
+    expect(parseClientWrite({ tags: 'vip' }, 'update')).toHaveProperty('error')
+    expect(parseClientWrite({ tags: [' vip ', 'vip', ''] }, 'update')).toEqual({ data: { tags: ['vip'] } })
+    expect(parseClientWrite({ agent_commission_rate: 150 }, 'update')).toHaveProperty('error')
+  })
+
+  it('shows the source an automatic writer recorded when no lead source was picked', () => {
+    expect(clientLeadSource({ lead_source: null, client_source: 'whatsapp' })).toBe('whatsapp')
+    expect(clientLeadSource({ lead_source: null, client_source: 'direct' })).toBeNull()
+    expect(clientLeadSource({ lead_source: 'referral', client_source: 'email' })).toBe('referral')
+  })
+
+  it('escapes a search for an or() filter', () => {
+    expect(orSearchTerm('Smith, (Jr)')).toBe('Smith Jr')
+    expect(orSearchTerm('100%_off')).toBe('100\\%\\_off')
+    expect(clientFullName('Ahmed', null)).toBe('Ahmed')
+  })
+
+  it('writes are gated: staff create and edit, managers delete, and a delete that removed nothing says so', () => {
+    const list = src('app/api/clients/route.ts')
+    const one = src('app/api/clients/[id]/route.ts')
+    expect(list).toMatch(/roleDenied\(authResult\.role, 'staff'\)/)
+    expect(one).toMatch(/roleDenied\(authResult\.role, 'staff'\)/)
+    expect(one).toMatch(/roleDenied\(authResult\.role, 'manage'\)/)
+    expect(one).toMatch(/Nothing was deleted/)
+    // A rename keeps full_name in step.
+    expect(one).toMatch(/updateData\.full_name = clientFullName/)
+    expect(src('supabase/migrations/411_client_passport_type_and_full_name.sql')).toMatch(/NEW\.first_name IS DISTINCT FROM OLD\.first_name/)
+  })
+
+  it('the client pages write through the API, not straight to the table', () => {
+    for (const f of ['app/clients/page.tsx', 'app/clients/new/page.tsx', 'app/clients/[id]/edit/page.tsx', 'app/clients/[id]/page.tsx']) {
+      expect(src(f)).not.toMatch(/from\('clients'\)\s*\.(insert|update|delete)/)
+    }
+    expect(src('app/clients/[id]/page.tsx')).toMatch(/onClick=\{deleteClient\}/)
+  })
+
+  it('the list shows the bookings and revenue the database keeps', () => {
+    const list = src('app/clients/page.tsx')
+    expect(list).toMatch(/client\.total_bookings_count \?\? 0/)
+    expect(list).toMatch(/order\('total_revenue_generated'/)
+    expect(list).toMatch(/fetchAllPages/)
   })
 })

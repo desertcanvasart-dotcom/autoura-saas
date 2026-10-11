@@ -9,9 +9,13 @@ import {
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/app/supabase'
-import { CLIENT_STAGES, clientStageBadge, clientStageLabel, isLead, isCustomer } from '@/lib/client-stage'
+import { CLIENT_STAGES, clientStageBadge, clientStageLabel } from '@/lib/client-stage'
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { LEAD_SOURCES, clientLeadSource, orSearchTerm } from '@/lib/clients/client-fields'
+import { formatCurrency } from '@/lib/currency'
 
 interface ClientSummary {
   id: string
@@ -25,6 +29,9 @@ interface ClientSummary {
   vip_status: boolean | null
   status: string | null
   lead_source: string | null
+  client_source: string | null
+  total_bookings_count: number | null
+  total_revenue_generated: number | null
   created_at: string | null
 }
 
@@ -34,18 +41,13 @@ interface DeleteModalState {
   clientName: string
 }
 
-const LEAD_SOURCES = [
-  { value: 'whatsapp', label: 'WhatsApp', icon: '💬', color: 'bg-green-100 text-green-700' },
-  { value: 'email', label: 'Email', icon: '✉️', color: 'bg-blue-100 text-blue-700' },
-  { value: 'website', label: 'Website', icon: '🌐', color: 'bg-purple-100 text-purple-700' },
-  { value: 'referral', label: 'Referral', icon: '👥', color: 'bg-orange-100 text-orange-700' },
-  { value: 'phone', label: 'Phone', icon: '📞', color: 'bg-cyan-100 text-cyan-700' },
-  { value: 'social_media', label: 'Social Media', icon: '📱', color: 'bg-pink-100 text-pink-700' },
-  { value: 'trade_show', label: 'Trade Show', icon: '🎪', color: 'bg-amber-100 text-amber-700' },
-  { value: 'other', label: 'Other', icon: '➕', color: 'bg-gray-100 text-gray-700' }
-]
+
+const LIST_COLUMNS = 'id, client_code, full_name, email, phone, whatsapp, nationality, client_type, vip_status, status, lead_source, client_source, total_bookings_count, total_revenue_generated, created_at'
 
 export default function ClientsPage() {
+  const { tenant } = useTenant()
+  // Revenue is kept in the agency's own currency (migration 284).
+  const agencyCurrency = tenant?.default_currency || 'EUR'
   const [clients, setClients] = useState<ClientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
@@ -105,13 +107,18 @@ export default function ClientsPage() {
   const fetchClients = async () => {
     try {
       setLoading(true)
+      // Every matching client, a page at a time: one request stopped at the
+      // database's 1000-row cap, so a large agency's list was silently cut.
+      const { data, error } = await fetchAllPages<ClientSummary>((from, to) => {
       let query = supabase
         .from('clients')
-        .select('id, client_code, full_name, email, phone, whatsapp, nationality, client_type, vip_status, status, lead_source, created_at')
+        .select(LIST_COLUMNS)
 
-      // Apply search filter (use debounced value)
-      if (debouncedSearch) {
-        query = query.or(`full_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%,client_code.ilike.%${debouncedSearch}%`)
+      // Apply search filter (use debounced value). Escaped: a comma or a
+      // bracket in the text broke the filter and % matched everything.
+      const term = orSearchTerm(debouncedSearch)
+      if (term) {
+        query = query.or(`full_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,client_code.ilike.%${term}%`)
       }
 
       // Apply status filter
@@ -124,9 +131,10 @@ export default function ClientsPage() {
         query = query.eq('client_type', filters.clientType)
       }
 
-      // Apply lead source filter
+      // Apply lead source filter — the source shown is the lead source, else
+      // the one an automatic writer (WhatsApp, email, concierge) recorded.
       if (filters.leadSource !== 'all') {
-        query = query.eq('lead_source', filters.leadSource)
+        query = query.or(`lead_source.eq.${filters.leadSource},and(lead_source.is.null,client_source.eq.${filters.leadSource})`)
       }
 
       // Apply VIP filter
@@ -142,7 +150,8 @@ export default function ClientsPage() {
         query = query.lte('created_at', filters.dateTo + 'T23:59:59')
       }
 
-      // Apply sorting
+      // Apply sorting. Bookings and revenue are the counts the database keeps
+      // (migrations 280 and 284); they sorted by date before.
       switch (filters.sortBy) {
         case 'name':
           query = query.order('full_name', { ascending: true })
@@ -151,16 +160,13 @@ export default function ClientsPage() {
           query = query.order('full_name', { ascending: false })
           break
         case 'revenue':
-          query = query.order('created_at', { ascending: false })
+          query = query.order('total_revenue_generated', { ascending: false, nullsFirst: false })
           break
         case 'revenue_asc':
-          query = query.order('created_at', { ascending: true })
+          query = query.order('total_revenue_generated', { ascending: true, nullsFirst: false })
           break
         case 'bookings':
-          query = query.order('created_at', { ascending: false })
-          break
-        case 'recent':
-          query = query.order('created_at', { ascending: false })
+          query = query.order('total_bookings_count', { ascending: false, nullsFirst: false })
           break
         case 'oldest':
           query = query.order('created_at', { ascending: true })
@@ -169,10 +175,11 @@ export default function ClientsPage() {
           query = query.order('created_at', { ascending: false })
       }
 
-      const { data, error } = await query
+      return query.order('id', { ascending: true }).range(from, to)
+      })
 
       if (error) throw error
-      setClients(data || [])
+      setClients(data)
     } catch (error) {
       console.error('Error fetching clients:', error)
     } finally {
@@ -201,13 +208,18 @@ export default function ClientsPage() {
     
     try {
       setDeleting(true)
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', deleteModal.clientId)
+      // Through the API, which refuses a client with trips, invoices,
+      // payments, bookings or email history (deleting it would orphan them)
+      // and says why — the direct delete failed on some and silently did
+      // nothing for a role that may not delete.
+      const res = await fetch(`/api/clients/${deleteModal.clientId}`, { method: 'DELETE' })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok || !result.success) {
+        showToast('error', result.error || 'Failed to delete client. Please try again.')
+        return
+      }
+      showToast('success', `${deleteModal.clientName || 'Client'} deleted`)
 
-      if (error) throw error
-      
       closeDeleteModal()
       fetchClients()
       // Stat cards fetched "only once on mount" went stale the moment a
@@ -224,23 +236,17 @@ export default function ClientsPage() {
 
   const fetchStats = async () => {
     try {
-      const { data: allClients } = await supabase
-        .from('clients')
-        .select('status, vip_status, created_at')
-
-      if (allClients) {
-        const now = new Date()
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-        setStats({
-          total: allClients.length,
-          leads: allClients.filter(c => isLead(c.status)).length,
-          active: allClients.filter(c => isCustomer(c.status)).length,
-          vip: allClients.filter(c => c.vip_status).length,
-          newThisMonth: allClients.filter(c => c.created_at !== null && new Date(c.created_at) >= firstDayOfMonth).length,
-          totalRevenue: 0, // Revenue tracking not yet implemented
-        })
-      }
+      // Counted by the database: reading every row stopped at 1000.
+      const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+      const head = () => supabase.from('clients').select('id', { count: 'exact', head: true })
+      const [total, leads, active, vip, newThisMonth] = (await Promise.all([
+        head(),
+        head().or('status.is.null,status.in.(lead,prospect)'),
+        head().eq('status', 'active'),
+        head().eq('vip_status', true),
+        head().gte('created_at', firstDayOfMonth),
+      ])).map(r => r.count ?? 0)
+      setStats({ total, leads, active, vip, newThisMonth, totalRevenue: 0 })
     } catch (error) {
       console.error('Error fetching stats:', error)
     }
@@ -333,6 +339,9 @@ export default function ClientsPage() {
                   <li>All follow-ups</li>
                   <li>Client preferences</li>
                 </ul>
+                <p className="text-xs text-red-700 mt-2">
+                  A client with trips, bookings, invoices, payments or email history cannot be deleted.
+                </p>
               </div>
               
               <div className="flex justify-end gap-3">
@@ -685,7 +694,7 @@ export default function ClientsPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {clients.map((client) => {
-                    const leadSourceConfig = getLeadSourceConfig(client.lead_source)
+                    const leadSourceConfig = getLeadSourceConfig(clientLeadSource(client))
                     return (
                       <tr key={client.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -738,12 +747,13 @@ export default function ClientsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <div className="font-semibold">0</div>
-                          <div className="text-xs text-gray-500">bookings</div>
+                          <div className="font-semibold">{client.total_bookings_count ?? 0}</div>
+                          <div className="text-xs text-gray-500">booking{client.total_bookings_count === 1 ? '' : 's'}</div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          {/* null = a booking in a currency that could not be converted (migration 284) */}
                           <div className="font-semibold text-green-600">
-                            €0
+                            {client.total_revenue_generated == null ? '—' : formatCurrency(client.total_revenue_generated, agencyCurrency)}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm">

@@ -1,71 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DEFAULT_CLIENT_STAGE } from '@/lib/client-stage'
-import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { parseClientWrite, clientFullName, orSearchTerm, LEAD_SOURCES } from '@/lib/clients/client-fields'
+
+/** No caller should need more than this in one list. */
+const MAX_LIST = 5000
 
 /**
- * GET /api/clients
- * List all clients for the authenticated user's tenant
- * RLS policies automatically filter by tenant_id
+ * GET /api/clients — the agency's clients, by name.
+ *
+ * `?search=` matches name, email, phone or code; `?limit=` caps the list
+ * (all of them, up to 5000, when absent — it stopped at 50, so the Invoices
+ * and Tasks pickers and the itinerary's "find this client" missed everyone
+ * after the 50th and made duplicates). The list is answered under both
+ * `clients` and `data`, as callers read either.
  */
 export async function GET(request: NextRequest) {
   try {
-    // Use authenticated client - RLS will automatically filter by tenant
-    const supabase = await createAuthenticatedClient()
-
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({
-        success: false,
-        error: 'Not authenticated'
-      }, { status: 401 })
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    const { supabase, tenant_id } = authResult
 
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const search = orSearchTerm(searchParams.get('search') || '')
+    const asked = parseInt(searchParams.get('limit') || '', 10)
+    const limit = Number.isFinite(asked) && asked > 0 ? Math.min(asked, MAX_LIST) : MAX_LIST
 
-    let query = supabase
-      .from('clients')
-      .select('id, first_name, last_name, email, phone, status')
-      .order('first_name', { ascending: true })
-      .limit(limit)
+    const { data: clients, error } = await fetchAllPages<Record<string, unknown>>((from, to) => {
+      if (from >= limit) return Promise.resolve({ data: [], error: null })
+      let query = supabase
+        .from('clients')
+        .select('id, first_name, last_name, full_name, email, phone, status, client_code')
+        .eq('tenant_id', tenant_id)
+        .order('full_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, Math.min(to, limit - 1))
+      if (search) {
+        const q = `%${search}%`
+        query = query.or(`full_name.ilike.${q},first_name.ilike.${q},last_name.ilike.${q},email.ilike.${q},phone.ilike.${q},client_code.ilike.${q}`)
+      }
+      return query
+    })
+    if (error) throw error
 
-    if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
-    }
-
-    const { data: clients, error } = await query
-
-    if (error) {
-      throw error
-    }
-
-    // Transform to include combined name field
-    const transformedClients = (clients || []).map((client: any) => ({
-      id: client.id,
-      name: `${client.first_name || ''} ${client.last_name || ''}`.trim(),
-      email: client.email,
-      phone: client.phone,
-      status: client.status
+    const rows = clients.slice(0, limit).map(c => ({
+      id: c.id,
+      name: (c.full_name as string) || clientFullName(c.first_name as string, c.last_name as string),
+      first_name: c.first_name,
+      last_name: c.last_name,
+      email: c.email,
+      phone: c.phone,
+      status: c.status,
+      client_code: c.client_code,
     }))
 
-    return NextResponse.json({ clients: transformedClients })
-
+    return NextResponse.json({ success: true, clients: rows, data: rows })
   } catch (error: any) {
     console.error('Error fetching clients:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
 
 /**
- * POST /api/clients
- * Create a new client for the authenticated user's tenant
- * RLS policies will validate tenant_id
+ * POST /api/clients — a new client. Staff and above (viewers read only).
+ * Takes only the fields the client forms edit, checked (lib/clients/client-fields).
  */
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication and get tenant info
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -73,45 +78,33 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication failed' },
-        { status: 401 }
-      )
-    }
     const body = await request.json()
 
-    // Validate required fields
-    if (!body.first_name) {
-      return NextResponse.json(
-        { success: false, error: 'First name is required' },
-        { status: 400 }
-      )
+    const parsed = parseClientWrite(body, 'create')
+    if ('error' in parsed) {
+      return NextResponse.json({ success: false, error: parsed.error }, { status: 400 })
     }
+    const fields = parsed.data
 
-    // Create client with tenant_id
-    const firstName = body.first_name
-    const lastName = body.last_name || body.first_name
-
+    // The surname stays blank when not given (it was set to the first name, so
+    // "Ahmed" became "Ahmed Ahmed"); nationality likewise (it was "Unknown").
+    // The source an automatic caller names is also the lead source the pages
+    // show, when it is one of theirs.
+    const source = (fields.client_source as string | null) ?? null
     const clientData = {
+      ...fields,
       tenant_id,
-      first_name: firstName,
-      last_name: lastName,
-      full_name: `${firstName} ${lastName}`.trim(), // Required by DB constraint
-      email: body.email || null,
-      phone: body.phone || null,
-      nationality: body.nationality || 'Unknown',
-      status: body.status || DEFAULT_CLIENT_STAGE,
-      client_type: body.client_type || 'individual',
-      passport_type: body.passport_type || 'other',
-      preferred_language: body.preferred_language || 'English',
-      client_source: body.client_source || 'whatsapp',
-      vip_status: body.vip_status || false
+      full_name: clientFullName(fields.first_name as string, fields.last_name as string),
+      status: fields.status ?? DEFAULT_CLIENT_STAGE,
+      client_type: fields.client_type ?? 'individual',
+      client_source: source ?? 'direct',
+      lead_source: fields.lead_source ?? (source && LEAD_SOURCES.some(s => s.value === source) ? source : null),
+      vip_status: fields.vip_status ?? false,
     }
-
-
 
     const { data: newClient, error: clientError } = await supabase
       .from('clients')
@@ -122,12 +115,10 @@ export async function POST(request: NextRequest) {
     if (clientError) {
       console.error('❌ Client insert error:', clientError)
       return NextResponse.json(
-        { success: false, error: clientError.message, details: clientError },
+        { success: false, error: clientError.message },
         { status: 500 }
       )
     }
-
-
 
     // Save preferences if provided
     if (body.preferences) {
@@ -174,8 +165,9 @@ export async function POST(request: NextRequest) {
           .from('whatsapp_conversations')
           .update({
             client_id: newClient.id,
-            client_name: `${clientData.first_name} ${clientData.last_name}`.trim()
+            client_name: clientData.full_name
           })
+          .eq('tenant_id', tenant_id)
           .eq('phone_number', body.link_whatsapp_phone)
 
       } catch (e) {

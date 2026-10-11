@@ -16,6 +16,9 @@ import {
 } from 'lucide-react'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { formatCurrency } from '@/lib/currency'
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { showToast } from '@/app/contexts/ToastContext'
 import { clientStageBadge, clientStageLabel } from '@/lib/client-stage'
 
 interface Client {
@@ -92,7 +95,38 @@ export default function ClientProfilePage() {
   const tenantCurrency = tenant?.default_currency || 'EUR'
 
   const router = useRouter()
+  const dialog = useConfirmDialog()
   const clientId = params?.id as string
+  const [deleting, setDeleting] = useState(false)
+
+  // The Delete button did nothing (it had no handler). Through the API, which
+  // refuses a client with trips, bookings, invoices, payments or email
+  // history and says why, and is for managers and admins.
+  const deleteClient = async () => {
+    const name = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'this client'
+    const ok = await dialog.confirm({
+      title: 'Delete Client',
+      message: `Delete ${name}? Their notes, follow-ups, preferences and communication log go with them. A client with trips, bookings, invoices, payments or email history cannot be deleted.`,
+      variant: 'danger',
+      confirmText: 'Delete Client',
+    })
+    if (!ok) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, { method: 'DELETE' })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok || !result.success) {
+        showToast('error', result.error || 'Failed to delete client')
+        setDeleting(false)
+        return
+      }
+      showToast('success', `${name} deleted`)
+      router.push('/clients')
+    } catch {
+      showToast('error', 'Failed to delete client')
+      setDeleting(false)
+    }
+  }
 
   const [client, setClient] = useState<Client | null>(null)
   // Revenue over bookings. null when there is nothing to divide, or when the
@@ -180,7 +214,7 @@ export default function ClientProfilePage() {
         .select('*')
         .eq('client_id', clientId)
         .order('communication_date', { ascending: false })
-        .limit(10)
+        .limit(500)
       if (commError) console.error('Failed to load communications:', commError)
       setCommunications(commData || [])
 
@@ -210,13 +244,23 @@ export default function ClientProfilePage() {
         .order('created_at', { ascending: false })
       setNotes(notesData || [])
 
-      // Fetch bookings
-      const { data: bookingsData } = await supabase
+      // The client's trips (itineraries). Each total is the one the trip page
+      // shows — its services' client prices — since total_cost is a cache
+      // that can be 0 or stale.
+      const { data: tripsData } = await supabase
         .from('itineraries')
-        .select('*')
+        .select('id, itinerary_code, trip_name, start_date, end_date, num_adults, num_children, total_cost, margin_percent, currency, status')
         .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
-      setBookings(bookingsData || [])
+        .order('start_date', { ascending: false, nullsFirst: false })
+      const trips = tripsData || []
+      const tripIds = trips.map(t => t.id)
+      const { data: servicesData } = tripIds.length
+        ? await supabase.from('itinerary_services').select('itinerary_id, total_cost, client_price').in('itinerary_id', tripIds)
+        : { data: [] as Array<{ itinerary_id: string; total_cost: number | null; client_price: number | null }> }
+      setBookings(trips.map(t => ({
+        ...t,
+        display_total: effectiveItineraryTotal(t, (servicesData || []).filter(sv => sv.itinerary_id === t.id)),
+      })))
 
     } catch (error) {
       console.error('Error fetching client data:', error)
@@ -282,9 +326,13 @@ export default function ClientProfilePage() {
                 <Edit className="w-4 h-4" />
                 Edit Client
               </Link>
-              <button className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200">
+              <button
+                onClick={deleteClient}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 disabled:opacity-50"
+              >
                 <Trash2 className="w-4 h-4" />
-                Delete
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>
@@ -414,7 +462,7 @@ export default function ClientProfilePage() {
             {[
               { id: 'overview', label: 'Overview', icon: User },
               { id: 'communications', label: 'Communications', icon: MessageSquare, count: communications.length },
-              { id: 'bookings', label: 'Bookings', icon: Calendar, count: bookings.length },
+              { id: 'bookings', label: 'Trips', icon: Calendar, count: bookings.length },
               { id: 'notes', label: 'Notes', icon: FileText, count: notes.length },
               { id: 'followups', label: 'Follow-ups', icon: Clock, count: pendingFollowups.length }
             ].map((tab) => {
@@ -517,7 +565,7 @@ export default function ClientProfilePage() {
                className="w-full flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 text-sm rounded-lg hover:bg-blue-100"
                  >
                 <Plus className="w-4 h-4" />
-                New Booking
+                New Trip
                 </Link>
                 <button 
                    onClick={() => setIsCommunicationModalOpen(true)}
@@ -720,26 +768,26 @@ export default function ClientProfilePage() {
         {activeTab === 'bookings' && (
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Booking History</h2>
+              <h2 className="text-xl font-bold">Trips</h2>
               <Link
                href={`/pricing-grid?clientId=${clientId}`}
                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
                >
               <Plus className="w-4 h-4" />
-              New Booking
+              New Trip
                </Link>
             </div>
 
             {bookings.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-600 mb-3">No bookings yet</p>
+                <p className="text-sm text-gray-600 mb-3">No trips yet</p>
                 <Link
                 href={`/pricing-grid?clientId=${clientId}`}
                 className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
                  >
                 <Plus className="w-4 h-4" />
-               Create First Booking
+               Create First Trip
                  </Link>  
               </div>
             ) : (
@@ -748,7 +796,7 @@ export default function ClientProfilePage() {
                   <div key={booking.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="text-base font-semibold mb-2">{booking.tour_name}</h3>
+                        <h3 className="text-base font-semibold mb-2">{booking.trip_name || booking.itinerary_code || 'Untitled trip'}</h3>
                         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-600">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-3 h-3" />
@@ -756,7 +804,7 @@ export default function ClientProfilePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <User className="w-3 h-3" />
-                            {booking.number_of_people} people
+                            {(Number(booking.num_adults) || 0) + (Number(booking.num_children) || 0)} travellers
                           </div>
                         </div>
                       </div>
@@ -768,7 +816,7 @@ export default function ClientProfilePage() {
                             labelled a USD trip in euros. Falls back to the
                             agency's currency only when the row has none.
                           */}
-                          {formatCurrency(Number(booking.total_cost ?? 0), booking.currency || tenantCurrency)}
+                          {formatCurrency(Number(booking.display_total ?? 0), booking.currency || tenantCurrency)}
                         </div>
                         <Link
                           href={`/view-itinerary/${booking.id}`}

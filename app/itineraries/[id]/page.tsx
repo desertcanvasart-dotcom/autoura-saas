@@ -437,10 +437,14 @@ export default function ViewItineraryPage() {
       let clientId = itinerary.client_id || null
       
       if (!clientId) {
-        const clientsResponse = await fetch('/api/clients')
+        // Searched by the trip's email, else its name: the unfiltered list
+        // stopped at 50 and was read under the wrong key, so the client was
+        // never found and a duplicate was created for every invoice.
+        const lookFor = itinerary.client_email || itinerary.client_name || ''
+        const clientsResponse = await fetch(`/api/clients?search=${encodeURIComponent(lookFor)}`)
         if (clientsResponse.ok) {
           const clientsData = await clientsResponse.json()
-          const clients = clientsData.success ? clientsData.data : (Array.isArray(clientsData) ? clientsData : [])
+          const clients = clientsData.clients ?? clientsData.data ?? (Array.isArray(clientsData) ? clientsData : [])
           
           const matchingClient = clients.find((c: any) => {
             const clientEmail = c.email?.toLowerCase()
