@@ -69,12 +69,39 @@ export async function GET(request: NextRequest) {
         ...a,
         current_conversations: counts.get(a.id as string) ?? 0,
       })),
-      count: agents.length
+      count: agents.length,
+      // Which agent is the signed-in person: the inbox's "Mine" tab and
+      // "Claim for myself" need it, and nothing ever told the page — Mine
+      // showed everyone's conversations and Claim always refused.
+      current_agent_id: await currentAgentId(supabase, user),
     })
   } catch (error: any) {
     console.error('Error fetching agents:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+/**
+ * The signed-in person's team member: the one linked to their login, else
+ * an active one with their email (agents added in the inbox carry an email,
+ * not a login). Null when they are not an agent.
+ */
+async function currentAgentId(
+  supabase: Awaited<ReturnType<typeof createAuthenticatedClient>>,
+  user: { id: string; email?: string | null }
+): Promise<string | null> {
+  const { data: linked } = await supabase
+    .from('team_members').select('id').eq('user_id', user.id).eq('is_active', true).limit(1)
+  if (linked?.[0]?.id) return linked[0].id
+  const email = (user.email || '').trim()
+  if (!email) return null
+  const { data: byEmail } = await supabase
+    .from('team_members').select('id')
+    // Case-insensitive, and the email's own % or _ are literal.
+    .ilike('email', email.replace(/[\\%_]/g, '\\$&'))
+    .eq('is_active', true)
+    .limit(1)
+  return byEmail?.[0]?.id ?? null
 }
 
 // POST /api/whatsapp/agents - Create new team member / agent

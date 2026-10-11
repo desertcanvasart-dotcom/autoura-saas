@@ -59,7 +59,7 @@ export default function CommunicationPage() {
         <h3 className="text-lg font-medium text-gray-900 mb-3">Using the Inbox</h3>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Go to <strong>WhatsApp</strong> in the sidebar (under Communicate)</li>
-          <li>The left panel lists conversations with the latest message, its time, an unread count and who it is assigned to. Use <strong>search</strong> to find one, or the <strong>All</strong> and <strong>Unassigned</strong> tabs to filter.</li>
+          <li>The left panel lists conversations with the latest message, its time, an unread count and who it is assigned to. Use <strong>search</strong> to find one, or the <strong>All</strong>, <strong>Mine</strong> (assigned to you) and <strong>Unassigned</strong> tabs to filter.</li>
           <li>Click a conversation to open the chat on the right; it is marked read</li>
           <li>Type your reply in <strong>Type a message&hellip;</strong> and send. Each message you send shows whether it was sent, delivered, read or failed.</li>
         </ol>
@@ -69,7 +69,7 @@ export default function CommunicationPage() {
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">In a Conversation</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Two-way AI translation</strong> &mdash; Pick the client&apos;s language under <strong>Send in:</strong> and yours under <strong>Read in:</strong>, then click <strong>Translate</strong> (it reads <strong>Translation ON</strong> while active). Incoming messages are translated for you, with the original underneath, and each can be switched with <strong>Translate</strong> / <strong>Show Original</strong>. As you type, a <strong>Will send:</strong> preview shows the translated text that goes out.</li>
-          <li><strong>Assignment</strong> &mdash; From the header, <strong>Assign to</strong> a team member, or <strong>Unassign</strong>. <strong>Manage Agents</strong> (top of the list) adds the team members who take WhatsApp conversations and marks them Available or Away.</li>
+          <li><strong>Assignment</strong> &mdash; From the header, <strong>Claim for myself</strong>, <strong>Assign to</strong> a team member, or <strong>Unassign</strong>. <strong>Manage Agents</strong> (top of the list) adds the team members who take WhatsApp conversations and marks them Available or Away. To claim conversations and use <strong>Mine</strong>, you must be one of them: add yourself with the email you sign in with.</li>
           <li><strong>AI Copilot</strong> &mdash; A draft already prepared for the latest message shows in the composer panel; otherwise click <strong>Suggest Reply</strong>. <strong>Use</strong> puts it in the composer to edit and send, or dismiss it.</li>
           <li><strong>Client</strong> / <strong>Create</strong> &mdash; <strong>Client</strong> opens the linked client&apos;s profile; <strong>Create</strong> starts a new client with the phone number filled in</li>
           <li><strong>Parse</strong> &mdash; Sends the whole chat to the Quote Builder (see below)</li>

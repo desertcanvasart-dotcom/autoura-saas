@@ -571,6 +571,8 @@ export default function WhatsAppInboxPage() {
       if (res.ok) {
         const data = await res.json()
         setAgents(data.agents || [])
+        // Who "Mine" and "Claim for myself" mean (the route works it out).
+        setCurrentAgentId(data.current_agent_id ?? null)
       }
     } catch (error) {
       console.error('Error fetching agents:', error)
@@ -579,6 +581,13 @@ export default function WhatsAppInboxPage() {
 
   // Fetch conversations
   const fetchConversations = useCallback(async (showLoader = true) => {
+    // "Mine" with no agent of your own is nobody's conversations — not, as it
+    // was, everyone's.
+    if (filterMode === 'mine' && !currentAgentId) {
+      setConversations([])
+      if (showLoader) setLoading(false)
+      return
+    }
     if (showLoader) setLoading(true)
     try {
       let url = `/api/whatsapp/conversations?search=${searchQuery}`
@@ -663,7 +672,7 @@ export default function WhatsAppInboxPage() {
     if (currentAgentId) {
       assignConversation(currentAgentId, 'claim')
     } else {
-      showToast('warning', 'Please set yourself as an agent first in the Agents settings')
+      showToast('warning', 'You are not a WhatsApp agent yet — add yourself in Manage Agents with your login email')
       setShowAgentsModal(true)
     }
   }
@@ -966,7 +975,7 @@ export default function WhatsAppInboxPage() {
           {loading ? (
             <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#25D366]"></div></div>
           ) : conversations.length === 0 ? (
-            <div className="p-6 text-center text-gray-500"><MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" /><p className="text-sm">No conversations</p></div>
+            <div className="p-6 text-center text-gray-500"><MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" /><p className="text-sm">{filterMode === 'mine' && !currentAgentId ? 'You are not a WhatsApp agent yet — add yourself in Manage Agents with your login email.' : 'No conversations'}</p></div>
           ) : (
             conversations.map((conv) => (
               <div
