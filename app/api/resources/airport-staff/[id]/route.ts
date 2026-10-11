@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
 
 // GET - Get single airport staff
 export async function GET(
@@ -60,6 +61,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
@@ -141,6 +144,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 

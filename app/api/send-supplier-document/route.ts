@@ -5,10 +5,13 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { escapeHtml } from '@/lib/html-escape'
 import { markSupplierDocumentSent } from '@/lib/documents/mark-sent'
+import { gateRole } from '@/lib/api-role-gate'
 
 // POST - Send supplier document via Gmail with PDF attachment
 export async function POST(request: Request) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase } = authResult

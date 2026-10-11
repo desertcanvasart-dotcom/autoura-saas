@@ -9,6 +9,7 @@
 
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * GET /api/itinerary-resources
@@ -65,6 +66,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     // Require authentication and get tenant info
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -189,6 +192,8 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     // Use authenticated client - RLS policies will enforce tenant isolation
     const supabase = await createAuthenticatedClient()
     const { searchParams } = new URL(request.url)
@@ -238,6 +243,8 @@ export async function DELETE(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })

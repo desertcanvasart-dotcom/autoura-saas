@@ -290,10 +290,6 @@ export default function PaymentRemindersPage() {
     fetchReminderHistory(false)
   }
 
-  const getCurrencySymbol = (currency: string) => {
-    return getCurrencySymbol(currency)
-  }
-
   const getReminderTypeConfig = (type: string) => {
     return REMINDER_TYPE_LABELS[type] || { label: type, color: 'bg-gray-100 text-gray-700' }
   }
@@ -773,15 +769,12 @@ export default function PaymentRemindersPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="text-sm font-medium text-blue-800 mb-2">Automatic Reminders</h4>
         <p className="text-sm text-blue-700">
-          Payment reminders are sent automatically every day at 9:00 AM based on the invoice due date:
+          Reminders are checked once a day. An unpaid invoice gets:
         </p>
         <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
-          <li>7 days before due date</li>
-          <li>3 days before due date</li>
-          <li>On the due date</li>
-          <li>7 days after due date (overdue)</li>
-          <li>14 days after due date (second notice)</li>
-          <li>30 days after due date (final notice)</li>
+          <li>Its first reminder 7 days before the due date &mdash; or straight away if it is already closer or overdue</li>
+          <li>Then one every 7 days until it is paid or paused</li>
+          <li>Sending one by hand pushes the next automatic one a week later</li>
         </ul>
         <p className="text-sm text-blue-600 mt-3">
           <strong>Tip:</strong> Use the pause button to temporarily stop reminders for specific invoices.

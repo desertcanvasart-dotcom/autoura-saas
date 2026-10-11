@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { buildCapacityWrite, DEFAULT_MAX_GROUPS } from '@/lib/capacity/capacity-write'
+import { gateRole } from '@/lib/api-role-gate'
 
 // ============================================
 // SINGLE DATE CAPACITY API
@@ -102,6 +103,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('admin')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -184,6 +187,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('admin')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

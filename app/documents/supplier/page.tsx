@@ -10,6 +10,7 @@ import {
   Clock, RotateCcw, AlertTriangle
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface SupplierDocument {
   id: string
@@ -193,9 +194,14 @@ export default function SupplierDocumentsPage() {
       if (response.ok) {
         fetchDocuments()
         fetchMissing(itineraryFilter)
+      } else {
+        // A refusal (your role, a document gone) used to change nothing silently.
+        const body = await response.json().catch(() => ({}))
+        showToast('error', body.error || 'Could not change the status')
       }
     } catch (error) {
       console.error('Error updating status:', error)
+      showToast('error', 'Could not change the status')
     }
   }
 
@@ -210,9 +216,13 @@ export default function SupplierDocumentsPage() {
       if (response.ok) {
         fetchDocuments()
         fetchMissing(itineraryFilter)
+      } else {
+        const body = await response.json().catch(() => ({}))
+        showToast('error', body.error || 'Could not delete the document')
       }
     } catch (error) {
       console.error('Error deleting document:', error)
+      showToast('error', 'Could not delete the document')
     }
   }
 

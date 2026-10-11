@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(
   request: NextRequest,
@@ -71,6 +72,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -167,6 +170,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

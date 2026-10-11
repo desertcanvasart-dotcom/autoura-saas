@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const { id } = await params
 
     // createAuthenticatedClient(), not the browser singleton from

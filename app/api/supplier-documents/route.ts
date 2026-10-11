@@ -1,6 +1,7 @@
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(request: NextRequest) {
   // Authenticate and get tenant context
@@ -118,6 +119,8 @@ export async function POST(request: NextRequest) {
     }
 
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const body = await request.json()
 
     // Add tenant_id for multi-tenancy

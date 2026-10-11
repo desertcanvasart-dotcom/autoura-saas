@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { saveRoute } from '../route'
+import { gateRole } from '@/lib/api-role-gate'
 
 
 export async function GET(
@@ -47,6 +48,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
@@ -67,6 +70,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

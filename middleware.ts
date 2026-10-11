@@ -83,6 +83,13 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/pricing-grid': ['admin', 'manager', 'member'],
   '/hotels': ['admin', 'manager'],
   '/restaurants': ['admin', 'manager'],
+  // Operate and the supplier directory, as the sidebar shows them: with no
+  // entry, any signed-in role (viewers too) opened them by URL — and the
+  // Resources page could delete suppliers.
+  '/departures': ['admin', 'manager'],
+  '/suppliers': ['admin', 'manager'],
+  '/resources': ['admin', 'manager'],
+  '/airport-staff': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],
   '/transportation': ['admin', 'manager'],
   '/attractions': ['admin', 'manager'],

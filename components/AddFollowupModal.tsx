@@ -258,7 +258,8 @@ export default function AddFollowupModal({
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                {/* No "Urgent": client_followups allows low / medium / high
+                    only (migration 035), so it failed to save. */}
               </select>
             </div>
           </div>

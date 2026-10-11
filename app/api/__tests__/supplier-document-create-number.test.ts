@@ -24,7 +24,7 @@ const h = vi.hoisted(() => {
 })
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 'tenant-B', user: { id: 'u1' }, supabase: h.rls }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 'tenant-B', role: 'manager', user: { id: 'u1' }, supabase: h.rls }),
   createAdminClient: () => h.admin,
 }))
 

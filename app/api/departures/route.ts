@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { shiftDateISO } from '@/lib/today'
 import { tenantToday } from '@/lib/tenant-today'
+import { gateRole } from '@/lib/api-role-gate'
 
 // ============================================
 // TOUR DEPARTURES API
@@ -149,6 +150,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

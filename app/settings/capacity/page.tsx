@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { toLocalDateString } from '@/lib/today'
 import {
   Calendar,
   ChevronLeft,
@@ -356,9 +357,11 @@ export default function CapacityPage() {
   // CALENDAR HELPERS
   // ============================================
 
-  const formatDate = (date: Date): string => {
-    return date.toISOString().split('T')[0]
-  }
+  // The calendar's days are local midnights: their date is the LOCAL one.
+  // toISOString() gave the UTC date — the day before, east of UTC — so in
+  // Cairo, blacking out the 15th saved the 14th, and the WhatsApp AI turned
+  // clients away on the wrong day.
+  const formatDate = (date: Date): string => toLocalDateString(date)
 
   const getDaysInMonth = (date: Date): Date[] => {
     const year = date.getFullYear()
