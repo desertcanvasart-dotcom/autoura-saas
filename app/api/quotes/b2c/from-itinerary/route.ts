@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { priceB2cQuote } from '@/lib/quotes/b2c-quote-price';
 import { recordsInTenant } from '@/lib/quotes/records-in-tenant';
 
 /**
@@ -34,7 +35,8 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validation
-    if (!itinerary_id || !num_travelers || !tier || !margin_percent) {
+    // A 0% margin (an at-cost trip) is a margin; only a missing one is not.
+    if (!itinerary_id || !num_travelers || !tier || margin_percent === undefined || margin_percent === null || margin_percent === '') {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: itinerary_id, num_travelers, tier, margin_percent' },
         { status: 400 }
@@ -117,9 +119,11 @@ export async function POST(request: NextRequest) {
 
     // Calculate totals
     const total_cost = Object.values(costBreakdown).reduce((sum: number, val: any) => sum + val, 0);
-    const margin_amount = total_cost * (margin_percent / 100);
-    const selling_price = total_cost + margin_amount;
-    const price_per_person = selling_price / num_travelers;
+    // In the currency's own units (lib/quotes/b2c-quote-price): whole yen.
+    const { selling_price, price_per_person } = priceB2cQuote({
+      totalCost: total_cost, marginPercent: margin_percent, travelers: num_travelers, currency,
+    });
+    const margin_amount = selling_price - total_cost;
 
     // 3. Generate quote number (requires admin client for RPC)
     const { data: quoteNumber, error: seqError } = await supabase

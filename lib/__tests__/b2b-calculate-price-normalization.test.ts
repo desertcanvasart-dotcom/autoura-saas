@@ -13,7 +13,7 @@ import { RATE_MONETARY_COLUMNS } from '@/lib/rates/rate-currency'
 // normalizeRateRows before its number joins a total.
 
 const ROUTE = readFileSync(
-  path.join(__dirname, '..', '..', 'app', 'api', 'b2b', 'calculate-price', 'route.ts'),
+  path.join(__dirname, '..', 'b2b', 'price-variation.ts'),
   'utf8'
 )
 

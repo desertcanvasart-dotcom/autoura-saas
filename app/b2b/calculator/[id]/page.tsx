@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { isBookableLine, sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
+import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { DayBandRow, groupByDay } from '@/components/pricing/DayBand'
 import { useVocabulary } from '@/components/vocabulary'
 
@@ -111,6 +111,7 @@ interface CatalogueExtraOption {
 interface SavedQuote {
   id: string
   quote_number: string
+  repricedTo: number | null
 }
 
 export default function TourPriceCalculator() {
@@ -267,6 +268,25 @@ export default function TourPriceCalculator() {
     </div>
   )
 
+  // What the price is calculated from. The quote save sends the same inputs
+  // and the server prices them again — the figures shown here are a preview.
+  const pricingInputs = (optionalIds: string[]) => ({
+    variation_id: variationId,
+    num_pax: numPax,
+    travel_date: travelDate,
+    is_eur_passport: isEurPassport,
+    margin_percent: marginPercent,
+    tour_leader_included: tourLeaderIncluded,
+    guide_grade: guideGrade,
+    guide_mode: guideMode,
+    language,
+    extras: selectedExtraIds,
+    selected_optional_ids: optionalIds
+  })
+  // The inputs of the price on screen: changing a field after calculating
+  // must not save a quote for inputs nobody has seen priced.
+  const [pricedInputs, setPricedInputs] = useState<ReturnType<typeof pricingInputs> | null>(null)
+
   const calculatePrice = async (optionalIdsOverride?: string[]) => {
     // Priced from the argument when given — state has not updated yet when a
     // checkbox handler calls this.
@@ -278,22 +298,13 @@ export default function TourPriceCalculator() {
       const res = await fetch('/api/b2b/calculate-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          variation_id: variationId,
-          num_pax: numPax,
-          travel_date: travelDate,
-          is_eur_passport: isEurPassport,
-          margin_percent: marginPercent,
-          tour_leader_included: tourLeaderIncluded,
-          guide_grade: guideGrade,
-          guide_mode: guideMode,
-          language,
-          extras: selectedExtraIds,
-          selected_optional_ids: optionalIds
-        })
+        body: JSON.stringify(pricingInputs(optionalIds))
       })
       const data = await res.json()
-      if (data.success) setResult(data.data)
+      if (data.success) {
+        setResult(data.data)
+        setPricedInputs(pricingInputs(optionalIds))
+      }
       else setError(data.error || 'Failed to calculate price')
     } catch (err) {
       setError('Failed to calculate price')
@@ -349,7 +360,7 @@ export default function TourPriceCalculator() {
   }
 
   const handleSaveQuote = async () => {
-    if (!result) return
+    if (!result || !pricedInputs) return
     
     setSaving(true)
     setError(null)
@@ -365,37 +376,10 @@ export default function TourPriceCalculator() {
           client_email: quoteForm.client_email || null,
           client_phone: quoteForm.client_phone || null,
           client_nationality: quoteForm.client_nationality || null,
-          travel_date: travelDate,
-          num_adults: numPax,
-          num_children: 0,
-          // The CHOSEN optional services travel with the quote as real services,
-          // so their money and their lines stay together downstream.
-          services_snapshot: [
-            // A no-rate line IS a service to book, so it travels with the
-            // quote; a line that only makes the day read whole (a meal already
-            // inside the hotel rate) does not, or it converts into a zero-cost
-            // booking nobody can act on.
-            ...result.services.filter(isBookableLine),
-            ...(result.optional_services || []).filter(s => s.is_selected),
-          ],
-          total_cost: result.total_cost,
-          margin_percent: result.margin_percent,
-          margin_amount: result.margin_amount,
-          selling_price: result.selling_price,
-          price_per_person: result.price_per_person,
-          tour_leader_included: tourLeaderIncluded,
-          tour_leader_cost: result.tour_leader_cost || null,
-          // Store only non-default values — NULL means the defaults (mig 326).
-          guide_grade: guideGrade === 'egyptologist' ? null : guideGrade,
-          guide_mode: guideMode === 'spot' ? null : guideMode,
-          single_supplement: result.single_supplement || 0,
-          // The prices are in the run's currency (the tenant's rates currency),
-          // not the column's EUR default.
-          currency: result.currency,
-          // The generated sheet becomes the partner's multi-pax table.
-          rate_sheet: rateSheet.map(row => ({ pax: row.pax, pp: row.price_per_person, total: row.selling_price })),
-          is_eur_passport: isEurPassport,
-          season: result.season,
+          // Priced again on the server from the inputs of the price shown;
+          // the totals, services and rate sheet are never sent.
+          pricing: pricedInputs,
+          include_rate_sheet: rateSheet.length > 0,
           notes: quoteForm.notes || null
         })
       })
@@ -405,7 +389,13 @@ export default function TourPriceCalculator() {
       if (data.success) {
         setSavedQuote({
           id: data.data.id,
-          quote_number: data.data.quote_number
+          quote_number: data.data.quote_number,
+          // Rates changed between the calculation and the save: the quote
+          // holds the current price, so say so rather than let the screen
+          // disagree with it.
+          repricedTo: Number(data.data.selling_price) !== Number(result.selling_price)
+            ? Number(data.data.selling_price)
+            : null
         })
         setShowSaveModal(false)
         // Reset form
@@ -531,6 +521,9 @@ export default function TourPriceCalculator() {
             <div>
               <p className="text-sm font-medium text-green-800">Quote saved successfully!</p>
               <p className="text-sm text-green-600">Reference: <span className="font-mono font-bold">{savedQuote.quote_number}</span></p>
+              {savedQuote.repricedTo !== null && (
+                <p className="text-sm text-amber-700">Rates changed since this price was calculated — the quote was saved at {money(savedQuote.repricedTo)}.</p>
+              )}
             </div>
           </div>
           <Link

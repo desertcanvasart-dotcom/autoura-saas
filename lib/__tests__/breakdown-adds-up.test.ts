@@ -127,7 +127,7 @@ describe('a day\'s extra transfers are charged, not only shown', () => {
 })
 
 describe('the calculator route sends lines as the group pays them', () => {
-  const route = readFileSync(join(process.cwd(), 'app/api/b2b/calculate-price/route.ts'), 'utf8')
+  const route = readFileSync(join(process.cwd(), 'lib/b2b/price-variation.ts'), 'utf8')
   it('scales quantity and total through the one shared rule', () => {
     expect(route).toContain("import { scaleForGroup } from '@/lib/pricing/line-for-group'")
     expect(route).toMatch(/quantity: perPaxQuantity\(s\),/)

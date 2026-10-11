@@ -201,7 +201,7 @@ describe('B2B partners', () => {
   })
 
   it('are checked before a quote is created, and a 0% margin counts', () => {
-    for (const f of ['app/api/b2b/quote-from-itinerary/route.ts', 'app/api/quotes/b2b/route.ts']) {
+    for (const f of ['app/api/b2b/quote-from-itinerary/route.ts'] /* app/api/quotes/b2b has no POST since quote prices moved to the server */) {
       expect(readFileSync(join(process.cwd(), f), 'utf8')).toContain('partnerInTenant(supabase, partner_id')
     }
     expect(readFileSync(join(process.cwd(), 'app/api/b2b/quote-from-itinerary/route.ts'), 'utf8')).toContain('default_margin_percent != null')

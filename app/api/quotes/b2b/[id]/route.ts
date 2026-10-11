@@ -137,8 +137,10 @@ export async function PUT(
     if (body.pp_tips !== undefined) updateData.pp_tips = body.pp_tips;
     if (body.pp_domestic_flights !== undefined) updateData.pp_domestic_flights = body.pp_domestic_flights;
 
-    // Pricing table
-    if (body.pricing_table !== undefined) updateData.pricing_table = body.pricing_table;
+    // The partner's multi-pax pricing_table is never taken from the request:
+    // it is worked out where the quote is priced (the calculator, the grid,
+    // from-itinerary). Rebuilding it from the fields above would zero every
+    // engine-priced quote, which keeps them at 0 — the edit page says so.
     if (body.tour_leader_cost !== undefined) updateData.tour_leader_cost = body.tour_leader_cost;
 
     // Status and validity
@@ -158,6 +160,7 @@ export async function PUT(
       .from('b2b_quotes')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select(`
         *,
         b2b_partners (
