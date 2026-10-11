@@ -27,6 +27,8 @@ export interface PortalLink {
   booking_id: string
   tenant_id: string
   passenger_id: string | null
+  /** The office has locked the details: no new requests from the portal. */
+  form_locked: boolean
 }
 
 /** Everything the two portal extras routes check before touching anything. */
@@ -44,12 +46,12 @@ export async function resolvePortalExtrasLink(
 
   const { data: link } = await extrasAdmin()
     .from('booking_portal_links')
-    .select('booking_id, tenant_id, passenger_id, revoked_at, expires_at')
+    .select('booking_id, tenant_id, passenger_id, revoked_at, expires_at, form_locked')
     .eq('token', token)
     .maybeSingle()
   if (!link || !portalLinkState(link).usable) return { error: notFound() }
 
-  return { link: link as PortalLink }
+  return { link: { ...link, form_locked: !!link.form_locked } as PortalLink }
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -78,7 +80,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return NextResponse.json({
     currency: booking?.currency || 'EUR',
-    canRequest: true,
+    // Once the office locks the details it takes no new requests; an offer
+    // it has already made can still be answered (extras/[eid]).
+    canRequest: !link.form_locked,
     // portalExtraView, not the row: no unit price, no supplier, no cost.
     extras: (data ?? []).map(portalExtraView),
   })
@@ -89,6 +93,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const resolved = await resolvePortalExtrasLink(request, token)
   if ('error' in resolved) return resolved.error
   const { link } = resolved
+  if (link.form_locked) {
+    return NextResponse.json({ error: 'Details are confirmed and locked — contact your agency for anything more.' }, { status: 409 })
+  }
   const admin = extrasAdmin()
 
   const body = await request.json().catch(() => null)
