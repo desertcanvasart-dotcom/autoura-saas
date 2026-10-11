@@ -3,6 +3,8 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import type { TablesInsert } from '@/types/database.types'
 import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
+import { nextSupplierCodes } from '@/lib/suppliers/supplier-code'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 // All valid supplier fields (including hierarchical fields)
 const VALID_FIELDS = [
@@ -155,11 +157,26 @@ export async function POST(request: NextRequest) {
       status: body.status || 'active'
     }
 
-    const { data, error } = await supabase
-      .from('suppliers')
-      .insert([newSupplier])
-      .select()
-      .single()
+    // Every supplier has a code (the key a rate sheet names it by): the next
+    // free SUP-#### of this agency. A clash with one made a moment earlier
+    // (the unique index, migration 409) takes the code after it.
+    let { data, error } = { data: null as unknown, error: null as { message: string; code?: string } | null }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data: codes } = await fetchAllPages((from, to) => supabase
+        .from('suppliers')
+        .select('supplier_code')
+        .eq('tenant_id', tenant_id)
+        .not('supplier_code', 'is', null)
+        .order('id', { ascending: true })
+        .range(from, to))
+      const [code] = nextSupplierCodes((codes ?? []).map(c => c.supplier_code), 1)
+      ;({ data, error } = await supabase
+        .from('suppliers')
+        .insert([{ ...newSupplier, supplier_code: code }])
+        .select()
+        .single())
+      if (!error || error.code !== '23505' || !/supplier_code/.test(error.message)) break
+    }
 
     if (error) {
       console.error('Error creating supplier:', error)

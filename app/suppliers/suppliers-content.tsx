@@ -29,6 +29,8 @@ import { VocabLabel } from '@/components/vocabulary'
 interface Supplier {
   id: string
   name: string
+  /** The portable code a rate sheet names this supplier by (SUP-####). */
+  supplier_code?: string | null
   /** The PRIMARY role; `types` is the full list (migration 340). */
   type: string
   types?: string[] | null
@@ -508,7 +510,12 @@ export default function SuppliersContent() {
       if (deleted.length === ids.length) {
         showToast('success', `${deleted.length} supplier${deleted.length === 1 ? '' : 's'} deleted`)
       } else {
-        showToast('error', `Deleted ${deleted.length} of ${ids.length} — ${ids.length - deleted.length} failed`)
+        // Say why: a supplier whose ships or hotels still carry rates is refused.
+        const firstFailed = results.find(r => r.status === 'fulfilled' && !r.value.ok)
+        const reason = firstFailed && firstFailed.status === 'fulfilled'
+          ? ((await firstFailed.value.json().catch(() => null)) as { error?: string } | null)?.error
+          : null
+        showToast('error', `Deleted ${deleted.length} of ${ids.length} — ${ids.length - deleted.length} failed${reason ? `: ${reason}` : ''}`)
       }
       fetchSuppliers()
     } catch (err) {
@@ -540,12 +547,12 @@ export default function SuppliersContent() {
         showToast('error', `Suppliers import failed: ${data?.error || `server returned ${res.status}`}`)
         return
       }
-      const bits = [`${data.inserted} imported`]
+      const bits = [`${data.inserted} created`, `${data.updated ?? 0} updated`]
+      if (data.exampleRows) bits.push('the example row was skipped')
       if (data.propertiesCreated) bits.push(`${data.propertiesCreated} properties created`)
       if (data.propertiesAlreadyPresent) bits.push(`${data.propertiesAlreadyPresent} properties already on file`)
       if (data.propertyWarnings?.length) bits.push(`${data.propertyWarnings.length} properties not placed (${data.propertyWarnings.slice(0, 2).map((w: { reason: string }) => w.reason).join('; ')}${data.propertyWarnings.length > 2 ? '…' : ''})`)
       if (data.typeDefaulted?.length) bits.push(`${data.typeDefaulted.length} had no Type — imported as "Other", reclassify when convenient`)
-      if (data.skippedExisting?.length) bits.push(`${data.skippedExisting.length} already existed (skipped)`)
       if (data.refused?.length) bits.push(`${data.refused.length} refused (${data.refused.slice(0, 3).map((r: { reason: string }) => r.reason).join('; ')}${data.refused.length > 3 ? '…' : ''})`)
       // A result that still needs the user's attention (refusals to fix,
       // types to reclassify) is a WARNING — sticky until dismissed.
@@ -640,7 +647,11 @@ export default function SuppliersContent() {
       if (data.refused?.length) {
         bits.push(`${data.refused.length} refused (${data.refused.slice(0, 2).map((r: { row: number; reason: string }) => `row ${r.row}: ${r.reason}`).join('; ')}${data.refused.length > 2 ? '…' : ''})`)
       }
-      showToast(data.refused?.length ? 'warning' : 'success', `Properties: ${bits.join(' · ')}`)
+      // Write errors too (a batch the database refused): they were dropped,
+      // and the toast said "nothing changed" over a failed save.
+      const writeErrors = (data.errors ?? []).filter((e: { row: number }) => e.row === 0)
+      if (writeErrors.length) bits.push(`${writeErrors.length} could not be saved (${writeErrors.slice(0, 2).map((e: { reason: string }) => e.reason).join('; ')})`)
+      showToast(data.refused?.length || writeErrors.length ? 'warning' : 'success', `Properties: ${bits.join(' · ')}`)
       if (selectedSupplier) void handleView(selectedSupplier, 'properties')
     } catch (err) {
       showToast('error', `Properties import failed: ${err instanceof Error ? err.message : 'network error'}`)
@@ -764,8 +775,8 @@ export default function SuppliersContent() {
     return (
       <input
         type={field.type}
-        value={value || ''}
-        onChange={(e) => setFormData(prev => ({ ...prev, [field.key]: field.type === 'number' ? parseFloat(e.target.value) || '' : e.target.value }))}
+        value={value ?? ''}
+        onChange={(e) => setFormData(prev => ({ ...prev, [field.key]: field.type === 'number' ? (e.target.value === '' || !Number.isFinite(parseFloat(e.target.value)) ? null : parseFloat(e.target.value)) : e.target.value }))}
         className="w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
         placeholder={`Enter ${field.name.toLowerCase()}`}
         required={field.required}
@@ -853,7 +864,7 @@ export default function SuppliersContent() {
                       },
                       {
                         label: 'Import suppliers',
-                        description: 'Adds new suppliers and updates existing ones by code.',
+                        description: 'Updates the suppliers it matches (by code, else name) and adds the rest.',
                         icon: <Upload className="w-4 h-4" />,
                         onSelect: () => importInputRef.current?.click(),
                       },
@@ -1290,7 +1301,7 @@ export default function SuppliersContent() {
                     Rates {supplierRates.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-gray-100 rounded text-xs">{supplierRates.length}</span>}
                   </button>
                 )}
-                {propertyTypesForRoles([selectedSupplier.type]).length > 0 && (
+                {propertyTypesForRoles(typesOf(selectedSupplier).map(behaviorOf)).length > 0 && (
                   <button onClick={() => setViewTab('properties')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${viewTab === 'properties' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Properties</button>
                 )}
                 <button onClick={() => setViewTab('documents')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${viewTab === 'documents' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Documents</button>
@@ -1317,6 +1328,7 @@ export default function SuppliersContent() {
                       {selectedSupplier.city && <div><p className="text-xs text-gray-500">City</p><p className="text-sm font-medium text-gray-900">{selectedSupplier.city}</p></div>}
                       {selectedSupplier.address && <div><p className="text-xs text-gray-500">Address</p><p className="text-sm font-medium text-gray-900">{selectedSupplier.address}</p></div>}
                       {selectedSupplier.star_rating && <div><p className="text-xs text-gray-500">Star Rating</p><div className="flex items-center gap-1">{Array.from({ length: parseInt(selectedSupplier.star_rating) || 0 }).map((_, i) => <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />)}</div></div>}
+                      {selectedSupplier.supplier_code && <div><p className="text-xs text-gray-500">Code</p><p className="text-sm font-mono font-medium text-gray-900">{selectedSupplier.supplier_code}</p></div>}
                       <div><p className="text-xs text-gray-500">Status</p><span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[selectedSupplier.status]}`}>{selectedSupplier.status}</span></div>
                     </div>
                   </div>
@@ -1347,7 +1359,7 @@ export default function SuppliersContent() {
                     </div>
                   ) : (
                     <table className="w-full">
-                      <thead><tr className="bg-gray-50"><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Service</th><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Vehicle</th><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Route</th><th className="text-right px-3 py-2 text-xs font-semibold text-gray-600">Rate</th><th className="text-right px-3 py-2 text-xs font-semibold text-gray-600">Non-EUR passport</th></tr></thead>
+                      <thead><tr className="bg-gray-50"><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Service</th><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Vehicle</th><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Route</th><th className="text-right px-3 py-2 text-xs font-semibold text-gray-600">Rate</th><th className="text-right px-3 py-2 text-xs font-semibold text-gray-600">Non-EU passport</th></tr></thead>
                       <tbody>{supplierRates.map(rate => (<tr key={rate.id} className="border-t border-gray-100"><td className="px-3 py-2 text-sm font-medium">{rate.service_code}</td><td className="px-3 py-2 text-sm"><VocabLabel kind="vehicle_type" value={rate.vehicle_type} /></td><td className="px-3 py-2 text-sm">{rate.city}{rate.destination_city && ` → ${rate.destination_city}`}</td><td className="px-3 py-2 text-sm text-right font-medium text-green-600">{fmtRate(rate.base_rate_eur, rate, 0)}</td><td className="px-3 py-2 text-sm text-right">{fmtRate(rate.base_rate_non_eur, rate, 0)}</td></tr>))}</tbody>
                     </table>
                   )}
