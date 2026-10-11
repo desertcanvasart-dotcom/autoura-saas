@@ -4,6 +4,7 @@ import { parseSuppliersCsv, splitAgainstExisting, resolveImportTypes } from '@/l
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { planNamedProperties, type NamedPropertyEntry, type SupplierRef, type ExistingProperty } from '@/lib/suppliers/property-csv-plan'
 import type { Database } from '@/types/database.types'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 type SupplierInsert = Database['public']['Tables']['suppliers']['Insert']
 
@@ -50,10 +51,14 @@ export async function POST(request: NextRequest) {
     // supplier row. Their ids and ROLES are read too — a property may be topped
     // up onto one, and it is validated against what that supplier actually is,
     // not what this file claims.
-    const { data: existing } = await supabase
+    // Paged: a plain select stops at 1000 rows, so the 1001st existing
+    // supplier was "new" and imported a second time (documents audit, round 12).
+    const { data: existing } = await fetchAllPages((from, to) => supabase
       .from('suppliers')
       .select('id, name, supplier_code, type, types')
       .eq('tenant_id', tenant_id)
+      .order('id', { ascending: true })
+      .range(from, to))
     const { toInsert: creatable, skippedExisting } = splitAgainstExisting(
       resolved.records,
       (existing ?? []).map(s => String(s.name ?? ''))

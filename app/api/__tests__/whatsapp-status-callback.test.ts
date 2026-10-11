@@ -20,14 +20,21 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
 
 // The update chain's terminal `.select('id')` resolves to whatever the current
-// scenario sets.
+// scenario sets. The update is conditional on the stored status
+// (`.in('status', …)`, documents audit round 12); when it changes nothing the
+// route looks the SID up (`.select().eq().limit()`) to tell a stale callback
+// from a missing row.
 let updateResult: { data: unknown; error: unknown } = { data: [{ id: 'm1' }], error: null }
+let lookupResult: { data: unknown; error: unknown } = { data: [], error: null }
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     from: () => ({
       update: () => ({
-        eq: () => ({ select: async () => updateResult }),
+        eq: () => ({ in: () => ({ select: async () => updateResult }) }),
+      }),
+      select: () => ({
+        eq: () => ({ limit: async () => lookupResult }),
       }),
     }),
   }),
@@ -72,10 +79,19 @@ describe('whatsapp status callback', () => {
 
   it('reports a distinct marker when no row carries the SID', async () => {
     updateResult = { data: [], error: null }
+    lookupResult = { data: [], error: null }
     const res = await POST(callback())
     expect(res.status).toBe(200) // Twilio must not retry
     expect(errors.join('\n')).toMatch(/NO_MATCHING_MESSAGE/)
     expect(errors.join('\n')).not.toMatch(/DB_ERROR/)
+  })
+
+  it('stays quiet when the row is already further along (stale callback)', async () => {
+    updateResult = { data: [], error: null }
+    lookupResult = { data: [{ id: 'm1' }], error: null }
+    const res = await POST(callback())
+    expect(res.status).toBe(200)
+    expect(errors.join('\n')).not.toMatch(/NO_MATCHING_MESSAGE|DB_ERROR/)
   })
 
   it('reports a different marker when the database itself fails', async () => {

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
+import { supplierTypesOrFilter } from '@/lib/suppliers/type-filter'
 
 // GET /api/resources/vehicles
 // Fetches transport suppliers mapped as vehicle resources (tenant-aware)
@@ -18,11 +20,16 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('is_active')
     const city = searchParams.get('city')
 
-    // Query suppliers filtered by transport types (RLS handles tenant filtering)
+    // Query suppliers filtered by transport types (RLS handles tenant filtering).
+    // Any of a supplier's roles, not only the legacy main supplier_type: a
+    // hotel group that also runs cars was missing (documents audit, round 12).
+    // The agency's own types that behave as transport count too, as on
+    // /api/suppliers.
+    const transportKeys = await supplierTypeKeysForBehaviors(supabase, ['transport_company', 'transport', 'driver'])
     let query = supabase
       .from('suppliers')
       .select('*')
-      .or('supplier_type.eq.transport_company,supplier_type.eq.transport,supplier_type.eq.driver')
+      .or(supplierTypesOrFilter(transportKeys) ?? 'supplier_type.in.(transport_company,transport,driver)')
       .order('company_name', { ascending: true })
 
     if (isActive === 'true') {

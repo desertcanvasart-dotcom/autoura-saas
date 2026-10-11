@@ -29,6 +29,7 @@ import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { whatsappModel } from '@/lib/ai/models'
 import { notifyTeam, bellSnippet } from '@/lib/notifications'
 import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbound-client'
+import { toConversationPhone, conversationPhoneKeys } from '@/lib/whatsapp-phone'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
@@ -163,7 +164,9 @@ async function handleMetaWebhook(request: NextRequest, rawBody: string) {
       }
 
       await processInboundWhatsAppMessage({
-        phoneNumber: msg.from,
+        // Meta sends bare digits; conversations are keyed "+…" like Twilio's
+        // (documents audit, round 12).
+        phoneNumber: toConversationPhone(msg.from),
         toNumber: msg.to,
         body: msg.body,
         messageSid: msg.messageSid,
@@ -374,8 +377,12 @@ async function processInboundWhatsAppMessage({
   const { data: existingConversation } = await supabase
     .from('whatsapp_conversations')
     .select('id, tenant_id, client_id')
-    .eq('phone_number', phoneNumber)
-    .single()
+    // "+…" and the legacy "…" the app stored before it kept the "+"
+    // (documents audit, round 12) — one conversation either way.
+    .in('phone_number', conversationPhoneKeys(phoneNumber))
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   // ============================================
   // STEP 1b: The client — of that conversation's tenant

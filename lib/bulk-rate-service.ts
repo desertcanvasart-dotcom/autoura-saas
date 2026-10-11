@@ -2,6 +2,7 @@ import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 import { formatSailingDaysCell, parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
+import { dateShapeIsReal } from '@/lib/rates/calendar-date'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -652,9 +653,11 @@ function parseCell(value: string | undefined | null, colDef: ColumnDef): { parse
       return { parsed: null, error: `${colDef.label} must be true/false` }
     }
     case 'date': {
-      // Accept ISO dates or common formats
-      if (/^\d{4}-\d{2}-\d{2}/.test(raw) || /^\d{2}\/\d{2}\/\d{4}/.test(raw)) {
-        return { parsed: raw, error: null }
+      // Accept ISO dates or common formats — but only real days: the shape
+      // check let 30 February through, to fail the insert batch or roll over
+      // to 2 March (documents audit, round 12).
+      if (!dateShapeIsReal(raw)) {
+        return { parsed: null, error: `${colDef.label} "${raw}" is not a real date (use YYYY-MM-DD)` }
       }
       return { parsed: raw, error: null } // Be lenient with date formats
     }

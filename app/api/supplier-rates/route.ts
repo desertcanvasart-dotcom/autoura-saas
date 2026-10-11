@@ -17,6 +17,14 @@ const SUPPLIER_RATE_TABLES: Record<string, string[]> = {
   attraction: ['activity_rates'],
   restaurant: ['meal_rates'],
   tour_operator: ['train_rates', 'sleeping_train_rates'],
+  // Airlines, rail, and airport / hotel assistants showed no rates: their
+  // tables carry supplier_id (flight_rates since 113, the staff tables since
+  // 339) but were never listed here (documents audit, round 12).
+  airline: ['flight_rates'],
+  train_operator: ['train_rates', 'sleeping_train_rates'],
+  ground_handler: ['airport_staff_rates', 'hotel_staff_rates'],
+  airport_assistant: ['airport_staff_rates'],
+  hotel_assistant: ['hotel_staff_rates'],
 }
 
 // Tables whose rows are tenant-owned (tenant_id NOT NULL)
@@ -25,8 +33,13 @@ const TENANT_SCOPED_TABLES = new Set([
   'nile_cruises', 'activity_rates', 'meal_rates',
 ])
 
-// Tables with shared/global catalog rows (tenant_id nullable)
-const SHARED_CATALOG_TABLES = new Set(['train_rates', 'sleeping_train_rates'])
+// Tables with shared/global catalog rows (tenant_id nullable). The round-12
+// additions live here too: their tenant_id may be empty, and this admin
+// client must still scope them to the caller's tenant.
+const SHARED_CATALOG_TABLES = new Set([
+  'train_rates', 'sleeping_train_rates',
+  'flight_rates', 'airport_staff_rates', 'hotel_staff_rates',
+])
 
 export async function GET(request: NextRequest) {
   try {

@@ -19,6 +19,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 let currentUser: { id: string; email: string } | null = null
 let currentProfile: { is_active: boolean } | null = null
 let currentMembership: { role: string } | null = null
+// The user's switched-off memberships (documents audit, round 12): read as a
+// list, only when no active membership was found.
+let currentInactiveMemberships: { status: string }[] = []
 const signOut = vi.fn(async () => ({ error: null }))
 
 vi.mock('@supabase/ssr', () => ({
@@ -36,10 +39,14 @@ vi.mock('@supabase/ssr', () => ({
       const chain: any = {
         select: () => chain,
         eq: () => chain,
+        in: () => chain,
         order: () => chain,
         limit: () => chain,
         single: async () => result(),
         maybeSingle: async () => result(),
+        // Awaiting the chain itself = a list read (the inactive-membership check).
+        then: (resolve: (v: unknown) => void) =>
+          resolve({ data: table === 'tenant_members' ? currentInactiveMemberships : [] }),
       }
       return chain
     },
@@ -63,6 +70,7 @@ beforeEach(() => {
   currentUser = null
   currentProfile = null
   currentMembership = null
+  currentInactiveMemberships = []
 })
 
 describe('super-admin / deactivated redirect handling', () => {
@@ -130,5 +138,29 @@ describe('super-admin / deactivated redirect handling', () => {
     currentMembership = null
     const res = await middleware(req('/settings'))
     expect(locationOf(res)).toContain('/dashboard?error=unauthorized')
+  })
+
+  it('signs out a user deactivated in their only company', async () => {
+    // Deactivation is per company now: the membership row is switched off,
+    // the account-wide profile flag stays true (documents audit, round 12).
+    currentUser = { id: 'u7', email: 'gone@tenant.test' }
+    currentProfile = { is_active: true }
+    currentMembership = null
+    currentInactiveMemberships = [{ status: 'deactivated' }]
+    const res = await middleware(req('/rates'))
+    expect(locationOf(res)).toContain('/login?error=account_inactive')
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
+  })
+
+  it('keeps a user deactivated in ONE company working in their other one', async () => {
+    // The lookup skips the deactivated row and finds the active one, so the
+    // inactive check never runs.
+    currentUser = { id: 'u8', email: 'two@tenant.test' }
+    currentProfile = { is_active: true }
+    currentMembership = { role: 'manager' }
+    currentInactiveMemberships = [{ status: 'deactivated' }]
+    const res = await middleware(req('/rates'))
+    expect(locationOf(res)).toBeNull()
+    expect(signOut).not.toHaveBeenCalled()
   })
 })

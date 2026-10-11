@@ -1,7 +1,8 @@
 import { tenantForUser, type MembershipRow } from '@/lib/email/scheduled-sync'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { getTokensFromCode, getUserEmail } from '@/lib/gmail'
+import { getTokensFromCode, getUserEmail, GMAIL_SCOPES } from '@/lib/gmail'
+import { missingGoogleScopes } from '@/lib/google-scopes'
 import { verifyState } from '@/lib/oauth-state'
 import { appRedirectBase } from '@/lib/oauth-config'
 
@@ -48,6 +49,18 @@ export async function GET(request: NextRequest) {
 
     if (!tokens.access_token || !tokens.refresh_token) {
       throw new Error('No tokens received')
+    }
+
+    // Google's granular consent lets the user untick a permission and still
+    // hand back a valid token; it was saved as a working connection and the
+    // first send/sync failed with a 403 (documents audit, round 12). Every
+    // scope the connect route requested must be granted, or nothing is saved.
+    const missingScopes = missingGoogleScopes(tokens.scope, GMAIL_SCOPES)
+    if (missingScopes.length > 0) {
+      console.error('OAuth callback: scopes not granted', { userId, missingScopes })
+      return NextResponse.redirect(
+        new URL('/settings/email?error=missing_scopes', base)
+      )
     }
 
     // Get user's email
