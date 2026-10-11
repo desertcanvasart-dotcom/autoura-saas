@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { priceB2cQuote } from '@/lib/quotes/b2c-quote-price'
 import {
   ArrowLeft, Save, Loader2, AlertCircle
 } from 'lucide-react'
@@ -59,11 +60,12 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
   }, [params.id])
 
   useEffect(() => {
-    // Recalculate selling price and price per person when relevant fields change
-    const calculated = totalCost * (1 + marginPercent / 100)
-    setSellingPrice(calculated)
-    setPricePerPerson(calculated / numTravelers)
-  }, [totalCost, marginPercent, numTravelers])
+    // The server's own calculation (lib/quotes/b2c-quote-price): the preview
+    // shows the price that is saved, in the currency's units.
+    const price = priceB2cQuote({ totalCost, marginPercent, travelers: numTravelers, currency })
+    setSellingPrice(price.selling_price)
+    setPricePerPerson(price.price_per_person)
+  }, [totalCost, marginPercent, numTravelers, currency])
 
   const fetchQuote = async () => {
     try {

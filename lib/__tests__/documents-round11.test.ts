@@ -51,9 +51,12 @@ describe('recordsInTenant', () => {
     expect(await recordsInTenant(d, 't1', { itinerary_id: 'i2' })).toMatchObject({ ok: false, status: 404 })
     expect(await recordsInTenant(d, 't1', { client_id: { x: 1 } })).toMatchObject({ ok: false, status: 400 })
   })
-  it('the B2C and B2B quote POSTs check them', () => {
-    expect(src('app/api/quotes/b2c/route.ts')).toContain('recordsInTenant(supabase, authResult.tenant_id, { client_id, itinerary_id })')
-    expect(src('app/api/quotes/b2b/route.ts')).toContain('recordsInTenant(supabase, authResult.tenant_id, { itinerary_id })')
+  it('the B2C and B2B quote POSTs that took any record are gone', () => {
+    // Removed when quote prices moved to the server (they stored every price
+    // the request sent); no create route may come back without these checks.
+    for (const f of ['app/api/quotes/b2c/route.ts', 'app/api/quotes/b2b/route.ts']) {
+      expect(src(f)).not.toContain('export async function POST')
+    }
   })
 })
 

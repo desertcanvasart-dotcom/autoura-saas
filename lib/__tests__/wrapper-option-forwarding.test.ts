@@ -18,7 +18,7 @@ import path from 'node:path'
 const ROOT = path.join(__dirname, '..', '..')
 const ENGINE = readFileSync(path.join(ROOT, 'lib', 'auto-pricing-service.ts'), 'utf8')
 const B2B_ROUTE = readFileSync(
-  path.join(ROOT, 'app', 'api', 'b2b', 'calculate-price', 'route.ts'),
+  path.join(ROOT, 'lib', 'b2b', 'price-variation.ts'),
   'utf8'
 )
 

@@ -50,3 +50,25 @@ export function pickEditable(body: Record<string, unknown>): Record<string, unkn
   }
   return out
 }
+
+/**
+ * The rate sheet a calculator quote stores, from the engine's own pax table
+ * (lib/b2b/price-variation): up to 10 people, with or without the tour
+ * leader as the quote was priced. The save builds it on the server — the
+ * browser's copy is never stored.
+ */
+export function rateSheetFromPaxTable(
+  paxTable: unknown,
+  tourLeaderIncluded: boolean
+): Array<{ pax: number; pp: number; total: number }> {
+  if (!Array.isArray(paxTable)) return []
+  const rows: Array<{ pax: number; pp: number; total: number }> = []
+  for (const row of paxTable) {
+    const r = row as { numPax?: unknown; withLeader?: { pricePerPerson?: unknown; sellingPrice?: unknown }; withoutLeader?: { pricePerPerson?: unknown; sellingPrice?: unknown } }
+    const pax = Number(r?.numPax)
+    if (!Number.isInteger(pax) || pax < 1 || pax > 10) continue
+    const block = tourLeaderIncluded ? r.withLeader : r.withoutLeader
+    rows.push({ pax, pp: Number(block?.pricePerPerson), total: Number(block?.sellingPrice) })
+  }
+  return rows
+}

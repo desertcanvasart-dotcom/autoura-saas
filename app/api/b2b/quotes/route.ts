@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
-import { calculatorPricingTable, pickEditable } from '@/lib/quotes/calculator-pricing-table'
+import { calculatorPricingTable, pickEditable, rateSheetFromPaxTable } from '@/lib/quotes/calculator-pricing-table'
+import { priceVariation } from '@/lib/b2b/price-variation'
+import { isBookableLine } from '@/lib/pricing/breakdown-order'
 
 // ============================================
 // B2B QUOTES API — calculator save/list/update
@@ -90,27 +92,6 @@ export async function POST(request: NextRequest) {
       client_email,
       client_phone,
       client_nationality,
-      travel_date,
-      num_adults = 2,
-      num_children = 0,
-      // Pre-calculated pricing from UI
-      services_snapshot,
-      total_cost,
-      margin_percent,
-      margin_amount,
-      selling_price,
-      price_per_person,
-      // New fields
-      tour_leader_included = false,
-      tour_leader_cost,
-      single_supplement,
-      is_eur_passport = true,
-      season,
-      // Guide grade/mode (B-item 1) — nullable, NULL = the defaults.
-      guide_grade = null,
-      guide_mode = null,
-      // Other
-      currency = 'EUR',
       valid_days = 30,
       notes,
       created_by
@@ -120,9 +101,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'variation_id is required' }, { status: 400 })
     }
 
-    if (!total_cost || !selling_price) {
+    // The price is the server's own: the calculator's inputs (`pricing`, the
+    // body it sent to /api/b2b/calculate-price) are priced again here, and
+    // nothing the browser computed — totals, margin, per-person price, the
+    // services or the rate sheet — is stored. Rates changed since the
+    // calculation are the ones saved.
+    const pricing = body.pricing
+    if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) {
+      return NextResponse.json({ success: false, error: 'Calculate the price before saving the quote' }, { status: 400 })
+    }
+    const priced = await priceVariation(authResult.tenant_id, { ...pricing, variation_id })
+    const result = priced.body.data
+    if (priced.status !== 200 || !result) {
+      return NextResponse.json(
+        { success: false, error: priced.body.error || 'The price could not be calculated' },
+        { status: priced.status === 200 ? 500 : priced.status }
+      )
+    }
+    if (!(result.total_cost > 0) || !(result.selling_price > 0)) {
       return NextResponse.json({ success: false, error: 'Pricing data is required' }, { status: 400 })
     }
+    // The CHOSEN optional services travel with the quote as real services. A
+    // no-rate line is a service to book; a line already inside another (a
+    // meal in the hotel rate) is not.
+    const servicesSnapshot = [
+      ...result.services.filter(isBookableLine),
+      ...(result.optional_services || []).filter(s => s.is_selected),
+    ]
+    const guideGrade = typeof pricing.guide_grade === 'string' ? pricing.guide_grade : null
+    const guideMode = typeof pricing.guide_mode === 'string' ? pricing.guide_mode : null
 
     // The partner must be this tenant's: the quote is later read and sent to
     // it through the admin client (lib/quotes/partner-in-tenant).
@@ -134,8 +141,8 @@ export async function POST(request: NextRequest) {
     // NOT NULL, read by every partner page: the quote's own size plus the
     // rate sheet generated on the calculator, when there is one.
     const pricingTable = calculatorPricingTable(
-      { pax: (Number(num_adults) || 0) + (Number(num_children) || 0), sellingPrice: selling_price, pricePerPerson: price_per_person },
-      body.rate_sheet
+      { pax: result.num_pax, sellingPrice: result.selling_price, pricePerPerson: result.price_per_person },
+      body.include_rate_sheet ? rateSheetFromPaxTable(result.pax_pricing_table, result.tour_leader_included) : undefined
     )
     if (!pricingTable) {
       return NextResponse.json({ success: false, error: 'A group size, selling price and per-person price are required' }, { status: 400 })
@@ -171,26 +178,27 @@ export async function POST(request: NextRequest) {
         client_email,
         client_phone,
         client_nationality,
-        travel_date,
-        num_adults,
-        num_children,
-        services_snapshot,
-        total_cost,
-        margin_percent,
-        margin_amount,
-        selling_price,
-        price_per_person,
-        currency,
-        tour_leader_included,
-        tour_leader_cost,
+        travel_date: result.travel_date,
+        num_adults: result.num_pax,
+        num_children: 0,
+        services_snapshot: servicesSnapshot,
+        total_cost: result.total_cost,
+        margin_percent: result.margin_percent,
+        margin_amount: result.margin_amount,
+        selling_price: result.selling_price,
+        price_per_person: result.price_per_person,
+        // The run's currency (the tenant's rates currency), not EUR.
+        currency: result.currency,
+        tour_leader_included: result.tour_leader_included,
+        tour_leader_cost: result.tour_leader_cost || null,
         // NOT NULL: a quote with no supplement stores 0, never null.
-        single_supplement: Number(single_supplement) || 0,
+        single_supplement: Number(result.single_supplement) || 0,
         pricing_table: pricingTable,
         // Store only non-default values (mig 326): NULL = egyptologist/spot.
-        guide_grade: guide_grade === 'egyptologist' ? null : guide_grade,
-        guide_mode: guide_mode === 'spot' ? null : guide_mode,
-        is_eur_passport,
-        season,
+        guide_grade: !guideGrade || guideGrade === 'egyptologist' ? null : guideGrade,
+        guide_mode: !guideMode || guideMode === 'spot' ? null : guideMode,
+        is_eur_passport: result.is_eur_passport,
+        season: result.season,
         status: 'draft',
         valid_until: validUntil.toISOString().split('T')[0],
         notes,

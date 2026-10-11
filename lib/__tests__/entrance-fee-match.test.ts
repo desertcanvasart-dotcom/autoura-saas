@@ -129,7 +129,7 @@ describe('the engine', () => {
 
 describe('the two B2B paths take only a definite fee', () => {
   it('the calculator\'s wrapper no longer drops the source', () => {
-    const src = readFileSync(join(process.cwd(), 'app/api/b2b/calculate-price/route.ts'), 'utf8')
+    const src = readFileSync(join(process.cwd(), 'lib/b2b/price-variation.ts'), 'utf8')
     const wrapper = src.slice(src.indexOf('async function getEntranceFee('), src.indexOf('// Get hotel rate from hotel_contacts'))
     expect(wrapper).toMatch(/if \(!fee \|\| fee\.source !== 'db'\) return null/)
   })
