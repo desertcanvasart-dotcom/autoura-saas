@@ -103,6 +103,19 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
   cancelled: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle }
 }
 
+// What the statuses read as: "Paid Full" and "Pending Deposit" were the raw
+// codes title-cased, and the payment toast showed the code itself.
+const STATUS_LABELS: Record<string, string> = {
+  pending_deposit: 'Awaiting deposit',
+  confirmed: 'Confirmed',
+  paid_full: 'Paid in full',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+const statusLabel = (status: string | null | undefined) =>
+  STATUS_LABELS[status ?? ''] ?? String(status ?? '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+
 export default function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
@@ -249,6 +262,30 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // Lock the travellers' details once they are final (form_locked): the
+  // portal then shows them but takes no more changes.
+  const [portalLock, setPortalLock] = useState<{ hasLink: boolean; locked: boolean } | null>(null)
+  useEffect(() => {
+    fetch(`/api/bookings/${resolvedParams.id}/portal-link`).then(r => r.json()).then(d => {
+      if (d?.success) setPortalLock({ hasLink: !!d.hasLink, locked: !!d.locked })
+    }).catch(() => undefined)
+  }, [resolvedParams.id, mintingPortal])
+  const togglePortalLock = async () => {
+    if (!portalLock) return
+    const res = await fetch(`/api/bookings/${resolvedParams.id}/portal-link`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locked: !portalLock.locked }),
+    })
+    const d = await res.json().catch(() => ({}))
+    if (res.ok && d.success) {
+      setPortalLock({ ...portalLock, locked: d.locked })
+      showToast('success', d.locked ? 'Traveller details locked' : 'Traveller details unlocked')
+    } else {
+      showToast('error', d.error || 'Could not change the lock')
+    }
+  }
+
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
     setToasts(prev => [...prev, { id, type, message }])
@@ -350,7 +387,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       const data = await response.json()
 
       if (data.success) {
-        showToast('success', `Payment recorded. Booking status: ${data.booking_status}`)
+        showToast('success', `Payment recorded. Booking: ${statusLabel(data.booking_status)}`)
         setShowAddPayment(false)
         setPaymentForm({
           amount: '',
@@ -411,7 +448,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   const statusConfig = STATUS_COLORS[booking.status] || STATUS_COLORS.pending_deposit
   const StatusIcon = statusConfig.icon
-  const paymentProgress = (booking.total_paid / booking.total_amount) * 100
+  // 0–100, and 0 for a booking with no total yet (it read NaN%, or past 100%
+  // after an overpayment).
+  const paymentProgress = booking.total_amount > 0
+    ? Math.min(100, Math.max(0, (booking.total_paid / booking.total_amount) * 100))
+    : 0
   // The trip this booking belongs to, for the back link and breadcrumb.
   const trip = booking.itineraries
     ? { id: booking.itineraries.id, code: booking.itineraries.itinerary_code, name: booking.itineraries.trip_name }
@@ -430,7 +471,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <h1 className="text-2xl font-bold text-gray-900">{booking.booking_number}</h1>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bg} ${statusConfig.text} flex items-center gap-1`}>
                   <StatusIcon className="w-4 h-4" />
-                  {booking.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {statusLabel(booking.status)}
                 </span>
               </div>
               <p className="text-sm text-gray-500 mt-1">{booking.trip_name}</p>
@@ -603,8 +644,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {/* Passengers Tab */}
-        {changeRequests.some(cr => cr.status === 'pending') && (
+        {/* Passengers Tab — its change requests show there, not on every tab */}
+        {activeTab === 'passengers' && changeRequests.some(cr => cr.status === 'pending') && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
             {changeRequests.filter(cr => cr.status === 'pending').map(cr => (
               <div key={cr.id} className="flex items-center justify-between gap-3">
@@ -653,6 +694,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <h3 className="text-lg font-semibold text-gray-900">
                 Passengers ({passengers.length})
               </h3>
+              {!isViewer && (<>
               <button
                 onClick={() => setShowAddPassenger(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
@@ -668,6 +710,16 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               >
                 {mintingPortal ? 'Creating…' : 'Portal link'}
               </button>
+              </>)}
+              {portalLock?.hasLink && !isViewer && (
+                <button
+                  onClick={togglePortalLock}
+                  title={portalLock.locked ? 'Let the travellers change their details again' : 'Stop changes in the portal once the details are final'}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  {portalLock.locked ? 'Unlock details' : 'Lock details'}
+                </button>
+              )}
             </div>
 
             {/* Add Passenger Form */}

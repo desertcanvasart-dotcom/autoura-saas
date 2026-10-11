@@ -19,7 +19,8 @@ function db() {
   const self = () => chain
   Object.assign(chain, {
     from: (t: string) => { table = t; return chain },
-    select: self, eq: self, in: self, order: self,
+    select: self, eq: self, in: self, order: self, is: self,
+    limit: async () => ({ data: [] }),
     maybeSingle: async () => table === 'booking_portal_links'
       ? { data: { tenant_id: 't1', booking_id: 'b1', passenger_id: null, form_locked: locked } }
       : { data: null },

@@ -6,6 +6,7 @@ import { buildFrozenFx } from '@/lib/itinerary-fx'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { createBookingOnConfirm } from '@/lib/bookings/create-booking-on-confirm'
 import { cruiseSailingNotes, type CruiseShip, type ItineraryCruiseDay } from '@/lib/rates/cruise-sailing'
+import { shiftDateISO } from '@/lib/today'
 
 /**
  * GET /api/itineraries/[id]
@@ -209,6 +210,26 @@ export async function PUT(
       .single()
 
     if (error) throw error
+
+    // New dates move what hangs off them: each day's date, and the bookings
+    // made from this trip. Dragging a trip on the Booking Calendar moved the
+    // itinerary alone — its booking kept the old dates.
+    if (data && body.start_date !== undefined && typeof data.start_date === 'string' && data.start_date) {
+      const start = data.start_date as string
+      const { data: dayRows } = await supabase
+        .from('itinerary_days').select('id, day_number').eq('itinerary_id', id)
+      for (const d of dayRows ?? []) {
+        const { error: dayError } = await supabase
+          .from('itinerary_days').update({ date: shiftDateISO(start, (d.day_number ?? 1) - 1) }).eq('id', d.id)
+        if (dayError) console.warn('[itinerary] moving a day date failed:', dayError.message)
+      }
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .update({ start_date: start, ...(data.end_date ? { end_date: data.end_date } : {}), updated_at: new Date().toISOString() })
+        .eq('itinerary_id', id)
+        .neq('status', 'cancelled')
+      if (bookingError) console.warn('[itinerary] moving the booking dates failed:', bookingError.message)
+    }
 
     // A cancelled trip's DRAFT supplier vouchers are cancelled with it (no
     // supplier has seen them), so they stop showing as work to send. Vouchers
