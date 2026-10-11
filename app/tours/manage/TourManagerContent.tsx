@@ -41,8 +41,6 @@ import {
   Loader2
 } from 'lucide-react'
 
-// Import DayBuilder component
-import DayBuilder from './DayBuilder'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTierConfigs, useVocabulary } from '@/components/vocabulary'
 import { suggestTourType, durationForType, isSingleDayType } from '@/lib/tours/tour-type'
@@ -81,6 +79,8 @@ interface TourVariation {
 interface TourTemplate {
   id: string
   template_code: string
+  default_transportation_service?: string | null
+  transportation_city?: string | null
   template_name: string
   tour_theme?: string
   tour_type: string
@@ -1471,6 +1471,9 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
   const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['standard']))
   const [groupTypes, setGroupTypes] = useState<Record<string, 'private' | 'shared'>>({})
   const [saving, setSaving] = useState(false)
+  // Only tiers the agency has: 'standard' is preselected, and an agency
+  // without it saw "1 tier selected" and got "No variations provided".
+  const chosenTiers = Array.from(selectedTiers).filter(tier => tierConfigs[tier])
 
   const toggleTier = (tier: string) => {
     const newSet = new Set(selectedTiers)
@@ -1483,14 +1486,14 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
   }
 
   const handleCreate = async () => {
-    if (selectedTiers.size === 0) {
+    if (chosenTiers.length === 0) {
       showToast('error', 'Please select at least one tier')
       return
     }
 
     setSaving(true)
     
-    const variations = Array.from(selectedTiers).filter(tier => tierConfigs[tier]).map(tier => {
+    const variations = chosenTiers.map(tier => {
       const config = tierConfigs[tier]
       const groupType = groupTypes[tier] ?? config.defaults.group_type
       
@@ -1517,7 +1520,17 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
       const data = await response.json()
 
       if (data.success) {
-        showToast('success', `Created ${data.data.length} variation(s) for ${template.template_name}`)
+        // A tier the tour already has is skipped, not added twice; say so
+        // rather than reporting the existing rows as created.
+        const created = data.deduplicated ? 0 : (Array.isArray(data.data) ? data.data.length : 1)
+        const skipped = Array.isArray(data.skippedTiers) ? data.skippedTiers.length : 0
+        if (created === 0) {
+          showToast('info', `${template.template_name} already has ${chosenTiers.length === 1 ? 'that tier' : 'those tiers'} — nothing was added`)
+        } else {
+          showToast(skipped ? 'info' : 'success',
+            `Created ${created} variation(s) for ${template.template_name}` +
+            (skipped ? ` — ${skipped} tier(s) it already had were skipped` : ''))
+        }
         onSuccess()
         onClose()
       } else {
@@ -1614,7 +1627,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
 
         <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-between">
           <p className="text-sm text-gray-500">
-            {selectedTiers.size} tier{selectedTiers.size !== 1 ? 's' : ''} selected
+            {chosenTiers.length} tier{chosenTiers.length !== 1 ? 's' : ''} selected
           </p>
           <div className="flex gap-2">
             <button
@@ -1625,7 +1638,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
             </button>
             <button
               onClick={handleCreate}
-              disabled={saving || selectedTiers.size === 0}
+              disabled={saving || chosenTiers.length === 0}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
@@ -1650,47 +1663,6 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
 // ============================================
 // DAY BUILDER MODAL COMPONENT
 // ============================================
-interface DayBuilderModalProps {
-  template: TourTemplate
-  onClose: () => void
-  onSave?: () => void
-}
-
-function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
-  // Its own read of the agency's tour types: which ones are measured in hours
-  // is their answer, not a constant (migration 363).
-  const { items: tourTypeItems } = useVocabulary('tour_type')
-  const singleDayKeys = useMemo(
-    () => new Set(tourTypeItems.filter(i => isSingleDayType(i)).map(i => i.key)),
-    [tourTypeItems]
-  )
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="px-4 py-3 border-b flex items-center justify-between bg-white">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Day Builder</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{template.template_name} • {formatTourDuration(template, singleDayKeys)}</p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-          <DayBuilder
-            templateId={template.id}
-            templateName={template.template_name}
-            durationDays={template.duration_days}
-            onClose={onClose}
-            onSave={onSave}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -1751,7 +1723,6 @@ export default function TourManagerContent() {
   const [addVariationTemplate, setAddVariationTemplate] = useState<TourTemplate | null>(null)
   
   // DAY BUILDER MODAL STATE
-  const [dayBuilderTemplate, setDayBuilderTemplate] = useState<TourTemplate | null>(null)
   
   // NEW TEMPLATE VARIATIONS STATE (for creating with template)
   const [newTemplateVariations, setNewTemplateVariations] = useState<Set<string>>(new Set(['standard']))
@@ -2106,15 +2077,24 @@ export default function TourManagerContent() {
         body: JSON.stringify({ csvData: text, dryRun: true }),
       }).then(r => r.json()).catch(() => null)
 
-      if (dry && dry.success) {
+      // No preview, no import: a failed dry run went straight on to the real,
+      // destructive one without asking.
+      if (!dry || !dry.success) {
+        showToast('error', dry?.error || 'Could not check the file before importing — nothing was changed')
+        return
+      }
+      {
         const skipped = dry.refusedRows
           ? `\n\n${dry.refusedRows} row(s) will be skipped — ${dry.refused?.[0]?.reason ?? 'see the result message'}.`
+          : ''
+        const ignoredCols = Array.isArray(dry.ignoredHeaders) && dry.ignoredHeaders.length
+          ? `\n\nColumns not imported: ${dry.ignoredHeaders.join(', ')}.`
           : ''
         const ok = await dialog.confirm({
           title: 'Replace these itineraries?',
           message:
             `${dry.templates} tour(s) named in this file will lose their current days and take the ${dry.days} day(s) in the sheet. ` +
-            `Tours the file does not name are untouched.${skipped}`,
+            `Tours the file does not name are untouched.${skipped}${ignoredCols}`,
           confirmText: `Replace ${dry.templates} itinerary(ies)`,
           cancelText: 'Cancel',
           variant: 'danger',
@@ -2276,14 +2256,23 @@ export default function TourManagerContent() {
       image_url: template.image_url || '',
       is_featured: template.is_featured,
       is_active: template.is_active,
-      default_transportation_service: 'day_tour',
-      transportation_city: 'Cairo',
+      // Read from the template too: a value set by the CSV import was reset to
+      // day_tour / Cairo by any Update.
+      default_transportation_service: template.default_transportation_service || 'day_tour',
+      transportation_city: template.transportation_city || 'Cairo',
       itinerary: template.itinerary || [],
       inclusions: template.inclusions || [],   // NEW: Load inclusions
       exclusions: template.exclusions || []    // NEW: Load exclusions
     })
     setActiveTab('basic')
     setShowModal(true)
+  }
+
+  // The days are edited on the form's Details tab (Day-by-Day Itinerary).
+  // The calendar buttons opened a "Day Builder" modal that rendered nothing.
+  const editDays = (template: TourTemplate) => {
+    handleEdit(template)
+    setActiveTab('details')
   }
 
   const handleDuplicate = async (template: TourTemplate) => {
@@ -2353,8 +2342,9 @@ export default function TourManagerContent() {
       
       if (data.success) {
         // If creating new template AND variations are selected, create them
-        if (!editingTemplate && newTemplateVariations.size > 0 && data.data?.id) {
-          const variations = Array.from(newTemplateVariations).filter(tier => tierConfigs[tier]).map(tier => {
+        const chosenNewTiers = Array.from(newTemplateVariations).filter(tier => tierConfigs[tier])
+        if (!editingTemplate && chosenNewTiers.length > 0 && data.data?.id) {
+          const variations = chosenNewTiers.map(tier => {
             const config = tierConfigs[tier]
             return {
               template_id: data.data.id,
@@ -2379,21 +2369,7 @@ export default function TourManagerContent() {
           
           if (varData.success) {
             showToast('success', `${formData.template_name} created with ${varData.data.length} variation(s)!`)
-            // Ask to open Day Builder
-            if (data.data) {
-              const newTemplate = { ...data.data, duration_days: formData.duration_days }
-              setTimeout(async () => {
-                if (await dialog.confirm({
-                  title: 'Tour created',
-                  message: 'Would you like to add activities and set up day-by-day pricing now? You can also do this later from the tour list.',
-                  confirmText: 'Add activities',
-                  cancelText: 'Later',
-                  variant: 'info',
-                })) {
-                  setDayBuilderTemplate(newTemplate)
-                }
-              }, 500)
-            }
+            // The days were entered on the form's Details tab; nothing more to open.
           } else {
             showToast('info', `Template created, but failed to create variations: ${varData.error}`)
           }
@@ -2786,7 +2762,7 @@ export default function TourManagerContent() {
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1">
                             <button
-                              onClick={() => setDayBuilderTemplate(template)}
+                              onClick={() => editDays(template)}
                               className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
                               title="Day Builder"
                             >
@@ -2831,7 +2807,7 @@ export default function TourManagerContent() {
                                 Add Variation
                               </button>
                               <button
-                                onClick={() => setDayBuilderTemplate(template)}
+                                onClick={() => editDays(template)}
                                 className="ml-2 text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
                               >
                                 <Calendar className="w-3 h-3" />
@@ -2987,7 +2963,7 @@ export default function TourManagerContent() {
                 </div>
                 <div className="flex border-t border-gray-200 divide-x divide-gray-200">
                   <button
-                    onClick={() => setDayBuilderTemplate(template)}
+                    onClick={() => editDays(template)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
                   >
                     <Calendar className="w-4 h-4" />Days
@@ -3058,7 +3034,7 @@ export default function TourManagerContent() {
                   {template.is_featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
                 </div>
                 <div className="flex items-center gap-1 ml-4">
-                  <button onClick={() => setDayBuilderTemplate(template)} className="p-1 text-gray-400 hover:text-purple-600 transition-colors">
+                  <button onClick={() => editDays(template)} className="p-1 text-gray-400 hover:text-purple-600 transition-colors">
                     <Calendar className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleEdit(template)} className="p-1 text-gray-400 hover:text-green-600 transition-colors">
@@ -3509,7 +3485,7 @@ export default function TourManagerContent() {
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-blue-800">
-                      <strong>💡 Tip:</strong> Select the pricing tiers you want to offer. After creating the template, use the Day Builder to add activities and enable auto-pricing.
+                      <strong>💡 Tip:</strong> Select the pricing tiers you want to offer. The days themselves are on the Details tab; edit them later with the calendar button on the tour list.
                     </p>
                   </div>
 
@@ -3579,7 +3555,7 @@ export default function TourManagerContent() {
 
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-sm text-gray-600">
-                      {newTemplateVariations.size} variation{newTemplateVariations.size !== 1 ? 's' : ''} will be created with this template
+                      {Array.from(newTemplateVariations).filter(t => tierConfigs[t]).length} variation{Array.from(newTemplateVariations).filter(t => tierConfigs[t]).length !== 1 ? 's' : ''} will be created with this template
                     </p>
                   </div>
                 </div>
@@ -3640,14 +3616,6 @@ export default function TourManagerContent() {
         />
       )}
 
-      {/* DAY BUILDER MODAL */}
-      {dayBuilderTemplate && (
-        <DayBuilderModal
-          template={dayBuilderTemplate}
-          onClose={() => setDayBuilderTemplate(null)}
-          onSave={fetchTemplates}
-        />
-      )}
 
       <style jsx>{`
         @keyframes slide-in {

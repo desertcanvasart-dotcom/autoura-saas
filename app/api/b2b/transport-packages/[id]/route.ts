@@ -26,23 +26,19 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
+    // Only the fields the body carries: a partial update (an active toggle)
+    // must not null the name or wipe every vehicle rate it did not send.
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    for (const key of ['package_code', 'package_name', 'package_type', 'origin_city', 'destination_city',
+      'duration_days', 'description', 'includes', 'notes', 'is_active'] as const) {
+      if (body[key] !== undefined) update[key] = body[key]
+    }
+    // Vehicles keyed by the agency's vehicle_type vocabulary (mig 381).
+    if (body.vehicles !== undefined) update.vehicles = sanitizePackageVehicles(body.vehicles)
+
     const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
-      .update({
-        package_code: body.package_code,
-        package_name: body.package_name,
-        package_type: body.package_type,
-        origin_city: body.origin_city,
-        destination_city: body.destination_city,
-        duration_days: body.duration_days,
-        // Vehicles keyed by the agency's vehicle_type vocabulary (mig 381).
-        vehicles: sanitizePackageVehicles(body.vehicles),
-        description: body.description,
-        includes: body.includes,
-        notes: body.notes,
-        is_active: body.is_active,
-        updated_at: new Date().toISOString()
-      })
+      .update(update)
       .eq('id', id)
       .eq('tenant_id', authResult.tenant_id)
       .select()

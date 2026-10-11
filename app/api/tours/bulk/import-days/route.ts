@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import Papa from 'papaparse'
 import { parseDaysCsv } from '@/lib/tours/itinerary-csv'
 import { summarizeMeals } from '@/lib/tours/day-meals'
@@ -22,6 +23,10 @@ export async function POST(request: NextRequest) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -62,20 +67,29 @@ export async function POST(request: NextRequest) {
     }
 
     const db = supabase.from('tour_templates') as unknown as {
-      select(c: string): { in(k: string, v: string[]): { eq(k: string, v: string): PromiseLike<{ data: Array<{ template_code: string }> | null }> } }
+      select(c: string): { eq(k: string, v: string): PromiseLike<{ data: Array<{ template_code: string }> | null }> }
       update(row: Record<string, unknown>): { eq(k: string, v: string): { eq(k: string, v: string): PromiseLike<{ error: { message: string } | null }> } }
     }
 
     // A days sheet never CREATES a tour: a day belongs to a template, and
     // inventing an empty one from a day row would hide a mistyped code.
-    const { data: existing } = await db.select('template_code').in('template_code', codes).eq('tenant_id', tenant_id)
-    const known = new Set((existing || []).map(r => r.template_code))
-    const unknown = codes.filter(c => !known.has(c))
-    for (const c of unknown) {
-      refused.push({ row: 0, reason: `"${c}": no tour with this code in this workspace — import the tour itself first` })
+    // Matched whatever its case, as the tour sheet matches it.
+    const { data: existing } = await db.select('template_code').eq('tenant_id', tenant_id)
+    const storedByLower = new Map((existing || []).map(r => [r.template_code.toLowerCase(), r.template_code]))
+    const storedFor = new Map<string, string>()
+    const storedExact = new Set((existing || []).map(r => r.template_code))
+    for (const c of codes) {
+      const stored = storedExact.has(c) ? c : storedByLower.get(c.toLowerCase())
+      if (!stored) {
+        refused.push({ row: 0, reason: `"${c}": no tour with this code in this workspace — import the tour itself first` })
+      } else if ([...storedFor.values()].includes(stored)) {
+        refused.push({ row: 0, reason: `"${c}": the file names tour ${stored} twice, in different letter case — give all its days one code` })
+      } else {
+        storedFor.set(c, stored)
+      }
     }
 
-    const willUpdate = codes.filter(c => known.has(c))
+    const willUpdate = codes.filter(c => storedFor.has(c))
     const preview = {
       templates: willUpdate.length,
       days: willUpdate.reduce((n, c) => n + (byTemplate.get(c)?.length ?? 0), 0),
@@ -92,7 +106,7 @@ export async function POST(request: NextRequest) {
       // write, so the two can never disagree.
       const { error } = await db
         .update({ itinerary, meals_included: summarizeMeals(itinerary) })
-        .eq('template_code', code)
+        .eq('template_code', storedFor.get(code)!)
         .eq('tenant_id', tenant_id)
       if (error) errors.push({ code, message: error.message })
       else { updated++; days += itinerary.length }

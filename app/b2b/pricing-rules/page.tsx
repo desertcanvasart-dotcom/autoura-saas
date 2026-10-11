@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
+import { getCurrencySymbol } from '@/lib/currency'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import CitySelect from '@/components/CitySelect'
 import { VocabLabel } from '@/components/vocabulary'
@@ -81,7 +82,10 @@ const DEFAULT_PACKAGE_FORM: PackageFormData = {
 export default function TransportPackagesPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { tenant, loading: tenantLoading, isAdmin } = useTenant()
+  const { tenant, loading: tenantLoading, isManager } = useTenant()
+  // Rates are entered and priced in the tenant's run currency
+  // (tenants.rates_currency, EUR by default) — never a fixed euro.
+  const currencySymbol = getCurrencySymbol(tenant?.rates_currency || 'EUR')
   const dialog = useConfirmDialog()
 
   const [transportPackages, setTransportPackages] = useState<TransportPackage[]>([])
@@ -215,7 +219,7 @@ export default function TransportPackagesPage() {
   }
 
   const handleDeletePackage = async (pkg: TransportPackage) => {
-    if (!isAdmin) {
+    if (!isManager) {
       showToast('error', 'You don\'t have permission to delete transport packages')
       return
     }
@@ -263,8 +267,8 @@ export default function TransportPackagesPage() {
     return null
   }
 
-  // Authorization check - Transport packages require admin access
-  if (!isAdmin) {
+  // Authorization: managers and up, as the sidebar, middleware and API allow
+  if (!isManager) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md text-center">
@@ -272,7 +276,7 @@ export default function TransportPackagesPage() {
             <XCircle className="w-8 h-8 text-red-600" />
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-gray-600 mb-4">You need admin permissions to manage transport packages.</p>
+          <p className="text-gray-600 mb-4">You need manager permissions to manage transport packages.</p>
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
@@ -411,7 +415,7 @@ export default function TransportPackagesPage() {
                                 return (
                                   <div key={v.vehicle_type} className="text-center p-2 bg-gray-50 rounded min-w-[90px]">
                                     <p className="text-xs text-gray-500"><VocabLabel kind="vehicle_type" value={v.vehicle_type} /></p>
-                                    <p className="font-semibold text-gray-900">€{v.rate}</p>
+                                    <p className="font-semibold text-gray-900">{currencySymbol}{v.rate}</p>
                                     {band && (
                                       <p className="text-xs text-gray-400">{band.min}-{band.max ?? '+'} pax</p>
                                     )}
@@ -518,7 +522,7 @@ export default function TransportPackagesPage() {
               </div>
 
               <div>
-                <h4 className="font-medium text-gray-900 mb-1">Vehicle Rates (€)</h4>
+                <h4 className="font-medium text-gray-900 mb-1">Vehicle Rates ({currencySymbol})</h4>
                 <p className="text-xs text-gray-500 mb-3">
                   Your own fleet, from Settings → Vocabulary. A group is priced for the
                   vehicle that seats it; leave a vehicle blank if the package does not offer it.
@@ -542,7 +546,7 @@ export default function TransportPackagesPage() {
                               vehicleRates: { ...packageForm.vehicleRates, [v.key]: e.target.value },
                             })}
                             className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm mb-2"
-                            placeholder="€"
+                            placeholder={currencySymbol}
                           />
                           <div className="text-xs text-gray-500">
                             {band.min}-{band.max ?? '+'} pax

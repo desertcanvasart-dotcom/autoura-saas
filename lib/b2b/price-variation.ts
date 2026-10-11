@@ -220,25 +220,51 @@ export function withProgrammeOptions(
   }
 }
 
-// Get transport package for cruise sightseeing (kept for package deals)
-async function getTransportPackage(packageType: string, originCity: string, destCity: string, tenantId?: string): Promise<any | null> {
+// The tenant's active transport package of this type for this tour. A
+// package is a route (origin → destination), so the tour's own cities pick
+// it: the one package whose origin and destination the tour covers, in that
+// order. A tour with no cities on record uses the tenant's only package of the
+// type. Several candidates, or none on the tour's route, is no package (the
+// line falls through to the vehicles table), never an arbitrary pick. This
+// read only Luxor → Aswan, so every other route's packages were never used.
+async function getTransportPackage(
+  packageType: string,
+  tourCities: string[] | null | undefined,
+  tenantId: string | undefined,
+  runCurrency: string,
+): Promise<any | null> {
   const admin = getSupabaseAdmin()
   const { data, error } = await (admin as any)
     .from('b2b_transport_packages')
     .select('*')
     .eq('tenant_id', tenantId)
     .eq('package_type', packageType)
-    .eq('origin_city', originCity)
-    .eq('destination_city', destCity)
     .eq('is_active', true)
-    .limit(1)
 
   if (error || !data || data.length === 0) return null
+  const pkg = pickTransportPackage(data, tourCities)
+  if (!pkg) return null
   // A rates table never converts — but a rates CONSUMER must: the row may be
   // priced in any currency (rate_currency, mig 295), and this total is summed
   // with every other line. Convert once, here, at the fetch boundary.
-  const [normalized] = await normalizeRateRows(admin, 'b2b_transport_packages', data)
+  const [normalized] = await normalizeRateRows(admin, 'b2b_transport_packages', [pkg], runCurrency)
   return normalized ?? null
+}
+
+/** Which of a tenant's packages of one type serves a tour covering `tourCities`. */
+export function pickTransportPackage<T extends { origin_city?: string | null; destination_city?: string | null }>(
+  packages: T[],
+  tourCities: string[] | null | undefined,
+): T | null {
+  const norm = (c: unknown) => String(c ?? '').trim().toLowerCase()
+  const cities = (tourCities ?? []).map(norm).filter(Boolean)
+  if (cities.length === 0) return packages.length === 1 ? packages[0] : null
+  const onRoute = packages.filter(p => {
+    const from = cities.indexOf(norm(p.origin_city))
+    const to = cities.lastIndexOf(norm(p.destination_city))
+    return from !== -1 && to !== -1 && from < to
+  })
+  return onRoute.length === 1 ? onRoute[0] : null
 }
 
 
@@ -282,7 +308,7 @@ async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standar
 }
 
 // Select guide from guides table based on language and tier
-async function selectGuideFromB2CTable(language: string = 'English', tier: string = 'standard', tenantId?: string): Promise<{ rate: number; name: string; id: string } | null> {
+async function selectGuideFromB2CTable(language: string, tier: string, tenantId: string | undefined, runCurrency: string): Promise<{ rate: number; name: string; id: string } | null> {
   const admin = getSupabaseAdmin()
   const { data: rawGuides, error } = await (admin as any)
     .from('guides')
@@ -294,7 +320,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
 
   // Per-row currency (mig 295): convert into the run currency at the fetch
   // boundary, before this rate joins a total with every other line.
-  const guides = await normalizeRateRows(admin, 'guides', rawGuides)
+  const guides = await normalizeRateRows(admin, 'guides', rawGuides, runCurrency)
 
   if (error || !guides || guides.length === 0) {
     // Fallback: any guide
@@ -305,7 +331,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
       .eq('tenant_id', tenantId)
       .order('is_preferred', { ascending: false })
       .limit(1)
-    const anyGuide = await normalizeRateRows(admin, 'guides', anyGuideRaw)
+    const anyGuide = await normalizeRateRows(admin, 'guides', anyGuideRaw, runCurrency)
 
     if (!anyGuide || anyGuide.length === 0) return null
 
@@ -445,7 +471,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
       .from('tour_variations')
       .select(`
         id, variation_name, variation_code, tier, group_type, min_pax, max_pax,
-        tour_templates (id, template_name, template_code, duration_days)
+        tour_templates (id, template_name, template_code, duration_days, cities_covered)
       `)
       .eq('id', variation_id)
       .eq('tenant_id', tenantId)
@@ -573,7 +599,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
       // ============================================
       if (rateSource === 'manual' && service.service_category === 'transportation') {
         if (service.service_name?.toLowerCase().includes('sightseeing')) {
-          const pkg = await getTransportPackage('cruise_sightseeing', 'Luxor', 'Aswan', tenantId)
+          const pkg = await getTransportPackage('cruise_sightseeing', template?.cities_covered, tenantId, runCurrency)
           const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax, vehicleBands) : null
           if (pkg && vehicle) {
             unitCost = vehicle.rate
@@ -586,7 +612,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
         }
         else if (service.service_name?.toLowerCase().includes('transfer') || 
                  service.service_name?.toLowerCase().includes('airport')) {
-          const pkg = await getTransportPackage('cruise_transfer', 'Luxor', 'Aswan', tenantId)
+          const pkg = await getTransportPackage('cruise_transfer', template?.cities_covered, tenantId, runCurrency)
           const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax, vehicleBands) : null
           if (pkg && vehicle) {
             unitCost = vehicle.rate
@@ -619,7 +645,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
           }
 
           case 'guide': {
-            const guide = await selectGuideFromB2CTable(language, effectiveTier, tenantId)
+            const guide = await selectGuideFromB2CTable(language, effectiveTier, tenantId, runCurrency)
             if (guide) {
               unitCost = guide.rate
               lineTotal = guide.rate
@@ -673,7 +699,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
               // Per-row currency (mig 295): an EGP-priced cabin must not join
               // the total as if its number were in the run currency.
               const [cruise] = await normalizeRateRows(
-                getSupabaseAdmin(), 'nile_cruises', cruiseRaw ? [cruiseRaw] : []
+                getSupabaseAdmin(), 'nile_cruises', cruiseRaw ? [cruiseRaw] : [], runCurrency
               )
 
               if (cruise) {
@@ -715,7 +741,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
               // The variation's own tier, as every other line here.
               .eq('tier', effectiveTier)
             // Per-row currency (mig 295), converted at the fetch boundary.
-            const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', mealRowsRaw)
+            const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', mealRowsRaw, runCurrency)
 
             const match = (mealRows ?? []).find(
               (r: any) => String(r.meal_type ?? '').toLowerCase().includes(mealType)

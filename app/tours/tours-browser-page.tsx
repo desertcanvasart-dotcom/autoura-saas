@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { loadPricesInBatches, type PriceState, type StartingFrom } from '@/lib/tours/price-loader'
 import { getCurrencySymbol } from '@/lib/currency'
+import { useTierConfigs } from '@/components/vocabulary'
 
 // Updated interface to match the new API response structure
 interface TourTemplate {
@@ -32,6 +33,7 @@ interface TourTemplate {
 }
 
 export default function ToursBrowsePage() {
+  const { entries: tierEntries, byKey: tierConfigs, labelFor: tierLabel } = useTierConfigs()
   const [tours, setTours] = useState<TourTemplate[]>([])
   // THE LIST FIRST, THE PRICES AFTER. The page used to wait for the pricing
   // engine before showing anything — 5–8 seconds on production data. The list
@@ -131,25 +133,15 @@ export default function ToursBrowsePage() {
     tours.map(t => t.theme_name).filter((n): n is string => Boolean(n))
   )]
 
+  // The agency's own tiers (Settings → Your vocabulary): the filter and the
+  // badges were fixed to budget/standard/deluxe/luxury, so an agency with its
+  // own tier keys could filter to nothing and saw its keys as raw words.
   const getTierBadge = (tier: string) => {
-    const styles: Record<string, string> = {
-      budget: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-      standard: 'bg-blue-50 text-blue-700 border border-blue-200',
-      deluxe: 'bg-purple-50 text-purple-700 border border-purple-200',
-      luxury: 'bg-amber-50 text-amber-700 border border-amber-200'
-    }
-    return styles[tier] || 'bg-gray-50 text-gray-700 border border-gray-200'
+    const c = tierConfigs[tier]
+    return c ? `${c.bgColor} ${c.textColor} border ${c.borderColor}` : 'bg-gray-50 text-gray-700 border border-gray-200'
   }
 
-  const getTierIcon = (tier: string) => {
-    const icons: Record<string, string> = {
-      budget: '💰',
-      standard: '💎',
-      deluxe: '✨',
-      luxury: '👑'
-    }
-    return icons[tier] || '📋'
-  }
+  const getTierIcon = (tier: string) => tierConfigs[tier]?.icon || '📋'
 
   if (loading) {
     return (
@@ -272,10 +264,9 @@ export default function ToursBrowsePage() {
           className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white min-w-[150px]"
         >
           <option value="all">All Tiers</option>
-          <option value="budget">💰 Budget</option>
-          <option value="standard">💎 Standard</option>
-          <option value="deluxe">✨ Deluxe</option>
-          <option value="luxury">👑 Luxury</option>
+          {tierEntries.map(t => (
+            <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
+          ))}
         </select>
         <select
           value={filterCategory}
@@ -336,7 +327,7 @@ export default function ToursBrowsePage() {
                       key={tier}
                       className={`px-2 py-1 rounded text-xs font-medium ${getTierBadge(tier)}`}
                     >
-                      {getTierIcon(tier)} {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                      {getTierIcon(tier)} {tierLabel(tier)}
                     </span>
                   ))
                 ) : (

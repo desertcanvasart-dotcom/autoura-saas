@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import type { Database } from '@/types/database.types'
 
 export const dynamic = 'force-dynamic'
@@ -92,6 +93,10 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
@@ -157,6 +162,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
@@ -211,6 +220,10 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
