@@ -47,12 +47,30 @@ export const SELF_AUTH_API_PREFIXES = [
   '/api/contact',
 ]
 
+/**
+ * The ROUTE_PERMISSIONS entry that governs a path: the MOST specific one
+ * that matches — '/settings/seasons' before '/settings'. The first match in
+ * the list used to win, so every page under /settings was admin-only
+ * whatever its own entry said.
+ */
+export function permissionRouteFor(pathname: string): string | undefined {
+  return Object.keys(ROUTE_PERMISSIONS)
+    .filter(route => pathname === route || pathname.startsWith(route + '/'))
+    .sort((a, b) => b.length - a.length)[0]
+}
+
 // Define route permissions - which roles can access which routes
 // Exported so lib/__tests__/roles.test.ts can assert the invariant that makes
 // toPermissionRole necessary: no entry here is ever 'owner'.
 export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Admin only
   '/settings': ['admin'],
+  // Pages under /settings the sidebar gives to more than admins — each
+  // sent its manager or member to "unauthorized", because the /settings
+  // rule above caught them first. The longest matching route wins (below).
+  '/settings/email-signatures': ['admin', 'manager', 'member'],
+  '/settings/copilot-analytics': ['admin', 'manager'],
+  '/settings/seasons': ['admin', 'manager'],
   '/users': ['admin'],
   
   // Admin and Manager
@@ -247,9 +265,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Check if this route has permission restrictions
-    const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find(route => {
-      return pathname === route || pathname.startsWith(route + '/')
-    })
+    const matchedRoute = permissionRouteFor(pathname)
 
     if (matchedRoute) {
       // is_active still comes from the profile; the ROLE comes from the
