@@ -96,14 +96,14 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Sell',
     items: [
-      { href: '/docs/itinerary-creation', icon: Wand2, title: 'Itinerary Creation', description: 'AI-powered itinerary generation from WhatsApp conversations and the Pricing Grid.' },
+      { href: '/docs/itinerary-creation', icon: Wand2, title: 'Itinerary Creation', description: 'Build and price trips in the Quote Builder: paste a request, upload a file, or load an itinerary, and the AI lays out the days.' },
       { href: '/docs/itineraries', icon: Map, title: 'Itineraries', description: 'Build day-by-day trip plans with drag-and-drop reordering, shareable client links, and PDF export.' },
-      { href: '/docs/b2c-pricing', icon: Calculator, title: 'B2C Pricing', description: 'Price itineraries interactively in the pricing grid with automatic rate lookup.' },
-      { href: '/docs/b2b-pricing', icon: Briefcase, title: 'B2B Pricing', description: 'B2B price calculator with rate sheets, pax tables (1–40), and single supplement.' },
-      { href: '/docs/b2b-quotes', icon: FileCheck, title: 'B2B Quotes', description: 'Save, manage, and export B2B quotes with PDF generation.' },
+      { href: '/docs/b2c-pricing', icon: Calculator, title: 'B2C Pricing', description: 'How the Quote Builder prices a trip from your rates and markup, and the B2C quotes it makes.' },
+      { href: '/docs/b2b-pricing', icon: Briefcase, title: 'B2B Pricing', description: 'The B2B Calculator: price a tour programme for partners, with a rate sheet for 1–10 travellers, tour leader and single supplement.' },
+      { href: '/docs/b2b-quotes', icon: FileCheck, title: 'B2B Quotes', description: 'Partner rate sheets: save, send by email or WhatsApp, export as PDF, and convert to bookings.' },
       { href: '/docs/b2b-import', icon: FileInput, title: 'Converting Itineraries to B2B', description: 'Turn standard itineraries into B2B quotes, templates, and partner rate sheets.' },
-      { href: '/docs/bookings', icon: CalendarCheck, title: 'Bookings', description: 'Convert quotes to bookings, manage passengers, and track payments and status.' },
-      { href: '/docs/extras', icon: Sparkles, title: 'Extras & Upgrades', description: 'Add-ons, upgrades and options offered on top of a trip — priced off-margin, per-row currency, and attached from the itinerary.' },
+      { href: '/docs/bookings', icon: CalendarCheck, title: 'Bookings', description: 'Bookings from accepted quotes or confirmed itineraries: travellers, payments, suppliers, extras and the traveller portal.' },
+      { href: '/docs/extras', icon: Sparkles, title: 'Extras & Upgrades', description: 'Add-ons and upgrades on top of a trip — at a set price or cost plus margin, on B2B quotes and bookings, and requested from the traveller portal.' },
     ],
   },
   {

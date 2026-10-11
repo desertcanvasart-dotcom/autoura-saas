@@ -493,7 +493,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 {showDayTypeOverrides ? 'hide overrides' : 'override components'}
               </button>
               <span className="text-[10px] text-indigo-500/80 ml-auto">
-                The completeness gate uses these to decide what each day requires.
+                What happens on this day — saved with the itinerary.
               </span>
             </div>
 

@@ -815,7 +815,7 @@ export default function B2CQuotesPage() {
               {searchQuery ? 'No quotes found' : 'No B2C quotes yet'}
             </h3>
             <p className="text-xs text-gray-400">
-              {searchQuery ? 'Try adjusting your search filters' : 'Create your first quote from the WhatsApp parser'}
+              {searchQuery ? 'Try adjusting your search filters' : 'Create your first quote with New Quote, or Parse a WhatsApp or email into the Quote Builder'}
             </p>
           </div>
         ) : (

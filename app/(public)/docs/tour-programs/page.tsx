@@ -75,10 +75,10 @@ export default function TourProgramsPage() {
         </p>
         <h3 className="text-lg font-medium text-gray-900 mb-2">3. Auto-Created from New Quote</h3>
         <p className="text-gray-600 mb-3">
-          When you build a quote in <strong>New Quote</strong> with the client type set to <strong>B2B</strong>, saving it automatically creates a tour template and its first variation, then redirects you to the B2B Price Calculator for that variation.
+          When you save a trip in the <strong>Quote Builder</strong> in <strong>B2B</strong> mode, a tour template and its first variation are created automatically, and the B2B Calculator opens on that variation (see <Link href="/docs/b2b-import" className="text-primary-600 hover:underline">Converting Itineraries to B2B</Link>).
         </p>
         <Tip>
-          <strong>Note:</strong> The WhatsApp Parser&apos;s B2B mode creates a B2B quote record only &mdash; it does not create a template. Templates are auto-created via the Pricing Grid flow described above.
+          <strong>Note:</strong> The template holds the trip&apos;s day structure &mdash; cities, meals, cruise days and nights &mdash; not its specific hotels or prices.
         </Tip>
         <ScreenshotPlaceholder caption="Template creation form with name, type, duration fields and the Edit Days day builder" />
       </section>

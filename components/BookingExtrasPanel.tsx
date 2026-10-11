@@ -335,7 +335,7 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
   if (groups.length === 0) {
     return (
       <p className="text-sm text-gray-500">
-        Nothing in the catalogue for this trip yet — mark options on the programme&rsquo;s variations, flag an attraction as a sellable extra, or add extras under Rates → Extras.{' '}
+        Nothing in the catalogue for this trip yet — mark options on the programme&rsquo;s variations, flag an attraction as a sellable extra, or add extras under Sell → Extras.{' '}
         <button type="button" onClick={onTypeInstead} className="text-[#647C47] underline">Type one in instead.</button>
       </p>
     )
