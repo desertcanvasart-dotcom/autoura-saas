@@ -6,6 +6,7 @@ import { resolveSender } from '@/lib/tenant-email-domain'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
 import { daysOverdueOrNull, reminderBlocker } from '@/lib/invoice-dates'
 import { escapeHtml } from '@/lib/html-escape'
+import { gateRole } from '@/lib/api-role-gate'
 
 // Reuse the email generation from the main route
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
@@ -132,6 +133,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 

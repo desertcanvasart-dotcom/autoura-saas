@@ -7,6 +7,7 @@ import { tenantToday } from '@/lib/tenant-today'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
+import { gateRole } from '@/lib/api-role-gate'
 
 // Sends a reminder email directly via the shared mail helper.
 async function sendReminderEmail(params: {
@@ -298,6 +299,8 @@ export async function GET(request: NextRequest) {
 // POST: Process and send reminders
 export async function POST(request: NextRequest) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 

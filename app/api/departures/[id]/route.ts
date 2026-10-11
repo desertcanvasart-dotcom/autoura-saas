@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { shiftDateISO } from '@/lib/today'
 import { validatePaxFields, checkPaxAgainstRow } from '@/lib/departures/departure-pax'
+import { gateRole } from '@/lib/api-role-gate'
 
 // ============================================
 // SINGLE TOUR DEPARTURE API
@@ -85,6 +86,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -228,6 +231,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

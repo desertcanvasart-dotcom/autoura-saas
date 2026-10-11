@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { completeChecklist, type ChecklistItem } from '@/lib/tasks/itinerary-tasks'
+import { gateRole } from '@/lib/api-role-gate'
 
 // GET - Fetch single task
 export async function GET(
@@ -48,6 +49,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const { id } = await params
 
     // Require authentication and get tenant info
@@ -153,6 +156,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const { id } = await params
 
     // Use authenticated client - RLS automatically filters by tenant_id

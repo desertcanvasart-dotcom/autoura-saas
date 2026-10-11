@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(request: NextRequest) {
   // Use authenticated client - RLS automatically filters by tenant_id
@@ -117,6 +118,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     // Authenticated client + tenant lookup - RLS filters by tenant_id
     const authResult = await requireAuth()
     if (authResult.error !== null) {

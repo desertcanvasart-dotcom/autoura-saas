@@ -10,6 +10,7 @@ import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { requestedDocTypes } from '@/lib/documents/group-services'
 import { parseManualAssignee } from '@/lib/notify/assignment-message'
 import { planSupplierDocuments, staleSupplierDocuments, type PlanDay, type PlanGuide } from '@/lib/documents/plan-supplier-documents'
+import { gateRole } from '@/lib/api-role-gate'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -167,6 +168,8 @@ export async function POST(
   const { id: itineraryId } = await params
 
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const body = await request.json().catch(() => ({}))
     const document_types = requestedDocTypes(body)
 

@@ -11,7 +11,7 @@ const h = vi.hoisted(() => ({ updates: [] as Record<string, unknown>[] }))
 
 vi.mock('@/lib/supabase-server', () => ({
   requireAuth: async () => ({
-    error: null, status: 200, tenant_id: 't1', user: { id: 'u1' },
+    error: null, status: 200, tenant_id: 't1', role: 'manager', user: { id: 'u1' },
     supabase: {
       from: () => {
         const b: Record<string, unknown> = {}

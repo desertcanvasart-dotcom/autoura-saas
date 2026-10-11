@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/supabase-server'
 import { editableSupplierDocumentFields } from '@/lib/documents/supplier-document-fields'
 import { NextRequest, NextResponse } from 'next/server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(
   request: NextRequest,
@@ -69,6 +70,8 @@ export async function PUT(
   const { id } = await params
 
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const body = await request.json()
 
 
@@ -133,6 +136,8 @@ export async function DELETE(
   const { id } = await params
 
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const { error } = await supabase
       .from('supplier_documents')
       .delete()
