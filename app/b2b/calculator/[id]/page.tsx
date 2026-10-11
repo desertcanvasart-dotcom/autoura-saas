@@ -95,6 +95,7 @@ interface Partner {
   id: string
   company_name: string
   partner_code: string
+  default_margin_percent: number | null
 }
 
 // A sellable catalogue extra (Rates → Extras). Chosen per quote and priced
@@ -729,6 +730,32 @@ export default function TourPriceCalculator() {
                 </select>
               </div>
 
+              {/* Partner — picking one applies its default margin (B2B Partners).
+                  It is the same choice the Save dialog offers. */}
+              {partners.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Building2 className="w-4 h-4 inline mr-1" />Partner
+                  </label>
+                  <select
+                    value={quoteForm.partner_id}
+                    onChange={(e) => {
+                      const picked = partners.find(p => p.id === e.target.value)
+                      setQuoteForm({ ...quoteForm, partner_id: e.target.value })
+                      if (picked?.default_margin_percent != null) setMarginPercent(Number(picked.default_margin_percent))
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg bg-white"
+                  >
+                    <option value="">No partner / Direct client</option>
+                    {partners.map(partner => (
+                      <option key={partner.id} value={partner.id}>
+                        {partner.company_name}{partner.default_margin_percent != null ? ` · ${partner.default_margin_percent}%` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Profit Margin */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1123,6 +1150,17 @@ export default function TourPriceCalculator() {
                     </option>
                   ))}
                 </select>
+                {(() => {
+                  const picked = partners.find(p => p.id === quoteForm.partner_id)
+                  if (!picked || picked.default_margin_percent == null || !result) return null
+                  if (Number(picked.default_margin_percent) === Number(result.margin_percent)) return null
+                  return (
+                    <p className="text-xs text-amber-700 mt-1">
+                      {picked.company_name}&apos;s default margin is {picked.default_margin_percent}%; this quote was priced at {result.margin_percent}%.
+                      To price it at theirs, pick the partner beside the margin and calculate again.
+                    </p>
+                  )
+                })()}
               </div>
 
               <div className="border-t pt-4">

@@ -26,6 +26,8 @@ interface TeamMember {
   email: string
   phone: string
   role: string
+  /** office / guide / driver / airport_staff / hotel_staff (migration 288). */
+  staff_type?: string | null
   department_id: string | null
   notes: string
   is_active: boolean
@@ -120,10 +122,13 @@ export default function TeamMembersPage() {
     email: '',
     phone: '',
     role: 'staff',
+    staff_type: 'office',
     department_id: '',
     notes: ''
   })
   const [saving, setSaving] = useState(false)
+  // A refused save (a duplicate email, a 403) left the form open in silence.
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const { features } = useTenant()
   // column lands with migration 267; types regen follows
@@ -244,13 +249,18 @@ export default function TeamMembersPage() {
       })
 
       if (response.ok) {
+        setSaveError(null)
         setShowModal(false)
         setEditingMember(null)
         resetForm()
         fetchMembers()
+      } else {
+        const data = await response.json().catch(() => null)
+        setSaveError(data?.error || `Could not save (${response.status})`)
       }
     } catch (error) {
       console.error('Error saving team member:', error)
+      setSaveError('Could not save — check your connection and try again')
     } finally {
       setSaving(false)
     }
@@ -263,9 +273,11 @@ export default function TeamMembersPage() {
       email: member.email || '',
       phone: member.phone || '',
       role: member.role || 'staff',
+      staff_type: member.staff_type || 'office',
       department_id: member.department_id || '',
       notes: member.notes || ''
     })
+    setSaveError(null)
     setShowModal(true)
   }
 
@@ -305,9 +317,11 @@ export default function TeamMembersPage() {
       email: '',
       phone: '',
       role: 'staff',
+      staff_type: 'office',
       department_id: '',
       notes: ''
     })
+    setSaveError(null)
   }
 
   const openAddModal = () => {
@@ -570,6 +584,9 @@ export default function TeamMembersPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              {saveError && (
+                <div className="p-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">{saveError}</div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Name <span className="text-red-500">*</span>
@@ -602,7 +619,7 @@ export default function TeamMembersPage() {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-                  placeholder="+20 100 123 4567"
+                  placeholder="+ country code and number"
                 />
               </div>
 
@@ -610,12 +627,35 @@ export default function TeamMembersPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  // A driver or guide is usually that kind of staff too.
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    role: e.target.value,
+                    staff_type: e.target.value === 'driver' ? 'driver' : e.target.value === 'guide' ? 'guide' : formData.staff_type,
+                  })}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
                 >
                   {ROLES.map(role => (
                     <option key={role.value} value={role.value}>{role.icon} {role.label}</option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Staff type</label>
+                {/* What the assignment pickers read: a Driver here is offered
+                    when a trip or vehicle needs a driver. It was never set, so
+                    every member was office staff and no driver appeared. */}
+                <select
+                  value={formData.staff_type}
+                  onChange={(e) => setFormData({ ...formData, staff_type: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                >
+                  <option value="office">Office</option>
+                  <option value="guide">Guide</option>
+                  <option value="driver">Driver</option>
+                  <option value="airport_staff">Airport staff</option>
+                  <option value="hotel_staff">Hotel staff</option>
                 </select>
               </div>
 

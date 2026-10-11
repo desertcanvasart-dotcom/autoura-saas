@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 // ============================================
 // B2B PARTNERS PAGE
@@ -41,13 +42,19 @@ interface Toast {
   message: string
 }
 
+// Suggestions only — the country is typed, so a partner in Poland is not "Other".
 const COUNTRIES = [
   'United States', 'United Kingdom', 'Germany', 'France', 'Italy', 'Spain',
   'Netherlands', 'Belgium', 'Switzerland', 'Austria', 'Australia', 'Canada',
-  'Japan', 'China', 'UAE', 'Saudi Arabia', 'Egypt', 'Other'
+  'Japan', 'China', 'United Arab Emirates', 'Saudi Arabia', 'Egypt'
 ]
 
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'AUD', 'CAD', 'JPY']
+const emptyForm = () => ({
+  partner_code: '', company_name: '', contact_name: '', email: '', phone: '',
+  // Blank = the agency's currency, filled in by the server.
+  country: '', currency: '', default_margin_percent: 20 as number | '',
+  is_active: true, credit_limit: '' as number | '', payment_terms: '', notes: ''
+})
 
 export default function B2BPartnersPage() {
   const router = useRouter()
@@ -62,12 +69,8 @@ export default function B2BPartnersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingPartner, setEditingPartner] = useState<B2BPartner | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [formData, setFormData] = useState({
-    partner_code: '', company_name: '', contact_name: '', email: '', phone: '',
-    country: '', currency: 'EUR', default_margin_percent: 20, show_net_rates: false,
-    show_cost_breakdown: false, pricing_model: 'margin', is_active: true,
-    credit_limit: null as number | null, payment_terms: '', notes: ''
-  })
+  const [formData, setFormData] = useState(emptyForm)
+  const agencyCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
 
   // Authentication check
   useEffect(() => {
@@ -102,12 +105,7 @@ export default function B2BPartnersPage() {
 
   const handleAddNew = () => {
     setEditingPartner(null)
-    setFormData({
-      partner_code: '', company_name: '', contact_name: '', email: '', phone: '',
-      country: '', currency: 'EUR', default_margin_percent: 20, show_net_rates: false,
-      show_cost_breakdown: false, pricing_model: 'margin', is_active: true,
-      credit_limit: null, payment_terms: '', notes: ''
-    })
+    setFormData(emptyForm())
     setShowModal(true)
   }
 
@@ -116,10 +114,9 @@ export default function B2BPartnersPage() {
     setFormData({
       partner_code: partner.partner_code, company_name: partner.company_name,
       contact_name: partner.contact_name || '', email: partner.email || '',
-      phone: partner.phone || '', country: partner.country || '', currency: partner.currency,
-      default_margin_percent: partner.default_margin_percent, show_net_rates: partner.show_net_rates,
-      show_cost_breakdown: partner.show_cost_breakdown, pricing_model: partner.pricing_model,
-      is_active: partner.is_active, credit_limit: partner.credit_limit,
+      phone: partner.phone || '', country: partner.country || '', currency: partner.currency && partner.currency !== agencyCurrency ? partner.currency : '',
+      default_margin_percent: partner.default_margin_percent ?? '',
+      is_active: partner.is_active, credit_limit: partner.credit_limit ?? '',
       payment_terms: partner.payment_terms || '', notes: partner.notes || ''
     })
     setShowModal(true)
@@ -132,7 +129,7 @@ export default function B2BPartnersPage() {
       const res = await fetch(url, {
         method: editingPartner ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, currency: formData.currency || agencyCurrency })
       })
       const data = await res.json()
       if (data.success) {
@@ -155,7 +152,9 @@ export default function B2BPartnersPage() {
 
     const confirmed = await dialog.confirm({
       title: 'Delete Partner',
-      message: `Are you sure you want to delete ${partner.company_name}? This will remove all associated data.`,
+      // A partner with bookings or trips is refused by the server (deactivate
+      // it instead); its pricing overrides and portal users go with it.
+      message: `Delete ${partner.company_name}? A partner that has bookings or trips cannot be deleted — deactivate it instead.`,
       variant: 'danger',
       confirmText: 'Delete Partner',
     })
@@ -275,7 +274,7 @@ export default function B2BPartnersPage() {
         <div className="bg-white rounded-lg border p-4">
           <p className="text-xs text-gray-500 mb-1">Avg Margin</p>
           <p className="text-2xl font-bold text-[#647C47]">
-            {partners.length > 0 ? (partners.reduce((sum, p) => sum + p.default_margin_percent, 0) / partners.length).toFixed(1) : 0}%
+            {partners.length > 0 ? (partners.reduce((sum, p) => sum + (Number(p.default_margin_percent) || 0), 0) / partners.length).toFixed(1) : 0}%
           </p>
         </div>
       </div>
@@ -370,14 +369,33 @@ export default function B2BPartnersPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Country</label>
-                  <select value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} className="w-full px-3 py-2 text-sm border rounded-lg bg-white">
-                    <option value="">Select...</option>
-                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  <input type="text" list="partner-countries" value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} className="w-full px-3 py-2 text-sm border rounded-lg" />
+                  <datalist id="partner-countries">
+                    {COUNTRIES.map(c => <option key={c} value={c} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Currency</label>
+                  <select value={formData.currency} onChange={(e) => setFormData({ ...formData, currency: e.target.value })} className="w-full px-3 py-2 text-sm border rounded-lg bg-white">
+                    <option value="">{agencyCurrency} (your agency&rsquo;s)</option>
+                    {SUPPORTED_CURRENCIES.filter(c => c !== agencyCurrency).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Default Margin (%)</label>
-                  <input type="number" value={formData.default_margin_percent} onChange={(e) => setFormData({ ...formData, default_margin_percent: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 text-sm border rounded-lg" />
+                  <input type="number" min={0} max={100} step="0.1" value={formData.default_margin_percent} onChange={(e) => setFormData({ ...formData, default_margin_percent: e.target.value === '' ? '' : parseFloat(e.target.value) })} className="w-full px-3 py-2 text-sm border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Payment Terms</label>
+                  <input type="text" value={formData.payment_terms} onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })} placeholder="e.g. 30 days before arrival" className="w-full px-3 py-2 text-sm border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Credit Limit</label>
+                  <input type="number" min={0} value={formData.credit_limit} onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value === '' ? '' : parseFloat(e.target.value) })} className="w-full px-3 py-2 text-sm border rounded-lg" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                  <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={2} className="w-full px-3 py-2 text-sm border rounded-lg" />
                 </div>
                 <div className="col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">
