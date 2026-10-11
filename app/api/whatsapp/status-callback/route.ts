@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isValidTwilioSignature } from '@/lib/twilio-signature'
 import { createClient } from '@supabase/supabase-js'
-import twilio from 'twilio'
 import { mapTwilioStatus, previousStatusesFor } from '@/lib/whatsapp-status'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
     // SECURITY: Validate Twilio Signature
     // ============================================
     const signature = request.headers.get('x-twilio-signature')
-    const url = request.url
 
     if (!signature) {
       console.error('❌ Missing Twilio signature header on status callback')
@@ -46,7 +45,8 @@ export async function POST(request: NextRequest) {
       return new NextResponse('Server Error', { status: 500 })
     }
 
-    const isValid = twilio.validateRequest(authToken, signature, url, params)
+    // Any URL Twilio may have signed: the proxy's, the public, www or bare.
+    const isValid = isValidTwilioSignature(authToken, signature, request, params)
 
     if (!isValid) {
       console.error('❌ Invalid Twilio signature on status callback - possible unauthorized request')

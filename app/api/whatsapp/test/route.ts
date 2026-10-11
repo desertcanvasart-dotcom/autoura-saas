@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
     const result = await sendWhatsAppMessage({
       to: phone,
       body: `✅ Test message from Autoura\n\nYour WhatsApp integration is working correctly.\n\nSent at: ${new Date().toLocaleString()}`,
+      // From the caller's company's number — the one its customers see.
+      tenantId: auth.tenant_id ?? null,
     })
 
     if (result.success) {

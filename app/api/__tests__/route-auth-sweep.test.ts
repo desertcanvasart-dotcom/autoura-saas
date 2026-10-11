@@ -53,10 +53,10 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   '/api/version': null, // sha + uptime only, public by design
   '/api/health': null, // pass/fail + latency only, public by design
   '/api/billing/webhook': ['verifyWebhookSignature', 'stripe-signature'],
-  // Dual-provider webhook: Twilio requests prove via validateRequest,
+  // Dual-provider webhook: Twilio requests prove via isValidTwilioSignature (lib/twilio-signature),
   // Meta Cloud API requests via verifyMetaSignature (X-Hub-Signature-256).
-  '/api/whatsapp/webhook': ['validateRequest', 'verifyMetaSignature'],
-  '/api/whatsapp/status-callback': ['validateRequest'],
+  '/api/whatsapp/webhook': ['isValidTwilioSignature', 'verifyMetaSignature'],
+  '/api/whatsapp/status-callback': ['isValidTwilioSignature'],
   // The invitee has no session yet — the secret invitation_token IS the
   // credential, and both handlers look the row up by it.
   '/api/invitations/verify': ['invitation_token'],

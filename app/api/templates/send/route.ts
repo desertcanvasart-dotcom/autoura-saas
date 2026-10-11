@@ -194,7 +194,7 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
 // ============================================
 
 async function sendWhatsApp(to: string, body: string, tenantId?: string | null): Promise<{ success: boolean; error?: string }> {
-  const result = await sendWhatsAppMessage({ to, body, tenantId })
+  const result = await sendWhatsAppMessage({ to, body, tenantId: tenantId ?? null })
   if (!result.success) {
     return { success: false, error: result.error || 'Failed to send WhatsApp message' }
   }

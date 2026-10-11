@@ -125,7 +125,9 @@ describe('an inbound WhatsApp number', () => {
   it('the webhook looks for the client inside the conversation’s tenant', () => {
     const src = readFileSync(path.join(process.cwd(), 'app/api/whatsapp/webhook/route.ts'), 'utf8')
     const convAt = src.indexOf(".from('whatsapp_conversations')")
-    const clientAt = src.indexOf("clientQuery = clientQuery.eq('tenant_id', existingConversation.tenant_id)")
+    // The tenant the number written to says (408), else the conversation's.
+    const clientAt = src.indexOf("if (knownTenantId) clientQuery = clientQuery.eq('tenant_id', knownTenantId)")
+    expect(src).toContain('const knownTenantId = ownerTenantId ?? existingConversation?.tenant_id ?? null')
     expect(convAt).toBeGreaterThan(-1)
     expect(clientAt).toBeGreaterThan(convAt)
   })

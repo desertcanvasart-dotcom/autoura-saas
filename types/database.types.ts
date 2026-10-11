@@ -9456,6 +9456,7 @@ export interface Database {
           default_currency: string | null
           services_offered: Json | null
           company_website: string | null
+          whatsapp_number: string | null
           company_address: string | null
           license_number: string | null
           tax_number: string | null
@@ -9495,6 +9496,7 @@ export interface Database {
           default_currency?: string | null
           services_offered?: Json | null
           company_website?: string | null
+          whatsapp_number?: string | null
           company_address?: string | null
           license_number?: string | null
           tax_number?: string | null
@@ -9534,6 +9536,7 @@ export interface Database {
           default_currency?: string | null
           services_offered?: Json | null
           company_website?: string | null
+          whatsapp_number?: string | null
           company_address?: string | null
           license_number?: string | null
           tax_number?: string | null

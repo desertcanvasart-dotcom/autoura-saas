@@ -688,7 +688,8 @@ export class ToolExecutor {
       const result = await sendWhatsAppMessage({
         to: this.phoneNumber,
         body: message,
-        mediaUrl: pdf.url
+        mediaUrl: pdf.url,
+        tenantId: this.tenantId
       })
 
       if (!result.success) {

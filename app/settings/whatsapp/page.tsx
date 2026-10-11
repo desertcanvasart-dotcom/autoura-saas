@@ -3,18 +3,17 @@
 import { useState, useEffect } from 'react'
 import { MessageCircle, Send, Check, AlertCircle, Settings, Phone, Zap, Bot, Sparkles, Loader2 } from 'lucide-react'
 
+// /api/whatsapp/status — the page read /api/whatsapp/test, which only
+// answers POST, so it always showed "Configuration Incomplete".
 interface ConfigStatus {
   configured: boolean
-  config: {
-    accountSid: string
-    apiKey: string
-    apiSecret: string
-    whatsappFrom: string
-    businessName: string
-    autoSendEnabled: string
-    statusUpdatesEnabled: string
-  }
-  message: string
+  provider: 'twilio' | 'meta'
+  has_credentials: boolean
+  has_number: boolean
+  /** The number this company's customers see. */
+  whatsapp_number: string
+  /** Its own number (set by the Autoura team), or the shared platform one. */
+  own_number?: boolean
 }
 
 interface AISettings {
@@ -48,7 +47,7 @@ export default function WhatsAppSettingsPage() {
   const loadConfig = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/whatsapp/test')
+      const response = await fetch('/api/whatsapp/status')
       const data = await response.json()
       setConfig(data)
     } catch (error) {
@@ -114,11 +113,18 @@ export default function WhatsAppSettingsPage() {
       const response = await fetch('/api/whatsapp/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: testPhone })
+        // The route reads `phone`; `phoneNumber` was never read, so every
+        // test answered "Phone number is required".
+        body: JSON.stringify({ phone: testPhone })
       })
 
       const data = await response.json()
-      setTestResult(data)
+      setTestResult({
+        success: !!data.success,
+        message: data.success
+          ? data.warning || 'Test message sent — check your WhatsApp.'
+          : data.error || 'Failed to send test message',
+      })
 
     } catch (error: any) {
       setTestResult({ success: false, message: error.message })
@@ -188,23 +194,36 @@ export default function WhatsAppSettingsPage() {
           </div>
 
           <div className="space-y-0">
-            {Object.entries(config?.config || {}).map(([key, value]) => (
+            {[
+              ['Provider', config?.provider === 'meta' ? 'Meta Cloud API' : 'Twilio'],
+              ['Credentials', config?.has_credentials ? '✅ Set' : '❌ Missing'],
+              [
+                'Your WhatsApp number',
+                config?.whatsapp_number
+                  ? `${config.whatsapp_number} ${config.own_number ? '(your own)' : '(shared platform number)'}`
+                  : '❌ Not set',
+              ],
+            ].map(([key, value]) => (
               <div key={key} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
-                <span className="text-xs text-gray-600 font-medium capitalize">
-                  {key.replace(/([A-Z])/g, ' $1').trim()}
-                </span>
+                <span className="text-xs text-gray-600 font-medium">{key}</span>
                 <span className={`
                   text-xs px-2 py-0.5 rounded
                   ${value.includes('✅') ? 'bg-green-50 text-green-700' : ''}
                   ${value.includes('❌') ? 'bg-red-50 text-red-700' : ''}
-                  ${value.includes('⚠️') ? 'bg-amber-50 text-amber-700' : ''}
-                  ${!value.includes('✅') && !value.includes('❌') && !value.includes('⚠️') ? 'text-gray-700' : ''}
+                  ${!value.includes('✅') && !value.includes('❌') ? 'text-gray-700' : ''}
                 `}>
                   {value}
                 </span>
               </div>
             ))}
           </div>
+
+          {config && !config.own_number && config.provider !== 'meta' && (
+            <p className="mt-3 text-[11px] text-gray-500">
+              You send from the shared platform number. Someone writing to it for the first time cannot be matched to
+              your company — ask the Autoura team for your own number so every message reaches you.
+            </p>
+          )}
 
           {!config?.configured && (
             <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">

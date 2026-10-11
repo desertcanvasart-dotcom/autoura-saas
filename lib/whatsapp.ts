@@ -96,7 +96,8 @@ export async function testWhatsAppConnection(
   const provider = getWhatsAppProvider()
   const result = await sendWhatsAppMessage({
     to: testPhone,
-    body: `✅ Success! Your WhatsApp integration (${provider}) is working correctly. This is a test message from Autoura.`
+    body: `✅ Success! Your WhatsApp integration (${provider}) is working correctly. This is a test message from Autoura.`,
+    tenantId: null
   })
   return {
     success: result.success,

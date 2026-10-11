@@ -123,6 +123,8 @@ export async function POST(request: NextRequest) {
     const sendResult = await sendWhatsAppMessage({
       to: formattedPhone,
       body: message,
+      // From the company's own number when it has one (lib/whatsapp-tenant).
+      tenantId: tenant_id ?? null,
       statusCallback: `${process.env.NEXT_PUBLIC_APP_URL || "https://autoura.net"}/api/whatsapp/status-callback`
     })
 
