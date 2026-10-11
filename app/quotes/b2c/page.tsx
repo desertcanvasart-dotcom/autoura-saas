@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { csvCell } from '@/lib/finance-export'
 
 interface B2CQuote {
   id: string
@@ -236,12 +237,15 @@ export default function B2CQuotesPage() {
   }
 
   // Selection handlers
+  // The header box selects the quotes on THIS page — the ones you can see.
+  // It selected every filtered quote, so a bulk delete took quotes on other
+  // pages nobody was looking at.
+  const pageAllSelected = paginatedQuotes.length > 0 && paginatedQuotes.every(q => selectedQuotes.has(q.id))
   const handleSelectAll = () => {
-    if (selectedQuotes.size === filteredQuotes.length) {
-      setSelectedQuotes(new Set())
-    } else {
-      setSelectedQuotes(new Set(filteredQuotes.map(q => q.id)))
-    }
+    const next = new Set(selectedQuotes)
+    if (pageAllSelected) paginatedQuotes.forEach(q => next.delete(q.id))
+    else paginatedQuotes.forEach(q => next.add(q.id))
+    setSelectedQuotes(next)
   }
 
   const handleSelectQuote = (quoteId: string) => {
@@ -379,7 +383,8 @@ export default function B2CQuotesPage() {
 
     const csvContent = [
       csvHeaders.join(','),
-      ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
+      // Quotes and formula characters escaped (a name like Smith "Jr" broke the row).
+      ...csvRows.map(row => row.map(csvCell).join(','))
     ].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv' })
@@ -448,7 +453,7 @@ export default function B2CQuotesPage() {
               <div className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={selectedQuotes.size === filteredQuotes.length && filteredQuotes.length > 0}
+                  checked={pageAllSelected}
                   onChange={handleSelectAll}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                   aria-label="Select all quotes"

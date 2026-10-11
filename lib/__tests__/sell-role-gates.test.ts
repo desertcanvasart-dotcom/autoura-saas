@@ -44,7 +44,6 @@ const GATED: Record<string, string> = {
   'app/api/quotes/b2b/[id]/generate-pdf/route.ts': "gateRole('manage')",
   'app/api/quotes/b2b/bulk-update/route.ts': "gateRole('manage')",
   'app/api/quotes/b2b/bulk-delete/route.ts': "gateRole('manage')",
-  'app/api/quotes/b2b/from-itinerary/route.ts': "'manage'",
   'app/api/quotes/b2c/bulk-update/route.ts': "gateRole('staff')",
   'app/api/quotes/b2c/from-itinerary/route.ts': "'staff'",
   'app/api/quotes/[type]/[id]/send/route.ts': "gateRole(type === 'b2b' ? 'manage' : 'staff')",

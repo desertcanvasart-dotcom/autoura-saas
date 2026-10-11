@@ -1,6 +1,7 @@
 'use client'
 
 import { formatMoney } from '@/lib/currency-totals'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { Fragment, useState, useEffect, useMemo } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
@@ -124,6 +125,10 @@ export default function TourPriceCalculator() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<PricingResult | null>(null)
+  const dialog = useConfirmDialog()
+  // The quote the Quote Builder opened this calculator on, if any.
+  const [linkedQuote, setLinkedQuote] = useState<string | null>(null)
+  useEffect(() => { setLinkedQuote(new URLSearchParams(window.location.search).get('quote')) }, [])
 
   // The breakdown reads like the day runs — the same rule the engine sorts by
   // (lib/pricing/breakdown-order.ts), so extras folded in after pricing land in
@@ -349,6 +354,30 @@ export default function TourPriceCalculator() {
             }
           })
         setRateSheet(sheet)
+      } else if (data.success) {
+        // A programme that lists its own services is priced one size at a
+        // time (that path has no table of its own) — it used to fail here.
+        const sizes = Array.from({ length: 10 }, (_, i) => i + 1)
+        const rows = await Promise.all(sizes.map(async pax => {
+          const r = await fetch('/api/b2b/calculate-price', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              variation_id: variationId, num_pax: pax, travel_date: travelDate,
+              is_eur_passport: isEurPassport, margin_percent: marginPercent,
+              tour_leader_included: tourLeaderIncluded, guide_grade: guideGrade, guide_mode: guideMode,
+              language, extras: selectedExtraIds, selected_optional_ids: selectedOptionals,
+            }),
+          }).then(x => x.json()).catch(() => null)
+          const d = r?.success ? r.data : null
+          return d ? {
+            pax, total_cost: d.total_cost, margin_amount: d.margin_amount,
+            selling_price: d.selling_price, price_per_person: d.price_per_person,
+          } : null
+        }))
+        const sheet = rows.filter((x): x is RateSheetRow => x !== null)
+        if (sheet.length === sizes.length) setRateSheet(sheet)
+        else setError('Some group sizes could not be priced — the rate sheet was not made')
       } else {
         setError(data.error || 'Failed to generate rate sheet')
       }
@@ -359,13 +388,16 @@ export default function TourPriceCalculator() {
     }
   }
 
-  const handleSaveQuote = async () => {
+  const handleSaveQuote = async (allowIncomplete = false) => {
     if (!result || !pricedInputs) return
     
     setSaving(true)
     setError(null)
     
     try {
+      // Opened from the Quote Builder on the quote it just made (?quote=…):
+      // saving reprices that quote rather than adding a second one.
+      const linkedQuoteId = linkedQuote
       const res = await fetch('/api/b2b/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -380,11 +412,28 @@ export default function TourPriceCalculator() {
           // the totals, services and rate sheet are never sent.
           pricing: pricedInputs,
           include_rate_sheet: rateSheet.length > 0,
-          notes: quoteForm.notes || null
+          notes: quoteForm.notes || null,
+          ...(linkedQuoteId ? { quote_id: linkedQuoteId } : {}),
+          ...(allowIncomplete ? { allow_incomplete: true } : {}),
         })
       })
       
       const data = await res.json()
+
+      // Services with no rate: the price is short of them. Saved only when
+      // the operator chooses to keep it as it is.
+      if (data.incomplete && !allowIncomplete) {
+        setSaving(false)
+        const holes = (data.holes || []) as { message: string }[]
+        const ok = await dialog.confirm({
+          title: 'Incomplete price',
+          message: `${data.error}\n\n${holes.map(h => `• ${h.message}`).join('\n')}\n\nSave the quote anyway? Add the missing rates before sending it to a partner.`,
+          confirmText: 'Save anyway',
+          variant: 'warning',
+        })
+        if (ok) await handleSaveQuote(true)
+        return
+      }
       
       if (data.success) {
         setSavedQuote({
@@ -789,9 +838,10 @@ export default function TourPriceCalculator() {
                   </div>
                 </div>
 
-                {result.tour_leader_included && (result.num_paying_pax ?? 0) > 0 && (
+                {/* The engine's num_pax is the paying guests; the leader travels on top. */}
+                {result.tour_leader_included && result.num_pax > 0 && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-                    <strong>Group:</strong> {result.num_pax} total ({result.num_paying_pax} paying guests + 1 tour leader)
+                    <strong>Group:</strong> {result.num_pax + 1} total ({result.num_pax} paying guests + 1 tour leader)
                     {typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
                       <span className="ml-2">• <strong>TL Cost:</strong> {money(result.tour_leader_cost)}</span>
                     )}
@@ -842,7 +892,7 @@ export default function TourPriceCalculator() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                   >
                     <Save className="w-4 h-4" />
-                    Save as Quote
+                    {linkedQuote ? 'Update Quote' : 'Save as Quote'}
                   </button>
                 </div>
               </div>
@@ -1147,11 +1197,11 @@ export default function TourPriceCalculator() {
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Pax:</span>
-                  <span className="font-medium">{numPax} {tourLeaderIncluded ? '(+1 TL)' : ''}</span>
+                  <span className="font-medium">{result?.num_pax} {result?.tour_leader_included ? '(+1 TL)' : ''}</span>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Travel Date:</span>
-                  <span className="font-medium">{travelDate}</span>
+                  <span className="font-medium">{result?.travel_date}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t mt-2">
                   <span className="text-gray-600">Selling Price:</span>
@@ -1168,7 +1218,7 @@ export default function TourPriceCalculator() {
                 Cancel
               </button>
               <button
-                onClick={handleSaveQuote}
+                onClick={() => handleSaveQuote()}
                 disabled={saving}
                 className="flex-1 px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >

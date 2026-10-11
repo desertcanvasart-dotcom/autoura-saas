@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient, createAdminClient, requireAuth } from '@/lib/supabase-server';
 import { gateRole } from '@/lib/api-role-gate'
+import { isQuoteStatus, quoteStatusError } from '@/lib/quotes/quote-status'
 
 /**
  * GET /api/quotes/b2b/[id]
@@ -149,6 +150,9 @@ export async function PUT(
     if (body.tour_leader_cost !== undefined) updateData.tour_leader_cost = body.tour_leader_cost;
 
     // Status and validity
+    if (body.status !== undefined && !isQuoteStatus('b2b', body.status)) {
+      return NextResponse.json({ success: false, error: quoteStatusError('b2b') }, { status: 400 });
+    }
     if (body.status !== undefined) updateData.status = body.status;
     if (body.valid_from !== undefined) updateData.valid_from = body.valid_from;
     if (body.valid_until !== undefined) updateData.valid_until = body.valid_until;

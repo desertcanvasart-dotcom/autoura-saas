@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
 import { gateRole } from '@/lib/api-role-gate'
+import { isQuoteStatus, quoteStatusError } from '@/lib/quotes/quote-status'
 
 /**
  * PUT /api/quotes/b2b/bulk-update
@@ -29,6 +30,10 @@ export async function PUT(request: NextRequest) {
         { success: false, error: 'status is required' },
         { status: 400 }
       );
+    }
+
+    if (!isQuoteStatus('b2b', status)) {
+      return NextResponse.json({ success: false, error: quoteStatusError('b2b') }, { status: 400 });
     }
 
     const updateData: any = {

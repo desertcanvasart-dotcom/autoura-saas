@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json()
-    const { itinerary_id, partner_id = null, margin_percent = 25, tour_leader_included = false, is_eur_passport = true, language = 'English', guide_mode = null, guide_grade = null } = body
+    const { itinerary_id, partner_id = null, tour_leader_included = false, is_eur_passport = true, language = 'English', guide_mode = null, guide_grade = null } = body
     if (!itinerary_id) return NextResponse.json({ success: false, error: 'itinerary_id is required' }, { status: 400 })
     const grid = body.grid
     if (grid !== undefined && (typeof grid !== 'object' || !grid || !Array.isArray(grid.days) || typeof grid.config !== 'object' || !grid.config)) {
@@ -66,8 +66,16 @@ export async function POST(request: NextRequest) {
     //    (lib/quotes/partner-in-tenant). A 0% default margin is a margin.
     const partnerCheck = await partnerInTenant(supabase, partner_id, tenant_id)
     if (!partnerCheck.ok) return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
-    let effectiveMargin = margin_percent
-    if (partnerCheck.partner?.default_margin_percent != null) effectiveMargin = Number(partnerCheck.partner.default_margin_percent)
+    // The margin the operator priced with wins: picking a partner already
+    // puts the partner's default in the grid, and a margin changed after that
+    // is a decision — the server used to overwrite it with the default. With
+    // none sent, the partner's default (0% is a margin), else 25%.
+    const sentMargin = body.margin_percent === null || body.margin_percent === '' || body.margin_percent === undefined
+      ? NaN : Number(body.margin_percent)
+    let effectiveMargin = Number.isFinite(sentMargin) ? sentMargin : 25
+    if (!Number.isFinite(sentMargin) && partnerCheck.partner?.default_margin_percent != null) {
+      effectiveMargin = Number(partnerCheck.partner.default_margin_percent)
+    }
 
     const tier = itinerary.tier || 'standard'
     const numPax = (itinerary.num_adults || 2) + (itinerary.num_children || 0)
@@ -134,22 +142,13 @@ export async function POST(request: NextRequest) {
     // 8. Create B2B quote (use b2b_quotes table)
     const validUntil = new Date(); validUntil.setDate(validUntil.getDate() + 30)
 
-    // Generate quote number via admin RPC
     const adminClient = createAdminClient()
-    const { data: quoteNum } = await adminClient.rpc('generate_b2b_quote_number')
 
-    const { data: quote, error: quoteError } = await supabase
-      .from('b2b_quotes')
-      .insert({
-        tenant_id,
-        itinerary_id,
-        // Attribution (mig 270): the staff member creating the quote.
-        created_by: authResult.user!.id,
+    // The price and trip facts — the same on a new quote and a repriced one.
+    const priced = {
         partner_id: partner_id || null,
-        quote_number: quoteNum || `B2B-${Date.now()}`,
         tier,
         currency: itinerary.currency || 'EUR',
-        status: 'draft',
         // Keyed by group size — the shape every quote page, email and PDF
         // reads. A list here showed as one "0 pax" column with no price.
         pricing_table: keyedPricingTable(sheetCosts, Number(effectiveMargin) || 0, { pax: numPax, sellingPrice, pricePerPerson }),
@@ -175,12 +174,66 @@ export async function POST(request: NextRequest) {
         tour_leader_included,
         tour_leader_cost: tourLeaderCost,
         single_supplement: singleSupplement,
-        internal_notes: `Created from itinerary ${itinerary.itinerary_code} | Season: ${season} | Margin: ${effectiveMargin}%`,
-      })
-      .select().single()
+    }
+
+    // "Update B2B Quote" reprices the itinerary's open quote (draft or sent),
+    // as a B2C re-save does — it used to add a new quote on every save, so
+    // the partner's list filled with copies at old prices.
+    const { data: openRows } = await supabase
+      .from('b2b_quotes')
+      .select('id, quote_number')
+      .eq('itinerary_id', itinerary_id)
+      .eq('tenant_id', tenant_id)
+      .in('status', ['draft', 'sent'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+    const open = openRows?.[0] ?? null
+
+    let quote: { id: string; quote_number: string } | null = null
+    let quoteError: { message: string } | null = null
+    if (open) {
+      const res = await supabase
+        .from('b2b_quotes')
+        .update({ ...priced, updated_at: new Date().toISOString() })
+        .eq('id', open.id)
+        .eq('tenant_id', tenant_id)
+        .select('id, quote_number').single()
+      quote = res.data
+      quoteError = res.error
+      if (quote) {
+        // The same version snapshot the quote editor records. The id came
+        // from this tenant's own (RLS) read and update just above.
+        try {
+          await adminClient.rpc('create_b2b_quote_version', {
+            p_quote_id: quote.id,
+            p_changed_by: authResult.user!.id,
+            p_change_reason: `Repriced from itinerary ${itinerary.itinerary_code}`,
+          })
+        } catch (versionError) {
+          console.error('Error creating quote version:', versionError instanceof Error ? versionError.message : versionError)
+        }
+      }
+    } else {
+      const { data: quoteNum } = await adminClient.rpc('generate_b2b_quote_number')
+      const res = await supabase
+        .from('b2b_quotes')
+        .insert({
+          ...priced,
+          tenant_id,
+          itinerary_id,
+          // Attribution (mig 270): the staff member creating the quote.
+          created_by: authResult.user!.id,
+          quote_number: quoteNum || `B2B-${Date.now()}`,
+          status: 'draft',
+          internal_notes: `Created from itinerary ${itinerary.itinerary_code} | Season: ${season} | Margin: ${effectiveMargin}%`,
+        })
+        .select('id, quote_number').single()
+      quote = res.data
+      quoteError = res.error
+    }
 
     if (quoteError || !quote) {
-      return NextResponse.json({ success: false, error: quoteError?.message || 'Failed to create quote' }, { status: 500 })
+      return NextResponse.json({ success: false, error: quoteError?.message || 'Failed to save quote' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -193,8 +246,9 @@ export async function POST(request: NextRequest) {
         tour_leader_cost: tourLeaderCost, single_supplement: singleSupplement,
         currency: itinerary.currency || 'EUR', num_pax: numPax, season,
         services_count: servicesSnapshot.length,
+        action: open ? 'updated' : 'created',
       },
-    }, { status: 201 })
+    }, { status: open ? 200 : 201 })
   } catch (error: any) {
     console.error('Error creating B2B quote from itinerary:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })

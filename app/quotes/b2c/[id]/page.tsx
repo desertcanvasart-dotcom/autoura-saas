@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import StatusManager from '@/components/quotes/StatusManager'
 import {
   FileText, User, Mail, Phone, Calendar, DollarSign, Percent,
   ArrowLeft, Edit, Download, Send, Eye, CheckCircle, XCircle,
-  Clock, AlertCircle, Loader2, MapPin, Users, MessageCircle, BookOpen
+  Clock, AlertCircle, Loader2, MapPin, Users, MessageCircle
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import ConvertToBookingButton from '@/components/quotes/ConvertToBookingButton'
 import { postQuoteSend } from '@/lib/quotes/send-quote-client'
 
 interface CostBreakdown {
@@ -75,41 +75,12 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
 
 export default function B2CQuoteDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
-  const router = useRouter()
   const dialog = useConfirmDialog()
   const [quote, setQuote] = useState<B2CQuote | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pdfGenerating, setPdfGenerating] = useState(false)
   const [sending, setSending] = useState(false)
-  const [converting, setConverting] = useState(false)
-
-  const handleConvertToBooking = async () => {
-    if (!quote) return
-    if (!(await dialog.confirm({
-      message: `Create a booking from quote ${quote.quote_number}? A quote can only be converted once.`,
-      confirmText: 'Create booking',
-    }))) return
-    setConverting(true)
-    try {
-      const res = await fetch('/api/bookings/from-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quote_id: quote.id, quote_type: 'b2c' }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        showToast('error', data.error || 'Failed to create booking')
-        setConverting(false)
-        return
-      }
-      showToast('success', 'Booking created')
-      router.push(`/bookings/${data.data.id}`)
-    } catch {
-      showToast('error', 'Failed to create booking')
-      setConverting(false)
-    }
-  }
 
   useEffect(() => {
     fetchQuote()
@@ -362,25 +333,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                   </>
                 )}
               </button>
-              <button
-                type="button"
-                onClick={handleConvertToBooking}
-                disabled={converting || quote.status !== 'accepted'}
-                title={quote.status !== 'accepted' ? 'Only accepted quotes can be converted — set the status to Accepted first' : 'Create a booking from this quote'}
-                className="px-4 py-2 bg-[#647C47] text-white rounded-lg text-sm font-medium hover:bg-[#566b3c] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {converting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <BookOpen className="w-4 h-4" />
-                    Convert to Booking
-                  </>
-                )}
-              </button>
+              <ConvertToBookingButton quoteId={quote.id} quoteType="b2c" quoteNumber={quote.quote_number} status={quote.status} />
             </div>
           </div>
 

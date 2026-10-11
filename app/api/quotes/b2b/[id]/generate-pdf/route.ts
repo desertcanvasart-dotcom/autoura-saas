@@ -246,6 +246,20 @@ export async function GET(
       );
     }
 
+    // The same check as POST: the download was a way round it, and the page
+    // calls this one (asking first, and passing allow_incomplete).
+    const completeness = quoteCompleteness((quote as { services_snapshot?: unknown }).services_snapshot);
+    if (!completeness.complete && !allowsIncomplete(new URL(request.url).searchParams.get('allow_incomplete'))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}. Add the rates, or download it anyway.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
+      );
+    }
+
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
       React.createElement(B2BQuotePDF, { quote: toPdfQuote(quote), company: await loadDocumentIdentity(tenantId) }) as any

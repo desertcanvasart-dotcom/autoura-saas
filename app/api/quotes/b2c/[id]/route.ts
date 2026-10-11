@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { priceB2cQuote, b2cPriceInputError } from '@/lib/quotes/b2c-quote-price';
 import { createAuthenticatedClient, createAdminClient, requireAuth } from '@/lib/supabase-server';
+import { isQuoteStatus, quoteStatusError } from '@/lib/quotes/quote-status'
 
 /**
  * GET /api/quotes/b2c/[id]
@@ -168,6 +169,9 @@ export async function PUT(
     if (cost_breakdown !== undefined) updateData.cost_breakdown = cost_breakdown;
 
     // Metadata fields
+    if (status !== undefined && !isQuoteStatus('b2c', status)) {
+      return NextResponse.json({ success: false, error: quoteStatusError('b2c') }, { status: 400 });
+    }
     if (status !== undefined) updateData.status = status;
     if (valid_until !== undefined) updateData.valid_until = valid_until;
     if (internal_notes !== undefined) updateData.internal_notes = internal_notes;

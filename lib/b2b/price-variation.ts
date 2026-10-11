@@ -509,8 +509,9 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
         .eq('tenant_id', tenantId)
         .single()
 
-      if ((partner as any)?.default_margin_percent) {
-        effectiveMargin = (partner as any).default_margin_percent
+      // A 0% default or override is a margin, not "none".
+      if ((partner as any)?.default_margin_percent != null) {
+        effectiveMargin = Number((partner as any).default_margin_percent)
       }
 
       const { data: override } = await (getSupabaseAdmin() as any)
@@ -522,8 +523,8 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
         .eq('is_active', true)
         .single()
 
-      if ((override as any)?.margin_percent_override) {
-        effectiveMargin = (override as any).margin_percent_override
+      if ((override as any)?.margin_percent_override != null) {
+        effectiveMargin = Number((override as any).margin_percent_override)
       }
     }
 
@@ -711,7 +712,8 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
               .select('meal_type, base_rate_eur, rate_currency')
               .eq('is_active', true)
               .eq('tenant_id', tenantId)
-              .eq('tier', tier)
+              // The variation's own tier, as every other line here.
+              .eq('tier', effectiveTier)
             // Per-row currency (mig 295), converted at the fetch boundary.
             const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', mealRowsRaw)
 
@@ -993,7 +995,11 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
       holes,
       // This path lists services directly; it does not run the day engine, so
       // it has no engine warnings (the sailing-day check is on the auto path).
-      warnings: [],
+      // It does not price a tour leader either — say so rather than show a
+      // "+1 Tour Leader" price that leaves the leader out.
+      warnings: tour_leader_included
+        ? ['This programme lists its own services, so the tour leader is not priced: add the leader’s costs as services, or build the programme by days in Tour Manager.']
+        : [],
     }
 
     return json({

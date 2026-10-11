@@ -77,7 +77,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
       update({
         partnerId: partner.id,
         partnerName: partner.company_name,
-        marginPercent: Math.min(partner.default_margin_percent || DEFAULT_MARGINS.b2b, 100),
+        marginPercent: Math.min(partner.default_margin_percent ?? DEFAULT_MARGINS.b2b, 100),
       })
     } else {
       update({ partnerId: null, partnerName: '' })
@@ -246,7 +246,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
               min={0}
               max={100}
               value={config.marginPercent}
-              onChange={(e) => update({ marginPercent: Math.min(parseFloat(e.target.value) || 0, 100) })}
+              onChange={(e) => update({ marginPercent: Math.min(Math.max(parseFloat(e.target.value) || 0, 0), 100) })}
               style={{ width: '4rem', padding: '0.25rem 0.5rem' }}
               className="!w-16 h-8 !p-1 text-sm border !border-gray-300 rounded-lg text-center font-bold !text-gray-900 bg-white focus:ring-2 focus:ring-blue-200"
             />

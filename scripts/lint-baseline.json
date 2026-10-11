@@ -1,7 +1,7 @@
 {
   "totals": {
-    "errors": 1463,
-    "warnings": 513
+    "errors": 1462,
+    "warnings": 512
   },
   "rules": {
     "(no rule — parse or config error)": {
@@ -30,7 +30,7 @@
     },
     "@typescript-eslint/no-unused-vars": {
       "errors": 0,
-      "warnings": 411
+      "warnings": 410
     },
     "import/no-anonymous-default-export": {
       "errors": 0,
@@ -41,7 +41,7 @@
       "warnings": 3
     },
     "prefer-const": {
-      "errors": 21,
+      "errors": 20,
       "warnings": 0
     },
     "react-hooks/exhaustive-deps": {
