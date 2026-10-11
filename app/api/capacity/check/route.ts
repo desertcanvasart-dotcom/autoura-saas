@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { capacityDateRange, freeGroupSlots } from '@/lib/capacity/capacity-write'
 
 // ============================================
 // CAPACITY CHECK API (Public for AI Agent)
@@ -62,6 +63,12 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveEndDate = end_date || start_date
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveEndDate)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid end_date format. Use YYYY-MM-DD' },
+        { status: 400 }
+      )
+    }
 
     // Admin client (bypasses RLS); all queries are scoped to the session tenant below
     const supabase = createAdminClient()
@@ -102,14 +109,16 @@ export async function POST(request: NextRequest) {
       })
     })
 
-    // Generate all dates in range
-    const dates: string[] = []
-    const current = new Date(start_date)
-    const end = new Date(effectiveEndDate)
-
-    while (current <= end) {
-      dates.push(current.toISOString().split('T')[0])
-      current.setDate(current.getDate() + 1)
+    // Generate all dates in range. Calendar arithmetic on the YYYY-MM-DD
+    // strings: stepping a Date by local days and printing it as UTC could
+    // repeat or skip a day where the host clock is not UTC
+    // (documents audit, round 12).
+    const dates = capacityDateRange(start_date, effectiveEndDate)
+    if (!dates) {
+      return NextResponse.json(
+        { success: false, error: 'Date range is too long (max 366 days)' },
+        { status: 400 }
+      )
     }
 
     // Check availability for each date
@@ -117,15 +126,19 @@ export async function POST(request: NextRequest) {
       const capacity = capacityMap.get(date)
 
       if (!capacity) {
-        // No entry = default available
+        // No entry = default available, with the default capacity and nothing
+        // booked. This used to subtract the group SIZE (pax) from the default
+        // 3 groups, so a party of 6 read as -3 free slots (documents audit,
+        // round 12).
         return {
           date,
           status: 'available' as const,
-          available_slots: 3 - group_size // Default 3 max groups
+          available_slots: freeGroupSlots(null)
         }
       }
 
-      const availableSlots = capacity.max_groups - capacity.booked_groups
+      // Never negative, even when a day is overbooked.
+      const availableSlots = freeGroupSlots(capacity)
 
       return {
         date,

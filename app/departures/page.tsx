@@ -99,6 +99,7 @@ export default function DeparturesPage() {
     max_pax: 20,
     min_pax: 2,
     price_per_person: '',
+    currency: 'EUR',
     status: 'open'
   })
 
@@ -114,6 +115,10 @@ export default function DeparturesPage() {
       max_pax: d.max_pax,
       min_pax: d.min_pax,
       price_per_person: d.price_per_person != null ? String(d.price_per_person) : '',
+      // The clone carries the source's currency; it used to fall back to the
+      // API default, so a USD departure came back priced in EUR (documents
+      // audit, round 12).
+      currency: d.currency || 'EUR',
       status: 'open'
     })
     setShowCreateModal(true)
@@ -211,6 +216,7 @@ export default function DeparturesPage() {
         max_pax: 20,
         min_pax: 2,
         price_per_person: '',
+        currency: 'EUR',
         status: 'open'
       })
       loadData()
@@ -641,7 +647,7 @@ export default function DeparturesPage() {
               {/* Price */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price per Person (EUR)
+                  Price per Person ({newDeparture.currency})
                 </label>
                 <input
                   type="number"
