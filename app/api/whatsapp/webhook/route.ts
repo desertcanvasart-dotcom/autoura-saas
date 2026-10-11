@@ -31,6 +31,7 @@ import { notifyTeam, bellSnippet } from '@/lib/notifications'
 import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbound-client'
 import { toConversationPhone, conversationPhoneKeys } from '@/lib/whatsapp-phone'
 import { tenantForWhatsAppNumber } from '@/lib/whatsapp-tenant'
+import { previousStatusesFor, type WhatsAppMessageStatus } from '@/lib/whatsapp-status'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
@@ -209,23 +210,30 @@ async function handleMetaWebhook(request: NextRequest, rawBody: string) {
 
 /** Meta status values map 1:1 onto whatsapp_messages.status
  *  ('sent' | 'delivered' | 'read' | 'failed'); anything else is skipped. */
-const META_DB_STATUSES = new Set(['sent', 'delivered', 'read', 'failed'])
+const META_DB_STATUSES = new Set<WhatsAppMessageStatus>(['sent', 'delivered', 'read', 'failed'])
 
 async function applyMetaStatuses(statuses: MetaStatusUpdate[]) {
   const admin = getServiceClient()
   if (!admin) return
 
   for (const s of statuses) {
-    if (!META_DB_STATUSES.has(s.status)) continue
+    const status = s.status as WhatsAppMessageStatus
+    if (!META_DB_STATUSES.has(status)) continue
+    // Receipts arrive out of order: a late "sent" overwrote "read". Only a
+    // status this one outranks is replaced — the rule the Twilio callback
+    // already follows (lib/whatsapp-status).
+    const replaceable = previousStatusesFor(status)
+    if (replaceable.length === 0) continue
     const { error } = await (admin as any)
       .from('whatsapp_messages')
       .update({
-        status: s.status,
+        status,
         ...(s.errorCode || s.errorMessage
           ? { metadata: { error_code: s.errorCode ?? null, error_message: s.errorMessage ?? null } }
           : {})
       })
       .eq('message_sid', s.messageSid)
+      .in('status', replaceable)
     if (error) {
       console.error('❌ Error applying Meta status update:', error)
     }
