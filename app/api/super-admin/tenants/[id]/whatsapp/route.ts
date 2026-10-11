@@ -2,11 +2,15 @@
 // number (migration 408). The Autoura team only: the number must be a sender
 // in the platform's Twilio account, and a company that could set any number
 // could take another's customers (travel-ops-pro, round 14).
-// Body: { whatsapp_number: "+81…" | "" } — blank goes back to the shared number.
+// Body: { whatsapp_number: "+81…" | "", force?: true } — blank goes back to
+// the shared number. The number is checked with Twilio first (a WhatsApp
+// sender in the account, and live); `force` saves it when that check fails —
+// a sender still pending approval, or Twilio unreachable.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/super-admin'
-import { checkTenantWhatsAppNumber } from '@/lib/whatsapp-tenant'
+import { checkTenantWhatsAppNumber, checkWhatsAppSender } from '@/lib/whatsapp-tenant'
+import { listWhatsAppSenders } from '@/lib/twilio-whatsapp'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,6 +22,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const checked = checkTenantWhatsAppNumber(body?.whatsapp_number)
     if (!checked.ok) return NextResponse.json({ success: false, error: checked.error }, { status: checked.status })
+
+    let senderStatus: string | null = null
+    if (checked.number) {
+      const sender = await checkWhatsAppSender(checked.number, listWhatsAppSenders)
+      if (sender.ok) senderStatus = sender.status
+      else if (body?.force !== true) {
+        // canForce: the page offers "Save anyway".
+        return NextResponse.json({ success: false, error: sender.error, reason: sender.reason, canForce: true }, { status: 422 })
+      }
+    }
 
     const { data, error } = await admin
       .from('tenants')
@@ -36,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     if (!data) return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 })
 
-    return NextResponse.json({ success: true, whatsapp_number: data.whatsapp_number })
+    return NextResponse.json({ success: true, whatsapp_number: data.whatsapp_number, sender_status: senderStatus })
   } catch (error: unknown) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

@@ -93,3 +93,36 @@ export function checkTenantWhatsAppNumber(raw: unknown):
   }
   return { ok: true, number }
 }
+
+export type WhatsAppSenderCheck =
+  | { ok: true; status: string }
+  | { ok: false; reason: 'not_found' | 'not_online' | 'unavailable'; error: string }
+
+/** Twilio sender statuses a number can send and receive in. */
+const LIVE_SENDER = new Set(['ONLINE', 'ONLINE:UPDATING'])
+
+/**
+ * Whether the number is a WhatsApp sender in the platform's Twilio account,
+ * and live — so a typo, or a number never registered, is refused when it is
+ * saved rather than found later as failed sends and lost replies.
+ */
+export async function checkWhatsAppSender(
+  number: string,
+  listSenders: () => Promise<Array<{ senderId: string; status: string }>>
+): Promise<WhatsAppSenderCheck> {
+  let senders: Array<{ senderId: string; status: string }>
+  try {
+    senders = await listSenders()
+  } catch (error) {
+    return { ok: false, reason: 'unavailable', error: `Could not check the number with Twilio: ${(error as Error).message}` }
+  }
+  const sender = senders.find(s => toWhatsAppE164(s.senderId) === number)
+  if (!sender) {
+    return { ok: false, reason: 'not_found', error: `${number} is not a WhatsApp sender in your Twilio account. Check the number, or register it in Twilio first.` }
+  }
+  const status = String(sender.status || '').toUpperCase()
+  if (!LIVE_SENDER.has(status)) {
+    return { ok: false, reason: 'not_online', error: `${number} is in your Twilio account but not live yet (status: ${status || 'unknown'}). It cannot send or receive until Twilio shows it ONLINE.` }
+  }
+  return { ok: true, status }
+}

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { NextRequest } from 'next/server'
 import {
   toWhatsAppE164, sharedWhatsAppNumber, tenantForWhatsAppNumber, whatsAppSenderFor, checkTenantWhatsAppNumber,
+  checkWhatsAppSender,
 } from '@/lib/whatsapp-tenant'
 import { twilioSignatureUrls } from '@/lib/twilio-signature'
 
@@ -61,6 +62,22 @@ describe('the numbers', () => {
     expect(checkTenantWhatsAppNumber('')).toEqual({ ok: true, number: null })
     expect(checkTenantWhatsAppNumber('03 1234 5678')).toMatchObject({ ok: false, status: 400 })
     expect(checkTenantWhatsAppNumber('+1 415 523 8886')).toMatchObject({ ok: false, status: 409 })
+  })
+
+  it('is checked with Twilio: a live sender in the account, else refused and saying why', async () => {
+    const senders = async () => [
+      { senderId: 'whatsapp:+81312345678', status: 'ONLINE' },
+      { senderId: 'whatsapp:+81355556666', status: 'PENDING_VERIFICATION' },
+    ]
+    expect(await checkWhatsAppSender('+81312345678', senders)).toEqual({ ok: true, status: 'ONLINE' })
+    expect(await checkWhatsAppSender('+81312345679', senders)).toMatchObject({ ok: false, reason: 'not_found' })
+    expect(await checkWhatsAppSender('+81355556666', senders)).toMatchObject({ ok: false, reason: 'not_online' })
+    expect(await checkWhatsAppSender('+81312345678', async () => { throw new Error('401') }))
+      .toMatchObject({ ok: false, reason: 'unavailable' })
+    const route = src('app/api/super-admin/tenants/[id]/whatsapp/route.ts')
+    expect(route).toContain('const sender = await checkWhatsAppSender(checked.number, listWhatsAppSenders)')
+    expect(route).toContain("else if (body?.force !== true) {")
+    expect(src('app/super-admin/tenants/[id]/page.tsx')).toContain('onClick={() => handleSaveWhatsapp(true)}')
   })
 
   it('only a super admin sets it', () => {

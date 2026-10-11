@@ -15,7 +15,7 @@ export default function TenantDetailPage() {
   const [saving, setSaving] = useState('')
   // The company's own WhatsApp number (migration 408); '' = the shared one.
   const [whatsappNumber, setWhatsappNumber] = useState('')
-  const [whatsappMessage, setWhatsappMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const [whatsappMessage, setWhatsappMessage] = useState<{ ok: boolean; text: string; canForce?: boolean } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -54,14 +54,14 @@ export default function TenantDetailPage() {
     }
   }
 
-  const handleSaveWhatsapp = async () => {
+  const handleSaveWhatsapp = async (force = false) => {
     setSaving('whatsapp')
     setWhatsappMessage(null)
     try {
       const res = await fetch(`/api/super-admin/tenants/${id}/whatsapp`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsapp_number: whatsappNumber }),
+        body: JSON.stringify({ whatsapp_number: whatsappNumber, ...(force ? { force: true } : {}) }),
       })
       const json = await res.json()
       if (json.success) {
@@ -70,11 +70,12 @@ export default function TenantDetailPage() {
         setWhatsappMessage({
           ok: true,
           text: json.whatsapp_number
-            ? `Saved. Messages to ${json.whatsapp_number} now reach this company, and its sends go out from it.`
+            ? `Saved${json.sender_status ? ` — live in Twilio (${json.sender_status})` : ' without the Twilio check'}. Messages to ${json.whatsapp_number} now reach this company, and its sends go out from it.`
             : 'Saved. This company uses the shared number.',
         })
       } else {
-        setWhatsappMessage({ ok: false, text: json.error || 'Could not save the number' })
+        // The Twilio check failed: say why, and offer to save anyway.
+        setWhatsappMessage({ ok: false, text: json.error || 'Could not save the number', canForce: json.canForce === true })
       }
     } catch {
       setWhatsappMessage({ ok: false, text: 'Could not save the number' })
@@ -251,7 +252,7 @@ export default function TenantDetailPage() {
                 className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-600"
               />
               <button
-                onClick={handleSaveWhatsapp}
+                onClick={() => handleSaveWhatsapp()}
                 disabled={saving === 'whatsapp' || whatsappNumber === (tenant.whatsapp_number || '')}
                 className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg"
               >
@@ -261,6 +262,15 @@ export default function TenantDetailPage() {
             </div>
             {whatsappMessage && (
               <p className={`text-xs mt-2 ${whatsappMessage.ok ? 'text-green-400' : 'text-red-400'}`}>{whatsappMessage.text}</p>
+            )}
+            {whatsappMessage?.canForce && (
+              <button
+                onClick={() => handleSaveWhatsapp(true)}
+                disabled={saving === 'whatsapp'}
+                className="mt-2 text-xs text-amber-400 hover:text-amber-300 underline disabled:opacity-50"
+              >
+                Save anyway
+              </button>
             )}
           </div>
 
