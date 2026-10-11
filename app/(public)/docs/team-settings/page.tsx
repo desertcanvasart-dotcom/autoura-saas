@@ -112,7 +112,7 @@ export default function TeamSettingsPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong><Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Your Vocabulary</Link></strong> &mdash; relabel the product&rsquo;s built-in terms in your own words (Settings group).</li>
           <li><strong><Link href="/docs/seasonal-premiums" className="text-primary-600 hover:underline">Seasonal Premiums</Link></strong> &mdash; the dated windows that lift every quote travelling in them.</li>
-          <li><strong><Link href="/docs/extras" className="text-primary-600 hover:underline">Extras &amp; Upgrades</Link></strong> &mdash; the add-ons, upgrades and options you can attach to any trip.</li>
+          <li><strong><Link href="/docs/extras" className="text-primary-600 hover:underline">Extras &amp; Upgrades</Link></strong> &mdash; the add-ons and upgrades you sell on top of a trip, on B2B quotes and bookings.</li>
         </ul>
       </section>
 

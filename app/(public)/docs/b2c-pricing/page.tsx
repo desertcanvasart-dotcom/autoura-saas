@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { Tip, DocScreenshot } from '../layout'
+import { DocScreenshot } from '../layout'
 import { DocPager } from '../pager'
 
 export default function B2CPricingPage() {
@@ -15,104 +15,86 @@ export default function B2CPricingPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">B2C Pricing</h1>
       <p className="text-gray-600 mb-8">
-        B2C pricing happens in the <strong>pricing grid</strong> (sidebar: Sell &rarr; <strong>Pricing Grid</strong>). The grid looks up hotel rates, guide fees, transport costs, entrance fees, meals, and more from your rate database, applies your profit margin, and recalculates the quote live as you edit.
+        Trips for your direct clients are priced in the <strong>Quote Builder</strong> (Sell &rarr; Quote Builder): every service is looked up in your rates, your markup is added, and the price updates as you change the trip. Building the trip itself is covered in <Link href="/docs/itinerary-creation" className="text-primary-600 hover:underline">Itinerary Creation</Link>.
       </p>
 
-      {/* How It Works */}
+      {/* How */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">How It Works</h2>
-        <p className="text-gray-600 mb-3">
-          From the itinerary editor, click <strong>Price in Grid</strong>. The itinerary opens in the pricing grid at <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/pricing-grid?itinerary=&lt;id&gt;</code> with every day and service loaded. From there:
-        </p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">How the Price Is Built</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Each day&apos;s service slots (transport, guide, accommodation, meals, entrance fees, and more) are matched to rates by city, tier, and season</li>
-          <li>The settings bar controls the calculation &mdash; <strong>PAX</strong>, <strong>start date</strong>, <strong>passport</strong> toggle, <strong>tier</strong>, <strong>guide</strong> toggle, <strong>B2C/B2B</strong> mode, <strong>currency</strong>, and <strong>margin</strong></li>
-          <li>Group costs (vehicle, guide, tipping) are divided by pax; per-person costs (accommodation, entrance fees, meals) are multiplied by pax</li>
-          <li>Your margin is applied to the aggregated cost to get the client selling price</li>
-          <li>Every change &mdash; a different hotel, one more traveler, a new margin &mdash; recalculates the quote instantly</li>
+          <li><strong>Group services</strong> &mdash; transport, guide, tipping, boat rides and other group costs &mdash; are shared among the travellers</li>
+          <li><strong>Per-person services</strong> &mdash; accommodation, entrance fees, flights, experiences, meals, water, cruise &mdash; are counted for each traveller</li>
+          <li>Airport services, hotel services and activities follow their rate&apos;s own basis: per group, per person, or per unit (for example per car)</li>
+          <li>Your <strong>Markup %</strong> is added to the cost per person: Sell/PP = Cost/PP &times; (1 + markup)</li>
         </ol>
-        <DocScreenshot src="/docs/b2c-pricing/pricing-grid.jpg" alt="Pricing grid with settings bar, live quote strip, and day-by-day service slots" />
-      </section>
-
-      {/* Rate Sources */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Rate Sources</h2>
-        <p className="text-gray-600 mb-3">
-          Pricing pulls from the rate tables managed under <strong>Suppliers &amp; Rates</strong> in the sidebar (start at the <strong>Rates Hub</strong>). The 14 categories are:
-        </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Hotels</strong> &mdash; Per-person per night by city, tier (budget/standard/deluxe/luxury), and season</li>
-          <li><strong>Nile Cruises</strong> &mdash; Per-person by cabin type and season</li>
-          <li><strong>Sleeping Trains</strong> &mdash; Overnight train cabins</li>
-          <li><strong>Flights</strong> &mdash; Domestic flight fares</li>
-          <li><strong>Trains</strong> &mdash; Day train fares</li>
-          <li><strong>Meals</strong> &mdash; Lunch and dinner rates per person by tier</li>
-          <li><strong>Attractions</strong> &mdash; Entrance fees per person by attraction and passport type (EU / Non-EU)</li>
-          <li><strong>Tour Guides</strong> &mdash; Daily rate by language and tier</li>
-          <li><strong>Activities</strong> &mdash; Excursions, experiences, and boat rides</li>
-          <li><strong>Transportation</strong> &mdash; Vehicle rates by type, capacity, and route area</li>
-          <li><strong>Airport Services</strong> &mdash; Arrival/departure assistance per service</li>
-          <li><strong>Hotel Services</strong> &mdash; Hotel staff services</li>
-          <li><strong>Tipping</strong> &mdash; Daily tipping allowance per tier</li>
-          <li><strong>Fixed Costs</strong> &mdash; Recurring flat costs</li>
-        </ul>
-      </section>
-
-      {/* Accommodation Model */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Accommodation Pricing Model</h2>
-        <p className="text-gray-600 mb-3">
-          All accommodation (hotels and cruises) uses the <strong>Per Person Double (PPD)</strong> model:
-        </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Double Rate</strong> &mdash; Base rate per person when sharing a double room</li>
-          <li><strong>Single Supplement</strong> &mdash; Extra charge for a traveler in a single room, added on top of the per-person total</li>
-        </ul>
         <p className="text-gray-600 mt-3">
-          Accommodation is aggregated per person: each overnight day contributes one night at that day&apos;s per-person rate, and the per-person accommodation total is then multiplied by the number of travelers. The number of nights comes from the days marked with an overnight stay &mdash; not simply from the trip length.
+          The price updates as you change anything. When you <strong>save</strong>, every service is priced again from your rates as they are then, and you are told about any that changed.
         </p>
       </section>
 
-      {/* Profit Margin */}
+      {/* Sources */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Profit Margin</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Where the Rates Come From</h2>
         <p className="text-gray-600 mb-3">
-          Margin is applied <strong>once</strong>, to the aggregated per-person cost &mdash; not to each line item:
+          From your rates in <strong>Suppliers &amp; Rates</strong> (managers and admins), filtered to each day&apos;s city:
         </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Sell/PP</strong> = Cost/PP + (Cost/PP &times; Margin %)</li>
-          <li>The grid defaults to <strong>25%</strong> in B2C mode and <strong>10%</strong> in B2B mode</li>
-          <li>Your personal default margin is a user preference in <strong>Settings</strong> (25% out of the box)</li>
-          <li>The margin input is clamped to a sensible range, so a typo can&apos;t produce a broken quote</li>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Hotels</strong> &mdash; At the trip&apos;s tier, priced from the rate period that covers the start date</li>
+          <li><strong>Nile Cruises</strong> &mdash; At the trip&apos;s tier, per person per night, by cabin</li>
+          <li><strong>Transportation</strong> &mdash; By route and vehicle; cruise transport packages are offered on cruise days</li>
+          <li><strong>Tour Guides</strong> &mdash; By language and type of guide</li>
+          <li><strong>Attractions</strong> &mdash; EU and non-EU prices, by the trip&apos;s passport setting</li>
+          <li><strong>Meals</strong>, <strong>Activities</strong>, <strong>Flights</strong>, <strong>Airport</strong> and <strong>Hotel Services</strong>, and <strong>Tipping</strong> (by who the tip is for)</li>
+          <li><strong>Water</strong> &mdash; From the Water Bottle fixed cost</li>
         </ul>
       </section>
 
-      {/* Viewing Results */}
+      {/* Accommodation */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Accommodation</h2>
+        <p className="text-gray-600">
+          Hotels and cruises are priced per person in a double room (PPD), for each day you pick one. A hotel&apos;s <strong>Single Supplement</strong> is charged when the trip is for one traveller.
+        </p>
+      </section>
+
+      {/* Margin */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Markup</h2>
+        <p className="text-gray-600">
+          <strong>Markup %</strong> in the header starts at 25% for B2C and 10% for B2B (switching resets it; in B2B a partner&apos;s default margin applies). Admins can set their own starting margin as the <strong>Default Profit Margin</strong> in Settings.
+        </p>
+      </section>
+
+      {/* Results */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Reading the Results</h2>
-        <p className="text-gray-600 mb-3">
-          Two areas of the grid summarize the money:
-        </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li><strong>Live Quote strip</strong> &mdash; Always visible at the top: <strong>Cost/PP</strong>, <strong>Total Cost</strong>, <strong>Margin</strong>, <strong>Sell/PP</strong>, and <strong>Sell Total</strong>, updating with every edit</li>
-          <li><strong>Grand Summary card</strong> &mdash; Below the day cards: the whole trip totaled by category, so you can see where the money goes</li>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Live Quote</strong> (header) &mdash; Cost/PP, Total Cost, Margin, Sell/PP and Sell Total, once something is priced</li>
+          <li><strong>The bottom bar</strong> &mdash; Cost / person, Total cost, Margin, Selling / person and Selling total, beside the save button</li>
+          <li><strong>Each day</strong> &mdash; Its own cost, also in the day bar</li>
         </ul>
-        <p className="text-gray-600 mb-3">
-          Switch the <strong>currency</strong> (EUR, USD, GBP, or EGP) at any time &mdash; every figure converts instantly.
+        <p className="text-gray-600 mt-3">
+          The <strong>Currency</strong> setting shows the prices in any of 12 currencies.
         </p>
-        <Tip>
-          <strong>Completeness gate:</strong> The grid blocks saving while mandatory components are still unpriced, based on each day&apos;s day type. Fill or clear the flagged slots and the save buttons unlock.
-        </Tip>
-        <DocScreenshot src="/docs/b2c-pricing/grand-summary.jpg" alt="Pricing grid scrolled to the Grand Summary showing per-category totals, cost, margin, and sell price" />
+        <DocScreenshot src="/docs/b2c-pricing/pricing-grid.jpg" alt="The Quote Builder" />
       </section>
 
-      {/* B2C Quotes */}
+      {/* B2C quotes */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">B2C Quotes Page</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">B2C Quotes</h2>
         <p className="text-gray-600 mb-3">
-          Saved B2C quotes live under <strong>B2C Quotes</strong> in the sidebar. The page shows status counts &mdash; <strong>draft</strong>, <strong>sent</strong>, <strong>viewed</strong>, <strong>accepted</strong>, <strong>rejected</strong>, and <strong>expired</strong> &mdash; with search and filters to find any quote, and an export option for your records. The <strong>New Quote</strong> button here opens the WhatsApp Parser to start a fresh quote.
+          Saving a B2C trip makes its quote, or reprices the open one. They are in <strong>Sell &rarr; B2C Quotes</strong>:
         </p>
-        <DocScreenshot src="/docs/b2c-pricing/b2c-quotes.jpg" alt="B2C Quotes page with status counts, search and filters, and the New Quote button" />
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Total Quotes</strong>, <strong>Drafts</strong>, <strong>Sent/Viewed</strong> and <strong>Accepted</strong>; the status filter counts every status</li>
+          <li><strong>Search</strong> by quote number, client name or trip, and <strong>Filters</strong> by tier, currency, created date and validity</li>
+          <li>Tick quotes to change their status, export them as CSV, or delete them</li>
+          <li><strong>New Quote</strong> opens the Quote Builder</li>
+        </ul>
+        <p className="text-gray-600 mt-3">
+          A quote has <strong>Quote PDF</strong>, <strong>Send Email</strong>, <strong>WhatsApp</strong>, its status, and <strong>Convert to Booking</strong> once accepted. <strong>Edit</strong> changes the base cost and margin; the selling price and price per person are worked out for you.
+        </p>
+        <DocScreenshot src="/docs/b2c-pricing/b2c-quotes.jpg" alt="The B2C Quotes list with its stats, search, filters and the New Quote button" />
       </section>
 
       {/* Previous / next — from the docs order (pager.tsx) */}

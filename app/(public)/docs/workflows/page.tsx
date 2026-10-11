@@ -89,11 +89,11 @@ export default function WorkflowsPage() {
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>On the Dashboard, click <strong>New Quote</strong> &mdash; this opens a simple new-itinerary form</li>
           <li>Enter the client, dates, and number of travelers, then create the itinerary</li>
-          <li>On the itinerary&apos;s detail page, add days and services, and use the <strong>Auto</strong>/<strong>Manual</strong> cost toggle &mdash; Auto prices everything from your rates database</li>
-          <li>Click <strong>Download PDF</strong> and send it to the client</li>
+          <li>Open <strong>&#8943;</strong> &rarr; <strong>Edit itinerary</strong> to add days and services, then <strong>Price in Grid</strong> to price them from your rates</li>
+          <li>Open <strong>Documents</strong> &rarr; <strong>Itinerary PDF</strong> to download it, or <strong>Send</strong> &rarr; <strong>Send quote</strong> to send it to the client</li>
         </ol>
         <Tip>
-          <strong>New Quote</strong> &mdash; on the Dashboard and in the sidebar (Sell group) &mdash; always opens the new-itinerary form: most sales start in an email or a WhatsApp and land in an itinerary. The spreadsheet-style quoting surface is its own entry, <strong>Pricing Grid</strong>, right below it.
+          <strong>New Quote</strong> on the Dashboard opens the new-itinerary form. Most quotes start in the <strong>Quote Builder</strong> (Sell group): <strong>Parse</strong> a WhatsApp or email straight into it and it prices every day from your rates.
         </Tip>
       </section>
 
