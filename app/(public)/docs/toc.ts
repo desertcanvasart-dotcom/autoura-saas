@@ -109,9 +109,9 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Operate',
     items: [
-      { href: '/docs/tasks-departures', icon: CheckSquare, title: 'Tasks, Departures & Capacity', description: 'Kanban task boards, scheduled group departures, and the capacity calendar.' },
-      { href: '/docs/followups-reminders', icon: Bell, title: 'Follow-ups & Reminders', description: 'Client follow-ups from the CRM and automated invoice payment reminders.' },
-      { href: '/docs/resources-documents', icon: FolderOpen, title: 'Resources & Documents', description: 'Manage operational resources and generate vouchers, contracts, and supplier documents.' },
+      { href: '/docs/tasks-departures', icon: CheckSquare, title: 'Tasks, Departures & Capacity', description: 'The task board and operations tasks from a trip, scheduled group departures, and the capacity calendar the WhatsApp AI reads.' },
+      { href: '/docs/followups-reminders', icon: Bell, title: 'Follow-ups & Reminders', description: 'Follow-ups scheduled on a client, and the weekly payment reminder emails for unpaid invoices.' },
+      { href: '/docs/resources-documents', icon: FolderOpen, title: 'Resources & Documents', description: 'Assign guides, drivers, vehicles and hotels to a trip, and generate and send vouchers and service orders.' },
     ],
   },
   {
