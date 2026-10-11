@@ -80,6 +80,16 @@ function getTwilioClient() {
   return twilioClient
 }
 
+/**
+ * The WhatsApp senders registered in the platform's Twilio account (Senders
+ * API): "whatsapp:+…" and their status (ONLINE, PENDING_VERIFICATION …).
+ * Super Admin checks a company's number against it before saving.
+ */
+export async function listWhatsAppSenders(): Promise<Array<{ senderId: string; status: string }>> {
+  const senders = await getTwilioClient().messaging.v2.channelsSenders.list({ channel: 'whatsapp' })
+  return senders.map(s => ({ senderId: s.senderId, status: String(s.status) }))
+}
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
