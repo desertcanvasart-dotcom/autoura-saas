@@ -216,6 +216,12 @@ export default function UserManagementPage() {
 
       if (response.ok) {
         fetchMembers()
+      } else {
+        // A refused change (not an owner/admin, your own role, the owner role)
+        // used to leave the dropdown on the new value and change nothing.
+        const data = await response.json().catch(() => ({}))
+        await dialog.alert('Role not changed', data.error || 'The role could not be changed.', 'warning')
+        fetchMembers()
       }
     } catch (error) {
       console.error('Error updating role:', error)
