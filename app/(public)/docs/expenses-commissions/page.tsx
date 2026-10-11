@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
 
 export default function ExpensesCommissionsPage() {
   return (
@@ -124,23 +125,8 @@ export default function ExpensesCommissionsPage() {
         <DocScreenshot src="/docs/profit-loss/financial-reports.jpg" alt="Reports page with Overview, Revenue, Cash Flow, Tax Summary, and Commissions tabs" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link
-          href="/docs/invoices-payments"
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Invoices &amp; Payments
-        </Link>
-        <Link
-          href="/docs/profit-loss"
-          className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-        >
-          Next: Profit &amp; Loss
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/expenses-commissions" />
     </div>
   )
 }

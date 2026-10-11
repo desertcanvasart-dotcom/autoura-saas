@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
 
 export default function InvoicesPaymentsPage() {
   return (
@@ -167,23 +168,8 @@ export default function InvoicesPaymentsPage() {
         <DocScreenshot src="/docs/invoices-payments/supplier-invoices.jpg" alt="Supplier Invoices page with upload, AI auto-extraction, status workflow, and match states" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link
-          href="/docs/bookings"
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Bookings
-        </Link>
-        <Link
-          href="/docs/expenses-commissions"
-          className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-        >
-          Next: Expenses &amp; Commissions
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/invoices-payments" />
     </div>
   )
 }

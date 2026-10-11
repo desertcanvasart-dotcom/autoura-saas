@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { DocScreenshot, Tip } from '../layout'
+import { DocPager } from '../pager'
 
 export default function ContentLibraryPage() {
   return (
@@ -83,13 +84,8 @@ export default function ContentLibraryPage() {
         <DocScreenshot src="/docs/content-library/documents-hub.jpg" alt="Documents hub page showing the Customer Documents section (contracts, invoices) and the Supplier Documents section listing the document types" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200">
-        <Link href="/docs" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          All Docs
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/content-library" />
     </div>
   )
 }

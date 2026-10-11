@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
 
 export default function B2CPricingPage() {
   return (
@@ -114,17 +115,8 @@ export default function B2CPricingPage() {
         <DocScreenshot src="/docs/b2c-pricing/b2c-quotes.jpg" alt="B2C Quotes page with status counts, search and filters, and the New Quote button" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link href="/docs/itineraries" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Itineraries
-        </Link>
-        <Link href="/docs/b2b-pricing" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          Next: B2B Pricing
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/b2c-pricing" />
     </div>
   )
 }

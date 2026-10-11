@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { DocScreenshot, Tip } from '../layout'
+import { DocPager } from '../pager'
 
 export default function AnalyticsReportsPage() {
   return (
@@ -69,13 +70,8 @@ export default function AnalyticsReportsPage() {
         </Tip>
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200">
-        <Link href="/docs" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          All Docs
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/analytics-reports" />
     </div>
   )
 }

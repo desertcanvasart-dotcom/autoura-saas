@@ -7,10 +7,13 @@
 // the Integrations entry the index still showed. Same cure as travel-ops-pro:
 // one list here, every renderer reads it.
 //
-// The groups mirror the app sidebar (components/Sidebar.tsx), which uses a
-// pipeline model — Home · Sell · Operate · Tours · Suppliers & Rates · People ·
-// Communicate · Finance · Settings — so the operator reads the same map in the
-// docs and in the app. Getting Started is the one docs-only group.
+// The groups mirror the app sidebar (components/Sidebar.tsx) — Home ·
+// Communicate · Sell · Operate · Tours · Suppliers & Rates · People · Finance ·
+// Settings — so the operator reads the same map in the docs and in the app.
+// Communicate sits second, straight under Home, as it does in the app, and
+// holds Concierge Leads as the app does. Getting Started is the one docs-only
+// group. Each page's previous / next links are read from this order
+// (pager.tsx).
 //
 // app/(public)/docs/__tests__/docs-toc.test.ts pins the /docs entries to the
 // page directories on disk, in both directions.
@@ -81,6 +84,16 @@ export const CATEGORIES: DocCategory[] = [
     ],
   },
   {
+    label: 'Communicate',
+    items: [
+      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'Conversations, the WhatsApp inbox with AI translation, the Gmail inbox, email signatures, and parsing a request into the Quote Builder.' },
+      { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Concierge Leads', description: 'Triage planning briefs from the AI Concierge and turn them into itineraries.' },
+      { href: '/docs/copilot', icon: Sparkles, title: 'AI Copilot', description: 'Review and send AI-drafted replies, manage the knowledge base, and track copilot analytics.' },
+      { href: '/docs/content-library', icon: Library, title: 'Content Library', description: 'Reusable destination content, AI prompts, and house writing rules for generated itineraries.' },
+      { href: '/docs/message-templates', icon: MailPlus, title: 'Message Templates', description: 'Create and send pre-designed messages via WhatsApp, email, and SMS with placeholder auto-fill.' },
+    ],
+  },
+  {
     label: 'Sell',
     items: [
       { href: '/docs/itinerary-creation', icon: Wand2, title: 'Itinerary Creation', description: 'AI-powered itinerary generation from WhatsApp conversations and the Pricing Grid.' },
@@ -98,7 +111,6 @@ export const CATEGORIES: DocCategory[] = [
     items: [
       { href: '/docs/tasks-departures', icon: CheckSquare, title: 'Tasks, Departures & Capacity', description: 'Kanban task boards, scheduled group departures, and the capacity calendar.' },
       { href: '/docs/followups-reminders', icon: Bell, title: 'Follow-ups & Reminders', description: 'Client follow-ups from the CRM and automated invoice payment reminders.' },
-      { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Concierge Leads', description: 'Triage planning briefs from the AI Concierge and turn them into itineraries.' },
       { href: '/docs/resources-documents', icon: FolderOpen, title: 'Resources & Documents', description: 'Manage operational resources and generate vouchers, contracts, and supplier documents.' },
     ],
   },
@@ -122,15 +134,6 @@ export const CATEGORIES: DocCategory[] = [
     label: 'People',
     items: [
       { href: '/docs/clients', icon: Users, title: 'Clients (CRM)', description: 'Add, search, and manage client profiles, notes, and follow-ups.' },
-    ],
-  },
-  {
-    label: 'Communicate',
-    items: [
-      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'Conversations, WhatsApp inbox with AI translation, email inbox, and the AI parser.' },
-      { href: '/docs/copilot', icon: Sparkles, title: 'AI Copilot', description: 'Review and send AI-drafted replies, manage the knowledge base, and track copilot analytics.' },
-      { href: '/docs/content-library', icon: Library, title: 'Content Library', description: 'Reusable destination content, AI prompts, and house writing rules for generated itineraries.' },
-      { href: '/docs/message-templates', icon: MailPlus, title: 'Message Templates', description: 'Create and send pre-designed messages via WhatsApp, email, and SMS with placeholder auto-fill.' },
     ],
   },
   {
