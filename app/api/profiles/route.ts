@@ -22,12 +22,20 @@ export async function GET(request: NextRequest) {
     // user_profiles has no tenant_id — scope via tenant_members membership
     const { data: members, error: membersError } = await (adminClient as any)
       .from('tenant_members')
-      .select('user_id, status')
+      .select('user_id, status, role')
       .eq('tenant_id', authResult.tenant_id)
 
     if (membersError) throw membersError
 
-    const memberIds = (members || []).map((m: any) => m.user_id)
+    // The role is this company's (tenant_members.role): user_profiles.role
+    // was dropped by migration 357, so the list carried no role and the role
+    // filter errored.
+    const memberRole = new Map<string, string | null>(
+      (members || []).map((m: { user_id: string; role: string | null }) => [m.user_id, m.role])
+    )
+    const memberIds = (members || [])
+      .filter((m: { role: string | null }) => !role || m.role === role)
+      .map((m: { user_id: string }) => m.user_id)
     // Deactivation is per company — it lives on the membership row, not on
     // the account-wide user_profiles.is_active (documents audit, round 12).
     const memberStatus = new Map<string, string>(
@@ -42,10 +50,6 @@ export async function GET(request: NextRequest) {
 
     if (activeOnly) {
       query = query.eq('is_active', true)
-    }
-
-    if (role) {
-      query = query.eq('role', role)
     }
 
     const { data, error } = await query
@@ -72,6 +76,7 @@ export async function GET(request: NextRequest) {
     const enriched = (data || [])
       .map((p: any) => ({
         ...p,
+        role: memberRole.get(p.id) ?? null,
         is_active: memberIsActive(p.is_active, memberStatus.get(p.id)),
         last_login_at: lastSignIn.get(p.id) ?? null,
       }))

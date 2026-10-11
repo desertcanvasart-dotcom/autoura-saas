@@ -7,6 +7,7 @@ import {
   isCheckViolation,
   memberIsActive,
 } from '@/lib/member-status'
+import { checkRoleChange } from '@/lib/member-role'
 
 // Verify the target user belongs to the caller's tenant (user_profiles has no tenant_id)
 async function isTenantMember(adminClient: any, tenantId: string, userId: string): Promise<boolean> {
@@ -21,15 +22,15 @@ async function isTenantMember(adminClient: any, tenantId: string, userId: string
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
-// This company's membership status for the user (null when unreadable).
-async function memberStatus(adminClient: AdminClient, tenantId: string, userId: string): Promise<string | null> {
+// This company's membership row: its status and role (the role's only home).
+async function membership(adminClient: AdminClient, tenantId: string, userId: string): Promise<{ status: string | null; role: string | null } | null> {
   const { data } = await adminClient
     .from('tenant_members')
-    .select('status')
+    .select('status, role')
     .eq('tenant_id', tenantId)
     .eq('user_id', userId)
     .maybeSingle()
-  return data?.status ?? null
+  return data ? { status: data.status ?? null, role: data.role ?? null } : null
 }
 
 // Activate / deactivate the user in ONE company. This used to write
@@ -98,11 +99,12 @@ export async function GET(
     if (error) throw error
 
     // is_active as THIS company sees it (account flag AND membership status).
-    const status = await memberStatus(adminClient, authResult.tenant_id!, id)
+    const member = await membership(adminClient, authResult.tenant_id!, id)
+    const status = member?.status ?? null
 
     return NextResponse.json({
       success: true,
-      data: { ...data, is_active: memberIsActive(data?.is_active, status) }
+      data: { ...data, role: member?.role ?? null, is_active: memberIsActive(data?.is_active, status) }
     })
   } catch (error) {
     console.error('Error fetching profile:', error)
@@ -177,7 +179,33 @@ export async function PUT(
 
     // is_active is per company: it goes to this tenant's membership row,
     // never to the account-wide user_profiles flag (documents audit, round 12).
-    const { is_active: isActive, ...profileUpdate } = updateData
+    // The role too: tenant_members.role is the only role column — writing
+    // user_profiles.role (dropped by migration 357) failed every change.
+    const { is_active: isActive, role: newRole, ...profileUpdate } = updateData
+    if (newRole !== undefined) {
+      const { data: target } = await adminClient
+        .from('tenant_members')
+        .select('role')
+        .eq('tenant_id', authResult.tenant_id!)
+        .eq('user_id', id)
+        .maybeSingle()
+      const check = checkRoleChange({
+        callerId: authResult.user.id,
+        callerRole: authResult.role,
+        targetId: id,
+        targetRole: target?.role,
+        newRole,
+      })
+      if (!check.ok) {
+        return NextResponse.json({ success: false, error: check.error }, { status: check.status })
+      }
+      const { error: roleError } = await adminClient
+        .from('tenant_members')
+        .update({ role: check.role })
+        .eq('tenant_id', authResult.tenant_id!)
+        .eq('user_id', id)
+      if (roleError) throw roleError
+    }
     if (isActive !== undefined) {
       await setMemberActive(adminClient, authResult.tenant_id!, id, isActive === true)
     }
@@ -189,11 +217,12 @@ export async function PUT(
 
     if (error) throw error
 
-    const status = await memberStatus(adminClient, authResult.tenant_id!, id)
+    const member = await membership(adminClient, authResult.tenant_id!, id)
+    const status = member?.status ?? null
 
     return NextResponse.json({
       success: true,
-      data: { ...data, is_active: memberIsActive(data?.is_active, status) }
+      data: { ...data, role: member?.role ?? null, is_active: memberIsActive(data?.is_active, status) }
     })
   } catch (error) {
     console.error('Error updating profile:', error)

@@ -29,7 +29,7 @@ describe('staff deactivation is per company', () => {
 
   it('the profile route writes the membership, not user_profiles.is_active', () => {
     const route = src('app/api/profiles/[id]/route.ts')
-    expect(route).toMatch(/const \{ is_active: isActive, \.\.\.profileUpdate \} = updateData/)
+    expect(route).toMatch(/const \{ is_active: isActive, (role: newRole, )?\.\.\.profileUpdate \} = updateData/)
     expect(route).toMatch(/setMemberActive\(adminClient, authResult\.tenant_id!/)
     expect(route).not.toMatch(/\.update\(updateData\)/)
     // scoped to the caller's tenant
