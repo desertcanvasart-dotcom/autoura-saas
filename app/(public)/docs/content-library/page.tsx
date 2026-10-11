@@ -15,7 +15,7 @@ export default function ContentLibraryPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Content Library &amp; Documents</h1>
       <p className="text-gray-600 mb-8">
-        <strong>Content Library</strong>, <strong>AI Prompts</strong> and <strong>Writing Rules</strong> sit in the sidebar&rsquo;s Communicate group, for admins and managers. The Content Library and Writing Rules shape how the AI writes your itineraries. The <strong>Documents</strong> hub, for customer and supplier paperwork, is in the Operate group.
+        <strong>Content Library</strong>, <strong>AI Prompts</strong> and <strong>Writing Rules</strong> sit in the sidebar&rsquo;s Communicate group, for admins and managers. The Content Library and Writing Rules are what the Quote Builder&apos;s <strong>Write descriptions</strong> writes your days from. The <strong>Documents</strong> hub, for customer and supplier paperwork, is in the Operate group.
       </p>
 
       {/* Content Library */}
@@ -40,7 +40,7 @@ export default function ContentLibraryPage() {
         </ul>
         <ScreenshotPlaceholder caption="Content Library with category pills and counts, the search bar, and content cards with their tier badges" />
         <Tip>
-          <strong>Tiers matter:</strong> When the AI writes an itinerary, it uses the entries that match the trip&apos;s cities and interests, in the variation for the trip&apos;s tier. An entry with every tier filled can be used for any trip; the cards show which tiers are missing.
+          <strong>Tiers matter:</strong> <strong>Write descriptions</strong> uses the entries that match what each day includes &mdash; its sites, hotel, cruise and experiences &mdash; in the version for the trip&apos;s tier. When that tier is missing it uses another tier&apos;s text and says so; the cards show which tiers are missing. A cruise&apos;s day-by-day is used for each sailing day, a Day Structure for its city shows how such a day reads, and Phrases marked for Itineraries are used where they fit.
         </Tip>
       </section>
 
@@ -57,7 +57,7 @@ export default function ContentLibraryPage() {
           <li><strong>Set as default for this purpose</strong> &mdash; the default is marked with a star; there is one per purpose, and it cannot be deleted</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          Each template can be viewed (the eye icon), edited, or deleted, and the copy icon copies its prompt text. These templates are a reference for your team: itinerary generation does not read them yet.
+          Each template can be viewed (the eye icon), edited, or deleted, and the copy icon copies its prompt text. These templates are a reference for your team: the AI features do not read them yet.
         </p>
         <ScreenshotPlaceholder caption="AI Prompt Templates grouped by purpose, with the default marked by a star" />
       </section>
@@ -69,7 +69,7 @@ export default function ContentLibraryPage() {
           <strong>Writing Rules</strong> are your house style. <strong>Add Rule</strong> asks for:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Rule Name</strong> and <strong>Description</strong> &mdash; what the AI reads</li>
+          <li><strong>Rule Name</strong> and <strong>Description</strong> &mdash; what the AI reads (rules for <strong>All</strong> or <strong>Itineraries</strong> are used by <strong>Write descriptions</strong>; Email and WhatsApp rules are not read yet)</li>
           <li><strong>Category</strong> &mdash; Tone, Vocabulary, Structure, Formatting, or Brand (also the filter pills at the top)</li>
           <li><strong>Rule Type</strong> &mdash; Must Follow, Preferred, or Avoid</li>
           <li><strong>Priority</strong> from 1 (low) to 10 (high), and <strong>Applies To</strong>: All, Itineraries, Emails, WhatsApp</li>

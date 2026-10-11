@@ -42,12 +42,22 @@ interface DayRowProps {
   /** Keep this day as a new block in the catalog; offered only on a day not
    *  already from it, and only to those who may change the catalog. */
   onSaveAsBlock?: () => void
+  /** Write this day again from the Content Library (Write descriptions). */
+  onRewriteDescription?: () => void
+  rewriting?: boolean
+  /** The library entries the day's text was written from. */
+  writtenFrom?: WrittenSource[]
 }
+
+/** A Content Library entry a day's text was written from. */
+export interface WrittenSource { name: string; kind: string; tier: string | null; otherTier: boolean }
+/** A pick the Content Library has no entry for. */
+export interface LibraryGap { dayNumber: number; kind: string; name: string }
 
 /** Services offered "Apply to all days" — a daily item, not a one-off. */
 const APPLY_TO_ALL_SLOTS = new Set(['water'])
 
-export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote, onSaveAsBlock }: DayRowProps) {
+export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote, onSaveAsBlock, onRewriteDescription, rewriting, writtenFrom }: DayRowProps) {
   const calc: DayCalc = calculateDay(day, config)
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
   // The app's own symbols for all 12 currencies (it knew three).
@@ -471,6 +481,20 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 className="w-full text-xs leading-5 text-gray-600 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 resize-none"
                 placeholder="Day description / activities..."
               />
+              <div className="flex items-center justify-between gap-2 mt-0.5 px-1">
+                <span className="text-[10px] text-gray-400 truncate">
+                  {writtenFrom && (writtenFrom.length > 0
+                    ? <>From your library: {writtenFrom.map(s => `${s.name}${s.otherTier ? ` (${s.tier} text)` : ''}`).join(' · ')}</>
+                    : 'Nothing for this day in your library — written from the day’s services')}
+                </span>
+                {onRewriteDescription && (
+                  <button type="button" onClick={onRewriteDescription} disabled={rewriting}
+                    title="Write this day from your Content Library and Writing Rules"
+                    className="shrink-0 text-[10px] text-[#556B2F] hover:underline disabled:opacity-50">
+                    {rewriting ? 'Writing…' : day.description.trim() ? 'Rewrite from library' : 'Write from library'}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

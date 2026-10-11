@@ -12,8 +12,8 @@
 //   fail-open-> the route's normal response, nothing user-visible, and a row
 //               in fail_open_events
 //
-// 402 matches what /api/ai/generate-itinerary already returns, so existing
-// client handling keeps working.
+// 402 is what the metered routes (itineraries, Write descriptions) return,
+// so client handling is the same everywhere.
 //
 // ORDERING RULE for callers: check -> create -> increment. Incrementing before
 // creation would burn allowance on failed creates. The increment is

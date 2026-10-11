@@ -85,6 +85,21 @@ export default function ItineraryCreationPage() {
         </p>
       </section>
 
+      {/* Writing */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Writing the Days</h2>
+        <p className="text-gray-600 mb-3">
+          Each day&apos;s title and description are what the client reads in the itinerary, the share page and the PDF. <strong>Write descriptions</strong> (above the days) writes them from what each day includes and your <Link href="/docs/content-library" className="text-primary-600 hover:underline">Content Library</Link>, in your Writing Rules:
+        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li>It writes only the days with no description, so your own words stay. A title you chose is kept; &ldquo;Day 3&rdquo; or just the city is replaced.</li>
+          <li><strong>Rewrite from library</strong> under a day&apos;s description writes that day again, after asking.</li>
+          <li>After <strong>Parse</strong>, the days carry the parser&apos;s brief descriptions, and you are offered to write them all from your library instead.</li>
+          <li>Under each written day, <em>From your library</em> names the entries it used. Anything picked that your library has no entry for is listed above the days, to add to the Content Library.</li>
+          <li>The text never mentions prices, and only describes what the day includes. Edit it freely; <strong>Save</strong> stores it. Each run counts as one AI generation.</li>
+        </ul>
+      </section>
+
       {/* Pricing */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Price</h2>
