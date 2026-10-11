@@ -152,9 +152,9 @@ export default function B2BPartnersPage() {
 
     const confirmed = await dialog.confirm({
       title: 'Delete Partner',
-      // A partner with bookings or trips is refused by the server (deactivate
-      // it instead); its pricing overrides and portal users go with it.
-      message: `Delete ${partner.company_name}? A partner that has bookings or trips cannot be deleted — deactivate it instead.`,
+      // A partner with quotes, bookings or trips is refused by the server
+      // (deactivate it instead). It used to say "all associated data" goes.
+      message: `Delete ${partner.company_name}? A partner with quotes, bookings or trips cannot be deleted — untick "Partner is active" instead.`,
       variant: 'danger',
       confirmText: 'Delete Partner',
     })

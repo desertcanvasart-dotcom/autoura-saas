@@ -125,12 +125,13 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Working with B2B Partners</h2>
         <p className="text-gray-600 mb-3">
-          Manage business-to-business relationships with other travel companies:
+          Selling to tour operators and agencies:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Partners</strong> &mdash; Go to <strong>B2B &gt; Partners</strong> to add partner companies, set pricing rules, and track performance</li>
-          <li><strong>B2B Quotes</strong> &mdash; Create quotes with net pricing, apply partner-specific rules, and generate B2B PDFs</li>
-          <li><strong>Pricing Rules</strong> &mdash; Set up partner-specific discounts, commission structures, and markup rules</li>
+          <li><strong>Partners</strong> &mdash; under <strong>People &rarr; Partners</strong>: each partner&rsquo;s contact, currency and default margin. See <Link href="/docs/partners" className="text-primary-600 hover:underline">Partners</Link>.</li>
+          <li><strong>B2B Calculator</strong> &mdash; a rate sheet for a tour programme, at the partner&rsquo;s margin. See <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Pricing</Link>.</li>
+          <li><strong>B2B Quotes</strong> &mdash; quotes for partners from the Quote Builder in B2B mode, with their PDFs. See <Link href="/docs/b2b-quotes" className="text-primary-600 hover:underline">B2B Quotes</Link>.</li>
+          <li><strong>Transport Packages</strong> &mdash; one price per vehicle for a cruise, a day tour or a road journey, which the calculator and Quote Builder apply. See <Link href="/docs/b2b-pricing-rules" className="text-primary-600 hover:underline">Transport Packages</Link>.</li>
         </ul>
       </section>
 

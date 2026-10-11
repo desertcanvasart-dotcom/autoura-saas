@@ -24,13 +24,10 @@ export default function TeamSettingsPage() {
         <p className="text-gray-600 mb-4">
           Go to <strong>Team Members</strong> under People (admin/manager only). This is your staff directory &mdash; the people you assign tasks to. Adding someone here does <strong>not</strong> give them a login.
         </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li>Click <strong>Add Member</strong> and fill in their details directly &mdash; no invitation email is sent</li>
-          <li><strong>Role</strong> here is a job title: Owner, Manager, Coordinator, Sales, Tour Guide, Driver, or Staff</li>
-          <li>Optionally assign a <strong>department</strong></li>
-          <li>Filter the directory by role or department</li>
-          <li>Members can be edited or deleted at any time</li>
-        </ul>
+        <p className="text-gray-600 mb-3">
+          Its role is a job title, not a permission, and its staff type is what the guide and driver pickers read.
+          The whole page is in <Link href="/docs/team-members" className="text-primary-600 underline hover:text-primary-700">Team Members</Link>.
+        </p>
         <DocScreenshot src="/docs/team-settings/team-members.jpg" alt="Team Members staff directory with job-title roles, departments, and filters" />
       </section>
 

@@ -282,7 +282,7 @@ export default function TeamMembersPage() {
   }
 
   const handleDelete = async (member: TeamMember) => {
-    if (!(await dialog.confirm({ message: `Are you sure you want to deactivate ${member.name}?`, variant: 'danger', confirmText: 'Delete' }))) return
+    if (!(await dialog.confirm({ message: `Are you sure you want to deactivate ${member.name}?`, variant: 'danger', confirmText: 'Deactivate' }))) return
 
     try {
       const response = await fetch(`/api/team-members/${member.id}`, {

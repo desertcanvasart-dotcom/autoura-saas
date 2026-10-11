@@ -36,6 +36,7 @@ import {
   FileText,
   FolderOpen,
   Globe,
+  Handshake,
   LayoutDashboard,
   Library,
   Lightbulb,
@@ -49,6 +50,7 @@ import {
   Sparkles,
   TrendingUp,
   Upload,
+  UserCog,
   Users,
   Wallet,
   Wand2,
@@ -133,7 +135,9 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'People',
     items: [
-      { href: '/docs/clients', icon: Users, title: 'Clients (CRM)', description: 'Add, search, and manage client profiles, notes, and follow-ups.' },
+      { href: '/docs/clients', icon: Users, title: 'Clients (CRM)', description: 'Your travellers: leads and customers, the New Client wizard, the profile with its trips, notes, follow-ups and communication log, and who may edit or delete.' },
+      { href: '/docs/partners', icon: Handshake, title: 'Partners', description: 'The tour operators and agencies you sell to: a code, a currency and a default margin each, which the B2B Calculator and Quote Builder apply.' },
+      { href: '/docs/team-members', icon: UserCog, title: 'Team Members', description: 'Your staff directory — the guides, drivers and office staff trips, tasks and chats are assigned to. Not logins.' },
     ],
   },
   {
