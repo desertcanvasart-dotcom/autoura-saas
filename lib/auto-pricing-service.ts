@@ -45,7 +45,7 @@ import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
 import { presetTierFor, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
-import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant } from '@/lib/vocabulary-server'
+import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant, guideGradesForTenant } from '@/lib/vocabulary-server'
 import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
@@ -295,9 +295,9 @@ export interface DayPricingParams {
   travelDate?: string
   marginPercent?: number
   // ---- Guide grades + the throughout guide (B-item 1) ----
-  /** 'egyptologist' (default) or 'senior'. The default ask keeps the
-   *  historical roster fallback; a non-default ask must match a real
-   *  guide_rates row — hole, never a guess. */
+  /** A key from the agency's Guide grades vocabulary. Absent = its first
+   *  active grade, which keeps the historical roster fallback; any other
+   *  grade must match a real guide_rates row — hole, never a guess. */
   guideGrade?: GuideGrade
   /** 'spot' (default, historical: per-city guide on sightseeing days) or
    *  'throughout' (+1: one guide travels day 1 → end — a fee every day, a
@@ -311,8 +311,12 @@ export interface DayPricingParams {
   requestedPax?: number
 }
 
-export type GuideGrade = 'egyptologist' | 'senior'
+// Any key of the agency's Guide grades vocabulary. It was 'egyptologist' |
+// 'senior', so a grade an agency added could be saved on a rate but never
+// quoted, and a non-Egypt agency's first grade was a word it does not use.
+export type GuideGrade = string
 export type GuideMode = 'spot' | 'throughout'
+/** The grade when the agency's vocabulary has none (guideGradesForTenant). */
 export const DEFAULT_GUIDE_GRADE: GuideGrade = 'egyptologist'
 /** The party size at and below which the throughout guide eats at group rates. */
 export const GUIDE_MEALS_MAX_PAX = 3
@@ -1864,13 +1868,17 @@ export async function getGuideRate(
   tier: ServiceTier,
   opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet'; city?: string | null; mode?: string }
 ): Promise<{ id: string; name: string; dailyRate: number; source: RateSource; ambiguous?: Ambiguity; cityMatched?: boolean } | null> {
-  const grade = opts?.grade ?? DEFAULT_GUIDE_GRADE
+  // The agency's grades, first = the default ask.
+  const grades = await memoRead(`guide-grades|${scope.tenantId}`, () =>
+    guideGradesForTenant(getSupabaseAdmin() as never, scope.tenantId))
+  const defaultGrade = grades[0] ?? DEFAULT_GUIDE_GRADE
+  const grade = opts?.grade || defaultGrade
   const duration = opts?.duration ?? 'full_day'
   // The quote's guide MODE (sibling #464): a Throughout quote is priced only
   // from Throughout rates, a Spot quote only from Spot rates — a rate says
   // which it is for (guide_rates.guide_mode, migration 380). Never the other.
   const mode = opts?.mode ?? 'spot'
-  const isDefaultAsk = grade === DEFAULT_GUIDE_GRADE && duration === 'full_day'
+  const isDefaultAsk = grade === defaultGrade && duration === 'full_day'
   try {
     // ---- guide_rates: the rate table, matched EXACTLY (lib/guides/guide-language) ----
     // The language is a vocabulary key; a row may store the key or an older
@@ -1897,7 +1905,7 @@ export async function getGuideRate(
     if (pick.kind === 'one') {
       return {
         id: pick.row.id,
-        name: `${language} ${grade === 'senior' ? 'Senior ' : ''}Guide`,
+        name: `${language} ${grade === defaultGrade ? '' : `${(await tenantVocabularyLabels(scope.tenantId, 'guide_grade')).get(grade) ?? grade} `}Guide`,
         dailyRate: pick.rate,
         source: 'db',
         cityMatched: pick.cityMatched,
@@ -1910,7 +1918,7 @@ export async function getGuideRate(
       }
     }
 
-    // A non-default ask stops here: senior or Meet & Assist without a row
+    // A non-default ask stops here: another grade or Meet & Assist without a row
     // is a HOLE naming what to add — pricing an egyptologist as a senior
     // (or a full day as a meet & greet) would be a silent wrong number.
     if (!isDefaultAsk) return null
@@ -2844,7 +2852,7 @@ export async function calculateDayBasedPricing(
     language = 'English',
     travelDate,
     marginPercent = 25,
-    guideGrade = DEFAULT_GUIDE_GRADE,
+    guideGrade: askedGrade,
     guideMode = 'spot',
     requestedPax
   } = params
@@ -2852,6 +2860,14 @@ export async function calculateDayBasedPricing(
 
   // Resolved once per calculation; every rate lookup below is scoped by it.
   const catalogScope = await getCatalogScope(getSupabaseAdmin(), tenantId)
+  // The grade asked for, else the agency's first; and its word for it.
+  const guideGrades = await memoRead(`guide-grades|${tenantId}`, () =>
+    guideGradesForTenant(getSupabaseAdmin() as never, tenantId))
+  const defaultGuideGrade = guideGrades[0] ?? DEFAULT_GUIDE_GRADE
+  const guideGrade: GuideGrade = askedGrade || defaultGuideGrade
+  const guideGradeWord = guideGrade === defaultGuideGrade
+    ? ''
+    : ((await tenantVocabularyLabels(tenantId, 'guide_grade')).get(guideGrade) ?? guideGrade)
 
   const warnings: string[] = []
   const services: PricedService[] = []
@@ -3769,7 +3785,7 @@ export async function calculateDayBasedPricing(
     // sightseeing days and the cheaper Meet & Assist fee on every other
     // day. A missing meet/assist rate is a hole NAMING the duration to
     // add, never the full-day rate worn as a guess.
-    const gradeLabel = guideGrade === 'senior' ? 'Senior ' : ''
+    const gradeLabel = guideGradeWord ? `${guideGradeWord} ` : ''
     const guideRate = (throughoutGuide || hasSightseeing) ? await guideRateFor(day.city) : null
     // The throughout guide's cheaper fee for meet/goodbye/transit days. Only
     // fetched when asked for — and it must be a REAL row: pricing a meet &
@@ -3778,7 +3794,7 @@ export async function calculateDayBasedPricing(
     if (throughoutGuide) {
       const dayRate = hasSightseeing ? guideRate : guideMeetRate
       const feeLabel = hasSightseeing
-        ? `Throughout Guide (${language}${guideGrade === 'senior' ? ', Senior' : ''})`
+        ? `Throughout Guide (${language}${guideGradeWord ? `, ${guideGradeWord}` : ''})`
         : 'Throughout Guide — Meet & Assist'
       if (dayRate && dayRate.source === 'db') {
         fixedCosts += dayRate.dailyRate

@@ -158,3 +158,53 @@ describe('rate pages', () => {
     expect(read('app/rates/page.tsx')).toContain('Could not load: {failedTabs.join')
   })
 })
+
+// ---------------------------------------------------------------------------
+// The five items left open in the Suppliers & Rates round.
+// ---------------------------------------------------------------------------
+describe('room supplements are priced in the Quote Builder', () => {
+  const supps = [
+    { type: 'nile_view', name: 'Nile View', low_season: { eur: 10, non_eur: 12 }, high_season: { eur: 15, non_eur: 0 }, peak_season: { eur: 0, non_eur: 0 } },
+    { type: 'half_board', low_season: { eur: 20 } },
+  ]
+
+  it('the season of the hotel period picks low, high or peak', async () => {
+    const { supplementSeason } = await import('@/lib/rates/hotel-supplements')
+    expect(supplementSeason('high_season')).toBe('high_season')
+    expect(supplementSeason(null, 'Christmas peak')).toBe('peak_season')
+    expect(supplementSeason('christmas')).toBe('low_season')
+  })
+
+  it('priced for that season; one with no price that season is not offered', async () => {
+    const { priceSupplements } = await import('@/lib/rates/hotel-supplements')
+    expect(priceSupplements(supps, 'high_season', k => (k === 'nile_view' ? 'Nile View' : k)))
+      .toEqual([{ type: 'nile_view', label: 'Nile View', eur: 15, nonEur: 15, season: 'high_season' }])
+    expect(priceSupplements(supps, 'peak_season')).toEqual([])
+    expect(priceSupplements(supps, 'low_season').map(s => [s.type, s.eur])).toEqual([['nile_view', 10], ['half_board', 20]])
+  })
+
+  it('offered as a per-person Hotel Services line, on that hotel\'s nights only', () => {
+    const grid = read('lib/pricing/grid-rates.ts')
+    expect(grid).toContain("service_type: 'room_supplement'")
+    expect(grid).toContain("pricing_basis: 'per_person'")
+    expect(read('app/pricing-grid/components/DayRow.tsx')).toContain('if (hotelId) return hotelId === nightHotel')
+  })
+})
+
+describe('guide grades are the agency\'s', () => {
+  it('the engine takes any grade key and defaults to the agency\'s first', () => {
+    const engine = read('lib/auto-pricing-service.ts')
+    expect(engine).toContain('export type GuideGrade = string')
+    expect(engine).toContain('guideGradesForTenant(')
+    expect(engine).not.toContain("grade === 'senior' ? 'Senior ' : ''")
+    expect(read('app/b2b/calculator/[id]/page.tsx')).not.toContain('<option value="senior">')
+  })
+})
+
+describe('the Rates Hub has a Flights tab', () => {
+  it('reads flight_rates and shows them', () => {
+    expect(read('app/api/rates/route.ts')).toContain("case 'flights':")
+    expect(read('lib/rates/first-tab-with-data.ts')).toContain("'flights'")
+    expect(read('app/rates/page.tsx')).toContain("activeTab === 'flights'")
+  })
+})

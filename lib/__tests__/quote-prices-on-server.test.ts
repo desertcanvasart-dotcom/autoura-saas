@@ -58,7 +58,8 @@ describe('the B2B calculator save', () => {
     priceVariation.mockResolvedValue({ status: 200, body: { success: true, data: engineResult } })
     const res = await save({
       variation_id: 'v1',
-      pricing: { num_pax: 4, margin_percent: 25, guide_grade: 'egyptologist', guide_mode: 'spot' },
+      // '' = the agency's first guide grade (the calculator's default).
+      pricing: { num_pax: 4, margin_percent: 25, guide_grade: '', guide_mode: 'spot' },
       include_rate_sheet: true,
       // A tampered request: none of these may reach the quote.
       selling_price: 1, price_per_person: 1, total_cost: 1, services_snapshot: [{ x: 1 }],
@@ -74,6 +75,12 @@ describe('the B2B calculator save', () => {
     })
     // The bookable lines and the chosen option, from the engine.
     expect((inserted!.services_snapshot as Array<{ service_name: string }>).map(s => s.service_name)).toEqual(['Hotel', 'Balloon'])
+  })
+
+  it('stores a grade the operator chose — any of the agency\'s, not only senior', async () => {
+    priceVariation.mockResolvedValue({ status: 200, body: { success: true, data: engineResult } })
+    await save({ variation_id: 'v1', pricing: { num_pax: 4, margin_percent: 25, guide_grade: 'lecturer', guide_mode: 'spot' } })
+    expect(inserted).toMatchObject({ guide_grade: 'lecturer' })
   })
 
   it('without a calculation, or when it fails, nothing is saved', async () => {

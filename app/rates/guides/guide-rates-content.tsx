@@ -18,9 +18,10 @@ import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 
 // The GRADE axis (B-item 1) and the day type both come from the agency's
 // vocabulary (Settings → Your vocabulary: Guide grades, Guide day types).
-// The engine prices by KEY — 'egyptologist' / 'senior', 'full_day' /
-// 'half_day' / 'meet_greet' — so labels are the agency's to change; the six
-// legacy grades are seeded hidden so old rows still read as words.
+// The engine prices by KEY — any of the agency's grades (its first is the
+// default ask), 'full_day' / 'half_day' / 'meet_greet' — so labels are the
+// agency's to change; the six legacy grades are seeded hidden so old rows
+// still read as words.
 
 interface Guide {
   id: string
@@ -74,6 +75,9 @@ export default function GuideRatesContent() {
   const [selectedLanguage, setSelectedLanguage] = useState('')
   // The agency's words for languages (Settings → Your vocabulary).
   const { labelFor: languageLabel } = useVocabulary('guide_language')
+  // A new rate starts at the agency's first grade, not 'egyptologist'.
+  const { items: gradeItems } = useVocabulary('guide_grade')
+  const firstGrade = gradeItems[0]?.key || 'egyptologist'
   const [selectedGuide, setSelectedGuide] = useState(initialSupplierId)
   const [selectedGuideType, setSelectedGuideType] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -214,7 +218,7 @@ export default function GuideRatesContent() {
     setFormData({
       service_code: generateServiceCode(),
       guide_language: 'english',
-      guide_type: 'egyptologist',
+      guide_type: firstGrade,
       guide_mode: 'spot',
       city: '',
       tour_duration: 'full_day',

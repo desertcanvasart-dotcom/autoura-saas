@@ -4,7 +4,7 @@ import { Tip, DocScreenshot } from '../layout'
 import { DocPager } from '../pager'
 
 const CATEGORIES: Array<{ group: string; name: string; what: string }> = [
-  { group: 'Accommodation', name: 'Hotels', what: 'By city, tier and board basis. Prices are dated rate periods (up to six): per person in a double, single supplement, triple reduction — each for EU and non-EU passports. One hotel per city and tier can be starred Preferred.' },
+  { group: 'Accommodation', name: 'Hotels', what: 'By city, tier and board basis. Prices are dated rate periods (up to six): per person in a double, single supplement, triple reduction — each for EU and non-EU passports — and optional room supplements (a view, a meal plan) with low, high and peak prices, offered in the Quote Builder under Hotel Services on that hotel’s nights. One hotel per city and tier can be starred Preferred.' },
   { group: 'Accommodation', name: 'Nile Cruises', what: 'By ship and cabin, with the sailing lengths and days it runs, embark and disembark cities, meals and sightseeing, in dated periods. One preferred ship per tier.' },
   { group: 'Accommodation', name: 'Sleeping Trains', what: 'By route and cabin: one-way and round-trip fares, a guide fare, times and season.' },
   { group: 'Accommodation', name: 'Hotel Services', what: 'Porter, check-in and check-out help and the like, by hotel category; priced per group, per person or per unit.' },
@@ -12,7 +12,7 @@ const CATEGORIES: Array<{ group: string; name: string; what: string }> = [
   { group: 'Transport & Tickets', name: 'Flights', what: 'Domestic and international fares by route, airline and cabin: base fare and tax, baggage, flight number and times, a guide fare.' },
   { group: 'Transport & Tickets', name: 'Trains', what: 'Day trains by route and class, with a guide fare.' },
   { group: 'Transport & Tickets', name: 'Airport Services', what: 'Meet & greet and other assistance, by airport (any IATA code) and direction; per group, per person or per unit.' },
-  { group: 'Guides & Services', name: 'Tour Guides', what: 'By language, grade, city and day type (full day, half day, meet & greet), for a spot or a throughout guide.' },
+  { group: 'Guides & Services', name: 'Tour Guides', what: 'By language, grade (your own grades — the first is the default a quote asks for), city and day type (full day, half day, meet & greet), for a spot or a throughout guide.' },
   { group: 'Guides & Services', name: 'Meals', what: 'Per restaurant, meal type, city and tier; one preferred restaurant per tier and meal.' },
   { group: 'Guides & Services', name: 'Attractions', what: 'Entrance fees: one price, child and student discounts. An Add-on stays out of the automatic price; Sell as extra lets travellers add it after booking.' },
   { group: 'Guides & Services', name: 'Activities', what: 'The Activities & Add-ons catalogue: per person, per unit (a boat for six), a flat price, or tiered by group size.' },
@@ -102,11 +102,11 @@ export default function ToursRatesPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Rates Hub</h3>
         <p className="text-gray-600 mb-3">
-          A read-only overview of your active rates in eleven tabs &mdash; Transport, Guides, Entrances,
-          Hotels, Meals, Airport and Hotel services, Cruises, Sleeping trains, Trains and Tipping &mdash;
+          A read-only overview of your active rates in twelve tabs &mdash; Transport, Guides, Entrances,
+          Hotels, Meals, Cruises, Sleeping trains, Trains, Flights, Airport and Hotel services, and Tipping &mdash;
           with stats, search and filters (city; category on Entrances; tier and property type on Hotels),
-          and <strong>Export</strong> or <strong>Print</strong> of the tab you are on. Flights, Activities
-          and Fixed Costs are on their own pages only. If a tab cannot be loaded, the hub says so rather
+          and <strong>Export</strong> or <strong>Print</strong> of the tab you are on. Activities and Fixed
+          Costs are on their own pages only. If a tab cannot be loaded, the hub says so rather
           than showing it empty.
         </p>
         <DocScreenshot src="/docs/tours-rates/rates-hub.jpg" alt="Rate Management page with stats cards, category tabs, filters, and the rates table" />

@@ -277,6 +277,19 @@ export async function GET(request: NextRequest) {
         error = trainsResult.error
         break
 
+      case 'flights': {
+        // Flights had no tab: their rates were on Rates → Flights only.
+        const flightsResult = await supabase
+          .from('flight_rates')
+          .select('id, service_code, route_from, route_to, airline, flight_number, flight_type, cabin_class, base_rate_eur, tax_eur, rate_currency, is_active')
+          .eq('is_active', true)
+          .order('route_from')
+          .order('route_to')
+        data = flightsResult.data || []
+        error = flightsResult.error
+        break
+      }
+
       case 'tipping':
         // ✅ Pull from tipping_rates table
         const tippingQuery = supabase

@@ -18,6 +18,10 @@ export interface RateTableConfig {
   displayName: string
   columns: ColumnDef[]
   uniqueKey: string[]       // columns used for upsert matching
+  /** What identifies a rate whose row has no code: a row with a blank
+   *  uniqueKey is matched on these instead of always being added — a
+   *  hand-filled sheet imported twice doubled every rate. */
+  identityKey?: string[]
 }
 
 export interface ColumnDef {
@@ -102,6 +106,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'accommodation_rates',
     displayName: 'Hotels / Accommodation',
     uniqueKey: ['service_code'],
+    identityKey: ['property_name', 'city', 'tier', 'board_basis'],
     columns: [
       id(), serviceCode(),
       col('property_name', 'Property Name', 'text', true),
@@ -209,6 +214,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'guide_rates',
     displayName: 'Guide Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['guide_language', 'guide_type', 'guide_mode', 'city', 'tour_duration'],
     columns: [
       id(), serviceCode(),
       col('guide_language', 'Language', 'text', true),
@@ -229,6 +235,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'meal_rates',
     displayName: 'Meal Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['restaurant_name', 'meal_type', 'city', 'tier'],
     columns: [
       id(), serviceCode(),
       col('restaurant_name', 'Restaurant Name', 'text', true),
@@ -242,6 +249,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('meal_category', 'Meal Category', 'text', false),
       col('per_person_rate', 'Per Person', 'boolean', false),
       col('minimum_pax', 'Min Pax', 'number', false),
+      // The dietary options the restaurant caters for, semicolon-separated.
+      col('dietary_options', 'Dietary Options', 'text', false),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(),
       col('supplier_name', 'Supplier Name', 'text', false),
@@ -256,6 +265,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'entrance_fees',
     displayName: 'Attractions / Entrance Fees',
     uniqueKey: ['service_code'],
+    identityKey: ['attraction_name', 'city'],
     columns: [
       id(), serviceCode(),
       col('attraction_name', 'Attraction Name', 'text', true),
@@ -268,6 +278,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('category', 'Category', 'text', false),
       col('is_addon', 'Is Add-on', 'boolean', false),
       col('addon_note', 'Add-on Note', 'text', false),
+      // Travellers may add it after booking (the page's "Sell as extra").
+      col('is_sellable_extra', 'Sell as Extra', 'boolean', false),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(), notes(), isActive(), createdAt(), updatedAt(),
       rateCurrency(),
@@ -278,6 +290,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'flight_rates',
     displayName: 'Flight Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['route_from', 'route_to', 'airline', 'cabin_class', 'flight_number'],
     columns: [
       id(), serviceCode(),
       col('route_from', 'From', 'text', true),
@@ -313,6 +326,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'activity_rates',
     displayName: 'Activity Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['activity_name', 'city'],
     columns: [
       id(), serviceCode(),
       col('activity_name', 'Activity Name', 'text', true),
@@ -340,6 +354,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'tipping_rates',
     displayName: 'Tipping Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['role_type', 'context', 'city', 'rate_unit'],
     columns: [
       id(), serviceCode(),
       col('role_type', 'Role Type', 'text', true),
@@ -357,6 +372,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'airport_staff_rates',
     displayName: 'Airport Service Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['airport_code', 'service_type', 'direction'],
     columns: [
       id(), serviceCode(),
       col('airport_code', 'Airport Code', 'text', true),
@@ -380,6 +396,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'hotel_staff_rates',
     displayName: 'Hotel Service Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['service_type', 'hotel_category'],
     columns: [
       id(), serviceCode(),
       col('service_type', 'Service Type', 'text', true),
@@ -399,6 +416,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'nile_cruises',
     displayName: 'Nile Cruises',
     uniqueKey: ['cruise_code'],
+    identityKey: ['ship_name', 'cabin_type', 'duration_nights'],
     columns: [
       id(),
       col('cruise_code', 'Cruise Code', 'text', true),
@@ -475,6 +493,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'train_rates',
     displayName: 'Train Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['origin_city', 'destination_city', 'class_type'],
     columns: [
       id(), serviceCode(),
       col('origin_city', 'Origin City', 'text', true),
@@ -497,6 +516,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'sleeping_train_rates',
     displayName: 'Sleeping Train Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['origin_city', 'destination_city', 'cabin_type'],
     columns: [
       id(), serviceCode(),
       col('origin_city', 'Origin City', 'text', true),
@@ -912,6 +932,7 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
   if (column === 'sailing_days') return formatSailingDaysCell(row.sailing_days)
   if (column === 'tiers' && table === 'activity_rates') return formatTiersCell(row.tiers)
+  if (column === 'dietary_options') return Array.isArray(row.dietary_options) ? row.dietary_options.join('; ') : (row.dietary_options ?? '')
   const direct = row[column]
   if (direct !== null && direct !== undefined && direct !== 0) return direct
   if (table === 'nile_cruises') {
@@ -1067,6 +1088,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'tier') return 'standard'
   if (name === 'sailing_days') return 'mon;fri'
   if (name === 'tiers') return ''
+  if (name === 'dietary_options') return 'vegetarian; vegan'
   if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'
@@ -1144,6 +1166,15 @@ export function importRowKey(
   }
   // NUL separator: a space would let ('a b','c') collide with ('a','b c').
   return parts.join('\u0000')
+}
+
+/** A keyless row's identity (config.identityKey) as a comparable string, or
+ *  null when its first column — the rate's name — is blank. Other blank parts
+ *  compare as empty: a hotel with no board basis is still that hotel. */
+export function importIdentityKey(record: Record<string, unknown>, identityKey: string[]): string | null {
+  const first = String(record[identityKey[0]] ?? '').trim()
+  if (!first) return null
+  return identityKey.map(c => String(record[c] ?? '').trim().toLowerCase()).join('\u0000')
 }
 
 export interface ImportRowPartition<T> {

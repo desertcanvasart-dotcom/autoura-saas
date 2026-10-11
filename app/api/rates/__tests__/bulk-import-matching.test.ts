@@ -98,4 +98,28 @@ describe('the rates import', () => {
     expect(res.invalidRows).toBe(1)
     expect(res.errors[0].message).toMatch(/Tiers "1-4 25"/)
   })
+
+  it('a row with no code updates the rate it names instead of adding a twin', async () => {
+    existing = [{ id: 'm1', service_code: 'MEAL-1', restaurant_name: 'Sofra', meal_type: 'lunch', city: 'Luxor', tier: 'standard' }]
+    const head = 'service_code,restaurant_name,meal_type,city,tier,base_rate_eur'
+    const res = await importCsv('meal_rates', `${head}\n,sofra,Lunch,luxor,standard,14`)
+    expect(res.inserted).toBe(0)
+    expect(res.updated).toBe(1)
+    expect(updated[0].where).toEqual({ tenant_id: 'tenant-1', id: 'm1' })
+  })
+
+  it('two code-less rows naming the same rate are refused, not both written', async () => {
+    const head = 'service_code,restaurant_name,meal_type,city,tier,base_rate_eur'
+    const res = await importCsv('meal_rates', `${head}\n,Sofra,lunch,Luxor,standard,14\n,SOFRA,lunch,Luxor,standard,15`)
+    expect(res.inserted).toBe(1)
+    expect(res.refusedDuplicates).toBe(1)
+  })
+
+  it('carries a meal\'s dietary options and an attraction\'s Sell as Extra', async () => {
+    await importCsv('meal_rates', 'service_code,restaurant_name,base_rate_eur,dietary_options\nM-1,Sofra,14,vegetarian; vegan')
+    expect(inserted[0].dietary_options).toEqual(['vegetarian', 'vegan'])
+    inserted = []
+    await importCsv('entrance_fees', 'service_code,attraction_name,city,eur_rate,is_sellable_extra\nE-1,Karnak,Luxor,20,yes')
+    expect(inserted[0].is_sellable_extra).toBe(true)
+  })
 })

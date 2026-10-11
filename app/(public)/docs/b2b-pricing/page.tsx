@@ -40,7 +40,7 @@ export default function B2BPricingPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Number of Passengers</strong> &mdash; 1 to 50</li>
           <li><strong>Tour Leader</strong> &mdash; <strong>+0 (No TL)</strong> or <strong>+1 (With TL)</strong>; the leader&apos;s costs are shared among the paying guests</li>
-          <li><strong>Guide</strong> &mdash; <strong>Spot</strong> (a guide on the sightseeing days) or <strong>Throughout (+1)</strong> (one guide travels the whole trip: a fee every day, a bed each night at the property&apos;s guide rate, meals for small groups, one more vehicle seat); the <strong>Guide language</strong> (a language with no rate is marked <em>no rate</em>); and the grade, <strong>Egyptologist</strong> or <strong>Senior guide</strong></li>
+          <li><strong>Guide</strong> &mdash; <strong>Spot</strong> (a guide on the sightseeing days) or <strong>Throughout (+1)</strong> (one guide travels the whole trip: a fee every day, a bed each night at the property&apos;s guide rate, meals for small groups, one more vehicle seat); the <strong>Guide language</strong> (a language with no rate is marked <em>no rate</em>); and the <strong>grade</strong> &mdash; one of your own guide grades, the first being the default</li>
           <li><strong>Travel Date</strong> &mdash; Picks the dated hotel and cruise rates, and your seasonal premium (added to the margin and to every row of the rate sheet)</li>
           <li><strong>Passport Type</strong> &mdash; <strong>European Passport</strong> or <strong>Non-European Passport</strong>, for entrance fees</li>
           <li><strong>Profit Margin (%)</strong> &mdash; 25% to start</li>

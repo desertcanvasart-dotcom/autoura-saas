@@ -74,6 +74,13 @@ export async function vocabularyLabelsForTenant(admin: Client, tenantId: string,
   return out
 }
 
+/** The tenant's guide grades, in its order: the first is the grade a quote
+ *  asks for when it names none. 'egyptologist' when the list is empty. */
+export async function guideGradesForTenant(admin: Client, tenantId: string): Promise<string[]> {
+  const keys = activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'guide_grade')).map(i => i.key)
+  return keys.length ? keys : ['egyptologist']
+}
+
 /** The tenant's tiers, lowest to highest — the preset when none exist. */
 export async function tierLadderForTenant(admin: Client, tenantId: string): Promise<string[]> {
   const keys = activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'tier')).map(i => i.key)

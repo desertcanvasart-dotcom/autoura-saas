@@ -295,7 +295,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     kind: 'guide_grade',
     group: 'Guides & tipping',
     title: 'Guide grades',
-    description: 'The grades of guide you price. The engine asks for these by key (egyptologist by default, senior on request); older grades are kept hidden so old rates still read.',
+    description: 'The grades of guide you price. A quote asks for one of these — the first is the default — and is priced from a guide rate of that grade; older grades are kept hidden so old rates still read.',
     usedIn: 'Guide rates, quotes, pricing engine',
     minItems: 1,
     example: 'Egyptologist / Senior guide',

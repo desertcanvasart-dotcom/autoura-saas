@@ -154,7 +154,9 @@ export default function TourPriceCalculator() {
   const [selectedOptionals, setSelectedOptionals] = useState<string[]>([])
   const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
   // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
-  const [guideGrade, setGuideGrade] = useState<'egyptologist' | 'senior'>('egyptologist')
+  // '' = the agency's first guide grade (the default ask); else a grade key.
+  const [guideGrade, setGuideGrade] = useState<string>('')
+  const { items: guideGradeItems, labelFor: guideGradeLabel } = useVocabulary('guide_grade')
   const [guideMode, setGuideMode] = useState<'spot' | 'throughout'>('spot')
   // The buttons carry the agency's own words for the two modes (Settings → Vocabulary → Guide modes).
   const { labelFor: guideModeLabel } = useVocabulary('guide_mode')
@@ -468,7 +470,7 @@ export default function TourPriceCalculator() {
 
   const exportToCSV = () => {
     if (rateSheet.length === 0) return
-    const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade === 'senior' ? ' Senior' : ''})` : ''
+    const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade ? ` ${guideGradeLabel(guideGrade)}` : ''})` : ''
     const tourLeaderSuffix = (tourLeaderIncluded ? ' (+1 TL)' : ' (+0)') + guideSuffix
     const cur = result?.currency || rateCurrency
     const headers = ['Passengers', `Total Cost (${cur})`, `Margin (${cur})`, `Selling Price (${cur})`, `Per Person (${cur})`]
@@ -681,13 +683,16 @@ export default function TourPriceCalculator() {
                     <option key={l.key} value={l.key} disabled={!l.hasRate}>{l.label}{l.hasRate ? '' : ' — no rate'}</option>
                   ))}
                 </select>
+                {/* The agency's own grades (Settings → Your vocabulary); the
+                    first is the default. It offered Egyptologist and Senior only. */}
                 <select
-                  value={guideGrade}
-                  onChange={(e) => setGuideGrade(e.target.value as 'egyptologist' | 'senior')}
+                  value={guideGrade || guideGradeItems[0]?.key || ''}
+                  onChange={(e) => setGuideGrade(e.target.value === guideGradeItems[0]?.key ? '' : e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
                 >
-                  <option value="egyptologist">Egyptologist (default)</option>
-                  <option value="senior">Senior guide</option>
+                  {guideGradeItems.map((g, i) => (
+                    <option key={g.key} value={g.key}>{g.label}{i === 0 ? ' (default)' : ''}</option>
+                  ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-2">
                   {guideMode === 'throughout'

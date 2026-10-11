@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
-import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons, propertyLinkFor, parseCsvBoolean, isBlankCsvCell, EXAMPLE_ROW_KEY } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons, propertyLinkFor, parseCsvBoolean, isBlankCsvCell, EXAMPLE_ROW_KEY, importIdentityKey } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES, keepStoredPeriods } from '@/lib/rates/periods-csv'
@@ -253,6 +253,11 @@ export async function POST(request: NextRequest) {
         else delete record.tiers
       }
 
+      // A meal's dietary options: the cell's list, stored as the form stores it.
+      if (typeof record.dietary_options === 'string') {
+        record.dietary_options = record.dietary_options.split(/[;|]/).map((x: string) => x.trim()).filter(Boolean)
+      }
+
       // Sailing days arrive as the cell's words ("mon;fri"); the table stores
       // the keys. Blank already skipped above; "any" stores none. (Bad words
       // were refused by validateImportData before anything is written.)
@@ -449,6 +454,22 @@ export async function POST(request: NextRequest) {
     // silently overwrite the first ("13 creates, 0 inserts"). Refuse them
     // row-wise with the collision named, import the rest.
     const partition = partitionImportRows(rowsToUpsert, uniqueKey)
+    // Two rows with no code that name the same rate: the second would update
+    // what the first just wrote. Refused, as two rows sharing a code are.
+    if (config.identityKey) {
+      const seenIdentity = new Set<string>()
+      partition.rows = partition.rows.filter(r => {
+        if (importRowKey(r, uniqueKey) !== null) return true
+        const ident = importIdentityKey(r, config.identityKey!)
+        if (ident === null) return true
+        if (!seenIdentity.has(ident)) { seenIdentity.add(ident); return true }
+        partition.duplicates.push({
+          record: r,
+          message: `Two rows in this file have no ${uniqueKey.join(' + ')} and the same ${config.identityKey!.join(' + ')} — give them codes, or merge them.`,
+        })
+        return false
+      })
+    }
 
     let inserted = 0, updated = 0
     const periodsKept: Array<{ row: string; operation: string; message: string }> = []
@@ -470,21 +491,32 @@ export async function POST(request: NextRequest) {
     // Two stored rates sharing one key are not updated at all: one row of the
     // file would have overwritten both.
     const storedByKey = new Map<string, Array<Record<string, unknown>>>()
+    // A row with no code is matched on what identifies the rate (identityKey)
+    // — the hotel and city, the restaurant and meal — instead of being added
+    // again on every import of the same hand-filled sheet.
+    const storedByIdentity = new Map<string, Array<Record<string, unknown>>>()
     {
       const { data: existing } = await fetchAllPages((from, to) => (supabase
         .from(config.tableName as 'accommodation_rates') as unknown as {
           select(c: string): { eq(c: string, v: string): { order(c: string, o: { ascending: boolean }): { range(a: number, b: number): PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }> } } }
         })
-        .select(['id', ...uniqueKey, ...(periodsTarget ? ['seasons'] : [])].join(', '))
+        .select([...new Set(['id', ...uniqueKey, ...(config.identityKey ?? []), ...(periodsTarget ? ['seasons'] : [])])].join(', '))
         .eq('tenant_id', tenant_id)
         .order('id', { ascending: true })
         .range(from, to))
       for (const row of existing ?? []) {
         const key = importRowKey(row, uniqueKey)
-        if (key === null) continue
-        const list = storedByKey.get(key)
-        if (list) list.push(row)
-        else storedByKey.set(key, [row])
+        if (key !== null) {
+          const list = storedByKey.get(key)
+          if (list) list.push(row)
+          else storedByKey.set(key, [row])
+        }
+        const ident = config.identityKey ? importIdentityKey(row, config.identityKey) : null
+        if (ident !== null) {
+          const list = storedByIdentity.get(ident)
+          if (list) list.push(row)
+          else storedByIdentity.set(ident, [row])
+        }
       }
     }
 
@@ -522,23 +554,22 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < partition.rows.length; i += BATCH_SIZE) {
       const batch = partition.rows.slice(i, i + BATCH_SIZE)
-      // Hotels/cruises: the periods each existing row holds now (see below).
-      const storedPeriods = new Map<string, unknown>()
-      for (const r of batch) {
-        const k = importRowKey(r, uniqueKey)
-        const stored = k !== null ? storedByKey.get(k) : undefined
-        if (k !== null && stored?.length === 1 && periodsTarget) storedPeriods.set(k, stored[0].seasons)
-      }
-
       const keyOf = (r: Record<string, unknown>) => importRowKey(r, uniqueKey)
-      const matchesOf = (r: Record<string, unknown>) => { const k = keyOf(r); return k === null ? [] : storedByKey.get(k) ?? [] }
+      const matchesOf = (r: Record<string, unknown>) => {
+        const k = keyOf(r)
+        if (k !== null) return storedByKey.get(k) ?? []
+        const ident = config.identityKey ? importIdentityKey(r, config.identityKey) : null
+        return ident === null ? [] : storedByIdentity.get(ident) ?? []
+      }
       const toInsert = batch.filter(r => matchesOf(r).length === 0)
       const toUpdate = batch.filter(r => matchesOf(r).length === 1)
       for (const r of batch.filter(r => matchesOf(r).length > 1)) {
         importErrors.push({
           row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '),
           operation: 'refused',
-          message: `${matchesOf(r).length} of your rates share this ${uniqueKey.join(' + ')} — give each its own code in the app first, so one row cannot overwrite them all.`,
+          message: keyOf(r) !== null
+            ? `${matchesOf(r).length} of your rates share this ${uniqueKey.join(' + ')} — give each its own code in the app first, so one row cannot overwrite them all.`
+            : `${matchesOf(r).length} of your rates match this row's ${(config.identityKey ?? []).join(' + ')} — add the ${uniqueKey.join(' + ')} of the one it means.`,
         })
       }
 
@@ -564,7 +595,8 @@ export async function POST(request: NextRequest) {
         // property, which never wipes.
         const fileSaysPeriods = periodsForRow !== null && Array.isArray(updateData.seasons)
         if (periodsTarget && !fileSaysPeriods) {
-          const kept = keepStoredPeriods(updateData, storedPeriods.get(keyOf(record) ?? ''), periodsTarget.entity)
+          // Hotels/cruises: the periods the matched row holds now.
+          const kept = keepStoredPeriods(updateData, matchesOf(record)[0]?.seasons, periodsTarget.entity)
           if (kept) {
             periodsKept.push({
               row: uniqueKey.map(c => `${c}=${String(record[c])}`).join(', '),

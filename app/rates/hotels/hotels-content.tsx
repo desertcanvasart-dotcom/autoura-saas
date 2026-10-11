@@ -1890,7 +1890,7 @@ export default function HotelsContent() {
                   <span className="text-xs font-normal text-gray-500 ml-2">(Optional add-ons per night)</span>
                 </h3>
                 <p className="text-xs text-gray-500 -mt-2 mb-3">
-                  Kept on the rate for reference. Quotes do not add them automatically — add a supplement to a trip as an extra.
+                  Offered in the Quote Builder under Hotel Services on nights at this hotel, per person per night — the low, high or peak price by the season of the hotel&apos;s rate period. Never added on their own.
                 </p>
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                   {/* Add Supplement Dropdown */}

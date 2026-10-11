@@ -437,7 +437,8 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
       tier = 'standard',
       tour_leader_included = false,  // NEW: Added tour leader parameter
       // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
-      guide_grade = 'egyptologist',
+      // '' / absent = the agency's first guide grade (the engine resolves it).
+      guide_grade = '',
       guide_mode = 'spot',
       // Catalogue extras chosen for THIS quote (ids, or {id} objects). Priced
       // through the engine like any other line — see lib/pricing/extras-pricing.
@@ -881,7 +882,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
         travelDate: travel_date,
         marginPercent: effectiveMargin,
         tourLeaderIncluded: tour_leader_included,
-        guideGrade: guide_grade,
+        guideGrade: guide_grade || undefined,
         guideMode: guide_mode
       })
 

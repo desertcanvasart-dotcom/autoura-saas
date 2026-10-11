@@ -26,7 +26,7 @@ const ROWS: Array<{ what: string; suppliers: string; properties: string; rates: 
     what: 'Not matched',
     suppliers: 'created, with the next SUP-#### if it has no code',
     properties: 'created under its supplier',
-    rates: 'created — so a row with no key is added every time it is imported',
+    rates: 'created. A row with no code is matched on what identifies the rate (a hotel by name, city, tier and board; a meal by restaurant, meal, city and tier …) and updates it',
   },
   {
     what: 'A blank cell',

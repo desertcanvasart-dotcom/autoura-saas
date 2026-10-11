@@ -205,8 +205,9 @@ export async function POST(request: NextRequest) {
         // NOT NULL: a quote with no supplement stores 0, never null.
         single_supplement: Number(result.single_supplement) || 0,
         pricing_table: pricingTable,
-        // Store only non-default values (mig 326): NULL = egyptologist/spot.
-        guide_grade: !guideGrade || guideGrade === 'egyptologist' ? null : guideGrade,
+        // Store only non-default values (mig 326): NULL = the agency's first
+        // grade / spot.
+        guide_grade: guideGrade || null,
         guide_mode: !guideMode || guideMode === 'spot' ? null : guideMode,
         is_eur_passport: result.is_eur_passport,
         season: result.season,

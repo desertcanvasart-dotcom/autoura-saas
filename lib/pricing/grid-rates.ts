@@ -10,6 +10,7 @@ import { cruisePpdNightEur, cruisePpdNightNonEur } from '@/lib/rates/cruise-ppd'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { gridHotelRate } from '@/lib/rates/grid-hotel-rate'
+import { priceSupplements, supplementSeason } from '@/lib/rates/hotel-supplements'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { DEFAULT_WATER_PER_PERSON_PER_DAY, isWaterCostType } from '@/lib/fixed-costs'
 import { pricingBasisLabel, toPricingBasis } from '@/lib/pricing/pricing-basis'
@@ -45,6 +46,8 @@ export async function loadGridRates(
   // A transport rate files its vehicle under a vocabulary KEY; the agency
   // may since have renamed it (key "minivan" now reads "Coach"), so the
   // option names the vehicle in today's word, never the stored slug.
+  const supplementTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'hotel_supplement')
+  const supplementLabel = (key: string) => labelFor(supplementTypes, key)
   const vehicleTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'vehicle_type')
   const vehicleTypeLabel = (key: string) => {
     const item = vehicleTypes.find(i => i.key === key || normLower(i.key) === normLower(key))
@@ -180,7 +183,30 @@ export async function loadGridRates(
         details: `${pricingBasisLabel(toPricingBasis(r.pricing_type), r.max_capacity)} | ${r.description || `${typeLabel} | ${r.hotel_category || 'all'}`}`,
         ...basisOf(r),
       }
-    }),
+    }).concat(
+      // Each hotel's room supplements (a view, a floor, a meal plan), priced
+      // for the season of its period on the trip date, per person per night.
+      // Offered only on a night that hotel is picked (DayRow), never added on
+      // their own (lib/rates/hotel-supplements.ts).
+      (accommodationRates || []).flatMap((r: any) => {
+        const price = gridHotelRate(r, startDate)
+        if (price.gapDate) return []
+        return priceSupplements(r.supplements, supplementSeason(price.seasonKey, price.periodName), supplementLabel)
+          .map(sup => ({
+            id: `${r.id}__rsupp_${sup.type}`,
+            name: `${sup.label} supplement — ${r.property_name}`,
+            rateEur: sup.eur,
+            rateNonEur: sup.nonEur,
+            category: 'all',
+            city: r.city,
+            details: `Room supplement | per person per night | ${sup.season.replace('_', ' ')}`,
+            pricing_basis: 'per_person',
+            unit_capacity: null,
+            service_type: 'room_supplement',
+            hotel_id: r.id,
+          }))
+      }),
+    ),
 
     tipping: (tippingRates || []).map((r: any) => ({
       id: r.id,
