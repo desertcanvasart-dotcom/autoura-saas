@@ -24,41 +24,45 @@ export default function ImportingToursPage() {
       {/* Two sheets */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Two sheets, one tour</h2>
+        <p className="text-gray-600 mb-3">
+          Both live in the <strong>Import / Export</strong> menu at the top of the Tour Manager
+          (Tours &rarr; Tour Manager).
+        </p>
         <div className="overflow-x-auto mb-4">
           <table className="min-w-full text-sm border border-gray-200 rounded-lg">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">Sheet</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-700">Buttons</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-700">Menu items</th>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">What it carries</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               <tr>
-                <td className="px-4 py-3 font-medium text-gray-900">Template sheet</td>
-                <td className="px-4 py-3 text-gray-700">Sample CSV &middot; Export &middot; Import</td>
-                <td className="px-4 py-3 text-gray-700">The tour itself: code, name, type, theme, duration, cities, highlights, main attractions, inclusions, exclusions, descriptions, image, pickup, featured and active flags.</td>
+                <td className="px-4 py-3 font-medium text-gray-900">Tours sheet</td>
+                <td className="px-4 py-3 text-gray-700">Sample sheet &middot; Export tours &middot; Import tours</td>
+                <td className="px-4 py-3 text-gray-700">The tour itself, one row per tour: code, name, type, durations, cities, theme, highlights, inclusions, descriptions, images, flags.</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-medium text-gray-900">Days sheet</td>
-                <td className="px-4 py-3 text-gray-700">Sample Days &middot; Export Days &middot; Import Days</td>
-                <td className="px-4 py-3 text-gray-700">The itinerary: <strong>one row per day</strong> &mdash; city, accommodation, the three meals, attractions, travel mode, and the airport / hotel / guide flags.</td>
+                <td className="px-4 py-3 text-gray-700">Sample days sheet &middot; Export days &middot; Import days &mdash; replaces itineraries</td>
+                <td className="px-4 py-3 text-gray-700">The itinerary: <strong>one row per day</strong> &mdash; city, night, the three meals, attractions, travel, sightseeing and the service flags.</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p className="text-gray-600 mb-3">
-          Why two? A day is a record in its own right &mdash; three meal states, a bed, attractions, a
-          travel mode, five flags &mdash; and a tour has several of them. That does not fit into one
-          row of a spreadsheet without inventing a code inside a cell that nobody can edit reliably.
-          Suppliers have a separate properties sheet for the same reason.
+          Why two? A day is a record in its own right &mdash; three meals, a night, attractions, travel,
+          several flags &mdash; and a tour has several of them. That does not fit into one row of a
+          spreadsheet without inventing a code inside a cell that nobody can edit reliably. Suppliers
+          have a separate properties sheet for the same reason.
         </p>
         <Tip>
-          A template sheet on its own imports a tour with <strong>no days</strong>. No days means no
-          nights, no meals and nothing for pricing to work from &mdash; the tour will show a
-          &ldquo;no itinerary&rdquo; hole rather than a price until its days arrive.
+          A tours sheet on its own imports a tour with <strong>no days</strong>. No days means no
+          nights, no meals and nothing to price from: the tour shows a &ldquo;no day-by-day
+          itinerary&rdquo; gap instead of a price until its days arrive.
         </Tip>
-        <ScreenshotPlaceholder caption="The Tour Manager header: Sample CSV / Export / Import for the tour, and Sample Days / Export Days / Import Days for its itinerary" />
+        <ScreenshotPlaceholder caption="The Tour Manager's Import / Export menu: the tours sheet items above, the days sheet items below" />
       </section>
 
       {/* Procedure */}
@@ -66,54 +70,74 @@ export default function ImportingToursPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The procedure</h2>
         <ol className="list-decimal list-inside space-y-3 text-gray-700 mb-4">
           <li>
-            <strong>Get both files.</strong> For new tours, download <strong>Sample CSV</strong> and{' '}
-            <strong>Sample Days</strong> &mdash; each has one example row, and both use the same
-            placeholder code. For existing tours, download <strong>Export</strong> and{' '}
-            <strong>Export Days</strong>.
+            <strong>Get both files.</strong> For new tours, download <strong>Sample sheet</strong> and{' '}
+            <strong>Sample days sheet</strong> &mdash; each has one example row, and both use the same
+            placeholder code. For existing tours, use <strong>Export tours</strong> and{' '}
+            <strong>Export days</strong>.
           </li>
           <li>
             <strong>Fill them in.</strong> Give the tour a real code in the <em>Code</em> column of the
-            template sheet and put the <em>same</em> code in the <em>Template Code</em> column of every
+            tours sheet and put the <em>same</em> code in the <em>Template Code</em> column of every
             one of its day rows. That code is the link.
           </li>
           <li>
-            <strong>Import the template sheet first</strong>, with <strong>Import</strong>.
+            <strong>Import the tours sheet first</strong>, with <strong>Import tours</strong>.
           </li>
           <li>
-            <strong>Then import the days</strong>, with <strong>Import Days</strong>. Order matters: a
-            days sheet never creates a tour, it only fills one that already exists.
+            <strong>Then import the days</strong>, with <strong>Import days</strong>. Order matters: a
+            days sheet never creates a tour, it only fills one that already exists. Before anything is
+            replaced, the import shows how many tours and days the file holds, how many rows it will
+            skip and why, and any columns it will not read &mdash; and asks you to confirm.
           </li>
         </ol>
         <p className="text-gray-600">
-          Open the tour afterwards and check the <strong>Details</strong> tab: the day count, and each
-          day&rsquo;s meals, should read exactly as your sheet said.
+          Open the tour afterwards (the calendar button on its row) and check the{' '}
+          <strong>Day-by-Day Itinerary</strong> on the <strong>Details</strong> tab: the day count, and
+          each day&rsquo;s meals, should read exactly as your sheet said.
         </p>
       </section>
 
-      {/* Template sheet */}
+      {/* Tours sheet */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">The template sheet</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The tours sheet</h2>
         <p className="text-gray-600 mb-3">
           Required columns are <strong>Code</strong>, <strong>Name</strong>, <strong>Type</strong> and{' '}
-          <strong>Duration Days</strong>. Everything else is optional. Lists &mdash; cities, highlights,
-          attractions, inclusions, exclusions, best-for &mdash; are separated with a semicolon.
+          <strong>Duration Days</strong>. The rest are optional: Duration Nights, Duration Hours,
+          Accommodation Nights, Cities, Destinations, Theme, Physical Level, Age Suitability, Best For,
+          Highlights, Main Attractions, Inclusions, Exclusions, Short and Long Description, Image URL,
+          Gallery URLs, Default Transport Service, Transport City, Pickup Required, Featured and Active.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li>
+            <strong>Lists</strong> &mdash; cities, highlights, attractions, inclusions, best-for and the
+            like &mdash; are separated with a semicolon (a <code>|</code> also splits, so keep it out of
+            the text).
+          </li>
           <li>
             <strong>Type, Theme, Physical Level, Best For</strong> come from{' '}
             <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">your vocabulary</Link>.
             You may type either the word you see on the form (&ldquo;Day Tour&rdquo;) or its key
-            (<code>day_tour</code>). A value that matches nothing in your vocabulary is refused by name,
-            with your valid options listed &mdash; never stored as something the form cannot show.
+            (<code>day_tour</code>). A value that matches nothing is refused by name, with your valid
+            options listed &mdash; never stored as something the form cannot show.
+          </li>
+          <li>
+            <strong>Numbers</strong> are whole numbers; <strong>Featured, Active, Pickup Required</strong>{' '}
+            take <code>true</code> or <code>false</code> (yes / no and 1 / 0 also work). Anything else
+            &mdash; &ldquo;two&rdquo;, &ldquo;2.5&rdquo;, &ldquo;ture&rdquo; &mdash; refuses the row
+            rather than being read as nothing or as false.
+          </li>
+          <li>
+            <strong>Image URL and Gallery URLs</strong> are the only way to give a tour pictures: the
+            Tour Manager form has no image field.
           </li>
           <li>
             <strong>Meals Included</strong> is written on export and <em>ignored on import</em>. It is
-            derived from the days, so it can describe the tour but never contradict it. Meals belong on
-            the days sheet.
+            worked out from the days, so it can describe the tour but never contradict it. Meals belong
+            on the days sheet.
           </li>
           <li>
             Column headers are forgiving (&ldquo;Tour Code&rdquo;, &ldquo;Days&rdquo; are accepted) and
-            order does not matter. A column the import does not read is <strong>named</strong> in the
+            order does not matter. Columns the import does not read are <strong>named</strong> in the
             result, never silently dropped.
           </li>
         </ul>
@@ -156,12 +180,25 @@ export default function ImportingToursPage() {
           before check-in eat somewhere.
         </Tip>
 
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-2">Other columns</h3>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-2">Every day says whether it has sightseeing</h3>
+        <p className="text-gray-600 mb-3">
+          A day lists its <strong>Attractions</strong>, sets <strong>Guide</strong> to true, or puts{' '}
+          <code>none</code> in <strong>Sightseeing</strong>. A day that does none of these is refused
+          &mdash; a departure day included, so give it <code>none</code>. Saying <code>none</code> while
+          listing attractions or a guide is refused too. A day in the air is exempt. (A sheet saved
+          before the Sightseeing column existed is not held to this rule.)
+        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-2">The other columns</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Accommodation</strong> &mdash; <code>hotel</code>, <code>cruise</code> or <code>none</code>. Nights are counted from these, not from Duration Nights. A departure day is <code>none</code>.</li>
-          <li><strong>Transport</strong> &mdash; <code>road</code>, <code>flight</code>, <code>train</code> or <code>sleeping_train</code>. A flight or train runs from the <em>previous</em> day&rsquo;s city into this one.</li>
-          <li><strong>Attractions</strong> &mdash; names, semicolon-separated. They are matched to your attraction rates by name.</li>
-          <li><strong>Airport Arrival / Departure, Hotel Check-in / Check-out, Guide</strong> &mdash; <code>true</code> or <code>false</code>.</li>
+          <li><strong>Title</strong> and <strong>Description</strong> &mdash; the day&rsquo;s heading and text.</li>
+          <li><strong>City</strong> &mdash; one city. &ldquo;Cairo; Luxor&rdquo; is refused: a day that travels is in the city it ends in.</li>
+          <li><strong>Accommodation</strong> &mdash; <code>hotel</code>, <code>cruise</code>, <code>none</code>, or <code>in_the_air</code> for an overnight flight. Nights are counted from these, not from Duration Nights. A departure day is <code>none</code>. A blank means the day does not say, and pricing works it out.</li>
+          <li><strong>Attractions</strong> &mdash; names, semicolon-separated, matched to your attraction rates by name.</li>
+          <li><strong>Transport</strong> &mdash; <code>road</code> (the default), <code>flight</code>, <code>train</code> or <code>sleeping_train</code>. A flight or day train runs from the <em>previous</em> day&rsquo;s city into this one; a sleeping train leaves this day&rsquo;s city for the next. <strong>Leg From / Leg To</strong> give a ticket its own route, and are refused on a road day.</li>
+          <li><strong>Assist At Departure / Arrival</strong> &mdash; <code>yes</code> or <code>no</code>, airport assistance on a flight day only.</li>
+          <li><strong>Transport Lines, Road Transfers, Cruise Boarding Assist, Cruise Leaving Assist, Local Transfer, Day Trip From, Sightseeing Length</strong> &mdash; the same settings as the day editor in the Tour Manager. Blank leaves them to the usual rules.</li>
+          <li><strong>Airport Arrival / Departure, Hotel Check-in / Check-out, Guide</strong> &mdash; <code>true</code> or <code>false</code> (yes / no and 1 / 0 also work). Anything else refuses the row.</li>
         </ul>
       </section>
 
@@ -169,11 +206,15 @@ export default function ImportingToursPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">What the import will and will not do</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Template rows update by code.</strong> An existing code is updated; a new code is created. Re-importing never touches days you have already built.</li>
+          <li><strong>Tour rows update by code.</strong> An existing code is updated; a new code is created. Codes match whatever their letter case. Re-importing never touches days you have already built.</li>
+          <li><strong>A blank cell leaves the stored value alone.</strong> Clearing a cell in an exported sheet does not clear it on the tour; edit the tour in the Tour Manager instead.</li>
           <li><strong>A days sheet replaces the whole itinerary</strong> of every tour it names, and leaves every tour it does not name alone. Export fresh before editing rather than reusing an old file.</li>
-          <li><strong>Nothing is guessed.</strong> A row with a problem is refused and the reason names the row, the column and the value. The rest of the file still imports.</li>
+          <li><strong>One refused day refuses its whole tour.</strong> Writing the other days would delete the refused one, so that tour keeps its current itinerary until the sheet is fixed.</li>
+          <li><strong>Nothing is guessed.</strong> A row with a problem is refused with the reason, and the rest of the file still imports. The result names the first reason; fix it and import again to see the next.</li>
           <li><strong>The example row is skipped.</strong> Any code beginning <code>EXAMPLE-</code> is ignored, so uploading a sample unedited creates nothing &mdash; and if <em>every</em> row is still an example, the import says so rather than reporting &ldquo;nothing to do&rdquo;.</li>
+          <li><strong>A code may appear once</strong> in a tours sheet; a repeat is refused.</li>
           <li><strong>Codes are yours.</strong> Two organizations can use the same tour code without colliding.</li>
+          <li><strong>Who can import:</strong> admins and managers, like the rest of the Tour Manager.</li>
         </ul>
       </section>
 

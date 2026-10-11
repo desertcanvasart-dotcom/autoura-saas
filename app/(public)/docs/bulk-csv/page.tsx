@@ -26,7 +26,7 @@ export default function BulkCsvPage() {
           <li><strong>Export</strong> &mdash; downloads what is already in the app, in the same shape. Edit it and re-import to make changes in bulk.</li>
           <li><strong>Import</strong> &mdash; reads a filled-in sheet back in.</li>
         </ul>
-        <ScreenshotPlaceholder caption="The Sample / Export / Import buttons in the Tour Manager" />
+        <ScreenshotPlaceholder caption="The Sample / Export / Import buttons on the Suppliers directory" />
       </section>
 
       <section className="mb-10">

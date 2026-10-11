@@ -2764,7 +2764,7 @@ export default function TourManagerContent() {
                             <button
                               onClick={() => editDays(template)}
                               className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                              title="Day Builder"
+                              title="Edit days"
                             >
                               <Calendar className="w-4 h-4" />
                             </button>
@@ -2860,7 +2860,7 @@ export default function TourManagerContent() {
                                   className="text-sm text-green-600 hover:text-green-800 font-medium flex items-center gap-1 mx-auto"
                                 >
                                   <Plus className="w-4 h-4" />
-                                  Add Budget / Standard / Deluxe / Luxury Variations
+                                  Add Variations
                                 </button>
                               </div>
                             )}

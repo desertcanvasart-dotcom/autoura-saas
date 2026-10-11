@@ -1,7 +1,7 @@
 // ============================================
 // Cruise sightseeing transport: which package a sailing needs (sibling #463)
 // ============================================
-// A package in Rates → Transport Packages is sold by the cruise's length in
+// A package in Tours → Transport Packages is sold by the cruise's length in
 // DAYS: "4D" is a 3-night cruise, "5D" a 4-night one. The sibling's engine
 // counted the NIGHTS and sold a 4-night cruise the 4D package, then fell back
 // to the closest length when the exact one was missing — the wrong package at

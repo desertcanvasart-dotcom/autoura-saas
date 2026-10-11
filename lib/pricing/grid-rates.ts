@@ -136,9 +136,6 @@ export async function loadGridRates(
       // travel-ops-pro migration 20260205_transportation_rates_restructure.
       ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel, vehicleTypeLabel),
       // Cruise transport packages (bundled sightseeing vehicle for cruise days).
-      // They live in the B2B packages list (B2B → Pricing rules), not in
-      // Rates → Transportation, so the name says where to find them; the
-      // grid offers them on cruise days only (DayRow).
       // One option per vehicle the package prices (its `vehicles` list since
       // migration 381, keyed by the agency's vehicle_type vocabulary), encoded
       // `${pkgId}__${vehicle}` with the vocabulary's pax band, so the grid

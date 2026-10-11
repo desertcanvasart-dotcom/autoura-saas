@@ -4478,7 +4478,7 @@ export async function calculateDayBasedPricing(
         addHole({
           kind: 'transport', reason: 'missing', tier, dayNumber: sailing.nightDays[0],
           lookupAttempted: `cruise sightseeing package for ${sailing.durationDays} days`,
-          message: `${pick.count} cruise sightseeing packages are ${sailing.durationDays} days long — pricing will not choose between them. Keep one active in Rates → Transport Packages.`,
+          message: `${pick.count} cruise sightseeing packages are ${sailing.durationDays} days long — pricing will not choose between them. Keep one active in Tours → Transport Packages.`,
         })
         continue
       }
@@ -4603,7 +4603,7 @@ export async function calculateDayBasedPricing(
       addHole({
         kind: 'transport', reason: 'missing', tier, dayNumber: firstDay,
         lookupAttempted: `${pkg.package_name}: vehicle for ${shownSeats}`,
-        message: `${pkg.package_name} has no vehicle price for a group of ${shownSeats}. Fill it in Rates → Transport Packages.`,
+        message: `${pkg.package_name} has no vehicle price for a group of ${shownSeats}. Fill it in Tours → Transport Packages.`,
       })
     }
     const included = (day: number, what: string) => services.push({

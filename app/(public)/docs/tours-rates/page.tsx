@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 import { DocPager } from '../pager'
 
 export default function ToursRatesPage() {
@@ -18,41 +18,13 @@ export default function ToursRatesPage() {
       {/* Tour Inventory */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Tour Inventory</h2>
-        <p className="text-gray-600 mb-4">
-          Pre-built tour packages you can browse and price instantly.
-        </p>
-
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Browsing Tours</h3>
-        <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Tours &rarr; Tour Inventory</strong> in the sidebar</li>
-          <li>Filter by <strong>Tier</strong> or <strong>Category</strong>, or search &mdash; the search matches tour names, descriptions, and cities</li>
-          <li>Click a tour to see the full details</li>
-        </ol>
-        <DocScreenshot src="/docs/tours-rates/tours-list.jpg" alt="Tour Inventory page with tier and category filters and tour cards" />
-
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Tour Detail Page</h3>
-        <p className="text-gray-600 mb-3">Each tour shows:</p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Description</strong> and key <strong>highlights</strong></li>
-          <li><strong>Day-by-day itinerary</strong> with cities, activities, and meals</li>
-          <li><strong>What&apos;s included</strong> and <strong>what&apos;s not included</strong></li>
-          <li><strong>Instant price calculator</strong> &mdash; enter the number of travelers and passport type for an immediate price</li>
-        </ul>
-
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Tour Tiers</h3>
-        <p className="text-gray-600 mb-3">Tours come in up to four tiers:</p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Budget</strong> &mdash; Basic accommodation and services</li>
-          <li><strong>Standard</strong> &mdash; Mid-range quality</li>
-          <li><strong>Deluxe</strong> &mdash; Premium options</li>
-          <li><strong>Luxury</strong> &mdash; Top-tier everything</li>
-        </ul>
-        <ScreenshotPlaceholder caption="Tour detail page with the instant price calculator and day-by-day breakdown" />
-
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Managing Tour Templates</h3>
         <p className="text-gray-600">
-          Packages are created and edited in the <strong>Tour Manager</strong> (Tours &rarr; Tour Manager), where you manage templates, variations, and day-by-day itineraries. See <Link href="/docs/tour-programs" className="text-primary-600 hover:underline">Tour Manager</Link> for the full guide. To schedule dated departures on a template, use <strong>Operations &rarr; Tour Departures</strong>.
+          Ready-made tours are browsed in <strong>Tours &rarr; Tour Inventory</strong> and created and
+          edited in the <strong>Tour Manager</strong> &mdash; both described on{' '}
+          <Link href="/docs/tour-programs" className="text-primary-600 hover:underline">Tour Manager</Link>.
+          To schedule dated departures on a tour, use <strong>Operate &rarr; Tour Departures</strong>.
         </p>
+        <DocScreenshot src="/docs/tours-rates/tours-list.jpg" alt="Tour Inventory page with tier and category filters and tour cards" />
       </section>
 
       {/* Rates Management */}
