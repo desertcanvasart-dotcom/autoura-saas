@@ -34,7 +34,7 @@ const TENANT_SCOPED_TABLES = new Set([
 ])
 
 // Tables with shared/global catalog rows (tenant_id nullable). The round-12
-// additions live here too: tenant_id is nullable on them, and this admin
+// additions live here too: their tenant_id may be empty, and this admin
 // client must still scope them to the caller's tenant.
 const SHARED_CATALOG_TABLES = new Set([
   'train_rates', 'sleeping_train_rates',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { memberIsActive } from '@/lib/member-status'
 
 // GET - List all profiles (team members)
 export async function GET(request: NextRequest) {
@@ -21,12 +22,17 @@ export async function GET(request: NextRequest) {
     // user_profiles has no tenant_id — scope via tenant_members membership
     const { data: members, error: membersError } = await (adminClient as any)
       .from('tenant_members')
-      .select('user_id')
+      .select('user_id, status')
       .eq('tenant_id', authResult.tenant_id)
 
     if (membersError) throw membersError
 
     const memberIds = (members || []).map((m: any) => m.user_id)
+    // Deactivation is per company — it lives on the membership row, not on
+    // the account-wide user_profiles.is_active (documents audit, round 12).
+    const memberStatus = new Map<string, string>(
+      (members || []).map((m: { user_id: string; status: string }) => [m.user_id, m.status])
+    )
 
     let query = (adminClient as any)
       .from('user_profiles')
@@ -63,10 +69,13 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching auth last_sign_in_at:', e)
     }
 
-    const enriched = (data || []).map((p: any) => ({
-      ...p,
-      last_login_at: lastSignIn.get(p.id) ?? null,
-    }))
+    const enriched = (data || [])
+      .map((p: any) => ({
+        ...p,
+        is_active: memberIsActive(p.is_active, memberStatus.get(p.id)),
+        last_login_at: lastSignIn.get(p.id) ?? null,
+      }))
+      .filter((p: { is_active: boolean }) => !activeOnly || p.is_active)
 
     return NextResponse.json({
       success: true,

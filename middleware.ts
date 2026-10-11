@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isSuperAdmin } from '@/lib/super-admin-shared'
 import { toPermissionRole } from '@/lib/roles'
+import { INACTIVE_MEMBER_STATUSES } from '@/lib/member-status'
 
 // ============================================
 // API ROUTES THAT SELF-AUTHENTICATE
@@ -272,8 +273,26 @@ export async function middleware(request: NextRequest) {
           .maybeSingle(),
       ])
 
+      // Deactivation is per company: the Team page switches off this
+      // company's membership row, not the account-wide profile flag, so a
+      // person deactivated in one company keeps every other one (documents
+      // audit, round 12). The lookup above already skips such rows and lands
+      // on the user's next active company; only when NO active membership
+      // remains and one was deactivated is the user inactive here.
+      // user_profiles.is_active stays the platform-level (super-admin) switch.
+      let deactivatedHere = false
+      if (!membership) {
+        const { data: inactive } = await supabase
+          .from('tenant_members')
+          .select('status')
+          .eq('user_id', user.id)
+          .in('status', [...INACTIVE_MEMBER_STATUSES])
+          .limit(1)
+        deactivatedHere = (inactive?.length ?? 0) > 0
+      }
+
       // Check if user is active
-      if (profile && !profile.is_active) {
+      if ((profile && !profile.is_active) || deactivatedHere) {
         // End the session BEFORE redirecting. The comment here used to claim
         // "sign them out" but nothing did — so a still-authenticated
         // deactivated user hit /login, the /login guard bounced them straight

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import twilio from 'twilio'
+import { mapTwilioStatus, previousStatusesFor } from '@/lib/whatsapp-status'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -68,6 +69,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing MessageSid' }, { status: 400 })
     }
 
+    // Twilio's raw status was written as-is: "undelivered", "queued",
+    // "accepted", "sending"… broke the status CHECK (so a failed message
+    // stayed "sent"), and a late "sent" overwrote "read". Map onto the
+    // allowed set and only ever move forward (documents audit, round 12).
+    const status = mapTwilioStatus(messageStatus)
+    const replaceable = status ? previousStatusesFor(status) : []
+    if (!status || replaceable.length === 0) {
+      // Unknown to us, or "pending" — which can replace nothing stored.
+      return new NextResponse('OK', { status: 200 })
+    }
+
     // Update message status in database.
     //
     // Deliberately NOT `.single()`. A status callback for a SID we have no row
@@ -79,19 +91,22 @@ export async function POST(request: NextRequest) {
     // The 200 is correct and stays: a non-2xx makes Twilio retry this callback
     // for hours. The failure has to be visible in the logs instead of in the
     // status code, so the two cases are separated and each is greppable.
-    const { data: updated, error } = await (getSupabaseAdmin() as any)
+    const db = getSupabaseAdmin() as any
+    const { data: updated, error } = await db
       .from('whatsapp_messages')
       // whatsapp_messages has no error_code/error_message/updated_at columns —
       // every status update carrying them 400'd. Errors ride the metadata
       // JSONB instead (set only on failure, so successful-status updates never
       // clobber existing metadata).
       .update({
-        status: messageStatus,
+        status,
         ...(errorCode || errorMessage
           ? { metadata: { error_code: errorCode ?? null, error_message: errorMessage ?? null } }
           : {})
       })
       .eq('message_sid', messageSid)
+      // Conditional: only a status this one outranks is replaced.
+      .in('status', replaceable)
       .select('id')
 
     if (error) {
@@ -103,19 +118,28 @@ export async function POST(request: NextRequest) {
         message: error.message,
       })
     } else if (!updated || updated.length === 0) {
-      // Signature was valid, so Twilio really did send this on our behalf, but
-      // no whatsapp_messages row carries the SID. Either the send never
-      // persisted its row, or the callback beat the insert. Silent until now.
-      console.error('[whatsapp/status-callback] NO_MATCHING_MESSAGE — status dropped', {
-        messageSid,
-        messageStatus,
-        to,
-        from,
-      })
+      // Nothing changed: either the row is already further along (a stale,
+      // out-of-order callback — expected, not an error) or no row has the SID.
+      const { data: existing } = await db
+        .from('whatsapp_messages')
+        .select('id')
+        .eq('message_sid', messageSid)
+        .limit(1)
+      if (!existing || existing.length === 0) {
+        // Signature was valid, so Twilio really did send this on our behalf, but
+        // no whatsapp_messages row carries the SID. Either the send never
+        // persisted its row, or the callback beat the insert. Silent until now.
+        console.error('[whatsapp/status-callback] NO_MATCHING_MESSAGE — status dropped', {
+          messageSid,
+          messageStatus,
+          to,
+          from,
+        })
+      }
     }
 
     // Log failed messages for debugging
-    if (messageStatus === 'failed' || messageStatus === 'undelivered') {
+    if (status === 'failed') {
       console.error('❌ Message delivery failed:', {
         messageSid,
         errorCode,

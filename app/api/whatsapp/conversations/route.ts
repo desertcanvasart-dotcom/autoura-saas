@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { markTeamNotificationsRead } from '@/lib/notifications'
+import { conversationPhoneNumber } from '@/lib/whatsapp'
+import { conversationPhoneKeys } from '@/lib/whatsapp-phone'
 
 // GET /api/whatsapp/conversations - List all conversations
 
@@ -133,15 +135,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 })
     }
 
-    // Clean phone number
-    const cleanPhone = phone_number.replace(/[^\d+]/g, '')
+    // E.164 with "+", the key the webhook looks the reply up by. Stored
+    // without the "+", the customer's reply opened a second conversation
+    // (documents audit, round 12). The lookup also finds a row stored the
+    // old way, so that one is reused rather than duplicated.
+    const cleanPhone = await conversationPhoneNumber(phone_number, tenant_id)
 
     // Check if conversation exists (including hidden ones - we'll unhide it)
     const { data: existing } = await supabase
       .from('whatsapp_conversations')
       .select('*')
-      .eq('phone_number', cleanPhone)
-      .single()
+      .in('phone_number', conversationPhoneKeys(cleanPhone))
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (existing) {
       const updates: any = {

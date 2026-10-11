@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import {
+  DEACTIVATED_MEMBER_STATUS,
+  LEGACY_DEACTIVATED_MEMBER_STATUS,
+  INACTIVE_MEMBER_STATUSES,
+  isCheckViolation,
+  memberIsActive,
+} from '@/lib/member-status'
 
 // Verify the target user belongs to the caller's tenant (user_profiles has no tenant_id)
 async function isTenantMember(adminClient: any, tenantId: string, userId: string): Promise<boolean> {
@@ -10,6 +17,51 @@ async function isTenantMember(adminClient: any, tenantId: string, userId: string
     .eq('user_id', userId)
     .maybeSingle()
   return !!data
+}
+
+type AdminClient = ReturnType<typeof createAdminClient>
+
+// This company's membership status for the user (null when unreadable).
+async function memberStatus(adminClient: AdminClient, tenantId: string, userId: string): Promise<string | null> {
+  const { data } = await adminClient
+    .from('tenant_members')
+    .select('status')
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return data?.status ?? null
+}
+
+// Activate / deactivate the user in ONE company. This used to write
+// user_profiles.is_active — the account-wide flag middleware enforces — so
+// deactivating someone here locked them out of every company they belong to
+// (documents audit, round 12). Only this tenant's membership row changes now;
+// every membership lookup (requireAuth, middleware) admits status 'active'
+// only. Re-activation only lifts a deactivation — it never promotes an
+// 'invited' row.
+async function setMemberActive(adminClient: AdminClient, tenantId: string, userId: string, active: boolean) {
+  const scoped = (status: string) =>
+    adminClient
+      .from('tenant_members')
+      .update({ status })
+      .eq('tenant_id', tenantId)
+      .eq('user_id', userId)
+
+  if (active) {
+    const { error } = await scoped('active').in('status', [...INACTIVE_MEMBER_STATUSES])
+    if (error) throw error
+    return
+  }
+
+  const { error } = await scoped(DEACTIVATED_MEMBER_STATUS).eq('status', 'active')
+  // Before migration 406 the status CHECK has no 'deactivated': fall back to
+  // 'suspended', which the membership lookups refuse just the same.
+  if (isCheckViolation(error)) {
+    const { error: legacyError } = await scoped(LEGACY_DEACTIVATED_MEMBER_STATUS).eq('status', 'active')
+    if (legacyError) throw legacyError
+    return
+  }
+  if (error) throw error
 }
 
 // GET - Get single profile
@@ -45,9 +97,12 @@ export async function GET(
 
     if (error) throw error
 
+    // is_active as THIS company sees it (account flag AND membership status).
+    const status = await memberStatus(adminClient, authResult.tenant_id!, id)
+
     return NextResponse.json({
       success: true,
-      data
+      data: { ...data, is_active: memberIsActive(data?.is_active, status) }
     })
   } catch (error) {
     console.error('Error fetching profile:', error)
@@ -120,18 +175,25 @@ export async function PUT(
       )
     }
 
-    const { data, error } = await (adminClient as any)
-      .from('user_profiles')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
+    // is_active is per company: it goes to this tenant's membership row,
+    // never to the account-wide user_profiles flag (documents audit, round 12).
+    const { is_active: isActive, ...profileUpdate } = updateData
+    if (isActive !== undefined) {
+      await setMemberActive(adminClient, authResult.tenant_id!, id, isActive === true)
+    }
+
+    const profiles = (adminClient as any).from('user_profiles')
+    const { data, error } = await (Object.keys(profileUpdate).length > 0
+      ? profiles.update(profileUpdate).eq('id', id).select().single()
+      : profiles.select().eq('id', id).single())
 
     if (error) throw error
 
+    const status = await memberStatus(adminClient, authResult.tenant_id!, id)
+
     return NextResponse.json({
       success: true,
-      data
+      data: { ...data, is_active: memberIsActive(data?.is_active, status) }
     })
   } catch (error) {
     console.error('Error updating profile:', error)

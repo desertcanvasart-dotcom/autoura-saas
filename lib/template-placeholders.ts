@@ -1,6 +1,7 @@
 // lib/template-placeholders.ts
 import { DEFAULT_DEPOSIT_DUE_DAYS } from '@/lib/bookings/deposit-rule'
 import { getCurrencySymbol } from '@/lib/currency'
+import { escapeHtml } from '@/lib/html-escape'
 // Utility functions for template placeholder replacement
 
 /**
@@ -21,14 +22,22 @@ export function getPlaceholders(text: string): string[] {
 }
 
 /**
- * Replace all {{placeholder}} with actual values
+ * Replace all {{placeholder}} with actual values.
+ *
+ * `escape: true` HTML-escapes each value — for an HTML body. Values are
+ * client, partner and typed-in text; pasted raw into the email body, a name
+ * like "Smith & <b>Sons</b>" became markup (documents audit, round 12).
+ * Plain-text uses (the subject) stay unescaped, or they would show "&amp;".
  */
 export function replacePlaceholders(
   text: string,
-  data: Record<string, string | undefined>
+  data: Record<string, string | undefined>,
+  options: { escape?: boolean } = {}
 ): string {
   return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key) => {
-    return data[key] !== undefined ? data[key]! : match
+    const value = data[key]
+    if (value === undefined) return match
+    return options.escape ? escapeHtml(value) : value
   })
 }
 

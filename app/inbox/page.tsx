@@ -1936,7 +1936,9 @@ function ComposeModal({
     }
 
     const processedSubject = replacePlaceholders(selectedTemplate.subject, finalData)
-    const processedContent = replacePlaceholders(selectedTemplate.content, finalData)
+    // The body is HTML: values are escaped, or a client's "&" / "<" became
+    // markup in the email (documents audit, round 12). The subject is plain.
+    const processedContent = replacePlaceholders(selectedTemplate.content, finalData, { escape: true })
 
     setSubject(processedSubject)
     setBody(processedContent)

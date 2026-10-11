@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { indexWhatsAppReply } from '@/lib/copilot-indexer'
-import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, conversationPhoneNumber } from '@/lib/whatsapp'
+import { conversationPhoneKeys } from '@/lib/whatsapp-phone'
 
 // GET /api/whatsapp/messages - Get messages for a conversation
 export async function GET(request: NextRequest) {
@@ -89,13 +90,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (!conversation_id && phone_number) {
-      // Create conversation if needed
-      const cleanPhone = phone_number.replace(/[^\d+]/g, '')
+      // Create conversation if needed. E.164 with "+", the key the webhook
+      // looks the reply up by — without it the customer's reply opened a
+      // second conversation (documents audit, round 12).
+      const cleanPhone = await conversationPhoneNumber(phone_number, tenant_id)
       const { data: existing } = await supabase
         .from('whatsapp_conversations')
         .select('id')
-        .eq('phone_number', cleanPhone)
-        .single()
+        .in('phone_number', conversationPhoneKeys(cleanPhone))
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (existing) {
         convId = existing.id

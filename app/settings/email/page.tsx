@@ -90,6 +90,13 @@ function EmailSettingsContent() {
     
     if (success) {
       setMessage({ type: 'success', text: 'Gmail connected successfully!' })
+    } else if (error === 'missing_scopes') {
+      // Google's consent screen lets each permission be unticked; the
+      // callback refuses such a connection (documents audit, round 12).
+      setMessage({
+        type: 'error',
+        text: 'Gmail was not connected: some permissions were left unticked on the Google consent screen. Connect again and tick every box (read, send and manage email).',
+      })
     } else if (error) {
       setMessage({ type: 'error', text: `Connection failed: ${error}` })
     }

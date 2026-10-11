@@ -17,6 +17,7 @@ import {
 } from './twilio-whatsapp'
 import { sendViaMeta, isMetaConfigured } from './whatsapp-cloud-api'
 import { formatPhoneForWhatsApp } from './communication-utils'
+import { toConversationPhone } from './whatsapp-phone'
 
 export type WhatsAppProvider = 'twilio' | 'meta'
 
@@ -59,6 +60,16 @@ export async function internationalNumber(to: string, tenantId?: string | null):
   const country = await tenantCountry(tenantId)
   const digits = formatPhoneForWhatsApp(compact, country)
   return digits.startsWith('0') ? raw : '+' + digits
+}
+
+/**
+ * The number as whatsapp_conversations stores it: E.164 with a leading "+",
+ * the key the inbound webhook looks conversations up by. Stored without the
+ * "+", the customer's reply opened a second conversation (documents audit,
+ * round 12). A local "0…" number takes the tenant's country first.
+ */
+export async function conversationPhoneNumber(to: string, tenantId?: string | null): Promise<string> {
+  return toConversationPhone(await internationalNumber(to, tenantId))
 }
 
 // Only a country that is set is kept, and for a minute: a send that failed

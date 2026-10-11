@@ -71,7 +71,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Handle deactivation
     if (body.deactivate === true) {
-      await admin.from('tenant_members').update({ status: 'suspended' }).eq('tenant_id', id)
+      // Only the active members: suspending every row turned a member the
+      // company had deactivated into 'suspended', and reactivating the
+      // company then let them back in (documents audit, round 12).
+      await admin.from('tenant_members').update({ status: 'suspended' }).eq('tenant_id', id).eq('status', 'active')
     }
     if (body.reactivate === true) {
       await admin.from('tenant_members').update({ status: 'active' }).eq('tenant_id', id).eq('status', 'suspended')
