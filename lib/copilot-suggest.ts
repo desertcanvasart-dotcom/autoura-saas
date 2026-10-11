@@ -174,6 +174,8 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
   // Call Claude
   const startedAt = Date.now()
   let rawDrafts: any[] = []
+  // The AI's call on whether a person must take this one (ai_flags.escalate).
+  let escalation: { escalate: boolean; escalation_reason: string | null } = { escalate: false, escalation_reason: null }
   let lastError: string | null = null
 
   // The shared client retries 429/529/500/503. A service failure is named
@@ -194,6 +196,7 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
     if (!parsed || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0) throw new Error('No drafts in response')
     rawDrafts = parsed.drafts.slice(0, count)
     if (rawDrafts.length === 0) throw new Error('All drafts were empty')
+    escalation = readEscalation(parsed.escalate)
   } catch (err: any) {
     lastError = isAiServiceError(err)
       ? getUserFriendlyError(err).message
@@ -257,6 +260,8 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
       rationale: d.rationale,
       instruction,
       pregenerated: reviewerUserId === null,
+      // The review panel's red banner reads these; nothing set them before.
+      ...(escalation.escalate ? escalation : {}),
     },
     context_used: {
       message_count: ctx.messages.length,
@@ -544,13 +549,15 @@ RULES
 - Do NOT invent prices, dates, availability, or itinerary details the transcript doesn't provide. If specific info is needed, ask a clarifying question or promise to follow up.
 - Match the customer's language (if they wrote in Arabic, reply in Arabic).
 - Never sign the message (the agent will add their signature manually).
+- Set "escalate.needed" to true only when a person must handle this before any reply goes out: a complaint, a refund or cancellation demand, an emergency or safety issue, a legal threat, or a request no draft can safely answer. Otherwise false.
 - Output valid JSON only. No markdown, no backticks.
 
 OUTPUT SHAPE
 {
   "drafts": [
     { "body": "reply text", "confidence": "high" | "medium" | "low", "rationale": "brief, one-line reason this reply fits" }
-  ]
+  ],
+  "escalate": { "needed": true | false, "reason": "one line, only when needed" }
 }
 
 Generate exactly ${count} distinct draft reply option${count === 1 ? '' : 's'}. Each draft should take a slightly different angle (e.g. one direct, one that asks a clarifying question, one that offers a next step).`
@@ -582,13 +589,15 @@ RULES
 - Do NOT invent prices, dates, availability, or itinerary details the transcript doesn't provide. If specific info is needed, ask a clarifying question or promise to follow up.
 - Match the customer's language (if they wrote in Arabic, reply in Arabic).
 - Keep subject aligned with the thread subject. Default to "${replySubjectHint}" unless the topic clearly shifted.
+- Set "escalate.needed" to true only when a person must handle this before any reply goes out: a complaint, a refund or cancellation demand, an emergency or safety issue, a legal threat, or a request no draft can safely answer. Otherwise false.
 - Output valid JSON only. No markdown, no backticks.
 
 OUTPUT SHAPE
 {
   "drafts": [
     { "subject": "Re: ...", "body": "reply body with paragraph breaks as \\n\\n", "confidence": "high" | "medium" | "low", "rationale": "one-line reason this reply fits" }
-  ]
+  ],
+  "escalate": { "needed": true | false, "reason": "one line, only when needed" }
 }
 
 Generate exactly ${count} distinct draft option${count === 1 ? '' : 's'}. Each draft should take a slightly different angle (e.g. one direct answer, one that asks a clarifying question, one that offers a next step).`
@@ -603,4 +612,12 @@ Generate exactly ${count} distinct draft option${count === 1 ? '' : 's'}. Each d
   if (parentDraftId) userPromptParts.push(`\nThe previous drafts were dismissed. Offer different angles this time.`)
 
   return { systemPrompt, userPromptParts }
+}
+
+/** The AI's escalation verdict, from `{ needed, reason }`; anything else is "no". */
+export function readEscalation(raw: unknown): { escalate: boolean; escalation_reason: string | null } {
+  const r = raw as { needed?: unknown; reason?: unknown } | null | undefined
+  if (!r || r.needed !== true) return { escalate: false, escalation_reason: null }
+  const reason = typeof r.reason === 'string' && r.reason.trim() ? r.reason.trim().slice(0, 300) : null
+  return { escalate: true, escalation_reason: reason }
 }

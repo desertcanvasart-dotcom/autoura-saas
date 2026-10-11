@@ -155,7 +155,7 @@ export default function CommunicationPage() {
           Copilot drafts replies to incoming messages; you review each one before it goes out. Its pages:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Copilot</strong> (Communicate) &mdash; The review queue: <strong>Approve</strong> and <strong>Send</strong> a WhatsApp draft (email drafts are <strong>Approve &amp; hand off</strong> to the Inbox), <strong>Regenerate</strong> it, or <strong>Reject</strong> it. Choose the tone: professional, friendly or formal.</li>
+          <li><strong>Copilot</strong> (Communicate) &mdash; The review queue: <strong>Approve</strong> and <strong>Send</strong> a WhatsApp draft (an email draft is <strong>Approve &amp; hand off</strong>: it opens in Conversations, filled in, for you to send), <strong>Regenerate</strong> it, or <strong>Reject</strong> it. Choose the tone: professional, friendly or formal.</li>
           <li><strong>Copilot Knowledge</strong> (Communicate) &mdash; The FAQs, policies and tour facts Copilot draws on</li>
           <li><strong>Copilot Settings</strong> (Settings, admins) &mdash; Including drafting replies in advance as messages arrive</li>
           <li><strong>Copilot Analytics</strong> (Home) &mdash; Draft volume and how many are accepted</li>

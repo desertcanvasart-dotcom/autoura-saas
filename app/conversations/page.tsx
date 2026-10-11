@@ -144,6 +144,12 @@ export default function ConversationsPage() {
     fetchConversations()
   }, [fetchConversations])
 
+  // Opened from a link (Copilot's "Open conversation"): /conversations?id=…
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('id')
+    if (id) fetchConversation(id)
+  }, [])
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

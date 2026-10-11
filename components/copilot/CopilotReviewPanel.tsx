@@ -26,6 +26,8 @@ export default function CopilotReviewPanel({
   const [showRegen, setShowRegen] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
+  // Where an approved email draft is sent from (Conversations, filled in).
+  const [openUrl, setOpenUrl] = useState<string | null>(null)
 
   // The active draft = newest pending/approved draft for this thread.
   const activeDraft: CopilotDraft | null = useMemo(() => {
@@ -39,6 +41,7 @@ export default function CopilotReviewPanel({
   useEffect(() => {
     setText(activeDraft ? (activeDraft.edited_body ?? activeDraft.draft_body) : '')
     setNotice(null)
+    setOpenUrl(null)
     setShowRegen(false)
     setInstruction('')
   }, [activeDraft?.id])
@@ -68,7 +71,8 @@ export default function CopilotReviewPanel({
       if (!res.ok || data.success === false) {
         setNotice(data.error || 'Action failed')
       } else if (data.requiresManualSend) {
-        setNotice(data.message || 'Draft approved — send from the Inbox.')
+        setNotice(data.message || 'Draft approved — send it from Conversations.')
+        setOpenUrl(typeof data.open_url === 'string' ? data.open_url : null)
         await onChanged()
       } else {
         await onChanged()
@@ -158,11 +162,18 @@ export default function CopilotReviewPanel({
           </div>
         ) : (
           <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg p-4 text-center">
-            No AI draft yet for this thread. Drafts are generated automatically when a message arrives.
+            No AI draft yet for this thread. Drafts are written as messages arrive when Proactive draft pre-generation is on (Copilot Settings); otherwise use Suggest Reply in WhatsApp or Conversations.
           </div>
         )}
 
-        {notice && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{notice}</p>}
+        {notice && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {notice}
+            {openUrl && (
+              <> <Link href={openUrl} className="font-medium underline">Open conversation</Link></>
+            )}
+          </p>
+        )}
       </div>
 
       {/* Actions */}

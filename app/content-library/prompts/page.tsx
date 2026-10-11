@@ -18,7 +18,6 @@ interface PromptTemplate {
   max_tokens: number
   is_active: boolean
   is_default: boolean
-  version: number
   created_at: string
 }
 
@@ -34,7 +33,7 @@ const PURPOSES = [
 
 const MODELS = CLAUDE_MODEL_OPTIONS
 
-const EMPTY_FORM: Omit<PromptTemplate, 'id' | 'created_at' | 'version'> = {
+const EMPTY_FORM: Omit<PromptTemplate, 'id' | 'created_at'> = {
   name: '', purpose: 'itinerary_full', description: '', system_prompt: '',
   user_prompt_template: '', variables: [], model: CLAUDE_MODEL,
   temperature: 0.7, max_tokens: 2000, is_active: true, is_default: false,
@@ -95,7 +94,12 @@ function PromptsContent() {
 
   const handleDelete = async (id: string) => {
     if (!(await dialog.confirm({ message: 'Delete this prompt template?', variant: 'danger', confirmText: 'Delete' }))) return
-    await fetch(`/api/content-library/prompts?id=${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/content-library/prompts?id=${id}`, { method: 'DELETE' })
+    // A default template cannot be deleted — say so instead of doing nothing.
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      await dialog.alert('Not deleted', data.error || 'Could not delete the template', 'warning')
+    }
     fetchPrompts()
   }
 
@@ -145,7 +149,8 @@ function PromptsContent() {
                             {p.name}
                             {p.is_default && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
                           </h3>
-                          <p className="text-xs text-gray-400 mt-0.5">{p.model} | temp {p.temperature} | v{p.version}</p>
+                          {/* There is no version column: the card used to show a bare "v". */}
+                          <p className="text-xs text-gray-400 mt-0.5">{p.model} | temp {p.temperature}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => setShowView(p)} className="p-1 text-gray-400 hover:text-gray-600"><Eye className="w-3.5 h-3.5" /></button>

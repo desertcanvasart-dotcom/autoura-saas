@@ -118,7 +118,7 @@ export default function CopilotAnalyticsPage() {
                 <MiniBar
                   key={ch}
                   icon={ch === 'email' ? <Mail className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
-                  label={ch === 'email' ? 'Email' : 'WhatsApp'}
+                  label={ch === 'email' ? 'Email' : ch === 'whatsapp' ? 'WhatsApp' : 'Other'}
                   value={stats.generated}
                   sub={`${stats.sent} sent`}
                   max={Math.max(...Object.values(data.by_channel).map((s: any) => s.generated), 1)}

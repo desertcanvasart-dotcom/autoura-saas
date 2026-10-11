@@ -677,7 +677,7 @@ export async function POST(request: NextRequest) {
     if (cruiseDetection.isCruise && inputMode === 'creative' && effectivePackageType === 'cruise-package') {
 
 
-      const cruiseContent = await findCruiseContent(getSupabaseAdmin(), cruiseDetection, tier, duration_days)
+      const cruiseContent = await findCruiseContent(getSupabaseAdmin(), tenant_id, cruiseDetection, tier, duration_days)
 
       if (cruiseContent.found && cruiseContent.dayByDay.length > 0) {
 
@@ -860,8 +860,8 @@ export async function POST(request: NextRequest) {
 
     // Fetch rates and content
     const searchCities = cities.length > 0 ? cities : [effectiveCity]
-    const contentLibrary = await fetchContentLibrary(getSupabaseAdmin(), tier, searchCities, interests)
-    const writingRules = await fetchWritingRules(getSupabaseAdmin())
+    const contentLibrary = await fetchContentLibrary(getSupabaseAdmin(), tenant_id, tier, searchCities, interests)
+    const writingRules = await fetchWritingRules(getSupabaseAdmin(), tenant_id)
     const contentContext = buildContentContext(contentLibrary)
     const writingContext = buildWritingRulesContext(writingRules)
     const attractionNames = await fetchAttractionsList(supabase)

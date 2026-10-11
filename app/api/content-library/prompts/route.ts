@@ -72,12 +72,11 @@ export async function POST(request: NextRequest) {
       await supabase.from('prompt_templates').update({ is_default: false }).eq('purpose', purpose).eq('is_default', true)
     }
 
-    // Extract variables from template if not provided
-    let finalVariables = variables
-    if (!finalVariables) {
-      const matches = user_prompt_template.match(/\{\{(\w+)\}\}/g)
-      finalVariables = matches ? [...new Set(matches.map((m: string) => m.replace(/\{\{|\}\}/g, '')))] : []
-    }
+    // The variables are the template's own {{…}}: the form always sent an
+    // empty list, and [] is not "missing", so none was ever recorded.
+    const finalVariables = Array.isArray(variables) && variables.length > 0
+      ? variables
+      : promptVariables(user_prompt_template)
 
     const { data, error } = await supabase
       .from('prompt_templates')
@@ -139,6 +138,9 @@ export async function PATCH(request: NextRequest) {
     delete updates.created_at
     delete updates.created_by
     delete updates.tenant_id
+    if (typeof updates.user_prompt_template === 'string') {
+      updates.variables = promptVariables(updates.user_prompt_template)
+    }
 
     const { data, error } = await supabase.from('prompt_templates').update(updates).eq('id', id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -171,4 +173,10 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+/** The {{variable}} names a prompt template uses, each once. */
+function promptVariables(template: string): string[] {
+  const matches = String(template || '').match(/\{\{(\w+)\}\}/g)
+  return matches ? [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '')))] : []
 }
