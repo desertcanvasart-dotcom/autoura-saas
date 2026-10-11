@@ -1,6 +1,52 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { ScreenshotPlaceholder, Tip } from '../layout'
+import { DocPager } from '../pager'
+
+const ROWS: Array<{ what: string; suppliers: string; properties: string; rates: string }> = [
+  {
+    what: 'Where',
+    suppliers: 'Suppliers → Import / Export: Sample sheet · Export suppliers · Import suppliers',
+    properties: 'Suppliers → Import / Export: Export properties · Import properties (no sample: start from an export)',
+    rates: 'Every rate page: Sample CSV · Export CSV · Import CSV',
+  },
+  {
+    what: 'A row matches',
+    suppliers: 'its Code, else its Name',
+    properties: 'its Property ID, else the same supplier, kind and name',
+    rates: 'its key — the Service Code on most sheets; Cruise Code on cruises; route, service type, city and vehicle on transportation; Name on extras; Cost Type on fixed costs',
+  },
+  {
+    what: 'Matched',
+    suppliers: 'updated',
+    properties: 'updated',
+    rates: 'updated',
+  },
+  {
+    what: 'Not matched',
+    suppliers: 'created, with the next SUP-#### if it has no code',
+    properties: 'created under its supplier',
+    rates: 'created — so a row with no key is added every time it is imported',
+  },
+  {
+    what: 'A blank cell',
+    suppliers: 'leaves the stored value',
+    properties: 'clears the field (a column the sheet lacks is left alone)',
+    rates: 'leaves the stored value',
+  },
+  {
+    what: 'A row with a problem',
+    suppliers: 'refused; the rest import',
+    properties: 'refused; the rest import',
+    rates: 'the whole file is refused — fix every row first; the preview lists them',
+  },
+  {
+    what: 'Preview before import',
+    suppliers: 'no',
+    properties: 'no',
+    rates: 'yes',
+  },
+]
 
 export default function BulkCsvPage() {
   return (
@@ -13,77 +59,114 @@ export default function BulkCsvPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Bulk Import (CSV)</h1>
       <p className="text-gray-600 mb-8">
-        Several parts of the app let you load many records from a spreadsheet instead of typing them
-        one at a time &mdash; suppliers, rates, and tour templates. They all work the same way, so
-        once you have done one you have done them all.
+        Suppliers, their properties, every rate table and your tours can be loaded from a spreadsheet
+        instead of typed one at a time. The pattern is the same everywhere &mdash; download a sample or
+        an export, fill it in, import it &mdash; and the differences that matter are in the table below.
+        Everything imports into your own agency&rsquo;s data and nowhere else, and only admins and
+        managers can import.
       </p>
 
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Sample &rarr; Export &rarr; Import</h2>
-        <p className="text-gray-600 mb-3">Wherever bulk import lives, you get the same three buttons:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li><strong>Sample CSV</strong> &mdash; downloads a sheet with the right column headers and one filled-in example row, so you never have to guess the shape.</li>
-          <li><strong>Export</strong> &mdash; downloads what is already in the app, in the same shape. Edit it and re-import to make changes in bulk.</li>
+          <li><strong>Sample</strong> &mdash; the right column headers and an example row, so you never guess the shape.</li>
+          <li><strong>Export</strong> &mdash; what is in the app now, in the same shape. Edit it and import it to change many records at once.</li>
           <li><strong>Import</strong> &mdash; reads a filled-in sheet back in.</li>
         </ul>
-        <ScreenshotPlaceholder caption="The Sample / Export / Import buttons on the Suppliers directory" />
+        <ScreenshotPlaceholder caption="The Import / Export menu on the Suppliers directory" />
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Import upserts by code</h2>
-        <p className="text-gray-600 mb-3">
-          Each row is matched on its stable code &mdash; a supplier&rsquo;s{' '}
-          <Link href="/docs/suppliers" className="text-primary-600 hover:underline">SUP-#### code</Link>,
-          a template code, a rate&rsquo;s key. If the code already exists the row updates it; if it is
-          new the row creates it. Running the same file twice is safe. Everything imports into your
-          own organization&rsquo;s data and nowhere else.
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">How each sheet imports</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold text-gray-900 border-b border-gray-200"></th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-900 border-b border-gray-200">Suppliers</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-900 border-b border-gray-200">Supplier properties</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-900 border-b border-gray-200">Rates</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-700">
+              {ROWS.map((r, i) => (
+                <tr key={r.what} className={`border-b border-gray-100 align-top ${i % 2 ? 'bg-gray-50/50' : ''}`}>
+                  <td className="px-3 py-2 font-medium whitespace-nowrap">{r.what}</td>
+                  <td className="px-3 py-2">{r.suppliers}</td>
+                  <td className="px-3 py-2">{r.properties}</td>
+                  <td className="px-3 py-2">{r.rates}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-gray-600 mt-3">
+          Codes and keys match whatever their letter case. Tours have their own two sheets and rules
+          &mdash; see <Link href="/docs/importing-tours" className="text-primary-600 hover:underline">Importing Tours</Link>.
         </p>
-        <Tip>
-          The example row in a Sample CSV uses an <code>EXAMPLE-</code> code, and import quietly skips
-          those. So you can download a sample, import it unchanged to prove the round-trip, and
-          nothing is created.
-        </Tip>
       </section>
 
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">What a sheet does and does not carry</h2>
-        <p className="text-gray-600 mb-3">
-          A row carries flat facts &mdash; names, types, durations, contact details, prices, and
-          semicolon-separated lists. It cannot carry a <em>nested</em> record. So where a thing has
-          children of its own, the children get a sheet of their own, one row each: a supplier&rsquo;s
-          properties, and a tour&rsquo;s days. Import writes only the columns in the sheet, so
-          re-importing a tour never wipes the days you have already built.
+        <p className="text-gray-600">
+          A row carries flat facts &mdash; names, types, contact details, prices, and lists separated
+          with semicolons. A record with children of its own gets a second sheet for them, one row each:
+          a supplier&rsquo;s properties, a tour&rsquo;s days. Some lists fit in one cell: a
+          supplier&rsquo;s several roles (<code>hotel | transport_company</code>), its properties&rsquo;
+          names (<code>hotel:Nile Star | ship:MS Hapi</code>), an activity&rsquo;s group-size bands
+          (<code>1-4:25; 5-8:40</code>), a cruise&rsquo;s sailing days (<code>mon;fri</code>).
         </p>
-        <Tip>
-          Tours are the clearest case: the tour is one sheet, its day-by-day itinerary is another, and
-          they are linked by the tour code. See{' '}
-          <Link href="/docs/importing-tours" className="text-primary-600 hover:underline">Importing Tours</Link>{' '}
-          for the order and the rules.
-        </Tip>
       </section>
 
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Nothing is guessed</h2>
-        <p className="text-gray-600 mb-3">The same rules apply to every sheet:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Headers are forgiving.</strong> Column order does not matter, and common variants of a name are accepted. A required column that is genuinely missing is reported once, about the file, with the columns it found instead.</li>
-          <li><strong>Unknown columns are named.</strong> A column the import does not read is listed in the result rather than silently dropped, so you can tell &ldquo;it was never read&rdquo; from &ldquo;it did not import&rdquo;.</li>
-          <li><strong>Vocabulary values accept words or keys.</strong> Type what you see on the form or the key behind it; a value that matches nothing in your vocabulary is refused by name with your valid options listed.</li>
-          <li><strong>A bad row is refused, not repaired.</strong> The reason names the row, the column and the value. Good rows in the same file still import.</li>
-          <li><strong>The example row is skipped.</strong> Any <code>EXAMPLE-</code> code is ignored, so a sample imported unedited creates nothing &mdash; and if every row is still an example, the import tells you that is why.</li>
+          <li>
+            <strong>Words from your vocabulary</strong> (types, tiers, board basis, vehicles, seasons) may be
+            written as you see them on the form or as the key behind them. One that matches nothing is refused.
+          </li>
+          <li>
+            <strong>Numbers and yes/no cells</strong> are checked: &ldquo;ten&rdquo; or &ldquo;ture&rdquo; is
+            refused, not stored as 0 or false. Yes/no accepts true/false, yes/no, y/n and 1/0.
+          </li>
+          <li>
+            <strong>Duplicates are refused.</strong> Two rows with the same code or key in one file, or a rate
+            key that two of your stored rates share (one row would overwrite both).
+          </li>
+          <li>
+            <strong>Headers.</strong> The supplier and property sheets accept common variants of a column name;
+            rate sheets want the column names as the sample and export write them. Columns an import does not
+            read are ignored.
+          </li>
+          <li>
+            <strong>The example row is skipped.</strong> The sample&rsquo;s example row (a code beginning{' '}
+            <code>EXAMPLE-</code>) is never imported, so a sample uploaded unedited creates nothing &mdash; and
+            a rates file holding only the example says so.
+          </li>
+          <li>
+            <strong>Preferred.</strong> A rate sheet that stars a hotel, ship or restaurant as Preferred takes
+            the star from the one that had it, as the star on the page does.
+          </li>
         </ul>
+        <Tip>
+          Export from the app you are importing into before you edit. A rate export is your agency&rsquo;s own
+          rates only &mdash; the shared catalogue rows are not in it, so importing it back never copies them.
+        </Tip>
       </section>
 
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Rates and the supplier code</h2>
-        <p className="text-gray-600 mb-3">
-          Rate sheets carry a <strong>supplier code</strong> column so each rate re-attaches to the
-          right supplier. If a rate names a code that does not exist in your organization, that row is
-          reported and skipped rather than guessed &mdash; import the supplier first (or fix the
-          code), then re-run. This is what lets a set of rates move cleanly between installs; the full
-          story is in <Link href="/docs/suppliers" className="text-primary-600 hover:underline">Suppliers</Link>.
+        <p className="text-gray-600">
+          Rate sheets that link a supplier carry a <strong>supplier code</strong> column, so each rate
+          re-attaches to the right supplier. A code your agency does not have is reported and that row
+          skipped &mdash; import the supplier first (or fix the code), then import again. A row with no code
+          but a supplier name is linked by the name when exactly one supplier has it, and reported when not.
+          Why codes matter: <Link href="/docs/suppliers" className="text-primary-600 hover:underline">Suppliers</Link>.
         </p>
       </section>
+
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/bulk-csv" />
     </div>
   )
 }

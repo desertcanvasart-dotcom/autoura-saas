@@ -125,9 +125,9 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Suppliers & Rates',
     items: [
-      { href: '/docs/suppliers', icon: Building2, title: 'Suppliers', description: 'Supplier directory with contact details and a portable SUP-#### code, CSV import/export, and property hierarchies for hotels, transport, guides and cruises.' },
-      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'Ready-made packages and rate management across every category, with per-rate CSV import and your own vocabulary on the labels.' },
-      { href: '/docs/bulk-csv', icon: Upload, title: 'Bulk Import (CSV)', description: 'The shared CSV pattern — download a sample, fill a row per record, import. How it upserts by code, what it never overwrites, and why an unknown supplier code is skipped.' },
+      { href: '/docs/suppliers', icon: Building2, title: 'Suppliers', description: 'Your supplier directory: several roles per supplier, a SUP-#### code each, their hotels, ships and trains, contracts, and import / export that updates by code.' },
+      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'The fourteen rate pages and the Rates Hub: what each rate holds, its currency, EU and non-EU prices, and CSV import.' },
+      { href: '/docs/bulk-csv', icon: Upload, title: 'Bulk Import (CSV)', description: 'Sample, export, import — and how the supplier, property and rate sheets each match rows, treat blank cells and refuse what they cannot read.' },
     ],
   },
   {
