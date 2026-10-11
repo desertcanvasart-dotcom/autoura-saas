@@ -13,13 +13,19 @@ export default function TenantDetailPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState('')
+  // The company's own WhatsApp number (migration 408); '' = the shared one.
+  const [whatsappNumber, setWhatsappNumber] = useState('')
+  const [whatsappMessage, setWhatsappMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
     async function load() {
       try {
         const res = await fetch(`/api/super-admin/tenants/${id}`)
         const json = await res.json()
-        if (json.success) setData(json.data)
+        if (json.success) {
+          setData(json.data)
+          setWhatsappNumber(json.data?.tenant?.whatsapp_number || '')
+        }
       } catch (err) {
         console.error(err)
       } finally {
@@ -43,6 +49,35 @@ export default function TenantDetailPage() {
       }))
     } catch (err) {
       console.error(err)
+    } finally {
+      setSaving('')
+    }
+  }
+
+  const handleSaveWhatsapp = async () => {
+    setSaving('whatsapp')
+    setWhatsappMessage(null)
+    try {
+      const res = await fetch(`/api/super-admin/tenants/${id}/whatsapp`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsapp_number: whatsappNumber }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setWhatsappNumber(json.whatsapp_number || '')
+        setData((prev: { tenant: Record<string, unknown> }) => ({ ...prev, tenant: { ...prev.tenant, whatsapp_number: json.whatsapp_number } }))
+        setWhatsappMessage({
+          ok: true,
+          text: json.whatsapp_number
+            ? `Saved. Messages to ${json.whatsapp_number} now reach this company, and its sends go out from it.`
+            : 'Saved. This company uses the shared number.',
+        })
+      } else {
+        setWhatsappMessage({ ok: false, text: json.error || 'Could not save the number' })
+      }
+    } catch {
+      setWhatsappMessage({ ok: false, text: 'Could not save the number' })
     } finally {
       setSaving('')
     }
@@ -198,6 +233,35 @@ export default function TenantDetailPage() {
             {/* Limits are no longer mirrored onto tenant_features — they come
                 from the tenant's plan, so read them there rather than from a
                 stale per-tenant copy. */}
+          </div>
+
+          {/* WhatsApp number — the Autoura team sets it (migration 408). */}
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
+            <h2 className="text-sm font-semibold text-white mb-1">WhatsApp number</h2>
+            <p className="text-xs text-gray-500 mb-3">
+              A sender in the platform&apos;s Twilio account. Messages to it reach this company — first-time senders included —
+              and its WhatsApp goes out from it. Leave blank to use the shared number.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="tel"
+                value={whatsappNumber}
+                onChange={e => setWhatsappNumber(e.target.value)}
+                placeholder="+81 3 1234 5678"
+                className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-600"
+              />
+              <button
+                onClick={handleSaveWhatsapp}
+                disabled={saving === 'whatsapp' || whatsappNumber === (tenant.whatsapp_number || '')}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg"
+              >
+                {saving === 'whatsapp' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save
+              </button>
+            </div>
+            {whatsappMessage && (
+              <p className={`text-xs mt-2 ${whatsappMessage.ok ? 'text-green-400' : 'text-red-400'}`}>{whatsappMessage.text}</p>
+            )}
           </div>
 
           {/* Members */}

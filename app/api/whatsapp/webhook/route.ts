@@ -13,10 +13,10 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { isValidTwilioSignature } from '@/lib/twilio-signature'
 import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import twilio from 'twilio'
 import { processIncomingMessage } from '@/lib/whatsapp-ai-agent'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import {
@@ -30,6 +30,7 @@ import { whatsappModel } from '@/lib/ai/models'
 import { notifyTeam, bellSnippet } from '@/lib/notifications'
 import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbound-client'
 import { toConversationPhone, conversationPhoneKeys } from '@/lib/whatsapp-phone'
+import { tenantForWhatsAppNumber } from '@/lib/whatsapp-tenant'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
@@ -83,7 +84,6 @@ async function handleTwilioWebhook(request: NextRequest, rawBody: string) {
     // SECURITY: Validate Twilio Signature
     // ============================================
     const signature = request.headers.get('x-twilio-signature')
-    const url = request.url
 
     if (!signature) {
       console.error('❌ Missing Twilio signature header')
@@ -101,7 +101,8 @@ async function handleTwilioWebhook(request: NextRequest, rawBody: string) {
       return twimlResponse(500)
     }
 
-    const isValid = twilio.validateRequest(authToken, signature, url, params)
+    // Any URL Twilio may have signed: the proxy's, the public, www or bare.
+    const isValid = isValidTwilioSignature(authToken, signature, request, params)
 
     if (!isValid) {
       console.error('❌ Invalid Twilio signature - possible unauthorized webhook')
@@ -336,9 +337,9 @@ interface InboundWhatsAppMessage {
 /**
  * A first-time WhatsApp contact becomes a prospect in the CRM, the way a
  * concierge brief does (lib/concierge-brief-intake.ts): name from the
- * profile, phone as the key. Needs a tenant — the platform has ONE WhatsApp
- * number and nothing maps it to a tenant, so this runs only when the tenant
- * is known from an existing conversation; a never-seen number still has
+ * profile, phone as the key. Needs a tenant: the company whose own number
+ * was written to (migration 408), or the one an existing conversation
+ * names. A never-seen number writing to the shared number still has
  * nowhere to land (see the error below).
  */
 async function createWhatsAppClient(
@@ -380,6 +381,7 @@ async function createWhatsAppClient(
 
 async function processInboundWhatsAppMessage({
   phoneNumber,
+  toNumber,
   body,
   messageSid,
   mediaUrl,
@@ -395,14 +397,30 @@ async function processInboundWhatsAppMessage({
   const supabase = createAdminClient()
 
   // ============================================
+  // STEP 0: The number it was sent TO (migration 408)
+  // ============================================
+  // A company's own number makes the message that company's — a first-time
+  // sender included. Any other number is the platform's shared one, routed
+  // as before by the conversation, else the client (lib/whatsapp-tenant).
+  let ownerTenantId: string | null = null
+  try {
+    ownerTenantId = await tenantForWhatsAppNumber(supabase as never, toNumber)
+  } catch (error) {
+    storeFailed('number lookup', error as Error)
+  }
+
+  // ============================================
   // STEP 1a: The conversation — it says whose contact this is
   // ============================================
-  const { data: existingConversation, error: conversationLookupError } = await supabase
+  let conversationQuery = supabase
     .from('whatsapp_conversations')
     .select('id, tenant_id, client_id')
     // "+…" and the legacy "…" the app stored before it kept the "+"
     // (documents audit, round 12) — one conversation either way.
     .in('phone_number', conversationPhoneKeys(phoneNumber))
+  // On a company's own number, only that company's conversation counts.
+  if (ownerTenantId) conversationQuery = conversationQuery.eq('tenant_id', ownerTenantId)
+  const { data: existingConversation, error: conversationLookupError } = await conversationQuery
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -424,7 +442,9 @@ async function processInboundWhatsAppMessage({
     .from('clients')
     .select('id, full_name, tenant_id')
     .eq('phone', phoneNumber)
-  if (existingConversation?.tenant_id) clientQuery = clientQuery.eq('tenant_id', existingConversation.tenant_id)
+  // The company the number or the conversation says, and only its clients.
+  const knownTenantId = ownerTenantId ?? existingConversation?.tenant_id ?? null
+  if (knownTenantId) clientQuery = clientQuery.eq('tenant_id', knownTenantId)
   const { data: clientMatches, error: clientLookupError } = await clientQuery.limit(10)
   if (clientLookupError) storeFailed('client lookup', clientLookupError)
   const existingClient = pickInboundClient((clientMatches ?? []) as InboundClientMatch[])
@@ -433,6 +453,19 @@ async function processInboundWhatsAppMessage({
     clientId = existingClient.id
     clientName = existingClient.full_name
     clientTenantId = existingClient.tenant_id
+  }
+
+  // A first message to a company's own number: the sender becomes its
+  // prospect and the conversation is opened under it below.
+  if (ownerTenantId && !existingConversation) {
+    if (!clientId) {
+      const created = await createWhatsAppClient(supabase, ownerTenantId, phoneNumber, senderName)
+      if (created) {
+        clientId = created.id
+        clientName = created.full_name
+      }
+    }
+    clientTenantId = ownerTenantId
   }
 
   // ============================================
@@ -490,10 +523,8 @@ async function processInboundWhatsAppMessage({
       tenantId = newConversation.tenant_id || clientTenantId
     }
   } else {
-    // A never-seen number: nothing maps the platform's WhatsApp number to a
-    // tenant, so there is no tenant to file the contact or the conversation
-    // under. Mapping the number to a tenant is the fix; see the comment on
-    // createWhatsAppClient.
+    // A never-seen number writing to the SHARED number: nothing says which
+    // company it is for. A company with its own number gets these (step 0).
     console.error('❌ Cannot create conversation: no tenant found for', phoneNumber)
   }
 

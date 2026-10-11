@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server'
 import { whatsAppProviderStatus } from '@/lib/whatsapp'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { sharedWhatsAppNumber, toWhatsAppE164 } from '@/lib/whatsapp-tenant'
 
 export async function GET() {
   try {
+    const auth = await requireAuth()
+    if (auth.error !== null) {
+      return NextResponse.json({ configured: false, error: auth.error }, { status: auth.status })
+    }
     const { provider, configured } = whatsAppProviderStatus()
 
     let hasCredentials: boolean
@@ -26,12 +32,24 @@ export async function GET() {
       phoneNumber = whatsappFrom?.replace('whatsapp:', '') || ''
     }
 
+    // The number THIS company's customers see (migration 408): its own when
+    // the Autoura team has set one, else the shared platform number.
+    let ownNumber: string | null = null
+    if (provider === 'twilio' && auth.tenant_id) {
+      const { data } = await createAdminClient()
+        .from('tenants').select('whatsapp_number').eq('id', auth.tenant_id).maybeSingle()
+      ownNumber = toWhatsAppE164((data as { whatsapp_number?: string | null } | null)?.whatsapp_number)
+    }
+    const sendingFrom = ownNumber ?? (provider === 'twilio' ? sharedWhatsAppNumber() : null) ?? phoneNumber
+
     return NextResponse.json({
       configured,
       provider,
       has_credentials: hasCredentials,
-      has_number: hasNumber,
-      whatsapp_number: phoneNumber,
+      has_number: hasNumber || !!ownNumber,
+      whatsapp_number: sendingFrom,
+      // true = the company's own number; false = the shared platform number.
+      own_number: !!ownNumber,
       business_name: process.env.BUSINESS_NAME || '',
       business_whatsapp: process.env.BUSINESS_WHATSAPP || '',
       features: {
