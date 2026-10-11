@@ -276,7 +276,7 @@ export class ToolExecutor {
 
   /**
    * The currency the trip is priced in: the tenant's run currency, as
-   * generate-itinerary labels its trips. The editor prices lines from the
+   * the Quote Builder's save labels its trips. The editor prices lines from the
    * rate tables in that currency and shows itinerary.currency beside them,
    * so a default_currency label put EUR rates under a USD sign.
    *

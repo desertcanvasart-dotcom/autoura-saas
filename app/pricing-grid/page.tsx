@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -29,6 +30,8 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import type { ExchangeRate } from '@/lib/currency'
 import { displayRate } from './lib/display-rate'
 import { takeConversation } from '@/lib/grid-handoff'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
+import type { LibraryGap, WrittenSource } from './components/DayRow'
 
 // ============================================
 // LOCAL STORAGE PERSISTENCE
@@ -528,6 +531,62 @@ function PricingGridContent() {
     setDays(prev => prev.map(d => d.id === dayId ? { ...d, ...partial } : d))
   }
 
+  // --- Write descriptions (lib/ai/day-writer.ts) ---
+  // From what each day sells and the agency's Content Library, in its
+  // Writing Rules. 'fill' writes only days with no description; 'rewrite'
+  // replaces the days named. The text lands on the days; the save stores it.
+  const dialog = useConfirmDialog()
+  const [writing, setWriting] = useState<'all' | number | null>(null)
+  const [writtenFrom, setWrittenFrom] = useState<Record<number, WrittenSource[]>>({})
+  const [libraryMissing, setLibraryMissing] = useState<LibraryGap[]>([])
+  const [offerWrite, setOfferWrite] = useState(false)
+  const writeDescriptions = async (mode: 'fill' | 'rewrite', dayNumbers?: number[]) => {
+    if (writing !== null || days.length === 0) return
+    setWriting(dayNumbers?.length === 1 ? dayNumbers[0] : 'all')
+    setOfferWrite(false)
+    try {
+      const res = await fetch('/api/pricing-grid/write-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days, tier: config.tier, tourName: config.tourName, pax: config.pax, mode, dayNumbers }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        showToast('error', data.error || 'Could not write the descriptions')
+        return
+      }
+      const written = (data.data?.written ?? []) as Array<{ dayNumber: number; title: string; description: string; sources: WrittenSource[] }>
+      if (written.length === 0) {
+        showToast('info', data.data?.note || 'Nothing to write')
+        return
+      }
+      const byDay = new Map(written.map(w => [w.dayNumber, w]))
+      setDays(prev => prev.map(d => {
+        const w = byDay.get(d.dayNumber)
+        return w ? { ...d, title: w.title, description: w.description } : d
+      }))
+      setWrittenFrom(prev => ({ ...prev, ...Object.fromEntries(written.map(w => [w.dayNumber, w.sources])) }))
+      const writtenDays = new Set(written.map(w => w.dayNumber))
+      setLibraryMissing(prev => [
+        ...prev.filter(m => !writtenDays.has(m.dayNumber)),
+        ...((data.data?.missing ?? []) as LibraryGap[]),
+      ])
+      showToast('success', `Wrote ${written.length} day${written.length === 1 ? '' : 's'} from your Content Library`)
+    } catch {
+      showToast('error', 'Could not write the descriptions')
+    } finally {
+      setWriting(null)
+    }
+  }
+  const rewriteDay = async (day: GridDay) => {
+    if (day.description.trim() && !(await dialog.confirm({
+      title: `Rewrite day ${day.dayNumber}?`,
+      message: 'Its title and description are replaced with new text from your Content Library.',
+      confirmText: 'Rewrite',
+    }))) return
+    await writeDescriptions('rewrite', [day.dayNumber])
+  }
+
   const updateSlot = (dayId: string, slotId: string, value: SlotValue) => {
     setDays(prev => prev.map(d => {
       if (d.id !== dayId) return d
@@ -661,6 +720,10 @@ function PricingGridContent() {
           if (!config.guideLanguage) setConfig(prev => ({ ...prev, guideLanguage }))
         }
         setDays(hydrated)
+        // The parse wrote its own brief descriptions: offer the library's.
+        setWrittenFrom({})
+        setLibraryMissing([])
+        setOfferWrite(hydrated.length > 0)
         // Which of the agency's day blocks is each day? The blocks then supply
         // the services (lib/day-blocks/match.ts); the AI's reading stays only
         // where no block fits, and is flagged.
@@ -1056,6 +1119,15 @@ function PricingGridContent() {
               )}
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => writeDescriptions('fill')}
+                disabled={writing !== null}
+                title="Write the days that have no description, from your Content Library and Writing Rules"
+                className="px-2.5 py-1 text-[11px] font-medium text-[#556B2F] hover:bg-[#556B2F]/10 rounded-md transition-colors disabled:opacity-50"
+              >
+                {writing === 'all' ? 'Writing…' : 'Write descriptions'}
+              </button>
+              <span className="text-gray-300">|</span>
               <button onClick={expandAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
                 Expand All
               </button>
@@ -1065,6 +1137,34 @@ function PricingGridContent() {
               </button>
             </div>
           </div>
+
+          {offerWrite && (
+            <div className="mb-2 flex items-center justify-between gap-3 px-3 py-2 text-xs bg-[#556B2F]/5 border border-[#556B2F]/20 rounded-lg">
+              <span className="text-gray-700">
+                The days have the parser&apos;s brief descriptions. Write them from your Content Library, in your house style?
+              </span>
+              <span className="flex items-center gap-2 shrink-0">
+                <button type="button" onClick={() => writeDescriptions('rewrite', days.map(d => d.dayNumber))}
+                  className="px-2.5 py-1 font-medium text-white bg-[#556B2F] rounded-md hover:bg-[#465a26]">
+                  Write descriptions
+                </button>
+                <button type="button" onClick={() => setOfferWrite(false)} className="text-gray-500 hover:underline">Not now</button>
+              </span>
+            </div>
+          )}
+          {libraryMissing.length > 0 && (
+            <details className="mb-2 px-3 py-2 text-xs bg-amber-50 border border-amber-200 rounded-lg">
+              <summary className="cursor-pointer text-amber-900 font-medium">
+                {libraryMissing.length} item{libraryMissing.length === 1 ? '' : 's'} not in your Content Library — the text for {libraryMissing.length === 1 ? 'it' : 'them'} is general
+              </summary>
+              <ul className="mt-1.5 space-y-0.5 text-amber-800">
+                {libraryMissing.map((m, i) => (
+                  <li key={`${m.dayNumber}-${m.kind}-${i}`}>Day {m.dayNumber}: {m.name} <span className="text-amber-600">({m.kind})</span></li>
+                ))}
+              </ul>
+              <Link href="/content-library" className="inline-block mt-1.5 text-amber-900 underline">Add them in the Content Library</Link>
+            </details>
+          )}
 
           {/* Day bar: every day at a glance, one click to jump to it */}
           <div className="sticky top-0 z-20 -mx-1 mb-2 px-1 py-1.5 bg-gray-50/95 backdrop-blur border-b border-gray-200">
@@ -1113,6 +1213,9 @@ function PricingGridContent() {
                 blockNote={blockNotes[day.id]}
                 onDismissBlockNote={() => setBlockNotes(prev => { const next = { ...prev }; delete next[day.id]; return next })}
                 onSaveAsBlock={canWriteBlocks ? () => setSavingBlockDayId(day.id) : undefined}
+                onRewriteDescription={() => rewriteDay(day)}
+                rewriting={writing === day.dayNumber || writing === 'all'}
+                writtenFrom={writtenFrom[day.dayNumber]}
               />
             ))}
           </div>
