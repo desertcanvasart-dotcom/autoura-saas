@@ -326,11 +326,17 @@ export class ToolExecutor {
 
       const filter = input.status_filter || 'all'
 
-      // Build itinerary query
+      // Build itinerary query — this company's trips only. The client id
+      // alone was the whole filter, and the webhook may hand the agent a
+      // service-role client (documents audit, round 13).
+      if (!this.tenantId) {
+        return { success: true, message: 'No trips found.', data: { itineraries: [], quotes: [] } }
+      }
       let itinQuery = this.supabase
         .from('itineraries')
         .select('id, itinerary_code, trip_name, start_date, end_date, total_days, status, num_adults, num_children')
         .eq('client_id', this.clientId)
+        .eq('tenant_id', this.tenantId)
         .order('start_date', { ascending: false })
         .limit(5)
 
@@ -543,12 +549,21 @@ export class ToolExecutor {
     tier?: string
   }): Promise<ToolResult> {
     try {
-      // Get the itinerary
+      // Only a trip of this company AND of the customer writing: the id
+      // came from the conversation, and it was looked up and updated by id
+      // alone — a customer could have the agent mark any company's trip
+      // "pending quote" and read back its name and code (documents audit,
+      // round 13).
+      if (!this.tenantId || !this.clientId) {
+        return { success: false, error: 'Itinerary not found' }
+      }
       const { data: itinerary, error: itinError } = await this.supabase
         .from('itineraries')
-        .select('*')
+        .select('id, itinerary_code, trip_name')
         .eq('id', input.itinerary_id)
-        .single()
+        .eq('tenant_id', this.tenantId)
+        .eq('client_id', this.clientId)
+        .maybeSingle()
 
       if (itinError || !itinerary) {
         return { success: false, error: 'Itinerary not found' }
@@ -561,7 +576,8 @@ export class ToolExecutor {
           status: 'pending_quote',
           updated_at: new Date().toISOString()
         })
-        .eq('id', input.itinerary_id)
+        .eq('id', itinerary.id)
+        .eq('tenant_id', this.tenantId)
 
       // Store notification for team
       await this.supabase.from('whatsapp_messages').insert({
@@ -1109,7 +1125,10 @@ export class WhatsAppAIAgent {
     supabase: SupabaseClient,
     conversationId: string,
     clientId: string | null,
-    phoneNumber: string
+    phoneNumber: string,
+    /** The conversation's company: the client, trips and quotes are read
+     *  within it only (documents audit, round 13). None: no client data. */
+    tenantId?: string | null
   ): Promise<ConversationContext> {
     const context: ConversationContext = {
       clientId,
@@ -1138,12 +1157,13 @@ export class WhatsAppAIAgent {
     }
 
     // Get client info if available
-    if (clientId) {
+    if (clientId && tenantId) {
       const { data: client } = await supabase
         .from('clients')
         .select('full_name, email, nationality, preferred_language')
         .eq('id', clientId)
-        .single()
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
 
       if (client) {
         context.clientName = client.full_name
@@ -1160,6 +1180,7 @@ export class WhatsAppAIAgent {
         .from('itineraries')
         .select('id, trip_name, start_date, end_date, status, total_days')
         .eq('client_id', clientId)
+        .eq('tenant_id', tenantId)
         .in('status', ['draft', 'confirmed', 'in_progress'])
         .order('start_date', { ascending: true })
         .limit(3)
@@ -1180,6 +1201,7 @@ export class WhatsAppAIAgent {
         .from('b2c_quotes')
         .select('id, quote_number, selling_price, currency, status, valid_until')
         .eq('client_id', clientId)
+        .eq('tenant_id', tenantId)
         .in('status', ['draft', 'sent', 'pending'])
         .order('created_at', { ascending: false })
         .limit(3)
@@ -1648,7 +1670,8 @@ export async function processIncomingMessage(
       supabase,
       conversationId,
       clientId,
-      phoneNumber
+      phoneNumber,
+      tenantId
     )
 
     // Generate response (with tools if enabled)
