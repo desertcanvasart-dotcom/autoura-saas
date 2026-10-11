@@ -358,10 +358,10 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
             <div className="text-right">
               <div className="text-sm text-gray-500 mb-1">Total Selling Price</div>
               <div className="text-3xl font-bold text-gray-900">
-                {quote.currency} {quote.selling_price.toLocaleString()}
+                {quote.currency} {Number(quote.selling_price ?? 0).toLocaleString()}
               </div>
               <div className="text-sm text-gray-500 mt-1">
-                {quote.currency} {quote.price_per_person.toLocaleString()} per person × {quote.num_travelers}
+                {quote.currency} {Number(quote.price_per_person ?? 0).toLocaleString()} per person × {quote.num_travelers}
               </div>
             </div>
           </div>
@@ -510,7 +510,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
               <div className="flex items-center justify-between py-3 border-t-2 border-gray-300 mt-3">
                 <span className="text-lg font-bold text-gray-900">Selling Price</span>
                 <span className="text-lg font-bold text-blue-600">
-                  {quote.currency} {quote.selling_price.toLocaleString()}
+                  {quote.currency} {Number(quote.selling_price ?? 0).toLocaleString()}
                 </span>
               </div>
 
@@ -518,7 +518,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
               <div className="flex items-center justify-between py-2 bg-gray-50 rounded-lg px-3 mt-2">
                 <span className="text-sm text-gray-600">Price per Person ({quote.num_travelers} travelers)</span>
                 <span className="text-sm font-bold text-gray-900">
-                  {quote.currency} {quote.price_per_person.toLocaleString()}
+                  {quote.currency} {Number(quote.price_per_person ?? 0).toLocaleString()}
                 </span>
               </div>
             </div>

@@ -13,6 +13,7 @@
 // repriced: the new price goes on a new draft instead.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { roundToCurrency } from '@/lib/currency-totals'
 
 /** Statuses whose price may still change. */
 export const OPEN_QUOTE_STATUSES = ['draft', 'sent', 'viewed'] as const
@@ -47,16 +48,19 @@ export async function findOpenGridQuote(db: SupabaseClient, itineraryId: string)
 }
 
 /** The fields a grid save sets on the quote. */
+// Rounded in the currency's own units, as the quote editor rounds them
+// (priceB2cQuote): a quote saved from the grid and then opened in the
+// editor read a different per-person price for the same figures.
 export function quotePriceFields(p: GridQuotePrice) {
-  const round2 = (n: number) => Math.round(n * 100) / 100
   const pax = Math.max(p.pax, 1)
+  const selling = roundToCurrency(p.sellingTotal, p.currency)
   return {
     num_travelers: pax,
     tier: p.tier,
     currency: p.currency,
     total_cost: p.supplierTotal,
     margin_percent: p.marginPercent,
-    selling_price: p.sellingTotal,
-    price_per_person: round2(p.sellingTotal / pax),
+    selling_price: selling,
+    price_per_person: roundToCurrency(selling / pax, p.currency),
   }
 }

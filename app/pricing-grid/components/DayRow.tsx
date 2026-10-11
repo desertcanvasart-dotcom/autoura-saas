@@ -9,6 +9,7 @@ import SlotRow from './SlotRow'
 import CitySelect from '@/components/CitySelect'
 import BlockPicker from '@/components/day-blocks/BlockPicker'
 import type { GridBlock } from '@/lib/day-blocks/grid-apply'
+import { getCurrencySymbol } from '@/lib/currency'
 
 /** A day block on a day: laid on it, suggested for it, or none fitting. */
 export interface BlockNote {
@@ -49,7 +50,8 @@ const APPLY_TO_ALL_SLOTS = new Set(['water'])
 export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote, onSaveAsBlock }: DayRowProps) {
   const calc: DayCalc = calculateDay(day, config)
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
-  const sym = config.currency === 'EUR' ? '€' : config.currency === 'USD' ? '$' : config.currency === 'GBP' ? '£' : config.currency
+  // The app's own symbols for all 12 currencies (it knew three).
+  const sym = getCurrencySymbol(config.currency)
 
   // Day-type + component override panel — collapsed by default to keep the
   // day editor tight; operators who care about the rich completeness gate

@@ -75,7 +75,7 @@ export default function TourProgramsPage() {
         </p>
         <h3 className="text-lg font-medium text-gray-900 mb-2">3. Auto-Created from New Quote</h3>
         <p className="text-gray-600 mb-3">
-          When you save a trip in the <strong>Quote Builder</strong> in <strong>B2B</strong> mode, a tour template and its first variation are created automatically, and the B2B Calculator opens on that variation (see <Link href="/docs/b2b-import" className="text-primary-600 hover:underline">Converting Itineraries to B2B</Link>).
+          When you save a trip in the <strong>Quote Builder</strong> in <strong>B2B</strong> mode, a tour template and its first variation are created automatically (one per itinerary &mdash; saving the trip again updates the same template), and the B2B Calculator opens on that variation (see <Link href="/docs/b2b-import" className="text-primary-600 hover:underline">Converting Itineraries to B2B</Link>).
         </p>
         <Tip>
           <strong>Note:</strong> The template holds the trip&apos;s day structure &mdash; cities, meals, cruise days and nights &mdash; not its specific hotels or prices.

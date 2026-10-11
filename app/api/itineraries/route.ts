@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { gateVolume, incrementVolumeUsage, loadUsageAnchor } from '@/lib/usage-enforcement'
+import { roleDenied } from '@/lib/api-role-gate'
+import type { TablesInsert } from '@/types/database.types'
+import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 
 // Generate unique itinerary code
 function generateItineraryCode(): string {
@@ -39,11 +42,32 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-
+    // effective_total: what the itinerary page shows — the services' client
+    // total when there are priced services, else the stored total_cost (a
+    // cache that can be 0 or stale: the list read "EUR 0" for priced trips).
+    const list = data || []
+    const servicesBy = new Map<string, PricedService[]>()
+    const ids = list.map(r => r.id)
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: svc } = await supabase
+        .from('itinerary_services')
+        .select('itinerary_id, total_cost, client_price')
+        .in('itinerary_id', ids.slice(i, i + 200))
+      for (const row of svc ?? []) {
+        if (!row.itinerary_id) continue
+        const bucket = servicesBy.get(row.itinerary_id) ?? []
+        bucket.push(row)
+        servicesBy.set(row.itinerary_id, bucket)
+      }
+    }
+    const rows = list.map(itinerary => ({
+      ...itinerary,
+      effective_total: effectiveItineraryTotal(itinerary, servicesBy.get(itinerary.id) ?? []),
+    }))
 
     return NextResponse.json({
       success: true,
-      data: data || []
+      data: rows
     })
   } catch (error: any) {
     console.error('❌ API error:', error)
@@ -69,6 +93,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
     if (!supabase) {
@@ -83,36 +109,36 @@ export async function POST(request: NextRequest) {
     const gate = await gateVolume(supabase, tenant_id!, 'itineraries', 'itineraries this year')
     if (!gate.ok) return gate.response!
 
-    const body = await request.json()
-
-    // Generate itinerary_code if not provided
-    if (!body.itinerary_code) {
-      body.itinerary_code = generateItineraryCode()
+    // Only the fields a new trip is made of. The body went to the insert
+    // whole, so a request could set its own status, totals, profit, owner,
+    // share token or created_at — or another tenant's client.
+    const raw = (await request.json().catch(() => ({}))) as Record<string, unknown>
+    const text = (k: string) => (typeof raw[k] === 'string' && (raw[k] as string).trim() ? (raw[k] as string).trim() : null)
+    const count = (k: string, min: number, fallback: number) => {
+      const n = Math.floor(Number(raw[k]))
+      return Number.isFinite(n) && n >= min ? n : fallback
     }
-
-    // Calculate total_days from dates if not provided
-    if (!body.total_days && body.start_date && body.end_date) {
-      body.total_days = calculateTotalDays(body.start_date, body.end_date)
-    } else if (!body.total_days) {
-      body.total_days = 1
+    const start_date = text('start_date')
+    const end_date = text('end_date')
+    const body: TablesInsert<'itineraries'> = {
+      tenant_id: tenant_id!,
+      itinerary_code: generateItineraryCode(),
+      status: 'draft',
+      client_name: text('client_name'),
+      client_email: text('client_email'),
+      client_phone: text('client_phone'),
+      trip_name: text('trip_name'),
+      start_date,
+      end_date,
+      total_days: start_date && end_date ? Math.max(calculateTotalDays(start_date, end_date), 1) : 1,
+      num_adults: count('num_adults', 1, 1),
+      num_children: count('num_children', 0, 0),
+      currency: text('currency') || 'EUR',
+      notes: text('notes'),
+      ...(text('tier') ? { tier: text('tier')! } : {}),
+      ...(text('package_type') ? { package_type: text('package_type')! } : {}),
+      total_cost: 0,
     }
-
-    // Set default status if not provided
-    if (!body.status) {
-      body.status = 'draft'
-    }
-
-    // Set default values for other required fields
-    body.num_adults = body.num_adults || 1
-    body.num_children = body.num_children || 0
-    body.total_cost = body.total_cost || 0
-    body.currency = body.currency || 'EUR'
-
-    // Set tenant_id and timestamps
-    body.tenant_id = tenant_id
-    const now = new Date().toISOString()
-    body.created_at = body.created_at || now
-    body.updated_at = now
 
     const { data, error } = await supabase
       .from('itineraries')

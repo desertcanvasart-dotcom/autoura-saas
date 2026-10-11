@@ -536,6 +536,14 @@ export default function ViewItineraryPage() {
 
   const [sharing, setSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
+  // The link the trip already has, so the menu offers Copy and Revoke for it.
+  useEffect(() => {
+    if (!itinerary?.id) return
+    fetch(`/api/itineraries/${itinerary.id}/share`)
+      .then(r => r.json())
+      .then(d => { if (d?.success) setShareUrl(d.url ?? null) })
+      .catch(() => undefined)
+  }, [itinerary?.id])
 
   // A share link IS a send path: the API refuses drafts and non-deliverable
   // prices with the same gate as email/WhatsApp. Idempotent — clicking again
@@ -614,7 +622,7 @@ export default function ViewItineraryPage() {
     if (!itinerary) return
   
     if (!itinerary.client_phone) {
-      showToast('error', 'Client phone number is required for WhatsApp. Please add it in edit mode.')
+      showToast('error', 'Client phone number is required for WhatsApp. Add it in the Quote Builder (Client & Trip Details) and save.')
       return
     }
   
@@ -650,10 +658,15 @@ export default function ViewItineraryPage() {
   }
 
   const handleSendEmail = async () => {
-    if (!itinerary || days.length === 0) return
+    if (!itinerary) return
+    // It returned silently with no days: the click did nothing at all.
+    if (days.length === 0) {
+      showToast('error', 'This trip has no days yet — add them before sending it.')
+      return
+    }
 
     if (!itinerary.client_email) {
-      showToast('error', 'Client email is required. Please add it in edit mode.')
+      showToast('error', 'Client email is required. Add it in the Quote Builder (Client & Trip Details) and save.')
       return
     }
 

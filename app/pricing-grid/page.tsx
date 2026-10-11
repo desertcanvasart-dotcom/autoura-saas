@@ -12,6 +12,7 @@ import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
 import { repickVehicles } from './lib/option-filters'
+import { optionItems, cruiseForTier } from './lib/option-item'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
 import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
@@ -24,6 +25,10 @@ import InputPanel from './components/InputPanel'
 import DayRow from './components/DayRow'
 import GridSummary from './components/GridSummary'
 import { showToast } from '@/app/contexts/ToastContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import type { ExchangeRate } from '@/lib/currency'
+import { displayRate } from './lib/display-rate'
+import { takeConversation } from '@/lib/grid-handoff'
 
 // ============================================
 // LOCAL STORAGE PERSISTENCE
@@ -219,8 +224,14 @@ function PricingGridContent() {
     }
   }, [])
 
+  // A new start date can fall in another rate period: the hotels and cruises
+  // already picked take that period's rates ('all'), as the save would. They
+  // kept the old period's price on screen until the save repriced them.
+  const prevStartRef = useRef(config.startDate)
   useEffect(() => {
-    fetchRates(config.tier, config.startDate)
+    const dateChanged = prevStartRef.current !== config.startDate
+    prevStartRef.current = config.startDate
+    fetchRates(config.tier, config.startDate, dateChanged ? 'all' : undefined)
   }, [config.tier, config.startDate, fetchRates])
 
   // Auto-swap accommodation and cruise when tier changes
@@ -244,35 +255,17 @@ function PricingGridContent() {
           const newHotel = (rates as AllRates).accommodation.find(
             (r: any) => r.city?.toLowerCase()?.trim() === dayCity
           )
-          if (newHotel) {
-            return {
-              ...slot,
-              selectedItems: [{
-                rateId: newHotel.id,
-                name: newHotel.name,
-                rateEur: newHotel.rateEur,
-                rateNonEur: newHotel.rateNonEur,
-              }],
-            }
-          }
+          // With its single supplement, as a pick in the row makes it.
+          if (newHotel) return { ...slot, selectedItems: optionItems('accommodation', newHotel) }
           // No hotel in new tier for this city — clear selection
           return { ...slot, selectedItems: [] }
         }
 
-        // Swap cruise: pick the first cruise in the new tier
+        // Swap cruise: the same ship in the new tier, else one from the
+        // day's city, else the tier's first (option-item.ts).
         if (slot.slotId === 'cruise' && slot.selectedItems.length > 0) {
-          const newCruise = (rates as AllRates).cruise[0]
-          if (newCruise) {
-            return {
-              ...slot,
-              selectedItems: [{
-                rateId: newCruise.id,
-                name: newCruise.name,
-                rateEur: newCruise.rateEur,
-                rateNonEur: newCruise.rateNonEur,
-              }],
-            }
-          }
+          const newCruise = cruiseForTier(slot.selectedItems[0], day.city, (rates as AllRates).cruise)
+          if (newCruise) return { ...slot, selectedItems: optionItems('cruise', newCruise) }
           return { ...slot, selectedItems: [] }
         }
 
@@ -291,43 +284,27 @@ function PricingGridContent() {
     setDays(prev => repickVehicles(prev, routes, config.pax))
   }, [config.pax, rates])
 
-  // Pre-fetch all exchange rates once on mount, then currency switching is instant
-  const exchangeRatesCache = useRef<Record<string, number> | null>(null)
+  // The rates, once; the display currency converts from the run currency
+  // (display-rate.ts). A currency with no rate goes back to the run currency
+  // rather than show its symbol on unconverted amounts.
+  const { tenant } = useTenant()
+  const runCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
+  const [fxRates, setFxRates] = useState<ExchangeRate[] | null>(null)
   useEffect(() => {
-    const prefetch = async () => {
-      try {
-        const res = await fetch('/api/exchange-rates?base=EUR')
-        const data = await res.json()
-        if (data.success && data.data?.rates) {
-          exchangeRatesCache.current = data.data.rates
-          // Apply if currency is already non-EUR
-          if (config.currency !== 'EUR' && data.data.rates[config.currency]) {
-            setConfig(prev => ({ ...prev, exchangeRate: data.data.rates[prev.currency] }))
-          }
-        }
-      } catch (err) {
-        console.error('Failed to prefetch exchange rates:', err)
-      }
-    }
-    prefetch()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetch('/api/exchange-rates')
+      .then(r => r.json())
+      .then(d => setFxRates(d?.success && Array.isArray(d.data) ? d.data : []))
+      .catch(() => setFxRates([]))
   }, [])
-
-  // Apply exchange rate instantly from cache when currency changes
   useEffect(() => {
-    if (config.currency === 'EUR') {
-      if (config.exchangeRate !== null) {
-        setConfig(prev => ({ ...prev, exchangeRate: null }))
-      }
-      return
+    const shown = displayRate(runCurrency, config.currency, fxRates)
+    if (shown.ok) {
+      if (config.exchangeRate !== shown.rate) setConfig(prev => ({ ...prev, exchangeRate: shown.rate }))
+    } else if (shown.reason !== 'loading') {
+      showToast('error', shown.reason)
+      setConfig(prev => ({ ...prev, currency: runCurrency, exchangeRate: null }))
     }
-    // Use cached rates (instant) — no API call needed
-    const cached = exchangeRatesCache.current
-    if (cached && cached[config.currency]) {
-      setConfig(prev => ({ ...prev, exchangeRate: cached[prev.currency] }))
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.currency])
+  }, [config.currency, config.exchangeRate, runCurrency, fxRates])
 
   // --- URL Params: Auto-load conversation from inbox redirect ---
   const searchParams = useSearchParams()
@@ -337,7 +314,11 @@ function PricingGridContent() {
   // Effect 1: Decode URL params and store text for parsing
   useEffect(() => {
     if (hasProcessedParams.current) return
-    const conversationParam = searchParams?.get('conversation')
+    // ?handoff=<id>: the conversation waits in sessionStorage (grid-handoff.ts);
+    // ?conversation= (base64) is the older way, still read.
+    const handoffParam = searchParams?.get('handoff')
+    const handedOff = handoffParam ? takeConversation(handoffParam) : null
+    const conversationParam = handedOff ?? searchParams?.get('conversation')
     if (!conversationParam) {
       // No conversation: "New booking" from a client's page (?clientId=) or
       // "New quote" from the quotes lists (?type=b2b|b2c) — a fresh grid for
@@ -380,7 +361,7 @@ function PricingGridContent() {
     hasProcessedParams.current = true
 
     // Decode conversation (handle both standard and URL-safe base64)
-    const isBase64 = searchParams?.get('encoded') === 'base64'
+    const isBase64 = !handedOff && searchParams?.get('encoded') === 'base64'
     let decodedText = conversationParam
 
     if (isBase64) {
@@ -704,6 +685,10 @@ function PricingGridContent() {
           ...(meta?.nationality && { nationality: meta.nationality }),
           // Client name: URL param takes precedence, then AI-extracted
           ...(meta?.clientName && !prev.clientName && { clientName: meta.clientName }),
+          // The email and phone the AI found (asked for, then dropped here).
+          // The office's own address is filtered at the save (own-address).
+          ...(meta?.clientEmail && !prev.clientEmail && { clientEmail: String(meta.clientEmail).trim() }),
+          ...(meta?.clientPhone && !prev.clientPhone && { clientPhone: String(meta.clientPhone).trim() }),
         }))
       } else {
         showToast('error', data.error || 'Failed to parse text')
@@ -731,6 +716,8 @@ function PricingGridContent() {
       const itn = headerData.data
       // The itinerary's tier comes with its own hotels: not a change to swap for.
       prevTierRef.current = itn.tier || 'standard'
+      // Nor is its date a change: its lines keep the prices they were saved at.
+      if (itn.start_date) prevStartRef.current = itn.start_date
 
       // Update config from itinerary
       setConfig(prev => ({
@@ -753,6 +740,12 @@ function PricingGridContent() {
         // still the best information available, and new saves are honest.
         packageType: (itn.package_type as GridConfig['packageType']) || 'full-package',
         partnerId: itn.partner_id || null,
+        // The trip's own pricing settings, so a re-save prices it as it was
+        // priced — reopening reset the margin, passport and nationality to
+        // whatever the last trip had.
+        ...(itn.margin_percent != null ? { marginPercent: Number(itn.margin_percent) } : {}),
+        ...(itn.is_euro_passport != null ? { passport: itn.is_euro_passport ? 'eu' as const : 'non_eu' as const } : {}),
+        ...(itn.nationality ? { nationality: itn.nationality } : {}),
         itineraryId: itn.id,
         itineraryCode: itn.itinerary_code,
         // A saved trip's guides are its own; the language follows them
@@ -796,6 +789,15 @@ function PricingGridContent() {
             intercity: dayData.intercity ?? undefined,
           }
         })
+        // The guide as it was saved: a priced trip with no guide line was
+        // saved with No Guide, and the throughout guide leaves its tagged
+        // bed / meal / seat lines. Reopening reset both to the defaults.
+        const allServices = (daysData.data as Array<{ services?: Array<{ description?: string | null }> }>).flatMap(d => d.services || [])
+        if (allServices.length > 0) {
+          const hasGuide = loadedDays.some(d => d.slots.some(sl => sl.slotId === 'guide' && (sl.selectedItems.length > 0 || sl.customAmount > 0)))
+          const throughout = allServices.some(sv => String(sv.description ?? '').includes('[pricing-grid:throughout_guide]'))
+          setConfig(prev => ({ ...prev, withGuide: hasGuide || throughout, guideMode: throughout ? 'throughout' : 'spot' }))
+        }
         // A saved line with no price (rate_eur defaults to 0) takes the rate
         // list's; priced lines keep the price they were saved at.
         setDays(rates ? hydrateDayRates(loadedDays, rates, 'missing').days : loadedDays)

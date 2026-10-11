@@ -83,6 +83,7 @@ export default function ExtrasPage() {
           Only <strong>Confirm</strong> changes what is owed: the extra is added to the trip total and balance (the
           deposit stays as it was &mdash; extras settle with the balance) and to the supplier manifest. An extra can
           also be <strong>Declined</strong> or <strong>Withdrawn</strong>; a sold extra is withdrawn, not deleted.
+          Confirming, and withdrawing a sold extra, are for managers and admins; members price, offer and decline.
         </p>
         <Tip>
           A confirmed extra in a different currency from the booking is not added to the trip total &mdash; the panel

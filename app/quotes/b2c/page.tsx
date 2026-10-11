@@ -912,10 +912,10 @@ export default function B2CQuotesPage() {
                       <div className="text-right">
                         <div className="text-xs text-gray-500 mb-1">Total Price</div>
                         <div className="text-2xl font-bold text-gray-900">
-                          {quote.currency} {quote.selling_price.toLocaleString()}
+                          {quote.currency} {Number(quote.selling_price ?? 0).toLocaleString()}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {quote.currency} {quote.price_per_person.toLocaleString()} / person × {quote.num_travelers}
+                          {quote.currency} {Number(quote.price_per_person ?? 0).toLocaleString()} / person × {quote.num_travelers}
                         </div>
                       </div>
 

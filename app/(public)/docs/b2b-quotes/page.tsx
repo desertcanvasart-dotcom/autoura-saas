@@ -15,7 +15,7 @@ export default function B2BQuotesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">B2B Quotes</h1>
       <p className="text-gray-600 mb-8">
-        B2B quotes are rate sheets for your partners: what a trip costs at each group size. They are made in the B2B Calculator, from a trip in the Quote Builder, or by the AI itinerary builder, and all of them land in <strong>Sell &rarr; B2B Quotes</strong> (managers and admins).
+        B2B quotes are rate sheets for your partners: what a trip costs at each group size. They are made in the B2B Calculator or from a trip in the Quote Builder, and all of them land in <strong>Sell &rarr; B2B Quotes</strong> (managers and admins).
       </p>
 
       {/* Creating */}
@@ -26,12 +26,12 @@ export default function B2BQuotesPage() {
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Calculate the price (see <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Pricing</Link>), and generate the rate sheet if the partner should see several group sizes</li>
-          <li>Click <strong>Save as Quote</strong></li>
+          <li>Click <strong>Save as Quote</strong> (<strong>Update Quote</strong> when the calculator was opened from the Quote Builder &mdash; it reprices that trip&apos;s quote)</li>
           <li>In <strong>Save Quote</strong>, choose the <strong>Partner</strong> (or <em>No partner / Direct client</em>), and add client details and notes for your own reference</li>
           <li>Click <strong>Save Quote</strong></li>
         </ol>
         <p className="text-gray-600 mt-3">
-          The server prices the quote again from the inputs you calculated &mdash; if a rate changed meanwhile, the banner says so and shows the price saved. The quote starts as a draft, valid for 30 days; <strong>View Quote</strong> opens it.
+          The server prices the quote again from the inputs you calculated &mdash; if a rate changed meanwhile, the banner says so and shows the price saved. A price with services that have no rate is saved only if you choose <strong>Save anyway</strong>. The quote starts as a draft, valid for 30 days; <strong>View Quote</strong> opens it, and shows the client details and notes you entered.
         </p>
         <ScreenshotPlaceholder caption="Save Quote dialog with the partner, client details and notes" />
       </section>
@@ -40,7 +40,7 @@ export default function B2BQuotesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Partners</h2>
         <p className="text-gray-600">
-          Your partners (tour operators and agencies) are in <strong>People &rarr; Partners</strong>, apart from your clients. Each has a <strong>Default Margin (%)</strong>, used when you make a B2B quote for them from the Quote Builder.
+          Your partners (tour operators and agencies) are in <strong>People &rarr; Partners</strong>, apart from your clients. Each has a <strong>Default Margin (%)</strong> (0% counts), which the Quote Builder puts in the margin when you pick the partner; a margin you change after that is the one the quote uses.
         </p>
         <DocScreenshot src="/docs/b2b-quotes/partners.jpg" alt="The B2B Partners page" />
       </section>
@@ -77,8 +77,8 @@ export default function B2BQuotesPage() {
           <li><strong>Quote PDF</strong> &mdash; Downloads the <strong>B2B Rate Sheet</strong>: your branding, partner information, trip details, the multi-pax table with the single supplement, validity, and your terms if set</li>
           <li><strong>Send Email</strong> &mdash; Emails it to the partner with the PDF attached (needs the partner&apos;s email)</li>
           <li><strong>WhatsApp</strong> &mdash; Sends the partner a link to the PDF</li>
-          <li><strong>Convert to Booking</strong> &mdash; Once the quote is <strong>Accepted</strong>; a quote converts once</li>
-          <li><strong>Edit</strong> &mdash; Tier, currency, tour leader, the cost components, status, validity, notes and terms. Saving these does not change the partner&apos;s price table: to change partner prices, make a new quote.</li>
+          <li><strong>Convert to Booking</strong> &mdash; Once the quote is <strong>Accepted</strong>; a quote converts once, then the button becomes <strong>View booking</strong></li>
+          <li><strong>Edit</strong> &mdash; Tier, currency, tour leader, the cost components, status, validity, notes and terms. Saving these does not change the partner&apos;s price table: to change partner prices, price the trip again. The currency is shown, not changed &mdash; a quote in another currency is priced again.</li>
         </ul>
         <p className="text-gray-600 mt-3">Sending by email or WhatsApp moves a draft to <strong>Sent</strong>.</p>
       </section>
