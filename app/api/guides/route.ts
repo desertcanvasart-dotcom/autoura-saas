@@ -1,7 +1,7 @@
 // ============================================
 // API Route: /api/guides
 // ============================================
-// Fetches guides from suppliers table (type='guide')
+// Fetches guides from suppliers table (any supplier whose types include 'guide')
 // GET: List all guides (with filters)
 // ============================================
 
@@ -10,6 +10,8 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
 import { sumByCurrency } from '@/lib/currency-totals'
+import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
+import { supplierTypesOrFilter } from '@/lib/suppliers/type-filter'
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,11 +36,18 @@ export async function GET(request: NextRequest) {
     const exclude_itinerary_id = searchParams.get('exclude_itinerary_id')
     const with_stats = searchParams.get('with_stats') === 'true'
 
-    // Build query - fetch from suppliers table with supplier_type='guide'
+    // Every supplier that GUIDES, as any of its roles: the picker filtered on
+    // the legacy supplier_type alone, so a transport company that also guides
+    // never appeared (documents audit, round 12). The agency's own types that
+    // behave as a guide count too, as on /api/suppliers; the vocabulary is
+    // read through the caller's RLS client so it is this tenant's.
+    const guideKeys = authResult.supabase
+      ? await supplierTypeKeysForBehaviors(authResult.supabase, ['guide'])
+      : ['guide']
     let query = supabase
       .from('suppliers')
       .select('*')
-      .eq('supplier_type', 'guide')
+      .or(supplierTypesOrFilter(guideKeys) ?? 'supplier_type.eq.guide')
       .eq('tenant_id', tenant_id)
       .order('name', { ascending: true })
 
@@ -169,7 +178,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create guide as a supplier. Set BOTH type and supplier_type: the GET
-    // list filters on supplier_type, and while a DB trigger mirrors the two,
+    // list also matches the legacy supplier_type, and while a DB trigger mirrors the two,
     // setting both keeps this correct even if that trigger is absent.
     // Note: suppliers has no specialties/daily_rate/hourly_rate columns —
     // guide rates live in guide_rates.

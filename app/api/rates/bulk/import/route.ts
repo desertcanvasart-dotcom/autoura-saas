@@ -11,6 +11,7 @@ import { loadVocabulary } from '@/lib/vocabulary-server'
 import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { linkRowsBySupplierName, supplierNameGapMessage } from '@/lib/rates/link-supplier-by-name'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function POST(request: NextRequest) {
   try {
@@ -343,12 +344,14 @@ export async function POST(request: NextRequest) {
         r => !r.supplier_id && String(r.supplier_name ?? '').trim()
       )
       if (needsLink) {
-        const { data: all } = await (supabase
-          .from('suppliers') as unknown as {
-            select(c: string): { eq(c: string, v: string): PromiseLike<{ data: Array<{ id: string; name: string | null }> | null }> }
-          })
+        // Paged: a plain select stops at 1000 rows, so a name past the
+        // 1000th supplier never linked (documents audit, round 12).
+        const { data: all } = await fetchAllPages((from, to) => supabase
+          .from('suppliers')
           .select('id, name')
           .eq('tenant_id', tenant_id)
+          .order('id', { ascending: true })
+          .range(from, to))
 
         const result = linkRowsBySupplierName(rowsToUpsert, all ?? [])
         supplierNamesLinked = result.linked

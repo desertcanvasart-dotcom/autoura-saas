@@ -40,7 +40,7 @@ function rows<T>(data: T[]) {
   const chain: Record<string, unknown> = {
     then: (resolve: (v: { data: T[]; error: null }) => unknown) => resolve({ data, error: null }),
   }
-  for (const method of ['eq', 'in', 'order', 'select']) chain[method] = () => chain
+  for (const method of ['eq', 'in', 'order', 'select', 'range']) chain[method] = () => chain
   return chain
 }
 
