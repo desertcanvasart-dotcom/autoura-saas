@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
 
 export default function FollowupsRemindersPage() {
   return (
@@ -85,17 +86,8 @@ export default function FollowupsRemindersPage() {
         <DocScreenshot src="/docs/followups-reminders/reminders.jpg" alt="Payment Reminders page with Pending/History tabs, stat tiles, and batch-send selection" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link href="/docs/profit-loss" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Profit &amp; Loss
-        </Link>
-        <Link href="/docs/tours-rates" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          Next: Tours &amp; Rates
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/followups-reminders" />
     </div>
   )
 }

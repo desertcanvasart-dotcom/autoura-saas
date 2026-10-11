@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
 
 export default function ProfitLossPage() {
   return (
@@ -106,17 +107,8 @@ export default function ProfitLossPage() {
         <DocScreenshot src="/docs/profit-loss/financial-reports.jpg" alt="Reports page with Overview, Revenue, Cash Flow, Tax Summary, and Commissions tabs" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link href="/docs/expenses-commissions" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Expenses &amp; Commissions
-        </Link>
-        <Link href="/docs/followups-reminders" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          Next: Follow-ups &amp; Reminders
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/profit-loss" />
     </div>
   )
 }

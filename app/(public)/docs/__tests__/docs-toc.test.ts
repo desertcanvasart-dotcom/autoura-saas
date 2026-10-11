@@ -47,3 +47,26 @@ describe('docs table of contents', () => {
     }
   })
 })
+
+describe('the docs follow the app', () => {
+  it('Communicate is second, under Home, and holds Concierge Leads — as in the app sidebar', () => {
+    expect(CATEGORIES.map(c => c.label).slice(0, 3)).toEqual(['Getting Started', 'Home', 'Communicate'])
+    const communicate = CATEGORIES.find(c => c.label === 'Communicate')!.items.map(i => i.href)
+    expect(communicate).toContain('/docs/concierge-leads')
+    const sidebar = readFileSync(join(process.cwd(), 'components/Sidebar.tsx'), 'utf8')
+    expect(sidebar.indexOf("title: 'Communicate'")).toBeLessThan(sidebar.indexOf("title: 'Sell'"))
+  })
+
+  it('every page’s previous / next comes from the TOC, never written by hand', async () => {
+    const { docNeighbours } = await import('@/app/(public)/docs/pager')
+    expect(docNeighbours('/docs/communication')).toMatchObject({
+      prev: { href: '/docs/analytics-reports' },
+      next: { href: '/docs/concierge-leads' },
+    })
+    for (const dir of pageDirs) {
+      const src = readFileSync(join(DOCS_DIR, dir.replace('/docs/', ''), 'page.tsx'), 'utf8')
+      expect(src, dir).not.toContain('{/* Navigation */}')
+      if (src.includes('<DocPager')) expect(src, dir).toContain(`<DocPager href="${dir}" />`)
+    }
+  })
+})
