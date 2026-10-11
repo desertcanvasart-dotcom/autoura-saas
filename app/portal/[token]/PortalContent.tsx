@@ -57,7 +57,7 @@ export default function PortalContent({ token, scope }: { token: string; scope: 
         <LeadCoordinator token={token} travellers={travellers} />
       )}
 
-      {scope === 'booking' && <ChangeRequestForm token={token} />}
+      {scope === 'booking' && !formLocked && <ChangeRequestForm token={token} />}
 
       {/* Options and upgrades: answer an offer, or ask for something. Never
           moves money — the office confirms. */}
