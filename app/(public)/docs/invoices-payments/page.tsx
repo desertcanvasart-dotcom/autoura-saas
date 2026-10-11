@@ -145,7 +145,7 @@ export default function InvoicesPaymentsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Receivables</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Receivables</strong> is an accounts receivable aging report of what clients owe you, bucketed into <strong>Current</strong>, <strong>1-30 Days</strong>, <strong>31-60 Days</strong>, and <strong>90+ Days</strong>. Filter by aging bucket, and use the <strong>Send Reminder</strong> action to email a payment reminder for an outstanding invoice.
+          <strong>Receivables</strong> is an accounts receivable aging report of what clients owe you, bucketed into <strong>Current</strong>, <strong>1-30 Days</strong>, <strong>31-60 Days</strong>, and <strong>90+ Days</strong>. Filter by aging bucket, and use the <strong>Send Reminder</strong> action to open a payment reminder email in your own mail program (the app&apos;s own reminders are on the Payment Reminders page).
         </p>
         <DocScreenshot src="/docs/invoices-payments/accounts-receivable.jpg" alt="Accounts Receivable aging report with Current, 1-30, 31-60, and 90+ day buckets" />
       </section>

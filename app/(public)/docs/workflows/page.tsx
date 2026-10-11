@@ -113,8 +113,8 @@ export default function WorkflowsPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Chasing Payments</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Go to <strong>Receivables</strong> (Finance group) to see everything clients still owe</li>
-          <li>Click the <strong>Send Reminder</strong> mail action on an overdue item &mdash; the reminder goes out by email</li>
-          <li>To review past and scheduled reminders for an invoice, open the invoice and follow its <strong>Reminder History</strong> to the Payment Reminders page</li>
+          <li>Click the <strong>Send Reminder</strong> mail action on an overdue item &mdash; it opens a reminder email in your own mail program, to send yourself</li>
+          <li>The app also emails reminders by itself, weekly from a week before the due date: open the invoice and click <strong>View All</strong> on its <strong>Reminder History</strong> for the Payment Reminders page</li>
         </ol>
         <p className="text-gray-600 mt-3">
           The invoice detail page itself gives you <strong>Send via WhatsApp</strong>, <strong>Download PDF</strong>, <strong>Mark as Sent</strong>, and <strong>Record Payment</strong>.

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { DocScreenshot, Tip } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 import { DocPager } from '../pager'
 
 export default function TasksDeparturesPage() {
@@ -15,80 +15,90 @@ export default function TasksDeparturesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Tasks, Departures &amp; Capacity</h1>
       <p className="text-gray-600 mb-8">
-        Three tools keep day-to-day operations on track: <strong>Tasks</strong> for team to-dos, <strong>Tour Departures</strong> for scheduled group departures, and the <strong>Capacity</strong> calendar for controlling how much your operation takes on per date. All three live in the sidebar under <strong>Operate</strong> &mdash; Tasks and Departures for admin and manager roles, the <strong>Capacity Calendar</strong> (right under Tour Departures) admin-only.
+        Three tools in the sidebar&apos;s <strong>Operate</strong> group: <strong>Tasks</strong> and <strong>Tour Departures</strong> for managers and admins, and the <strong>Capacity Calendar</strong> for admins.
       </p>
 
       {/* Tasks */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Tasks</h2>
         <p className="text-gray-600 mb-3">
-          The Tasks page (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/tasks</code>) tracks your team&rsquo;s work in three views &mdash; <strong>Kanban</strong>, <strong>Table</strong>, and <strong>List</strong>. Every task has:
+          The team&apos;s to-do board. Three views, by the icons at the top right: <strong>Kanban</strong> (the default, columns To Do, In Progress and Done), <strong>Table</strong> and <strong>List</strong>.
         </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
-          <li><strong>Status</strong> &mdash; To Do, In Progress, or Done</li>
-          <li><strong>Priority</strong> &mdash; low, medium, high, or urgent</li>
-          <li><strong>Assignee and due date</strong> &mdash; who does it and by when</li>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>Cards</strong> &mdash; Total, To Do, In Progress, Done, Overdue, Due Today, High Priority (high and urgent) and Archived, across all tasks</li>
+          <li><strong>Search tasks&hellip;</strong>, the quick filters <strong>Overdue</strong>, <strong>Due Today</strong> and <strong>This Week</strong> (the next seven days), and <strong>Filters</strong> for status, priority, who it is assigned to and due date</li>
+          <li><strong>Table</strong> sorts by title, status, priority, due date or assignee; Table and List show 10 to 100 per page</li>
+          <li>Overdue tasks are tinted red; a task due today has an amber date</li>
         </ul>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Adding a Task</h3>
         <p className="text-gray-600 mb-3">
-          Metric cards at the top show the totals at a glance: total tasks, overdue, due today, and high priority. Below them you can filter by search, status, priority, assignee, and due date, plus a <strong>Show archived</strong> toggle. The table view supports sorting and pagination.
+          <strong>+ Add Task</strong> asks for a <strong>Title</strong>, <strong>Description</strong>, <strong>Due Date</strong>, <strong>Priority</strong> (Low, Medium, High, Urgent), <strong>Assign To</strong>, <strong>Link To</strong> (a client or itinerary from a list; an invoice or expense by its ID) and <strong>Notes</strong>. A new task starts in To Do. The person it is assigned to is notified in the app and by email, with the due date &mdash; and again if it is reassigned to someone else.
         </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Working Through Tasks</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>Start</strong>, <strong>Complete</strong> and <strong>Reopen</strong> on a card; <strong>Mark Complete</strong> in the table; in List, click the status icon</li>
+          <li><strong>Archive</strong> puts any task away; <strong>Archive Done</strong> archives every finished one at once. <strong>Show Archived</strong> shows them, and <strong>Unarchive</strong> brings one back.</li>
+          <li><strong>Delete</strong> removes a task for good, after asking</li>
+          <li>The person assigned is reminded the day before a task is due, and again while it is overdue (every three days), as your notification settings allow</li>
+        </ul>
         <DocScreenshot src="/docs/tasks-departures/tasks.jpg" alt="Tasks page in Kanban view with metric cards across the top, the filter bar, and the To Do / In Progress / Done columns" />
 
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Linking tasks to records</h3>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Operations Tasks from a Trip</h3>
         <p className="text-gray-600 mb-3">
-          A task can be linked to an <strong>itinerary</strong>, <strong>client</strong>, <strong>invoice</strong>, or <strong>expense</strong>. The linked record shows on the task row and links straight through, so &ldquo;chase payment for invoice X&rdquo; is one click from the invoice itself.
+          On an itinerary, the <strong>Tasks</strong> card (<strong>Create tasks</strong> / <strong>Sync tasks</strong>) or <strong>&#8943; &rarr; Operations tasks</strong> turns the trip&apos;s services into one task per kind &mdash; Accommodation, Flights, Transportation, Guides, Airport services, Hotel services, Meals, Entrance tickets, Other services &mdash; each for the department that books it:
         </p>
-
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Assignment notifications</h3>
-        <p className="text-gray-600 mb-3">
-          Assigning a task to a team member notifies them with an in-app notification that includes the due date, so nothing relies on someone remembering to check the board.
-        </p>
-
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Archiving and deleting</h3>
-        <p className="text-gray-600">
-          Finished tasks are <strong>soft-archived</strong> rather than destroyed &mdash; use the <strong>Show archived</strong> toggle to bring them back into view, and the bulk action to <strong>archive all done tasks</strong> in one go. Hard delete is also available and asks for confirmation first.
-        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li>Each is due a set number of days before the trip (two weeks for hotels and flights, a week for transport and guides, fewer for the rest), and goes to the person you pick for each department</li>
+          <li>The task holds a <strong>Checklist</strong>: day, date, city, service and supplier for each line, with a box to tick and the supplier&apos;s confirmation number. Its status follows the ticks.</li>
+          <li><strong>Sync tasks</strong> after the trip changes: new lines are added, ticks and confirmation numbers are kept, and a line that left the trip is marked <em>&ldquo;No longer on the itinerary &mdash; cancel this booking&rdquo;</em> until you mark it <strong>Cancelled</strong></li>
+          <li>Kinds with no department set up are skipped, and said so</li>
+        </ul>
       </section>
 
       {/* Departures */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Tour Departures</h2>
         <p className="text-gray-600 mb-3">
-          The Departures page (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/departures</code>) lists your scheduled group-tour departures, each optionally linked to a tour template (see <Link href="/docs/tour-programs" className="text-primary-600 hover:underline">Tour Programs</Link>). Every departure carries a status with a colored badge:
+          Scheduled group departures &mdash; a tour on a date that travellers join. The list opens on <strong>Upcoming</strong>; the filter also offers All, Open, Limited, Full, Guaranteed and Cancelled, and <strong>Search tours&hellip;</strong> finds a tour by name or code. Each row shows the tour, its date and length, <strong>booked/max (N left)</strong> with a bar (yellow from 80%, red when full), the price per person, and its status.
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-          {['Draft', 'Open', 'Limited', 'Full', 'Guaranteed', 'Cancelled'].map((s) => (
-            <div key={s} className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 text-center">{s}</div>
-          ))}
-        </div>
-        <p className="text-gray-600 mb-3">
-          The list defaults to the <strong>Upcoming</strong> filter and can be searched by tour name. Each row shows the start date, duration, tour code, capacity as booked/max with spots remaining, an occupancy bar (yellow at 80% or more, red at 100% or more), and the price per person. You can change status inline from a dropdown on the row (hidden once a departure is cancelled or full) and delete with a confirmation.
-        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>Status</strong> &mdash; change it from the row. As bookings come in it turns <strong>Limited</strong> at 80% and <strong>Full</strong> at 100% by itself, and <strong>Guaranteed</strong> once a guaranteed departure reaches its minimum.</li>
+          <li><strong>Clone</strong> &mdash; the same tour on a new date</li>
+          <li><strong>Delete</strong> &mdash; only while it has no pending or confirmed bookings</li>
+        </ul>
         <DocScreenshot src="/docs/tasks-departures/departures.jpg" alt="Departures list with rows showing status badges, booked/max capacity with spots remaining, occupancy bars, and price per person" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Creating a departure</h3>
-        <p className="text-gray-600">
-          The <strong>New Departure</strong> modal takes a tour template, name, start date, duration, maximum and minimum pax, price per person, and the initial status.
+        <p className="text-gray-600 mt-3">
+          <strong>New Departure</strong> asks for the <strong>Tour Template</strong> (or a <strong>Tour Name</strong> and <strong>Duration</strong> without one), the <strong>Start Date</strong>, <strong>Max Pax</strong> and <strong>Min Pax</strong>, the <strong>Price per Person</strong>, and the <strong>Status</strong>: <em>Draft (not visible)</em> or <em>Open (accepting bookings)</em>. One departure per tour per date.
         </p>
         <DocScreenshot src="/docs/tasks-departures/new-departure-modal.jpg" alt="New Departure modal showing template, name, start date, duration, max/min pax, price per person, and status fields" />
+        <Tip>
+          The WhatsApp AI offers group tours from your departures that are Open, Limited or Guaranteed, have room for the party, and start after the booking cutoff.
+        </Tip>
       </section>
 
       {/* Capacity */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Capacity Calendar</h2>
         <p className="text-gray-600 mb-3">
-          The Capacity page (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/settings/capacity</code>, admin-only) is a month calendar with two views &mdash; <strong>General Capacity</strong> and <strong>Tours</strong>.
+          A month calendar of how much you can take on each day, read by the WhatsApp AI. Two views: <strong>General Capacity</strong> and <strong>Tour Departures</strong>.
         </p>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">General Capacity</h3>
-        <p className="text-gray-600 mb-3">
-          Each date gets a status &mdash; <strong>available</strong>, <strong>limited</strong>, <strong>busy</strong>, or <strong>blackout</strong> &mdash; plus per-date limits for maximum groups, guides, and vehicles, and a blackout reason where relevant. Edits are staged as you click through dates, then written all at once with the <strong>Save N Changes</strong> button.
-        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mb-3">General Capacity</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li>Click a date (today or later). <strong>Quick Status</strong> sets it <strong>Available</strong>, <strong>Limited</strong>, <strong>Busy</strong> or <strong>Blackout</strong>.</li>
+          <li><strong>Edit Capacity</strong> sets its <strong>Max Groups</strong> and <strong>Booked Groups</strong> (you keep this count; bookings do not change it), a <strong>Reason</strong> for a blackout, and <strong>Notes</strong></li>
+          <li>Changed dates are marked; <strong>Save N Changes</strong> saves them all. Leaving the page before saving loses them.</li>
+        </ul>
         <DocScreenshot src="/docs/tasks-departures/capacity.jpg" alt="Capacity calendar in General Capacity view showing a month with date statuses (available/limited/busy/blackout) and per-date capacity settings" />
         <Tip>
-          <strong>The WhatsApp AI reads this calendar.</strong> When a client asks about dates, the assistant answers according to the date status: <strong>available</strong> &rarr; confirms the dates; <strong>limited</strong> &rarr; suggests booking soon; <strong>busy</strong> &rarr; suggests alternative dates; <strong>blackout</strong> &rarr; says you&rsquo;re unavailable. Hotel availability still needs separate confirmation &mdash; the calendar covers your own operation&rsquo;s capacity only.
+          <strong>What the WhatsApp AI does with it:</strong> on a <strong>Blackout</strong> date it tells the client you are not operating, with your reason; when a date is full (<strong>Booked Groups</strong> at <strong>Max Groups</strong>) it says the dates are busy and offers others; otherwise it says the dates work. For a trip starting within three days it does not check the calendar and answers that the notice is short.
         </Tip>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Tours view</h3>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Tour Departures</h3>
         <p className="text-gray-600">
-          The <strong>Tours</strong> view overlays your departures on the same calendar, listing the departures on each date and linking through to <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/departures</code>.
+          Pick a tour or an itinerary from <strong>Select a tour or itinerary&hellip;</strong>. For a tour, the calendar shows its departures in the month, with the days each one runs; click a date for <strong>Departures on &hellip;</strong> with the seats booked and left. For an itinerary, it marks the trip&apos;s start and each of its days.
         </p>
       </section>
 
