@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAdminClient } from '@/lib/supabase-server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import twilio from 'twilio'
 import { processIncomingMessage } from '@/lib/whatsapp-ai-agent'
@@ -32,6 +32,19 @@ import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbou
 import { toConversationPhone, conversationPhoneKeys } from '@/lib/whatsapp-phone'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+
+/**
+ * The message could not be stored for a reason that may pass (the database
+ * was unreachable, a query failed). The webhook answers 500 so the provider
+ * delivers it again, instead of 200 — which lost it for good. A re-delivery
+ * of a message already stored is caught by the unique message_sid and never
+ * answered twice.
+ */
+class InboundStoreError extends Error {}
+
+function storeFailed(step: string, error: { message?: string } | null | undefined): never {
+  throw new InboundStoreError(`${step}: ${error?.message ?? 'unknown error'}`)
+}
 
 function twimlResponse(status: number) {
   return new NextResponse(TWIML_EMPTY, {
@@ -114,8 +127,9 @@ async function handleTwilioWebhook(request: NextRequest, rawBody: string) {
     return twimlResponse(200)
   } catch (error: any) {
     console.error('❌ Error processing WhatsApp webhook (twilio):', error)
-    // Still return 200 to Twilio to avoid retries
-    return twimlResponse(200)
+    // A message that could not be stored is asked for again; anything else
+    // is acknowledged, so a bad payload is not re-sent forever.
+    return twimlResponse(error instanceof InboundStoreError ? 500 : 200)
   }
 }
 
@@ -183,7 +197,11 @@ async function handleMetaWebhook(request: NextRequest, rawBody: string) {
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('❌ Error processing WhatsApp webhook (meta):', error)
-    // Still return 200 to Meta to avoid retries
+    // Meta re-delivers on a non-200: only for a message that could not be
+    // stored (see InboundStoreError).
+    if (error instanceof InboundStoreError) {
+      return NextResponse.json({ error: 'Could not store the message' }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   }
 }
@@ -324,7 +342,7 @@ interface InboundWhatsAppMessage {
  * nowhere to land (see the error below).
  */
 async function createWhatsAppClient(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof createAdminClient>,
   tenantId: string,
   phoneNumber: string,
   senderName: string | null
@@ -369,12 +387,17 @@ async function processInboundWhatsAppMessage({
   mediaType,
   senderName
 }: InboundWhatsAppMessage) {
-  const supabase = createClient()
+  // The service connection. The provider calls with no user session, and the
+  // WhatsApp tables only show and accept a signed-in user's own company's
+  // rows: on the anonymous browser client every lookup came back empty and
+  // every insert was refused, so incoming messages were dropped. Every query
+  // below is filtered by the tenant it resolved, or sets it on the row.
+  const supabase = createAdminClient()
 
   // ============================================
   // STEP 1a: The conversation — it says whose contact this is
   // ============================================
-  const { data: existingConversation } = await supabase
+  const { data: existingConversation, error: conversationLookupError } = await supabase
     .from('whatsapp_conversations')
     .select('id, tenant_id, client_id')
     // "+…" and the legacy "…" the app stored before it kept the "+"
@@ -383,6 +406,7 @@ async function processInboundWhatsAppMessage({
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (conversationLookupError) storeFailed('conversation lookup', conversationLookupError)
 
   // ============================================
   // STEP 1b: The client — of that conversation's tenant
@@ -401,7 +425,8 @@ async function processInboundWhatsAppMessage({
     .select('id, full_name, tenant_id')
     .eq('phone', phoneNumber)
   if (existingConversation?.tenant_id) clientQuery = clientQuery.eq('tenant_id', existingConversation.tenant_id)
-  const { data: clientMatches } = await clientQuery.limit(10)
+  const { data: clientMatches, error: clientLookupError } = await clientQuery.limit(10)
+  if (clientLookupError) storeFailed('client lookup', clientLookupError)
   const existingClient = pickInboundClient((clientMatches ?? []) as InboundClientMatch[])
 
   if (existingClient) {
@@ -441,6 +466,7 @@ async function processInboundWhatsAppMessage({
           updated_at: new Date().toISOString()
         })
         .eq('id', conversationId)
+        .eq('tenant_id', tenantId!)
         .is('client_id', null) // Only update if not already linked
     }
   } else if (clientTenantId) {
@@ -458,7 +484,7 @@ async function processInboundWhatsAppMessage({
       .single()
 
     if (convError) {
-      console.error('❌ Error creating conversation:', convError)
+      storeFailed('creating the conversation', convError)
     } else {
       conversationId = newConversation.id
       tenantId = newConversation.tenant_id || clientTenantId
@@ -501,7 +527,7 @@ async function processInboundWhatsAppMessage({
   const isDuplicateDelivery = msgError?.code === '23505'
 
   if (msgError && !isDuplicateDelivery) {
-    console.error('❌ Error storing message:', msgError)
+    storeFailed('storing the message', msgError)
   } else if (isDuplicateDelivery) {
     console.warn(`⚠️ Duplicate delivery of ${messageSid} — not replying again`)
   }
@@ -554,6 +580,7 @@ async function processInboundWhatsAppMessage({
             client_name: clientName,
           })
           .eq('id', threadId)
+          .eq('tenant_id', tenantId)
       } else {
         const { data: newThread, error: threadErr } = await supabase
           .from('communication_threads')
@@ -636,7 +663,8 @@ async function processInboundWhatsAppMessage({
           // Send the AI-generated response (via the active provider)
           const sendResult = await sendWhatsAppMessage({
             to: phoneNumber,
-            body: aiResponse.reply
+            body: aiResponse.reply,
+            tenantId
           })
 
           if (sendResult.success) {
