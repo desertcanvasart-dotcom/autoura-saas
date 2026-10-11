@@ -97,6 +97,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    // A blank price is not a free site: `|| 0` stored one as 0, and a body
+    // with only eur_rate made the site free for non-EU passports. The price is
+    // required; the non-EU price is the same unless given (as the form does).
+    const eurRate = parseFloat(body.eur_rate)
+    if (!Number.isFinite(eurRate)) {
+      return NextResponse.json({ success: false, error: 'Required: eur_rate (0 for a free site)' }, { status: 400 })
+    }
+    const nonEurRate = parseFloat(body.non_eur_rate)
 
 
     const newFee = {
@@ -106,8 +114,8 @@ export async function POST(request: NextRequest) {
       attraction_name: body.attraction_name,
       city: body.city,
       fee_type: body.fee_type || 'standard',
-      eur_rate: parseFloat(body.eur_rate) || 0,
-      non_eur_rate: parseFloat(body.non_eur_rate) || 0,
+      eur_rate: eurRate,
+      non_eur_rate: Number.isFinite(nonEurRate) ? nonEurRate : eurRate,
       student_discount_percentage: body.student_discount_percentage || 50,
       child_discount_percent: body.child_discount_percent || 50,
       season: body.season || 'all_year',
@@ -121,7 +129,9 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null
     }
 
-    const { data, error } = await (createAdminClient() as any)
+    // The caller's own RLS-bound client: the service key bypassed every
+    // policy for a write that only ever lands in the caller's tenant.
+    const { data, error } = await (authResult.supabase as any)
       .from('entrance_fees')
       .insert(newFee)
       .select('*')

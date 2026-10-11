@@ -322,7 +322,7 @@ export default function TransportationContent() {
     const classes = gridClasses(formData.vehicles)
     const offeredClasses = classes.filter(c => parseFloat(formData.vehicles[c.key]?.rate_eur ?? '') > 0)
     if (offeredClasses.length === 0) {
-      setError('Enter a EUR rate for at least one vehicle (leave others blank if not offered)')
+      setError('Enter a rate for at least one vehicle (leave others blank if not offered)')
       setSaving(false)
       return
     }

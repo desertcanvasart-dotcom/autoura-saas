@@ -149,7 +149,9 @@ export default function GuideRatesContent() {
   const fetchRates = async () => {
     try {
       const params = new URLSearchParams()
-      if (!showInactive) params.append('active_only', 'true')
+      // Every rate, inactive too: the list filters them (matchesActive). The
+      // fetch ran once, on mount, with active_only — so "Show All" had nothing
+      // to show and a deactivated rate could never be found to switch back on.
 
       const response = await fetch(`/api/rates/guides?${params}`)
       const data = await response.json()

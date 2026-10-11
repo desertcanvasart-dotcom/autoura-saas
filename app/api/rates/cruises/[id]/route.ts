@@ -112,8 +112,8 @@ export async function PUT(
       ship_name: body.ship_name,
       ship_category: body.ship_category || 'deluxe',
       route_name: body.route_name,
-      embark_city: body.embark_city || 'Luxor',
-      disembark_city: body.disembark_city || 'Aswan',
+      embark_city: body.embark_city || null,
+      disembark_city: body.disembark_city || null,
       // What was sent, or left as it is. This wrote `[4]` when the body had no
       // length — an edit from anywhere but the form turned any ship into a
       // four-night one.
@@ -177,7 +177,9 @@ export async function PUT(
       sightseeing_included: body.sightseeing_included || false,
       description: body.description || null,
       notes: body.notes || null,
-      supplements: body.supplements || [],
+      // Only when sent: the cruise form has no supplements field, and every save
+      // wrote [] over what the row had.
+      ...(Array.isArray(body.supplements) ? { supplements: body.supplements } : {}),
 
       updated_at: new Date().toISOString(),
       // LAST, so it wins: a rate IS its dated periods, and the first period is

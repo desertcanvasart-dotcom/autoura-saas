@@ -237,7 +237,9 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       )
     }
-    const { id, ...updates } = body
+    // A row never changes hands: tenant_id is not the body's to set.
+    const { id, tenant_id: _ignoredTenant, ...updates } = body
+    void _ignoredTenant
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
@@ -250,6 +252,7 @@ export async function PUT(request: NextRequest) {
         .from('transportation_rates')
         .select('*')
         .eq('id', id)
+        .eq('tenant_id', authResult.tenant_id)
         .single()
 
       if (current) {
@@ -278,6 +281,7 @@ export async function PUT(request: NextRequest) {
       .from('transportation_rates')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('*')
       .single()
 
@@ -327,6 +331,7 @@ export async function DELETE(request: NextRequest) {
       .from('transportation_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE transportation_rates error:', error)

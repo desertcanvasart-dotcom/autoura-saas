@@ -10,6 +10,8 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface FixedCost {
   rate_currency?: string | null
+  /** null = the platform's shared default, which this agency cannot edit. */
+  tenant_id?: string | null
   id: string
   cost_type: string
   cost_per_person_per_day: number
@@ -26,8 +28,10 @@ function FixedCostsContent() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true })
   const [saving, setSaving] = useState(false)
+  // A refused save or delete said nothing: the form just stayed open.
+  const [saveError, setSaveError] = useState<string | null>(null)
   const dialog = useConfirmDialog()
-  // Which currency this cost is entered in ('' = EUR default)
+  // Which currency this cost is entered in ('' = the agency's rates currency)
   const [rateCurrency, setRateCurrency] = useState('')
 
   const fetchCosts = useCallback(async () => {
@@ -51,7 +55,13 @@ function FixedCostsContent() {
         : { ...form, cost_per_person_per_day: parseFloat(form.cost_per_person_per_day) || 0, ...currencyPatch }
 
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      if (res.ok) {
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setSaveError(data?.error || `Could not save (${res.status})`)
+        return
+      }
+      setSaveError(null)
+      {
         setShowForm(false); setEditingId(null)
         setRateCurrency('')
         setForm({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true })
@@ -70,13 +80,21 @@ function FixedCostsContent() {
         body: JSON.stringify({ id: c.id }),
       })
       if (res.ok) fetchCosts()
+      else {
+        const data = await res.json().catch(() => null)
+        setSaveError(data?.error || `Could not delete (${res.status})`)
+      }
     } catch {}
   }
 
   const handleEdit = (c: FixedCost) => {
+    setSaveError(null)
     setRateCurrency((c as { rate_currency?: string | null }).rate_currency || '')
     setForm({ cost_type: c.cost_type, cost_per_person_per_day: String(c.cost_per_person_per_day), description: c.description || '', is_active: c.is_active })
-    setEditingId(c.id)
+    // The shared default (tenant_id null) is not this agency's to change —
+    // editing it matched no row and failed silently. Saving creates the
+    // agency's OWN cost of the same type, which pricing then uses instead.
+    setEditingId(c.tenant_id == null ? null : c.id)
     setShowForm(true)
   }
 
@@ -104,7 +122,7 @@ function FixedCostsContent() {
             <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-[#647C47]" /> Fixed Daily Costs
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Per-person daily costs (water, tips, service fees)</p>
+            <p className="text-sm text-gray-500 mt-0.5">Per-person costs per sightseeing day. Pricing reads the water cost (a type containing &ldquo;water&rdquo;); other types are kept for reference.</p>
           </div>
           <div className="flex items-center gap-2">
             <BulkRateImportExport tableName="fixed_costs" onImportComplete={fetchCosts} />
@@ -140,7 +158,10 @@ function FixedCostsContent() {
             {filtered.map(c => (
               <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-800">{c.cost_type}</h3>
+                  <h3 className="font-medium text-gray-800">
+                    {c.cost_type}
+                    {c.tenant_id == null && <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Shared default — edit to set your own</span>}
+                  </h3>
                   {c.description && <p className="text-sm text-gray-500">{c.description}</p>}
                 </div>
                 <div className="flex items-center gap-4">
@@ -150,7 +171,9 @@ function FixedCostsContent() {
                   </span>
                   <button onClick={() => handleEdit(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]" title="Edit"><Edit className="w-4 h-4" /></button>
                   <button onClick={() => handleClone(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]" title="Duplicate"><Copy className="w-4 h-4" /></button>
-                  <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                  {c.tenant_id != null && (
+                    <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                  )}
                 </div>
               </div>
             ))}
@@ -160,6 +183,7 @@ function FixedCostsContent() {
         {showForm && (
           <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5">
             <h3 className="font-medium text-gray-800 mb-3">{editingId ? 'Edit' : 'New'} Fixed Cost</h3>
+            {saveError && <div className="mb-3 p-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">{saveError}</div>}
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Cost Type</label>

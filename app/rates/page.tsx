@@ -197,6 +197,8 @@ type TabType = 'transportation' | 'guides' | 'entrances' | 'accommodation' | 'me
 export default function RatesPage() {
   const [rates, setRates] = useState<RatesData | null>(null)
   const [loading, setLoading] = useState(true)
+  // Tabs whose rates could not be loaded: shown as a warning, never as "0".
+  const [failedTabs, setFailedTabs] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCity, setSelectedCity] = useState('all')
@@ -305,6 +307,12 @@ export default function RatesPage() {
         }
 
         setRates(combinedData)
+        const loaded: Record<string, { success?: boolean }> = {
+          Transportation: transportationData, Guides: guidesData, Entrances: entrancesData, Hotels: accommodationData,
+          Meals: mealsData, 'Airport services': airportStaffData, 'Hotel services': hotelStaffData, Cruises: cruisesData,
+          'Sleeping trains': sleepingTrainsData, Trains: trainsData, Tipping: tippingData,
+        }
+        setFailedTabs(Object.entries(loaded).filter(([, d]) => !d?.success).map(([name]) => name))
 
         // Open on a tab that HAS something — the hub always opened on
         // Transportation, so an account whose only rates lived elsewhere
@@ -563,6 +571,11 @@ export default function RatesPage() {
 
       {/* Statistics Dashboard */}
       <div className="container mx-auto px-4 lg:px-6 py-6 print:hidden">
+        {failedTabs.length > 0 && (
+          <div className="mb-3 p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg">
+            Could not load: {failedTabs.join(', ')}. Those tabs may look empty — reload, or open their own page.
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
@@ -579,7 +592,7 @@ export default function RatesPage() {
               <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
             </div>
             <p className="text-xs text-gray-600">Categories</p>
-            <p className="text-2xl font-bold text-gray-900">11</p>
+            <p className="text-2xl font-bold text-gray-900">{RATES_TAB_ORDER.length}</p>
           </div>
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">

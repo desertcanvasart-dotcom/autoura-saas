@@ -300,12 +300,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Supabase error:', error)
-      // Return empty array instead of error for missing tables
-      return NextResponse.json({
-        success: true,
-        data: [],
-        count: 0
-      })
+      // An error, said as one. Answering success with no rows showed "0 rates"
+      // over a failed query — indistinguishable from an empty table.
+      return NextResponse.json(
+        { success: false, error: (error as { message?: string }).message || 'Could not load these rates' },
+        { status: 500 }
+      )
     }
 
     // A train rate names WHICH train it prices; the hub showed only the

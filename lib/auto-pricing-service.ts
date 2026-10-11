@@ -3348,7 +3348,7 @@ export async function calculateDayBasedPricing(
   const [mealRates, tippingRows, fixedDailyCosts] = await Promise.all([
     getMealRates(catalogScope, tier),
     loadTippingRows(catalogScope),
-    getFixedDailyCosts(),
+    getTenantRunCurrency(getSupabaseAdmin(), catalogScope.tenantId).then(run => getFixedDailyCosts(catalogScope.tenantId, run)),
   ])
   const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
 
@@ -4390,7 +4390,7 @@ export async function calculateDayBasedPricing(
       rateSource: 'fixed',
       isPerPax: true,
       isOptional: false,
-      notes: `€${waterCostPerPax}/day × ${sightseeingDays} days`
+      notes: `${waterCostPerPax}/day × ${sightseeingDays} days`
     })
   }
 

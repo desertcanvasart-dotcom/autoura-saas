@@ -3,7 +3,7 @@
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Plane, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -20,6 +20,7 @@ import { uniqueServiceCode } from '@/lib/rates/unique-code'
 // CONSTANTS
 // ============================================
 
+// Suggestions in the airport field, not a fixed list.
 const AIRPORTS = [
   { code: 'CAI', name: 'Cairo International' },
   { code: 'LXR', name: 'Luxor International' },
@@ -195,6 +196,12 @@ export default function AirportServicesPage() {
   
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<AirportStaffRate[]>([])
+  // The suggested airports plus every code the agency's rates already use.
+  const airportOptions = useMemo(() => {
+    const known = new Map(AIRPORTS.map(a => [a.code, a.name]))
+    for (const r of rates) if (r.airport_code && !known.has(r.airport_code)) known.set(r.airport_code, r.airport_code)
+    return [...known].map(([code, name]) => ({ code, name }))
+  }, [rates])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedAirport, setSelectedAirport] = useState('all')
@@ -221,7 +228,7 @@ export default function AirportServicesPage() {
 
   const [formData, setFormData] = useState({
     service_code: '',
-    airport_code: 'CAI',
+    airport_code: '',
     service_type: 'meet_greet',
     direction: 'arrival',
     rate_eur: 0,
@@ -297,7 +304,7 @@ export default function AirportServicesPage() {
     setEditingRate(null)
     setFormData({
       service_code: '',
-      airport_code: 'CAI',
+      airport_code: '',
       service_type: 'meet_greet',
       direction: 'arrival',
       rate_eur: 0,
@@ -577,7 +584,7 @@ export default function AirportServicesPage() {
               className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
             >
               <option value="all">All Airports</option>
-              {AIRPORTS.map(a => (
+              {airportOptions.map(a => (
                 <option key={a.code} value={a.code}>{a.code} - {a.name}</option>
               ))}
             </select>
@@ -771,16 +778,23 @@ export default function AirportServicesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Airport *</label>
-                  <select 
-                    name="airport_code" 
-                    value={formData.airport_code} 
-                    onChange={handleChange} 
+                  {/* Any airport's code — the five Egyptian ones were the only
+                      choice, so another country's agency could not price its
+                      own airports. They stay as suggestions. */}
+                  <input
+                    name="airport_code"
+                    value={formData.airport_code}
+                    onChange={e => setFormData(prev => ({ ...prev, airport_code: e.target.value.toUpperCase().slice(0, 4) }))}
+                    list="airport-code-options"
+                    placeholder="IATA code, e.g. CAI"
+                    required
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
-                  >
-                    {AIRPORTS.map(a => (
-                      <option key={a.code} value={a.code}>{a.code} - {a.name}</option>
+                  />
+                  <datalist id="airport-code-options">
+                    {airportOptions.map(a => (
+                      <option key={a.code} value={a.code}>{a.name}</option>
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Service Type *</label>

@@ -103,3 +103,58 @@ describe('suppliers', () => {
     expect(src).toContain('selectedSupplier.supplier_code &&')
   })
 })
+
+describe('rate pages', () => {
+  it('the currency picker offers the agency\'s currency as the blank choice, and EUR', () => {
+    const src = read('app/components/RateCurrencyField.tsx')
+    expect(src).not.toContain('<option value="">EUR (default)</option>')
+    expect(src).toContain('RATE_CURRENCIES.filter(c => c !== agencyCurrency)')
+  })
+
+  it('no rate form labels its amounts EUR whatever the currency', () => {
+    for (const f of ['app/rates/hotels/hotels-content.tsx', 'app/rates/cruises/page.tsx', 'app/rates/activities/activity-rates-content.tsx']) {
+      expect(read(f), f).not.toContain("currencyLabel={rateCurrency || 'EUR'}")
+    }
+    const flights = read('app/rates/flights/flights-content.tsx')
+    expect(flights).not.toContain('Base Rate (EUR)')
+    expect(flights).not.toContain('Tax (EUR)')
+  })
+
+  it('"Show All" can show inactive rates: the lists load them', () => {
+    for (const f of ['app/rates/guides/guide-rates-content.tsx', 'app/rates/meals/meal-rates-content.tsx',
+      'app/rates/activities/activity-rates-content.tsx', 'app/rates/trains/train-rates-content.tsx',
+      'app/rates/sleeping-train/sleeping-train-rates-content.tsx']) {
+      expect(read(f), f).not.toContain("if (!showInactive) params.append('active_only', 'true')")
+    }
+  })
+
+  it('editing a transport route keeps the fields the form does not show', () => {
+    const src = read('app/api/resources/transportation/route.ts')
+    expect(src).toContain("duration: kept('duration')")
+    expect(src).toContain("area: kept('area')")
+  })
+
+  it('hotel supplements are saved; a cruise save does not wipe them', () => {
+    for (const f of ['app/api/rates/hotels/route.ts', 'app/api/rates/hotels/[id]/route.ts']) {
+      expect(read(f), f).toContain('Array.isArray(body.supplements)')
+    }
+    expect(read('app/api/rates/cruises/[id]/route.ts')).not.toContain('supplements: body.supplements || []')
+  })
+
+  it('the engine prices water from this agency\'s row, not any agency\'s', () => {
+    expect(read('lib/fixed-costs.ts')).toContain('r.tenant_id == null || (tenantId != null && r.tenant_id === tenantId)')
+    expect(read('lib/auto-pricing-service.ts')).toContain('getFixedDailyCosts(catalogScope.tenantId, run)')
+  })
+
+  it('cities and airports are the agency\'s, not a fixed Egypt list', () => {
+    expect(read('app/rates/trains/train-rates-content.tsx')).not.toContain("'Damanhur'")
+    expect(read('app/rates/cruises/page.tsx')).not.toContain("const CITIES = ['Luxor'")
+    expect(read('app/rates/airport-services/page.tsx')).toContain('list="airport-code-options"')
+    expect(read('app/rates/flights/flights-content.tsx')).not.toContain('const domesticCities')
+  })
+
+  it('the hub says when a tab failed to load', () => {
+    expect(read('app/api/rates/route.ts')).not.toMatch(/Return empty array instead of error/)
+    expect(read('app/rates/page.tsx')).toContain('Could not load: {failedTabs.join')
+  })
+})

@@ -222,11 +222,15 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: 'Attraction not found' }, { status: 404 })
     }
     
-    // Check if attraction is used in any itinerary services
+    // Check if attraction is used in any itinerary services. A line keeps no
+    // rate id, so its NAME is matched — exactly, whatever the case. A substring
+    // match refused "Karnak Temple" because some trip had "Karnak Temple Sound
+    // & Light", and a name with % or _ matched unrelated lines.
+    const exactName = String(existing.attraction_name ?? '').replace(/[\\%_]/g, ch => `\\${ch}`)
     const { data: usedIn } = await supabase
       .from('itinerary_services')
       .select('id')
-      .ilike('service_name', `%${existing.attraction_name}%`)
+      .ilike('service_name', exactName)
       .limit(1)
     
     if (usedIn && usedIn.length > 0) {

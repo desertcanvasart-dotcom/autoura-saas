@@ -361,7 +361,7 @@ export default function HotelsContent() {
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
   // Labels must name the currency the amounts are actually in (C3.4b).
-  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
+  const { symbol: rateSymbol, code: rateCode } = useRateCurrency(rateCurrency)
   // Dated contract periods (C3.2). While any exist, they price the rate and
   // the fixed low/high/peak blocks below are only a fallback.
   const [periods, setPeriods] = useState<RateSeason[]>([])
@@ -1871,7 +1871,7 @@ export default function HotelsContent() {
                     entity="accommodation"
                     periods={periods}
                     onChange={setPeriods}
-                    currencyLabel={rateCurrency || 'EUR'}
+                    currencyLabel={rateCode}
                   />
                 </div>
 
@@ -1889,6 +1889,9 @@ export default function HotelsContent() {
                   Supplements
                   <span className="text-xs font-normal text-gray-500 ml-2">(Optional add-ons per night)</span>
                 </h3>
+                <p className="text-xs text-gray-500 -mt-2 mb-3">
+                  Kept on the rate for reference. Quotes do not add them automatically — add a supplement to a trip as an extra.
+                </p>
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                   {/* Add Supplement Dropdown */}
                   <div className="mb-4">

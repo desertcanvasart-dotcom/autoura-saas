@@ -205,6 +205,12 @@ export async function POST(request: NextRequest) {
 
       // Other
       notes: body.notes || null,
+      // Room supplements (sea view, half board …) as the form lists them. The
+      // column existed and the form had an editor, but this list left it out,
+      // so every supplement was dropped on save. Only when the body sends them.
+      ...(Array.isArray(body.supplements)
+        ? { supplements: body.supplements.filter((x: unknown) => x && typeof x === 'object' && typeof (x as { type?: unknown }).type === 'string') }
+        : {}),
       is_active: body.is_active !== false,
       // LAST, so it wins: a rate IS its dated periods, and the first period is
       // mirrored onto the base columns for readers that have no travel date. It
