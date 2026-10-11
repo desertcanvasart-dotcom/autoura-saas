@@ -30,7 +30,7 @@ export default function BookingsPage() {
           A new booking starts as <strong>Pending Deposit</strong>, with the deposit set by your company&apos;s deposit rule. A conversion is refused &mdash; and says why &mdash; when the quote has unpriced services, no price or no traveller count, when its itinerary has no dates, or when the trip is already booked.
         </p>
         <Tip>
-          A quote converts only once. Clicking <strong>Convert to Booking</strong> again says the booking already exists; find it under Bookings.
+          A quote converts only once: afterwards the button reads <strong>View booking BK-&hellip;</strong> and opens it. A quote with services that have no price asks first, and books it as it is if you choose <strong>Book as it is</strong>.
         </Tip>
       </section>
 
@@ -113,7 +113,10 @@ export default function BookingsPage() {
           <li>Answer the options and upgrades you offer, and ask for others</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          A request to add travellers shows at the top of the booking: <strong>Approve</strong> re-prices it per person and adds empty passenger rows; <strong>Reject</strong> declines it.
+          A request to add travellers shows on the <strong>Passengers</strong> tab: <strong>Approve</strong> re-prices it per person and adds empty passenger rows; <strong>Reject</strong> declines it.
+        </p>
+        <p className="text-gray-600 mt-3">
+          Once the details are final, <strong>Lock details</strong> (beside <strong>Portal link</strong>) stops changes: travellers still see the portal but can no longer edit their details, upload documents or ask for extras. <strong>Unlock details</strong> opens it again.
         </p>
       </section>
 

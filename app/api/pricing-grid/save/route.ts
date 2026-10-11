@@ -449,6 +449,10 @@ export async function POST(request: NextRequest) {
       try {
         const adminClient = createAdminClient()
         const { data: quoteNum } = await adminClient.rpc('generate_b2c_quote_number')
+        const newQuotePrice = quotePriceFields({
+          pax, tier: config.tier || 'standard', currency: recordCurrency,
+          supplierTotal: finalSupplierTotal, sellingTotal: finalSellingTotal, marginPercent: marginPct,
+        })
 
         const { data: quote, error: quoteError } = await supabase
           .from('b2c_quotes')
@@ -469,8 +473,9 @@ export async function POST(request: NextRequest) {
       // price had been calculated at 0 — the record then disagreed with
       // its own total.
       margin_percent: marginPct,
-            selling_price: finalSellingTotal,
-            price_per_person: round2(finalSellingTotal / pax),
+            // Rounded as the quote editor rounds (grid-quote-sync.ts).
+            selling_price: newQuotePrice.selling_price,
+            price_per_person: newQuotePrice.price_per_person,
             internal_notes: 'Created via Pricing Grid',
           })
           .select()

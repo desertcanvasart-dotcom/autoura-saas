@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * DELETE /api/quotes/b2b/bulk-delete
@@ -8,6 +9,8 @@ import { createAuthenticatedClient } from '@/lib/supabase-server';
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const gate = await gateRole('manage')
+    if (gate) return gate
     // Use authenticated client - RLS will enforce tenant isolation and role permission
     const supabase = await createAuthenticatedClient();
 

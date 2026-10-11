@@ -50,6 +50,7 @@ import {
 import { createClient } from '@/app/supabase'
 import { isBusinessEmail } from '@/lib/inbox-business-filter'
 import { sanitizeEmailHtml } from '@/lib/sanitize-html'
+import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
 
 // Email body formatter - converts ■ bullets to styled lists.
 // Sanitizes first: the body is attacker-controlled inbound email HTML and is
@@ -549,14 +550,12 @@ ${bodyText}`
     const senderEmail = extractEmailAddress(selectedEmail.from)
     const matchedClient = clients.find(c => c.email?.toLowerCase() === senderEmail.toLowerCase())
 
-    // Use base64 encoding to avoid URL issues with special characters
-    const encodedConversation = btoa(unescape(encodeURIComponent(conversationText)))
-
-    const params = new URLSearchParams({ 
-      conversation: encodedConversation, 
-      source: 'email',
-      encoded: 'base64'
-    })
+    // The text goes by sessionStorage, not the URL (lib/grid-handoff.ts):
+    // a long email made a URL too long to open.
+    const handoff = stashConversation(conversationText)
+    const params = new URLSearchParams(handoff
+      ? { handoff, source: 'email' }
+      : { conversation: toUrlBase64(conversationText), source: 'email', encoded: 'base64' })
 
     // The pricing grid is the pricing engine: it decodes the conversation,
     // parses it into days and prices them, and saves onto the CRM client.

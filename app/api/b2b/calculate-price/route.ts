@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { priceVariation } from '@/lib/b2b/price-variation'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest) {
       { status: authResult.status }
     )
   }
+  const denied = roleDenied(authResult.role, 'manage')
+  if (denied) return denied
   const body = await request.json()
   const priced = await priceVariation(authResult.tenant_id, body)
   return NextResponse.json(priced.body, { status: priced.status })
@@ -30,6 +33,8 @@ export async function GET(request: NextRequest) {
       { status: authResult.status }
     )
   }
+  const denied = roleDenied(authResult.role, 'manage')
+  if (denied) return denied
 
   const { searchParams } = new URL(request.url)
   const variation_id = searchParams.get('variation_id')

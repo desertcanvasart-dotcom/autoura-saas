@@ -131,8 +131,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .from('entrance_fees')
     .select('id, attraction_name, city, eur_rate, non_eur_rate, rate_currency, is_active, addon_note, supplier_id, tenant_id')
     .eq('is_sellable_extra', true)
-    // The rate catalogue is tenant rows plus the shared global rows (tenant_id
-    // NULL), exactly as the engine reads it.
+    // The tenant's own rows, exactly as the engine reads the catalogue (there
+    // are no shared global rows any more — lib/catalog-scope.ts).
     .eq('tenant_id', tenantId)
   if (addonError) console.error('extras catalog: sellable attraction extras', addonError)
 

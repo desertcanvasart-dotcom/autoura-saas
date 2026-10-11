@@ -4,6 +4,8 @@ import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
 import { calculatorPricingTable, pickEditable, rateSheetFromPaxTable } from '@/lib/quotes/calculator-pricing-table'
 import { priceVariation } from '@/lib/b2b/price-variation'
 import { isBookableLine } from '@/lib/pricing/breakdown-order'
+import { roleDenied } from '@/lib/api-role-gate'
+import { isQuoteStatus, quoteStatusError } from '@/lib/quotes/quote-status'
 
 // ============================================
 // B2B QUOTES API — calculator save/list/update
@@ -25,6 +27,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -83,6 +87,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const body = await request.json()
     const {
@@ -120,6 +126,17 @@ export async function POST(request: NextRequest) {
     }
     if (!(result.total_cost > 0) || !(result.selling_price > 0)) {
       return NextResponse.json({ success: false, error: 'Pricing data is required' }, { status: 400 })
+    }
+    // A price with holes (a service with no rate, counted at 0) is not a rate
+    // sheet to send a partner. Saved only when the operator says to keep it
+    // as it is — the calculator asks.
+    if (result.complete === false && body.allow_incomplete !== true) {
+      return NextResponse.json({
+        success: false,
+        incomplete: true,
+        holes: result.holes ?? [],
+        error: `${(result.holes ?? []).length || 'Some'} service(s) have no rate, so this price is incomplete.`,
+      }, { status: 422 })
     }
     // The CHOSEN optional services travel with the quote as real services. A
     // no-rate line is a service to book; a line already inside another (a
@@ -164,13 +181,7 @@ export async function POST(request: NextRequest) {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + valid_days)
 
-    // b2b_quotes numbering comes from the shared RPC (tour_quotes had a
-    // trigger; this table does not)
-    const { data: quoteNum } = await (getSupabaseAdmin() as any).rpc('generate_b2b_quote_number')
-    const { data: quote, error } = await (getSupabaseAdmin() as any)
-      .from('b2b_quotes')
-      .insert({
-        tenant_id: authResult.tenant_id,
+    const fields = {
         variation_id,
         partner_id: partner_id || null,
         trip_name: tripName,
@@ -199,16 +210,64 @@ export async function POST(request: NextRequest) {
         guide_mode: !guideMode || guideMode === 'spot' ? null : guideMode,
         is_eur_passport: result.is_eur_passport,
         season: result.season,
-        status: 'draft',
         valid_until: validUntil.toISOString().split('T')[0],
         notes,
-        source: 'calculator',
-        quote_number: quoteNum || `B2B-${Date.now()}`,
-        // Attribution (mig 269/270): the staff member saving the quote.
-        created_by: created_by || authResult.user!.id
-      } as any)
-      .select()
-      .single()
+    }
+
+    // The Quote Builder already made this programme's quote and opened the
+    // calculator on it (?quote=…): saving here reprices THAT quote while it
+    // is still open, instead of leaving the partner two.
+    let target: { id: string } | null = null
+    if (typeof body.quote_id === 'string' && body.quote_id) {
+      const { data: open } = await getSupabaseAdmin()
+        .from('b2b_quotes')
+        .select('id')
+        .eq('id', body.quote_id)
+        .eq('tenant_id', authResult.tenant_id)
+        .in('status', ['draft', 'sent'])
+        .maybeSingle()
+      target = open
+    }
+
+    let quote: unknown
+    let error: { message: string } | null
+    if (target) {
+      ;({ data: quote, error } = await (getSupabaseAdmin() as any)
+        .from('b2b_quotes')
+        .update({ ...fields, updated_at: new Date().toISOString() })
+        .eq('id', target.id)
+        .eq('tenant_id', authResult.tenant_id)
+        .select()
+        .single())
+      if (!error) {
+        try {
+          await getSupabaseAdmin().rpc('create_b2b_quote_version', {
+            p_quote_id: target.id,
+            p_changed_by: authResult.user!.id,
+            p_change_reason: 'Repriced in the B2B Calculator',
+          })
+        } catch (versionError) {
+          console.error('Error creating quote version:', versionError instanceof Error ? versionError.message : versionError)
+        }
+      }
+    } else {
+      // b2b_quotes numbering comes from the shared RPC (tour_quotes had a
+      // trigger; this table does not)
+      const { data: quoteNum } = await (getSupabaseAdmin() as any).rpc('generate_b2b_quote_number')
+      ;({ data: quote, error } = await (getSupabaseAdmin() as any)
+        .from('b2b_quotes')
+        .insert({
+          ...fields,
+          tenant_id: authResult.tenant_id,
+          status: 'draft',
+          source: 'calculator',
+          quote_number: quoteNum || `B2B-${Date.now()}`,
+          // Attribution (mig 269/270): the staff member saving the quote.
+          created_by: created_by || authResult.user!.id,
+        } as any)
+        .select()
+        .single())
+    }
 
     if (error) {
       console.error('Error creating quote:', error)
@@ -217,7 +276,7 @@ export async function POST(request: NextRequest) {
 
     const q = quote as any
 
-    return NextResponse.json({ success: true, data: q }, { status: 201 })
+    return NextResponse.json({ success: true, data: q, action: target ? 'updated' : 'created' }, { status: target ? 200 : 201 })
 
   } catch (error: any) {
     console.error('Error in POST /api/b2b/quotes:', error)
@@ -234,6 +293,8 @@ export async function PUT(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const body = await request.json()
     const id = body?.id
@@ -245,6 +306,9 @@ export async function PUT(request: NextRequest) {
     // Only the editable fields — the body was spread into the update, so a
     // request could set any column, prices and partner included.
     const updates = pickEditable(body)
+    if (updates.status !== undefined && !isQuoteStatus('b2b', updates.status)) {
+      return NextResponse.json({ success: false, error: quoteStatusError('b2b') }, { status: 400 })
+    }
     if (updates.partner_id !== undefined) {
       const partnerCheck = await partnerInTenant(getSupabaseAdmin(), updates.partner_id, authResult.tenant_id)
       if (!partnerCheck.ok) {
@@ -279,6 +343,8 @@ export async function DELETE(request: NextRequest) {
       { status: authResult.status }
     )
   }
+  const denied = roleDenied(authResult.role, 'manage')
+  if (denied) return denied
 
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')

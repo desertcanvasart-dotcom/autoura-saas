@@ -109,6 +109,13 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/communications': ['admin', 'manager', 'member'],
   '/followups': ['admin', 'manager', 'member'],
   '/tours': ['admin', 'manager', 'member'],
+  // Sell: quotes and bookings for the sales team; B2B (quotes, partners, the
+  // calculator, transport packages) for managers and admins — as the sidebar
+  // shows them. With no entry, a viewer or member with the link got in.
+  '/quotes': ['admin', 'manager', 'member'],
+  '/quotes/b2b': ['admin', 'manager'],
+  '/b2b': ['admin', 'manager'],
+  '/bookings': ['admin', 'manager', 'member'],
   '/expenses': ['admin', 'manager', 'member'],
   '/reminders': ['admin', 'manager', 'member'],
   

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 import { priceB2cQuote } from '@/lib/quotes/b2c-quote-price';
 import { recordsInTenant } from '@/lib/quotes/records-in-tenant';
+import { roleDenied } from '@/lib/api-role-gate'
 
 /**
  * POST /api/quotes/b2c/from-itinerary
@@ -19,6 +20,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
     // Admin client with explicit tenant scoping (auth gate above is the security boundary)
     const supabase = createAdminClient()

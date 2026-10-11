@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { roleDenied } from '@/lib/api-role-gate'
 
 /**
  * GET /api/quotes/b2b
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const supabase = createAdminClient();
 
@@ -97,4 +100,4 @@ export async function GET(request: NextRequest) {
 }
 
 // No POST: creating a quote here stored every price the request sent, and
-// nothing in the app called it. A B2B quote is made from the calculator (/api/b2b/quotes) or a trip (/api/b2b/quote-from-itinerary, /api/quotes/b2b/from-itinerary), which price it on the server.
+// nothing in the app called it. A B2B quote is made from the calculator (/api/b2b/quotes) or a trip (/api/b2b/quote-from-itinerary), which price it on the server.

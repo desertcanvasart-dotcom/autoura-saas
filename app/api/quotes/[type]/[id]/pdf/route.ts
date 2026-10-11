@@ -6,6 +6,7 @@ import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * GET /api/quotes/[type]/[id]/pdf
@@ -25,6 +26,9 @@ export async function GET(
     }
 
     const { type, id } = await params
+    // B2B quotes are managers' and admins'.
+    const gate = type === 'b2b' ? await gateRole('manage') : null
+    if (gate) return gate
 
     if (type !== 'b2c' && type !== 'b2b') {
       return NextResponse.json(

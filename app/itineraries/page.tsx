@@ -17,7 +17,9 @@ interface Itinerary {
   total_days: number
   num_adults: number
   num_children: number
-  total_cost: number
+  total_cost: number | null
+  /** The total the itinerary page shows (GET /api/itineraries). */
+  effective_total?: number
   currency: string
   status: string
 }
@@ -403,7 +405,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     <div className="text-sm font-semibold text-gray-900">
-                      {itinerary.currency} {itinerary.total_cost.toFixed(0)}
+                      {itinerary.currency} {Number(itinerary.effective_total ?? itinerary.total_cost ?? 0).toFixed(0)}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-center whitespace-nowrap">

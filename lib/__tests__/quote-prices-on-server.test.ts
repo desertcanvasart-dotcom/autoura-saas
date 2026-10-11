@@ -27,7 +27,7 @@ vi.mock('@/lib/supabase-server', () => {
     single: async () => ({ data: { id: 'q1', quote_number: 'B2B-1', ...inserted }, error: null }),
   })
   return {
-    requireAuth: async () => ({ error: null, tenant_id: 't1', user: { id: 'u1' } }),
+    requireAuth: async () => ({ error: null, tenant_id: 't1', role: 'manager', user: { id: 'u1' } }),
     createAdminClient: () => ({ from: () => chain, rpc: async () => ({ data: 'B2B-1' }) }),
   }
 })

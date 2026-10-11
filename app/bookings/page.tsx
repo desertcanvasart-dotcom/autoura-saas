@@ -69,17 +69,17 @@ export default function BookingsPage() {
 
   const [bookingType, setBookingType] = useState<'all' | 'b2c' | 'b2b'>('all')
 
+  // The status filter is applied here, not by the API: fetching only the
+  // filtered status made every card and count read that status alone
+  // ("Total 3" under a "Confirmed" filter).
   useEffect(() => {
     fetchBookings()
-  }, [statusFilter, bookingType])
+  }, [bookingType])
 
   const fetchBookings = async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter)
-      }
       if (bookingType !== 'all') {
         params.append('quote_type', bookingType)
       }
@@ -100,6 +100,7 @@ export default function BookingsPage() {
   }
 
   const filteredBookings = bookings.filter(booking => {
+    if (statusFilter !== 'all' && booking.status !== statusFilter) return false
     if (!searchQuery) return true
     const search = searchQuery.toLowerCase()
     return (

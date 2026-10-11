@@ -15,6 +15,7 @@ import { nextStatus, isPriced, lineAmount, type ExtraAction, type BookingExtraLi
 import { recomputeBookingExtras } from '../recompute'
 import { manifestCost } from '@/lib/bookings/extra-supplier-cost'
 import type { ExchangeRate } from '@/lib/currency'
+import { roleDenied } from '@/lib/api-role-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,8 @@ const EXTRA_COLS =
 export async function PATCH(request: NextRequest, { params }: Ctx) {
   const auth = await requireAuth()
   if (auth.error !== null) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const denied = roleDenied(auth.role, 'staff')
+  if (denied) return denied
   const tenantId = auth.tenant_id
   const { id, eid } = await params
   const admin = extrasAdmin()
@@ -122,6 +125,13 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     updates.status = decision.status
     moneyMoves = decision.moneyMoves
 
+    // Confirming — or undoing a confirmation — is what moves money: managers
+    // and admins only. The rest (offering, declining, pricing an offer) is the
+    // sales conversation.
+    if (decision.status === 'confirmed' || extra.status === 'confirmed') {
+      const deniedConfirm = roleDenied(auth.role, 'manage')
+      if (deniedConfirm) return deniedConfirm
+    }
     if (decision.status === 'confirmed') {
       updates.confirmed_at = new Date().toISOString()
       updates.confirmed_by = auth.user.id
@@ -174,6 +184,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 export async function DELETE(_request: NextRequest, { params }: Ctx) {
   const auth = await requireAuth()
   if (auth.error !== null) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const denied = roleDenied(auth.role, 'staff')
+  if (denied) return denied
   const tenantId = auth.tenant_id
   const { id, eid } = await params
   const admin = extrasAdmin()

@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import type { SlotDefinition, SlotValue, RateOption, SelectedItem, PassportType } from '../types'
-import { supplementItem } from '../lib/single-supplement'
+import type { SlotDefinition, SlotValue, RateOption, PassportType } from '../types'
 import { citiesOf, facetsOf, filterOptions, humanize, onePerRoute, optionCities, routeKey, routeLabel, vehicleLabel, FACET_LABEL, type FacetField } from '../lib/option-filters'
+import { optionItems } from '../lib/option-item'
 
 /** Single-choice services picked from the filtered list rather than a plain
  *  select: every hotel of the tier, every guide, every cruise and cabin —
@@ -88,20 +88,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
       onChange({ ...value, selectedItems: [], customAmount: 0 })
       return
     }
-    const item: SelectedItem = {
-      rateId: opt.id,
-      name: opt.name,
-      rateEur: opt.rateEur,
-      rateNonEur: opt.rateNonEur,
-      serviceType: opt.service_type,
-      pricingClass: opt.pricing_class,
-      ...(opt.pricing_basis ? { pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null } : {}),
-    }
-    const items: SelectedItem[] = [item]
-    if (definition.slotId === 'accommodation') {
-      const supp = supplementItem(opt)
-      if (supp) items.push(supp)
-    }
+    const items = optionItems(definition.slotId, opt)
     onChange({ ...value, selectedItems: items, customAmount: 0 })
   }
 

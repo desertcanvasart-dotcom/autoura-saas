@@ -1,6 +1,7 @@
 import { dayTripFromItineraryDay } from '@/lib/pricing/day-trip'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // POST /api/b2b/create-template-from-itinerary
 // Converts a parsed itinerary into tour_template + tour_variation for B2B pricing
@@ -8,6 +9,8 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -27,15 +30,25 @@ export async function POST(request: NextRequest) {
 
     // 3. Fetch services
     const dayIds = days.map(d => d.id)
+    // The grid files its lines under itinerary_day_id (older rows: day_id).
+    // Reading day_id alone found none of them, so every grid trip's template
+    // came out with no airport or hotel services and no restaurant meals.
     const { data: services } = await supabase
-      .from('itinerary_services').select('day_id, service_type, service_name').in('day_id', dayIds)
+      .from('itinerary_services')
+      .select('day_id, itinerary_day_id, service_type, service_name, description')
+      .or(`itinerary_day_id.in.(${dayIds.join(',')}),day_id.in.(${dayIds.join(',')})`)
 
     const servicesByDay: Record<string, any[]> = {}
     for (const svc of (services || [])) {
-      if (!svc.day_id) continue
-      if (!servicesByDay[svc.day_id]) servicesByDay[svc.day_id] = []
-      servicesByDay[svc.day_id].push(svc)
+      const dayId = svc.itinerary_day_id ?? svc.day_id
+      if (!dayId) continue
+      if (!servicesByDay[dayId]) servicesByDay[dayId] = []
+      servicesByDay[dayId].push(svc)
     }
+    // Airport and hotel services are saved as 'transfer' / 'other'; the grid
+    // tags each line with its slot, which says which they were.
+    const isSlot = (s: any, slot: string, ...types: string[]) =>
+      String(s.description ?? '').includes(`[pricing-grid:${slot}]`) || types.includes(s.service_type)
 
     // 4. Build template itinerary JSONB
     const templateItinerary = days.map((day, index) => {
@@ -54,7 +67,7 @@ export async function POST(request: NextRequest) {
         dinner: hasMeal('dinner') ? 'external' : 'none',
       }
 
-      const isCruiseDay = daySvcs.some((s: any) => s.service_type === 'cruise') || day.is_cruise_day
+      const isCruiseDay = daySvcs.some((s: any) => s.service_type === 'cruise' || String(s.description ?? '').includes('[pricing-grid:cruise]')) || day.is_cruise_day
       const hasGuide = daySvcs.some((s: any) => s.service_type === 'guide')
       const isFirst = index === 0, isLast = index === days.length - 1
 
@@ -78,10 +91,10 @@ export async function POST(request: NextRequest) {
         ...(tripFrom ? { day_trip_from: tripFrom } : {}),
         accommodation_type: accommodationType,
         services: {
-          airport_arrival: isFirst && daySvcs.some((s: any) => s.service_type === 'airport_service' || s.service_type === 'airport_services'),
-          airport_departure: isLast && daySvcs.some((s: any) => s.service_type === 'airport_service' || s.service_type === 'airport_services'),
-          hotel_checkin: isFirst && daySvcs.some((s: any) => s.service_type === 'hotel_service' || s.service_type === 'hotel_services'),
-          hotel_checkout: isLast && daySvcs.some((s: any) => s.service_type === 'hotel_service' || s.service_type === 'hotel_services'),
+          airport_arrival: isFirst && daySvcs.some((s: any) => isSlot(s, 'airport_services', 'airport_service', 'airport_services')),
+          airport_departure: isLast && daySvcs.some((s: any) => isSlot(s, 'airport_services', 'airport_service', 'airport_services')),
+          hotel_checkin: isFirst && daySvcs.some((s: any) => isSlot(s, 'hotel_services', 'hotel_service', 'hotel_services')),
+          hotel_checkout: isLast && daySvcs.some((s: any) => isSlot(s, 'hotel_services', 'hotel_service', 'hotel_services')),
           guide_required: day.guide_required ?? hasGuide,
         },
       }
@@ -90,15 +103,12 @@ export async function POST(request: NextRequest) {
     // 5. Create template
     const cities = [...new Set(days.map(d => d.city).filter((c): c is string => c !== null))]
     const totalDays = itinerary.total_days || days.length
-    const cityPrefix = (cities[0] || 'EGY').substring(0, 3).toUpperCase()
-    const templateCode = `${cityPrefix}-MUL-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`
+    // One template per itinerary, named by its code: "Update B2B Quote" made a
+    // new template (and variation) on every save, under a random three-digit
+    // code that could also collide with one already there.
+    const templateCode = `TPL-${itinerary.itinerary_code}`.slice(0, 50)
     const tripName = itinerary.trip_name || 'Custom Tour'
-
-    const { data: template, error: templateError } = await supabase
-      .from('tour_templates')
-      .insert({
-        tenant_id,
-        template_code: templateCode,
+    const templateFields = {
         template_name: tripName,
         tour_type: totalDays <= 1 ? 'day_tour' : 'multi_day',
         duration_days: totalDays,
@@ -107,9 +117,16 @@ export async function POST(request: NextRequest) {
         short_description: 'Custom tour created from itinerary',
         itinerary: templateItinerary,
         is_active: true,
-        is_featured: false,
-      })
-      .select().single()
+    }
+    const { data: existingTemplate } = await supabase
+      .from('tour_templates').select('id')
+      .eq('tenant_id', tenant_id).eq('template_code', templateCode)
+      .maybeSingle()
+    const { data: template, error: templateError } = existingTemplate
+      ? await supabase.from('tour_templates').update(templateFields).eq('id', existingTemplate.id).select().single()
+      : await supabase.from('tour_templates')
+          .insert({ ...templateFields, tenant_id, template_code: templateCode, is_featured: false })
+          .select().single()
 
     if (templateError || !template) {
       return NextResponse.json({ success: false, error: templateError?.message || 'Failed to create template' }, { status: 500 })
@@ -119,7 +136,13 @@ export async function POST(request: NextRequest) {
     const variationName = `${tripName} - ${tier.charAt(0).toUpperCase() + tier.slice(1)}`
     const variationCode = `${templateCode}-${tier.toUpperCase()}`
 
-    const { data: variation, error: varError } = await supabase
+    const { data: existingVariation } = await supabase
+      .from('tour_variations').select('id')
+      .eq('tenant_id', tenant_id).eq('template_id', template.id).eq('variation_code', variationCode)
+      .maybeSingle()
+    const { data: variation, error: varError } = existingVariation
+      ? { data: existingVariation, error: null }
+      : await supabase
       .from('tour_variations')
       .insert({
         tenant_id,

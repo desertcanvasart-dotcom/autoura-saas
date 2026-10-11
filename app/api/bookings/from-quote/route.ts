@@ -8,6 +8,7 @@ import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
 import { roundToCurrency } from '@/lib/currency-totals'
 import { shiftDateISO } from '@/lib/today'
 import { tenantToday } from '@/lib/tenant-today'
+import { roleDenied } from '@/lib/api-role-gate'
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
     const { tenant_id, user } = authResult
 
@@ -61,6 +64,11 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'quote_type must be b2c or b2b' },
         { status: 400 }
       )
+    }
+    // B2B quotes are managers' and admins' (Sell → B2B Quotes).
+    if (quote_type === 'b2b') {
+      const deniedB2b = roleDenied(authResult.role, 'manage')
+      if (deniedB2b) return deniedB2b
     }
 
     // Fetch the quote (separate typed queries — the two tables share almost

@@ -1115,6 +1115,11 @@ export default function ItineraryEditorPage() {
                   if (response.ok) {
                     const invoice = await response.json()
                     router.push(fromThisPage(`/invoices/${invoice.id}`))
+                  } else {
+                    // A refusal (no price yet, an invoice already made…) said
+                    // nothing: the button simply did nothing.
+                    const body = await response.json().catch(() => ({}))
+                    showToast('error', body.error || 'Failed to create invoice')
                   }
                 }}
                 className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 flex items-center gap-1.5"
@@ -1125,9 +1130,12 @@ export default function ItineraryEditorPage() {
             )}
 
             {/* Documents Dropdown */}
-            <GenerateDocumentsButton 
+            {/* "Supplier docs", as on the itinerary page — there "Documents" is
+                the client's PDF, contract and invoice. */}
+            <GenerateDocumentsButton
               itineraryId={itinerary.id}
               itineraryCode={itinerary.itinerary_code}
+              label="Supplier docs"
             />
 
             {/* Contract Link */}

@@ -6,6 +6,7 @@ import B2BQuotePDF from '@/components/pdf/B2BQuotePDF';
 import React from 'react';
 import type { Tables } from '@/types/database.types';
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness';
+import { gateRole } from '@/lib/api-role-gate'
 
 type B2BQuoteWithRelations = Tables<'b2b_quotes'> & {
   b2b_partners: Pick<
@@ -54,6 +55,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage');
+    if (gate) return gate;
     const { id: quoteId } = await params;
 
     // Authenticate and get user
@@ -192,6 +195,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage');
+    if (gate) return gate;
     const { id: quoteId } = await params;
 
     // Authenticate and get user
@@ -238,6 +243,20 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: 'Quote not found' },
         { status: 404 }
+      );
+    }
+
+    // The same check as POST: the download was a way round it, and the page
+    // calls this one (asking first, and passing allow_incomplete).
+    const completeness = quoteCompleteness((quote as { services_snapshot?: unknown }).services_snapshot);
+    if (!completeness.complete && !allowsIncomplete(new URL(request.url).searchParams.get('allow_incomplete'))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}. Add the rates, or download it anyway.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
       );
     }
 

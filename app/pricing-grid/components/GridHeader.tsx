@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { GridConfig, GridTotals, ClientType, PassportType } from '../types'
 import { VocabSelect } from '@/components/vocabulary'
 import { convertAmount } from '../lib/calculator'
+import { useRole } from '@/hooks/useRole'
 
 interface GridHeaderProps {
   config: GridConfig
@@ -31,6 +32,9 @@ const DEFAULT_MARGINS: Record<ClientType, number> = {
 
 export default function GridHeader({ config, onChange, totals, guideLanguages = [] }: GridHeaderProps) {
   const [partners, setPartners] = useState<B2BPartner[]>([])
+  // B2B pricing is managers' and admins' (the B2B APIs refuse anyone else).
+  const { isAdmin, isManager } = useRole()
+  const canB2b = isAdmin || isManager
   const update = (partial: Partial<GridConfig>) => onChange({ ...config, ...partial })
   const sym = getCurrencySymbol(config.currency)
   const fmt = (n: number) => n.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -73,7 +77,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
       update({
         partnerId: partner.id,
         partnerName: partner.company_name,
-        marginPercent: Math.min(partner.default_margin_percent || DEFAULT_MARGINS.b2b, 100),
+        marginPercent: Math.min(partner.default_margin_percent ?? DEFAULT_MARGINS.b2b, 100),
       })
     } else {
       update({ partnerId: null, partnerName: '' })
@@ -146,7 +150,9 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
           <button
             type="button"
             onClick={toggleClientType}
-            className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap ${
+            disabled={!canB2b && config.clientType === 'b2c'}
+            title={!canB2b && config.clientType === 'b2c' ? 'B2B quotes are made by managers and admins' : undefined}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-70 ${
               config.clientType === 'b2b'
                 ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
                 : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
@@ -240,7 +246,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
               min={0}
               max={100}
               value={config.marginPercent}
-              onChange={(e) => update({ marginPercent: Math.min(parseFloat(e.target.value) || 0, 100) })}
+              onChange={(e) => update({ marginPercent: Math.min(Math.max(parseFloat(e.target.value) || 0, 0), 100) })}
               style={{ width: '4rem', padding: '0.25rem 0.5rem' }}
               className="!w-16 h-8 !p-1 text-sm border !border-gray-300 rounded-lg text-center font-bold !text-gray-900 bg-white focus:ring-2 focus:ring-blue-200"
             />

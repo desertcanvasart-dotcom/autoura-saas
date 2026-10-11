@@ -5,6 +5,7 @@ import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { priceB2cQuote } from '@/lib/quotes/b2c-quote-price'
+import { VocabSelect } from '@/components/vocabulary'
 import {
   ArrowLeft, Save, Loader2, AlertCircle
 } from 'lucide-react'
@@ -240,34 +241,19 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Service Tier
                 </label>
-                <select
-                  value={tier}
-                  onChange={(e) => setTier(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="budget">Budget</option>
-                  <option value="standard">Standard</option>
-                  <option value="deluxe">Deluxe</option>
-                  <option value="luxury">Luxury</option>
-                </select>
+                {/* The agency's own tiers (Settings → Vocabulary), not four fixed names. */}
+                <VocabSelect kind="tier" value={tier} onChange={setTier} placeholder={null}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Currency
                 </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="EUR">EUR (€)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="EGP">EGP (E£)</option>
-                </select>
+                {/* Read-only: changing it relabelled the amounts without converting them
+                    (EUR 2,500 became "USD 2,500"). A quote in another currency is priced again. */}
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">{currency}</div>
+                <p className="mt-1 text-xs text-gray-500">The amounts are in this currency. To quote in another, price the trip again.</p>
               </div>
             </div>
           </div>

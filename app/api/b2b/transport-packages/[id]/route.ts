@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { sanitizePackageVehicles } from '@/lib/pricing/package-vehicle'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // ============================================
 // B2B TRANSPORT PACKAGES API - Single Item
@@ -19,6 +20,8 @@ export async function PUT(
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { id } = await params
     const body = await request.json()
@@ -69,6 +72,8 @@ export async function DELETE(
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { id } = await params
 

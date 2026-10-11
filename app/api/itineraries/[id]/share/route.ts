@@ -172,3 +172,24 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }
+
+// GET — the itinerary's live link, if it has one. The page asked only by
+// creating, so on every visit the menu offered "Create share link" (and no
+// Revoke) for a trip whose link the client already had.
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const auth = await requireAuth()
+  if (auth.error !== null) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  }
+  const { data } = await auth.supabase!
+    .from('itinerary_shares')
+    .select('token')
+    .eq('itinerary_id', id)
+    .eq('tenant_id', auth.tenant_id!)
+    .is('revoked_at', null)
+    .maybeSingle()
+  if (!data?.token) return NextResponse.json({ success: true, url: null })
+  const base = appRedirectBase(process.env.NEXT_PUBLIC_APP_URL, request.url)
+  return NextResponse.json({ success: true, token: data.token, url: new URL(`/share/${data.token}`, base).toString() })
+}

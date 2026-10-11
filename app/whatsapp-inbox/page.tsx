@@ -14,6 +14,7 @@ import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
 import { showToast } from '@/app/contexts/ToastContext'
 import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -841,15 +842,13 @@ export default function WhatsAppInboxPage() {
   const parseConversation = () => {
     if (!selectedConversation || messages.length === 0) return
     const conversationText = messages.map(m => `${m.direction === 'inbound' ? 'Client' : 'Agent'}: ${m.message_body}`).join('\n')
-    // URL-safe base64 encoding
-    const encoder = new TextEncoder()
-    const bytes = encoder.encode(conversationText)
-    const base64 = btoa(String.fromCharCode(...bytes))
-    // Make it URL-safe: replace + with -, / with _, remove =
-    const encoded = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-    // The pricing grid is the pricing engine: it decodes the conversation,
-    // parses it into days and prices them, and saves onto the CRM client.
-    const params = new URLSearchParams({ conversation: encoded, encoded: 'base64', source: 'whatsapp', phone: selectedConversation.phone_number })
+    // The pricing grid is the pricing engine: it parses the conversation into
+    // days, prices them, and saves onto the CRM client. The text goes by
+    // sessionStorage, not the URL (lib/grid-handoff.ts).
+    const handoff = stashConversation(conversationText)
+    const params = new URLSearchParams(handoff
+      ? { handoff, source: 'whatsapp', phone: selectedConversation.phone_number }
+      : { conversation: toUrlBase64(conversationText), encoded: 'base64', source: 'whatsapp', phone: selectedConversation.phone_number })
     if (selectedConversation.client_id) params.set('clientId', selectedConversation.client_id)
     const clientName = selectedConversation.clients?.full_name || selectedConversation.client_name
     if (clientName) params.set('clientName', clientName)
