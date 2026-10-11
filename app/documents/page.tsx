@@ -132,7 +132,7 @@ export default function DocumentsPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-blue-800 mb-2">💡 Quick Tips</h3>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Generate supplier documents from any itinerary using the "Documents" button</li>
+            <li>• Generate supplier documents from any itinerary using the "Supplier docs" button</li>
             <li>• Documents are auto-grouped by supplier from your itinerary services</li>
             <li>• Send vouchers directly via Email or WhatsApp to suppliers</li>
             <li>• Track confirmation status for each document</li>

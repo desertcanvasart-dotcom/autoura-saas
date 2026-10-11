@@ -13,8 +13,12 @@ export interface CruiseContentMatch {
   recommendedSuppliers: string[]
 }
 
+// TENANT: every read below is filtered to the generating company. The route
+// passes the service-role client, which bypasses RLS — unfiltered, another
+// company's content and writing rules went into this company's prompts.
 export async function findCruiseContent(
   supabase: any,
+  tenantId: string,
   cruiseDetection: CruiseDetectionResult,
   tier: ServiceTier,
   requestedDuration: number | null
@@ -49,6 +53,7 @@ export async function findCruiseContent(
           is_active
         )
       `)
+      .eq('tenant_id', tenantId)
       .eq('is_cruise', true)
       .eq('is_active', true)
       .eq('content_variations.is_active', true)
@@ -166,6 +171,7 @@ export interface WritingRule {
 
 export async function fetchContentLibrary(
   supabase: any,
+  tenantId: string,
   tier: string,
   cities: string[],
   interests: string[]
@@ -200,6 +206,7 @@ export async function fetchContentLibrary(
           )
         )
       `)
+      .eq('content_library.tenant_id', tenantId)
       .eq('tier', tier)
       .eq('is_active', true)
 
@@ -248,11 +255,12 @@ export async function fetchContentLibrary(
   }
 }
 
-export async function fetchWritingRules(supabase: any): Promise<WritingRule[]> {
+export async function fetchWritingRules(supabase: any, tenantId: string): Promise<WritingRule[]> {
   try {
     const { data: rules, error } = await supabase
       .from('writing_rules')
       .select('*')
+      .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .order('priority', { ascending: false })
 
