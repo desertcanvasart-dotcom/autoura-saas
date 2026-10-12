@@ -143,9 +143,9 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Finance',
     items: [
-      { href: '/docs/invoices-payments', icon: FileText, title: 'Invoices & Payments', description: 'Invoices, payments, receipts, receivables, payables, and supplier invoices with AI extraction.' },
-      { href: '/docs/expenses-commissions', icon: Wallet, title: 'Expenses & Commissions', description: 'Record trip expenses, track commissions, and export financial data.' },
-      { href: '/docs/profit-loss', icon: TrendingUp, title: 'Profit & Loss', description: 'Per-trip and aggregate P&L with multi-currency reporting and margin analysis.' },
+      { href: '/docs/invoices-payments', icon: FileText, title: 'Invoices & Payments', description: 'Invoices and their statuses, payments, receipts, what clients owe and what you owe suppliers — and supplier bills read by AI, matched to expenses, approved and paid.' },
+      { href: '/docs/expenses-commissions', icon: Wallet, title: 'Expenses & Commissions', description: 'Trip and office expenses, approvals and CSV export; commissions generated from a trip or added by hand; and the yearly Reports.' },
+      { href: '/docs/profit-loss', icon: TrendingUp, title: 'Profit & Loss', description: 'What each trip earned (invoices net of tax, or the quote), cost and paid in commission — trip by trip and in your agency’s currency.' },
     ],
   },
   {
