@@ -107,7 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fire-and-forget — presence must never affect the auth flow.
   useEffect(() => {
     if (!user) return
-    let lastInput = Date.now()
+    // No input yet: opening a page is not five minutes of work (the first
+    // beat on every load and new tab counted as focused).
+    let lastInput = 0
     const markInput = () => { lastInput = Date.now() }
     const INPUT_EVENTS: (keyof WindowEventMap)[] = ['keydown', 'pointerdown', 'scroll']
     INPUT_EVENTS.forEach(e => window.addEventListener(e, markInput, { passive: true }))

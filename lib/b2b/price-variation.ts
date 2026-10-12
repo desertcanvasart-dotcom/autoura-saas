@@ -1,5 +1,6 @@
 import { scaleForGroup } from '@/lib/pricing/line-for-group'
-import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
+import { calculateAutoPricing, ServiceTier, loadSeasonWindows } from '@/lib/auto-pricing-service'
+import { seasonForDate, computeUplift } from '@/lib/pricing/season-uplift'
 import { getEntranceFee as canonicalGetEntranceFee } from '@/lib/pricing/rate-resolution'
 import { getCatalogScope } from '@/lib/catalog-scope'
 import { createAdminClient } from '@/lib/supabase-server'
@@ -92,9 +93,17 @@ export interface PriceCalculationResult {
   total_cost: number
   tour_leader_cost: number  // NEW
   margin_percent: number
+  /** The margin alone — the seasonal premium is its own line below. */
   margin_amount: number
   selling_price: number
   price_per_person: number
+  /** The operator's demand premium (Settings → Seasonal Premiums) on the
+   *  departure date, already inside selling_price. It was folded into
+   *  margin_amount, so a "25%" margin showed a larger amount and the quote
+   *  never said why. */
+  season_name?: string | null
+  season_percent?: number
+  season_premium?: number
   single_supplement: number  // NEW
   currency: string
   pax_pricing_table?: any[]  // NEW - for rate sheet
@@ -960,7 +969,10 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
         total_cost: autoPriceResult.totalCost,
         tour_leader_cost: autoPriceResult.tourLeaderCost,  // NEW
         margin_percent: autoPriceResult.marginPercent,
-        margin_amount: autoPriceResult.marginAmount,
+        margin_amount: Math.round((autoPriceResult.marginAmount - (autoPriceResult.seasonUplift || 0)) * 100) / 100,
+        season_name: autoPriceResult.seasonName ?? null,
+        season_percent: autoPriceResult.seasonPercent ?? 0,
+        season_premium: autoPriceResult.seasonUplift || 0,
         selling_price: autoPriceResult.sellingPrice,
         price_per_person: autoPriceResult.pricePerPerson,
         single_supplement: autoPriceResult.singleSupplement || 0,  // NEW
@@ -991,7 +1003,14 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
     })
     const totalCost = quoteTotals.costTotal
     const marginAmount = quoteTotals.marginAmount
-    const sellingPrice = quoteTotals.baseSellingPrice
+    // The seasonal premium, as the day engine adds it: on the selling price
+    // after margin, by the departure date. This path (a programme listing its
+    // own services) never applied it, so the same departure priced
+    // differently depending on how the programme was built.
+    const seasonMatch = seasonForDate(await loadSeasonWindows(tenantId, travel_date), travel_date)
+    const premium = computeUplift({ sellingPrice: quoteTotals.baseSellingPrice, season: seasonMatch })
+    const seasonPremium = Math.round(premium.amount * 100) / 100
+    const sellingPrice = quoteTotals.baseSellingPrice + seasonPremium
     const optionalTotal = quoteTotals.optionalSellingTotal
     const pricePerPerson = sellingPrice / num_pax
 
@@ -1012,6 +1031,9 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
       tour_leader_cost: 0,  // Not calculated in legacy mode
       margin_percent: effectiveMargin,
       margin_amount: Math.round(marginAmount * 100) / 100,
+      season_name: premium.seasonName,
+      season_percent: premium.percent,
+      season_premium: seasonPremium,
       selling_price: Math.round(sellingPrice * 100) / 100,
       price_per_person: Math.round(pricePerPerson * 100) / 100,
       single_supplement: 0,  // Not calculated in legacy mode

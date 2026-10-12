@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { memberIsActive } from '@/lib/member-status'
+import { roleAllows } from '@/lib/api-role-gate'
 
 // GET - List all profiles (team members)
 export async function GET(request: NextRequest) {
@@ -18,6 +19,20 @@ export async function GET(request: NextRequest) {
     const role = searchParams.get('role')
 
     const adminClient = createAdminClient()
+
+    // When colleagues were last seen and last signed in is for managers and
+    // admins — it went to every member, viewers too. Last seen is activity
+    // data, so it also needs Activity Summaries on (it was shown regardless).
+    const canSeeLogins = roleAllows(authResult.role, 'manage')
+    let activityOn = false
+    if (canSeeLogins) {
+      const { data: features } = await (adminClient as any)
+        .from('tenant_features')
+        .select('activity_summary_enabled')
+        .eq('tenant_id', authResult.tenant_id)
+        .maybeSingle()
+      activityOn = !!features?.activity_summary_enabled
+    }
 
     // user_profiles has no tenant_id — scope via tenant_members membership
     const { data: members, error: membersError } = await (adminClient as any)
@@ -59,15 +74,18 @@ export async function GET(request: NextRequest) {
     // Last login comes from Supabase's own auth record (last_sign_in_at) —
     // user_profiles never had a real last_login_at column; the UI field of
     // that name rendered nothing until this enrichment.
+    // Each member looked up by id: one listUsers page of 1000 covered the
+    // whole platform, so past 1000 accounts most members showed no login.
     let lastSignIn = new Map<string, string | null>()
     try {
-      const { data: authUsers } = await adminClient.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      })
-      lastSignIn = new Map(
-        (authUsers?.users || []).map((u) => [u.id, u.last_sign_in_at ?? null])
-      )
+      if (canSeeLogins) {
+        const ids: string[] = (data || []).map((p: { id: string }) => p.id)
+        const found = await Promise.all(ids.map(async (uid) => {
+          const { data: u } = await adminClient.auth.admin.getUserById(uid)
+          return [uid, u?.user?.last_sign_in_at ?? null] as [string, string | null]
+        }))
+        lastSignIn = new Map(found)
+      }
     } catch (e) {
       // Enrichment only — the member list must not fail because of it.
       console.error('Error fetching auth last_sign_in_at:', e)
@@ -76,9 +94,10 @@ export async function GET(request: NextRequest) {
     const enriched = (data || [])
       .map((p: any) => ({
         ...p,
+        last_seen_at: canSeeLogins && activityOn ? p.last_seen_at ?? null : null,
         role: memberRole.get(p.id) ?? null,
         is_active: memberIsActive(p.is_active, memberStatus.get(p.id)),
-        last_login_at: lastSignIn.get(p.id) ?? null,
+        last_login_at: canSeeLogins ? lastSignIn.get(p.id) ?? null : null,
       }))
       .filter((p: { is_active: boolean }) => !activeOnly || p.is_active)
 

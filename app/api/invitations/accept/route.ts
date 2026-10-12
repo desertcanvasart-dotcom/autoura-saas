@@ -1,3 +1,4 @@
+import { gateStructural } from '@/lib/usage-enforcement'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 
@@ -155,6 +156,16 @@ export async function POST(request: NextRequest) {
     }
 
     // ---- 3. The membership — the part that was missing entirely -----------
+    // Still a seat free? Invitations made before the plan shrank, or several
+    // accepted at once, could take the company over its limit.
+    const seatGate = await gateStructural(db, invitation.tenant_id, 'seats', 'team members')
+    if (!seatGate.ok) {
+      return NextResponse.json(
+        { success: false, error: 'This company has no free seats on its plan. Ask whoever invited you to free a seat or upgrade, then use the link again.' },
+        { status: 403 }
+      )
+    }
+
     const { error: memberError } = await db
       .from('tenant_members')
       .insert({

@@ -1,3 +1,4 @@
+import { gateStructural } from '@/lib/usage-enforcement'
 import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/email-send'
 import crypto from 'crypto'
@@ -116,6 +117,11 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       )
     }
+
+    // The plan's seat limit — it was checked only on an older route nothing
+    // calls, so a two-seat plan could invite any number of people.
+    const seatGate = await gateStructural(authResult.supabase, authResult.tenant_id, 'seats', 'team members')
+    if (!seatGate.ok) return seatGate.response!
 
     // Throttle invite creation per authenticated user (un-spoofable id).
     const rl = checkRateLimit(getRateLimitIdentifier(request, authResult.user!.id), 'invitation')

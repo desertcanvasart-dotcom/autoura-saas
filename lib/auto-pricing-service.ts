@@ -5428,6 +5428,7 @@ export async function loadSeasonWindows(
     .from('pricing_seasons')
     .select('id, name, uplift_percent, is_active')
     .in('id', seasonIds)
+    .eq('tenant_id', tenantId)
     .eq('is_active', true)
 
   const seasons = (rawSeasons ?? []) as unknown as Array<{
