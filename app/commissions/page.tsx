@@ -35,6 +35,8 @@ import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { formatMoney, formatTotals, type CurrencyTotals } from '@/lib/currency-totals'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 interface Commission {
   id: string
@@ -163,6 +165,9 @@ export default function CommissionsPage() {
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
   const dialog = useConfirmDialog()
+  const { tenant } = useTenant()
+  // A new commission starts in the agency's currency (it was always EUR).
+  const agencyCurrency = tenant?.default_currency || 'EUR'
 
   const fetchCommissions = useCallback(async () => {
     try {
@@ -176,6 +181,9 @@ export default function CommissionsPage() {
         const result = await response.json()
         setCommissions(result.data || [])
         setSummary(result.summary || null)
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not load commissions')
       }
     } catch (error) {
       console.error('Error fetching commissions:', error)
@@ -282,9 +290,13 @@ export default function CommissionsPage() {
       const response = await fetch(`/api/commissions/${id}`, { method: 'DELETE' })
       if (response.ok) {
         fetchCommissions()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Failed to delete commission')
       }
     } catch (error) {
       console.error('Error deleting commission:', error)
+      showToast('error', 'Failed to delete commission')
     }
   }
 
@@ -297,20 +309,27 @@ export default function CommissionsPage() {
       })
       if (response.ok) {
         fetchCommissions()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Failed to update commission')
       }
     } catch (error) {
       console.error('Error updating commission:', error)
+      showToast('error', 'Failed to update commission')
     }
   }
 
   const openAddModal = () => {
-    setFormData(initialFormData)
+    setFormData({ ...initialFormData, currency: agencyCurrency })
     setEditingId(null)
     setIsModalOpen(true)
   }
 
   const filteredCommissions = commissions.filter(c => {
-    const search = searchTerm.toLowerCase()
+    const search = searchTerm.trim().toLowerCase()
+    // No search: every row. A commission with no source, description,
+    // supplier or trip matched nothing and was hidden for good.
+    if (!search) return true
     return (
       c.source_name?.toLowerCase().includes(search) ||
       c.description?.toLowerCase().includes(search) ||
@@ -568,12 +587,12 @@ export default function CommissionsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">
-                        {new Date(commission.transaction_date).toLocaleDateString()}
+                        {commission.transaction_date ? new Date(`${commission.transaction_date.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {commission.status === 'pending' && (
+                        {['pending', 'invoiced', 'disputed'].includes(commission.status) && (
                           <button
                             onClick={() => handleMarkAs(commission.id, commission.commission_type === 'receivable' ? 'received' : 'paid')}
                             className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -760,6 +779,16 @@ export default function CommissionsPage() {
                     max="100"
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  >
+                    {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Commission Amount <span className="text-red-500">*</span></label>

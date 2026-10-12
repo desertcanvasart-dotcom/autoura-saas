@@ -19,7 +19,7 @@ function client() {
 
 vi.mock('@/lib/supabase-server', () => ({
   createAuthenticatedClient: async () => client(),
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: client() }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, role: 'manager', supabase: client() }),
 }))
 vi.mock('@/lib/sender-tenant', () => ({ loadSenderTenant: async () => ({ company_name: 'Nile Journeys' }) }))
 vi.mock('@/lib/whatsapp', () => ({ sendWhatsAppMessage: async (m: unknown) => { h.sent.push(m); return { success: true } } }))

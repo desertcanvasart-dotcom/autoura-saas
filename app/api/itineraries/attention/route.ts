@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   try {
     const { data: trips, error: tripsError } = await supabase
       .from('itineraries')
-      .select('id, itinerary_code, trip_name, client_name, start_date, end_date, status, currency, total_cost, margin_percent')
+      .select('id, tenant_id, itinerary_code, trip_name, client_name, start_date, end_date, status, currency, total_cost, margin_percent')
       .not('status', 'in', '(cancelled,completed)')
     if (tripsError) throw new Error(tripsError.message)
     const itineraries = (trips ?? []) as Array<PnlItinerary & { margin_percent: number | null }>

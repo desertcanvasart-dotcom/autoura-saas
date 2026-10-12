@@ -1,5 +1,6 @@
 // POST   /api/supplier-invoices/[id]/match — link expenses, recompute match
 // DELETE /api/supplier-invoices/[id]/match — unlink an expense, recompute
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -22,6 +23,11 @@ const notMatchable = (status: string | null, verb: string) =>
   NextResponse.json({ success: false, error: `Cannot ${verb} an invoice with status '${status}'` }, { status: 409 })
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase || !auth.tenant_id) {
@@ -65,6 +71,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase) {

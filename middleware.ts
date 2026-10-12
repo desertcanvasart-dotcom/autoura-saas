@@ -79,6 +79,9 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/profit-loss': ['admin', 'manager'],
   '/accounts-receivable': ['admin', 'manager'],
   '/accounts-payable': ['admin', 'manager'],
+  // Finance pages with no entry were open to any role by URL, viewers too.
+  '/commissions': ['admin', 'manager'],
+  '/supplier-invoices': ['admin', 'manager'],
   '/rates': ['admin', 'manager'],
   '/pricing-grid': ['admin', 'manager', 'member'],
   '/hotels': ['admin', 'manager'],
@@ -99,6 +102,7 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/itineraries': ['admin', 'manager', 'member'],
   '/invoices': ['admin', 'manager', 'member'],
   '/payments': ['admin', 'manager', 'member'],
+  '/receipts': ['admin', 'manager', 'member'],
   '/tasks': ['admin', 'manager', 'member'],
   '/inbox': ['admin', 'manager', 'member'],
   '/whatsapp-inbox': ['admin', 'manager', 'member'],

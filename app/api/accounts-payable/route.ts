@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 // Money in different currencies does not add (lib/currency-totals.ts).
@@ -23,6 +24,11 @@ interface SupplierPayable {
 }
 
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication
     const authResult = await requireAuth()

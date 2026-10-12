@@ -7,6 +7,7 @@
 // Security: Requires authentication
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { invoiceBalance } from '@/lib/invoices/invoice-balance'
@@ -16,6 +17,11 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS automatically filters by tenant
@@ -52,6 +58,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     const body = await request.json()
@@ -150,6 +161,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS policies enforce tenant isolation + manager role

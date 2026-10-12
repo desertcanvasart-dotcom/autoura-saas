@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError, replyText } from '@/lib/ai/anthropic-client'
@@ -60,6 +61,11 @@ Return ONLY a valid JSON object (no markdown, no explanation) with this exact st
 }`
 
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     let formData: FormData
     try {

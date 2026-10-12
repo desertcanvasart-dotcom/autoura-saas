@@ -1,10 +1,16 @@
 // GET  /api/supplier-invoices — list (filters) + summary stats
 // POST /api/supplier-invoices — create (auto internal_reference)
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-numbering'
 
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const supabase = await createAuthenticatedClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -47,6 +53,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase || !auth.tenant_id || !auth.user) {

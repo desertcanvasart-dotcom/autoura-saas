@@ -1,9 +1,15 @@
 // GET/PATCH/DELETE /api/supplier-invoices/[id]
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { isMatchable } from '@/lib/supplier-invoices/match-state'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     const supabase = await createAuthenticatedClient()
@@ -26,6 +32,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase || !auth.tenant_id) {
@@ -101,6 +112,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase) {

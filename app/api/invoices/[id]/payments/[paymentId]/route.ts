@@ -7,6 +7,7 @@
 // Security: Requires manager role (via RLS policy)
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { invoiceBalance, sumPayments } from '@/lib/invoices/invoice-balance'
@@ -15,6 +16,11 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; paymentId: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id, paymentId } = await params
     // Use authenticated client - RLS enforces tenant + manager role
