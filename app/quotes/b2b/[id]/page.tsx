@@ -335,12 +335,12 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
               <span className="text-sm font-medium">Back to B2B Quotes</span>
             </Link>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={handleDownloadPDF}
                 disabled={pdfGenerating}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {pdfGenerating ? (
                   <>
@@ -356,7 +356,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
               </button>
               <Link
                 href={`/quotes/b2b/${quote.id}/edit`}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
+                className="h-10 px-4 whitespace-nowrap shrink-0 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 inline-flex items-center justify-center gap-2"
               >
                 <Edit className="w-4 h-4" />
                 Edit
@@ -365,7 +365,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
                 type="button"
                 onClick={() => handleSendQuote('email')}
                 disabled={sending || !quote.b2b_partners?.email}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <>
@@ -383,7 +383,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
                 type="button"
                 onClick={() => handleSendQuote('whatsapp')}
                 disabled={sending || !quote.b2b_partners?.phone}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!quote.b2b_partners?.phone ? 'No phone number available' : 'Send via WhatsApp'}
               >
                 {sending ? (

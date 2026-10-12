@@ -108,7 +108,7 @@ export default function ConvertToBookingButton({ quoteId, quoteType, quoteNumber
     return (
       <Link
         href={`/bookings/${booking.id}`}
-        className="px-4 py-2 bg-[#647C47] text-white rounded-lg text-sm font-medium hover:bg-[#566b3c] flex items-center gap-2"
+        className="h-10 px-4 whitespace-nowrap shrink-0 bg-[#647C47] text-white rounded-lg text-sm font-medium hover:bg-[#566b3c] inline-flex items-center justify-center gap-2"
       >
         <BookOpen className="w-4 h-4" />
         View booking{booking.booking_number ? ` ${booking.booking_number}` : ''}
@@ -122,7 +122,7 @@ export default function ConvertToBookingButton({ quoteId, quoteType, quoteNumber
       onClick={convert}
       disabled={converting || status !== 'accepted'}
       title={status !== 'accepted' ? 'Only accepted quotes can be converted — set the status to Accepted first' : 'Create a booking from this quote'}
-      className="px-4 py-2 bg-[#647C47] text-white rounded-lg text-sm font-medium hover:bg-[#566b3c] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="h-10 px-4 whitespace-nowrap shrink-0 bg-[#647C47] text-white rounded-lg text-sm font-medium hover:bg-[#566b3c] inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {converting ? (
         <><Loader2 className="w-4 h-4 animate-spin" />Converting...</>
