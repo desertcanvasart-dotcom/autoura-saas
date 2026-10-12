@@ -36,8 +36,12 @@ export async function GET(request: NextRequest) {
   // this, an attacker could initiate their own Google OAuth flow with
   // state=<victim_user_id> and have THEIR tokens written to the victim's
   // gmail_tokens row, hijacking the victim's email-sync identity.
-  const userId = verifyState(state)
-  if (!userId) {
+  // The payload is `${userId}:${tenantId}` (the company the person was
+  // working in when they clicked Connect); a state from before migration 415
+  // carries the user id alone.
+  const payload = verifyState(state)
+  const [userId, stateTenant] = (payload ?? '').split(':')
+  if (!payload || !userId) {
     return NextResponse.redirect(
       new URL('/settings/email?error=invalid_state', base)
     )
@@ -77,23 +81,29 @@ export async function GET(request: NextRequest) {
       .select('user_id, tenant_id, joined_at')
       .eq('user_id', userId)
       .eq('status', 'active') // the one company rule (migration 390)
-    const tenantId = tenantForUser(userId, null, (memberships ?? []) as MembershipRow[])
+    // The signed company, while the person is still an active member of it;
+    // otherwise (an older state) the oldest-membership rule.
+    const tenantId = stateTenant && (memberships ?? []).some(m => m.tenant_id === stateTenant)
+      ? stateTenant
+      : tenantForUser(userId, null, (memberships ?? []) as MembershipRow[])
+    if (!tenantId) {
+      return NextResponse.redirect(new URL('/settings/email?error=no_company', base))
+    }
 
     // Upsert token record
     const { error: dbError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .upsert({
         user_id: userId,
-        // Left out rather than nulled when unknown, so a reconnect can never
-        // erase a company that was already recorded.
-        ...(tenantId ? { tenant_id: tenantId } : {}),
+        // One mailbox per person per company (migration 415).
+        tenant_id: tenantId,
         email,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         token_expiry: expiryDate.toISOString(),
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id'
+        onConflict: 'user_id,tenant_id'
       })
 
     if (dbError) {

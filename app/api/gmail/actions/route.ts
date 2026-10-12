@@ -18,6 +18,9 @@ export async function POST(request: NextRequest) {
       )
     }
     const user = authResult.user!
+    // The mailbox of the company being worked in (migration 415: one per
+    // person per company).
+    const mailboxTenant = authResult.tenant_id!
     const supabase = createAdminClient()
 
     const { userId, messageIds, action, labelId } = await request.json()
@@ -35,7 +38,8 @@ export async function POST(request: NextRequest) {
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
@@ -54,6 +58,7 @@ export async function POST(request: NextRequest) {
           token_expiry: new Date(newTokens.expiry_date || Date.now() + 3600000).toISOString(),
         })
         .eq('user_id', userId)
+        .eq('tenant_id', mailboxTenant)
     }
 
     const gmail = getGmailClient(access_token, refresh_token)

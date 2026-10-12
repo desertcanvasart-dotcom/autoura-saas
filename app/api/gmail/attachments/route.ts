@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
       )
     }
     const user = authResult.user!
+    // The mailbox of the company being worked in (migration 415: one per
+    // person per company).
+    const mailboxTenant = authResult.tenant_id!
     const supabase = createAdminClient()
 
     const { searchParams } = new URL(request.url)
@@ -39,7 +42,8 @@ export async function GET(request: NextRequest) {
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json(
@@ -72,6 +76,7 @@ export async function GET(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
+        .eq('tenant_id', mailboxTenant)
 
       oauth2Client.setCredentials(credentials)
     }

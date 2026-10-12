@@ -86,7 +86,7 @@ async function getHandler(request: NextRequest) {
           headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
           // use_history: only what Gmail added since the last clean run (the
           // date window is the fallback — lib/email/gmail-candidates.ts).
-          body: JSON.stringify({ user_id: box.user_id, full_sync: false, max_results: 50, days_back: await daysToLookBack(admin, box.tenant_id), use_history: true }),
+          body: JSON.stringify({ user_id: box.user_id, tenant_id: box.tenant_id, full_sync: false, max_results: 50, days_back: await daysToLookBack(admin, box.tenant_id), use_history: true }),
         })),
         new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error(`timed out after ${PER_MAILBOX_TIMEOUT_MS / 1000}s`)))),
       ])

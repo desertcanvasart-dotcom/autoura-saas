@@ -23,7 +23,7 @@ const h = vi.hoisted(() => {
   }
   const adminClient = {
     from: () => {
-      const b: any = { select: () => b, eq: () => b, single: async () => ({ data: { access_token: 'a', refresh_token: 'r', user_id: 'u1' } }) }
+      const b: any = { select: () => b, eq: () => b, single: async () => ({ data: { access_token: 'a', refresh_token: 'r', user_id: 'u1' } }), maybeSingle: async () => ({ data: { access_token: 'a', refresh_token: 'r', user_id: 'u1' } }) }
       return b
     },
   }

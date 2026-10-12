@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { currentTenantId, type MembershipDb } from '@/lib/current-membership'
 
 // Reports the Gmail connection status for the Settings → Email tab.
 //
@@ -21,29 +22,19 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Actual Gmail connection from gmail_tokens (RLS-scoped to this tenant).
-    // Prefer this user's token, then fall back to the tenant's most recent.
-    // The OAuth callback writes the connected address to `email` (the live
-    // column); migration 007's `email_address` was stale. Read `email`.
+    // This person's mailbox in the company they are working in — one per
+    // company since migration 415. (It used to fall back to "any visible
+    // mailbox", which after switching showed another company's address.)
+    const { tenantId } = await currentTenantId(supabase as unknown as MembershipDb)
     let tokenData: { email?: string | null } | null = null
-
-    const { data: userToken } = await supabase
-      .from('gmail_tokens')
-      .select('email, updated_at')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (userToken) tokenData = userToken
-
-    if (!tokenData) {
-      const { data: anyToken } = await supabase
+    if (tenantId) {
+      const { data: userToken } = await supabase
         .from('gmail_tokens')
         .select('email, updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(1)
+        .eq('user_id', user.id)
+        .eq('tenant_id', tenantId)
         .maybeSingle()
-      if (anyToken) tokenData = anyToken
+      if (userToken) tokenData = userToken
     }
 
     const gmailEmail = String(tokenData?.email || '')

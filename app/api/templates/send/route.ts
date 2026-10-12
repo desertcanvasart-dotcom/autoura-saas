@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     let result
 
     if (channel === 'email') {
-      result = await sendEmail(recipient, subject, messageBody, authResult.user!.id)
+      result = await sendEmail(recipient, subject, messageBody, authResult.user!.id, tenant_id)
     } else if (channel === 'whatsapp') {
       result = await sendWhatsApp(recipient, messageBody, tenant_id)
     } else if (channel === 'sms') {
@@ -134,7 +134,9 @@ function plainTextEmailHtml(text: string): string {
   return `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${escapeHtml(text)}</div>`
 }
 
-async function sendEmail(to: string, subject: string, body: string, userId: string): Promise<{ success: boolean; error?: string }> {
+async function sendEmail(to: string, subject: string, body: string, userId: string, tenantId: string | null): Promise<{ success: boolean; error?: string }> {
+  // The sender's mailbox in the company being worked in (migration 415).
+  if (!tenantId) return { success: false, error: 'No active company' }
   try {
     // Gmail tokens for the signed-in user.
     //
@@ -148,7 +150,8 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
       .from('gmail_tokens')
       .select('access_token, refresh_token, email')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
 
     if (!tokens) {
       return {
@@ -169,6 +172,7 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
       },
       body: JSON.stringify({
         userId,
+        tenant_id: tenantId,
         to,
         subject,
         body: plainTextEmailHtml(body),

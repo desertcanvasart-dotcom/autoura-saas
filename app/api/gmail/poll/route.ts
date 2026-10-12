@@ -3,6 +3,7 @@ import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { notifyNewEmails } from '@/lib/email/new-mail-alerts'
+import { currentTenantId, type MembershipDb } from '@/lib/current-membership'
 
 // Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
 let _supabase: ReturnType<typeof createClient> | null = null
@@ -42,12 +43,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
+    // The mailbox of the company being worked in (migration 415).
+    const { tenantId: mailboxTenant } = await currentTenantId(authClient as unknown as MembershipDb)
+    if (!mailboxTenant) {
+      return NextResponse.json({ error: 'No active company' }, { status: 403 })
+    }
+
     // Get user's Gmail tokens
     const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
@@ -77,6 +85,7 @@ export async function GET(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
+        .eq('tenant_id', mailboxTenant)
 
       oauth2Client.setCredentials(credentials)
     }
@@ -243,12 +252,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
+    // The mailbox of the company being worked in (migration 415).
+    const { tenantId: mailboxTenant } = await currentTenantId(authClient as unknown as MembershipDb)
+    if (!mailboxTenant) {
+      return NextResponse.json({ error: 'No active company' }, { status: 403 })
+    }
+
     // Get user's Gmail tokens
     const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })

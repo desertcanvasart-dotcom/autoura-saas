@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
 import { TemplateEditor } from '@/components/email/RichTextEditor'
@@ -33,6 +34,7 @@ interface EmailTemplate {
 
 function EmailSettingsContent() {
   const { user } = useAuth()
+  const { tenant } = useTenant()
   const { isAdmin } = useRole()
   const dialog = useConfirmDialog()
   const searchParams = useSearchParams()
@@ -99,6 +101,8 @@ function EmailSettingsContent() {
         type: 'error',
         text: 'Gmail was not connected: some permissions were left unticked on the Google consent screen. Connect again and tick every box (read, send and manage email).',
       })
+    } else if (error === 'no_company') {
+      setMessage({ type: 'error', text: 'Gmail was not connected: you are not an active member of the company you were working in. Switch to your company and connect again.' })
     } else if (error) {
       setMessage({ type: 'error', text: `Connection failed: ${error}` })
     }
@@ -110,16 +114,19 @@ function EmailSettingsContent() {
       fetchTemplates()
       loadOfficeAddresses()
     }
-  }, [user])
+  }, [user, tenant?.id])
 
   const checkGmailConnection = async () => {
     if (!user) return
     try {
+      // This person's mailbox in the company being worked in (migration 415).
+      if (!tenant?.id) return
       const { data, error } = await supabase
         .from('gmail_tokens')
         .select('email')
         .eq('user_id', user.id)
-        .single()
+        .eq('tenant_id', tenant.id)
+        .maybeSingle()
 
       if (data && !error) {
         setGmailConnected(true)
@@ -174,10 +181,14 @@ function EmailSettingsContent() {
     if (!(await dialog.confirm({ message: 'Are you sure you want to disconnect Gmail?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
+      // Only this company's mailbox: the same person's mailbox in another
+      // company stays connected.
+      if (!tenant?.id) return
       const { error } = await supabase
         .from('gmail_tokens')
         .delete()
         .eq('user_id', user.id)
+        .eq('tenant_id', tenant.id)
 
       if (error) throw error
 

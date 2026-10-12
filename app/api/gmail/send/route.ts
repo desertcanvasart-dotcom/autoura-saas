@@ -28,6 +28,10 @@ export async function POST(request: NextRequest) {
 
     let user: { id: string; email?: string | null } | null = null
     let authClient: any = null
+    // The company whose mailbox sends (migration 415: one per person per
+    // company): the session's current company, or the one a trusted server
+    // caller names.
+    let sessionTenant: string | null = null
 
     if (!isTrustedServerCall) {
       const authResult = await requireAuth()
@@ -39,6 +43,7 @@ export async function POST(request: NextRequest) {
       }
       user = authResult.user
       authClient = authResult.supabase
+      sessionTenant = authResult.tenant_id
     }
 
     const supabase = createAdminClient()
@@ -54,10 +59,19 @@ export async function POST(request: NextRequest) {
       request_key: requestKey,
       seen_up_to: seenUpTo,
       allow_duplicate: allowDuplicate,
+      tenant_id: requestedTenant,
     } = await request.json()
+    const mailboxTenant: string | null = isTrustedServerCall
+      ? (typeof requestedTenant === 'string' ? requestedTenant : null)
+      : sessionTenant
 
     if (!userId || !to || !subject || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    // Which company's mailbox: a session's current company, or the one a
+    // trusted server caller names (migration 415).
+    if (!mailboxTenant) {
+      return NextResponse.json({ error: 'Missing company' }, { status: 400 })
     }
 
     // Plain-text version for body_text column + RAG indexing. Client may send
@@ -99,7 +113,8 @@ export async function POST(request: NextRequest) {
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
@@ -120,6 +135,7 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
+        .eq('tenant_id', mailboxTenant)
     }
 
     // ============================================

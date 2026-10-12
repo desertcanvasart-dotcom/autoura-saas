@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
 import RichTextEditor from '@/components/email/RichTextEditor'
 // NEW IMPORTS FOR GMAIL ENHANCEMENTS
@@ -173,6 +174,7 @@ type FolderType = 'inbox' | 'sent' | 'drafts'
 
 export default function InboxPage() {
   const { user } = useAuth()
+  const { tenant } = useTenant()
   const [loading, setLoading] = useState(true)
   const [emails, setEmails] = useState<Email[]>([])
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
@@ -270,16 +272,20 @@ export default function InboxPage() {
       fetchLabels()
       fetchClients() // NEW: Fetch clients for template placeholders
     }
-  }, [user])
+  }, [user, tenant?.id])
 
   const checkConnectionAndFetchEmails = async () => {
     if (!user) return
     try {
-      const { data } = await supabase
-        .from('gmail_tokens')
-        .select('email')
-        .eq('user_id', user.id)
-        .single()
+      // This person's mailbox in the company being worked in (migration 415).
+      const { data } = tenant?.id
+        ? await supabase
+          .from('gmail_tokens')
+          .select('email')
+          .eq('user_id', user.id)
+          .eq('tenant_id', tenant.id)
+          .maybeSingle()
+        : { data: null }
 
       if (!data) {
         setIsConnected(false)
