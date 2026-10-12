@@ -8,7 +8,8 @@ import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
 import { roundToCurrency } from '@/lib/currency-totals'
 import { shiftDateISO } from '@/lib/today'
 import { tenantToday } from '@/lib/tenant-today'
-import { roleDenied } from '@/lib/api-role-gate'
+import { roleDenied, roleAllows } from '@/lib/api-role-gate'
+import { bookingCapacityProblems, describeCapacityProblems } from '@/lib/capacity/booking-capacity'
 
 export async function POST(request: NextRequest) {
   try {
@@ -362,6 +363,24 @@ export async function POST(request: NextRequest) {
       // In the company's timezone (lib/tenant-today), not the UTC server's.
       payment_deadline: shiftDateISO(today, depositRule.depositDueDays),
       created_by: user?.id
+    }
+
+    // The Capacity Calendar (lib/capacity/booking-capacity): a full or closed
+    // day takes no booking unless a manager or admin books it anyway.
+    const capacityOverride = body?.override_capacity === true && roleAllows(authResult.role, 'manage')
+    if (!capacityOverride) {
+      const problems = await bookingCapacityProblems(adminClient, authResult.tenant_id!, tripFacts.start_date, tripFacts.end_date)
+      if (problems.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `The Capacity Calendar is ${describeCapacityProblems(problems)}.`,
+            capacity: problems,
+            can_override: roleAllows(authResult.role, 'manage'),
+          },
+          { status: 409 }
+        )
+      }
     }
 
     const { data: booking, error: bookingError } = await adminClient

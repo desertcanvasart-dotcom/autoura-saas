@@ -110,7 +110,8 @@ describe('capacity check', () => {
   it('is wired into the check route', () => {
     const code = src('app/api/capacity/check/route.ts')
     expect(code).toContain('capacityDateRange(start_date, effectiveEndDate)')
-    expect(code).toContain('freeGroupSlots(')
+    // Counted like a booking is checked: live bookings + the calendar (lib/capacity/booking-capacity).
+    expect(code).toContain('loadDayLoads(')
     expect(code).not.toContain('3 - group_size')
     expect(code).not.toContain('setDate(')
   })

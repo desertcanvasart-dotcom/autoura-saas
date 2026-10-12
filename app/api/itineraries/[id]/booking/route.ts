@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { roleAllows } from '@/lib/api-role-gate'
 import { createBookingOnConfirm } from '@/lib/bookings/create-booking-on-confirm'
 
 /**
@@ -13,7 +14,7 @@ import { createBookingOnConfirm } from '@/lib/bookings/create-booking-on-confirm
  * which never makes a second booking for an itinerary.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -37,9 +38,13 @@ export async function POST(
       )
     }
 
-    const { booking, note } = await createBookingOnConfirm(id, itinerary as Record<string, unknown>)
+    // "Book anyway" over a full or closed day: managers and admins only.
+    const body = await request.json().catch(() => ({})) as { override_capacity?: unknown }
+    const auth = body.override_capacity === true ? await requireAuth() : null
+    const overrideCapacity = auth !== null && auth.error === null && roleAllows(auth.role, 'manage')
+    const { booking, note, capacityFull } = await createBookingOnConfirm(id, itinerary as Record<string, unknown>, { overrideCapacity })
     if (!booking) {
-      return NextResponse.json({ success: false, error: note ?? 'Booking not created' }, { status: 409 })
+      return NextResponse.json({ success: false, error: note ?? 'Booking not created', ...(capacityFull ? { capacity_full: true } : {}) }, { status: 409 })
     }
     return NextResponse.json({ success: true, booking })
   } catch (err) {

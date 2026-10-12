@@ -26,9 +26,10 @@ export default function SeasonalPremiumsPage() {
           date and is already in their rate. A rate period is the supplier&rsquo;s contract; a premium is your own decision on top.
         </p>
         <p className="text-gray-600">
-          In the <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Calculator</Link>, a departure in a
-          season shows the premium as its own line, with the season&rsquo;s name, and the total includes it. Your margin is
-          reported without it. Quotes built from an itinerary and B2C prices do not apply premiums yet.
+          It applies wherever a price is made: the <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Calculator</Link>,
+          and every B2C quote &mdash; saved from the Quote Builder, created from an itinerary, or edited. The quote shows it as its
+          own line, with the season&rsquo;s name and percentage, and the selling price includes it. Your margin is reported
+          without it. An edit reprices it from the trip&rsquo;s start date; the client&rsquo;s PDF shows the total.
         </p>
       </section>
 

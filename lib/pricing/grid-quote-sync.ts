@@ -13,7 +13,7 @@
 // repriced: the new price goes on a new draft instead.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { roundToCurrency } from '@/lib/currency-totals'
+import { withSeasonPremium } from '@/lib/quotes/b2c-quote-price'
 
 /** Statuses whose price may still change. */
 export const OPEN_QUOTE_STATUSES = ['draft', 'sent', 'viewed'] as const
@@ -25,6 +25,8 @@ export interface GridQuotePrice {
   supplierTotal: number
   sellingTotal: number
   marginPercent: number
+  /** The departure's seasonal premium (lib/quotes/quote-season). */
+  season?: { season_name: string | null; season_percent: number }
 }
 
 export interface OpenQuote {
@@ -53,14 +55,19 @@ export async function findOpenGridQuote(db: SupabaseClient, itineraryId: string)
 // editor read a different per-person price for the same figures.
 export function quotePriceFields(p: GridQuotePrice) {
   const pax = Math.max(p.pax, 1)
-  const selling = roundToCurrency(p.sellingTotal, p.currency)
+  // The grid's selling total, plus the departure's seasonal premium on top
+  // (after margin), recorded as its own line.
+  const price = withSeasonPremium(p.sellingTotal, p.season?.season_percent ?? 0, pax, p.currency)
   return {
     num_travelers: pax,
     tier: p.tier,
     currency: p.currency,
     total_cost: p.supplierTotal,
     margin_percent: p.marginPercent,
-    selling_price: selling,
-    price_per_person: roundToCurrency(selling / pax, p.currency),
+    selling_price: price.selling_price,
+    price_per_person: price.price_per_person,
+    season_name: p.season?.season_name ?? null,
+    season_percent: p.season?.season_percent ?? 0,
+    season_premium: price.season_premium,
   }
 }

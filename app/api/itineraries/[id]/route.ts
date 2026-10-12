@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+import { roleAllows } from '@/lib/api-role-gate'
 import { evaluateDeleteGuard } from '@/lib/delete-guard'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
 import { buildFrozenFx } from '@/lib/itinerary-fx'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
@@ -261,10 +262,15 @@ export async function PUT(
     // surfaced as booking_note, never allowed to block the confirm itself.
     let booking: Record<string, unknown> | null = null
     let bookingNote: string | null = null
+    let capacityFull = false
     if (body.status === 'confirmed') {
-      const result = await createBookingOnConfirm(id, data as Record<string, unknown>)
+      const result = await createBookingOnConfirm(id, data as Record<string, unknown>, {
+        // Over the Capacity Calendar only on a manager's or admin's say-so.
+        overrideCapacity: body.override_capacity === true && roleAllows((await requireAuth()).role, 'manage'),
+      })
       booking = result.booking
       bookingNote = result.note
+      capacityFull = result.capacityFull === true
     }
 
     return NextResponse.json({
@@ -272,6 +278,7 @@ export async function PUT(
       data,
       ...(booking ? { booking } : {}),
       ...(bookingNote ? { booking_note: bookingNote } : {}),
+      ...(capacityFull ? { capacity_full: true } : {}),
     })
   } catch (error) {
     console.error('Error updating itinerary:', error)

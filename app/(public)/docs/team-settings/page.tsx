@@ -79,7 +79,7 @@ export default function TeamSettingsPage() {
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
           <li><strong>Email</strong> and <strong>in-app</strong> switches for your notifications.</li>
           <li><strong>Task Due Soon</strong> (24 hours before) and <strong>Task Overdue</strong> reminders follow their switches.</li>
-          <li><strong>Task Assigned</strong> and <strong>Task Completed</strong> are saved but not yet acted on.</li>
+          <li><strong>Task Assigned</strong> &mdash; when a task is assigned or reassigned to you (not when you assign it to yourself). <strong>Task Completed</strong> &mdash; when a task you created is completed by someone else. Both by email and in the app, as the two switches above allow.</li>
         </ul>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Preferences</h3>
@@ -87,7 +87,7 @@ export default function TeamSettingsPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Default Service Tier</strong>, <strong>Default Currency</strong> &mdash; preselected in the Pricing Grid; the currency is also the one figures are shown in.</li>
           <li><strong>Default Profit Margin</strong> &mdash; your margin on new quotes. It comes before your company&rsquo;s house margin; a margin typed on a quote always wins. 0% is allowed.</li>
-          <li><strong>Cost Calculation Mode</strong> &mdash; saved, but not yet used: new itineraries are always priced from your rates.</li>
+          <li><strong>Cost Calculation Mode</strong> &mdash; the mode a new itinerary you create starts in: Auto-Calculate (costs from your rates) or Manual Entry (costs editable, with the rates&rsquo; figures filled in). Each itinerary&rsquo;s own switch still changes one trip.</li>
           <li><strong>Exchange Rates</strong> &mdash; your company&rsquo;s rates. <strong>Refresh from API</strong> loads the market rates; a rate you change is marked <strong>Custom</strong>, and only the rates you change are saved.</li>
         </ul>
         <DocScreenshot src="/docs/team-settings/settings-preferences.jpg" alt="Settings page Preferences tab with cost mode, tier, margin, and currency defaults" />
@@ -143,7 +143,7 @@ export default function TeamSettingsPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Capacity Calendar</h3>
         <p className="text-gray-600 mb-4">
-          (Operations group.) A month view of your departures, with a maximum number of groups per day you can edit date by date. The default per day shown on the page is not saved, and nothing yet stops a booking on a full day &mdash; use it as a planning view.
+          (Operations group; admins.) A month view of your departures and your limit of groups per day. Set the <strong>default</strong> for every day (blank = no limit) and change single days, or close one. A day&rsquo;s groups are your live bookings on the ground that day plus any you enter as booked outside Autoura. A booking that would go over a day&rsquo;s limit, or fall on a closed day &mdash; from a quote or by confirming an itinerary &mdash; is refused with the days named; a manager or admin can book it anyway. The WhatsApp assistant&rsquo;s availability answers count the same way.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Support Chat</h3>

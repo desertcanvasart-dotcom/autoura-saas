@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { quoteSeasonFor } from '@/lib/quotes/quote-season'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 import { priceB2cQuote } from '@/lib/quotes/b2c-quote-price';
 import { recordsInTenant } from '@/lib/quotes/records-in-tenant';
@@ -123,10 +124,15 @@ export async function POST(request: NextRequest) {
     // Calculate totals
     const total_cost = Object.values(costBreakdown).reduce((sum: number, val: any) => sum + val, 0);
     // In the currency's own units (lib/quotes/b2c-quote-price): whole yen.
-    const { selling_price, price_per_person } = priceB2cQuote({
+    // The departure's seasonal premium (Settings → Seasonal Premiums), on the
+    // price after margin — it used to apply in the B2B Calculator only.
+    const season = await quoteSeasonFor(authResult.tenant_id, itinerary.start_date);
+    const { selling_price, price_per_person, season_premium } = priceB2cQuote({
       totalCost: total_cost, marginPercent: margin_percent, travelers: num_travelers, currency,
+      seasonPercent: season.season_percent,
     });
-    const margin_amount = selling_price - total_cost;
+    // Margin is margin; the premium is reported as its own line.
+    const margin_amount = selling_price - season_premium - total_cost;
 
     // 3. Generate quote number (requires admin client for RPC)
     const { data: quoteNumber, error: seqError } = await supabase
@@ -156,6 +162,9 @@ export async function POST(request: NextRequest) {
         margin_percent,
         selling_price,
         price_per_person,
+        season_name: season.season_name,
+        season_percent: season.season_percent,
+        season_premium,
         currency: currency || 'EUR',
         cost_breakdown: costBreakdown,
         valid_until: valid_until || null,
@@ -195,6 +204,9 @@ export async function POST(request: NextRequest) {
         total_cost,
         margin_amount,
         margin_percent,
+        season_name: season.season_name,
+        season_percent: season.season_percent,
+        season_premium,
         selling_price,
         price_per_person,
         cost_breakdown: costBreakdown

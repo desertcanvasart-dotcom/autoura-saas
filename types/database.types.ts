@@ -1287,6 +1287,9 @@ export interface Database {
           last_modified_at: string | null
           pdf_generated_at: string | null
           created_by: string | null
+          season_name: string | null
+          season_percent: number
+          season_premium: number
         }
         Insert: {
           id?: string
@@ -1317,6 +1320,9 @@ export interface Database {
           last_modified_at?: string | null
           pdf_generated_at?: string | null
           created_by?: string | null
+          season_name?: string | null
+          season_percent?: number
+          season_premium?: number
         }
         Update: {
           id?: string
@@ -1347,6 +1353,9 @@ export interface Database {
           last_modified_at?: string | null
           pdf_generated_at?: string | null
           created_by?: string | null
+          season_name?: string | null
+          season_percent?: number
+          season_premium?: number
         }
         Relationships: [
           {
@@ -8734,6 +8743,7 @@ export interface Database {
           service_type: string | null
           generation_snapshot: Json | null
           checklist: Json | null
+          created_by: string | null
         }
         Insert: {
           id?: string
@@ -8756,6 +8766,7 @@ export interface Database {
           service_type?: string | null
           generation_snapshot?: Json | null
           checklist?: Json | null
+          created_by?: string | null
         }
         Update: {
           id?: string
@@ -8778,6 +8789,7 @@ export interface Database {
           service_type?: string | null
           generation_snapshot?: Json | null
           checklist?: Json | null
+          created_by?: string | null
         }
         Relationships: [
           {
@@ -9446,6 +9458,7 @@ export interface Database {
         Row: {
           id: string
           company_name: string
+          default_max_groups_per_day: number | null
           contact_email: string | null
           created_at: string | null
           updated_at: string | null
@@ -9486,6 +9499,7 @@ export interface Database {
         Insert: {
           id?: string
           company_name: string
+          default_max_groups_per_day?: number | null
           contact_email?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -9526,6 +9540,7 @@ export interface Database {
         Update: {
           id?: string
           company_name?: string
+          default_max_groups_per_day?: number | null
           contact_email?: string | null
           created_at?: string | null
           updated_at?: string | null

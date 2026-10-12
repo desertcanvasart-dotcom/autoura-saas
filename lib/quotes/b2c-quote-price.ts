@@ -13,6 +13,28 @@ import { MARGIN_MAX, MARGIN_MIN } from '@/lib/pricing-guards'
 export interface B2cQuotePrice {
   selling_price: number
   price_per_person: number
+  /** The demand-calendar premium inside selling_price (0 on an ordinary date). */
+  season_premium: number
+}
+
+/**
+ * The seasonal premium on a selling price (Settings → Seasonal Premiums):
+ * a percentage of the price AFTER margin, in the currency's units — the same
+ * rule as the B2B Calculator (lib/pricing/season-uplift.ts).
+ */
+export function withSeasonPremium(
+  sellingBeforeSeason: number,
+  seasonPercent: unknown,
+  travelers: unknown,
+  currency: string | null | undefined,
+): B2cQuotePrice {
+  const cur = currency || 'EUR'
+  const pct = Math.max(0, Number(seasonPercent) || 0)
+  const base = roundToCurrency(Math.max(0, sellingBeforeSeason), cur)
+  const premium = pct > 0 ? roundToCurrency((base * pct) / 100, cur) : 0
+  const selling = roundToCurrency(base + premium, cur)
+  const pax = Math.max(1, Math.floor(Number(travelers) || 1))
+  return { selling_price: selling, price_per_person: roundToCurrency(selling / pax, cur), season_premium: premium }
 }
 
 export function priceB2cQuote(input: {
@@ -20,13 +42,13 @@ export function priceB2cQuote(input: {
   marginPercent: unknown
   travelers: unknown
   currency: string | null | undefined
+  /** The departure's seasonal premium, % of the price after margin. */
+  seasonPercent?: unknown
 }): B2cQuotePrice {
   const currency = input.currency || 'EUR'
   const cost = Math.max(0, Number(input.totalCost) || 0)
   const margin = Number(input.marginPercent) || 0
-  const selling = roundToCurrency(cost * (1 + margin / 100), currency)
-  const travelers = Math.max(1, Math.floor(Number(input.travelers) || 1))
-  return { selling_price: selling, price_per_person: roundToCurrency(selling / travelers, currency) }
+  return withSeasonPremium(cost * (1 + margin / 100), input.seasonPercent, input.travelers, currency)
 }
 
 /** Why a base cost / margin pair cannot be priced, or null. */

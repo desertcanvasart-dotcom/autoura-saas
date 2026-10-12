@@ -30,6 +30,8 @@ export function daysOverdue(dueDate: string, today: string): number {
 export interface NotificationPreferences {
   task_due_soon?: boolean
   task_overdue?: boolean
+  task_assigned?: boolean
+  task_completed?: boolean
   email_enabled?: boolean
   in_app_enabled?: boolean
   [key: string]: unknown
@@ -44,7 +46,10 @@ export interface ReminderChannels {
 
 /** What a person's settings allow for this reminder. No settings saved: the
  *  defaults (both on), as Settings → Notifications shows them. */
-export function reminderChannels(prefs: NotificationPreferences | null | undefined, kind: TaskReminderKind): ReminderChannels {
+/** Every task notification a person can switch off in Settings → Notifications. */
+export type TaskNotificationKind = TaskReminderKind | 'task_assigned' | 'task_completed'
+
+export function reminderChannels(prefs: NotificationPreferences | null | undefined, kind: TaskNotificationKind): ReminderChannels {
   const p = prefs ?? {}
   const email = p.email_enabled !== false
   const inApp = p.in_app_enabled !== false

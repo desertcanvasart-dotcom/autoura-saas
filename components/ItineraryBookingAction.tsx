@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { BookOpen, Loader2 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useRole } from '@/hooks/useRole'
 import { showToast } from '@/app/contexts/ToastContext'
 import { withReturnTo } from '@/lib/nav/return-to'
 
@@ -44,6 +45,8 @@ export default function ItineraryBookingAction({
   // Back from the booking returns here (lib/nav/return-to).
   const toBooking = (id: string) => withReturnTo(`/bookings/${id}`, returnTo ?? `/itineraries/${itineraryId}`)
   const { confirm } = useConfirmDialog()
+  const { role } = useRole()
+  const canOverride = role === 'admin' || role === 'manager'
   const [booking, setBooking] = useState<Booking | null>(null)
   const [checked, setChecked] = useState(false)
   const [working, setWorking] = useState(false)
@@ -112,9 +115,29 @@ export default function ItineraryBookingAction({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'confirmed' }),
           })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.error || 'Could not create the booking')
-      if (!isConfirmed) onStatusChange?.('confirmed')
+      let data = await res.json()
+      if (!isConfirmed && res.ok && data.success) onStatusChange?.('confirmed')
+      // A full or closed day on the Capacity Calendar: managers and admins
+      // may book it anyway (the server checks the role again).
+      if (data.capacity_full && canOverride) {
+        const anyway = await confirm({
+          title: 'Over capacity',
+          message: `${data.booking_note || data.error}\n\nBook it anyway?`,
+          confirmText: 'Book anyway',
+          cancelText: 'Cancel',
+          variant: 'warning',
+        })
+        if (!anyway) return
+        const again = await fetch(`/api/itineraries/${itineraryId}/booking`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ override_capacity: true }),
+        })
+        data = await again.json()
+        if (!again.ok || !data.success) throw new Error(data.error || 'Could not create the booking')
+      } else if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Could not create the booking')
+      }
 
       const made = data.booking as Booking | undefined
       if (made?.id) {

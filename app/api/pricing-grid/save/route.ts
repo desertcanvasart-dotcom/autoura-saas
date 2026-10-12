@@ -12,6 +12,8 @@
 // grid asks /api/b2b/quote-from-itinerary for it after the save.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { defaultCostMode } from '@/lib/itineraries/default-cost-mode'
+import { quoteSeasonFor } from '@/lib/quotes/quote-season'
 import { isOwnAddress, loadOwnAddresses } from '@/lib/email/own-address'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { ratePin } from '@/lib/pricing/rate-pin'
@@ -231,6 +233,8 @@ export async function POST(request: NextRequest) {
             ...itineraryData,
             nationality: config.nationality || null,
             is_euro_passport: config.passport === 'eu',
+            // A new trip starts in the saver's preferred cost mode.
+            cost_mode: await defaultCostMode(supabase, authResult.user?.id),
           })
           .select()
           .single()
@@ -403,6 +407,9 @@ export async function POST(request: NextRequest) {
     // A re-save REPRICES the itinerary's open quote (lib/pricing/
     // grid-quote-sync.ts) — it used to add a new draft every time, leaving
     // the quote the operator was working from at the old price.
+    // The departure's seasonal premium goes on the B2C quote, after margin
+    // (lib/quotes/quote-season) — the itinerary keeps the grid's own total.
+    const quoteSeason = config.clientType === 'b2c' ? await quoteSeasonFor(tenant_id, config.startDate || null) : undefined
     let quoteAction: 'created' | 'updated' | undefined
     let previousSellingTotal: number | null = null
     const openQuote = config.clientType === 'b2c' && config.itineraryId
@@ -418,6 +425,7 @@ export async function POST(request: NextRequest) {
           ...quotePriceFields({
             pax, tier: config.tier || 'standard', currency: recordCurrency,
             supplierTotal: finalSupplierTotal, sellingTotal: finalSellingTotal, marginPercent: marginPct,
+            season: quoteSeason,
           }),
           ...(linkedClientId ? { client_id: linkedClientId } : {}),
           updated_at: new Date().toISOString(),
@@ -452,6 +460,7 @@ export async function POST(request: NextRequest) {
         const newQuotePrice = quotePriceFields({
           pax, tier: config.tier || 'standard', currency: recordCurrency,
           supplierTotal: finalSupplierTotal, sellingTotal: finalSellingTotal, marginPercent: marginPct,
+          season: quoteSeason,
         })
 
         const { data: quote, error: quoteError } = await supabase
@@ -476,6 +485,9 @@ export async function POST(request: NextRequest) {
             // Rounded as the quote editor rounds (grid-quote-sync.ts).
             selling_price: newQuotePrice.selling_price,
             price_per_person: newQuotePrice.price_per_person,
+            season_name: newQuotePrice.season_name,
+            season_percent: newQuotePrice.season_percent,
+            season_premium: newQuotePrice.season_premium,
             internal_notes: 'Created via Pricing Grid',
           })
           .select()

@@ -36,6 +36,9 @@ interface B2CQuote {
   margin_percent: number
   selling_price: number
   price_per_person: number
+  season_name?: string | null
+  season_percent?: number | null
+  season_premium?: number | null
   currency: string
   cost_breakdown: CostBreakdown | null
   created_at: string | null
@@ -502,9 +505,21 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                   Margin ({quote.margin_percent}%)
                 </span>
                 <span className="text-sm font-bold text-blue-700">
-                  {quote.currency} {(quote.selling_price - quote.total_cost).toLocaleString()}
+                  {quote.currency} {(quote.selling_price - Number(quote.season_premium ?? 0) - quote.total_cost).toLocaleString()}
                 </span>
               </div>
+
+              {/* Seasonal premium (Settings → Seasonal Premiums), its own line */}
+              {Number(quote.season_premium ?? 0) > 0 && (
+                <div className="flex items-center justify-between py-2 bg-amber-50 rounded-lg px-3 mt-2">
+                  <span className="text-sm text-amber-800">
+                    Seasonal premium{quote.season_name ? ` — ${quote.season_name}` : ''} ({Number(quote.season_percent ?? 0)}%)
+                  </span>
+                  <span className="text-sm font-bold text-amber-800">
+                    {quote.currency} {Number(quote.season_premium).toLocaleString()}
+                  </span>
+                </div>
+              )}
 
               {/* Selling Price */}
               <div className="flex items-center justify-between py-3 border-t-2 border-gray-300 mt-3">
