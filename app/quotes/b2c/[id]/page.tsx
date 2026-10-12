@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import StatusManager from '@/components/quotes/StatusManager'
@@ -76,7 +76,10 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
   expired: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: AlertCircle }
 }
 
-export default function B2CQuoteDetailPage({ params }: { params: { id: string } }) {
+// params is a Promise in a client page (Next 15+): reading params.id
+// directly gave undefined, and the page asked for quote "undefined".
+export default function B2CQuoteDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise)
   const supabase = createClient()
   const dialog = useConfirmDialog()
   const [quote, setQuote] = useState<B2CQuote | null>(null)
