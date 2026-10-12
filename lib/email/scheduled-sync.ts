@@ -69,10 +69,13 @@ export function planMailboxSweep(
     const email = r.email ?? null
     if (!r.user_id) { skipped.push({ email, reason: 'the connection has no owner' }); continue }
     if (!r.access_token || !r.refresh_token) { skipped.push({ email, reason: 'the Google sign-in was never finished — reconnect it in Settings → Email' }); continue }
-    if (seen.has(r.user_id)) continue
     const tenant_id = tenantForUser(r.user_id, r.tenant_id, memberships)
     if (!tenant_id) { skipped.push({ email, reason: 'its owner belongs to no company, so there is nowhere to file the mail' }); continue }
-    seen.add(r.user_id)
+    // A mailbox is (person, company) since migration 415: the same person's
+    // mailbox in two companies is two mailboxes, each synced into its own.
+    const key = `${r.user_id}:${tenant_id}`
+    if (seen.has(key)) continue
+    seen.add(key)
     mailboxes.push({ user_id: r.user_id, tenant_id, email })
   }
   return { mailboxes, skipped }

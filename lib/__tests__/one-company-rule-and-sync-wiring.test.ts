@@ -91,8 +91,15 @@ describe('the scheduled sync', () => {
   })
 
   it('mailbox → company uses ACTIVE memberships everywhere it is decided', () => {
-    for (const f of ['app/api/email/sync/route.ts', 'app/api/cron/gmail-sync/route.ts', 'app/api/auth/google/callback/route.ts']) {
+    for (const f of ['app/api/cron/gmail-sync/route.ts', 'app/api/auth/google/callback/route.ts']) {
       expect(read(f), f).toMatch(/tenant_members'\)[\s\S]{0,200}\.eq\('status', 'active'\)/)
     }
+  })
+
+  it('the sync reads the mailbox of one (person, company) — migration 415', () => {
+    const sync = read('app/api/email/sync/route.ts')
+    expect(sync).toMatch(/from\('gmail_tokens'\)[\s\S]{0,200}\.eq\('user_id', userId\)[\s\S]{0,40}\.eq\('tenant_id'/)
+    expect(sync).toContain("onConflict: 'user_id,tenant_id'")
+    expect(read('app/api/cron/gmail-sync/route.ts')).toContain('tenant_id: box.tenant_id')
   })
 })

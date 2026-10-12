@@ -1,4 +1,3 @@
-import { tenantForUser, type MembershipRow } from '@/lib/email/scheduled-sync'
 import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
@@ -59,7 +58,8 @@ export async function GET(request: NextRequest) {
     const userId = request.nextUrl.searchParams.get('user_id') || authResult.user?.id
     if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
-    const { data } = await supabase.from('email_sync_state').select('*').eq('user_id', userId).single()
+    // Sync progress is per mailbox: this person in this company (migration 415).
+    const { data } = await supabase.from('email_sync_state').select('*').eq('user_id', userId).eq('tenant_id', authResult.tenant_id!).maybeSingle()
     return NextResponse.json({ sync_state: data || { user_id: userId, sync_status: 'idle', emails_synced: 0 }, success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message, success: false }, { status: 500 })
@@ -69,9 +69,11 @@ export async function GET(request: NextRequest) {
 // POST - Trigger email sync
 export async function POST(request: NextRequest) {
   let userId: string | undefined
+  // The mailbox's company, kept for recording a failure.
+  let failedTenant: string | null = null
   try {
     const body = await request.json()
-    const { user_id, full_sync = false, max_results = 100, days_back = 30, use_history = false } = body
+    const { user_id, tenant_id: requestedTenant, full_sync = false, max_results = 100, days_back = 30, use_history = false } = body
 
     // Two ways in. A person, with a session — or the scheduled sweep, with the
     // server-to-server secret, because mail must arrive whether or not anybody
@@ -86,21 +88,17 @@ export async function POST(request: NextRequest) {
     if (isTrustedServerCall) {
       userId = user_id
       if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
-      // The tenant comes from the mailbox's own row, never from the request.
+      // A mailbox is (person, company) since migration 415, so the sweep
+      // names the company with the person — and it must be a mailbox that
+      // exists, never just what the request says.
       const { data: owner } = await createAdminClient()
         .from('gmail_tokens')
         .select('tenant_id')
         .eq('user_id', userId)
+        .eq('tenant_id', typeof requestedTenant === 'string' ? requestedTenant : '00000000-0000-0000-0000-000000000000')
         .maybeSingle()
-      // …or, when that row carries none (the sign-in never wrote one: all four
-      // production mailboxes had NULL on 2026-09-20), from the owner's own
-      // membership — still never from the request.
-      const { data: memberships } = await createAdminClient()
-        .from('tenant_members')
-        .select('user_id, tenant_id, joined_at')
-        .eq('user_id', userId)
-        .eq('status', 'active') // the one company rule (migration 390)
-      tenant_id = tenantForUser(userId, owner?.tenant_id ?? null, (memberships ?? []) as MembershipRow[])
+      tenant_id = owner?.tenant_id ?? null
+      failedTenant = tenant_id
       if (!tenant_id) return NextResponse.json({ error: 'Mailbox is not linked to a company', success: false }, { status: 404 })
       // No session, so no RLS client: the sweep spans every tenant and writes
       // with the service role, scoped by the tenant_id resolved above.
@@ -111,6 +109,7 @@ export async function POST(request: NextRequest) {
       if (!authResult.supabase || !authResult.tenant_id) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
       db = authResult.supabase as unknown as SupabaseLike
       tenant_id = authResult.tenant_id
+      failedTenant = tenant_id
       userId = user_id || authResult.user?.id
       if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
@@ -129,7 +128,7 @@ export async function POST(request: NextRequest) {
     // refresh_token can be revoked from `authenticated` (migration 273) — RLS
     // is row-level, not column-level, so an own-row SELECT policy necessarily
     // hands the refresh token to the user's own browser.
-    const { data: tokenRecord } = await createAdminClient().from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).single()
+    const { data: tokenRecord } = await createAdminClient().from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).eq('tenant_id', tenant_id).maybeSingle()
     if (!tokenRecord || !tokenRecord.access_token || !tokenRecord.refresh_token) return NextResponse.json({ error: 'Gmail not connected', success: false }, { status: 401 })
     const refreshToken = tokenRecord.refresh_token
 
@@ -162,7 +161,7 @@ export async function POST(request: NextRequest) {
     const repaired = await repairOfficeDirections(db as never, tenant_id, office)
 
     // Update sync state
-    await db.from('email_sync_state').upsert({ user_id: userId, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    await db.from('email_sync_state').upsert({ user_id: userId, tenant_id, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id,tenant_id' })
 
     // Build query
     let query = ''
@@ -181,7 +180,7 @@ export async function POST(request: NextRequest) {
     // Which messages to download (lib/email/gmail-candidates.ts): what Gmail
     // added since the stored history id on a scheduled run, else the date
     // window — then only the ones not already stored.
-    const { data: syncState } = await db.from('email_sync_state').select('last_history_id').eq('user_id', userId).maybeSingle()
+    const { data: syncState } = await db.from('email_sync_state').select('last_history_id').eq('user_id', userId).eq('tenant_id', tenant_id).maybeSingle()
     const knownSenders = new Set((knownRows ?? []).map((r: { email: string | null }) => (r.email || '').trim().toLowerCase()).filter(Boolean))
     const candidates = await collectCandidates(gmail, {
       useHistory: Boolean(use_history) && !full_sync,
@@ -508,6 +507,7 @@ export async function POST(request: NextRequest) {
     const problem = clean ? null : `${downloaded.failed} message(s) could not be downloaded and ${insertFailed} could not be saved — they are retried on the next run${why}`
     await db.from('email_sync_state').upsert({
       user_id: userId,
+      tenant_id,
       sync_status: clean ? 'idle' : 'partial',
       last_full_sync_at: full_sync ? new Date().toISOString() : undefined,
       ...(clean ? { last_incremental_sync_at: new Date().toISOString() } : {}),
@@ -515,13 +515,13 @@ export async function POST(request: NextRequest) {
       emails_synced: result.messages_created,
       error_message: problem,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+    }, { onConflict: 'user_id,tenant_id' })
     if (!clean) (result as Record<string, unknown>).warning = problem
 
     return NextResponse.json(result)
   } catch (error: any) {
     console.error('[Email Sync] Error:', error.message)
-    if (userId) {
+    if (userId && failedTenant) {
       // The failure is recorded with the service role: the scheduled sweep has
       // no session to write it with, and a failed sync that records nothing is
       // the silence this whole job exists to end.
@@ -529,8 +529,8 @@ export async function POST(request: NextRequest) {
         await createAdminClient()
           .from('email_sync_state')
           .upsert(
-            { user_id: userId, sync_status: 'failed', error_message: error.message, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id' }
+            { user_id: userId, tenant_id: failedTenant, sync_status: 'failed', error_message: error.message, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id,tenant_id' }
           )
       } catch {}
     }

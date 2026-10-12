@@ -78,6 +78,11 @@ export default function GettingStartedPage() {
         <p className="text-gray-600">
           If you are deactivated in the company you chose, you are taken to your next company automatically.
         </p>
+        <p className="text-gray-600 mt-3">
+          Your Gmail is connected per company: in each company, connect the mailbox you use for it under
+          <strong> Settings &rarr; Email</strong> (it can be the same address). The Inbox, replies and the mail sync use the
+          current company&rsquo;s mailbox, and disconnecting in one company leaves the others connected.
+        </p>
       </section>
 
       {/* Roles */}

@@ -3,6 +3,7 @@ import { getAuthUrl } from '@/lib/gmail'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { signState } from '@/lib/oauth-state'
 import { checkGoogleRedirect } from '@/lib/oauth-config'
+import { currentTenantId, type MembershipDb } from '@/lib/current-membership'
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,7 +53,15 @@ export async function POST(request: NextRequest) {
     // plaintext state — an attacker could initiate their own Google OAuth
     // flow with `state=<victim_user_id>` and have the callback bind their
     // Google tokens to the victim's gmail_tokens row.
-    const authUrl = getAuthUrl(signState(userId))
+    //
+    // The company is signed in too: the mailbox is filed under the company
+    // the person is working in now (migration 415: one per person per
+    // company), not whichever the callback would guess.
+    const { tenantId } = await currentTenantId(authClient as unknown as MembershipDb)
+    if (!tenantId) {
+      return NextResponse.json({ error: 'No active company' }, { status: 403 })
+    }
+    const authUrl = getAuthUrl(signState(`${userId}:${tenantId}`))
 
     return NextResponse.json({ authUrl, redirect_uri: redirectCheck.redirectUri })
   } catch (err: any) {

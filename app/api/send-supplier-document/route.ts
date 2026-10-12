@@ -92,7 +92,8 @@ export async function POST(request: Request) {
       .from('gmail_tokens')
       .select('access_token, refresh_token, user_id')
       .eq('user_id', authResult.user!.id)
-      .single()
+      .eq('tenant_id', authResult.tenant_id!)
+      .maybeSingle()
 
     if (!tokenRecord || !tokenRecord.refresh_token) {
       return NextResponse.json({ success: false, error: 'Gmail not connected. Connect in Settings > Email.' }, { status: 401 })

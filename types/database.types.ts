@@ -4463,6 +4463,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          tenant_id: string | null
           sync_status: string | null
           last_history_id: string | null
           last_full_sync_at: string | null
@@ -4475,6 +4476,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          tenant_id?: string | null
           sync_status?: string | null
           last_history_id?: string | null
           last_full_sync_at?: string | null
@@ -4487,6 +4489,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          tenant_id?: string | null
           sync_status?: string | null
           last_history_id?: string | null
           last_full_sync_at?: string | null
