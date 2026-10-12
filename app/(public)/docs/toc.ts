@@ -75,7 +75,7 @@ export const CATEGORIES: DocCategory[] = [
     label: 'Getting Started',
     items: [
       { href: '/docs/getting-started', icon: Rocket, title: 'Getting Started', description: 'Sign up or accept an invitation, complete onboarding, and understand your role.' },
-      { href: '/docs/workflows', icon: Lightbulb, title: 'Workflows & Tips', description: 'End-to-end workflows across the sidebar pipeline — Sell, Operate, Suppliers & Rates, Finance — and the shortcuts that speed each one.' },
+      { href: '/docs/workflows', icon: Lightbulb, title: 'Workflows & Tips', description: 'End-to-end workflows — from a WhatsApp enquiry to a paid, completed trip, quotes, leads, Copilot, expenses, payments, partners and tasks — and the shortcuts that speed them.' },
     ],
   },
   {
@@ -155,7 +155,7 @@ export const CATEGORIES: DocCategory[] = [
       { href: '/docs/vocabulary', icon: BookOpen, title: 'Your Vocabulary', description: 'The 40 lists behind your dropdowns — tiers, supplier types, vehicles and more: rename, add, hide, reorder, delete or reset them.' },
       { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your peak dates as a premium on the selling price after margin, matched by departure date; applied in the B2B Calculator.' },
       { href: '/docs/activity-summary', icon: Activity, title: 'Team Activity', description: 'Optional, transparent activity summaries: last seen, focused time, and work counts per member.' },
-      { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp Business API and Gmail OAuth, both live today. Accounting sync (Xero, QuickBooks) is on the roadmap for Q3 2026.' },
+      { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp (on Autoura’s account) and your own Gmail for the inbox, both live today. Accounting sync (Xero, QuickBooks) is planned.' },
     ],
   },
 ]

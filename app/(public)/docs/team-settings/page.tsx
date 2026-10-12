@@ -38,7 +38,7 @@ export default function TeamSettingsPage() {
           <strong>User Management</strong> (admins and owners) controls who can log in to your workspace:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li><strong>Invite User</strong> &mdash; enter an email and pick a role. You can give a role up to your own: an admin invites admins, managers, members and viewers; only an owner invites an owner. Each invite takes a seat on your plan, and an invite is refused when the plan is full.</li>
+          <li><strong>Invite User</strong> &mdash; enter an email and pick a role. You can give a role below your own: an admin invites managers, members and viewers, and an owner can also invite admins. Nobody is invited as an owner. Each invite takes a seat on your plan, and an invite is refused when the plan is full.</li>
           <li>If the invitation email could not be sent, the page says so and gives you the link to pass on yourself.</li>
           <li><strong>Pending</strong> and <strong>Expired</strong> invites can be resent (with a fresh link and a new expiry date) or revoked.</li>
           <li>Change a user&rsquo;s role from the dropdown, or deactivate them. You cannot change your own role or deactivate yourself, only an owner acts on an owner, and the last active owner or admin cannot be deactivated or demoted.</li>

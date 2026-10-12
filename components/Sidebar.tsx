@@ -255,17 +255,19 @@ const navigation: NavSection[] = [
   {
     title: 'Finance',
     key: 'finance',
-    roles: ['admin', 'manager'],
+    // Members invoice and collect on their own trips (API: staff), so they
+    // get those four pages; the finance-only ones stay pinned below.
+    roles: ['admin', 'manager', 'member'],
     items: [
       { label: 'Payments', href: '/payments', icon: DollarSign },
       { label: 'Invoices', href: '/invoices', icon: FileText },
       { label: 'Receipts', href: '/receipts', icon: Receipt },
-      { label: 'Receivables', href: '/accounts-receivable', icon: Wallet },
-      { label: 'Payables', href: '/accounts-payable', icon: CreditCard },
-      { label: 'Supplier Invoices', href: '/supplier-invoices', icon: Receipt },
+      { label: 'Receivables', href: '/accounts-receivable', icon: Wallet, roles: ['admin', 'manager'] },
+      { label: 'Payables', href: '/accounts-payable', icon: CreditCard, roles: ['admin', 'manager'] },
+      { label: 'Supplier Invoices', href: '/supplier-invoices', icon: Receipt, roles: ['admin', 'manager'] },
       { label: 'Expenses', href: '/expenses', icon: Receipt },
-      { label: 'Commissions', href: '/commissions', icon: Handshake },
-      { label: 'Profit & Loss', href: '/profit-loss', icon: TrendingUp },
+      { label: 'Commissions', href: '/commissions', icon: Handshake, roles: ['admin', 'manager'] },
+      { label: 'Profit & Loss', href: '/profit-loss', icon: TrendingUp, roles: ['admin', 'manager'] },
     ]
   },
   // Configured once. 'Team Management' (/settings/team) was consolidated into

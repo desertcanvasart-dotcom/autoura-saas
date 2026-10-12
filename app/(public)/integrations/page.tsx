@@ -111,28 +111,28 @@ const comingSoonIntegrations = [
     description: "Popular messaging app in Japan and Southeast Asia. Connect with clients who prefer LINE over WhatsApp.",
     icon: MessageSquare,
     region: "Japan, Thailand, Taiwan",
-    eta: "Q2 2026"
+    eta: "Planned"
   },
   {
     name: "WeChat",
     description: "Essential for Chinese market. Receive inquiries and send quotes directly through WeChat.",
     icon: MessageSquare,
     region: "China",
-    eta: "Q2 2026"
+    eta: "Planned"
   },
   {
     name: "Stripe",
     description: "Accept credit card payments online. Clients can pay deposits and balances directly from their quote.",
     icon: Zap,
     region: "Global",
-    eta: "Q3 2026"
+    eta: "Planned"
   },
   {
     name: "QuickBooks",
     description: "Sync invoices and payments automatically with your accounting software.",
     icon: Shield,
     region: "Global",
-    eta: "Q3 2026"
+    eta: "Planned"
   },
   {
     name: "Google Calendar",
