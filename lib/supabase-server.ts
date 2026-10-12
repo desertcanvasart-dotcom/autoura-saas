@@ -6,6 +6,7 @@
  */
 
 import { createServerClient } from '@supabase/ssr';
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
@@ -129,23 +130,15 @@ export async function getUserTenantId(): Promise<TenantIdResult> {
     };
   }
 
-  // Get user's tenant membership. A person can belong to several companies
-  // (tenant_members is unique per tenant/user PAIR — an existing user who
-  // accepts an invitation gains a second row). .single() errored on 2+ rows,
-  // so every requireAuth() route answered 403 for such a user. One rule picks
-  // the membership everywhere — here, middleware.ts, AuthContext and
-  // TenantContext: oldest joined_at, then lowest tenant_id so a tie cannot
-  // resolve differently in two layers (guarded by
-  // lib/__tests__/membership-lookup-rule.test.ts).
-  const { data: membership, error: membershipError } = await supabase
-    .from('tenant_members')
-    .select('tenant_id, role, status')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .order('joined_at', { ascending: true })
-    .order('tenant_id', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  // The membership in the company the person is working in. A person can
+  // belong to several companies; which one is current is the database's
+  // answer (get_user_tenant_id: their chosen company, else the oldest), the
+  // same one every RLS policy uses — see lib/current-membership.ts.
+  const { data: membership, error: membershipError } = await currentMembership<{ tenant_id: string; role: string; status: string }>(
+    supabase as unknown as MembershipDb,
+    user.id,
+    'tenant_id, role, status',
+  );
 
   if (membershipError || !membership) {
     return {

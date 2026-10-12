@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
@@ -179,15 +180,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // single() errors on 2+ rows — which silently skipped the onboarding
       // redirect. status is filtered too, so a suspended membership cannot
       // decide where login lands.
-      const { data: memberData } = await supabase
-        .from('tenant_members')
-        .select('tenant_id, role')
-        .eq('user_id', data.user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .order('tenant_id', { ascending: true })
-        .limit(1)
-        .maybeSingle()
+      const { data: memberData } = await currentMembership<{ tenant_id: string; role: string }>(
+        supabase as unknown as MembershipDb,
+        data.user.id,
+        'tenant_id, role',
+      )
 
       if (memberData?.tenant_id) {
         const { data: featuresData } = await supabase

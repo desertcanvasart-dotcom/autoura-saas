@@ -1,6 +1,7 @@
 'use client'
 
 import { VocabSelect } from '@/components/vocabulary'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -285,15 +286,11 @@ export default function ItineraryEditorPage() {
 
         if (user) {
           // Check tenant membership
-          const { data: membership, error: membershipError } = await supabase
-            .from('tenant_members')
-            .select('tenant_id, role, status')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .order('joined_at', { ascending: true })
-            .order('tenant_id', { ascending: true })
-            .limit(1)
-            .maybeSingle()
+          const { data: membership, error: membershipError } = await currentMembership(
+            supabase as unknown as MembershipDb,
+            user.id,
+            'tenant_id, role, status',
+          )
           console.error('Tenant membership:', membership, 'error:', membershipError?.message)
         } else {
           console.error('User not authenticated!')

@@ -30,6 +30,9 @@ vi.mock('@supabase/ssr', () => ({
       getUser: async () => ({ data: { user: currentUser } }),
       signOut,
     },
+    // The current company is the database's answer (get_user_tenant_id,
+    // lib/current-membership): one when there is an active membership.
+    rpc: async () => ({ data: currentMembership ? 'tenant-1' : null, error: null }),
     // Table-aware: the gate reads is_active from user_profiles and the role
     // from tenant_members, so one canned row can no longer answer both.
     from: (table: string) => {

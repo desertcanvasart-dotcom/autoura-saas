@@ -155,28 +155,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ---- 2b. One company per login, for now ---------------------------------
-    // Every lookup (TenantContext, middleware, requireAuth) works in the
-    // OLDEST active membership and nothing lets a login switch, so a second
-    // company joined here was never shown — the page said "joined", the seat
-    // was taken, and the person kept seeing their first company. Refuse it
-    // plainly until switching exists.
-    if (action !== 'created' && userId) {
-      const { data: others } = await db
-        .from('tenant_members')
-        .select('tenant_id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .neq('tenant_id', invitation.tenant_id)
-        .limit(1)
-      if ((others ?? []).length > 0) {
-        return NextResponse.json(
-          { success: false, error: 'This email already belongs to another company on Autoura, and one login cannot switch between companies yet. Ask to be invited with a different email address.' },
-          { status: 409 }
-        )
-      }
-    }
-
     // ---- 3. The membership — the part that was missing entirely -----------
     // Still a seat free? Invitations made before the plan shrank, or several
     // accepted at once, could take the company over its limit.
@@ -235,6 +213,18 @@ export async function POST(request: NextRequest) {
     if (profileError) {
       // Not fatal: the membership is what grants access, and it exists.
       console.error('Membership created but profile details not updated:', profileError)
+    }
+
+    // ---- 4b. Open the company just joined ----------------------------------
+    // Someone already working in another company lands in this one; the
+    // sidebar's company switcher takes them back. Separate from the update
+    // above so a database without migration 414 still saves the name.
+    if (action !== 'created') {
+      const { error: activeError } = await db
+        .from('user_profiles')
+        .update({ active_tenant_id: invitation.tenant_id })
+        .eq('id', userId)
+      if (activeError) console.error('Joined, but could not make the new company current:', activeError)
     }
 
     // ---- 5. Now the invitation is genuinely used --------------------------

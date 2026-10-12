@@ -36,8 +36,8 @@ describe('onboarding and invitations', () => {
     expect(src('app/api/invitations/route.ts')).toMatch(/invitation_token: _token, \.\.\.i/)
   })
 
-  it('a login already in another company is refused, not silently added', () => {
-    expect(src('app/api/invitations/accept/route.ts')).toMatch(/cannot switch between companies yet/)
+  it('a login already in another company joins and lands in the new one (migration 414)', () => {
+    expect(src('app/api/invitations/accept/route.ts')).toMatch(/active_tenant_id: invitation\.tenant_id/)
   })
 
   it('invitation links default to this app', () => {

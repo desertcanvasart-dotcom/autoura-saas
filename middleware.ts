@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isSuperAdmin } from '@/lib/super-admin-shared'
 import { toPermissionRole } from '@/lib/roles'
@@ -316,15 +317,9 @@ export async function middleware(request: NextRequest) {
           .select('is_active')
           .eq('id', user.id)
           .single(),
-        supabase
-          .from('tenant_members')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: true })
-          .order('tenant_id', { ascending: true })
-          .limit(1)
-          .maybeSingle(),
+        // The current company's membership — the database's answer, the one
+        // RLS uses (lib/current-membership.ts).
+        currentMembership<{ role: string }>(supabase as unknown as MembershipDb, user.id, 'role'),
       ])
 
       // Deactivation is per company: the Team page switches off this
