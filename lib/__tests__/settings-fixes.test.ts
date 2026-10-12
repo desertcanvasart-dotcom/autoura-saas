@@ -129,3 +129,33 @@ describe('signatures', () => {
     expect(swapSignatureBlock(body, '<div data-signature="true">--<br/>Omar</div>')).toBe('<p>Hi</p><div data-signature="true">--<br/>Omar</div>')
   })
 })
+
+describe('vocabulary, aliases, day blocks and destinations', () => {
+  it('the tier ladder keeps hidden tiers in place, so hiding one reprices nothing', () => {
+    const r = src('lib/vocabulary-server.ts')
+    expect(r).toMatch(/HIDDEN TIERS INCLUDED/)
+    expect(r.slice(r.indexOf('export async function tierLadderForTenant'), r.indexOf('export async function vehicleBandsForTenant'))).not.toMatch(/activeInOrder/)
+  })
+
+  it('a tier or supplier type in use is not deleted without a second yes; duplicate labels are refused', () => {
+    expect(src('app/api/vocabulary/[id]/route.ts')).toMatch(/current\.kind === 'tier' \|\| current\.kind === 'supplier_type'/)
+    expect(src('app/api/vocabulary/route.ts')).toMatch(/is already in this list/)
+  })
+
+  it('aliases match whatever the spacing, and are checked when switched back on', async () => {
+    const { buildAliasIndex, resolveAttractionAlias } = await import('../pricing/attraction-aliases')
+    const index = buildAliasIndex([{ tenant_id: 't', alias: 'Giza Plateau', canonical: 'Giza Pyramids' } as never])
+    expect(resolveAttractionAlias('Giza  Plateau', index)).toEqual(['Giza Pyramids'])
+    expect(src('app/api/attraction-aliases/[id]/route.ts')).toMatch(/const switchingOn = body\.is_active === true && !current\.is_active/)
+  })
+
+  it('a day block list splits on semicolons only — a comma is part of a name', async () => {
+    const { listCell } = await import('../day-blocks/blocks')
+    expect(listCell('Hatshepsut Temple, Deir el-Bahari; Valley of the Kings')).toEqual(['Hatshepsut Temple, Deir el-Bahari', 'Valley of the Kings'])
+  })
+
+  it('a stored city outside your list stays selectable in rate forms', () => {
+    expect(src('app/rates/hotels/hotels-content.tsx')).toMatch(/cityOptionsFor\(cityOptions, formData\.city/)
+    expect(src('app/api/destination-catalog/manage/route.ts')).toMatch(/is already in this country/)
+  })
+})

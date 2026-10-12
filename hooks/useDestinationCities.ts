@@ -24,15 +24,21 @@ export type { CatalogCity, CatalogDestination } from '@/lib/destination-catalog'
 
 // One fetch per session, shared by every dropdown on every page.
 let cache: CatalogDestination[] | null = null
+let cachedAt = 0
+const CACHE_MS = 5 * 60 * 1000
 let inflight: Promise<CatalogDestination[]> | null = null
 
 async function loadCatalog(): Promise<CatalogDestination[]> {
-  if (cache) return cache
+  // Five minutes, then read again: an admin's change reached colleagues only
+  // after a full reload, since the cache lived for the whole session.
+  if (cache && Date.now() - cachedAt < CACHE_MS) return cache
   if (!inflight) {
     inflight = fetch('/api/destination-catalog')
       .then(r => r.json())
       .then(j => {
         cache = (j?.success && Array.isArray(j.data)) ? j.data : []
+        cachedAt = Date.now()
+        inflight = null // done: the next read after expiry fetches again
         return cache!
       })
       .catch(() => {

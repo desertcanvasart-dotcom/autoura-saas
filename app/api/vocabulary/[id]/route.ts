@@ -19,7 +19,7 @@ import {
   VOCABULARY_KIND_INFO,
   vehicleInUseWarning,
 } from '@/lib/vocabulary'
-import { vehicleTypeUsage } from '@/lib/vocabulary-server'
+import { vehicleTypeUsage, vocabularyKeyUsage } from '@/lib/vocabulary-server'
 import { COLS, WRITE_ROLES, WRITE_DENIED } from '../route'
 
 export const dynamic = 'force-dynamic'
@@ -78,6 +78,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const verdict = validateVocabularyItem(merged)
     if (!verdict.ok) return NextResponse.json({ success: false, error: verdict.error }, { status: 400 })
 
+    // A new label another entry of the list already has is refused.
+    if (typeof patch.label === 'string' && patch.label.toLowerCase() !== String(current.label ?? '').trim().toLowerCase()) {
+      const { data: same } = await supabase.from('tenant_vocabularies').select('id, label').eq('kind', current.kind).neq('id', id)
+      if ((same ?? []).some(e => String(e.label ?? '').trim().toLowerCase() === (patch.label as string).toLowerCase())) {
+        return NextResponse.json({ success: false, error: `"${patch.label}" is already in this list` }, { status: 409 })
+      }
+    }
+
     if (patch.is_active === false && current.is_active) {
       const { data: siblings } = await supabase.from('tenant_vocabularies').select('id, is_active').eq('kind', current.kind)
       if (wouldBreakMinimum(current.kind, siblings ?? [], id)) {
@@ -113,6 +121,19 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       const usage = await vehicleTypeUsage(supabase, current.tenant_id, current.key)
       const warning = vehicleInUseWarning(current.label, usage)
       if (warning) return NextResponse.json({ success: false, error: warning, usage }, { status: 409 })
+    }
+
+    // A tier or supplier type still in use: hide it instead, or delete on an
+    // explicit go-ahead (only vehicles were checked).
+    if ((current.kind === 'tier' || current.kind === 'supplier_type') && current.tenant_id && new URL(request.url).searchParams.get('confirm_in_use') !== '1') {
+      const used = await vocabularyKeyUsage(supabase, current.tenant_id, current.kind, current.key)
+      if (used.length) {
+        return NextResponse.json({
+          success: false,
+          error: `"${current.label}" is still used by ${used.join(', ')}. Deleting it leaves them with a word your list no longer has. Hide it instead, or re-file them first.`,
+          usage: used,
+        }, { status: 409 })
+      }
     }
 
     const { data: siblings } = await supabase.from('tenant_vocabularies').select('id, is_active').eq('kind', current.kind)

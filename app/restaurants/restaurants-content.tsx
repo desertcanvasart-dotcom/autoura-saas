@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { cityOptionsFor } from '@/components/CitySelect'
 import { useEffect, useState, useRef } from 'react'
 import { todayLocal } from '@/lib/today'
 import Link from 'next/link'
@@ -1076,7 +1077,7 @@ export default function RestaurantsContent() {
                     <select name="city" value={formData.city} onChange={handleChange} required
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm">
                       <option value="">Select City...</option>
-                      {cityOptions.map(city => (<option key={city} value={city}>{city}</option>))}
+                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (<option key={city} value={city}>{city}</option>))}
                     </select>
                   </div>
                   <div className="md:col-span-2">

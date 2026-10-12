@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
@@ -740,7 +741,7 @@ export default function TippingPage() {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
                 >
                   <option value="">Any city (country-wide)</option>
-                  {cityOptions.map(city => (
+                  {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                     <option key={city} value={city}>{city}</option>
                   ))}
                 </select>

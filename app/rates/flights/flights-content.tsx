@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 
@@ -683,7 +684,7 @@ export default function FlightsContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">From Any</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, routeFromFilter || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -697,7 +698,7 @@ export default function FlightsContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">To Any</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, routeToFilter || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1102,7 +1103,7 @@ export default function FlightsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     >
                       <option value="">Select departure city</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.route_from || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
