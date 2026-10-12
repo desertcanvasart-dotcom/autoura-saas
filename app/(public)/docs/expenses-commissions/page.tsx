@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { Tip, DocScreenshot } from '../layout'
 import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/expenses-commissions')
 
 const CATEGORIES = [
   'Tour Guide', 'Driver', 'Hotel/Accommodation', 'Nile Cruise', 'Transportation', 'Flights', 'Entrance Fees', 'Meals',

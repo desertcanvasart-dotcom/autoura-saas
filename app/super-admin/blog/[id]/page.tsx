@@ -21,14 +21,16 @@ interface Draft {
   slug: string
   language: 'en' | 'ja'
   excerpt: string
+  seo_description: string
   body_html: string
   cover_image_url: string
+  cover_image_alt: string
   author_name: string
   tags: string
   status: 'draft' | 'published'
 }
 
-const EMPTY: Draft = { title: '', slug: '', language: 'en', excerpt: '', body_html: '', cover_image_url: '', author_name: '', tags: '', status: 'draft' }
+const EMPTY: Draft = { title: '', slug: '', language: 'en', excerpt: '', seo_description: '', body_html: '', cover_image_url: '', cover_image_alt: '', author_name: '', tags: '', status: 'draft' }
 
 export default function BlogPostEditorPage() {
   const router = useRouter()
@@ -55,7 +57,8 @@ export default function BlogPostEditorPage() {
         const p = data.post
         setDraft({
           title: p.title ?? '', slug: p.slug ?? '', language: p.language === 'ja' ? 'ja' : 'en',
-          excerpt: p.excerpt ?? '', body_html: p.body_html ?? '', cover_image_url: p.cover_image_url ?? '',
+          excerpt: p.excerpt ?? '', seo_description: p.seo_description ?? '', body_html: p.body_html ?? '',
+          cover_image_url: p.cover_image_url ?? '', cover_image_alt: p.cover_image_alt ?? '',
           author_name: p.author_name ?? '', tags: (p.tags ?? []).join(', '), status: p.status,
         })
       })
@@ -111,6 +114,15 @@ export default function BlogPostEditorPage() {
   }
 
   const published = draft.status === 'published'
+  // Search engines show about 155 characters; under ~70 reads as thin.
+  const snippet = (draft.seo_description || draft.excerpt).trim()
+  const descriptionHint = !snippet
+    ? { text: 'No summary or search description — search engines will quote the opening of the post.', tone: 'text-amber-600' }
+    : snippet.length > 160
+      ? { text: `${snippet.length} characters — search results cut it at about 155.`, tone: 'text-amber-600' }
+      : snippet.length < 70
+        ? { text: `${snippet.length} characters — aim for 120–155 so the snippet says enough.`, tone: 'text-amber-600' }
+        : { text: `${snippet.length} characters — a good length for search results.`, tone: 'text-gray-400' }
   const input = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500'
 
   return (
@@ -168,13 +180,19 @@ export default function BlogPostEditorPage() {
           <textarea value={draft.excerpt} onChange={e => set('excerpt', e.target.value)} rows={2} maxLength={500} placeholder="One or two sentences shown on the blog list and in link previews." className={`mt-1 ${input}`} />
         </label>
 
+        <label className="block text-xs font-medium text-gray-600">Search description <span className="font-normal text-gray-400">(optional)</span>
+          <textarea value={draft.seo_description} onChange={e => set('seo_description', e.target.value)} rows={2} maxLength={300}
+            placeholder="The snippet under the title in Google and AI search. Leave empty to use the summary." className={`mt-1 ${input}`} />
+          <span className={`mt-1 block font-normal ${descriptionHint.tone}`} data-testid="seo-description-hint">{descriptionHint.text}</span>
+        </label>
+
         <div className="text-xs font-medium text-gray-600">
           Cover image
           {draft.cover_image_url ? (
             <div className="mt-1 relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={draft.cover_image_url} alt="" className="w-full max-h-64 object-cover rounded-lg border border-gray-200" />
-              <button type="button" onClick={() => set('cover_image_url', '')} className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 shadow hover:bg-white" title="Remove the cover image" aria-label="Remove the cover image">
+              <button type="button" onClick={() => setDraft(d => ({ ...d, cover_image_url: '', cover_image_alt: '' }))} className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 shadow hover:bg-white" title="Remove the cover image" aria-label="Remove the cover image">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -183,6 +201,13 @@ export default function BlogPostEditorPage() {
               {uploadingCover ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
               Add a cover image
               <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={e => setCover(e.target.files?.[0])} />
+            </label>
+          )}
+          {draft.cover_image_url && (
+            <label className="mt-2 block">Cover image description (alt text)
+              <input value={draft.cover_image_alt} onChange={e => set('cover_image_alt', e.target.value)} maxLength={250}
+                placeholder="What the picture shows, e.g. “A felucca on the Nile at sunset”. Empty uses the post title."
+                className={`mt-1 ${input} font-normal`} />
             </label>
           )}
         </div>

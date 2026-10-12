@@ -10,7 +10,7 @@ import { sanitizeBlogHtml } from './sanitize'
 export * from './posts-shared'
 import { BLOG_LANGUAGES, isValidSlug, slugify, type BlogLanguage, type BlogPost, type BlogPostSummary } from './posts-shared'
 
-const SUMMARY_COLUMNS = 'id, slug, language, title, excerpt, cover_image_url, author_name, tags, status, published_at, created_at, updated_at'
+const SUMMARY_COLUMNS = 'id, slug, language, title, excerpt, seo_description, cover_image_url, cover_image_alt, author_name, tags, status, published_at, created_at, updated_at'
 /** Every column a post page or the editor needs. */
 export const POST_COLUMNS = `${SUMMARY_COLUMNS}, body_html`
 
@@ -21,6 +21,8 @@ export type PostInput = {
   excerpt: string | null
   body_html: string
   cover_image_url: string | null
+  cover_image_alt: string | null
+  seo_description: string | null
   author_name: string | null
   tags: string[]
   status: 'draft' | 'published'
@@ -57,6 +59,8 @@ export function validatePostInput(body: unknown): { ok: true; post: PostInput } 
       excerpt: optional(b.excerpt, 500),
       body_html: sanitizeBlogHtml(typeof b.body_html === 'string' ? b.body_html : ''),
       cover_image_url: safeImageUrl(b.cover_image_url),
+      cover_image_alt: optional(b.cover_image_alt, 250),
+      seo_description: optional(b.seo_description, 300),
       author_name: optional(b.author_name, 120),
       tags,
       status,

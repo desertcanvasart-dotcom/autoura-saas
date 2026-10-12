@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { ScreenshotPlaceholder, Tip } from '../layout'
 import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/bulk-csv')
 
 const ROWS: Array<{ what: string; suppliers: string; properties: string; rates: string }> = [
   {

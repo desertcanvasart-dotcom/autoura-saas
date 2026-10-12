@@ -13,6 +13,10 @@ export interface BlogPost {
   excerpt: string | null
   body_html: string
   cover_image_url: string | null
+  /** What the cover shows, for readers who cannot see it (migration 419). */
+  cover_image_alt: string | null
+  /** The search-result snippet when it should differ from the excerpt. */
+  seo_description: string | null
   author_name: string | null
   tags: string[]
   status: 'draft' | 'published'

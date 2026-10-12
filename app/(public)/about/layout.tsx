@@ -1,11 +1,11 @@
-import type { Metadata } from 'next'
+import { buildPageMetadata } from '@/lib/seo/site'
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: 'About',
   description:
-    'Autoura is built by tour operators, for tour operators — the operating system that takes an inquiry from WhatsApp to invoice.',
-  alternates: { canonical: '/about' },
-}
+    'Autoura is built by tour operators, for tour operators and DMCs: one system that takes an enquiry from WhatsApp to itinerary, quote, booking and invoice.',
+  path: '/about',
+})
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children

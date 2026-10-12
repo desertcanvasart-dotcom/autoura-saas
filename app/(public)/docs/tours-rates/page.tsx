@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { Tip, DocScreenshot } from '../layout'
 import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/tours-rates')
 
 const CATEGORIES: Array<{ group: string; name: string; what: string }> = [
   { group: 'Accommodation', name: 'Hotels', what: 'By city, tier and board basis. Prices are dated rate periods (up to six): per person in a double, single supplement, triple reduction — each for EU and non-EU passports — and optional room supplements (a view, a meal plan) with low, high and peak prices, offered in the Quote Builder under Hotel Services on that hotel’s nights. One hotel per city and tier can be starred Preferred.' },

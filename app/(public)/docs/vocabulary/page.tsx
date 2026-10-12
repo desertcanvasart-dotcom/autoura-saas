@@ -3,6 +3,9 @@ import { ChevronRight } from 'lucide-react'
 import { Tip } from '../layout'
 import { DocPager } from '../pager'
 import { VOCABULARY_GROUPS, VOCABULARY_KIND_INFO, SUPPLIER_BEHAVIORS } from '@/lib/vocabulary'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/vocabulary')
 
 const KINDS = Object.values(VOCABULARY_KIND_INFO)
 

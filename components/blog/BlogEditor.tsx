@@ -12,9 +12,11 @@ import Placeholder from '@tiptap/extension-placeholder'
 import { useEffect, useRef, useState } from 'react'
 import {
   Bold, Italic, Heading2, Heading3, List, ListOrdered, Quote, Code2,
-  Link as LinkIcon, ImagePlus, Undo, Redo, Loader2,
+  Link as LinkIcon, ImagePlus, Captions, Undo, Redo, Loader2,
 } from 'lucide-react'
 import { uploadBlogImage } from '@/lib/blog/upload-client'
+
+const ALT_PROMPT = 'Describe this image for readers who cannot see it (alt text), e.g. "Guests boarding a felucca in Aswan"'
 
 function ToolbarButton({ onClick, active, disabled, title, children }: {
   onClick: () => void; active?: boolean; disabled?: boolean; title: string; children: React.ReactNode
@@ -70,12 +72,25 @@ export default function BlogEditor({ value, onChange }: { value: string; onChang
     ed.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run()
   }
 
+  // Alt text for the selected picture: read aloud by screen readers and read
+  // by search engines in place of the image.
+  const setAlt = (ed: Editor) => {
+    if (!ed.isActive('image')) { setError('Click a picture in the post first, then describe it.'); return }
+    setError(null)
+    const current = (ed.getAttributes('image').alt as string | undefined) ?? ''
+    const alt = window.prompt(ALT_PROMPT, current)
+    if (alt === null) return
+    ed.chain().focus().updateAttributes('image', { alt: alt.trim() }).run()
+  }
+
   const addImage = async (file: File | undefined) => {
     if (!file || !editor) return
     setUploading(true); setError(null)
     try {
       const src = await uploadBlogImage(file)
-      editor.chain().focus().setImage({ src, alt: file.name.replace(/\.[^.]+$/, '') }).run()
+      // A file name ("IMG_2041") describes nothing; ask what the picture shows.
+      const alt = window.prompt(ALT_PROMPT, '')
+      editor.chain().focus().setImage({ src, alt: (alt ?? '').trim() }).run()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not upload the image')
     } finally {
@@ -102,6 +117,9 @@ export default function BlogEditor({ value, onChange }: { value: string; onChang
             <ToolbarButton title="Link" active={editor.isActive('link')} onClick={() => setLink(editor)}><LinkIcon className="w-4 h-4" /></ToolbarButton>
             <ToolbarButton title="Insert an image" disabled={uploading} onClick={() => fileRef.current?.click()}>
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+            </ToolbarButton>
+            <ToolbarButton title="Describe the selected image (alt text)" onClick={() => setAlt(editor)}>
+              <Captions className="w-4 h-4" />
             </ToolbarButton>
             <span className="w-px h-5 bg-gray-200 mx-1" />
             <ToolbarButton title="Undo" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}><Undo className="w-4 h-4" /></ToolbarButton>

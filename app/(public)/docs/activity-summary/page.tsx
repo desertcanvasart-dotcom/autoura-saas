@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { DocScreenshot, Tip } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/activity-summary')
 
 export default function ActivitySummaryDocs() {
   return (
@@ -78,11 +82,8 @@ export default function ActivitySummaryDocs() {
         </Tip>
       </section>
 
-      <div className="pt-4 border-t border-gray-100">
-        <Link href="/docs" className="text-sm text-primary-600 hover:text-primary-700 transition-colors">
-          &larr; All Docs
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/activity-summary" />
     </div>
   )
 }

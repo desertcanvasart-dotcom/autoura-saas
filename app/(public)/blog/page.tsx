@@ -7,14 +7,25 @@ import Link from 'next/link'
 import { listPublishedPosts, type BlogLanguage } from '@/lib/blog/posts'
 import { currentUser, isBlogAdmin } from '@/lib/blog/admin'
 import { BlogHeader, BlogFooter, fmtPostDate } from '@/components/blog/BlogChrome'
+import JsonLd from '@/components/seo/JsonLd'
+import { coverAlt } from '@/lib/blog/seo'
+import { absoluteUrl, breadcrumbs, buildPageMetadata, ORG_ID } from '@/lib/seo/site'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  title: 'Blog — Autoura',
-  description: 'Product news, how-tos and operations tips for tour operators and travel agencies, from the Autoura team.',
-  openGraph: { title: 'Autoura Blog', description: 'Product news, how-tos and operations tips for tour operators.', type: 'website' },
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ lang?: string }> }): Promise<Metadata> {
+  const { lang } = await searchParams
+  return buildPageMetadata({
+    title: 'Blog',
+    description: BLOG_DESCRIPTION,
+    // ?lang= filters the same posts; the unfiltered list is the canonical page.
+    path: '/blog',
+    noindex: lang !== undefined,
+  })
 }
+
+const BLOG_DESCRIPTION =
+  'Product news, how-tos and operations tips for tour operators, DMCs and travel agencies: quoting, pricing, WhatsApp enquiries and running trips, from the Autoura team.'
 
 const LANGS: { value: BlogLanguage | null; label: string }[] = [
   { value: null, label: 'All' },
@@ -31,6 +42,24 @@ export default async function BlogIndexPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="min-h-screen bg-[#F5F3EF]">
+      <JsonLd data={[
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Blog',
+          name: 'Autoura Blog',
+          description: BLOG_DESCRIPTION,
+          url: absoluteUrl('/blog'),
+          publisher: { '@id': ORG_ID },
+          blogPost: posts.slice(0, 20).map(p => ({
+            '@type': 'BlogPosting',
+            headline: p.title,
+            url: absoluteUrl(`/blog/${p.slug}`),
+            inLanguage: p.language,
+            ...(p.published_at ? { datePublished: p.published_at } : {}),
+          })),
+        },
+        breadcrumbs([{ name: 'Blog', path: '/blog' }]),
+      ]} />
       <BlogHeader adminHref={admin ? '/super-admin/blog' : null} />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -59,7 +88,7 @@ export default async function BlogIndexPage({ searchParams }: { searchParams: Pr
             <Link href={`/blog/${lead.slug}`} className="group grid md:grid-cols-2 gap-8 items-center py-6" data-testid="blog-lead">
               {lead.cover_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={lead.cover_image_url} alt="" className="w-full aspect-[16/9] object-cover rounded-2xl bg-gray-100" />
+                <img src={lead.cover_image_url} alt={coverAlt(lead)} className="w-full aspect-[16/9] object-cover rounded-2xl bg-gray-100" />
               ) : (
                 <div className="w-full aspect-[16/9] rounded-2xl bg-gradient-to-br from-[#647C47]/15 to-[#647C47]/5" />
               )}
@@ -77,7 +106,7 @@ export default async function BlogIndexPage({ searchParams }: { searchParams: Pr
                   <Link key={p.id} href={`/blog/${p.slug}`} className="group" lang={p.language}>
                     {p.cover_image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.cover_image_url} alt="" className="w-full aspect-[16/9] object-cover rounded-xl bg-gray-100" />
+                      <img src={p.cover_image_url} alt={coverAlt(p)} loading="lazy" className="w-full aspect-[16/9] object-cover rounded-xl bg-gray-100" />
                     ) : (
                       <div className="w-full aspect-[16/9] rounded-xl bg-gradient-to-br from-[#647C47]/15 to-[#647C47]/5" />
                     )}
@@ -100,7 +129,7 @@ export default async function BlogIndexPage({ searchParams }: { searchParams: Pr
 function PostMeta({ date, language, tags }: { date: string | null; language: string; tags: string[] }) {
   return (
     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-      {fmtPostDate(date, language)}
+      {date && <time dateTime={date}>{fmtPostDate(date, language)}</time>}
       {tags[0] && <span className="text-[#647C47]"> · {tags[0]}</span>}
     </p>
   )
