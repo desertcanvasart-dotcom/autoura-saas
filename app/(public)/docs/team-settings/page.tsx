@@ -43,6 +43,7 @@ export default function TeamSettingsPage() {
           <li><strong>Pending</strong> and <strong>Expired</strong> invites can be resent (with a fresh link and a new expiry date) or revoked.</li>
           <li>Change a user&rsquo;s role from the dropdown, or deactivate them. You cannot change your own role or deactivate yourself, only an owner acts on an owner, and the last active owner or admin cannot be deactivated or demoted.</li>
           <li>Deactivating someone removes their access to <em>this</em> workspace only; any other company they work with is untouched.</li>
+          <li>Someone who already works for another company on Autoura accepts with their usual password; they switch between companies from the <strong>Company</strong> picker in the sidebar.</li>
         </ul>
         <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="User Management page with users, roles, and invitation management" />
         <Tip>

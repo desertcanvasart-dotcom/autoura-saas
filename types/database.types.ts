@@ -11037,6 +11037,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           last_seen_at: string | null
+          active_tenant_id: string | null
         }
         Insert: {
           id: string
@@ -11049,6 +11050,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           last_seen_at?: string | null
+          active_tenant_id?: string | null
         }
         Update: {
           id?: string
@@ -11061,6 +11063,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           last_seen_at?: string | null
+          active_tenant_id?: string | null
         }
         Relationships: []
       }

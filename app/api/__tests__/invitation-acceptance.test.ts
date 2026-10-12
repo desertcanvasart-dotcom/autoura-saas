@@ -126,24 +126,20 @@ describe('holding two memberships does not break the app', () => {
   // are legal, and .single() errors on 2+ rows just as it does on 0.
   const files = ['app/contexts/TenantContext.tsx', 'app/contexts/AuthContext.tsx']
 
-  it('neither context reads memberships with .single()', () => {
-    for (const f of files) {
-      const src = read(f)
-      const i = src.indexOf("from('tenant_members')")
-      expect(i, f).toBeGreaterThan(-1)
-      const query = src.slice(i, i + 400)
-      expect(query, f).not.toMatch(/\.single\(\)/)
-      expect(query, f).toContain('maybeSingle()')
-    }
+  // Both ask the database which company is current (lib/current-membership):
+  // one row, pinned to that company, active only — two memberships cannot
+  // make the read fail or pick at random.
+  it('both contexts read the current membership through the shared helper', () => {
+    for (const f of files) expect(read(f), f).toMatch(/currentMembership(<[^>]*>)?\(/)
   })
 
-  it('both pick deterministically and ignore non-active memberships', () => {
-    for (const f of files) {
-      const src = read(f)
-      const query = src.slice(src.indexOf("from('tenant_members')"), src.indexOf("from('tenant_members')") + 400)
-      expect(query, f).toContain("eq('status', 'active')")
-      expect(query, f).toContain('.limit(1)')
-    }
+  it('the helper pins one company, reads active rows, and never .single()', () => {
+    const helper = read('lib/current-membership.ts')
+    expect(helper).toContain("rpc('get_user_tenant_id')")
+    expect(helper).toContain(".eq('tenant_id', tenantId)")
+    expect(helper).toContain(".eq('status', 'active')")
+    expect(helper).toContain('.maybeSingle()')
+    expect(helper).not.toMatch(/\.single\(\)/)
   })
 })
 

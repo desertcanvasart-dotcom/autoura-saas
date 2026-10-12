@@ -62,9 +62,22 @@ export default function GettingStartedPage() {
         </ol>
         <Tip>
           <strong>Tip:</strong> Check your spam folder if you don&apos;t see the invitation email within a few minutes.
-          One login belongs to one company for now: if your email already has an Autoura account with another company, the
-          invitation is refused &mdash; ask to be invited with a different email address.
+          Already on Autoura with another company? Use the same link and sign in with your usual password: the new company is
+          added to your login and opens straight away.
         </Tip>
+      </section>
+
+      {/* Several companies */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Working for Several Companies</h2>
+        <p className="text-gray-600 mb-3">
+          One login can belong to several companies, with a different role in each. When it does, a <strong>Company</strong>
+          picker appears in the sidebar under your role: choose a company and Autoura reloads in it &mdash; its clients, trips,
+          rates, settings and your role there. Autoura remembers your choice the next time you sign in.
+        </p>
+        <p className="text-gray-600">
+          If you are deactivated in the company you chose, you are taken to your next company automatically.
+        </p>
       </section>
 
       {/* Roles */}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
@@ -405,15 +406,11 @@ export default function AutouraHomepage() {
     const checkAuthAndRedirect = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        const { data: memberData } = await supabase
-          .from('tenant_members')
-          .select('tenant_id, role')
-          .eq('user_id', session.user.id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: true })
-          .order('tenant_id', { ascending: true })
-          .limit(1)
-          .maybeSingle()
+        const { data: memberData } = await currentMembership<{ tenant_id: string; role: string }>(
+          supabase as unknown as MembershipDb,
+          session.user.id,
+          'tenant_id, role',
+        )
         if (memberData?.tenant_id) {
           const { data: featuresData } = await supabase
             .from('tenant_features')

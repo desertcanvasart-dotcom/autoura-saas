@@ -61,37 +61,33 @@ const userLookups = files.flatMap(f =>
 )
 
 describe('membership lookup rule', () => {
-  it('finds the lookups it is meant to guard', () => {
-    const guarded = new Set(userLookups.map(l => l.file))
+  // Since migration 414 the rule lives in ONE place, get_user_tenant_id():
+  // the person's chosen company while they are an active member of it, else
+  // the oldest active membership. Every layer asks it (lib/current-membership)
+  // rather than re-implementing it, so the page, the API and RLS agree.
+  it('every layer asks the database which company is current', () => {
     for (const f of [
       'lib/supabase-server.ts',
       'middleware.ts',
       'app/contexts/AuthContext.tsx',
       'app/contexts/TenantContext.tsx',
+      'app/page.tsx',
     ]) {
-      expect(guarded.has(f), `${f} should contain a user membership lookup`).toBe(true)
+      const src = files.find(x => x.rel === f)!.src
+      expect(src, f).toMatch(/currentMembership(<[^>]*>)?\(/)
     }
+    const helper = files.find(x => x.rel === 'lib/current-membership.ts')!.src
+    expect(helper).toMatch(/rpc\('get_user_tenant_id'\)/)
+    expect(helper).toMatch(/\.eq\('status', 'active'\)/)
+  })
+
+  it('nothing picks "the" membership by its own rule any more', () => {
+    // A single-row read of the user's memberships not pinned to a company.
+    expect(userLookups.map(l => `${l.file}:\n${l.chain}`)).toEqual([])
   })
 
   it('no user membership lookup uses .single()', () => {
     const bad = userLookups.filter(l => /\.single\(\)/.test(l.chain)).map(l => l.file)
-    expect(bad).toEqual([])
-  })
-
-  it('every one orders by joined_at, then tenant_id, and takes one row', () => {
-    const bad = userLookups
-      .filter(
-        l =>
-          !/\.order\(\s*'joined_at',\s*\{\s*ascending:\s*true\s*\}\s*\)\s*\n\s*\.order\(\s*'tenant_id',\s*\{\s*ascending:\s*true\s*\}\s*\)\s*\n\s*\.limit\(1\)\s*\n\s*\.maybeSingle\(\)/.test(
-            l.chain
-          )
-      )
-      .map(l => `${l.file}:\n${l.chain}`)
-    expect(bad, bad.join('\n\n')).toEqual([])
-  })
-
-  it('every one reads only active memberships', () => {
-    const bad = userLookups.filter(l => !/\.eq\(\s*'status',\s*'active'\s*\)/.test(l.chain)).map(l => l.file)
     expect(bad).toEqual([])
   })
 
