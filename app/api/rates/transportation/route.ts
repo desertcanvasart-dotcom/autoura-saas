@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { activeKeys } from '@/lib/vocabulary-server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
 
 // ============================================
@@ -125,6 +126,10 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase) {
       return NextResponse.json(
@@ -211,6 +216,10 @@ export async function PUT(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(
@@ -228,7 +237,9 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       )
     }
-    const { id, ...updates } = body
+    // A row never changes hands: tenant_id is not the body's to set.
+    const { id, tenant_id: _ignoredTenant, ...updates } = body
+    void _ignoredTenant
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
@@ -241,6 +252,7 @@ export async function PUT(request: NextRequest) {
         .from('transportation_rates')
         .select('*')
         .eq('id', id)
+        .eq('tenant_id', authResult.tenant_id)
         .single()
 
       if (current) {
@@ -269,6 +281,7 @@ export async function PUT(request: NextRequest) {
       .from('transportation_rates')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('*')
       .single()
 
@@ -295,6 +308,10 @@ export async function DELETE(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(
@@ -314,6 +331,7 @@ export async function DELETE(request: NextRequest) {
       .from('transportation_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE transportation_rates error:', error)

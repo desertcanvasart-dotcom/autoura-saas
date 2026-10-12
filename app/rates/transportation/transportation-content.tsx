@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -322,7 +323,7 @@ export default function TransportationContent() {
     const classes = gridClasses(formData.vehicles)
     const offeredClasses = classes.filter(c => parseFloat(formData.vehicles[c.key]?.rate_eur ?? '') > 0)
     if (offeredClasses.length === 0) {
-      setError('Enter a EUR rate for at least one vehicle (leave others blank if not offered)')
+      setError('Enter a rate for at least one vehicle (leave others blank if not offered)')
       setSaving(false)
       return
     }
@@ -702,7 +703,7 @@ export default function TransportationContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">All Cities</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, cityFilter || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1124,7 +1125,7 @@ export default function TransportationContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     >
                       <option value="">Select City</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>

@@ -1,9 +1,15 @@
 // GET/PATCH/DELETE /api/supplier-invoices/[id]
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { isMatchable } from '@/lib/supplier-invoices/match-state'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     const supabase = await createAuthenticatedClient()
@@ -26,6 +32,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase || !auth.tenant_id) {
@@ -101,14 +112,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase) {
       return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: auth.status })
     }
     const { id } = await params
-    const { error } = await auth.supabase.from('supplier_invoices').delete().eq('id', id)
+    const { data: removed, error } = await auth.supabase.from('supplier_invoices').delete().eq('id', id).select('id, document_storage_path')
     if (error) return NextResponse.json({ success: false, error: 'Failed to delete' }, { status: 500 })
+    if (!removed || removed.length === 0) return NextResponse.json({ success: false, error: 'Supplier invoice not found' }, { status: 404 })
+    // Its document goes with it (the file stayed in storage).
+    const path = (removed[0] as { document_storage_path?: string | null }).document_storage_path
+    if (path && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { createClient } = await import('@supabase/supabase-js')
+      const { error: rmError } = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY)
+        .storage.from('supplier-invoices').remove([path])
+      if (rmError) console.error('supplier-invoice DELETE: document not removed:', rmError.message)
+    }
     return NextResponse.json({ success: true })
   } catch (e: any) {
     console.error('supplier-invoice DELETE error:', e?.message)

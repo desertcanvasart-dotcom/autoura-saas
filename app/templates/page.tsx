@@ -1435,7 +1435,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
         }
       } else if (isInternalTemplate) {
         // Internal team members
-        endpoint = '/api/team-members'
+        endpoint = '/api/team-members?active=true' // a deactivated member is not a recipient
         recipientType = 'client' // Using client type for team members
       }
       // else: Customer templates use /api/clients (default)

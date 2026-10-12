@@ -64,12 +64,8 @@
     "full_day_rate",
     "half_day_rate"
   ],
-  "meal_rates": [
-    "dietary_options"
-  ],
   "entrance_fees": [
-    "egyptian_rate",
-    "is_sellable_extra"
+    "egyptian_rate"
   ],
   "flight_rates": [
     "carry_on_kg",
@@ -77,8 +73,7 @@
   ],
   "activity_rates": [
     "addon_note",
-    "is_addon",
-    "tiers"
+    "is_addon"
   ],
   "airport_staff_rates": [
     "airport_name",

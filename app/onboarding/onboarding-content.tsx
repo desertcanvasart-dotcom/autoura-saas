@@ -30,7 +30,8 @@ const STEPS = [
 export default function OnboardingContent() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { tenant, loading: tenantLoading } = useTenant()
+  const { tenant, tenantMember, loading: tenantLoading } = useTenant()
+  const [finishError, setFinishError] = useState<string | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [checkingStatus, setCheckingStatus] = useState(true)
@@ -39,6 +40,11 @@ export default function OnboardingContent() {
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       if (!user || authLoading || tenantLoading) return
+      // Setting up the company is for its owner and admins.
+      if (tenantMember && !['owner', 'admin'].includes(String(tenantMember.role))) {
+        router.push('/dashboard')
+        return
+      }
 
       try {
         const response = await fetch('/api/onboarding/status')
@@ -66,7 +72,7 @@ export default function OnboardingContent() {
     }
 
     checkOnboardingStatus()
-  }, [user, authLoading, tenantLoading, router])
+  }, [user, authLoading, tenantLoading, tenantMember, router])
 
   // Authentication check
   useEffect(() => {
@@ -104,9 +110,14 @@ export default function OnboardingContent() {
       if (response.ok) {
         // Redirect to dashboard
         router.push('/dashboard')
+      } else {
+        // It failed silently before: the button simply did nothing.
+        const json = await response.json().catch(() => ({}))
+        setFinishError(json.error || 'Setup could not be finished. Please try again.')
       }
     } catch (error) {
       console.error('Error completing onboarding:', error)
+      setFinishError('Setup could not be finished. Check your connection and try again.')
     }
   }
 
@@ -176,6 +187,9 @@ export default function OnboardingContent() {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-6 py-12">
+        {finishError && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{finishError}</div>
+        )}
         <CurrentStepComponent
           onNext={handleNext}
           onBack={handleBack}

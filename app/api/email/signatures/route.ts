@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { cleanSignature } from '@/lib/email/signature'
 
 export async function GET() {
   const auth = await requireAuth()
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   const name: string = (body.name || '').trim()
-  const content: string = (body.content || '').trim()
+  const content: string = cleanSignature(body.content)
   const isDefault: boolean = !!body.is_default
 
   if (!name || !content) {
@@ -58,3 +59,4 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   return NextResponse.json({ success: true, signature: data })
 }
+

@@ -27,7 +27,7 @@ function from(table: string) {
 }
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from } }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, role: 'manager', supabase: { from } }),
 }))
 
 const { POST } = await import('@/app/api/supplier-invoices/[id]/pay/route')

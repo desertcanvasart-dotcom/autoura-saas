@@ -11,8 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-
-const WRITE_ROLES = ['owner', 'admin', 'manager']
+import { roleDenied } from '@/lib/api-role-gate'
 
 export async function GET() {
   try {
@@ -64,9 +63,9 @@ export async function POST(request: NextRequest) {
     }
     const { supabase, tenant_id, role } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
-    if (!WRITE_ROLES.includes(role || '')) {
-      return NextResponse.json({ success: false, error: 'Insufficient permissions' }, { status: 403 })
-    }
+    // Managers price, so they keep the demand calendar (as the sidebar shows it).
+    const denied = roleDenied(role, 'manage')
+    if (denied) return denied
 
     const body = await request.json().catch(() => ({}))
     const action = body?.action
@@ -105,8 +104,12 @@ export async function POST(request: NextRequest) {
         }
         if ('colour' in body) patch.colour = colourOf(body.colour)
         if ('is_active' in body) patch.is_active = body.is_active !== false
-        const { error } = await supabase.from('pricing_seasons').update(patch).eq('id', id)
-        if (error) return dbFail(error)
+        const { data: changed, error } = await supabase.from('pricing_seasons').update(patch).eq('id', id).eq('tenant_id', tenant_id).select('id')
+        if (error) {
+          if (error.code === '23505') return bad('Another season already has that name')
+          return dbFail(error)
+        }
+        if (!changed?.length) return notFound()
         return NextResponse.json({ success: true })
       }
 
@@ -114,8 +117,9 @@ export async function POST(request: NextRequest) {
         const id = String(body.id || '')
         if (!id) return bad('id is required')
         // Dates cascade with the season (migration 304).
-        const { error } = await supabase.from('pricing_seasons').delete().eq('id', id)
+        const { data: removed, error } = await supabase.from('pricing_seasons').delete().eq('id', id).eq('tenant_id', tenant_id).select('id')
         if (error) return dbFail(error)
+        if (!removed?.length) return notFound()
         return NextResponse.json({ success: true })
       }
 
@@ -126,6 +130,10 @@ export async function POST(request: NextRequest) {
         if (!seasonId) return bad('season_id is required')
         if (!isDate(start) || !isDate(end)) return bad('Both dates are required')
         if (end < start) return bad('The end date cannot be before the start date')
+        // The season must be this agency's: the foreign key does not check
+        // the tenant, so a window could hang off another agency's season.
+        const { data: season } = await supabase.from('pricing_seasons').select('id').eq('id', seasonId).eq('tenant_id', tenant_id).maybeSingle()
+        if (!season) return notFound()
         const { error } = await supabase.from('pricing_season_dates').insert({
           tenant_id,
           season_id: seasonId,
@@ -140,8 +148,9 @@ export async function POST(request: NextRequest) {
       case 'delete_dates': {
         const id = String(body.id || '')
         if (!id) return bad('id is required')
-        const { error } = await supabase.from('pricing_season_dates').delete().eq('id', id)
+        const { data: removed, error } = await supabase.from('pricing_season_dates').delete().eq('id', id).eq('tenant_id', tenant_id).select('id')
         if (error) return dbFail(error)
+        if (!removed?.length) return notFound()
         return NextResponse.json({ success: true })
       }
 
@@ -154,6 +163,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
+function notFound() {
+  return NextResponse.json({ success: false, error: 'Not found — it may have been deleted' }, { status: 404 })
+}
 function bad(error: string) {
   return NextResponse.json({ success: false, error }, { status: 400 })
 }
@@ -163,6 +175,8 @@ function dbFail(error: { message: string }) {
 }
 /** null = out of range; the CHECK enforces the same bounds in the database. */
 function clampUplift(value: unknown): number | null {
+  // A blank box is not 0% (it was saved as +0% with no word).
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null
   const n = Number(value)
   if (!Number.isFinite(n) || n < 0 || n > 200) return null
   return Math.round(n * 100) / 100

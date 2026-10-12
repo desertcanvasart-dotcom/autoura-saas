@@ -643,32 +643,8 @@ export default function ProfilePage() {
             )
           })()}
 
-          {/* DANGER ZONE */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 border-l-4 border-l-red-500">
-            <h3 className="text-sm font-semibold text-red-600 mb-3">Danger Zone</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-700">Deactivate Account</p>
-                  <p className="text-[10px] text-gray-400">Temporarily disable your account</p>
-                </div>
-                <button className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors shadow-sm">
-                  Deactivate
-                </button>
-              </div>
-              <div className="border-t border-gray-100 pt-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-700">Delete Account</p>
-                    <p className="text-[10px] text-gray-400">Permanently delete your account and all data</p>
-                  </div>
-                  <button className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* No self-serve Deactivate / Delete here: the old buttons had no
+              action. An admin deactivates a member in User Management. */}
 
         </div>
       </div>

@@ -69,7 +69,8 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
           services_offered: services,
           company_phone: phone,
           company_website: website,
-          current_step: currentStep
+          // The step to resume on: the next one, not this one again.
+          current_step: currentStep + 1
         })
       })
 

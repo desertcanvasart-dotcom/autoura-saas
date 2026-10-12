@@ -71,6 +71,14 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/settings/email-signatures': ['admin', 'manager', 'member'],
   '/settings/copilot-analytics': ['admin', 'manager'],
   '/settings/seasons': ['admin', 'manager'],
+  // Your own profile, password and notifications, and your own Gmail
+  // (connected per person): everyone with a login. The Inbox sends members
+  // here to connect Gmail; they were turned away. Office addresses and
+  // templates on the email page stay admin-only inside the page.
+  '/settings/profile': ['admin', 'manager', 'member', 'viewer'],
+  '/settings/email': ['admin', 'manager', 'member'],
+  // Team Members (managers) links here to manage departments.
+  '/settings/departments': ['admin', 'manager'],
   '/users': ['admin'],
   
   // Admin and Manager
@@ -79,6 +87,9 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/profit-loss': ['admin', 'manager'],
   '/accounts-receivable': ['admin', 'manager'],
   '/accounts-payable': ['admin', 'manager'],
+  // Finance pages with no entry were open to any role by URL, viewers too.
+  '/commissions': ['admin', 'manager'],
+  '/supplier-invoices': ['admin', 'manager'],
   '/rates': ['admin', 'manager'],
   '/pricing-grid': ['admin', 'manager', 'member'],
   '/hotels': ['admin', 'manager'],
@@ -99,6 +110,7 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/itineraries': ['admin', 'manager', 'member'],
   '/invoices': ['admin', 'manager', 'member'],
   '/payments': ['admin', 'manager', 'member'],
+  '/receipts': ['admin', 'manager', 'member'],
   '/tasks': ['admin', 'manager', 'member'],
   '/inbox': ['admin', 'manager', 'member'],
   '/whatsapp-inbox': ['admin', 'manager', 'member'],
@@ -116,6 +128,8 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/communications': ['admin', 'manager', 'member'],
   '/followups': ['admin', 'manager', 'member'],
   '/tours': ['admin', 'manager', 'member'],
+  // The Tour Manager edits the catalogue: managers and admins, as the sidebar.
+  '/tours/manage': ['admin', 'manager'],
   // Sell: quotes and bookings for the sales team; B2B (quotes, partners, the
   // calculator, transport packages) for managers and admins — as the sidebar
   // shows them. With no entry, a viewer or member with the link got in.

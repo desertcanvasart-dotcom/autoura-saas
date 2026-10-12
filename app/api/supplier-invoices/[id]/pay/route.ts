@@ -1,4 +1,5 @@
 // POST /api/supplier-invoices/[id]/pay — requires approved status
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -7,17 +8,17 @@ async function payMatchedExpenses(
   supabase: SupabaseClient,
   invoiceId: string,
   payment: { payment_date: string; payment_method: string | null; payment_reference: string | null },
-): Promise<number> {
+): Promise<{ count: number; error: string | null }> {
   const { data: links, error: linkErr } = await supabase
     .from('supplier_invoice_expenses')
     .select('expense_id')
     .eq('supplier_invoice_id', invoiceId)
   if (linkErr) {
     console.error('[supplier-invoices/pay] matched expenses:', linkErr.message)
-    return 0
+    return { count: 0, error: linkErr.message }
   }
   const ids = (links || []).map((l: { expense_id: string }) => l.expense_id)
-  if (ids.length === 0) return 0
+  if (ids.length === 0) return { count: 0, error: null }
 
   const { data: paid, error } = await supabase
     .from('expenses')
@@ -27,12 +28,17 @@ async function payMatchedExpenses(
     .select('id')
   if (error) {
     console.error('[supplier-invoices/pay] marking expenses paid:', error.message)
-    return 0
+    return { count: 0, error: error.message }
   }
-  return paid?.length ?? 0
+  return { count: paid?.length ?? 0, error: null }
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase) {
@@ -85,13 +91,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Payables, never counted as money out — so they are paid with it.
     // Only pending/approved ones: a rejected expense stays rejected, and one
     // already paid keeps its own payment details.
-    const expensesPaid = await payMatchedExpenses(supabase, id, {
+    const expensesResult = await payMatchedExpenses(supabase, id, {
       payment_date: (data.paid_at as string).slice(0, 10),
       payment_method: data.payment_method ?? null,
       payment_reference: data.payment_reference || (data.supplier_invoice_number ? `Supplier invoice ${data.supplier_invoice_number}` : null),
     })
 
-    return NextResponse.json({ success: true, data, expenses_paid: expensesPaid })
+    // Said, not logged only: the bill is paid but its expenses would stay
+    // "owed" in Payables, inviting a second payment.
+    return NextResponse.json({
+      success: true,
+      data,
+      expenses_paid: expensesResult.count,
+      ...(expensesResult.error ? { warning: 'The invoice is marked paid, but its matched expenses could not be marked paid — mark them paid in Expenses so Payables does not list them.' } : {}),
+    })
   } catch (e: any) {
     console.error('pay error:', e?.message)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })

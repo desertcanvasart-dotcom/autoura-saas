@@ -15,7 +15,7 @@ export default function TeamSettingsPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Team &amp; Settings</h1>
       <p className="text-gray-600 mb-8">
-        Autoura separates your <strong>staff directory</strong> (people you assign work to) from <strong>user access</strong> (who can log in and what they can do). This page covers both, plus the Settings area.
+        Autoura separates your <strong>staff directory</strong> (people you assign work to) from <strong>user access</strong> (who can log in and what they can do). This page covers both, your own settings, and the admin-only Settings group.
       </p>
 
       {/* Team Members */}
@@ -24,13 +24,10 @@ export default function TeamSettingsPage() {
         <p className="text-gray-600 mb-4">
           Go to <strong>Team Members</strong> under People (admin/manager only). This is your staff directory &mdash; the people you assign tasks to. Adding someone here does <strong>not</strong> give them a login.
         </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li>Click <strong>Add Member</strong> and fill in their details directly &mdash; no invitation email is sent</li>
-          <li><strong>Role</strong> here is a job title: Owner, Manager, Coordinator, Sales, Tour Guide, Driver, or Staff</li>
-          <li>Optionally assign a <strong>department</strong></li>
-          <li>Filter the directory by role or department</li>
-          <li>Members can be edited or deleted at any time</li>
-        </ul>
+        <p className="text-gray-600 mb-3">
+          Its role is a job title, not a permission, and its staff type is what the guide and driver pickers read.
+          The whole page is in <Link href="/docs/team-members" className="text-primary-600 underline hover:text-primary-700">Team Members</Link>.
+        </p>
         <DocScreenshot src="/docs/team-settings/team-members.jpg" alt="Team Members staff directory with job-title roles, departments, and filters" />
       </section>
 
@@ -38,106 +35,119 @@ export default function TeamSettingsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">User Management</h2>
         <p className="text-gray-600 mb-4">
-          <strong>User Management</strong> (admin only) is the single place to control who can log in to your workspace:
+          <strong>User Management</strong> (admins and owners) controls who can log in to your workspace:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li>Click <strong>Invite User</strong>, enter their email, and pick an access role &mdash; they receive an email to set up their account</li>
-          <li>Access roles are <strong>Administrator</strong> (full access), <strong>Manager</strong> (clients, tasks, and reports), <strong>Member</strong> (assigned work), and <strong>Viewer</strong> (read-only)</li>
-          <li>Change a user&apos;s role from the inline dropdown &mdash; it takes effect on their next page load &mdash; or deactivate a user to revoke access</li>
-          <li><strong>Pending Invites</strong> and <strong>Expired Invites</strong> sections let you resend or revoke invitations</li>
-          <li>A <strong>Role Permissions</strong> reference table at the bottom of the page shows what each role can do</li>
+          <li><strong>Invite User</strong> &mdash; enter an email and pick a role. You can give a role below your own: an admin invites managers, members and viewers, and an owner can also invite admins. Nobody is invited as an owner. Each invite takes a seat on your plan, and an invite is refused when the plan is full.</li>
+          <li>If the invitation email could not be sent, the page says so and gives you the link to pass on yourself.</li>
+          <li><strong>Pending</strong> and <strong>Expired</strong> invites can be resent (with a fresh link and a new expiry date) or revoked.</li>
+          <li>Change a user&rsquo;s role from the dropdown, or deactivate them. You cannot change your own role or deactivate yourself, only an owner acts on an owner, and the last active owner or admin cannot be deactivated or demoted.</li>
+          <li>Deactivating someone removes their access to <em>this</em> workspace only; any other company they work with is untouched.</li>
         </ul>
         <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="User Management page with users, roles, and invitation management" />
         <Tip>
-          Refer to the <Link href="/docs/getting-started" className="text-primary-600 underline hover:text-primary-700">Getting Started</Link> page for a full breakdown of what each access role can do.
+          What each role can see is in{' '}
+          <Link href="/docs/getting-started" className="text-primary-600 underline hover:text-primary-700">Getting Started</Link>.
         </Tip>
       </section>
 
-      {/* Team Activity */}
+      {/* Personal settings */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Team Activity (optional)</h2>
-        <p className="text-gray-600 mb-4">
-          Activity Summaries give admins and managers a light-touch view of how the team uses Autoura: last login,
-          last seen, approximate focused time, and work counts per member &mdash; off by default, and always visible
-          to the member themselves. See the dedicated{' '}
-          <Link href="/docs/activity-summary" className="text-primary-600 underline hover:text-primary-700">Team Activity</Link>{' '}
-          page for how to enable it, what it shows, and its deliberate limits.
-        </p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Your own settings (every role)</h2>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>My profile</strong> &mdash; click your name at the bottom of the sidebar. Change your name, phone, company name and photo, change your password, and see <strong>Your Activity</strong> (when your company has Activity Summaries on).</li>
+          <li><strong>Email</strong> (<code>/settings/email</code>; admins, managers and members) &mdash; connect your own Gmail, used to read and reply to client email in the Inbox.</li>
+          <li><strong>Email Signatures</strong> (Communication group) &mdash; your signatures; the default one is added to the reply composer.</li>
+        </ul>
       </section>
 
       {/* Settings */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Settings</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The Settings page (admins)</h2>
         <p className="text-gray-600 mb-4">
-          Go to <strong>Settings</strong> (the Settings group is admin-only). The page has four tabs:
+          <strong>Settings</strong>, at the top of the Settings group, has four tabs:
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Profile</h3>
-        <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
-          <li>Update your name and upload an avatar</li>
-          <li>View your role</li>
-          <li>Set your <strong>Timezone</strong> and <strong>Company Name</strong></li>
-        </ul>
+        <p className="text-gray-600 mb-4">Your name, phone and photo; your email and role are shown, not edited here.</p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Email</h3>
-        <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
-          <li>Connect or disconnect your Gmail account</li>
-          <li>Email signatures are managed on their own page &mdash; follow the <strong>Manage signatures</strong> link (rich and HTML signatures; your default signature auto-appears in the reply composer)</li>
-        </ul>
+        <p className="text-gray-600 mb-4">Your Gmail connection, and a link to <strong>Email Signatures</strong>.</p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Notifications</h3>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
-          <li>Master toggles for email and in-app notifications</li>
-          <li>Per-event toggles: Task Assigned, Task Due Soon, Task Overdue, Task Completed</li>
+          <li><strong>Email</strong> and <strong>in-app</strong> switches for your notifications.</li>
+          <li><strong>Task Due Soon</strong> (24 hours before) and <strong>Task Overdue</strong> reminders follow their switches.</li>
+          <li><strong>Task Assigned</strong> and <strong>Task Completed</strong> are saved but not yet acted on.</li>
         </ul>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Preferences</h3>
-        <p className="text-gray-600 mb-3">Titled <strong>Itinerary Preferences</strong> &mdash; defaults for new itineraries:</p>
+        <p className="text-gray-600 mb-3">Your own starting points, plus shortcuts to the settings below:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Default Cost Mode</strong> &mdash; Auto-Calculate (use rates database) or Manual Entry (enter costs by hand)</li>
-          <li><strong>Default Tier</strong> &mdash; one of your own service tiers (see <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Your Vocabulary</Link>)</li>
-          <li><strong>Default Margin</strong> &mdash; Default markup percentage</li>
-          <li><strong>Default Currency</strong> &mdash; Your preferred currency (EUR, USD, etc.)</li>
+          <li><strong>Default Service Tier</strong>, <strong>Default Currency</strong> &mdash; preselected in the Pricing Grid; the currency is also the one figures are shown in.</li>
+          <li><strong>Default Profit Margin</strong> &mdash; your margin on new quotes. It comes before your company&rsquo;s house margin; a margin typed on a quote always wins. 0% is allowed.</li>
+          <li><strong>Cost Calculation Mode</strong> &mdash; saved, but not yet used: new itineraries are always priced from your rates.</li>
+          <li><strong>Exchange Rates</strong> &mdash; your company&rsquo;s rates. <strong>Refresh from API</strong> loads the market rates; a rate you change is marked <strong>Custom</strong>, and only the rates you change are saved.</li>
         </ul>
         <DocScreenshot src="/docs/team-settings/settings-preferences.jpg" alt="Settings page Preferences tab with cost mode, tier, margin, and currency defaults" />
-        <p className="mt-4 text-gray-600">
-          WhatsApp is configured on its own admin page &mdash; <strong>WhatsApp</strong> in the Settings group &mdash; not as a Settings tab.
-        </p>
+      </section>
 
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Settings that reach across the app</h3>
-        <p className="text-gray-600 mb-3">
-          A few settings are less about your account and more about how the whole product behaves.
-          They each have their own page:
-        </p>
+      {/* Lists and pricing */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Your words, places and standard days (admins)</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong><Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Your Vocabulary</Link></strong> &mdash; relabel the product&rsquo;s built-in terms in your own words (Settings group).</li>
-          <li><strong><Link href="/docs/seasonal-premiums" className="text-primary-600 hover:underline">Seasonal Premiums</Link></strong> &mdash; the dated windows that lift every quote travelling in them.</li>
-          <li><strong><Link href="/docs/extras" className="text-primary-600 hover:underline">Extras &amp; Upgrades</Link></strong> &mdash; the add-ons and upgrades you sell on top of a trip, on B2B quotes and bookings.</li>
+          <li><strong><Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Your Vocabulary</Link></strong> &mdash; the 40 lists behind your dropdowns: tiers, supplier types, vehicles, meal types and more.</li>
+          <li><strong>Attraction Names</strong> &mdash; your tours name a sight one way, your entrance-fee sheet may name it another. Say which fee a wording means and every tour using it is priced from that fee. The top panel lists every wording in your tours that reaches no fee &mdash; each is a gap in the price.</li>
+          <li><strong>Day Blocks</strong> &mdash; your standard days, kept once: what each includes and where its night is. Export the sheet, edit it in Excel or Google Sheets and import it back; you see what would change before anything is saved. A paid sight with no fee behind it is flagged.</li>
+          <li><strong>Destinations</strong> &mdash; the countries you operate and the cities you sell. Every city dropdown follows this list. A country or city the catalogue lacks can be added (names are matched without regard to capitals, so &ldquo;luxor&rdquo; finds Luxor); additions join the shared catalogue.</li>
+          <li><strong><Link href="/docs/seasonal-premiums" className="text-primary-600 hover:underline">Seasonal Premiums</Link></strong> (admins and managers) &mdash; your peak dates and the premium you charge on them.</li>
+          <li><strong><Link href="/docs/extras" className="text-primary-600 hover:underline">Extras &amp; Upgrades</Link></strong> &mdash; the add-ons you sell on top of a trip.</li>
         </ul>
+        <p className="text-gray-600 mt-3">Changes to lists and destinations reach every open screen within five minutes, or at once on a reload.</p>
       </section>
 
       {/* Other admin pages */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Organization, Billing &amp; Capacity</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Organization, Billing &amp; the rest</h2>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Organization</h3>
-        <p className="text-gray-600 mb-4">
-          <strong>Organization</strong> (Settings group) holds your company profile: upload your logo and set primary and secondary brand colors, which flow into your generated documents (quotes, invoices, and more). A Features section controls which platform features are enabled.
-        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-4">
+          <li><strong>Basic Information</strong> &mdash; company name and contact email; your house, minimum and deposit percentages and the days a deposit is due (left blank, the platform defaults apply); the company timezone; the country you operate in and the governing law for contracts; and the <strong>rates currency</strong> your supplier rates are kept in (changing it asks you to confirm, as existing rates are not converted).</li>
+          <li><strong>Limits</strong> &mdash; set by your plan.</li>
+          <li><strong>Team Activity</strong> &mdash; switch on <Link href="/docs/activity-summary" className="text-primary-600 hover:underline">Activity Summaries</Link>.</li>
+          <li><strong>Branding</strong> &mdash; logo and primary and secondary colours, used on your documents. If the logo fails to upload, nothing is saved.</li>
+          <li><strong>Document header &amp; footer</strong> &mdash; tagline, phone, website, address, licence and tax numbers, and a footer note.</li>
+        </ul>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Billing and Subscriptions</h3>
         <p className="text-gray-600 mb-4">
-          <strong>Billing and Subscriptions</strong> shows your current plan and usage against plan limits, links to the plans page, and opens the Stripe customer portal to manage payment details.
+          Your plan, its price and your usage against its limits; <strong>Upgrade</strong> opens the plans; <strong>Manage Billing</strong> opens the Stripe portal for cards and invoices.
         </p>
 
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Capacity</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Departments</h3>
         <p className="text-gray-600 mb-4">
-          <strong>Capacity</strong> provides a capacity calendar: set default daily capacity and edit individual dates.
+          The teams tasks are routed to: each department names the kinds of service it handles, and the tasks generated for a trip go to the department that claims them.
+        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Copilot Settings</h3>
+        <p className="text-gray-600 mb-4">
+          <strong>Proactive draft pre-generation</strong> drafts replies in the background so they are ready when someone opens the thread; they still need a person to send them.
+          <strong> WhatsApp AI auto-reply</strong> lets the bot answer WhatsApp messages on its own, with no review &mdash; leave it off unless you have decided to; it can only be switched on once the Autoura team has enabled it for your workspace.
+        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mb-3">WhatsApp</h3>
+        <p className="text-gray-600 mb-4">
+          WhatsApp runs on Autoura&rsquo;s WhatsApp account; your number is connected by the Autoura support team, not entered here. The page shows whether it is set up, sends a test message, and holds the same AI auto-reply switch.
+        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Capacity Calendar</h3>
+        <p className="text-gray-600 mb-4">
+          (Operations group.) A month view of your departures, with a maximum number of groups per day you can edit date by date. The default per day shown on the page is not saved, and nothing yet stops a booking on a full day &mdash; use it as a planning view.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Support Chat</h3>
         <p className="text-gray-600">
-          A floating support chat widget is available on every page &mdash; use it to message the Autoura support team directly, and replies arrive both in the widget and by email.
+          The chat button on every page messages the Autoura support team; replies arrive in the widget and by email.
         </p>
       </section>
 
@@ -161,7 +171,8 @@ export default function TeamSettingsPage() {
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Replying in the Client&apos;s Language</h3>
         <p className="text-gray-600 mb-3">
           The AI copilot drafts replies in whatever language the client wrote in. You review and
-          approve every draft before it is sent &mdash; nothing goes out automatically.
+          approve every draft before it is sent &mdash; nothing goes out automatically, unless an
+          admin has switched on WhatsApp AI auto-reply.
         </p>
 
         <Tip>

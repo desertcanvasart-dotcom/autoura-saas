@@ -107,7 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fire-and-forget — presence must never affect the auth flow.
   useEffect(() => {
     if (!user) return
-    let lastInput = Date.now()
+    // No input yet: opening a page is not five minutes of work (the first
+    // beat on every load and new tab counted as focused).
+    let lastInput = 0
     const markInput = () => { lastInput = Date.now() }
     const INPUT_EVENTS: (keyof WindowEventMap)[] = ['keydown', 'pointerdown', 'scroll']
     INPUT_EVENTS.forEach(e => window.addEventListener(e, markInput, { passive: true }))
@@ -179,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // decide where login lands.
       const { data: memberData } = await supabase
         .from('tenant_members')
-        .select('tenant_id')
+        .select('tenant_id, role')
         .eq('user_id', data.user.id)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
@@ -194,8 +196,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq('tenant_id', memberData.tenant_id)
           .single()
 
-        // Redirect to onboarding if not completed
-        if (featuresData && !featuresData.onboarding_completed) {
+        // Redirect to onboarding if not completed — owners and admins only:
+        // the wizard sets up the company, and an invited member signing in
+        // before the owner finished it landed in it.
+        if (featuresData && !featuresData.onboarding_completed && ['owner', 'admin'].includes(String(memberData.role))) {
           router.push('/onboarding')
           return
         }

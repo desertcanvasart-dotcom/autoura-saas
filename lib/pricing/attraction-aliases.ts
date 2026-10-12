@@ -35,7 +35,9 @@ export function buildAliasIndex(rows: AttractionAliasRow[]): Map<string, string>
   const index = new Map<string, string>()
   for (const row of rows) {
     if (!row.tenant_id) continue
-    const key = row.alias.trim().toLowerCase()
+    // Inner spaces collapsed, as the settings page saves an alias: a tour
+    // saying "Giza  Plateau" (two spaces) never matched its saved alias.
+    const key = row.alias.trim().replace(/\s+/g, ' ').toLowerCase()
     const canonical = row.canonical.trim()
     if (key && canonical) index.set(key, canonical)
   }
@@ -47,7 +49,7 @@ export function buildAliasIndex(rows: AttractionAliasRow[]): Map<string, string>
  * Unknown names come back as themselves, single-element.
  */
 export function resolveAttractionAlias(name: string, index: Map<string, string>): string[] {
-  const canonical = index.get(name.trim().toLowerCase())
+  const canonical = index.get(name.trim().replace(/\s+/g, ' ').toLowerCase())
   if (!canonical) return [name]
   return canonical
     .split(' + ')

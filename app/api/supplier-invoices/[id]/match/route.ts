@@ -1,27 +1,20 @@
 // POST   /api/supplier-invoices/[id]/match — link expenses, recompute match
 // DELETE /api/supplier-invoices/[id]/match — unlink an expense, recompute
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { MATCHABLE, isMatchable, matchState, otherCurrency } from '@/lib/supplier-invoices/match-state'
-
-async function recompute(supabase: SupabaseClient, id: string) {
-  const { data: invoice } = await supabase.from('supplier_invoices').select('amount').eq('id', id).single()
-  const { data: matches } = await supabase.from('supplier_invoice_expenses').select('matched_amount').eq('supplier_invoice_id', id)
-  const state = matchState(invoice?.amount, (matches || []).map((m: { matched_amount: unknown }) => m.matched_amount))
-  // Guarded on the status too: a bill approved or disputed meanwhile keeps it.
-  await supabase.from('supplier_invoices').update({
-    ...state,
-    updated_at: new Date().toISOString(),
-  }).eq('id', id).in('status', MATCHABLE)
-
-  return { matched_amount: state.matched_amount, discrepancy_amount: state.discrepancy_amount, match_status: state.match_status }
-}
+import { isMatchable, otherCurrency } from '@/lib/supplier-invoices/match-state'
+import { recomputeMatch } from '@/lib/supplier-invoices/recompute-match'
 
 const notMatchable = (status: string | null, verb: string) =>
   NextResponse.json({ success: false, error: `Cannot ${verb} an invoice with status '${status}'` }, { status: 409 })
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase || !auth.tenant_id) {
@@ -39,7 +32,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!invoice) return NextResponse.json({ success: false, error: 'Supplier invoice not found' }, { status: 404 })
     if (!isMatchable(invoice.status)) return notMatchable(invoice.status, 'match')
 
-    const { data: expenses } = await supabase.from('expenses').select('id, amount, currency').in('id', expenseIds)
+    const { data: expenses } = await supabase.from('expenses').select('id, amount, currency, status, expense_number').in('id', expenseIds)
+
+    // A cost belongs to one bill, and only an unpaid one can be matched: the
+    // same expense linked to two bills made both read "matched", and a paid
+    // or rejected one could be linked at all.
+    const settled = (expenses || []).filter((e: { status?: string | null }) => e.status !== 'pending' && e.status !== 'approved')
+    if (settled.length) {
+      return NextResponse.json({ success: false, error: `Only pending or approved expenses can be matched (${settled.map((e: { expense_number?: string | null }) => e.expense_number).join(', ')})` }, { status: 400 })
+    }
+    const { data: elsewhere } = await supabase
+      .from('supplier_invoice_expenses')
+      .select('expense_id')
+      .in('expense_id', expenseIds)
+      .neq('supplier_invoice_id', id)
+    if (elsewhere && elsewhere.length) {
+      return NextResponse.json({ success: false, error: 'Some of these expenses are already matched to another supplier invoice', details: { expense_ids: elsewhere.map((l: { expense_id: string }) => l.expense_id) } }, { status: 409 })
+    }
     const foreign = otherCurrency(invoice.currency, expenses || [])
     if (foreign.length) {
       return NextResponse.json({
@@ -56,7 +65,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (error) return NextResponse.json({ success: false, error: 'Failed to link expenses' }, { status: 500 })
     }
 
-    const result = await recompute(supabase, id)
+    const result = await recomputeMatch(supabase, id)
     return NextResponse.json({ success: true, ...result })
   } catch (e: any) {
     console.error('match POST error:', e?.message)
@@ -65,6 +74,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase) {
@@ -94,7 +108,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ success: false, error: 'Failed to unmatch the expense' }, { status: 500 })
     }
 
-    const result = await recompute(supabase, id)
+    const result = await recomputeMatch(supabase, id)
     return NextResponse.json({ success: true, ...result })
   } catch (e: any) {
     console.error('match DELETE error:', e?.message)

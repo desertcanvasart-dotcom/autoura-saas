@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
@@ -164,7 +165,9 @@ export default function MealRatesContent() {
   const fetchRates = async () => {
     try {
       const params = new URLSearchParams()
-      if (!showInactive) params.append('active_only', 'true')
+      // Every rate, inactive too: the list filters them (matchesActive). The
+      // fetch ran once, on mount, with active_only — so "Show All" had nothing
+      // to show and a deactivated rate could never be found to switch back on.
 
       const response = await fetch(`/api/rates/meals?${params}`)
       const data = await response.json()
@@ -751,7 +754,7 @@ export default function MealRatesContent() {
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
           >
             <option value="">All Cities</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, selectedCity || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1239,7 +1242,7 @@ export default function MealRatesContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select City</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>

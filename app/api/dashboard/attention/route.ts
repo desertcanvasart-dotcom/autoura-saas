@@ -9,6 +9,9 @@
 import { NextResponse } from 'next/server'
 import { extrasAdmin } from '@/lib/booking-extras-db'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
+import { tenantToday } from '@/lib/tenant-today'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import {
   buildAttentionItems,
   HORIZON_DAYS,
@@ -27,7 +30,8 @@ import {
 const BOOKING_COLS =
   'id, booking_number, trip_name, client_id, start_date, status, itinerary_id, balance_due, payment_deadline'
 
-const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10)
+// Days from the company's today (its timezone), set per request in GET.
+const dayFrom = (today: string, offset: number) => new Date(Date.parse(`${today}T00:00:00Z`) + offset * 864e5).toISOString().slice(0, 10)
 
 /** What the operator has dismissed (migration 397). A database without the
  *  table hides nothing rather than sinking the list. */
@@ -56,8 +60,12 @@ export async function GET() {
     }
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
+    // Passports, balances and change requests: staff work, not a viewer's.
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
-    const today = day(0)
+    const today = await tenantToday(supabase, authResult.tenant_id)
+    const day = (offset: number) => dayFrom(today, offset)
     const dismissalsPromise = dismissalsFor(supabase)
 
     const [departing, balanceDue] = await Promise.all([
@@ -115,10 +123,15 @@ export async function GET() {
       .in('booking_id', bookingIds)
       .then((r: { data: unknown; error: unknown }) => (r.error ? { data: [] } : r))
     const [passengers, changeRequests, itineraries, clients, extraRequests] = await Promise.all([
-      supabase
-        .from('booking_passengers')
-        .select('booking_id, passport_number, date_of_birth')
-        .in('booking_id', bookingIds),
+      // Every passenger: past 1,000 rows the read was cut short and a booking
+      // could look like it had passengers missing.
+      fetchAllPages<{ booking_id: string; passport_number: string | null; date_of_birth: string | null }, { message?: string }>((from, to) =>
+        supabase
+          .from('booking_passengers')
+          .select('id, booking_id, passport_number, date_of_birth')
+          .in('booking_id', bookingIds)
+          .order('id')
+          .range(from, to)),
       supabase
         .from('booking_change_requests')
         .select('booking_id, kind, requested_count, created_at')

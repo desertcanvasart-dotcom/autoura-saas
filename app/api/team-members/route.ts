@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
+import { parseTeamMemberWrite, teamMemberSaveError } from '@/lib/team/team-member-fields'
 
 // GET - Fetch all team members
 export async function GET(request: NextRequest) {
@@ -71,6 +73,10 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    // The directory is the managers' (People → Team Members); RLS checks only
+    // the tenant, so a viewer could deactivate or rename anyone.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
     if (!supabase) {
@@ -79,32 +85,18 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
-    const body = await request.json()
-
-    const { name, email, phone, role, notes, department_id } = body
-
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
-    }
+    const parsed = parseTeamMemberWrite(await request.json(), 'create')
+    if ('error' in parsed) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 })
 
     const { data, error } = await supabase
       .from('team_members')
-      .insert({
-        tenant_id, // ✅ Explicit tenant_id
-        name,
-        email: email || null,
-        phone: phone || null,
-        role: role || 'staff',
-        notes: notes || null,
-        department_id: department_id || null,
-        is_active: true
-      })
+      .insert({ tenant_id, ...parsed.data, is_active: true } as never)
       .select()
       .single()
 
     if (error) {
       console.error('Error creating team member:', error)
-      return NextResponse.json({ error: 'Failed to create team member' }, { status: 500 })
+      return NextResponse.json({ success: false, error: teamMemberSaveError(error) }, { status: error.code === '23505' ? 409 : 500 })
     }
 
     return NextResponse.json({ success: true, data })

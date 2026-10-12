@@ -281,7 +281,16 @@ const HEADER_MAP: Record<string, string> = (() => {
   return m
 })()
 
+// What a blank cell writes: an empty list, no value — or 0 nights, the one
+// optional number the table will not hold empty (duration_nights NOT NULL).
+function clearedValue(col: TemplateCsvColumn): unknown {
+  if (col.kind === 'list') return []
+  if (col.name === 'duration_nights') return 0
+  return null
+}
+
 const truthy = (v: string) => ['true', '1', 'yes', 'y', 'active', 'featured'].includes(v.trim().toLowerCase())
+const falsy = (v: string) => ['false', '0', 'no', 'n', 'inactive'].includes(v.trim().toLowerCase())
 
 /**
  * Parse a template CSV. Header-tolerant. Refuses a row missing a required
@@ -331,15 +340,34 @@ export function parseTemplatesCsv(
   parsed.data.forEach((raw, i) => {
     const rowNum = i + 2
     const rec: Record<string, unknown> = {}
+    // Cells that say nothing the column can hold. A typo in Active ("ture")
+    // read as false and switched the tour off; "two" in Duration Nights was
+    // stored as nothing. Both are refused, by name, below.
+    const badCells: string[] = []
     for (const [header, value] of Object.entries(raw)) {
       const field = HEADER_MAP[slug(header)]
       if (!field || field === '_ignore') continue
       const v = (value ?? '').trim()
-      if (v === '') continue
       const col = TEMPLATE_CSV_COLUMNS.find(c => c.name === field)!
       if (col.readOnly) continue
-      if (col.kind === 'int') rec[field] = Number(v)
-      else if (col.kind === 'bool') rec[field] = truthy(v)
+      if (v === '') {
+        // A column the sheet HAS, left blank, clears the field: that is how an
+        // exported sheet says "no image any more". A column the sheet does not
+        // have is never touched. A required column refuses a blank (below); a
+        // yes/no has nothing to clear to, so a blank leaves it as it is.
+        if (!col.required && col.kind !== 'bool') rec[field] = clearedValue(col)
+        continue
+      }
+      if (col.kind === 'int') {
+        const n = Number(v)
+        if (Number.isInteger(n) && n >= 0) rec[field] = n
+        else badCells.push(`${col.label} "${v}" is not a whole number`)
+      }
+      else if (col.kind === 'bool') {
+        if (truthy(v)) rec[field] = true
+        else if (falsy(v)) rec[field] = false
+        else badCells.push(`${col.label} "${v}" is not true or false`)
+      }
       else if (col.kind === 'list') rec[field] = v.split(/[;|]/).map(s => s.trim()).filter(Boolean)
       else rec[field] = v
     }
@@ -357,6 +385,7 @@ export function parseTemplatesCsv(
     // import, and it used to end in "no valid rows" with nothing refused and
     // no hint that the Code column was the problem.
     if (/^example[-_]/i.test(code)) { exampleRows++; return }
+    if (badCells.length > 0) { refused.push({ row: rowNum, reason: `"${code}" row ${rowNum}: ${badCells.join('; ')}` }); return }
     if (!String(rec.template_name ?? '').trim()) { refused.push({ row: rowNum, reason: `"${code}": missing Name` }); return }
     if (!String(rec.tour_type ?? '').trim()) { refused.push({ row: rowNum, reason: `"${code}": missing Type` }); return }
     if (rec.duration_days == null || !Number.isFinite(rec.duration_days as number) || (rec.duration_days as number) < 1) {

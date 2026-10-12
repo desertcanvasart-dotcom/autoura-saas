@@ -10,7 +10,7 @@
 
 export const RATES_TAB_ORDER = [
   'transportation', 'guides', 'entrances', 'accommodation', 'meals',
-  'cruises', 'sleepingTrains', 'trains', 'airportStaff', 'hotelStaff', 'tipping',
+  'cruises', 'sleepingTrains', 'trains', 'flights', 'airportStaff', 'hotelStaff', 'tipping',
 ] as const
 
 export type RatesTab = (typeof RATES_TAB_ORDER)[number]

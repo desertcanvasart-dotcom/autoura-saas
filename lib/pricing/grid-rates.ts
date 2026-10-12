@@ -10,11 +10,13 @@ import { cruisePpdNightEur, cruisePpdNightNonEur } from '@/lib/rates/cruise-ppd'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { gridHotelRate } from '@/lib/rates/grid-hotel-rate'
+import { priceSupplements, supplementSeason } from '@/lib/rates/hotel-supplements'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { DEFAULT_WATER_PER_PERSON_PER_DAY, isWaterCostType } from '@/lib/fixed-costs'
 import { pricingBasisLabel, toPricingBasis } from '@/lib/pricing/pricing-basis'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
+import { packageVehicles, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 
 // The caller's RLS-scoped client (requireAuth's).
 type GridRatesClient = any
@@ -44,6 +46,8 @@ export async function loadGridRates(
   // A transport rate files its vehicle under a vocabulary KEY; the agency
   // may since have renamed it (key "minivan" now reads "Coach"), so the
   // option names the vehicle in today's word, never the stored slug.
+  const supplementTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'hotel_supplement')
+  const supplementLabel = (key: string) => labelFor(supplementTypes, key)
   const vehicleTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'vehicle_type')
   const vehicleTypeLabel = (key: string) => {
     const item = vehicleTypes.find(i => i.key === key || normLower(i.key) === normLower(key))
@@ -135,24 +139,11 @@ export async function loadGridRates(
       // travel-ops-pro migration 20260205_transportation_rates_restructure.
       ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel, vehicleTypeLabel),
       // Cruise transport packages (bundled sightseeing vehicle for cruise days).
-      // They live in the B2B packages list (B2B → Pricing rules), not in
-      // Rates → Transportation, so the name says where to find them; the
-      // grid offers them on cruise days only (DayRow).
-      ...(cruiseTransportPkgs || []).map((r: any) => ({
-        id: r.id,
-        name: `B2B package: ${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
-        rateEur: toNum(r.sedan_rate),
-        rateNonEur: toNum(r.sedan_rate),
-        city: r.origin_city,
-        details: `cruise_package | ${r.description || ''}`,
-        service_type: 'cruise_transport_package',
-        package_type: r.package_type,
-        sedan_rate: toNum(r.sedan_rate),
-        minivan_rate: toNum(r.minivan_rate),
-        van_rate: toNum(r.van_rate),
-        minibus_rate: toNum(r.minibus_rate),
-        bus_rate: toNum(r.bus_rate),
-      })),
+      // One option per vehicle the package prices (its `vehicles` list since
+      // migration 381, keyed by the agency's vehicle_type vocabulary), encoded
+      // `${pkgId}__${vehicle}` with the vocabulary's pax band, so the grid
+      // re-selects the vehicle as the group grows — as it does for a route.
+      ...packageVehicleTiers((cruiseTransportPkgs || []) as unknown as Parameters<typeof packageVehicleTiers>[0], vehicleTypes, vehicleTypeLabel),
     ],
 
     guide: (guideRates || []).map((r: any) => ({
@@ -192,7 +183,30 @@ export async function loadGridRates(
         details: `${pricingBasisLabel(toPricingBasis(r.pricing_type), r.max_capacity)} | ${r.description || `${typeLabel} | ${r.hotel_category || 'all'}`}`,
         ...basisOf(r),
       }
-    }),
+    }).concat(
+      // Each hotel's room supplements (a view, a floor, a meal plan), priced
+      // for the season of its period on the trip date, per person per night.
+      // Offered only on a night that hotel is picked (DayRow), never added on
+      // their own (lib/rates/hotel-supplements.ts).
+      (accommodationRates || []).flatMap((r: any) => {
+        const price = gridHotelRate(r, startDate)
+        if (price.gapDate) return []
+        return priceSupplements(r.supplements, supplementSeason(price.seasonKey, price.periodName), supplementLabel)
+          .map(sup => ({
+            id: `${r.id}__rsupp_${sup.type}`,
+            name: `${sup.label} supplement — ${r.property_name}`,
+            rateEur: sup.eur,
+            rateNonEur: sup.nonEur,
+            category: 'all',
+            city: r.city,
+            details: `Room supplement | per person per night | ${sup.season.replace('_', ' ')}`,
+            pricing_basis: 'per_person',
+            unit_capacity: null,
+            service_type: 'room_supplement',
+            hotel_id: r.id,
+          }))
+      }),
+    ),
 
     tipping: (tippingRates || []).map((r: any) => ({
       id: r.id,
@@ -447,6 +461,65 @@ export function groupVehicleRowsToTiers(
         capacity_max: capMax,
         service_type: r.service_type,
         origin_city: r.origin_city || r.city,
+        destination_city: r.destination_city,
+      })
+    }
+  }
+  return options
+}
+
+/**
+ * A cruise transport package's vehicles as tiered grid options. The package
+ * stores one rate per vocabulary vehicle (`vehicles`, migration 381) — or, for
+ * a row entered before it, the five legacy columns read as one list. Each
+ * option is `${pkgId}__${vehicle}` with that vehicle's pax band from the
+ * agency's vocabulary (else the built-in band for its alias), so
+ * buildTransportTierIndex re-selects the vehicle by group size. `row_id` is the
+ * package id, so a selection saved under the old flat id is found again.
+ */
+export function packageVehicleTiers(
+  rows: Array<PackageVehicleRates & {
+    id: string; package_name?: string | null; package_type?: string | null
+    origin_city?: string | null; destination_city?: string | null; duration_days?: number | null
+  }>,
+  vehicleTypes: Array<{ key: string; meta?: Record<string, unknown> | null }>,
+  vehicleLabel?: (vehicleType: string) => string,
+): Array<Record<string, unknown>> {
+  const options: Array<Record<string, unknown>> = []
+  for (const r of rows) {
+    const tiers = packageVehicles(r)
+      .map(v => {
+        const rate = toNum(v.rate)
+        if (rate <= 0) return null
+        const vocab = vehicleTypes.find(i => normLower(i.key) === normLower(v.vehicle_type))
+        const alias = TIER_BY_ALIAS.get(normLower(v.vehicle_type))
+        const vMin = Number(vocab?.meta?.min_pax), vMax = Number(vocab?.meta?.max_pax)
+        const capMin = vMax > 0 ? (vMin > 0 ? vMin : 1) : (alias ? alias.capMin : 1)
+        const capMax = vMax > 0 ? vMax : (alias ? alias.capMax : 99)
+        const vlabel = (vehicleLabel ? vehicleLabel(v.vehicle_type) : '') ||
+          v.vehicle_type.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase())
+        return { key: vehicleSlug(v.vehicle_type), rate, capMin, capMax, vlabel }
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null)
+      .sort((a, b) => a.capMax - b.capMax || a.capMin - b.capMin)
+    for (const t of tiers) {
+      options.push({
+        id: `${r.id}__${t.key}`,
+        row_id: r.id,
+        // They live in Tours → Transport Packages, not in Rates → Transportation,
+        // so the name says where to find them.
+        name: `${t.vlabel} (${t.capMin}-${t.capMax} pax) — Transport package: ${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
+        rateEur: t.rate,
+        rateNonEur: t.rate,
+        city: r.origin_city,
+        details: `cruise_package | ${t.vlabel}`,
+        // The two cruise kinds go on cruise days; Day Tour and Multi-Day on
+        // road days (DayRow).
+        service_type: r.package_type === 'day_tour' || r.package_type === 'multi_day' ? 'road_transport_package' : 'cruise_transport_package',
+        package_type: r.package_type,
+        capacity_min: t.capMin,
+        capacity_max: t.capMax,
+        origin_city: r.origin_city,
         destination_city: r.destination_city,
       })
     }

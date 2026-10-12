@@ -407,7 +407,7 @@ export default function AutouraHomepage() {
       if (session?.user) {
         const { data: memberData } = await supabase
           .from('tenant_members')
-          .select('tenant_id')
+          .select('tenant_id, role')
           .eq('user_id', session.user.id)
           .eq('status', 'active')
           .order('joined_at', { ascending: true })
@@ -420,7 +420,7 @@ export default function AutouraHomepage() {
             .select('onboarding_completed')
             .eq('tenant_id', memberData.tenant_id)
             .single()
-          if (featuresData && !featuresData.onboarding_completed) {
+          if (featuresData && !featuresData.onboarding_completed && ['owner', 'admin'].includes(String(memberData.role))) {
             router.push('/onboarding')
           } else {
             router.push('/dashboard')

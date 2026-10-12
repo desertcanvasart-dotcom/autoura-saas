@@ -74,9 +74,15 @@ export async function POST(request: NextRequest) {
 
     const { data: existing, error: readError } = await supabase
       .from('tenant_vocabularies')
-      .select('id, key, rank, is_active')
+      .select('id, key, label, rank, is_active')
       .eq('kind', kind)
     if (readError) throw readError
+
+    // Two "Deluxe" in one list look the same in every dropdown, and the CSV
+    // import reads a word by its label — it picked the first.
+    if (label && (existing ?? []).some(e => String(e.label ?? '').trim().toLowerCase() === label.toLowerCase())) {
+      return NextResponse.json({ success: false, error: `"${label}" is already in this list` }, { status: 409 })
+    }
 
     // The key: the caller's, or derived from the label; unique within the kind.
     const requested = String(body.key ?? '').trim()

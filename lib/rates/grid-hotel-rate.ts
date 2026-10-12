@@ -26,6 +26,9 @@ export interface GridHotelRate {
   guideRateEur: number | null
   /** Name of the period the price came from, when it came from one. */
   periodName: string | null
+  /** The period's season word (rate_season key), when it has one — what a
+   *  room supplement's low / high / peak price is read by. */
+  seasonKey: string | null
   /** The start date falls between the hotel's periods: no price for it. */
   gapDate: string | null
 }
@@ -47,7 +50,7 @@ export function gridHotelRate(row: Record<string, unknown>, startDate?: string |
   if (resolved.kind === 'gap') {
     return {
       ppdEur: 0, ppdNonEur: 0, singleSuppEur: 0, singleSuppNonEur: 0,
-      guideRateEur: null, periodName: null, gapDate: resolved.travelDate,
+      guideRateEur: null, periodName: null, seasonKey: null, gapDate: resolved.travelDate,
     }
   }
   // No period for the date (or no date): the first stored period, as the
@@ -64,6 +67,7 @@ export function gridHotelRate(row: Record<string, unknown>, startDate?: string |
       singleSuppNonEur: positive(r.single_supplement_non_eur) || singleEur,
       guideRateEur: positive(r.guide_rate_eur) || null,
       periodName: season.name || null,
+      seasonKey: season.season || null,
       gapDate: null,
     }
   }
@@ -76,6 +80,7 @@ export function gridHotelRate(row: Record<string, unknown>, startDate?: string |
     singleSuppNonEur: first(row.single_supplement_non_eur, row.single_supp_non_eur) || singleEur,
     guideRateEur: null,
     periodName: null,
+    seasonKey: null,
     gapDate: null,
   }
 }

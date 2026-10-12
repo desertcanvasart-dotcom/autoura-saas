@@ -43,6 +43,7 @@ export default function SupplierInvoiceDetail() {
   const action = async (key: string, fn: () => Promise<Response>) => {
     setBusy(key)
     try { const res = await fn(); const d = await res.json(); if (!res.ok || d.success === false) showToast('error', d.error || 'Action failed')
+      else if (key === 'pay' && d.warning) showToast('error', d.warning)
       else if (key === 'pay') showToast('success', d.expenses_paid ? `Paid — ${d.expenses_paid} matched expense${d.expenses_paid === 1 ? '' : 's'} marked paid too` : 'Paid')
       await load() }
     catch (e) { console.error(e) } finally { setBusy(null) }
@@ -59,6 +60,12 @@ export default function SupplierInvoiceDetail() {
   const lineItems = Array.isArray(inv.line_items) ? inv.line_items : []
   const canApprove = inv.match_status === 'matched' && !['approved', 'paid', 'cancelled'].includes(inv.status)
   const canPay = inv.status === 'approved'
+  // Linking and unlinking are open before review only (received / matched).
+  const canMatch = inv.status === 'received' || inv.status === 'matched'
+  const canDispute = ['received', 'matched', 'approved'].includes(inv.status)
+  const canCancel = ['received', 'matched', 'approved', 'disputed'].includes(inv.status)
+  const move = (act: 'dispute' | 'resolve' | 'cancel', reason?: string) =>
+    action(act, () => fetch(`/api/supplier-invoices/${id}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: act, reason }) }))
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
@@ -125,7 +132,7 @@ export default function SupplierInvoiceDetail() {
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-gray-800">Matched expenses</h3>
-          <button onClick={openLink} className="text-xs font-medium text-[#647C47] hover:underline inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" /> Link expenses</button>
+          {canMatch && <button onClick={openLink} className="text-xs font-medium text-[#647C47] hover:underline inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" /> Link expenses</button>}
         </div>
         {matchedExpenses.length === 0 ? (
           <p className="text-sm text-gray-400">No expenses linked yet.</p>
@@ -136,8 +143,8 @@ export default function SupplierInvoiceDetail() {
                 <span className="text-gray-700">{m.expense?.description || m.expense?.expense_number || 'Expense'}</span>
                 <div className="flex items-center gap-3">
                   <span className="tabular-nums text-gray-800">{money(m.matched_amount, inv.currency)}</span>
-                  <button onClick={() => action('unlink', () => fetch(`/api/supplier-invoices/${id}/match`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expenseId: m.expense_id }) }))}
-                    className="text-gray-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                  {canMatch && <button onClick={() => action('unlink', () => fetch(`/api/supplier-invoices/${id}/match`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expenseId: m.expense_id }) }))}
+                    className="text-gray-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
               </div>
             ))}
@@ -150,14 +157,23 @@ export default function SupplierInvoiceDetail() {
         <label className="px-3 py-1.5 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer inline-flex items-center gap-1">
           <Upload className="h-3.5 w-3.5" /> {busy === 'upload' ? 'Uploading…' : 'Upload document'}
           <input type="file" accept="application/pdf,image/*" className="hidden" disabled={busy === 'upload'}
-            onChange={e => { const f = e.target.files?.[0]; if (f) { const fd = new FormData(); fd.append('file', f); action('upload', () => fetch(`/api/supplier-invoices/${id}/upload`, { method: 'POST', body: fd })) } }} />
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { const fd = new FormData(); fd.append('file', f); action('upload', () => fetch(`/api/supplier-invoices/${id}/upload`, { method: 'POST', body: fd })) } }} />
         </label>
-        <button disabled={busy !== null || inv.status === 'disputed'} onClick={() => { const r = prompt('Reason for dispute:'); if (r != null) action('dispute', () => fetch(`/api/supplier-invoices/${id}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: r }) })) }}
-          className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Dispute</button>
+        {inv.status === 'disputed' ? (
+          <button disabled={busy !== null} onClick={() => move('resolve')}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Resolve dispute</button>
+        ) : (
+          <button disabled={busy !== null || !canDispute} onClick={() => { const r = prompt('Reason for dispute:'); if (r != null) move('dispute', r) }}
+            className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Dispute</button>
+        )}
+        {canCancel && (
+          <button disabled={busy !== null} onClick={async () => { if (await dialog.confirm({ message: 'Cancel this supplier invoice? It will no longer be owed.', variant: 'danger', confirmText: 'Cancel invoice' })) move('cancel') }}
+            className="px-3 py-1.5 text-sm font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"><X className="h-3.5 w-3.5" /> Cancel</button>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <button disabled={busy !== null || (!canApprove && inv.match_status !== 'discrepancy' && inv.match_status !== 'partial')} onClick={async () => { const override = inv.match_status !== 'matched'; if (override && !(await dialog.confirm({ message: 'Invoice is not fully matched. Approve with a discrepancy?', variant: 'warning' }))) return; action('approve', () => fetch(`/api/supplier-invoices/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ override }) })) }}
             className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Approve</button>
-          <button disabled={busy !== null || !canPay} onClick={() => { const ref = prompt('Payment reference (optional):') || undefined; action('pay', () => fetch(`/api/supplier-invoices/${id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_reference: ref }) })) }}
+          <button disabled={busy !== null || !canPay} onClick={() => { const entered = prompt('Payment reference (optional):'); if (entered === null) return; const ref = entered || undefined; action('pay', () => fetch(`/api/supplier-invoices/${id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_reference: ref }) })) }}
             className="px-4 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50 inline-flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Mark paid</button>
         </div>
       </div>

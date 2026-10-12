@@ -1,3 +1,4 @@
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
@@ -115,6 +116,18 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // A rate is a number above 0 between two currencies the app knows.
+    for (const r of rates as Array<{ rate?: unknown; target_currency?: unknown; base_currency?: unknown }>) {
+      const n = Number(r?.rate)
+      if (!Number.isFinite(n) || n <= 0) {
+        return NextResponse.json({ success: false, error: `The rate for ${String(r?.target_currency ?? '?')} must be a number above 0` }, { status: 400 })
+      }
+      const codes = [r?.target_currency, r?.base_currency ?? 'EUR'].map(c => String(c ?? '').toUpperCase())
+      if (!codes.every(c => (SUPPORTED_CURRENCIES as readonly string[]).includes(c))) {
+        return NextResponse.json({ success: false, error: `Unsupported currency in ${codes.join('/')}` }, { status: 400 })
+      }
+    }
+
     // Upsert all rates as tenant overrides
     const upsertPromises = rates.map(async (rate: any) => {
       const rateData = {
@@ -134,7 +147,7 @@ export async function PUT(request: NextRequest) {
         .eq('tenant_id', memberData.tenant_id)
         .eq('base_currency', rateData.base_currency)
         .eq('target_currency', rateData.target_currency)
-        .single()
+        .maybeSingle()
 
       if (existing) {
         return supabase
@@ -148,7 +161,13 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    await Promise.all(upsertPromises)
+    // Each write checked: the page said "saved" whatever happened.
+    const results = await Promise.all(upsertPromises)
+    const failed = results.find((r: { error?: { message?: string } | null }) => r?.error)
+    if (failed) {
+      console.error('exchange-rates PUT:', failed.error)
+      return NextResponse.json({ success: false, error: 'Some rates could not be saved' }, { status: 500 })
+    }
 
     // Fetch updated rates
     const { data: updatedRates, error: fetchError } = await supabase

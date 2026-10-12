@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // GET - List all variations (optionally filter by template_id)
 export async function GET(request: NextRequest) {
@@ -55,6 +56,10 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
     if (!supabase) {
@@ -76,6 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields for each variation
+    const templateCodes = new Map<string, string>()
     for (const v of variations) {
       if (!v.template_id) {
         return NextResponse.json(
@@ -99,7 +105,7 @@ export async function POST(request: NextRequest) {
       // Verify template belongs to this tenant
       const { data: template } = await supabase
         .from('tour_templates')
-        .select('id, tenant_id')
+        .select('id, tenant_id, template_code')
         .eq('id', v.template_id)
         .single()
 
@@ -116,13 +122,31 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         )
       }
+      templateCodes.set(v.template_id, template.template_code)
+    }
+
+    // Variation codes are unique per tenant (migration 360). The code was the
+    // first 20 letters of the NAME plus the tier, so "Cairo Pyramids Day Tour"
+    // and its "(Copy)" both made CAIRO-PYRAMIDS-DAY-T-STANDARD and the second
+    // insert failed. The tour's own code is unique, so build from that, and
+    // step past any code already taken.
+    const { data: takenRows } = await supabase
+      .from('tour_variations')
+      .select('variation_code')
+      .eq('tenant_id', tenant_id)
+    const takenCodes = new Set((takenRows ?? []).map((r: { variation_code: string | null }) => r.variation_code))
+    const freeCode = (base: string) => {
+      let code = base, n = 2
+      while (takenCodes.has(code)) code = `${base}-${n++}`
+      takenCodes.add(code)
+      return code
     }
 
     // Prepare variation data with smart defaults
     const variationsToInsert = variations.map(v => {
       // Generate variation code
       const variationCode = v.variation_code ||
-        `${v.variation_name.toUpperCase().replace(/\s+/g, '-').substring(0, 20)}-${v.tier.toUpperCase()}`
+        freeCode(`${templateCodes.get(v.template_id) || v.variation_name.toUpperCase().replace(/\s+/g, '-').substring(0, 20)}-${String(v.tier).toUpperCase()}`)
 
       return {
         tenant_id, // ✅ Explicit tenant_id
@@ -185,6 +209,11 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Tiers the tour already had, so the caller can say they were skipped.
+    const skippedTiers = variationsToInsert
+      .filter(v => existingKeys.has(`${v.template_id}|${v.tier}`))
+      .map(v => v.tier)
+
     const { data, error } = await supabase
       .from('tour_variations')
       .insert(toInsert)
@@ -212,6 +241,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: data,
+      skippedTiers,
       message: `${data?.length || 0} variation(s) created successfully`
     }, { status: 201 })
 

@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
@@ -7,6 +8,11 @@ import { requireAuth } from '@/lib/supabase-server'
 import { formatDateOnly } from '@/lib/date-utils'
 
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()

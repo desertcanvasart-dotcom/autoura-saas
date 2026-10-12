@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
 import { cruiseLengthsToStore } from '@/lib/rates/cruise-ppd'
@@ -64,6 +65,10 @@ export async function PUT(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase } = authResult
     if (!supabase) {
@@ -107,8 +112,8 @@ export async function PUT(
       ship_name: body.ship_name,
       ship_category: body.ship_category || 'deluxe',
       route_name: body.route_name,
-      embark_city: body.embark_city || 'Luxor',
-      disembark_city: body.disembark_city || 'Aswan',
+      embark_city: body.embark_city || null,
+      disembark_city: body.disembark_city || null,
       // What was sent, or left as it is. This wrote `[4]` when the body had no
       // length — an edit from anywhere but the form turned any ship into a
       // four-night one.
@@ -172,7 +177,9 @@ export async function PUT(
       sightseeing_included: body.sightseeing_included || false,
       description: body.description || null,
       notes: body.notes || null,
-      supplements: body.supplements || [],
+      // Only when sent: the cruise form has no supplements field, and every save
+      // wrote [] over what the row had.
+      ...(Array.isArray(body.supplements) ? { supplements: body.supplements } : {}),
 
       updated_at: new Date().toISOString(),
       // LAST, so it wins: a rate IS its dated periods, and the first period is
@@ -221,6 +228,10 @@ export async function DELETE(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase } = authResult
     if (!supabase) {

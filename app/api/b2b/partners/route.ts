@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { gateStructural } from '@/lib/usage-enforcement'
 import { roleDenied } from '@/lib/api-role-gate'
+import { parsePartnerWrite, nextPartnerCode } from '@/lib/b2b/partner-fields'
+import { orSearchTerm } from '@/lib/clients/client-fields'
 
 // ============================================
 // B2B PARTNERS API
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search')
+    const search = orSearchTerm(searchParams.get('search') || '')
     const active_only = searchParams.get('active_only') !== 'false'
 
     let query = supabase
@@ -79,26 +81,30 @@ export async function POST(request: NextRequest) {
     const gate = await gateStructural(supabase, tenant_id!, 'b2b_partners', 'B2B partners')
     if (!gate.ok) return gate.response!
 
-    const body = await request.json()
+    const parsed = parsePartnerWrite(await request.json(), 'create')
+    if ('error' in parsed) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 })
+    const partner = parsed.data
 
-    if (!body.partner_code) {
-      const prefix = (body.company_name || 'PARTNER').substring(0, 3).toUpperCase()
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-      body.partner_code = `${prefix}-${random}`
+    // The code, if not given: the next free one for this agency. The currency,
+    // if not given: the agency's rates currency (it was always EUR).
+    if (!partner.partner_code || !partner.currency) {
+      const [{ data: codes }, { data: tenantRow }] = await Promise.all([
+        supabase.from('b2b_partners').select('partner_code').eq('tenant_id', tenant_id),
+        supabase.from('tenants').select('rates_currency').eq('id', tenant_id).maybeSingle(),
+      ])
+      if (!partner.partner_code) partner.partner_code = nextPartnerCode(partner.company_name ?? '', (codes ?? []).map(c => c.partner_code))
+      if (!partner.currency) partner.currency = (tenantRow as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
     }
-
-    // Add tenant_id to partner data
-    body.tenant_id = tenant_id
 
     const { data, error } = await supabase
       .from('b2b_partners')
-      .insert(body)
+      .insert({ ...partner, tenant_id } as never)
       .select()
       .single()
 
     if (error) {
       console.error('Error creating partner:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 })

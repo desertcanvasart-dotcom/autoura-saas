@@ -249,6 +249,7 @@ const HEADER_MAP: Record<string, string> = (() => {
 })()
 
 const truthy = (v: string) => ['true', '1', 'yes', 'y'].includes(v.trim().toLowerCase())
+const falsy = (v: string) => ['false', '0', 'no', 'n'].includes(v.trim().toLowerCase())
 
 /**
  * Parse a days sheet into per-template day arrays, in the shape
@@ -283,10 +284,14 @@ export function parseDaysCsv(
   const refused: Array<{ row: number; reason: string }> = []
   let exampleRows = 0
   const rowsByCode = new Map<string, Array<{ row: number; rec: Record<string, unknown> }>>()
+  // Tours with a refused day: their sheet is incomplete, and a days sheet
+  // REPLACES the itinerary, so none of their days may be written.
+  const codesWithRefusedRows = new Set<string>()
 
   parsed.data.forEach((raw, i) => {
     const rowNum = i + 2
     const rec: Record<string, unknown> = {}
+    const badFlags: string[] = []
     for (const [header, value] of Object.entries(raw)) {
       const field = HEADER_MAP[slug(header)]
       if (!field) continue
@@ -294,7 +299,13 @@ export function parseDaysCsv(
       if (v === '') continue
       const col = DAY_CSV_COLUMNS.find(c => c.name === field)!
       if (col.kind === 'int') rec[field] = Number(v)
-      else if (col.kind === 'bool') rec[field] = truthy(v)
+      else if (col.kind === 'bool') {
+        // A typo is not "false": "ture" would quietly drop a guide or a
+        // transfer the day asked for.
+        if (truthy(v)) rec[field] = true
+        else if (falsy(v)) rec[field] = false
+        else badFlags.push(`${col.label} "${v}"`)
+      }
       else if (col.kind === 'list') rec[field] = v.split(/[;|]/).map(s => s.trim()).filter(Boolean)
       else rec[field] = v
     }
@@ -305,10 +316,18 @@ export function parseDaysCsv(
       return
     }
     if (/^example[-_]/i.test(code)) { exampleRows++; return }
+    const refuse = (reason: string) => {
+      refused.push({ row: rowNum, reason })
+      codesWithRefusedRows.add(code)
+    }
+    if (badFlags.length > 0) {
+      refuse(`"${code}" row ${rowNum}: ${badFlags.join(', ')} — a yes/no column takes true or false (yes/no, 1/0 also work)`)
+      return
+    }
 
     const day = rec.day
     if (day == null || !Number.isFinite(day as number) || (day as number) < 1) {
-      refused.push({ row: rowNum, reason: `"${code}" row ${rowNum}: Day must be a whole number ≥ 1` })
+      refuse(`"${code}" row ${rowNum}: Day must be a whole number ≥ 1`)
       return
     }
 
@@ -322,10 +341,7 @@ export function parseDaysCsv(
       // a blank, and they refuse it below, with their own reason.
       if (v === '') continue
       if (!col.allowed.includes(v)) {
-        refused.push({
-          row: rowNum,
-          reason: `"${code}" day ${day}: ${col.label} "${rec[col.name]}" is not one of ${col.allowed.join(', ')}`,
-        })
+        refuse(`"${code}" day ${day}: ${col.label} "${rec[col.name]}" is not one of ${col.allowed.join(', ')}`)
         return
       }
       rec[col.name] = v
@@ -335,7 +351,7 @@ export function parseDaysCsv(
     // not one rate could be found for them — see lib/tours/day-city.ts for why
     // the list is refused rather than read by position.
     if (namesSeveralPlaces(rec.city)) {
-      refused.push({ row: rowNum, reason: `"${code}" day ${day}: ${severalPlacesReason(rec.city)}` })
+      refuse(`"${code}" day ${day}: ${severalPlacesReason(rec.city)}`)
       return
     }
 
@@ -343,11 +359,11 @@ export function parseDaysCsv(
     // that FLIES. Said on a road day it would be stored and never priced.
     const mode = rec.transport_type && rec.transport_type !== 'road' ? String(rec.transport_type) : ''
     if ((rec.leg_from || rec.leg_to) && !mode) {
-      refused.push({ row: rowNum, reason: `"${code}" day ${day}: Leg From / Leg To name a ticket's route, but Transport is road — set Transport to flight, train or sleeping_train, or clear them` })
+      refuse(`"${code}" day ${day}: Leg From / Leg To name a ticket's route, but Transport is road — set Transport to flight, train or sleeping_train, or clear them`)
       return
     }
     if ((rec.leg_assist_from || rec.leg_assist_to) && mode !== 'flight') {
-      refused.push({ row: rowNum, reason: `"${code}" day ${day}: Assist At Departure / Arrival is airport assistance, and the day does not fly — set Transport to flight, or clear them` })
+      refuse(`"${code}" day ${day}: Assist At Departure / Arrival is airport assistance, and the day does not fly — set Transport to flight, or clear them`)
       return
     }
 
@@ -356,18 +372,12 @@ export function parseDaysCsv(
     // an older file imports exactly as it did.
     const namesAttractions = Array.isArray(rec.attractions) && rec.attractions.length > 0
     if (rec.sightseeing === 'none' && (namesAttractions || rec.guide_required === true)) {
-      refused.push({
-        row: rowNum,
-        reason: `"${code}" day ${day}: Sightseeing says "none" but the day ${namesAttractions ? 'lists attractions' : 'asks for a guide'} — it cannot be both`,
-      })
+      refuse(`"${code}" day ${day}: Sightseeing says "none" but the day ${namesAttractions ? 'lists attractions' : 'asks for a guide'} — it cannot be both`)
       return
     }
     // (A day in the air has said everything: nothing on it is sold.)
     if (hasSightseeingColumn && rec.accommodation_type !== 'in_the_air' && !namesAttractions && rec.guide_required !== true && rec.sightseeing !== 'none') {
-      refused.push({
-        row: rowNum,
-        reason: `"${code}" day ${day} ${SIGHTSEEING_NOT_STATED}. List its Attractions, set Guide to true, or put "none" in Sightseeing`,
-      })
+      refuse(`"${code}" day ${day} ${SIGHTSEEING_NOT_STATED}. List its Attractions, set Guide to true, or put "none" in Sightseeing`)
       return
     }
 
@@ -376,10 +386,7 @@ export function parseDaysCsv(
     // itinerary that has not said, and a cost line cannot be left unsaid.
     for (const slot of ['breakfast', 'lunch', 'dinner'] as const) {
       if (rec[slot] == null) {
-        refused.push({
-          row: rowNum,
-          reason: `"${code}" day ${day}: ${slot[0].toUpperCase() + slot.slice(1)} is not stated — every meal must be included (hotel), external (restaurant), or none`,
-        })
+        refuse(`"${code}" day ${day}: ${slot[0].toUpperCase() + slot.slice(1)} is not stated — every meal must be included (hotel), external (restaurant), or none`)
         return
       }
     }
@@ -393,6 +400,15 @@ export function parseDaysCsv(
   // rather than write a truncated itinerary.
   const byTemplate = new Map<string, Array<Record<string, unknown>>>()
   for (const [code, rows] of rowsByCode) {
+    if (codesWithRefusedRows.has(code)) {
+      refused.push({
+        row: rows[0].row,
+        reason:
+          `"${code}": not imported — one of its days was refused (see above). ` +
+          `A days sheet replaces the whole itinerary, so writing the rest would delete the refused day.`,
+      })
+      continue
+    }
     const days = rows.map(r => r.rec.day as number).sort((a, b) => a - b)
     const expected = Array.from({ length: days.length }, (_, i) => i + 1)
     if (days.join(',') !== expected.join(',')) {

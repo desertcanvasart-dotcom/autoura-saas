@@ -111,8 +111,11 @@ export default function BillingPage() {
       })
 
       const data = await response.json()
-      if (data.success && data.url) {
-        window.location.href = data.url
+      // The route answers portal_url; this read data.url, so the button
+      // always failed and paying customers could not reach Stripe.
+      const portal = data.portal_url || data.url
+      if (data.success && portal) {
+        window.location.href = portal
       } else {
         setError(data.error || 'Failed to open billing portal')
       }

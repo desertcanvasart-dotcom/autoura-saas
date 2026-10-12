@@ -4,11 +4,13 @@
 // Per-rate currency — the shared form field (P3)
 // ============================================
 // One selector for every rate form: which currency THIS rate's amounts are
-// stored in. Empty selection = the system default (EUR) — exactly what every
-// pre-migration row means. The pricing engine converts a copy at the fetch
+// stored in. Empty selection = the agency's rates currency
+// (tenants.rates_currency, EUR when unset) — what the engine reads a row with
+// no rate_currency as (lib/rates/run-currency.ts). The pricing engine converts a copy at the fetch
 // boundary (lib/rates/rate-currency.ts); the stored amounts never change.
 
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 export const RATE_CURRENCIES = SUPPORTED_CURRENCIES
 
@@ -41,6 +43,11 @@ interface RateCurrencyFieldProps {
 }
 
 export default function RateCurrencyField({ value, onChange, className, compact }: RateCurrencyFieldProps) {
+  // The blank choice read "EUR (default)" and left EUR out of the list, while
+  // blank means the AGENCY's currency: an EGP agency could not tag a EUR
+  // contract as EUR, and picking "EUR (default)" stored it as EGP.
+  const { tenant } = useTenant()
+  const agencyCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
   return (
     <div className={className}>
       <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -51,8 +58,8 @@ export default function RateCurrencyField({ value, onChange, className, compact 
         onChange={e => onChange(e.target.value)}
         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47] focus:border-transparent bg-white"
       >
-        <option value="">EUR (default)</option>
-        {RATE_CURRENCIES.filter(c => c !== 'EUR').map(c => (
+        <option value="">{agencyCurrency} (your rates currency)</option>
+        {RATE_CURRENCIES.filter(c => c !== agencyCurrency).map(c => (
           <option key={c} value={c}>{c}</option>
         ))}
       </select>

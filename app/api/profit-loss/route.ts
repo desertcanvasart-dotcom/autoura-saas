@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { buildPnlSummary, type PnlItinerary } from '@/lib/trip-pnl'
-import { loadTripPnls } from '@/lib/trip-pnl-load'
+import { loadTripPnls, PnlLoadError } from '@/lib/trip-pnl-load'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 // ============================================
 // GET /api/profit-loss
@@ -31,42 +33,54 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { supabase } = authResult
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication failed' },
-        { status: 401 }
-      )
-    }
+    // Margins, costs and commissions are for managers and admins — the page
+    // was, but this route answered any signed-in role.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
+
+    const { supabase, tenant_id } = authResult
 
     const searchParams = request.nextUrl.searchParams
     const itineraryId = searchParams.get('itineraryId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const status = searchParams.get('status')
-    // resolveReportingCurrency normalises this; empty means "infer it".
-    const requestedCurrency = searchParams.get('reportingCurrency')
+    // resolveReportingCurrency normalises this. Unasked, the agency's own
+    // currency — it was the most common trip currency, which could change
+    // from one filter to the next.
+    let requestedCurrency = searchParams.get('reportingCurrency')
+    if (!requestedCurrency) {
+      const { data: tenant } = await supabase.from('tenants').select('default_currency').eq('id', tenant_id).maybeSingle()
+      requestedCurrency = (tenant as { default_currency?: string | null } | null)?.default_currency ?? null
+    }
 
     // ---------- Itineraries (RLS filters by tenant) ----------
-    let itineraryQuery = supabase
-      .from('itineraries')
-      .select('id, itinerary_code, trip_name, client_name, start_date, end_date, status, currency, total_cost')
-      .order('start_date', { ascending: false })
-
-    if (itineraryId) itineraryQuery = itineraryQuery.eq('id', itineraryId)
-    if (status) itineraryQuery = itineraryQuery.eq('status', status)
-    if (startDate) itineraryQuery = itineraryQuery.gte('start_date', startDate)
-    if (endDate) itineraryQuery = itineraryQuery.lte('start_date', endDate)
-
-    const { data: itineraries, error: itinError } = await itineraryQuery
+    // Every trip, a page at a time (one read stopped at 1000). A trip is in
+    // the range when it overlaps it — starts before the end and ends after
+    // the start — not only when it starts inside it.
+    const { data: itineraries, error: itinError } = await fetchAllPages<PnlItinerary>((from, to) => {
+      let q = supabase
+        .from('itineraries')
+        .select('id, tenant_id, itinerary_code, trip_name, client_name, start_date, end_date, status, currency, total_cost')
+        .order('start_date', { ascending: false })
+        .order('id', { ascending: true })
+      if (itineraryId) q = q.eq('id', itineraryId)
+      if (status) q = q.eq('status', status)
+      if (startDate) q = q.or(`end_date.gte.${startDate},and(end_date.is.null,start_date.gte.${startDate})`)
+      if (endDate) q = q.lte('start_date', endDate)
+      return q.range(from, to)
+    })
 
     if (itinError) {
       console.error('Error fetching itineraries:', itinError)
-      return NextResponse.json({ error: 'Failed to fetch itineraries' }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Failed to fetch itineraries' }, { status: 500 })
     }
 
-    if (!itineraries || itineraries.length === 0) {
-      return NextResponse.json([])
+    if (itineraries.length === 0) {
+      // The same shape as any other answer: a bare [] left the page showing
+      // the previous filter's trips and totals.
+      const summary = buildPnlSummary({ trips: [], reportingCurrency: requestedCurrency || 'EUR', fxIndex: new Map() })
+      return NextResponse.json({ success: true, data: [], summary, meta: { reporting_currency: summary.reporting_currency, fx_history_available: true, snapshot_count: 0, commissions_available: true } })
     }
 
     const { pnlData, reportingCurrency, fxContext, commissionsAvailable } =
@@ -94,6 +108,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error in P&L GET:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    if (error instanceof PnlLoadError) {
+      return NextResponse.json({ success: false, error: `${error.message} — the report would be wrong, so it is not shown.` }, { status: 500 })
+    }
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

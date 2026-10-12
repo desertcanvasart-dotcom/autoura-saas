@@ -7,14 +7,21 @@
 // Security: Requires authentication
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { EXPENSE_STATUSES, expenseStatusUpdate } from '@/lib/expense-status'
+import { checkExpenseFields } from '@/lib/expenses/expense-fields'
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS automatically filters by tenant
@@ -51,6 +58,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     const body = await request.json()
@@ -83,13 +95,20 @@ export async function PUT(
       'booking_id',
       'notes',
       'receipt_url',
+      'receipt_filename',
       'payment_method',
       'payment_reference',
     ]
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
     for (const field of allowedFields) {
-      if (body[field] !== undefined) updateData[field] = body[field]
+      if (body[field] === undefined) continue
+      // A blank form field is nothing, not '': an expense with no trip sent
+      // itinerary_id '' and every edit of it failed on the uuid column.
+      const v = typeof body[field] === 'string' ? body[field].trim() : body[field]
+      updateData[field] = v === '' ? null : v
     }
+    const bad = checkExpenseFields(updateData)
+    if (bad) return NextResponse.json({ success: false, error: bad }, { status: 400 })
 
     // Status moves here too. It was left off the list above, so every
     // Approve / Mark as paid button (Expenses, Payables, the edit form) sent
@@ -97,6 +116,11 @@ export async function PUT(
     // payment date follows it: set on paid (today unless given), cleared
     // when the expense is no longer paid.
     if (body.status !== undefined) {
+      // Approving, paying or rejecting a cost is a manager's call.
+      if (['approved', 'paid', 'rejected'].includes(String(body.status))) {
+        const managerGate = await gateRole('manage')
+        if (managerGate) return managerGate
+      }
       const status = expenseStatusUpdate(body.status, body.payment_date)
       if (!status) {
         return NextResponse.json({ success: false, error: `status must be one of: ${EXPENSE_STATUSES.join(', ')}` }, { status: 400 })
@@ -139,6 +163,11 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS policies enforce tenant isolation + manager role
@@ -153,10 +182,11 @@ export async function DELETE(
       }, { status: 401 })
     }
 
-    const { error } = await supabase
+    const { data: removed, error } = await supabase
       .from('expenses')
       .delete()
       .eq('id', id)
+      .select('id')
 
     if (error) {
       console.error('❌ Error deleting expense:', error)
@@ -168,6 +198,10 @@ export async function DELETE(
         )
       }
       return NextResponse.json({ error: 'Failed to delete expense' }, { status: 500 })
+    }
+    // Nothing deleted is not a success (it was reported as one).
+    if (!removed || removed.length === 0) {
+      return NextResponse.json({ error: 'Expense not found or you do not have permission to delete it' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true })

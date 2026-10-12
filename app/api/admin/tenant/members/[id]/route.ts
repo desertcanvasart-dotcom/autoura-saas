@@ -1,3 +1,4 @@
+import { checkRoleChange, checkActiveChange } from '@/lib/member-role'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { logActivity } from '@/lib/billing-middleware'
@@ -74,20 +75,19 @@ export async function PATCH(
       }, { status: 404 })
     }
 
-    // Prevent non-owners from creating/modifying owners
-    if (role === 'owner' && currentMember.role !== 'owner') {
-      return NextResponse.json({
-        success: false,
-        error: 'Only owners can assign the owner role'
-      }, { status: 403 })
-    }
-
-    // Prevent users from modifying their own role
-    if ((targetMember as any).user_id === user.id) {
-      return NextResponse.json({
-        success: false,
-        error: 'You cannot change your own role'
-      }, { status: 400 })
+    // The same rules as User Management (lib/member-role): only an owner
+    // assigns or changes the owner role — an admin could demote the owner
+    // here, since only ASSIGNING the owner role was checked — and nobody
+    // changes their own.
+    const check = checkRoleChange({
+      callerId: user.id,
+      callerRole: currentMember.role,
+      targetId: (targetMember as { user_id: string }).user_id,
+      targetRole: (targetMember as { role?: string | null }).role,
+      newRole: role,
+    })
+    if (!check.ok) {
+      return NextResponse.json({ success: false, error: check.error }, { status: check.status })
     }
 
     const old_role = (targetMember as any).role
@@ -192,6 +192,17 @@ export async function DELETE(
         success: false,
         error: 'Team member not found'
       }, { status: 404 })
+    }
+
+    // Only an owner removes an owner, and nobody removes themselves here.
+    const removal = checkActiveChange({
+      callerId: user.id,
+      callerRole: currentMember.role,
+      targetId: (targetMember as { user_id: string }).user_id,
+      targetRole: (targetMember as { role?: string | null }).role,
+    })
+    if (!removal.ok) {
+      return NextResponse.json({ success: false, error: removal.error }, { status: removal.status })
     }
 
     // Prevent removing the last owner

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import Papa from 'papaparse'
 import {
   parseTemplatesCsv,
@@ -25,6 +26,10 @@ export async function POST(request: NextRequest) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -88,14 +93,21 @@ export async function POST(request: NextRequest) {
     }
 
     const db = supabase.from('tour_templates') as unknown as {
-      select(c: string): { in(k: string, v: string[]): { eq(k: string, v: string): PromiseLike<{ data: Array<{ template_code: string }> | null }> } }
+      select(c: string): { eq(k: string, v: string): PromiseLike<{ data: Array<{ template_code: string }> | null }> }
       insert(row: Record<string, unknown>): PromiseLike<{ error: { message: string } | null }>
       update(row: Record<string, unknown>): { eq(k: string, v: string): { eq(k: string, v: string): PromiseLike<{ error: { message: string } | null }> } }
     }
 
-    const codes = records.map(r => r.template_code)
-    const { data: existing } = await db.select('template_code').in('template_code', codes).eq('tenant_id', tenant_id)
+    // A code is matched whatever its case, as the file's own duplicate check
+    // does: "cai-day-001" in the sheet updates the stored "CAI-DAY-001" rather
+    // than creating a second tour the days sheet could not tell apart.
+    const { data: existing } = await db.select('template_code').eq('tenant_id', tenant_id)
+    const storedByLower = new Map((existing || []).map(r => [r.template_code.toLowerCase(), r.template_code]))
     const existingCodes = new Set((existing || []).map(r => r.template_code))
+    for (const rec of records) {
+      const stored = existingCodes.has(rec.template_code) ? rec.template_code : storedByLower.get(rec.template_code.toLowerCase())
+      if (stored) rec.template_code = stored
+    }
 
     const preview = {
       totalRows: records.length + refused.length,

@@ -8,11 +8,14 @@
 // lib/suppliers/csv-schema.ts, and a parity test fails if they part ways.
 //
 // The natural-key doctrine (A-item 5) applies:
-//   - two rows in one file sharing a name → the later rows are REFUSED
-//     with the collision named, never last-row-wins;
-//   - a supplier that already exists (same name, case-insensitive, in
-//     the tenant) is SKIPPED and reported — an import CREATES, it never
-//     silently updates.
+//   - two rows in one file sharing a name, or a code → the later rows are
+//     REFUSED with the collision named, never last-row-wins;
+//   - a supplier that already exists is UPDATED (planSupplierImport): matched
+//     on its code, whatever the case, else on its name. It used to be skipped
+//     — "an import creates" — while the page promised "updates existing ones
+//     by code", so an edited export re-imported changed nothing. The cells the
+//     row fills in are written; a blank cell leaves the stored value alone.
+//   - the sample's example row (code EXAMPLE-…) is skipped and counted.
 //
 // Type is NOT identity: a row without one imports as 'other' and is
 // REPORTED, not refused — a real list of 64 suppliers with no Type column
@@ -44,6 +47,9 @@ export interface SupplierImportRecord {
   name: string
   /** Portable supplier code (SUP-0001) from the other install, when the sheet carries it. */
   supplier_code?: string
+  /** False when the row named no type and 'other' was assumed: an update
+   *  then leaves the stored roles alone. */
+  typeGiven?: boolean
   /** The PRIMARY role (types[0]). */
   type: string
   /** Every role the Type cell named, as slugs (or vocabulary keys after resolveImportTypes). */
@@ -73,6 +79,8 @@ export interface SupplierImportParseResult {
   refused: Array<{ row: number; reason: string }>
   /** Names imported with type 'other' because the row named no type. */
   typeDefaulted: string[]
+  /** Rows skipped because they are the sample's example row (code EXAMPLE-…). */
+  exampleRows?: number
   /** Fatal CSV syntax errors — nothing was parsed. */
   parseError?: string
 }
@@ -100,16 +108,34 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
   const records: SupplierImportRecord[] = []
   const typeDefaulted: string[] = []
   const seenNames = new Set<string>()
+  const seenCodes = new Set<string>()
+  let exampleRows = 0
 
   parsed.data.forEach((raw, i) => {
     const rowNum = i + 2 // header is row 1
     const record: Record<string, string | number> = {}
+    let badCommission: string | null = null
     for (const [header, value] of Object.entries(raw)) {
       const field = HEADER_MAP[header]
       if (!field) continue
       const v = (value ?? '').trim()
       if (v === '') continue
-      record[field] = field === 'default_commission_rate' ? Number(v) || 0 : v
+      if (field === 'default_commission_rate') {
+        // "10" or "10%". Anything else is refused: "ten" was stored as 0.
+        const n = Number(v.replace(/%$/, '').trim())
+        if (Number.isFinite(n) && n >= 0) record[field] = n
+        else badCommission = v
+        continue
+      }
+      record[field] = v
+    }
+    if (/^example[-_]/i.test(String(record.supplier_code ?? ''))) {
+      exampleRows++
+      return
+    }
+    if (badCommission !== null) {
+      refused.push({ row: rowNum, reason: `Commission "${badCommission}" is not a number — write it like 10 or 10%` })
+      return
     }
     // WhatsApp is the only reachable number for many suppliers (the Phone cell
     // is blank). It is a column of its own now, but it STILL falls back into
@@ -129,6 +155,7 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       refused.push({ row: rowNum, reason: 'missing Name' })
       return
     }
+    const typeGiven = Boolean(record.type)
     if (!record.type) {
       // Type is not identity — import as 'other' and say so.
       record.type = 'other'
@@ -142,11 +169,18 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       })
       return
     }
+    const code = String(record.supplier_code ?? '').trim()
+    if (code && seenCodes.has(code.toLowerCase())) {
+      refused.push({ row: rowNum, reason: `Code "${code}" appears more than once in this file — each supplier has its own` })
+      return
+    }
     seenNames.add(key)
+    if (code) seenCodes.add(code.toLowerCase())
     const types = splitTypes(String(record.type))
     records.push({
       ...(record as Omit<SupplierImportRecord, 'row' | 'name' | 'type' | 'types'>),
       row: rowNum,
+      typeGiven,
       name,
       type: types[0],
       types,
@@ -154,7 +188,7 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
     })
   })
 
-  return { totalRows: parsed.data.length, records, refused, typeDefaulted }
+  return { totalRows: parsed.data.length, records, refused, typeDefaulted, exampleRows }
 }
 
 /** "Hotel | Transport company; ground_handler" → ['hotel', 'transport_company', 'ground_handler']. */
@@ -180,6 +214,9 @@ export function resolveImportTypes(
   const ok: SupplierImportRecord[] = []
   const refused: Array<{ row: number; reason: string }> = []
   for (const r of records) {
+    // A row that named no role is not checked against the list: an update
+    // leaves the stored roles alone, a new supplier lands as 'other' (reported).
+    if (r.typeGiven === false) { ok.push(r); continue }
     const keys: string[] = []
     let bad: string | null = null
     for (const t of r.types) {
@@ -196,22 +233,63 @@ export function resolveImportTypes(
   return { records: ok, refused }
 }
 
-/** Split parsed records against the tenant's existing supplier names
- *  (case-insensitive): existing names are SKIPPED — an import creates,
- *  it never silently updates. */
-export function splitAgainstExisting(
+export interface ExistingSupplier {
+  id: string
+  name: string | null
+  supplier_code: string | null
+}
+
+export interface SupplierImportPlan {
+  creates: SupplierImportRecord[]
+  updates: Array<{ id: string; record: SupplierImportRecord; matchedBy: 'code' | 'name' }>
+  refused: Array<{ row: number; reason: string }>
+}
+
+/**
+ * Which rows create a supplier and which update one. A row matches an
+ * existing supplier on its code (whatever the case), else on its name (also
+ * case-insensitive). A row whose name belongs to a supplier with a DIFFERENT
+ * code is refused — the sheet and the workspace disagree about who that is.
+ */
+export function planSupplierImport(
   records: SupplierImportRecord[],
-  existingNames: Iterable<string>
-): { toInsert: SupplierImportRecord[]; skippedExisting: string[] } {
-  const existing = new Set(Array.from(existingNames, n => n.trim().toLowerCase()))
-  const toInsert: SupplierImportRecord[] = []
-  const skippedExisting: string[] = []
-  for (const record of records) {
-    if (existing.has(record.name.trim().toLowerCase())) {
-      skippedExisting.push(record.name)
-    } else {
-      toInsert.push(record)
-    }
+  existing: readonly ExistingSupplier[],
+): SupplierImportPlan {
+  const norm = (v: unknown) => String(v ?? '').trim().toLowerCase()
+  const byCode = new Map<string, ExistingSupplier>()
+  const byName = new Map<string, ExistingSupplier>()
+  for (const s of existing) {
+    if (s.supplier_code) byCode.set(norm(s.supplier_code), s)
+    if (s.name) byName.set(norm(s.name), s)
   }
-  return { toInsert, skippedExisting }
+  const plan: SupplierImportPlan = { creates: [], updates: [], refused: [] }
+  const claimed = new Set<string>()
+  for (const r of records) {
+    const code = norm(r.supplier_code)
+    const hitCode = code ? byCode.get(code) : undefined
+    const hitName = byName.get(norm(r.name))
+    let target: ExistingSupplier | undefined
+    let matchedBy: 'code' | 'name' = 'code'
+    if (hitCode) {
+      target = hitCode
+    } else if (hitName) {
+      if (code && hitName.supplier_code && norm(hitName.supplier_code) !== code) {
+        plan.refused.push({
+          row: r.row,
+          reason: `"${r.name}" is supplier ${hitName.supplier_code} here, but the sheet gives it code "${r.supplier_code}" — use the code it has, or rename one of them`,
+        })
+        continue
+      }
+      target = hitName
+      matchedBy = 'name'
+    }
+    if (!target) { plan.creates.push(r); continue }
+    if (claimed.has(target.id)) {
+      plan.refused.push({ row: r.row, reason: `"${r.name}" matches a supplier another row of this file already updates` })
+      continue
+    }
+    claimed.add(target.id)
+    plan.updates.push({ id: target.id, record: r, matchedBy })
+  }
+  return plan
 }

@@ -7,6 +7,7 @@
 // Security: Requires authentication, ALL data filtered by tenant
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import {
@@ -109,6 +110,11 @@ interface CommissionData {
  * RLS policies automatically filter ALL data by tenant_id
  */
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     // Use authenticated client - RLS automatically filters ALL queries by tenant
     const supabase = await createAuthenticatedClient()

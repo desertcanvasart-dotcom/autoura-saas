@@ -52,7 +52,7 @@ const TENANT = 'tenant-1'
 const NOW = new Date().toISOString()
 
 const post = async (mod: string, body: unknown, sb: ReturnType<typeof makeSupabase>) => {
-  mockAuth.mockResolvedValue({ error: null, supabase: sb, tenant_id: TENANT })
+  mockAuth.mockResolvedValue({ error: null, supabase: sb, tenant_id: TENANT, role: 'manager' })
   const { POST } = await import(mod)
   const req = new Request('http://t' + mod, { method: 'POST', body: JSON.stringify(body) })
   return (await POST(req as unknown as Request & { json: () => Promise<unknown> })).json()
@@ -99,5 +99,33 @@ describe('tour variations create idempotency', () => {
     expect(json).toMatchObject({ success: true })
     expect(sb.inserted.tour_variations).toHaveLength(1)
     expect(sb.inserted.tour_variations[0].tier).toBe('luxury')
+  })
+
+  it("builds the code from the tour's own code, stepping past one already taken", async () => {
+    // From the NAME, "Cairo Pyramids Day Tour" and its "(Copy)" both made
+    // CAIRO-PYRAMIDS-DAY-T-STANDARD and the copy's insert failed.
+    const sb = makeSupabase({
+      tour_templates: [{ id: 'tmpl-2', tenant_id: TENANT, template_code: 'CAI-DAY-002' }],
+      tour_variations: [{ id: 'v', tenant_id: TENANT, template_id: 'other', tier: 'standard', variation_code: 'CAI-DAY-002-STANDARD' }],
+    })
+    const json = await post('../variations/route', [
+      { template_id: 'tmpl-2', tier: 'standard', variation_name: 'Cairo Pyramids Day Tour (Copy) - Standard' },
+      { template_id: 'tmpl-2', tier: 'luxury', variation_name: 'Cairo Pyramids Day Tour (Copy) - Luxury' },
+    ], sb)
+    expect(json).toMatchObject({ success: true, skippedTiers: [] })
+    expect(sb.inserted.tour_variations.map((v: Row) => v.variation_code)).toEqual(['CAI-DAY-002-STANDARD-2', 'CAI-DAY-002-LUXURY'])
+  })
+
+  it('names the tiers it skipped', async () => {
+    const sb = makeSupabase({
+      tour_templates: [{ id: 'tmpl-1', tenant_id: TENANT, template_code: 'T1' }],
+      tour_variations: [{ id: 'var-1', tenant_id: TENANT, template_id: 'tmpl-1', tier: 'standard', variation_code: 'T1-STANDARD' }],
+    })
+    const json = await post('../variations/route', [
+      { template_id: 'tmpl-1', tier: 'standard', variation_name: 'X - Standard' },
+      { template_id: 'tmpl-1', tier: 'luxury', variation_name: 'X - Luxury' },
+    ], sb)
+    expect(json).toMatchObject({ success: true, skippedTiers: ['standard'] })
+    expect(sb.inserted.tour_variations).toHaveLength(1)
   })
 })

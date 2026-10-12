@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
 import { TemplateEditor } from '@/components/email/RichTextEditor'
 import { 
@@ -32,6 +33,7 @@ interface EmailTemplate {
 
 function EmailSettingsContent() {
   const { user } = useAuth()
+  const { isAdmin } = useRole()
   const dialog = useConfirmDialog()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -192,14 +194,17 @@ function EmailSettingsContent() {
     if (!(await dialog.confirm({ message: 'Delete this template?', variant: 'danger', confirmText: 'Delete' }))) return
     
     try {
-      await fetch('/api/email/templates', {
+      const res = await fetch('/api/email/templates', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, userId: user.id }),
+        body: JSON.stringify({ id }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) setMessage({ type: 'error', text: data.error || 'Could not delete the template' })
       fetchTemplates()
     } catch (err) {
       console.error('Error deleting template:', err)
+      setMessage({ type: 'error', text: 'Could not delete the template' })
     }
   }
 
@@ -336,6 +341,8 @@ function EmailSettingsContent() {
               </div>
 
               {/* The office's other addresses (migration 367) */}
+              {/* Company-wide, so admins only (the API is too); everyone connects their own Gmail above. */}
+              {isAdmin && (
               <div className="bg-white rounded-lg border border-gray-200 p-4 mt-4">
                 <h3 className="text-sm font-semibold text-gray-900">Our other email addresses</h3>
                 <p className="text-xs text-gray-500 mt-1">
@@ -365,6 +372,7 @@ function EmailSettingsContent() {
                   </span>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -461,9 +469,11 @@ function TemplateModal({
   const [content, setContent] = useState(template?.content || '')
   const [category, setCategory] = useState(template?.category || 'general')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const handleSave = async () => {
     if (!name || !subject || !content) return
+    setSaveError(null)
     
     setSaving(true)
     try {
@@ -472,14 +482,20 @@ function TemplateModal({
         ? { id: template.id, userId, name, subject, content, category }
         : { userId, name, subject, content, category }
 
-      await fetch('/api/email/templates', {
+      const res = await fetch('/api/email/templates', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        setSaveError(data.error || 'Could not save the template')
+        return
+      }
       onSaved()
     } catch (err) {
       console.error('Error saving template:', err)
+      setSaveError('Could not save the template')
     } finally {
       setSaving(false)
     }
@@ -552,6 +568,7 @@ function TemplateModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
+          {saveError && <p className="mr-auto text-sm text-red-600">{saveError}</p>}
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg"

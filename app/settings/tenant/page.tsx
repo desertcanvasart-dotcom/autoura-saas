@@ -26,6 +26,7 @@ import Image from 'next/image'
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { identityFromTenant } from '@/lib/company-identity'
 import { DocumentFooter } from '@/components/documents/Letterhead'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 const supabase = createClient()
 
@@ -42,6 +43,7 @@ function isMissingColumnError(err: { code?: string; message?: string }, columns:
 }
 
 export default function TenantSettingsPage() {
+  const dialog = useConfirmDialog()
   const { tenant, tenantMember, features, isAdmin, loading, refetchTenant } = useTenant()
 
   // Tenant basic info state
@@ -243,8 +245,9 @@ export default function TenantSettingsPage() {
       return publicUrl
     } catch (error) {
       console.error('Error uploading logo:', error)
-      setMessage({ type: 'error', text: 'Failed to upload logo' })
-      return logoUrl
+      // null = the upload failed; the save stops and says so (it carried
+      // on and replaced this message with "Settings saved successfully!").
+      return null
     } finally {
       setUploading(false)
     }
@@ -253,14 +256,50 @@ export default function TenantSettingsPage() {
   const handleSave = async () => {
     if (!tenant || !features || !isAdmin) return
 
-    setSaving(true)
     setMessage(null)
 
+    // Checked here: this page writes the row directly, and the boxes' min and
+    // max were never enforced — a -5% house margin or a 999% deposit saved.
+    const num = (v: string) => (v.trim() === '' ? null : Number(v))
+    const pct = (v: string) => { const n = num(v); return n === null || (Number.isFinite(n) && n >= 0 && n <= 100) }
+    const problems: string[] = []
+    if (!pct(defaultMargin)) problems.push('House margin is a percentage from 0 to 100')
+    if (!pct(minMargin)) problems.push('Minimum margin is a percentage from 0 to 100')
+    const house = num(defaultMargin), floor = num(minMargin)
+    if (house !== null && floor !== null && floor > house) problems.push('The minimum margin cannot be above the house margin')
+    if (!pct(depositPercent)) problems.push('Deposit is a percentage from 0 to 100')
+    const due = num(depositDueDays)
+    if (due !== null && !(Number.isInteger(due) && due >= 0 && due <= 365)) problems.push('Deposit due days is a whole number from 0 to 365')
+    for (const [label, c] of [['Primary colour', primaryColor], ['Secondary colour', secondaryColor]] as const) {
+      if (c && !/^#[0-9a-fA-F]{6}$/.test(c)) problems.push(`${label} must be a hex colour like #647C47`)
+    }
+    if (problems.length) {
+      setMessage({ type: 'error', text: problems.join('. ') + '.' })
+      return
+    }
+    // The rates currency reinterprets every stored rate: confirm it.
+    const storedRates = (tenant as { rates_currency?: string | null }).rates_currency || ''
+    if ((ratesCurrency || '') !== storedRates) {
+      const ok = await dialog.confirm({
+        title: 'Change the rates currency?',
+        message: `Every stored rate will be read as ${ratesCurrency || 'EUR'} instead of ${storedRates || 'EUR'}. The amounts are not converted. Continue?`,
+        variant: 'warning',
+        confirmText: 'Change it',
+      })
+      if (!ok) return
+    }
+
+    setSaving(true)
     try {
       // Upload logo if a new one was selected
       let finalLogoUrl = logoUrl
       if (logoFile) {
-        finalLogoUrl = await uploadLogo()
+        const uploaded = await uploadLogo()
+        if (!uploaded) {
+          setMessage({ type: 'error', text: 'The logo could not be uploaded, so nothing was saved. Try a smaller PNG or JPG.' })
+          return
+        }
+        finalLogoUrl = uploaded
       }
 
       // Identity AND branding live on tenants — one table, one write.

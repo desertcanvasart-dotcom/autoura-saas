@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
@@ -28,6 +29,11 @@ async function invoicePdfBytes(invoice: any, senderTenant: SenderTenant | null):
 }
 
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()

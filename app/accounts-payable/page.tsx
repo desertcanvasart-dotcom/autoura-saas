@@ -193,9 +193,13 @@ export default function AccountsPayablePage() {
       })
       if (response.ok) {
         fetchData()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not mark the expense paid')
       }
     } catch (error) {
       console.error('Error marking as paid:', error)
+      showToast('error', 'Could not mark the expense paid')
     }
   }
 
@@ -208,9 +212,13 @@ export default function AccountsPayablePage() {
       })
       if (response.ok) {
         fetchData()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not approve the expense')
       }
     } catch (error) {
       console.error('Error approving expense:', error)
+      showToast('error', 'Could not approve the expense')
     }
   }
 
@@ -354,7 +362,7 @@ export default function AccountsPayablePage() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">💰</span>
@@ -392,6 +400,16 @@ export default function AccountsPayablePage() {
             </div>
             <p className="text-xs text-gray-500 mb-1">Not due yet</p>
             <p className="text-2xl font-semibold text-green-600">{formatTotals(summary.aging.current)}</p>
+          </div>
+
+          {/* The cards add up to the total: 1-30 days was missing. */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">⏳</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+            </div>
+            <p className="text-xs text-gray-500 mb-1">1-30 days overdue</p>
+            <p className="text-2xl font-semibold text-yellow-600">{formatTotals(summary.aging.days30)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -661,7 +679,7 @@ export default function AccountsPayablePage() {
                                     {expense.expense_number}
                                   </Link>
                                   <p className="text-xs text-gray-500">
-                                    {expense.description || catConfig.label} • {new Date(expense.expense_date).toLocaleDateString()}
+                                    {expense.description || catConfig.label} • {new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                                     {expense.is_overdue && (
                                       <span className="text-orange-500 ml-2">({expense.days_past_due} days overdue)</span>
                                     )}
@@ -765,9 +783,9 @@ export default function AccountsPayablePage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-sm text-gray-600">{new Date(expense.expense_date).toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-600">{new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}</p>
                         <p className={`text-xs ${expense.is_overdue ? 'text-orange-500' : 'text-gray-400'}`}>
-                          Due {new Date(expense.due_date).toLocaleDateString()}
+                          Due {new Date(`${String(expense.due_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                           {expense.due_from_invoice ? ` (bill ${expense.due_from_invoice})` : ''}
                         </p>
                       </td>
@@ -866,7 +884,7 @@ export default function AccountsPayablePage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-sm text-gray-600">
-                          {expense.payment_date ? new Date(expense.payment_date).toLocaleDateString() : '-'}
+                          {expense.payment_date ? new Date(`${String(expense.payment_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '-'}
                         </p>
                       </td>
                       <td className="px-4 py-3">

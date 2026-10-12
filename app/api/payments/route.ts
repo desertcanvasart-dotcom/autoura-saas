@@ -7,6 +7,7 @@
 // Security: Requires authentication for all operations
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { parsePaymentInput } from '@/lib/payment-input'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
@@ -18,6 +19,11 @@ import { paymentCurrencyFor } from '@/lib/payment-currency'
  * RLS policies automatically filter by tenant_id
  */
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Use authenticated client - RLS automatically filters by tenant
     const supabase = await createAuthenticatedClient()
@@ -78,6 +84,11 @@ export async function GET(request: NextRequest) {
  * Requires authentication and validates tenant ownership
  */
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()

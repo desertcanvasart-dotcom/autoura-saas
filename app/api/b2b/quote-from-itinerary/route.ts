@@ -169,7 +169,8 @@ export async function POST(request: NextRequest) {
         season,
         // Guide ask (B-items 1/3): NULL = the defaults, only non-default stored.
         guide_mode: guide_mode === 'throughout' ? 'throughout' : null,
-        guide_grade: guide_grade === 'senior' ? 'senior' : null,
+        // Any of the agency's grades; NULL = its first (the default).
+        guide_grade: typeof guide_grade === 'string' && guide_grade.trim() ? guide_grade.trim() : null,
         source: 'from_itinerary',
         tour_leader_included,
         tour_leader_cost: tourLeaderCost,

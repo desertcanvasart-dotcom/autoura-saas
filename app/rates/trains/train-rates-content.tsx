@@ -4,7 +4,7 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Train, Plus, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -14,13 +14,7 @@ import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 import Link from 'next/link'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
-
-// Egyptian cities with train stations
-const TRAIN_CITIES = [
-  'Alexandria', 'Aswan', 'Asyut', 'Beni Suef', 'Cairo', 'Damanhur',
-  'Edfu', 'El Minya', 'Esna', 'Giza', 'Kom Ombo', 'Luxor',
-  'Mansoura', 'Port Said', 'Qena', 'Sohag', 'Suez', 'Tanta', 'Zagazig'
-]
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 interface TrainRate {
   // The currency this row's amounts are in; blank means the tenant's.
@@ -52,6 +46,16 @@ export default function TrainRatesContent() {
   const searchParams = useSearchParams()
 
   const [rates, setRates] = useState<TrainRate[]>([])
+
+  // The agency's destination cities (Settings → Destinations), plus any city
+  // its rates already name — a fixed Egypt list was required here, so a
+  // non-Egypt agency could not add a rate and an imported route could not be
+  // saved until a listed city was picked.
+  const { cities: destinationCities } = useDestinationCities()
+  const TRAIN_CITIES = useMemo(() => {
+    const stored = rates.flatMap(r => [r.origin_city, r.destination_city]).filter((c): c is string => Boolean(c))
+    return [...new Set([...destinationCities, ...stored])].sort((a, b) => a.localeCompare(b))
+  }, [destinationCities, rates])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
@@ -135,7 +139,9 @@ export default function TrainRatesContent() {
   const fetchRates = async () => {
     try {
       const params = new URLSearchParams()
-      if (!showInactive) params.append('active_only', 'true')
+      // Every rate, inactive too: the list filters them (matchesActive). The
+      // fetch ran once, on mount, with active_only — so "Show All" had nothing
+      // to show and a deactivated rate could never be found to switch back on.
 
       const response = await fetch(`/api/rates/trains?${params}`)
       const data = await response.json()

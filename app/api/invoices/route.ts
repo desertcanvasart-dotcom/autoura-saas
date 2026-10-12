@@ -7,6 +7,7 @@
 // Security: Requires authentication for all operations
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { NextRequest, NextResponse } from 'next/server'
 import { formatMoney, roundToCurrency } from '@/lib/currency-totals'
@@ -23,6 +24,11 @@ import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-number
  * RLS policies automatically filter by tenant_id
  */
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Use authenticated client - RLS automatically filters by tenant
     const supabase = await createAuthenticatedClient()
@@ -41,6 +47,7 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId')
     const itineraryId = searchParams.get('itineraryId')
     const invoiceType = searchParams.get('type')
+    const parentInvoiceId = searchParams.get('parentInvoiceId')
 
     // Pagination. Callers may opt in with ?limit / ?offset. When neither is
     // supplied we still apply a safety cap so a tenant with a very large
@@ -70,6 +77,7 @@ export async function GET(request: NextRequest) {
     if (status) {
       query = query.eq('status', status)
     }
+    if (parentInvoiceId) query = query.eq('parent_invoice_id', parentInvoiceId)
 
     if (clientId) {
       query = query.eq('client_id', clientId)
@@ -114,6 +122,11 @@ export async function GET(request: NextRequest) {
  * Requires authentication and validates tenant ownership
  */
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
@@ -295,6 +308,11 @@ export async function POST(request: NextRequest) {
       currency,
     })
     totalAmount = money.total_amount
+    // An invoice for nothing, or for less than nothing (a discount above the
+    // subtotal), is refused — as an edit already was.
+    if (!(totalAmount > 0)) {
+      return NextResponse.json({ success: false, error: 'The invoice total must be above 0' }, { status: 400 })
+    }
 
     const baseInvoice = {
       tenant_id, // ✅ Explicit tenant_id

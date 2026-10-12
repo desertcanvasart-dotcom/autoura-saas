@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseSuppliersCsv, splitAgainstExisting, splitTypes, resolveImportTypes } from '@/lib/suppliers/import-csv'
+import { parseSuppliersCsv, planSupplierImport, splitTypes, resolveImportTypes } from '@/lib/suppliers/import-csv'
 import { SUPPLIER_CSV_COLUMNS, SUPPLIER_CSV_HEADERS, supplierCsvSampleRow } from '@/lib/suppliers/csv-schema'
 
 // ============================================
@@ -114,14 +114,49 @@ describe('parseSuppliersCsv', () => {
   })
 })
 
-describe('splitAgainstExisting', () => {
-  it('skips existing tenant suppliers case-insensitively — an import creates, never updates', () => {
-    const { records } = parseSuppliersCsv(
-      ['Name,Type', 'Nile Star,hotel', 'New Kid,guide'].join('\n')
-    )
-    const { toInsert, skippedExisting } = splitAgainstExisting(records, ['  NILE STAR '])
-    expect(skippedExisting).toEqual(['Nile Star'])
-    expect(toInsert.map(r => r.name)).toEqual(['New Kid'])
+describe('planSupplierImport', () => {
+  const existing = [
+    { id: 's1', name: 'Nile Star', supplier_code: 'SUP-0001' },
+    { id: 's2', name: 'Old Name Tours', supplier_code: 'SUP-0002' },
+    { id: 's3', name: 'No Code Hotel', supplier_code: null },
+  ]
+  const plan = (lines: string[]) => planSupplierImport(parseSuppliersCsv(['Name,Code,Type', ...lines].join('\n')).records, existing)
+
+  it('updates an existing supplier, matched by name case-insensitively', () => {
+    const p = plan(['  NILE STAR ,,hotel', 'New Kid,,guide'])
+    expect(p.updates.map(u => [u.id, u.matchedBy])).toEqual([['s1', 'name']])
+    expect(p.creates.map(r => r.name)).toEqual(['New Kid'])
+  })
+
+  it('the code wins: a renamed supplier is updated, not created twice', () => {
+    const p = plan(['New Name Tours,sup-0002,guide'])
+    expect(p.updates).toMatchObject([{ id: 's2', matchedBy: 'code' }])
+    expect(p.creates).toEqual([])
+  })
+
+  it('refuses a name whose supplier has a different code', () => {
+    const p = plan(['Nile Star,SUP-0099,hotel'])
+    expect(p.updates).toEqual([])
+    expect(p.refused[0].reason).toMatch(/is supplier SUP-0001 here/)
+  })
+
+  it('a supplier with no code takes the sheet\'s', () => {
+    const p = plan(['No Code Hotel,SUP-0050,hotel'])
+    expect(p.updates).toMatchObject([{ id: 's3', matchedBy: 'name' }])
+  })
+})
+
+describe('the parser refuses what it cannot hold', () => {
+  it('a commission that is not a number; 10% is read as 10', () => {
+    const r = parseSuppliersCsv(['Name,Commission', 'A,ten', 'B,10%'].join('\n'))
+    expect(r.refused[0].reason).toMatch(/Commission "ten" is not a number/)
+    expect(r.records[0]).toMatchObject({ name: 'B', default_commission_rate: 10 })
+  })
+
+  it('a code twice in one file', () => {
+    const r = parseSuppliersCsv(['Name,Code', 'A,SUP-1', 'B,sup-1'].join('\n'))
+    expect(r.records.map(x => x.name)).toEqual(['A'])
+    expect(r.refused[0].reason).toMatch(/appears more than once/)
   })
 })
 
@@ -132,7 +167,10 @@ describe('the suppliers Sample CSV is the contract', () => {
       SUPPLIER_CSV_HEADERS.join(','),
       supplierCsvSampleRow('hotel').map(c => `"${String(c).replace(/"/g, '""')}"`).join(','),
     ].join('\n')
-    const r = parseSuppliersCsv(sample)
+    // Uploaded unedited, the example row is skipped — it creates nothing.
+    expect(parseSuppliersCsv(sample)).toMatchObject({ records: [], refused: [], exampleRows: 1 })
+    // With a real code, the same row imports cleanly.
+    const r = parseSuppliersCsv(sample.replace('EXAMPLE-SUP-0001', 'SUP-0001'))
     expect(r.refused).toEqual([])
     expect(r.typeDefaulted).toEqual([])
     expect(r.records[0]).toMatchObject({

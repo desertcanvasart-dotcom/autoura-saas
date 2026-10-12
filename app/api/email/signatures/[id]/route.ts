@@ -3,6 +3,7 @@
 // DELETE /api/email/signatures/[id]
 // ============================================
 
+import { cleanSignature } from '@/lib/email/signature'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
@@ -31,7 +32,7 @@ export async function PATCH(
 
   const patch: Record<string, any> = {}
   if (typeof body.name === 'string' && body.name.trim()) patch.name = body.name.trim()
-  if (typeof body.content === 'string' && body.content.trim()) patch.content = body.content.trim()
+  if (typeof body.content === 'string' && body.content.trim()) patch.content = cleanSignature(body.content)
 
   if (typeof body.is_default === 'boolean') {
     patch.is_default = body.is_default

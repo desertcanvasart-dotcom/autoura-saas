@@ -32,14 +32,22 @@ const SUPPLIER = 'supplier-local-uuid'
 /** Rows handed to .insert(), captured per table. */
 let inserted: Record<string, unknown>[]
 
+// A select chain: any filters, then await or .range() — the route reads
+// whole tables in pages now.
+const selectChain = (rows: () => unknown[]) => {
+  const chain: Record<string, unknown> = {}
+  for (const m of ['eq', 'in', 'not', 'order', 'ilike']) chain[m] = () => chain
+  chain.range = async () => ({ data: rows(), error: null })
+  chain.then = (ok: (v: unknown) => unknown) => ok({ data: rows(), error: null })
+  return chain
+}
+
 function stubDb() {
   const suppliers = {
-    select: () => ({
-      in: () => ({ eq: async () => ({ data: [{ id: SUPPLIER }] }) }),
-    }),
+    select: () => selectChain(() => [{ id: SUPPLIER }]),
   }
   const rateTable = {
-    select: () => ({ in: () => ({ eq: async () => ({ data: [] }) }) }), // nothing exists yet
+    select: () => selectChain(() => []), // nothing exists yet
     insert: async (rows: Record<string, unknown>[]) => { inserted.push(...rows); return { error: null } },
   }
   return { from: (t: string) => (t === 'suppliers' ? suppliers : rateTable) }
@@ -55,7 +63,7 @@ const HEADER = 'service_code,origin_city,destination_city,class_type,rate_eur,su
 beforeEach(() => {
   vi.clearAllMocks()
   inserted = []
-  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT })
+  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT, role: 'manager' })
   mockResolveProperty.mockResolvedValue({ property_id: 'property-uuid', name: 'Nefertari Express' })
 })
 

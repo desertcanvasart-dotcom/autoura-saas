@@ -7,7 +7,7 @@ import {
   isCheckViolation,
   memberIsActive,
 } from '@/lib/member-status'
-import { checkRoleChange } from '@/lib/member-role'
+import { checkRoleChange, checkActiveChange } from '@/lib/member-role'
 
 // Verify the target user belongs to the caller's tenant (user_profiles has no tenant_id)
 async function isTenantMember(adminClient: any, tenantId: string, userId: string): Promise<boolean> {
@@ -133,7 +133,9 @@ export async function PUT(
     const body = await request.json()
 
     // Fields that can be updated
-    const allowedFields = ['full_name', 'phone', 'role', 'is_active', 'timezone']
+    // No timezone: user_profiles has no such column, and sending one failed
+    // the whole save (name and phone with it).
+    const allowedFields = ['full_name', 'phone', 'role', 'is_active']
     const updateData: Record<string, any> = {}
 
     for (const field of allowedFields) {
@@ -207,6 +209,33 @@ export async function PUT(
       if (roleError) throw roleError
     }
     if (isActive !== undefined) {
+      const { data: target } = await adminClient
+        .from('tenant_members')
+        .select('role')
+        .eq('tenant_id', authResult.tenant_id!)
+        .eq('user_id', id)
+        .maybeSingle()
+      const check = checkActiveChange({
+        callerId: authResult.user.id,
+        callerRole: authResult.role,
+        targetId: id,
+        targetRole: target?.role,
+      })
+      if (!check.ok) {
+        return NextResponse.json({ success: false, error: check.error }, { status: check.status })
+      }
+      if (isActive !== true && ['owner', 'admin'].includes(String(target?.role))) {
+        // Never the last active owner or admin: nobody could run the company.
+        const { data: leaders } = await adminClient
+          .from('tenant_members')
+          .select('user_id, status')
+          .eq('tenant_id', authResult.tenant_id!)
+          .in('role', ['owner', 'admin'])
+        const stillActive = (leaders ?? []).filter((m: { user_id: string; status?: string | null }) => m.user_id !== id && (m.status ?? 'active') === 'active')
+        if (stillActive.length === 0) {
+          return NextResponse.json({ success: false, error: 'This is the last active owner or admin — make someone else an admin first' }, { status: 409 })
+        }
+      }
       await setMemberActive(adminClient, authResult.tenant_id!, id, isActive === true)
     }
 

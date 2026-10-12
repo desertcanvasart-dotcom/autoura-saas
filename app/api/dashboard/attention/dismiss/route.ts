@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // ============================================
 // "Needs attention", dismissed (migration 397)
@@ -26,6 +27,9 @@ export async function POST(request: NextRequest) {
   if (auth.error !== null) {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
+  // A dismissal hides the item for the whole company: staff only.
+  const denied = roleDenied(auth.role, 'staff')
+  if (denied) return denied
 
   const body = await readBody(request)
   const key = typeof body.key === 'string' ? body.key : ''
@@ -59,6 +63,8 @@ export async function DELETE(request: NextRequest) {
   if (auth.error !== null) {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
+  const denied = roleDenied(auth.role, 'staff')
+  if (denied) return denied
 
   const body = await readBody(request)
   const key = typeof body.key === 'string' ? body.key : ''

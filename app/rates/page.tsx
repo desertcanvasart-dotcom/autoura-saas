@@ -165,6 +165,21 @@ interface TrainRate {
   is_active: boolean
 }
 
+interface FlightRate {
+  rate_currency?: string | null
+  id: string
+  service_code: string
+  route_from: string
+  route_to: string
+  airline?: string | null
+  flight_number?: string | null
+  flight_type?: string | null
+  cabin_class?: string | null
+  base_rate_eur: number
+  tax_eur?: number | null
+  is_active: boolean
+}
+
 interface TippingRate {
   rate_currency?: string | null
   id: string
@@ -189,14 +204,17 @@ interface RatesData {
   cruises: CruiseRate[]
   sleepingTrains: SleepingTrainRate[]
   trains: TrainRate[]
+  flights: FlightRate[]
   tipping: TippingRate[]
 }
 
-type TabType = 'transportation' | 'guides' | 'entrances' | 'accommodation' | 'meals' | 'cruises' | 'sleepingTrains' | 'trains' | 'airportStaff' | 'hotelStaff' | 'tipping'
+type TabType = 'transportation' | 'guides' | 'entrances' | 'accommodation' | 'meals' | 'cruises' | 'sleepingTrains' | 'trains' | 'flights' | 'airportStaff' | 'hotelStaff' | 'tipping'
 
 export default function RatesPage() {
   const [rates, setRates] = useState<RatesData | null>(null)
   const [loading, setLoading] = useState(true)
+  // Tabs whose rates could not be loaded: shown as a warning, never as "0".
+  const [failedTabs, setFailedTabs] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCity, setSelectedCity] = useState('all')
@@ -249,6 +267,7 @@ export default function RatesPage() {
           cruisesRes,
           sleepingTrainsRes,
           trainsRes,
+          flightsRes,
           tippingRes
         ] = await Promise.all([
           fetch('/api/rates?type=transportation'),
@@ -261,6 +280,7 @@ export default function RatesPage() {
           fetch('/api/rates?type=cruises'),
           fetch('/api/rates?type=sleeping_trains'),
           fetch('/api/rates?type=trains'),
+          fetch('/api/rates?type=flights'),
           fetch('/api/rates?type=tipping')
         ])
 
@@ -275,6 +295,7 @@ export default function RatesPage() {
           cruisesData,
           sleepingTrainsData,
           trainsData,
+          flightsData,
           tippingData
         ] = await Promise.all([
           transportationRes.json(),
@@ -287,6 +308,7 @@ export default function RatesPage() {
           cruisesRes.json(),
           sleepingTrainsRes.json(),
           trainsRes.json(),
+          flightsRes.json(),
           tippingRes.json()
         ])
 
@@ -301,10 +323,17 @@ export default function RatesPage() {
           cruises: cruisesData.success ? cruisesData.data : [],
           sleepingTrains: sleepingTrainsData.success ? sleepingTrainsData.data : [],
           trains: trainsData.success ? trainsData.data : [],
+          flights: flightsData.success ? flightsData.data : [],
           tipping: tippingData.success ? tippingData.data : []
         }
 
         setRates(combinedData)
+        const loaded: Record<string, { success?: boolean }> = {
+          Transportation: transportationData, Guides: guidesData, Entrances: entrancesData, Hotels: accommodationData,
+          Meals: mealsData, 'Airport services': airportStaffData, 'Hotel services': hotelStaffData, Cruises: cruisesData,
+          'Sleeping trains': sleepingTrainsData, Trains: trainsData, Flights: flightsData, Tipping: tippingData,
+        }
+        setFailedTabs(Object.entries(loaded).filter(([, d]) => !d?.success).map(([name]) => name))
 
         // Open on a tab that HAS something — the hub always opened on
         // Transportation, so an account whose only rates lived elsewhere
@@ -382,7 +411,9 @@ export default function RatesPage() {
     ...rates.sleepingTrains.map(r => r.origin_city),
     ...rates.sleepingTrains.map(r => r.destination_city),
     ...rates.trains.map(r => r.origin_city),
-    ...rates.trains.map(r => r.destination_city)
+    ...rates.trains.map(r => r.destination_city),
+    ...rates.flights.map(r => r.route_from),
+    ...rates.flights.map(r => r.route_to)
   ].filter(Boolean))).sort()
 
   const filterRates = <T extends BaseRate>(rateArray: T[]): T[] => {
@@ -432,6 +463,7 @@ export default function RatesPage() {
     cruises: filterGeneric(rates.cruises),
     sleepingTrains: filterGeneric(rates.sleepingTrains),
     trains: filterGeneric(rates.trains),
+    flights: filterGeneric(rates.flights),
     tipping: filterGeneric(rates.tipping)
   }
 
@@ -453,6 +485,7 @@ export default function RatesPage() {
     cruises: filteredRates.cruises.slice(startIndex, endIndex),
     sleepingTrains: filteredRates.sleepingTrains.slice(startIndex, endIndex),
     trains: filteredRates.trains.slice(startIndex, endIndex),
+    flights: filteredRates.flights.slice(startIndex, endIndex),
     tipping: filteredRates.tipping.slice(startIndex, endIndex)
   }
 
@@ -507,7 +540,7 @@ export default function RatesPage() {
   const totalServices = rates.transportation.length + rates.guides.length + rates.entrances.length + 
                         rates.accommodation.length + rates.meals.length + rates.airportStaff.length +
                         rates.hotelStaff.length + rates.cruises.length + rates.sleepingTrains.length +
-                        rates.trains.length + rates.tipping.length
+                        rates.trains.length + rates.flights.length + rates.tipping.length
 
   // Get current tab count
   const getCurrentCount = () => {
@@ -563,6 +596,11 @@ export default function RatesPage() {
 
       {/* Statistics Dashboard */}
       <div className="container mx-auto px-4 lg:px-6 py-6 print:hidden">
+        {failedTabs.length > 0 && (
+          <div className="mb-3 p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg">
+            Could not load: {failedTabs.join(', ')}. Those tabs may look empty — reload, or open their own page.
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
@@ -579,7 +617,7 @@ export default function RatesPage() {
               <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
             </div>
             <p className="text-xs text-gray-600">Categories</p>
-            <p className="text-2xl font-bold text-gray-900">11</p>
+            <p className="text-2xl font-bold text-gray-900">{RATES_TAB_ORDER.length}</p>
           </div>
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
@@ -826,6 +864,16 @@ export default function RatesPage() {
               }`}
             >
               🚂 Trains ({rates.trains.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('flights')}
+              className={`px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'flights'
+                  ? 'text-sky-600 border-b-2 border-sky-600 bg-sky-50'
+                  : 'text-gray-600 hover:text-sky-600 hover:bg-gray-50'
+              }`}
+            >
+              ✈️ Flights ({rates.flights.length})
             </button>
             <button
               onClick={() => setActiveTab('airportStaff')}
@@ -1232,6 +1280,43 @@ export default function RatesPage() {
                       <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                         <span className="text-3xl">🛏️</span>
                         <p className="text-sm font-medium mt-2">No sleeping train rates found</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+
+            {/* Flights Table */}
+            {activeTab === 'flights' && (
+              <table className="w-full">
+                <thead className="bg-sky-50 border-b border-sky-200">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-sky-800">Route</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-sky-800">Airline</th>
+                    <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Cabin</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-sky-800">Fare</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-sky-800">Tax</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {paginatedRates.flights.map((rate, index) => (
+                    <tr key={rate.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'} hover:bg-sky-50 transition-colors`}>
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900">{rate.route_from} → {rate.route_to}</p>
+                        <p className="text-xs text-gray-500">{rate.flight_type === 'international' ? 'International' : 'Domestic'}{rate.flight_number ? ` · ${rate.flight_number}` : ''}</p>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700"><VocabLabel kind="airline" value={rate.airline} fallback="—" /></td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-700"><VocabLabel kind="flight_cabin" value={rate.cabin_class} fallback="—" /></td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-green-600">{displayRate(rate, rate.base_rate_eur)}</td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-700">{rate.tax_eur ? displayRate(rate, rate.tax_eur) : '—'}</td>
+                    </tr>
+                  ))}
+                  {paginatedRates.flights.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                        <span className="text-3xl">✈️</span>
+                        <p className="text-sm font-medium mt-2">No flight rates found</p>
                       </td>
                     </tr>
                   )}

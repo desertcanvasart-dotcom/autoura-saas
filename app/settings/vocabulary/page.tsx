@@ -126,16 +126,27 @@ export default function VocabularySettingsPage() {
     }
     const ok = warning
       ? await dialog.confirm({ title: `"${item.label}" is in use`, message: warning, confirmText: 'Delete anyway', variant: 'warning' })
-      : await dialog.confirmDelete(item.label, `Remove "${item.label}" from ${info.title.toLowerCase()}? Rows already filed under it keep the word until you re-file them.`)
+      : await dialog.confirmDelete(item.label, `Remove "${item.label}" from ${info.title.toLowerCase()}? Rows already filed under it keep its key (shown instead of your word) until you re-file them — hiding it is the safer choice.`)
     if (!ok) return
-    const url = warning ? `/api/vocabulary/${item.id}?confirm_in_use=1` : `/api/vocabulary/${item.id}`
+    let url = warning ? `/api/vocabulary/${item.id}?confirm_in_use=1` : `/api/vocabulary/${item.id}`
+    // A tier or supplier type still in use: the server says where; delete
+    // only on a second, informed yes.
+    if (!warning && (kind === 'tier' || kind === 'supplier_type')) {
+      const probe = await fetch(url, { method: 'DELETE' }).catch(() => null)
+      const body = probe ? await probe.json().catch(() => ({})) : {}
+      if (probe?.ok) { await call(item.id, async () => new Response(JSON.stringify({ success: true })), `"${item.label}" removed`); return }
+      if (probe?.status !== 409 || !body.usage) { await call(item.id, async () => new Response(JSON.stringify(body), { status: probe?.status ?? 500 }), ""); return }
+      const again = await dialog.confirm({ title: `"${item.label}" is in use`, message: body.error, confirmText: 'Delete anyway', variant: 'warning' })
+      if (!again) return
+      url = `/api/vocabulary/${item.id}?confirm_in_use=1`
+    }
     await call(item.id, () => fetch(url, { method: 'DELETE' }), `"${item.label}" removed`)
   }
 
   const reset = async () => {
     const ok = await dialog.confirm({
       title: `Reset ${info.title.toLowerCase()}?`,
-      message: 'Everything you added or renamed in this list is replaced by the Egypt defaults. Other lists are untouched.',
+      message: 'Everything you added or renamed in this list is replaced by the Egypt defaults — it is not an undo. Anything already filed under a word you added keeps its key, shown instead of a word, until you re-file it. Other lists are untouched.',
       confirmText: 'Reset to defaults', variant: 'warning',
     })
     if (!ok) return

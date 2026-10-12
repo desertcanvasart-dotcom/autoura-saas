@@ -15,7 +15,7 @@ export async function GET() {
 
     const { data: profile, error } = await supabase
       .from('user_profiles')
-      .select('preferred_language, timezone')
+      .select('preferred_language')
       .eq('id', user.id)
       .single()
 
@@ -41,7 +41,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { preferred_language, timezone } = body
+    const { preferred_language } = body
 
     if (preferred_language && !SUPPORTED_LOCALES.includes(preferred_language)) {
       return NextResponse.json({ error: 'Invalid language' }, { status: 400 })
@@ -49,7 +49,6 @@ export async function PATCH(request: NextRequest) {
 
     const updateData: Record<string, string> = {}
     if (preferred_language) updateData.preferred_language = preferred_language
-    if (timezone) updateData.timezone = timezone
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })

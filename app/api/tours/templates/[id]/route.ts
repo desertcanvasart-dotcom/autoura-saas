@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // GET - Get single template with variations and days
 export async function GET(
@@ -167,6 +168,10 @@ export async function PUT(
         { status: authResult.status }
       )
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase } = authResult
     if (!supabase) {
@@ -266,7 +271,7 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    // Require authentication - RLS policies enforce manager role
+    // Require authentication; the role is checked below (RLS checks only the tenant)
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -274,6 +279,10 @@ export async function DELETE(
         { status: authResult.status }
       )
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase } = authResult
     if (!supabase) {
@@ -303,10 +312,17 @@ export async function DELETE(
     // now unreachable, because the parent they hang off had been deleted.
     // Orphaned rows nothing can list are worse than a failed delete: a failed
     // delete can be retried.
+    // The steps are not one transaction: a later failure leaves the earlier
+    // ones done. The message says which, rather than "Nothing was removed".
+    const done: string[] = []
     const failStep = (step: string, message: string) => {
       console.error(`[tours/templates DELETE] ${step} failed for ${id}: ${message}`)
       return NextResponse.json(
-        { success: false, error: `Failed to delete ${step}. Nothing was removed.` },
+        {
+          success: false,
+          error: `Failed to delete ${step}. The tour itself was kept` +
+            (done.length ? `; its ${done.join(', ')} were already removed.` : ' and nothing was removed.'),
+        },
         { status: 500 }
       )
     }
@@ -319,6 +335,7 @@ export async function DELETE(
         .delete()
         .in('tour_day_id', dayIds)
       if (actErr) return failStep('day activities', actErr.message)
+      done.push('day activities')
     }
 
     const { error: daysErr } = await supabase
@@ -326,6 +343,7 @@ export async function DELETE(
       .delete()
       .eq('template_id', id)
     if (daysErr) return failStep('days', daysErr.message)
+    done.push('days')
 
     // Delete variation services first (RLS filters to tenant's variations only)
     const { data: variations } = await supabase
@@ -340,6 +358,7 @@ export async function DELETE(
         .delete()
         .in('variation_id', variationIds)
       if (vsErr) return failStep('variation services', vsErr.message)
+      done.push('variation services')
     }
 
     const { error: varErr } = await supabase
@@ -347,6 +366,7 @@ export async function DELETE(
       .delete()
       .eq('template_id', id)
     if (varErr) return failStep('variations', varErr.message)
+    done.push('variations')
 
     const { error: priceErr } = await supabase
       .from('tour_pricing')
@@ -354,7 +374,7 @@ export async function DELETE(
       .eq('tour_id', id)
     if (priceErr) return failStep('pricing', priceErr.message)
 
-    // Delete template (RLS requires manager role)
+    // Delete template (the role was checked above; RLS checks only the tenant)
     const { error } = await supabase
       .from('tour_templates')
       .delete()

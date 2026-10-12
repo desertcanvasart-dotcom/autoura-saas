@@ -6,17 +6,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Loader2, User, Mail, Phone, Globe, Building, Star, Tag } from 'lucide-react'
 import { CLIENT_STAGES, DEFAULT_CLIENT_STAGE, normalizeClientStage } from '@/lib/client-stage'
+import { LEAD_SOURCES, clientLeadSource } from '@/lib/clients/client-fields'
 
-const LEAD_SOURCES = [
-  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-  { value: 'email', label: 'Email', icon: '✉️' },
-  { value: 'website', label: 'Website', icon: '🌐' },
-  { value: 'referral', label: 'Referral', icon: '👥' },
-  { value: 'phone', label: 'Phone', icon: '📞' },
-  { value: 'social_media', label: 'Social Media', icon: '📱' },
-  { value: 'trade_show', label: 'Trade Show', icon: '🎪' },
-  { value: 'other', label: 'Other', icon: '➕' }
-]
 
 interface ClientFormData {
   first_name: string
@@ -99,7 +90,7 @@ export default function EditClientPage() {
           client_type: data.client_type || 'individual',
           vip_status: data.vip_status || false,
           status: normalizeClientStage(data.status),
-          lead_source: data.lead_source || '',
+          lead_source: clientLeadSource(data) || '',
           company_name: data.company_name || '',
           internal_notes: data.internal_notes || '',
           special_interests: data.special_interests || [],
@@ -159,8 +150,10 @@ export default function EditClientPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.first_name || !formData.last_name || !formData.email) {
-      setError('Please fill in all required fields')
+    // Only the first name is required — a lead from a call may have no
+    // surname or email yet (both were required here, though not on create).
+    if (!formData.first_name.trim()) {
+      setError('First name is required')
       return
     }
 
@@ -168,30 +161,19 @@ export default function EditClientPage() {
       setSaving(true)
       setError(null)
 
-      const { error: updateError } = await supabase
-        .from('clients')
-        .update({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          email: formData.email,
-          phone: formData.phone || null,
-          nationality: formData.nationality || null,
-          passport_type: formData.passport_type || null,
-          preferred_language: formData.preferred_language || null,
-          preferred_contact_method: formData.preferred_contact_method || null,
-          client_type: formData.client_type,
-          vip_status: formData.vip_status,
-          status: formData.status,
-          lead_source: formData.lead_source || null,
-          company_name: formData.company_name || null,
-          internal_notes: formData.internal_notes || null,
-          special_interests: formData.special_interests,
-          tags: formData.tags,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', clientId)
-
-      if (updateError) throw updateError
+      // Through the API: checked fields, the full name kept in step with a
+      // rename, and only staff may edit (viewers read only).
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok || !result.success) {
+        setError(result.error || 'Failed to update client. Please try again.')
+        setSaving(false)
+        return
+      }
 
             // Keep the button in its saving state THROUGH the navigation:
       // router.push() does not await the destination, so a finally{} here
@@ -272,28 +254,26 @@ export default function EditClientPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Name <span className="text-red-500">*</span>
+                  Last Name
                 </label>
                 <input
                   type="text"
                   name="last_name"
                   value={formData.last_name}
                   onChange={handleChange}
-                  required
                   className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Mail className="w-3 h-3 inline mr-1" />
-                  Email <span className="text-red-500">*</span>
+                  Email
                 </label>
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  required
                   className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                 />
               </div>

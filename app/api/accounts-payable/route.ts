@@ -1,3 +1,6 @@
+import { gateRole } from '@/lib/api-role-gate'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { escapeLike } from '@/lib/grid-client-link'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 // Money in different currencies does not add (lib/currency-totals.ts).
@@ -23,6 +26,11 @@ interface SupplierPayable {
 }
 
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication
     const authResult = await requireAuth()
@@ -48,25 +56,20 @@ export async function GET(request: NextRequest) {
 
     // Fetch all unpaid expenses (pending or approved but not paid)
     // RLS automatically filters by tenant_id
-    let query = supabase
-      .from('expenses')
-      .select('*')
-      .in('status', ['pending', 'approved'])
-      .order('expense_date', { ascending: true })
-
-    if (supplierName) {
-      query = query.ilike('supplier_name', `%${supplierName}%`)
-    }
-
-    if (supplierType) {
-      query = query.eq('supplier_type', supplierType)
-    }
-
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    const { data: expenses, error } = await query
+    // Every unpaid expense, a page at a time (one read stopped at 1000).
+    const { data: expenses, error } = await fetchAllPages<{ id: string; expense_date: string; [column: string]: unknown }>((from, to) => {
+      let query = supabase
+        .from('expenses')
+        .select('*')
+        .in('status', ['pending', 'approved'])
+        .order('expense_date', { ascending: true })
+        .order('id', { ascending: true })
+      // % and _ typed in the search are letters, not wildcards.
+      if (supplierName) query = query.ilike('supplier_name', `%${escapeLike(supplierName)}%`)
+      if (supplierType) query = query.eq('supplier_type', supplierType)
+      if (status) query = query.eq('status', status)
+      return query.range(from, to)
+    })
 
     if (error) {
       console.error('Error fetching expenses:', error)
@@ -76,7 +79,8 @@ export async function GET(request: NextRequest) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const DAY = 1000 * 60 * 60 * 24
-    const dateOnly = (d: string) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+    // A YYYY-MM-DD day at local midnight (new Date('2026-03-04') is UTC midnight).
+    const dateOnly = (d: string) => { const [y, m, dd] = String(d).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, dd) }
 
     // When a supplier's bill is matched to an expense, the bill's due date is
     // when the money is owed. Without one, an expense is due 14 days after it
@@ -84,14 +88,21 @@ export async function GET(request: NextRequest) {
     // so Payables and Supplier Invoices agree on what is overdue.
     const dueByExpense = new Map<string, { due_date: string; supplier_invoice_number: string | null }>()
     const expenseIds = (expenses || []).map((e: any) => e.id)
-    if (expenseIds.length) {
-      const { data: links, error: linkErr } = await supabase
+    // In chunks: every id in one .in() made a URL too long for the server
+    // past a few hundred expenses, and every due date fell back to 14 days.
+    const links: Array<{ expense_id: string; supplier_invoices: unknown }> = []
+    for (let i = 0; i < expenseIds.length; i += 200) {
+      const { data, error: linkErr } = await supabase
         .from('supplier_invoice_expenses')
         .select('expense_id, supplier_invoices(due_date, status, supplier_invoice_number)')
-        .in('expense_id', expenseIds)
+        .in('expense_id', expenseIds.slice(i, i + 200))
       if (linkErr) console.error('[accounts-payable] supplier invoice due dates:', linkErr.message)
-      for (const link of (links || []) as any[]) {
-        const inv = Array.isArray(link.supplier_invoices) ? link.supplier_invoices[0] : link.supplier_invoices
+      links.push(...(data || []))
+    }
+    {
+      type Bill = { due_date?: string | null; status?: string | null; supplier_invoice_number?: string | null } | null
+      for (const link of links) {
+        const inv = (Array.isArray(link.supplier_invoices) ? link.supplier_invoices[0] : link.supplier_invoices) as Bill
         if (!inv?.due_date || inv.status === 'cancelled') continue
         // An expense split across bills is due on the earliest of them.
         const prev = dueByExpense.get(link.expense_id)

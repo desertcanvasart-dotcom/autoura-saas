@@ -70,6 +70,10 @@ interface PricingResult {
   total_cost: number
   margin_percent: number
   margin_amount: number
+  /** Your seasonal premium on the departure date (Settings → Seasonal Premiums). */
+  season_name?: string | null
+  season_percent?: number
+  season_premium?: number
   selling_price: number
   price_per_person: number
   single_supplement?: number
@@ -95,6 +99,7 @@ interface Partner {
   id: string
   company_name: string
   partner_code: string
+  default_margin_percent: number | null
 }
 
 // A sellable catalogue extra (Rates → Extras). Chosen per quote and priced
@@ -154,7 +159,9 @@ export default function TourPriceCalculator() {
   const [selectedOptionals, setSelectedOptionals] = useState<string[]>([])
   const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
   // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
-  const [guideGrade, setGuideGrade] = useState<'egyptologist' | 'senior'>('egyptologist')
+  // '' = the agency's first guide grade (the default ask); else a grade key.
+  const [guideGrade, setGuideGrade] = useState<string>('')
+  const { items: guideGradeItems, labelFor: guideGradeLabel } = useVocabulary('guide_grade')
   const [guideMode, setGuideMode] = useState<'spot' | 'throughout'>('spot')
   // The buttons carry the agency's own words for the two modes (Settings → Vocabulary → Guide modes).
   const { labelFor: guideModeLabel } = useVocabulary('guide_mode')
@@ -468,7 +475,7 @@ export default function TourPriceCalculator() {
 
   const exportToCSV = () => {
     if (rateSheet.length === 0) return
-    const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade === 'senior' ? ' Senior' : ''})` : ''
+    const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade ? ` ${guideGradeLabel(guideGrade)}` : ''})` : ''
     const tourLeaderSuffix = (tourLeaderIncluded ? ' (+1 TL)' : ' (+0)') + guideSuffix
     const cur = result?.currency || rateCurrency
     const headers = ['Passengers', `Total Cost (${cur})`, `Margin (${cur})`, `Selling Price (${cur})`, `Per Person (${cur})`]
@@ -487,15 +494,6 @@ export default function TourPriceCalculator() {
     a.download = `rate-sheet-${result?.variation_name || 'tour'}${tourLeaderSuffix}-${travelDate}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }
-
-  const getSeasonBadge = (season: string) => {
-    const styles: Record<string, string> = {
-      low: 'bg-green-100 text-green-700',
-      high: 'bg-amber-100 text-amber-700',
-      peak: 'bg-red-100 text-red-700'
-    }
-    return styles[season] || 'bg-gray-100 text-gray-700'
   }
 
   // Show loading state while checking auth/tenant
@@ -681,13 +679,16 @@ export default function TourPriceCalculator() {
                     <option key={l.key} value={l.key} disabled={!l.hasRate}>{l.label}{l.hasRate ? '' : ' — no rate'}</option>
                   ))}
                 </select>
+                {/* The agency's own grades (Settings → Your vocabulary); the
+                    first is the default. It offered Egyptologist and Senior only. */}
                 <select
-                  value={guideGrade}
-                  onChange={(e) => setGuideGrade(e.target.value as 'egyptologist' | 'senior')}
+                  value={guideGrade || guideGradeItems[0]?.key || ''}
+                  onChange={(e) => setGuideGrade(e.target.value === guideGradeItems[0]?.key ? '' : e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
                 >
-                  <option value="egyptologist">Egyptologist (default)</option>
-                  <option value="senior">Senior guide</option>
+                  {guideGradeItems.map((g, i) => (
+                    <option key={g.key} value={g.key}>{g.label}{i === 0 ? ' (default)' : ''}</option>
+                  ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-2">
                   {guideMode === 'throughout'
@@ -723,6 +724,32 @@ export default function TourPriceCalculator() {
                   <option value="non-eur">Non-European Passport</option>
                 </select>
               </div>
+
+              {/* Partner — picking one applies its default margin (B2B Partners).
+                  It is the same choice the Save dialog offers. */}
+              {partners.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Building2 className="w-4 h-4 inline mr-1" />Partner
+                  </label>
+                  <select
+                    value={quoteForm.partner_id}
+                    onChange={(e) => {
+                      const picked = partners.find(p => p.id === e.target.value)
+                      setQuoteForm({ ...quoteForm, partner_id: e.target.value })
+                      if (picked?.default_margin_percent != null) setMarginPercent(Number(picked.default_margin_percent))
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg bg-white"
+                  >
+                    <option value="">No partner / Direct client</option>
+                    {partners.map(partner => (
+                      <option key={partner.id} value={partner.id}>
+                        {partner.company_name}{partner.default_margin_percent != null ? ` · ${partner.default_margin_percent}%` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Profit Margin */}
               <div>
@@ -832,9 +859,14 @@ export default function TourPriceCalculator() {
                         +1 Tour Leader
                       </span>
                     )}
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSeasonBadge(result.season)}`}>
-                      {result.season.charAt(0).toUpperCase() + result.season.slice(1)} Season
-                    </span>
+                    {/* Your own season, from Settings → Seasonal Premiums. The badge
+                        showed a built-in Egypt calendar (December–April "high")
+                        that priced nothing. */}
+                    {result.season_name && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        {result.season_name} +{result.season_percent}%
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -856,6 +888,9 @@ export default function TourPriceCalculator() {
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Margin ({result.margin_percent}%)</p>
                     <p className="text-xl font-bold text-green-600">{money(result.margin_amount)}</p>
+                    {(result.season_premium ?? 0) > 0 && (
+                      <p className="text-xs text-amber-700 mt-1">+ {money(result.season_premium ?? 0)} {result.season_name} premium</p>
+                    )}
                   </div>
                   <div className="bg-[#647C47]/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Selling Price</p>
@@ -979,6 +1014,12 @@ export default function TourPriceCalculator() {
                       <td colSpan={5} className="px-4 py-2 text-right text-green-600">Margin ({result.margin_percent}%):</td>
                       <td className="px-4 py-2 text-right text-green-600">{money(result.margin_amount)}</td>
                     </tr>
+                    {(result.season_premium ?? 0) > 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-2 text-right text-amber-700">{result.season_name} premium (+{result.season_percent}%):</td>
+                        <td className="px-4 py-2 text-right text-amber-700">{money(result.season_premium ?? 0)}</td>
+                      </tr>
+                    )}
                     <tr className="text-lg">
                       <td colSpan={5} className="px-4 py-2 text-right text-[#647C47]">Total:</td>
                       <td className="px-4 py-2 text-right text-[#647C47]">{money(result.selling_price)}</td>
@@ -1118,6 +1159,17 @@ export default function TourPriceCalculator() {
                     </option>
                   ))}
                 </select>
+                {(() => {
+                  const picked = partners.find(p => p.id === quoteForm.partner_id)
+                  if (!picked || picked.default_margin_percent == null || !result) return null
+                  if (Number(picked.default_margin_percent) === Number(result.margin_percent)) return null
+                  return (
+                    <p className="text-xs text-amber-700 mt-1">
+                      {picked.company_name}&apos;s default margin is {picked.default_margin_percent}%; this quote was priced at {result.margin_percent}%.
+                      To price it at theirs, pick the partner beside the margin and calculate again.
+                    </p>
+                  )
+                })()}
               </div>
 
               <div className="border-t pt-4">

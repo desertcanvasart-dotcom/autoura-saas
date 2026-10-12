@@ -32,6 +32,9 @@ interface TripPnL {
   quoted_amount: number
   total_revenue: number
   total_paid: number
+  revenue_basis: 'invoiced' | 'quoted' | 'none'
+  revenue_for_margin: number
+  extras_supplier_cost: number
   total_expenses: number
   expenses_paid: number
   expenses_pending: number
@@ -70,6 +73,7 @@ interface Invoice {
   invoice_number: string
   total_amount: number
   amount_paid: number
+  currency?: string | null
   status: string
   issue_date: string
 }
@@ -80,9 +84,18 @@ interface Expense {
   category: string
   description: string
   amount: number
+  currency?: string | null
   status: string
   expense_date: string
   supplier_name: string
+}
+
+/** A YYYY-MM-DD day as written (new Date('2026-03-04') showed the day before west of UTC). */
+function fmtDay(day: string | null | undefined): string {
+  if (!day) return '—'
+  const [y, m, d] = day.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return '—'
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { timeZone: 'UTC' })
 }
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
@@ -122,6 +135,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -131,11 +145,12 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
     try {
       // Fetch P&L data for this itinerary
       const pnlResponse = await fetch(`/api/profit-loss?itineraryId=${resolvedParams.id}`)
-      if (pnlResponse.ok) {
-        const pnlResult = await pnlResponse.json()
-        if (pnlResult.success && pnlResult.data.length > 0) {
-          setPnlData(pnlResult.data[0])
-        }
+      const pnlResult = await pnlResponse.json().catch(() => ({}))
+      if (pnlResponse.ok && pnlResult.success) {
+        if (pnlResult.data.length > 0) setPnlData(pnlResult.data[0])
+      } else {
+        // A refused or failed report is not "Trip not found".
+        setLoadError(pnlResult.error || 'Could not load this trip\'s P&L')
       }
 
       // Fetch invoices for this itinerary
@@ -183,7 +198,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
   if (!pnlData) {
     return (
       <div className="p-6 text-center">
-        <p className="text-gray-500">Trip not found</p>
+        <p className="text-gray-500">{loadError || 'Trip not found'}</p>
         <Link href="/profit-loss" className="text-[#647C47] hover:underline mt-2 inline-block">
           Back to Profit & Loss
         </Link>
@@ -191,7 +206,10 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
     )
   }
 
-  const revenue = pnlData.total_revenue > 0 ? pnlData.total_revenue : pnlData.quoted_amount
+  const revenue = pnlData.revenue_for_margin
+  // Extras' supplier cost is a cost: shown in Expenses so the equation on
+  // screen adds up to the profit beneath it.
+  const costs = pnlData.total_expenses + (pnlData.extras_supplier_cost || 0)
   const sortedBreakdown = Object.entries(pnlData.expense_breakdown)
     .sort(([, a], [, b]) => b - a)
 
@@ -247,8 +265,13 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
             <p className="text-2xl font-bold text-blue-700">
               {getCurrencySymbol(pnlData.currency)}{revenue.toLocaleString()}
             </p>
-            {pnlData.total_revenue === 0 && (
-              <p className="text-xs text-blue-500 mt-1">Quoted amount</p>
+            {pnlData.revenue_basis === 'quoted' && (
+              <p className="text-xs text-blue-500 mt-1">
+                {pnlData.total_revenue > 0 ? 'Quoted amount (only deposits invoiced)' : 'Quoted amount'}
+              </p>
+            )}
+            {pnlData.revenue_basis === 'none' && (
+              <p className="text-xs text-blue-500 mt-1">Cancelled — nothing invoiced</p>
             )}
             {pnlData.total_paid > 0 && pnlData.total_paid < revenue && (
               <p className="text-xs text-blue-500 mt-1">
@@ -269,8 +292,13 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
               <span className="text-sm font-medium text-red-600">Expenses</span>
             </div>
             <p className="text-2xl font-bold text-red-700">
-              {getCurrencySymbol(pnlData.currency)}{pnlData.total_expenses.toLocaleString()}
+              {getCurrencySymbol(pnlData.currency)}{costs.toLocaleString()}
             </p>
+            {pnlData.extras_supplier_cost > 0 && (
+              <p className="text-xs text-red-500 mt-1">
+                incl. {getCurrencySymbol(pnlData.currency)}{pnlData.extras_supplier_cost.toLocaleString()} for extras sold
+              </p>
+            )}
             {pnlData.expenses_pending > 0 && (
               <p className="text-xs text-red-500 mt-1">
                 {getCurrencySymbol(pnlData.currency)}{pnlData.expenses_pending.toLocaleString()} pending
@@ -441,7 +469,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
             </div>
           ) : (
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {expenses.slice(0, 10).map(expense => {
+              {expenses.map(expense => {
                 const config = CATEGORY_CONFIG[expense.category] || CATEGORY_CONFIG.other
                 const statusConfig = STATUS_CONFIG[expense.status] || STATUS_CONFIG.pending
                 return (
@@ -462,7 +490,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-semibold text-gray-900">
-                        {getCurrencySymbol(pnlData.currency)}{Number(expense.amount).toLocaleString()}
+                        {getCurrencySymbol(expense.currency || pnlData.currency)}{Number(expense.amount).toLocaleString()}
                       </p>
                       <span className={`text-xs ${statusConfig.color}`}>{statusConfig.label}</span>
                     </div>
@@ -506,13 +534,13 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                       <div>
                         <p className="text-sm font-medium text-gray-900">{invoice.invoice_number}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(invoice.issue_date).toLocaleDateString()}
+                          {fmtDay(invoice.issue_date)}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-semibold text-gray-900">
-                        {getCurrencySymbol(pnlData.currency)}{Number(invoice.total_amount).toLocaleString()}
+                        {getCurrencySymbol(invoice.currency || pnlData.currency)}{Number(invoice.total_amount).toLocaleString()}
                       </p>
                       <span className={`text-xs ${statusConfig.color}`}>{statusConfig.label}</span>
                     </div>
@@ -552,7 +580,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <p className="text-xs text-gray-500">Dates</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {new Date(pnlData.start_date).toLocaleDateString()} - {new Date(pnlData.end_date).toLocaleDateString()}
+                  {fmtDay(pnlData.start_date)} - {fmtDay(pnlData.end_date)}
                 </p>
               </div>
             </div>

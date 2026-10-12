@@ -40,6 +40,10 @@ export default function ClientShell({
     publicPages.includes(pathname) ||
     pathname.startsWith('/docs') ||
     pathname.startsWith('/blog/') ||
+    // The invitation page (often logged out) and the setup wizard: no app
+    // navigation around them, so nobody wanders off mid-way.
+    pathname.startsWith('/invite/') ||
+    pathname.startsWith('/onboarding') ||
     isTokenPage
   const isSuperAdminPage = pathname.startsWith('/super-admin')
 

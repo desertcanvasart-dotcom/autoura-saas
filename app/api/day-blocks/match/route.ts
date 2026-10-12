@@ -8,6 +8,7 @@
 // (lib/day-blocks/match.ts). Read-only: the Grid decides what to do with the
 // answer. An agency with no blocks gets no matches, and no AI call.
 
+import { roleDenied } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createMessageWithRetry, replyText } from '@/lib/ai/anthropic-client'
@@ -27,6 +28,9 @@ export async function POST(request: NextRequest) {
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const { supabase, tenant_id } = auth
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
+    // It calls the AI: staff only (viewers could trigger it).
+    const denied = roleDenied(auth.role, 'staff')
+    if (denied) return denied
 
     const body = await request.json().catch(() => ({})) as { days?: unknown }
     const days: RawDay[] = (Array.isArray(body.days) ? body.days : [])

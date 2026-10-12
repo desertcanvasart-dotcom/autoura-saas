@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const table = request.nextUrl.searchParams.get('table')
@@ -52,7 +52,10 @@ export async function GET(request: NextRequest) {
     // fixed_daily_costs table.
     const tableName = config.tableName as keyof Database['public']['Tables']
 
-    // RLS automatically filters by tenant.
+    // This tenant's OWN rows. RLS also shows the shared catalogue (entrance
+    // fees, flights, trains, tipping …), and exporting those then importing
+    // the sheet made a tenant copy of every shared row — the import matches
+    // only the tenant's own rates.
     // select('*') + header mapping, never select(headers.join(',')): naming a
     // column the database does not have yet (e.g. rate_currency before
     // migration 295) would 500 the whole export.
@@ -64,7 +67,7 @@ export async function GET(request: NextRequest) {
       }>
     }
     interface DynamicQuery {
-      select(columns: string): DynamicOrdered
+      select(columns: string): { eq(column: string, value: string): DynamicOrdered }
     }
     // Paged: a plain select stops at PostgREST's 1000-row cap, so a table of
     // 1,400 rates exported 1,000 with no warning (documents audit, round 12).
@@ -72,6 +75,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await fetchAllPages((from, to) =>
       (supabase.from(tableName) as unknown as DynamicQuery)
         .select('*')
+        .eq('tenant_id', tenant_id)
         .order('created_at', { ascending: false })
         .order('id', { ascending: true })
         .range(from, to)

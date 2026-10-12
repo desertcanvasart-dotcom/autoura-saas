@@ -7,6 +7,8 @@
 // Security: Requires authentication
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
+import { invoiceMoney } from '@/lib/invoices/invoice-money'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { invoiceBalance } from '@/lib/invoices/invoice-balance'
@@ -16,6 +18,11 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS automatically filters by tenant
@@ -52,6 +59,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     const body = await request.json()
@@ -79,6 +91,44 @@ export async function PUT(
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updateData[field] = body[field]
+      }
+    }
+
+    // Status by hand is draft, sent or cancelled. Paid and part-paid come
+    // from the payments: PUT { status: 'paid' } marked an unpaid invoice paid.
+    if (updateData.status !== undefined && !['draft', 'sent', 'cancelled'].includes(String(updateData.status))) {
+      return NextResponse.json({ error: 'Status can be set to draft, sent or cancelled — paid and part paid follow the payments' }, { status: 400 })
+    }
+
+    // Lines, tax or discount changed: the money is worked out here, never
+    // taken from the request (a new subtotal or tax could be sent with the
+    // old total).
+    const moneyEdit = ['line_items', 'tax_rate', 'discount_amount', 'subtotal', 'tax_amount'].some(k => body[k] !== undefined)
+    if (moneyEdit || updateData.status !== undefined) {
+      const { data: cur } = await supabase
+        .from('invoices')
+        .select('invoice_type, line_items, tax_rate, discount_amount, total_amount, amount_paid, currency')
+        .eq('id', id)
+        .maybeSingle()
+      if (!cur) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+      if (updateData.status === 'cancelled' && Number(cur.amount_paid || 0) > 0) {
+        return NextResponse.json({ error: 'Payments were recorded on this invoice — delete them before cancelling it' }, { status: 409 })
+      }
+      // An invoice with payments keeps the status they give it: "Mark as
+      // sent" or a WhatsApp send would have turned a part-paid one back to Sent.
+      if ((updateData.status === 'sent' || updateData.status === 'draft') && Number(cur.amount_paid || 0) > 0) {
+        delete updateData.status
+      }
+      if (moneyEdit) {
+        const m = invoiceMoney({
+          invoiceType: String(cur.invoice_type || 'standard'),
+          total: Number(updateData.total_amount ?? cur.total_amount),
+          lineItems: (updateData.line_items ?? cur.line_items ?? []) as Array<{ amount?: unknown }>,
+          taxRate: updateData.tax_rate ?? cur.tax_rate,
+          discountAmount: updateData.discount_amount ?? cur.discount_amount,
+          currency: String(updateData.currency ?? cur.currency ?? 'EUR'),
+        })
+        Object.assign(updateData, m)
       }
     }
 
@@ -150,6 +200,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS policies enforce tenant isolation + manager role
@@ -173,10 +228,11 @@ export async function DELETE(
     }
 
     // Then delete the invoice (RLS will filter to tenant's invoices only)
-    const { error } = await supabase
+    const { data: removed, error } = await supabase
       .from('invoices')
       .delete()
       .eq('id', id)
+      .select('id')
 
     if (error) {
       console.error('❌ Error deleting invoice:', error)
@@ -188,6 +244,10 @@ export async function DELETE(
         )
       }
       return NextResponse.json({ error: 'Failed to delete invoice' }, { status: 500 })
+    }
+    // Nothing deleted is not a success.
+    if (!removed || removed.length === 0) {
+      return NextResponse.json({ error: 'Invoice not found or you do not have permission to delete it' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true })

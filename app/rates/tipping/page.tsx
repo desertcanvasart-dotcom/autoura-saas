@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
@@ -14,6 +15,7 @@ import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import { whyTipRowIsNotPriced, howTipIsCounted } from '@/lib/pricing/tipping'
+import { uniqueServiceCode, codePart } from '@/lib/rates/unique-code'
 
 // ============================================
 // CONSTANTS
@@ -248,7 +250,11 @@ export default function TippingPage() {
   }
 
   const generateCode = () => {
-    return `TIP-${formData.role_type.toUpperCase()}-${formData.context?.toUpperCase() || 'GEN'}`
+    // The city is part of the rate (a Cairo and a Luxor guide tip are two
+    // rates); the code steps past any already taken (lib/rates/unique-code).
+    const city = codePart((formData as { city?: string | null }).city)
+    const base = `TIP-${formData.role_type.toUpperCase()}-${formData.context?.toUpperCase() || 'GEN'}${city ? `-${city}` : ''}`
+    return uniqueServiceCode(base, rates.filter(r => r.id !== editingRate?.id).map(r => r.service_code))
   }
 
   const handleAddNew = () => {
@@ -735,7 +741,7 @@ export default function TippingPage() {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
                 >
                   <option value="">Any city (country-wide)</option>
-                  {cityOptions.map(city => (
+                  {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                     <option key={city} value={city}>{city}</option>
                   ))}
                 </select>

@@ -37,3 +37,28 @@ export function checkRoleChange(input: {
   }
   return { ok: true, role }
 }
+
+/**
+ * Whether the caller may switch a member's login on or off. Managers could
+ * deactivate the owner (locking them out of their own company) and admins
+ * themselves; now: owners and admins only, never yourself, and only an owner
+ * acts on an owner. Leaving the company with no active owner or admin is
+ * checked by the route, which can count them.
+ */
+export function checkActiveChange(input: {
+  callerId: string
+  callerRole: string | null | undefined
+  targetId: string
+  targetRole: string | null | undefined
+}): { ok: true } | { ok: false; status: number; error: string } {
+  if (!['owner', 'admin'].includes(String(input.callerRole ?? ''))) {
+    return { ok: false, status: 403, error: 'Only owners and admins can activate or deactivate users' }
+  }
+  if (input.callerId === input.targetId) {
+    return { ok: false, status: 400, error: 'You cannot deactivate yourself' }
+  }
+  if (input.targetRole === 'owner' && input.callerRole !== 'owner') {
+    return { ok: false, status: 403, error: 'Only an owner can deactivate an owner' }
+  }
+  return { ok: true }
+}

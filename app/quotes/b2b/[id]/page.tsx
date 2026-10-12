@@ -26,6 +26,7 @@ type SavedQuoteLine = {
   issue?: string
 }
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabLabel } from '@/components/vocabulary'
 import ConvertToBookingButton from '@/components/quotes/ConvertToBookingButton'
 import { postQuoteSend } from '@/lib/quotes/send-quote-client'
 
@@ -415,7 +416,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 )}
                 {quote.guide_mode === 'throughout' && (
                   <span className="px-3 py-1 rounded-full text-sm font-medium bg-[#e8ede3] text-[#4a5c35]">
-                    +1 Guide{quote.guide_grade === 'senior' ? ' \u00b7 Senior' : ''}
+                    +1 Guide{quote.guide_grade ? <>{' \u00b7 '}<VocabLabel kind="guide_grade" value={quote.guide_grade} /></> : null}
                   </span>
                 )}
               </div>

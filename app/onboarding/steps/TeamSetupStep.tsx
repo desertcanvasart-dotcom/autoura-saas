@@ -108,29 +108,42 @@ export default function TeamSetupStep({ onNext, onBack, onSkip, currentStep, ten
     setSending(true)
 
     try {
-      const response = await fetch('/api/onboarding/team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          members: filledMembers.map(m => ({
-            email: m.email.trim(),
-            role: m.role
-          })),
-          current_step: currentStep
+      // Each invitation through the one invite route: role and seat checks,
+      // duplicates, and the email itself (this step used to send nothing).
+      const sent: string[] = []
+      const failed: string[] = []
+      const linksToShare: string[] = []
+      for (const m of filledMembers) {
+        const res = await fetch('/api/invitations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: m.email.trim(), role: m.role }),
         })
-      })
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && json.success) {
+          sent.push(m.email.trim())
+          if (json.emailSent === false && json.inviteUrl) linksToShare.push(`${m.email.trim()}: ${json.inviteUrl}`)
+        } else {
+          failed.push(`${m.email.trim()} (${json.error || 'could not be invited'})`)
+        }
+      }
 
-      if (response.ok) {
-        const result = await response.json()
-        showToast('success', `Invitations sent to ${filledMembers.length} team member${filledMembers.length > 1 ? 's' : ''}!`)
+      if (failed.length > 0) {
+        showToast('error', `Not invited: ${failed.join('; ')}`)
+      }
+      if (linksToShare.length > 0) {
+        showToast('warning', `The email could not be sent — pass these links on yourself: ${linksToShare.join('  ')}`)
+      } else if (sent.length > 0) {
+        showToast('success', `Invitation${sent.length > 1 ? 's' : ''} sent to ${sent.join(', ')}`)
+      }
+
+      if (failed.length === 0) {
+        await fetch('/api/onboarding/team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current_step: currentStep + 1 }),
+        }).catch(() => {})
         onNext()
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('❌ Team invitation error:', {
-          status: response.status,
-          error: errorData
-        })
-        showToast('error', `Failed to send invitations: ${errorData.error || 'Unknown error'}`)
       }
     } catch (error: any) {
       console.error('❌ Error sending invites:', error)

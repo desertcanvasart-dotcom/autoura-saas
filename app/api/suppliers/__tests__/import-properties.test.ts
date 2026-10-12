@@ -46,6 +46,7 @@ function rows<T>(data: T[]) {
 
 let tenantCountry: string | null = null
 let insertedSuppliers: Array<Record<string, unknown>> = []
+let updatedSuppliers: Array<Record<string, unknown>> = []
 
 function stubDb() {
   return {
@@ -65,6 +66,12 @@ function stubDb() {
       }
       return {
         select: () => rows(existingSuppliers),
+        update: (patch: Record<string, unknown>) => {
+          updatedSuppliers.push(patch)
+          const chain: Record<string, unknown> = { then: (ok: (v: { error: null }) => unknown) => ok({ error: null }) }
+          chain.eq = () => chain
+          return chain
+        },
         insert: (inserting: { name: string; type: string; types: string[] }[]) => (insertedSuppliers.push(...inserting), {
           select: async () => ({
             data: inserting.map((r, i) => ({ id: `supplier-${i}`, name: r.name, type: r.type, types: r.types })),
@@ -88,10 +95,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   insertedProperties = []
   insertedSuppliers = []
+  updatedSuppliers = []
   tenantCountry = null
   existingSuppliers = []
   existingProperties = []
-  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT })
+  mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT, role: 'manager' })
   mockVocab.mockResolvedValue(VOCAB)
 })
 
@@ -172,10 +180,11 @@ describe('a re-import TOPS UP a supplier already on file', () => {
     existingSuppliers = [{ id: 'existing-1', name: 'Sunboat Cruises', type: 'cruise', types: ['cruise'] }]
   })
 
-  it('adds the ships it does not have yet, without touching the supplier row', async () => {
+  it('adds the ships it does not have yet, and updates the supplier rather than re-creating it', async () => {
     const res = await importCsv(['Sunboat Cruises,cruise,ship:MS Hapi | ship:MS Isis'])
     expect(res.inserted).toBe(0) // the supplier itself is never re-created
-    expect(res.skippedExisting).toEqual(['Sunboat Cruises'])
+    expect(res.updated).toBe(1)
+    expect(updatedSuppliers[0]).toMatchObject({ name: 'Sunboat Cruises', types: ['cruise'] })
     expect(res.propertiesCreated).toBe(2)
     expect(placed()).toEqual(['ship:MS Hapi', 'ship:MS Isis'])
     expect(insertedProperties[0]).toMatchObject({ supplier_id: 'existing-1' })
@@ -202,10 +211,17 @@ describe('a re-import TOPS UP a supplier already on file', () => {
     expect(insertedProperties).toEqual([])
   })
 
-  it('validates against the roles the supplier ACTUALLY has, not the file\'s claim', async () => {
-    // The sheet says hotel; the supplier on file is a cruise company. Nothing
-    // updates the supplier, so a hotel cannot be hung off it.
-    const res = await importCsv(['Sunboat Cruises,hotel,hotel:Nile Star'])
+  it('validates against the roles the supplier has AFTER the import', async () => {
+    // The sheet makes the cruise company a hotel too — the update lands first,
+    // so a hotel may then be hung off it.
+    const res = await importCsv(['Sunboat Cruises,hotel|cruise,hotel:Nile Star'])
+    expect(res.propertiesCreated).toBe(1)
+    expect(placed()).toEqual(['hotel:Nile Star'])
+  })
+
+  it('a row with no Type keeps the roles on file, and they still decide', async () => {
+    const res = await importCsv(['Sunboat Cruises,,hotel:Nile Star'])
+    expect(updatedSuppliers[0]).not.toHaveProperty('types')
     expect(res.propertiesCreated).toBe(0)
     expect(res.propertyWarnings[0].reason).toMatch(/does not own a hotel/)
   })

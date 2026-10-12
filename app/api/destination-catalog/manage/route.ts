@@ -190,6 +190,17 @@ export async function POST(request: NextRequest) {
         if (!catalogId) return badRequest('catalog_id is required')
         if (!name) return badRequest('name is required')
 
+        // The same city in the SAME country, whatever its case: the unique
+        // rule is case-sensitive, so "luxor" sat beside "Luxor" in every
+        // agency's dropdowns. The catalog is shared; there is no delete.
+        const { data: same } = await admin
+          .from('destination_cities')
+          .select('id, name')
+          .eq('catalog_id', catalogId)
+          .ilike('name', name.replace(/[\\%_]/g, ch => `\\${ch}`))
+          .limit(1)
+        if (same && same.length) return badRequest(`"${(same[0] as { name: string }).name}" is already in this country`)
+
         // Same-name city in ANOTHER country: allowed (Alexandria exists twice
         // on Earth) but flagged, so vocabulary collisions in the AI parser
         // are a known thing, not a surprise.

@@ -44,6 +44,33 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // Focused minutes are recorded only while Activity Summaries are on —
+    // recorded with it off, switching it on showed managers a month of
+    // history nobody had been told about.
+    if (focused) {
+      const { data: features } = await adminClient
+        .from('tenant_features')
+        .select('activity_summary_enabled')
+        .eq('tenant_id', authResult.tenant_id)
+        .maybeSingle()
+      if (!features?.activity_summary_enabled) focused = false
+    }
+
+    if (focused) {
+      // One beat per interval: each POST added 5 minutes, so reloads, extra
+      // tabs or a script added hours. A beat within 4.5 minutes of the last
+      // credited one adds nothing.
+      const { data: lastBeat } = await adminClient
+        .from('user_activity_daily')
+        .select('last_seen_at')
+        .eq('tenant_id', authResult.tenant_id)
+        .eq('user_id', authResult.user.id)
+        .eq('day', nowIso.slice(0, 10))
+        .maybeSingle()
+      const last = lastBeat?.last_seen_at ? Date.parse(lastBeat.last_seen_at as string) : 0
+      if (last && now.getTime() - last < 270_000) focused = false
+    }
+
     if (focused) {
       // UTC day bucket (spec open-question #2: tenant-timezone buckets are
       // a possible phase 2; the tenants table has no timezone column yet).
