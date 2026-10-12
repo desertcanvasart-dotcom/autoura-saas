@@ -79,20 +79,24 @@ export default function GettingStartedPage() {
             </thead>
             <tbody>
               <tr className="border-b border-gray-100">
-                <td className="px-4 py-3 font-medium text-gray-900">Administrator</td>
-                <td className="px-4 py-3 text-gray-600">Everything, including the admin-only Settings area: organization settings, team management, WhatsApp configuration, billing, and user management</td>
+                <td className="px-4 py-3 font-medium text-gray-900">Owner</td>
+                <td className="px-4 py-3 text-gray-600">Everything an administrator can do. Only an owner can make someone an owner, change an owner&rsquo;s role or deactivate an owner</td>
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
+                <td className="px-4 py-3 font-medium text-gray-900">Administrator</td>
+                <td className="px-4 py-3 text-gray-600">Everything, including the admin-only Settings area: organization, vocabulary, destinations, WhatsApp, Copilot, billing and user management</td>
+              </tr>
+              <tr className="border-b border-gray-100">
                 <td className="px-4 py-3 font-medium text-gray-900">Manager</td>
                 <td className="px-4 py-3 text-gray-600">All day-to-day operations plus Rates, Finance, Suppliers, Itineraries, Tour Departures, Team Members, and Tasks</td>
               </tr>
-              <tr className="border-b border-gray-100">
+              <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-3 font-medium text-gray-900">Member</td>
-                <td className="px-4 py-3 text-gray-600">Works on the clients and tasks assigned to them &mdash; communication, quotes, and bookings. Does not see Rates, Finance, or the operations management pages</td>
+                <td className="px-4 py-3 text-gray-600">Day-to-day work: clients, itineraries, tours, quotes, bookings, communication and tasks, and adding and editing invoices, payments and expenses. Does not delete finance records, and does not see Rates, Suppliers, B2B, P&amp;L, Reports, Receivables, Payables, Commissions or Settings</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-medium text-gray-900">Viewer</td>
-                <td className="px-4 py-3 text-gray-600">View-only access</td>
+                <td className="px-4 py-3 text-gray-600">The Dashboard, Analytics, Calendar, Notifications and their own profile &mdash; nothing else</td>
               </tr>
             </tbody>
           </table>

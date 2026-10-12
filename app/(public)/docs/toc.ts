@@ -151,9 +151,9 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Settings',
     items: [
-      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'Team management, user roles, organization branding, billing, and the preferences that reach across the app — Vocabulary, Extras and Seasonal Premiums.' },
-      { href: '/docs/vocabulary', icon: BookOpen, title: 'Your Vocabulary', description: 'Relabel the product in your own words — the built-in terms, per tenant — without renaming anything under the hood.' },
-      { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your high-demand dates as a premium on the whole price after margin — set the dated windows once and every quote in them lifts automatically.' },
+      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'Who can log in and as what, your own profile and email, the admin Settings page, Organization, Billing, Attraction Names, Day Blocks, Destinations, Copilot and WhatsApp.' },
+      { href: '/docs/vocabulary', icon: BookOpen, title: 'Your Vocabulary', description: 'The 40 lists behind your dropdowns — tiers, supplier types, vehicles and more: rename, add, hide, reorder, delete or reset them.' },
+      { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your peak dates as a premium on the selling price after margin, matched by departure date; applied in the B2B Calculator.' },
       { href: '/docs/activity-summary', icon: Activity, title: 'Team Activity', description: 'Optional, transparent activity summaries: last seen, focused time, and work counts per member.' },
       { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp Business API and Gmail OAuth, both live today. Accounting sync (Xero, QuickBooks) is on the roadmap for Q3 2026.' },
     ],

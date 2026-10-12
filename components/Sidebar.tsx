@@ -714,10 +714,12 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
         {/* User Profile Footer */}
         <div className="border-t border-gray-200 p-2.5 flex-shrink-0 space-y-1">
-          {/* User Info with Role Badge */}
-          <div
+          {/* User Info with Role Badge — opens your own profile (every role) */}
+          <Link
+            href="/settings/profile"
+            title={isCollapsed ? 'My profile' : 'My profile — name, password, your activity'}
             className={`
-              flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md
+              flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md hover:bg-gray-100 transition-colors
               ${isCollapsed ? 'justify-center' : ''}
             `}
           >
@@ -734,8 +736,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 </span>
               </div>
             )}
-          </div>
-          
+          </Link>
+
           {/* Sign Out Button */}
           <button
             onClick={handleSignOut}

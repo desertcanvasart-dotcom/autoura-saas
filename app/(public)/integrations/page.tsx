@@ -72,7 +72,7 @@ function AnimatedSection({
 const activeIntegrations = [
   {
     name: "WhatsApp Business API",
-    description: "Connect your WhatsApp Business account to receive and manage client conversations directly in Autoura. AI automatically extracts client details, dates, and preferences from every message.",
+    description: "Receive and answer client WhatsApp conversations in Autoura. WhatsApp runs on the Autoura platform account and our team connects your number for you. AI extracts client details, dates, and preferences from the messages you choose to parse.",
     icon: MessageSquare,
     color: "from-green-500 to-green-600",
     bgColor: "bg-green-50",
@@ -81,25 +81,25 @@ const activeIntegrations = [
     features: [
       "Receive messages in unified inbox",
       "AI-powered conversation parsing",
-      "Send quotes and documents directly",
+      "Send quotes and invoices on WhatsApp",
       "Team assignment and notifications",
       "Full conversation history per client"
     ]
   },
   {
     name: "Gmail",
-    description: "Send professional quotes, itineraries, and invoices directly from Autoura through your Gmail account. All sent emails are automatically logged to client profiles.",
+    description: "Connect your own Gmail to read and answer client email in the Autoura inbox, with your signatures and templates. Quotes are emailed from Autoura's own sending service, with the PDF attached, so they go out even without a connected mailbox.",
     icon: Mail,
     color: "from-red-500 to-red-600",
     bgColor: "bg-red-50",
     borderColor: "border-red-200",
     status: "Live",
     features: [
-      "Send quotes with PDF attachments",
-      "Email itineraries to clients",
-      "Invoice delivery via email",
-      "Automatic logging to client profile",
-      "Custom email templates"
+      "Read and reply to client email in the inbox",
+      "Your own email signatures",
+      "Custom email templates",
+      "Quotes emailed with their PDF",
+      "Conversation history per client"
     ]
   }
 ]
