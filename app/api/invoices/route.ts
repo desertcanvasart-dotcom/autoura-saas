@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId')
     const itineraryId = searchParams.get('itineraryId')
     const invoiceType = searchParams.get('type')
+    const parentInvoiceId = searchParams.get('parentInvoiceId')
 
     // Pagination. Callers may opt in with ?limit / ?offset. When neither is
     // supplied we still apply a safety cap so a tenant with a very large
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
     if (status) {
       query = query.eq('status', status)
     }
+    if (parentInvoiceId) query = query.eq('parent_invoice_id', parentInvoiceId)
 
     if (clientId) {
       query = query.eq('client_id', clientId)
@@ -306,6 +308,11 @@ export async function POST(request: NextRequest) {
       currency,
     })
     totalAmount = money.total_amount
+    // An invoice for nothing, or for less than nothing (a discount above the
+    // subtotal), is refused — as an edit already was.
+    if (!(totalAmount > 0)) {
+      return NextResponse.json({ success: false, error: 'The invoice total must be above 0' }, { status: 400 })
+    }
 
     const baseInvoice = {
       tenant_id, // ✅ Explicit tenant_id

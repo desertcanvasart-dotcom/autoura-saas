@@ -89,3 +89,55 @@ describe('who reaches the finance routes', () => {
     expect(g.indexOf("update({ commission_status: 'generated' })")).toBeLessThan(g.indexOf(".from('commissions')\n      .insert"))
   })
 })
+
+describe('invoices, payments and receivables', () => {
+  it('part-paid invoices have a label, and the detail page cannot crash on a linked status', () => {
+    expect(src('app/invoices/invoices-content.tsx')).toMatch(/partially_paid: \{ label: 'Part paid'/)
+    expect(src('app/invoices/[id]/page.tsx')).toMatch(/\?\? STATUS_CONFIG\.draft\)\.label/)
+  })
+
+  it('status by hand is draft, sent or cancelled; paid follows the payments', () => {
+    const put = src('app/api/invoices/[id]/route.ts')
+    expect(put).toMatch(/\['draft', 'sent', 'cancelled'\]\.includes/)
+    expect(put).toMatch(/invoiceMoney\(/)
+  })
+
+  it('no payment on a cancelled or draft invoice', () => {
+    const post = src('app/api/invoices/[id]/payments/route.ts')
+    expect(post).toMatch(/invoice\.status === 'cancelled'/)
+    expect(post).toMatch(/invoice\.status === 'draft'/)
+  })
+
+  it('a payment edit keeps its trip', () => {
+    expect(src('app/api/payments/[id]/route.ts')).toMatch(/if \(body\.itinerary_id === undefined\) delete update\.itinerary_id/)
+  })
+
+  it('receivables leave drafts out and age an invoice with no due date as current', () => {
+    const ar = src('app/api/accounts-receivable/route.ts')
+    expect(ar).toMatch(/\.not\('status', 'in', '\(cancelled,draft\)'\)/)
+    expect(ar).toMatch(/if \(inv\.due_date\)/)
+  })
+})
+
+describe('supplier invoices', () => {
+  it('a paid bill cannot be disputed; a disputed one can be resolved or cancelled', () => {
+    const d = src('app/api/supplier-invoices/[id]/dispute/route.ts')
+    expect(d).toMatch(/dispute: \{ from: \['received', 'matched', 'approved'\]/)
+    expect(d).toMatch(/resolve: \{ from: \['disputed'\]/)
+  })
+
+  it('an expense is matched to one bill, and only while unpaid', () => {
+    const m = src('app/api/supplier-invoices/[id]/match/route.ts')
+    expect(m).toMatch(/already matched to another supplier invoice/)
+    expect(m).toMatch(/Only pending or approved expenses can be matched/)
+  })
+
+  it('cancelling the payment prompt does not pay', () => {
+    expect(src('app/supplier-invoices/[id]/page.tsx')).toMatch(/if \(entered === null\) return/)
+  })
+
+  it('the summary is per currency and counts every bill', () => {
+    const r = src('app/api/supplier-invoices/route.ts')
+    expect(r).toMatch(/total_amount: sumByCurrency\(everyBill/)
+  })
+})

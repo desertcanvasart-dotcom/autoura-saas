@@ -38,7 +38,8 @@ describe('supplier bills', () => {
   it('both match routes check the status; the edit route guards the currency', () => {
     const match = src('app/api/supplier-invoices/[id]/match/route.ts')
     expect(match.match(/!isMatchable\(invoice\.status\)/g)?.length).toBe(2)
-    expect(match).toContain(".in('status', MATCHABLE)")
+    // The recompute (now shared, lib/supplier-invoices/recompute-match) keeps the guard.
+    expect(src('lib/supplier-invoices/recompute-match.ts')).toContain(".in('status', MATCHABLE)")
     const edit = src('app/api/supplier-invoices/[id]/route.ts')
     expect(edit).toContain('Unmatch its expenses before changing the invoice currency')
     const fields = edit.slice(edit.indexOf('const allowedFields = ['), edit.indexOf(']', edit.indexOf('const allowedFields = [')))

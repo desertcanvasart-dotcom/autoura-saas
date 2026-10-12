@@ -6,6 +6,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 import { sumByCurrency, formatTotals, currencySymbol, formatMoney } from '@/lib/currency-totals'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { invoiceMoney } from '@/lib/invoices/invoice-money'
 import { 
   Plus, 
@@ -174,7 +175,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100' },
   viewed: { label: 'Viewed', color: 'text-purple-700', bg: 'bg-purple-100' },
-  partial: { label: 'Partial', color: 'text-orange-700', bg: 'bg-orange-100' },
+  // The stored word is partially_paid (lib/invoices/invoice-balance); with no
+  // entry, a part-paid invoice showed as Draft.
+  partially_paid: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100' },
+  partial: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100' },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100' },
   overdue: { label: 'Overdue', color: 'text-red-700', bg: 'bg-red-100' },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bg: 'bg-gray-100' }
@@ -205,14 +209,27 @@ export default function InvoicesContent() {
   const fetchInvoices = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (statusFilter) params.append('status', statusFilter)
+      // Overdue is worked out here from the due date, never stored, so it is
+      // not sent (the filter found nothing).
+      if (statusFilter && statusFilter !== 'overdue') params.append('status', statusFilter)
       if (typeFilter) params.append('type', typeFilter)
-      
-      const response = await fetch(`/api/invoices?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setInvoices(data)
+
+      // Every invoice, 1000 at a time (the route's cap): the cards were
+      // worked out from the first 1000.
+      const all: Invoice[] = []
+      for (let offset = 0; ; offset += 1000) {
+        params.set('offset', String(offset))
+        const response = await fetch(`/api/invoices?${params}`)
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}))
+          showToast('error', err.error || 'Could not load invoices')
+          break
+        }
+        const page = await response.json()
+        all.push(...page)
+        if (page.length < 1000) break
       }
+      setInvoices(all)
     } catch (error) {
       console.error('Error fetching invoices:', error)
     } finally {
@@ -455,7 +472,8 @@ export default function InvoicesContent() {
   }
 
   const openAddModal = () => {
-    setFormData({ ...initialFormData, deposit_percent: tenantDepositPercent })
+    // The agency's currency to start with (it was EUR for every agency).
+    setFormData({ ...initialFormData, deposit_percent: tenantDepositPercent, currency: tenant?.default_currency || 'EUR' })
     setIsModalOpen(true)
   }
 
@@ -516,19 +534,21 @@ export default function InvoicesContent() {
       })
       if (response.ok) {
         fetchInvoices()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not mark the invoice sent')
       }
     } catch (error) {
       console.error('Error updating invoice:', error)
+      showToast('error', 'Could not mark the invoice sent')
     }
   }
 
   // Check for overdue invoices
   const processedInvoices = invoices.map(inv => {
-    if (inv.status !== 'paid' && inv.status !== 'cancelled' && inv.due_date) {
-      const dueDate = new Date(inv.due_date)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      if (dueDate < today && inv.balance_due > 0) {
+    // A draft has not been sent, so it cannot be overdue.
+    if (inv.status !== 'paid' && inv.status !== 'cancelled' && inv.status !== 'draft' && inv.due_date) {
+      if (inv.due_date.slice(0, 10) < todayLocal() && inv.balance_due > 0) {
         return { ...inv, status: 'overdue' }
       }
     }
@@ -536,6 +556,7 @@ export default function InvoicesContent() {
   })
 
   const filteredInvoices = processedInvoices.filter(invoice => {
+    if (statusFilter === 'overdue' && invoice.status !== 'overdue') return false
     const matchesSearch = 
       invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       invoice.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -547,9 +568,12 @@ export default function InvoicesContent() {
   const totalInvoices = invoices.length
   // Per currency, never summed across them: a $10,000 and a €5,000 invoice do
   // not make €15,000 of revenue (see lib/currency-totals.ts).
-  const totalRevenue = sumByCurrency(invoices, inv => inv.total_amount, inv => inv.currency)
+  // Billed and outstanding are what was sent: drafts are not billed yet,
+  // and a cancelled invoice is owed by no one.
+  const billable = invoices.filter(inv => inv.status !== 'draft' && inv.status !== 'cancelled')
+  const totalRevenue = sumByCurrency(billable, inv => inv.total_amount, inv => inv.currency)
   const totalPaid = sumByCurrency(invoices, inv => inv.amount_paid, inv => inv.currency)
-  const totalOutstanding = sumByCurrency(invoices, inv => inv.balance_due, inv => inv.currency)
+  const totalOutstanding = sumByCurrency(billable, inv => inv.balance_due, inv => inv.currency)
   const overdueAmount = sumByCurrency(
     processedInvoices.filter(inv => inv.status === 'overdue'),
     inv => inv.balance_due, inv => inv.currency)
@@ -674,7 +698,7 @@ export default function InvoicesContent() {
             <option value="">All Status</option>
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
-            <option value="partial">Partial</option>
+            <option value="partially_paid">Part paid</option>
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
             <option value="cancelled">Cancelled</option>
@@ -856,7 +880,7 @@ export default function InvoicesContent() {
                       <input
                         type="number"
                         value={formData.deposit_percent}
-                        onChange={(e) => handleDepositPercentChange(parseInt(e.target.value) || 10)}
+                        onChange={(e) => { const n = parseInt(e.target.value); if (n >= 1 && n <= 100) handleDepositPercentChange(n) }}
                         min="1"
                         max="100"
                         className="w-20 px-3 py-2 text-sm text-center border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
@@ -935,9 +959,8 @@ export default function InvoicesContent() {
                     onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm bg-white"
                   >
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="GBP">GBP (£)</option>
+                    {/* Every supported currency: a JPY trip's invoice showed EUR here. */}
+                    {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c} ({currencySymbol(c)})</option>)}
                   </select>
                 </div>
                 <div>

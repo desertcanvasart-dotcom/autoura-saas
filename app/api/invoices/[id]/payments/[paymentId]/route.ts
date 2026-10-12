@@ -39,10 +39,11 @@ export async function DELETE(
     }
 
     // Delete the payment (RLS requires manager role)
-    const { error } = await supabase
+    const { data: removed, error } = await supabase
       .from('invoice_payments')
       .delete()
       .eq('id', paymentId)
+      .select('id')
 
     if (error) {
       console.error('❌ Error deleting payment:', error)
@@ -54,6 +55,9 @@ export async function DELETE(
         )
       }
       return NextResponse.json({ error: 'Failed to delete payment' }, { status: 500 })
+    }
+    if (!removed || removed.length === 0) {
+      return NextResponse.json({ error: 'Payment not found or you do not have permission to delete it' }, { status: 404 })
     }
 
     // Recalculate invoice balance after deletion
@@ -78,10 +82,14 @@ export async function DELETE(
         status: invoice.status,
         paidAt: invoice.paid_at,
       })
-      await supabase
+      const { error: balanceError } = await supabase
         .from('invoices')
         .update({ ...balance, updated_at: new Date().toISOString() })
         .eq('id', id)
+      if (balanceError) {
+        console.error('Invoice balance after payment delete:', balanceError)
+        return NextResponse.json({ error: 'The payment was deleted, but the invoice balance could not be updated — reload and check it' }, { status: 500 })
+      }
     }
 
     return NextResponse.json({ success: true })

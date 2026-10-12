@@ -87,7 +87,7 @@ export async function POST(
     const body = await request.json()
 
     // Validate required fields
-    if (!body.amount || body.amount <= 0) {
+    if (!Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0) {
       return NextResponse.json(
         { error: 'Valid payment amount is required' },
         { status: 400 }
@@ -97,7 +97,7 @@ export async function POST(
     // Verify invoice exists and belongs to this tenant (RLS filters automatically)
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
-      .select('id, balance_due, currency, tenant_id')
+      .select('id, balance_due, currency, tenant_id, status')
       .eq('id', id)
       .single()
 
@@ -113,13 +113,22 @@ export async function POST(
       )
     }
 
+    // A cancelled invoice is owed by no one (the balance trigger then marked
+    // it paid); a draft has not been sent — send it first.
+    if (invoice.status === 'cancelled') {
+      return NextResponse.json({ error: 'This invoice is cancelled — no payment can be recorded on it' }, { status: 409 })
+    }
+    if (invoice.status === 'draft') {
+      return NextResponse.json({ error: 'This invoice is still a draft — mark it sent before recording a payment' }, { status: 409 })
+    }
+
     // In the invoice's currency (lib/payment-currency): the balance trigger
     // sums amounts with no currency of their own.
     const paid = paymentCurrencyFor(body.currency, invoice.currency)
     if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: 400 })
 
     // Check if payment exceeds balance (allow small overpayment for rounding)
-    if (body.amount > Number(invoice.balance_due) + 0.01) {
+    if (Number(body.amount) > Number(invoice.balance_due) + 0.01) {
       return NextResponse.json(
         { error: `Payment amount exceeds balance due (${invoice.balance_due})` },
         { status: 400 }
@@ -129,7 +138,7 @@ export async function POST(
     const newPayment = {
       tenant_id, // ✅ Explicit tenant_id (also auto-populated by trigger)
       invoice_id: id,
-      amount: body.amount,
+      amount: Number(body.amount),
       currency: paid.currency,
       payment_method: body.payment_method || 'bank_transfer',
       payment_date: body.payment_date || new Date().toISOString().split('T')[0],

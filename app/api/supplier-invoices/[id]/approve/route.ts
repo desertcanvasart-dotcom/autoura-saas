@@ -42,6 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!override) {
       updateBuilder = updateBuilder.eq('match_status', 'matched')
+    } else {
+      // An override approves a partial or mismatched bill — not one with
+      // nothing linked at all (the page never offered that; the API took it).
+      updateBuilder = updateBuilder.neq('match_status', 'unmatched')
     }
 
     const { data, error: uErr } = await updateBuilder.select().maybeSingle()

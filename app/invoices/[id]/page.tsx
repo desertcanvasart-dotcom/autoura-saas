@@ -111,7 +111,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100', icon: FileText },
   sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100', icon: Send },
   viewed: { label: 'Viewed', color: 'text-purple-700', bg: 'bg-purple-100', icon: FileText },
-  partial: { label: 'Partial', color: 'text-orange-700', bg: 'bg-orange-100', icon: Clock },
+  // The stored word; with no entry a part-paid invoice showed as Draft, and
+  // a deposit linked to one crashed this page.
+  partially_paid: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100', icon: Clock },
+  partial: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100', icon: Clock },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircle },
   overdue: { label: 'Overdue', color: 'text-red-700', bg: 'bg-red-100', icon: AlertCircle },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bg: 'bg-gray-100', icon: X }
@@ -194,7 +197,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         }
 
         if (data.invoice_type === 'deposit') {
-          const allInvoicesResponse = await fetch(`/api/invoices?itineraryId=${data.itinerary_id}`)
+          // By the deposit itself: a deposit with no trip asked for
+          // itineraryId=null, found no final, and offered to create another.
+          const allInvoicesResponse = await fetch(`/api/invoices?parentInvoiceId=${data.id}`)
           if (allInvoicesResponse.ok) {
             const allInvoices = await allInvoicesResponse.json()
             const finalInvoice = allInvoices.find((inv: Invoice) => 
@@ -281,9 +286,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       })
       if (response.ok) {
         fetchInvoice()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not mark the invoice sent')
       }
     } catch (error) {
       console.error('Error updating invoice:', error)
+      showToast('error', 'Could not mark the invoice sent')
     }
   }
 
@@ -359,9 +368,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       if (response.ok) {
         fetchInvoice()
         fetchPayments()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not delete the payment')
       }
     } catch (error) {
       console.error('Error deleting payment:', error)
+      showToast('error', 'Could not delete the payment')
     }
   }
 
@@ -581,7 +594,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </button>
           )}
 
-          {Number(invoice.balance_due) > 0 && (
+          {Number(invoice.balance_due) > 0 && invoice.status !== 'cancelled' && invoice.status !== 'draft' && (
             <button
               onClick={() => setShowPaymentModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors"
@@ -610,7 +623,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <p className={`text-xs ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-emerald-600'}`}>
                   {linkedInvoice?.invoice_number || childInvoice?.invoice_number} • 
                   {' '}{formatMoney(linkedInvoice?.total_amount || childInvoice?.total_amount, linkedInvoice?.currency || childInvoice?.currency || 'EUR')} • 
-                  {' '}{STATUS_CONFIG[linkedInvoice?.status || childInvoice?.status || 'draft'].label}
+                  {' '}{(STATUS_CONFIG[linkedInvoice?.status || childInvoice?.status || 'draft'] ?? STATUS_CONFIG.draft).label}
                 </p>
               </div>
             </div>
@@ -820,7 +833,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
-            {Number(invoice.balance_due) > 0 && (
+            {Number(invoice.balance_due) > 0 && invoice.status !== 'cancelled' && invoice.status !== 'draft' && (
               <button
                 onClick={() => setShowPaymentModal(true)}
                 className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors"

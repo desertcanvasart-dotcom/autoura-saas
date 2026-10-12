@@ -40,6 +40,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const file = formData.get('file') as File
     if (!file) return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 })
     if (file.size > MAX) return NextResponse.json({ success: false, error: 'File too large (max 20MB)' }, { status: 400 })
+    // A document, not any file: PDF or an image.
+    if (!/^(application\/pdf|image\/(png|jpeg|webp|gif))$/.test(file.type)) {
+      return NextResponse.json({ success: false, error: 'Upload a PDF or an image (PNG, JPG, WebP, GIF)' }, { status: 400 })
+    }
+
+    // The invoice first, as the caller sees it (RLS): the file was written
+    // with the service key before this check, leaving an orphan behind a bad id.
+    const { data: existing } = await supabase
+      .from('supplier_invoices').select('id, document_storage_path').eq('id', id).maybeSingle()
+    if (!existing) return NextResponse.json({ success: false, error: 'Supplier invoice not found' }, { status: 404 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -70,7 +80,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         updated_at: new Date().toISOString(),
       })
       .eq('id', id).select().single()
-    if (error) return NextResponse.json({ success: false, error: 'Uploaded, but failed to attach to invoice' }, { status: 500 })
+    if (error) {
+      await admin().storage.from(BUCKET).remove([filePath])
+      return NextResponse.json({ success: false, error: 'Failed to attach the document to the invoice' }, { status: 500 })
+    }
+    // The document it replaces is removed (each upload left the last behind).
+    const previous = (existing as { document_storage_path?: string | null }).document_storage_path
+    if (previous && previous !== filePath) await admin().storage.from(BUCKET).remove([previous])
 
     return NextResponse.json({ success: true, data })
   } catch (e: any) {

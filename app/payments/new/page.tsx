@@ -522,9 +522,6 @@ export default function RecordPaymentPage() {
                     >
                       <option value="completed">Completed</option>
                       <option value="pending">Pending</option>
-                      <option value="deposit_received">Deposit Received</option>
-                      <option value="partially_paid">Partially Paid</option>
-                      <option value="partially_refunded">Partially Refunded</option>
                       <option value="failed">Failed</option>
                       <option value="refunded">Fully Refunded</option>
                     </select>
