@@ -86,6 +86,8 @@ interface AnalyticsData {
     holes: Array<{ reference: string; message: string }>
     fx_history_available: boolean
   }
+  /** Figures the API could not read — shown as such, not as real zeros. */
+  degraded?: string[]
   pipeline?: {
     leads: number
     followups: number
@@ -160,7 +162,7 @@ export default function AnalyticsPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d')
   const [destinationFilter, setDestinationFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchAnalytics()
@@ -174,13 +176,16 @@ export default function AnalyticsPage() {
       
       if (data.success && data.data) {
         setAnalytics(data.data)
+        setLoadError(null)
       } else {
-        // Use empty data if API fails or returns no data
+        // A failure is not "no data yet": say so instead of showing zeros.
         setAnalytics(emptyData)
+        setLoadError(data?.error || 'Analytics could not be loaded')
       }
     } catch (error) {
       console.error('Error fetching analytics:', error)
       setAnalytics(emptyData)
+      setLoadError('Analytics could not be loaded')
     } finally {
       setLoading(false)
     }
@@ -209,7 +214,7 @@ export default function AnalyticsPage() {
     completed: '#8B5CF6'
   }
 
-  const PIE_COLORS = [COLORS.confirmed, COLORS.pending, COLORS.cancelled]
+  const PIE_COLORS = [COLORS.confirmed, COLORS.pending, COLORS.cancelled, COLORS.completed]
 
   // Safe percentage calculation
   const safePercent = (value: number, total: number): number => {
@@ -358,8 +363,27 @@ export default function AnalyticsPage() {
         </div>
       )}
 
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-red-800">Analytics could not be loaded</h3>
+            <p className="text-sm text-red-700 mt-1">{loadError}. The figures below are not your numbers.</p>
+          </div>
+          <button onClick={fetchAnalytics} className="text-xs font-medium text-red-700 hover:underline">Retry</button>
+        </div>
+      )}
+      {!loadError && (displayData.degraded?.length ?? 0) > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800">
+            Some figures could not be loaded ({displayData.degraded!.join(', ')}) and read lower than they are. Refresh to try again.
+          </p>
+        </div>
+      )}
+
       {/* Empty State Banner - shown when no data */}
-      {!hasAnyData && (
+      {!loadError && !hasAnyData && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
@@ -533,13 +557,13 @@ export default function AnalyticsPage() {
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.clients }} />
             </div>
           </div>
-          <h3 className="text-xs text-gray-600 font-medium mb-1">Total Clients</h3>
+          <h3 className="text-xs text-gray-600 font-medium mb-1">New Clients</h3>
           <p className="text-3xl font-bold text-gray-900">
             {displayData.clients.total}
           </p>
           <div className="flex items-center gap-3 mt-1 text-xs">
-            <span className="text-gray-600">{displayData.clients.new} new</span>
-            <span className="text-gray-600">{displayData.clients.returning} returning</span>
+            <span className="text-gray-600">{displayData.clients.new} leads</span>
+            <span className="text-gray-600">{displayData.clients.returning} customers</span>
           </div>
           
           {/* Progress bar */}
@@ -554,7 +578,7 @@ export default function AnalyticsPage() {
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              {returningRate}% returning rate
+              {returningRate}% already customers
             </p>
           </div>
         </div>
@@ -641,16 +665,16 @@ export default function AnalyticsPage() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center gap-2 mb-3">
           <Zap className="w-5 h-5 text-yellow-500" />
-          <h3 className="text-base font-semibold text-gray-900">Highlights This Month</h3>
+          <h3 className="text-base font-semibold text-gray-900">Highlights</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="text-center p-3 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-900">{displayData.clients.new}</p>
-            <p className="text-xs text-gray-600 mt-1">New clients</p>
+            <p className="text-xs text-gray-600 mt-1">New leads</p>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-900">{displayData.bookings.pending}</p>
-            <p className="text-xs text-gray-600 mt-1">Pending bookings</p>
+            <p className="text-xs text-gray-600 mt-1">Quotes pending</p>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-900">{formatCurrency(displayData.avgDealSize)}</p>
@@ -665,8 +689,9 @@ export default function AnalyticsPage() {
             <p className="text-xs text-gray-600 mt-1">Top destination</p>
           </div>
           <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <p className="text-2xl font-bold text-gray-900">WhatsApp</p>
-            <p className="text-xs text-gray-600 mt-1">Best channel</p>
+            {/* Was the word "WhatsApp", hardcoded and measuring nothing. */}
+            <p className="text-2xl font-bold text-gray-900">{pipelineData.followups}</p>
+            <p className="text-xs text-gray-600 mt-1">Open follow-ups</p>
           </div>
         </div>
       </div>
@@ -707,7 +732,7 @@ export default function AnalyticsPage() {
               <YAxis
                 stroke="#666"
                 style={{ fontSize: '12px' }}
-                tickFormatter={(value) => `€${value.toLocaleString()}`}
+                tickFormatter={(value) => `${getCurrencySymbol(reportingCurrency)}${value.toLocaleString()}`}
               />
               <Tooltip
                 contentStyle={{
@@ -860,18 +885,6 @@ export default function AnalyticsPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold text-gray-900">Booking Status</h3>
-            {displayData.bookings.total > 0 && (
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="all">All Status</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="pending">Pending</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            )}
           </div>
           
           {displayData.bookings.total > 0 ? (
@@ -881,7 +894,8 @@ export default function AnalyticsPage() {
                   data={[
                     { name: 'Confirmed', value: displayData.bookings.confirmed },
                     { name: 'Pending', value: displayData.bookings.pending },
-                    { name: 'Cancelled', value: displayData.bookings.cancelled }
+                    { name: 'Cancelled', value: displayData.bookings.cancelled },
+                    { name: 'Completed', value: displayData.bookings.completed || 0 }
                   ]}
                   cx="50%"
                   cy="50%"
@@ -893,7 +907,8 @@ export default function AnalyticsPage() {
                   {[
                     { name: 'Confirmed', value: displayData.bookings.confirmed },
                     { name: 'Pending', value: displayData.bookings.pending },
-                    { name: 'Cancelled', value: displayData.bookings.cancelled }
+                    { name: 'Cancelled', value: displayData.bookings.cancelled },
+                    { name: 'Completed', value: displayData.bookings.completed || 0 }
                   ].map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />
                   ))}
@@ -939,6 +954,15 @@ export default function AnalyticsPage() {
               </div>
               <span className="text-xs font-bold text-gray-900">
                 {displayData.bookings.cancelled} ({safePercent(displayData.bookings.cancelled, displayData.bookings.total)}%)
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.completed }} />
+                <span className="text-xs text-gray-700">Completed</span>
+              </div>
+              <span className="text-xs font-bold text-gray-900">
+                {displayData.bookings.completed || 0} ({safePercent(displayData.bookings.completed || 0, displayData.bookings.total)}%)
               </span>
             </div>
           </div>
@@ -1018,7 +1042,7 @@ export default function AnalyticsPage() {
             <p className="text-xs text-gray-500 mt-1">View all clients</p>
           </Link>
           
-          <Link href="/follow-ups" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all text-left group">
+          <Link href="/followups" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.followups }} />

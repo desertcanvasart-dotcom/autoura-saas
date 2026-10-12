@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // TODO: Send invitation email
     // For now, return the invitation link
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getautoura.net'
     const invitationLink = `${appUrl}/accept-invitation?token=${invitationToken}`
 
     return NextResponse.json({

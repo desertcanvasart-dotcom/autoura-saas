@@ -85,7 +85,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: invitations.map((i) => ({
+      // Never the token: whoever holds it can accept the invitation, and this
+      // list is open to managers. A resend returns a fresh link instead.
+      data: invitations.map(({ invitation_token: _token, ...i }) => ({
         ...i,
         inviter: i.invited_by ? inviters[i.invited_by as string] ?? null : null,
       })),
@@ -215,9 +217,9 @@ export async function POST(request: NextRequest) {
         .update({ invitation_token: freshToken, expires_at: freshExpiry.toISOString() })
         .eq('id', existingInvitation.id)
       if (resendError) throw resendError
-      const resendUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'}/invite/accept?token=${freshToken}`
+      const resendUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://getautoura.net'}/invite/accept?token=${freshToken}`
       let resent = true
-      try { await sendInvitationEmail(email, role, resendUrl) } catch (err) { console.error('Failed to resend invitation email:', err); resent = false }
+      try { await sendInvitationEmail(email, role, resendUrl, await companyNameOf(supabase, tenant_id)) } catch (err) { console.error('Failed to resend invitation email:', err); resent = false }
       return NextResponse.json({ success: true, emailSent: resent, inviteUrl: resendUrl })
     }
 
@@ -252,13 +254,13 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     // Send invitation email
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getautoura.net'
     const inviteUrl = `${baseUrl}/invite/accept?token=${token}`
 
     let emailSent = true
     let emailError: string | null = null
     try {
-      await sendInvitationEmail(email, role, inviteUrl)
+      await sendInvitationEmail(email, role, inviteUrl, await companyNameOf(supabase, tenant_id))
     } catch (err: any) {
       console.error('Failed to send invitation email:', err)
       emailSent = false
@@ -338,18 +340,29 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
+async function companyNameOf(db: ReturnType<typeof createAdminClient>, tenantId: string | null | undefined): Promise<string | null> {
+  if (!tenantId) return null
+  const { data } = await db.from('tenants').select('company_name').eq('id', tenantId).maybeSingle()
+  return (data as { company_name?: string | null } | null)?.company_name ?? null
+}
+
 // Helper function to send invitation email
 async function sendInvitationEmail(
   toEmail: string,
   role: string,
-  inviteUrl: string
+  inviteUrl: string,
+  companyName: string | null
 ) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
+  // The company's name, so the invitee knows who is asking (it said only
+  // "join Autoura"). Escaped: it is the tenant's own text.
+  const company = String(companyName || '').trim().replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getautoura.net'
 
   const roleLabels: Record<string, string> = {
+    owner: 'Owner',
     admin: 'Administrator',
     manager: 'Manager',
-    agent: 'Agent',
+    member: 'Member',
     viewer: 'Viewer'
   }
 
@@ -371,7 +384,7 @@ async function sendInvitationEmail(
           <!-- Content -->
           <div style="padding: 32px;">
             <p style="color: #374151; font-size: 16px; margin: 0 0 16px 0;">
-              You've been invited to join <strong>Autoura</strong> as a <strong>${roleLabels[role] || role}</strong>.
+              You've been invited to join <strong>${company || 'a team'}</strong> on Autoura as a <strong>${roleLabels[role] || role}</strong>.
             </p>
 
             <p style="color: #6b7280; font-size: 14px; margin: 0 0 24px 0;">
@@ -410,7 +423,7 @@ async function sendInvitationEmail(
   // by the caller's try/catch: no invitation email has ever been sent.
   const result = await sendMail({
     to: toEmail,
-    subject: `You're invited to join Autoura`,
+    subject: company ? `You're invited to join ${companyName} on Autoura` : `You're invited to join Autoura`,
     html: htmlContent,
   })
 

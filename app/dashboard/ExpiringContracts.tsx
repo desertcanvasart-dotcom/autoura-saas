@@ -39,7 +39,7 @@ export default function ExpiringContracts() {
   const [items, setItems] = useState<Item[]>([])
   const [today, setToday] = useState('')
   const [horizon, setHorizon] = useState(60)
-  const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [state, setState] = useState<'loading' | 'ready' | 'failed' | 'hidden'>('loading')
 
   const load = useCallback(async () => {
     try {
@@ -51,7 +51,8 @@ export default function ExpiringContracts() {
         setHorizon(json.data.horizonDays)
         setState('ready')
       } else {
-        setState('failed')
+        // 403: not this role's panel — show nothing rather than an error.
+        setState(res.status === 403 ? 'hidden' : 'failed')
       }
     } catch {
       setState('failed')
@@ -62,6 +63,8 @@ export default function ExpiringContracts() {
 
   const expired = items.filter(i => i.status === 'expired').length
   const expiring = items.length - expired
+
+  if (state === 'hidden') return null
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">

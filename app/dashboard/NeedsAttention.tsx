@@ -95,7 +95,7 @@ function insertAt(list: AttentionItem[], item: AttentionItem, index: number): At
 
 export default function NeedsAttention() {
   const [items, setItems] = useState<AttentionItem[]>([])
-  const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [state, setState] = useState<'loading' | 'ready' | 'failed' | 'hidden'>('loading')
   // The last row dismissed, kept long enough to undo a mis-click.
   const [undo, setUndo] = useState<{ item: AttentionItem; index: number } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -108,7 +108,8 @@ export default function NeedsAttention() {
         setItems(json.data.items)
         setState('ready')
       } else {
-        setState('failed')
+        // 403: not this role's panel — show nothing rather than an error.
+        setState(res.status === 403 ? 'hidden' : 'failed')
       }
     } catch {
       setState('failed')
@@ -162,6 +163,8 @@ export default function NeedsAttention() {
   }, [undo])
 
   const urgent = items.filter(i => i.severity === 'urgent').length
+
+  if (state === 'hidden') return null
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">

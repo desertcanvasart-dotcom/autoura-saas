@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
@@ -10,6 +11,10 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    // The company setup wizard is the owner's and admins' — a member who
+    // signed in first must not set its currency, branding or finish it.
+    const denied = roleDenied(authResult.role, 'admin')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
     if (!supabase) {

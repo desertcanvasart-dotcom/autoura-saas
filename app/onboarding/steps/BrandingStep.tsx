@@ -150,7 +150,8 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
           secondary_color: secondaryColor,
           tagline: tagline,
           logo_url: logoUrl,
-          current_step: currentStep
+          // The step to resume on: the next one, not this one again.
+          current_step: currentStep + 1
         })
       })
 

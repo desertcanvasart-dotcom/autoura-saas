@@ -155,6 +155,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ---- 2b. One company per login, for now ---------------------------------
+    // Every lookup (TenantContext, middleware, requireAuth) works in the
+    // OLDEST active membership and nothing lets a login switch, so a second
+    // company joined here was never shown — the page said "joined", the seat
+    // was taken, and the person kept seeing their first company. Refuse it
+    // plainly until switching exists.
+    if (action !== 'created' && userId) {
+      const { data: others } = await db
+        .from('tenant_members')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .neq('tenant_id', invitation.tenant_id)
+        .limit(1)
+      if ((others ?? []).length > 0) {
+        return NextResponse.json(
+          { success: false, error: 'This email already belongs to another company on Autoura, and one login cannot switch between companies yet. Ask to be invited with a different email address.' },
+          { status: 409 }
+        )
+      }
+    }
+
     // ---- 3. The membership — the part that was missing entirely -----------
     // Still a seat free? Invitations made before the plan shrank, or several
     // accepted at once, could take the company over its limit.
