@@ -146,7 +146,9 @@ export async function POST(request: NextRequest) {
         linked_id: body.linked_id || null,
         notes: body.notes || null,
         archived: false,
-        archived_at: null
+        archived_at: null,
+        // Who made it, so they hear when it is done (migration 418).
+        created_by: authResult.user?.id ?? null,
       })
       .select(`
         *,

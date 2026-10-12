@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -41,7 +41,10 @@ interface B2BQuote {
   } | null
 }
 
-export default function EditB2BQuotePage({ params }: { params: { id: string } }) {
+// params is a Promise in a client page (Next 15+): reading params.id
+// directly gave undefined, and the page asked for quote "undefined".
+export default function EditB2BQuotePage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise)
   const supabase = createClient()
   const router = useRouter()
 

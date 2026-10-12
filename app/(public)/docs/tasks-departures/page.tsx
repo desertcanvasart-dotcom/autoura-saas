@@ -42,6 +42,7 @@ export default function TasksDeparturesPage() {
           <li><strong>Archive</strong> puts any task away; <strong>Archive Done</strong> archives every finished one at once. <strong>Show Archived</strong> shows them, and <strong>Unarchive</strong> brings one back.</li>
           <li><strong>Delete</strong> removes a task for good, after asking</li>
           <li>The person assigned is reminded the day before a task is due, and again while it is overdue (every three days), as your notification settings allow</li>
+          <li>When a task someone else created is completed, they are told (their <strong>Task Completed</strong> setting decides how)</li>
         </ul>
         <DocScreenshot src="/docs/tasks-departures/tasks.jpg" alt="Tasks page in Kanban view with metric cards across the top, the filter bar, and the To Do / In Progress / Done columns" />
 
@@ -88,12 +89,14 @@ export default function TasksDeparturesPage() {
         <h3 className="text-lg font-medium text-gray-900 mb-3">General Capacity</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li>Click a date (today or later). <strong>Quick Status</strong> sets it <strong>Available</strong>, <strong>Limited</strong>, <strong>Busy</strong> or <strong>Blackout</strong>.</li>
-          <li><strong>Edit Capacity</strong> sets its <strong>Max Groups</strong> and <strong>Booked Groups</strong> (you keep this count; bookings do not change it), a <strong>Reason</strong> for a blackout, and <strong>Notes</strong></li>
+          <li><strong>Edit Capacity</strong> sets its <strong>Max Groups</strong>, the groups <strong>Booked outside Autoura</strong> (your bookings here count by themselves: each live booking counts on every day from its start to its end), a <strong>Reason</strong> for a blackout, and <strong>Notes</strong></li>
+          <li><strong>Default Settings</strong> &mdash; the limit for any day without its own entry; <strong>Save</strong> keeps it. Blank means no limit.</li>
+          <li>A booking that would go over a day&rsquo;s limit, or fall on a Blackout day, is refused with the days named &mdash; from a quote or by confirming an itinerary (the itinerary is still confirmed). A manager or admin can <strong>Book anyway</strong>.</li>
           <li>Changed dates are marked; <strong>Save N Changes</strong> saves them all. Leaving the page before saving loses them.</li>
         </ul>
         <DocScreenshot src="/docs/tasks-departures/capacity.jpg" alt="Capacity calendar in General Capacity view showing a month with date statuses (available/limited/busy/blackout) and per-date capacity settings" />
         <Tip>
-          <strong>What the WhatsApp AI does with it:</strong> on a <strong>Blackout</strong> date it tells the client you are not operating, with your reason; when a date is full (<strong>Booked Groups</strong> at <strong>Max Groups</strong>) it says the dates are busy and offers others; otherwise it says the dates work. For a trip starting within three days it does not check the calendar and answers that the notice is short.
+          <strong>What the WhatsApp AI does with it:</strong> on a <strong>Blackout</strong> date it tells the client you are not operating, with your reason; when a date is full (its groups at its limit) it says the dates are busy and offers others; otherwise it says the dates work. For a trip starting within three days it does not check the calendar and answers that the notice is short.
         </Tip>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Tour Departures</h3>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { notifyTaskCompleted } from '@/lib/tasks/task-notify'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { completeChecklist, type ChecklistItem } from '@/lib/tasks/itinerary-tasks'
 import { gateRole } from '@/lib/api-role-gate'
@@ -71,6 +72,14 @@ export async function PUT(
     }
     const body = await request.json()
 
+    // Before the update: who it was assigned to, whether it was done, who
+    // created it — to tell the right people what changed.
+    const { data: before } = await supabase
+      .from('tasks')
+      .select('status, created_by')
+      .eq('id', id)
+      .maybeSingle()
+
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     }
@@ -141,6 +150,15 @@ export async function PUT(
     if (error) {
       console.error('Error updating task:', error)
       return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
+    }
+
+    // The creator hears it is done (the Tasks page itself tells a new
+    // assignee, through /api/notifications).
+    if (body.status === 'done' && before?.status !== 'done') {
+      await notifyTaskCompleted(authResult.tenant_id!, { ...data, created_by: before?.created_by ?? null }, {
+        id: authResult.user!.id,
+        email: authResult.user?.email ?? null,
+      })
     }
 
     return NextResponse.json({ success: true, data })

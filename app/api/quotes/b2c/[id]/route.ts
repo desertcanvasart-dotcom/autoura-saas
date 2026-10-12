@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { quoteSeasonFor } from '@/lib/quotes/quote-season'
 import { priceB2cQuote, b2cPriceInputError } from '@/lib/quotes/b2c-quote-price';
 import { createAuthenticatedClient, createAdminClient, requireAuth } from '@/lib/supabase-server';
 import { isQuoteStatus, quoteStatusError } from '@/lib/quotes/quote-status'
@@ -143,7 +144,7 @@ export async function PUT(
     if (total_cost !== undefined || margin_percent !== undefined || num_travelers !== undefined || currency !== undefined) {
       const { data: currentQuote } = await supabase
         .from('b2c_quotes')
-        .select('total_cost, margin_percent, num_travelers, currency')
+        .select('total_cost, margin_percent, num_travelers, currency, itinerary_id')
         .eq('id', id)
         .eq('tenant_id', authResult.tenant_id)
         .maybeSingle();
@@ -156,12 +157,26 @@ export async function PUT(
       if (inputError) {
         return NextResponse.json({ success: false, error: inputError }, { status: 400 });
       }
+      // The departure's seasonal premium, from the trip's start date now —
+      // an edit reprices it like the rest of the price.
+      let departure: string | null = null;
+      if (currentQuote.itinerary_id) {
+        const { data: trip } = await supabase
+          .from('itineraries')
+          .select('start_date')
+          .eq('id', currentQuote.itinerary_id)
+          .eq('tenant_id', authResult.tenant_id)
+          .maybeSingle();
+        departure = trip?.start_date ?? null;
+      }
+      const season = await quoteSeasonFor(authResult.tenant_id, departure);
       Object.assign(updateData, priceB2cQuote({
         totalCost: cost,
         marginPercent: margin,
         travelers: num_travelers !== undefined ? num_travelers : currentQuote.num_travelers,
         currency: currency !== undefined ? currency : currentQuote.currency,
-      }));
+        seasonPercent: season.season_percent,
+      }), { season_name: season.season_name, season_percent: season.season_percent });
       if (total_cost !== undefined) updateData.total_cost = Number(total_cost);
       if (margin_percent !== undefined) updateData.margin_percent = Number(margin_percent);
     }

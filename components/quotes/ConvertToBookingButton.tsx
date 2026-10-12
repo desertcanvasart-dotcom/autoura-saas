@@ -49,12 +49,18 @@ export default function ConvertToBookingButton({ quoteId, quoteType, quoteNumber
     }))) return
     setConverting(true)
     try {
-      const post = (allowIncomplete: boolean) => fetch('/api/bookings/from-quote', {
+      let allowIncomplete = false
+      let overrideCapacity = false
+      const post = () => fetch('/api/bookings/from-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quote_id: quoteId, quote_type: quoteType, ...(allowIncomplete ? { allow_incomplete: true } : {}) }),
+        body: JSON.stringify({
+          quote_id: quoteId, quote_type: quoteType,
+          ...(allowIncomplete ? { allow_incomplete: true } : {}),
+          ...(overrideCapacity ? { override_capacity: true } : {}),
+        }),
       })
-      let res = await post(false)
+      let res = await post()
       let data = await res.json()
       // Unpriced services: the operator decides.
       if (res.status === 422 && Array.isArray(data.gaps) && data.gaps.length > 0) {
@@ -65,7 +71,22 @@ export default function ConvertToBookingButton({ quoteId, quoteType, quoteNumber
           variant: 'warning',
         })
         if (!ok) { setConverting(false); return }
-        res = await post(true)
+        allowIncomplete = true
+        res = await post()
+        data = await res.json()
+      }
+      // A full or closed day on the Capacity Calendar: a manager or admin may
+      // book it anyway; anyone else is told why.
+      if (res.status === 409 && Array.isArray(data.capacity) && data.capacity.length > 0 && data.can_override) {
+        const ok = await dialog.confirm({
+          title: 'Over capacity',
+          message: `${data.error}\n\nBook it anyway?`,
+          confirmText: 'Book anyway',
+          variant: 'warning',
+        })
+        if (!ok) { setConverting(false); return }
+        overrideCapacity = true
+        res = await post()
         data = await res.json()
       }
       if (!res.ok || !data.success) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
-import { capacityDateRange, freeGroupSlots } from '@/lib/capacity/capacity-write'
+import { capacityDateRange } from '@/lib/capacity/capacity-write'
+import { loadDayLoads } from '@/lib/capacity/booking-capacity'
 
 // ============================================
 // CAPACITY CHECK API (Public for AI Agent)
@@ -73,78 +74,32 @@ export async function POST(request: NextRequest) {
     // Admin client (bypasses RLS); all queries are scoped to the session tenant below
     const supabase = createAdminClient()
 
-    // Get capacity entries for the date range
-    const { data: capacityData, error } = await supabase
-      .from('operator_capacity')
-      .select('date, status, max_groups, booked_groups, notes, reason')
-      .eq('tenant_id', tenant_id)
-      .gte('date', start_date)
-      .lte('date', effectiveEndDate)
-      .order('date', { ascending: true })
-
-    if (error) {
-      console.error('Error checking capacity:', error)
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      )
-    }
-
-    // Create a map of dates to capacity
-    const capacityMap = new Map<string, {
-      status: string
-      max_groups: number
-      booked_groups: number
-      notes?: string | null
-      reason?: string | null
-    }>()
-
-    capacityData?.forEach(entry => {
-      capacityMap.set(entry.date, {
-        status: entry.status,
-        max_groups: entry.max_groups,
-        booked_groups: entry.booked_groups,
-        notes: entry.notes,
-        reason: entry.reason
-      })
-    })
-
-    // Generate all dates in range. Calendar arithmetic on the YYYY-MM-DD
-    // strings: stepping a Date by local days and printing it as UTC could
-    // repeat or skip a day where the host clock is not UTC
-    // (documents audit, round 12).
-    const dates = capacityDateRange(start_date, effectiveEndDate)
-    if (!dates) {
+    // Each day's load the way bookings are checked (lib/capacity/booking-capacity):
+    // live bookings on the ground + groups booked outside Autoura, against the
+    // day's own limit or the company's default (none = no limit).
+    if (!capacityDateRange(start_date, effectiveEndDate)) {
       return NextResponse.json(
         { success: false, error: 'Date range is too long (max 366 days)' },
         { status: 400 }
       )
     }
+    const { loads, error } = await loadDayLoads(supabase, tenant_id!, start_date, effectiveEndDate)
+    if (error) {
+      console.error('Error checking capacity:', error)
+      return NextResponse.json({ success: false, error }, { status: 500 })
+    }
 
-    // Check availability for each date
-    const details = dates.map(date => {
-      const capacity = capacityMap.get(date)
-
-      if (!capacity) {
-        // No entry = default available, with the default capacity and nothing
-        // booked. This used to subtract the group SIZE (pax) from the default
-        // 3 groups, so a party of 6 read as -3 free slots (documents audit,
-        // round 12).
-        return {
-          date,
-          status: 'available' as const,
-          available_slots: freeGroupSlots(null)
-        }
-      }
-
-      // Never negative, even when a day is overbooked.
-      const availableSlots = freeGroupSlots(capacity)
-
+    const details = loads.map(d => {
+      const free = d.max == null ? Number.MAX_SAFE_INTEGER : Math.max(0, d.max - d.booked)
+      // A day at its limit reads as busy whatever its label says.
+      const status = d.status === 'blackout' ? 'blackout' as const
+        : d.max != null && free === 0 ? 'busy' as const
+        : (d.status as 'available' | 'limited' | 'busy')
       return {
-        date,
-        status: capacity.status as 'available' | 'limited' | 'busy' | 'blackout',
-        available_slots: availableSlots,
-        reason: capacity.reason
+        date: d.date,
+        status,
+        available_slots: d.max == null ? 99 : free,
+        reason: d.reason,
       }
     })
 

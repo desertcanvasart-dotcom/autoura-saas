@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { defaultCostMode } from '@/lib/itineraries/default-cost-mode'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { gateVolume, incrementVolumeUsage, loadUsageAnchor } from '@/lib/usage-enforcement'
 import { roleDenied } from '@/lib/api-role-gate'
@@ -138,6 +139,8 @@ export async function POST(request: NextRequest) {
       ...(text('tier') ? { tier: text('tier')! } : {}),
       ...(text('package_type') ? { package_type: text('package_type')! } : {}),
       total_cost: 0,
+      // The creator's Settings → Preferences cost mode (auto or manual).
+      cost_mode: await defaultCostMode(supabase, authResult.user?.id),
     }
 
     const { data, error } = await supabase

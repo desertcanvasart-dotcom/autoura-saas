@@ -13,6 +13,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase-server'
+import { reminderChannels, type NotificationPreferences, type TaskNotificationKind } from '@/lib/tasks/task-reminders'
 import { sendSystemEmail } from '@/lib/email'
 import { sendPushToUsers, type PushPayload } from '@/lib/push'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -189,6 +190,20 @@ export function bellSnippet(text: string | null | undefined, max = 140): string 
 export async function createNotification(input: CreateNotificationInput) {
   const supabase = createAdminClient() as any
 
+  // Task notifications follow the recipient's Settings → Notifications:
+  // the per-event switch (Task Assigned, Due Soon, Overdue, Completed) and
+  // the email / in-app switches. Task Assigned and Task Completed were shown
+  // there but nothing read them.
+  if (TASK_KINDS.has(input.type)) {
+    const channels = await taskChannelsFor(supabase, input.team_member_id, input.type as TaskNotificationKind)
+    if (!channels.remind) return null
+    if (!channels.email) input = { ...input, send_email: false }
+    if (!channels.inApp) {
+      if (input.send_email) await emailOnly(supabase, input)
+      return null
+    }
+  }
+
   const { data: notification, error } = await supabase
     .from('notifications')
     .insert({
@@ -230,6 +245,36 @@ export async function createNotification(input: CreateNotificationInput) {
   }
 
   return notification
+}
+
+const TASK_KINDS = new Set(['task_assigned', 'task_completed', 'task_due_soon', 'task_overdue'])
+
+/** A team member's switches, through their login (matched by email, as staff records have no user id). */
+async function taskChannelsFor(supabase: ReturnType<typeof createAdminClient>, teamMemberId: string, kind: TaskNotificationKind) {
+  try {
+    const { data: member } = await supabase.from('team_members').select('email').eq('id', teamMemberId).maybeSingle()
+    const email = member?.email ? String(member.email).trim().toLowerCase() : ''
+    if (!email) return reminderChannels(null, kind)
+    const { data: profile } = await supabase.from('user_profiles').select('id').ilike('email', email).limit(1).maybeSingle()
+    if (!profile?.id) return reminderChannels(null, kind)
+    const { data: settings } = await supabase.from('user_settings').select('notification_preferences').eq('user_id', profile.id).maybeSingle()
+    return reminderChannels((settings?.notification_preferences ?? null) as NotificationPreferences | null, kind)
+  } catch {
+    // Settings that cannot be read: the defaults (everything on).
+    return reminderChannels(null, kind)
+  }
+}
+
+/** Email the person without a bell entry (in-app switched off). */
+async function emailOnly(supabase: ReturnType<typeof createAdminClient>, input: CreateNotificationInput) {
+  try {
+    const { data: member } = await supabase.from('team_members').select('name, email').eq('id', input.team_member_id).maybeSingle()
+    if (member?.email) {
+      await sendEmailNotification(member.email, member.name, input.title, input.message, input.link ?? null, input.type)
+    }
+  } catch (err) {
+    console.error('Failed to send email notification:', err)
+  }
 }
 
 // Helper function to send an email notification via Resend (system transport).

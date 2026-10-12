@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import StatusManager from '@/components/quotes/StatusManager'
@@ -36,6 +36,9 @@ interface B2CQuote {
   margin_percent: number
   selling_price: number
   price_per_person: number
+  season_name?: string | null
+  season_percent?: number | null
+  season_premium?: number | null
   currency: string
   cost_breakdown: CostBreakdown | null
   created_at: string | null
@@ -73,7 +76,10 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
   expired: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: AlertCircle }
 }
 
-export default function B2CQuoteDetailPage({ params }: { params: { id: string } }) {
+// params is a Promise in a client page (Next 15+): reading params.id
+// directly gave undefined, and the page asked for quote "undefined".
+export default function B2CQuoteDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise)
   const supabase = createClient()
   const dialog = useConfirmDialog()
   const [quote, setQuote] = useState<B2CQuote | null>(null)
@@ -502,9 +508,21 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                   Margin ({quote.margin_percent}%)
                 </span>
                 <span className="text-sm font-bold text-blue-700">
-                  {quote.currency} {(quote.selling_price - quote.total_cost).toLocaleString()}
+                  {quote.currency} {(quote.selling_price - Number(quote.season_premium ?? 0) - quote.total_cost).toLocaleString()}
                 </span>
               </div>
+
+              {/* Seasonal premium (Settings → Seasonal Premiums), its own line */}
+              {Number(quote.season_premium ?? 0) > 0 && (
+                <div className="flex items-center justify-between py-2 bg-amber-50 rounded-lg px-3 mt-2">
+                  <span className="text-sm text-amber-800">
+                    Seasonal premium{quote.season_name ? ` — ${quote.season_name}` : ''} ({Number(quote.season_percent ?? 0)}%)
+                  </span>
+                  <span className="text-sm font-bold text-amber-800">
+                    {quote.currency} {Number(quote.season_premium).toLocaleString()}
+                  </span>
+                </div>
+              )}
 
               {/* Selling Price */}
               <div className="flex items-center justify-between py-3 border-t-2 border-gray-300 mt-3">

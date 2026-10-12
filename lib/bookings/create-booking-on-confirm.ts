@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase-server'
+import { bookingCapacityProblems, describeCapacityProblems } from '@/lib/capacity/booking-capacity'
 import { itineraryBookingFacts } from '@/lib/bookings/booking-on-confirm'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
@@ -17,8 +18,9 @@ import { tenantToday } from '@/lib/tenant-today'
  */
 export async function createBookingOnConfirm(
   itineraryId: string,
-  itinerary: Record<string, unknown>
-): Promise<{ booking: Record<string, unknown> | null; note: string | null }> {
+  itinerary: Record<string, unknown>,
+  options: { overrideCapacity?: boolean } = {},
+): Promise<{ booking: Record<string, unknown> | null; note: string | null; capacityFull?: boolean }> {
   try {
     const tenantId = itinerary.tenant_id
     if (typeof tenantId !== 'string') {
@@ -45,6 +47,20 @@ export async function createBookingOnConfirm(
     const facts = itineraryBookingFacts(itinerary)
     if (!facts.ok) {
       return { booking: null, note: `Booking not created: ${facts.reason}.` }
+    }
+
+    // The Capacity Calendar: a full or closed day takes no booking unless a
+    // manager or admin confirmed with override (lib/capacity/booking-capacity).
+    // The itinerary is still confirmed; the note says why there is no booking.
+    if (!options.overrideCapacity) {
+      const problems = await bookingCapacityProblems(admin, tenantId, facts.value.start_date, facts.value.end_date)
+      if (problems.length > 0) {
+        return {
+          booking: null,
+          note: `Booking not created: the Capacity Calendar is ${describeCapacityProblems(problems)}. Free a day or raise its limit; a manager or admin can book it anyway.`,
+          capacityFull: true,
+        }
+      }
     }
 
     const { data: tenantRow } = await admin

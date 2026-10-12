@@ -112,11 +112,11 @@ describe('the rate sheet a calculator quote stores', () => {
 describe('a B2C quote’s price', () => {
   it('is in the currency’s units', () => {
     expect(priceB2cQuote({ totalCost: 80000, marginPercent: 25, travelers: 3, currency: 'JPY' }))
-      .toEqual({ selling_price: 100000, price_per_person: 33333 })
+      .toEqual({ selling_price: 100000, price_per_person: 33333, season_premium: 0 })
     expect(priceB2cQuote({ totalCost: 1000, marginPercent: 20, travelers: 3, currency: 'EUR' }))
-      .toEqual({ selling_price: 1200, price_per_person: 400 })
+      .toEqual({ selling_price: 1200, price_per_person: 400, season_premium: 0 })
     expect(priceB2cQuote({ totalCost: 1000, marginPercent: 0, travelers: 0, currency: null }))
-      .toEqual({ selling_price: 1000, price_per_person: 1000 })
+      .toEqual({ selling_price: 1000, price_per_person: 1000, season_premium: 0 })
   })
 
   it('needs a positive cost and a margin in range — 0% is a margin', () => {
@@ -130,8 +130,8 @@ describe('a B2C quote’s price', () => {
     const put = src('app/api/quotes/b2c/[id]/route.ts')
     expect(put).not.toMatch(/selling_price !== undefined|price_per_person !== undefined/)
     expect(put).toContain('Object.assign(updateData, priceB2cQuote({')
-    expect(src('app/quotes/b2c/[id]/edit/page.tsx')).toContain('priceB2cQuote({ totalCost, marginPercent, travelers: numTravelers, currency })')
-    expect(src('app/api/quotes/b2c/from-itinerary/route.ts')).toContain('const { selling_price, price_per_person } = priceB2cQuote({')
+    expect(src('app/quotes/b2c/[id]/edit/page.tsx')).toContain('priceB2cQuote({ totalCost, marginPercent, travelers: numTravelers, currency, seasonPercent })')
+    expect(src('app/api/quotes/b2c/from-itinerary/route.ts')).toContain('const { selling_price, price_per_person, season_premium } = priceB2cQuote({')
   })
 })
 
