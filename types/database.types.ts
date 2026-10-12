@@ -1468,11 +1468,13 @@ export interface Database {
       blog_posts: {
         Row: {
           id: string
+          seo_description: string | null
           slug: string
           language: string
           title: string
           excerpt: string | null
           body_html: string
+          cover_image_alt: string | null
           cover_image_url: string | null
           author_name: string | null
           tags: string[]
@@ -1484,11 +1486,13 @@ export interface Database {
         }
         Insert: {
           id?: string
+          seo_description?: string | null
           slug: string
           language?: string
           title: string
           excerpt?: string | null
           body_html?: string
+          cover_image_alt?: string | null
           cover_image_url?: string | null
           author_name?: string | null
           tags?: string[]
@@ -1500,11 +1504,13 @@ export interface Database {
         }
         Update: {
           id?: string
+          seo_description?: string | null
           slug?: string
           language?: string
           title?: string
           excerpt?: string | null
           body_html?: string
+          cover_image_alt?: string | null
           cover_image_url?: string | null
           author_name?: string | null
           tags?: string[]

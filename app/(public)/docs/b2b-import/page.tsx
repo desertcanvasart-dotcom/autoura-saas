@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { ScreenshotPlaceholder, Tip } from '../layout'
 import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/b2b-import')
 
 export default function B2BImportPage() {
   return (

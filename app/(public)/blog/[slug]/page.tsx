@@ -9,6 +9,9 @@ import { getPublishedPost, readingMinutes, listPublishedPosts } from '@/lib/blog
 import { sanitizeBlogHtml } from '@/lib/blog/sanitize'
 import { currentUser, isBlogAdmin } from '@/lib/blog/admin'
 import { BlogHeader, BlogFooter, fmtPostDate } from '@/components/blog/BlogChrome'
+import JsonLd from '@/components/seo/JsonLd'
+import { coverAlt, postDescription, postJsonLd, withImageAlts } from '@/lib/blog/seo'
+import { buildPageMetadata } from '@/lib/seo/site'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,22 +21,20 @@ const loadPost = cache((slug: string) => getPublishedPost(slug))
 type Props = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const post = await loadPost((await params).slug)
-  if (!post) return { title: 'Post not found — Autoura Blog' }
-  const description = post.excerpt ?? undefined
-  return {
-    title: `${post.title} — Autoura Blog`,
-    description,
-    alternates: { canonical: `/blog/${post.slug}` },
-    openGraph: {
-      title: post.title,
-      description,
-      type: 'article',
-      publishedTime: post.published_at ?? undefined,
-      images: post.cover_image_url ? [post.cover_image_url] : undefined,
-    },
-    twitter: { card: post.cover_image_url ? 'summary_large_image' : 'summary', title: post.title, description },
-  }
+  const slug = (await params).slug
+  const post = await loadPost(slug)
+  if (!post) return { title: 'Post not found', robots: { index: false, follow: true } }
+  return buildPageMetadata({
+    title: post.title,
+    description: postDescription(post),
+    path: `/blog/${post.slug}`,
+    type: 'article',
+    locale: post.language === 'ja' ? 'ja_JP' : 'en_US',
+    image: post.cover_image_url ? { url: post.cover_image_url, alt: coverAlt(post) } : null,
+    publishedTime: post.published_at,
+    modifiedTime: post.updated_at,
+    authors: post.author_name ? [post.author_name] : [],
+  })
 }
 
 export default async function BlogPostPage({ params }: Props) {
@@ -42,18 +43,19 @@ export default async function BlogPostPage({ params }: Props) {
 
   const [user, more] = await Promise.all([currentUser(), listPublishedPosts({ language: post.language, limit: 4 })])
   const admin = isBlogAdmin(user?.email)
-  const body = sanitizeBlogHtml(post.body_html)
+  const body = withImageAlts(sanitizeBlogHtml(post.body_html), post.title)
   const others = more.filter(p => p.id !== post.id).slice(0, 3)
 
   return (
     <div className="min-h-screen bg-[#F5F3EF]">
       <BlogHeader adminHref={admin ? `/super-admin/blog/${post.id}` : null} adminLabel="Edit post" />
 
+      <JsonLd data={postJsonLd(post)} />
       <main>
         <article lang={post.language} className="max-w-3xl mx-auto px-4 sm:px-6 pt-12" data-testid="blog-post">
           <Link href="/blog" className="text-sm font-medium text-[#647C47] hover:underline">← All posts</Link>
           <p className="mt-6 text-sm text-gray-500">
-            {fmtPostDate(post.published_at, post.language)}
+            {post.published_at && <time dateTime={post.published_at}>{fmtPostDate(post.published_at, post.language)}</time>}
             {' · '}{post.language === 'ja' ? `${readingMinutes(post.body_html)}分で読めます` : `${readingMinutes(post.body_html)} min read`}
             {post.author_name && <> · {post.author_name}</>}
           </p>
@@ -68,7 +70,7 @@ export default async function BlogPostPage({ params }: Props) {
           )}
           {post.cover_image_url && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.cover_image_url} alt="" className="mt-8 w-full rounded-2xl" />
+            <img src={post.cover_image_url} alt={coverAlt(post)} className="mt-8 w-full rounded-2xl" />
           )}
           <div className="blog-prose mt-10" dangerouslySetInnerHTML={{ __html: body }} />
         </article>
@@ -92,11 +94,11 @@ export default async function BlogPostPage({ params }: Props) {
                 <Link key={p.id} href={`/blog/${p.slug}`} className="group" lang={p.language}>
                   {p.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.cover_image_url} alt="" className="w-full aspect-[16/9] object-cover rounded-xl bg-gray-100" />
+                    <img src={p.cover_image_url} alt={coverAlt(p)} loading="lazy" className="w-full aspect-[16/9] object-cover rounded-xl bg-gray-100" />
                   ) : (
                     <div className="w-full aspect-[16/9] rounded-xl bg-gradient-to-br from-[#647C47]/15 to-[#647C47]/5" />
                   )}
-                  <p className="mt-3 text-xs text-gray-500">{fmtPostDate(p.published_at, p.language)}</p>
+                  <p className="mt-3 text-xs text-gray-500">{p.published_at && <time dateTime={p.published_at}>{fmtPostDate(p.published_at, p.language)}</time>}</p>
                   <h3 className="mt-1 font-semibold leading-snug text-[#111710] group-hover:text-[#647C47]">{p.title}</h3>
                 </Link>
               ))}

@@ -218,6 +218,8 @@ export async function middleware(request: NextRequest) {
     // the matcher the way images are). These redirected to /login, which
     // made organic discovery impossible.
     '/robots.txt', '/sitemap.xml',
+    // The site summary for AI assistants (app/llms.txt, lib/seo/llms.ts).
+    '/llms.txt', '/llms-full.txt',
     // PWA manifest (app/manifest.ts): a manifest behind a login redirect is
     // no manifest at all — install would silently break for logged-out users.
     '/manifest.webmanifest',

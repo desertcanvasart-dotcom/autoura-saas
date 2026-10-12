@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { Tip } from '../layout'
 import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/seasonal-premiums')
 
 export default function SeasonalPremiumsPage() {
   return (

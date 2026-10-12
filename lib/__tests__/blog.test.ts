@@ -60,7 +60,7 @@ describe('validatePostInput', () => {
       ok: true,
       post: {
         title: 'Release notes', slug: 'release-notes', language: 'en', excerpt: null, body_html: '<p>New</p>',
-        cover_image_url: null, author_name: null, tags: ['product'], status: 'draft',
+        cover_image_url: null, cover_image_alt: null, seo_description: null, author_name: null, tags: ['product'], status: 'draft',
       },
     })
   })

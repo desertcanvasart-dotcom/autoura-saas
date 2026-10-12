@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { DocScreenshot, Tip } from '../layout'
 import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/analytics-reports')
 
 export default function AnalyticsReportsPage() {
   return (

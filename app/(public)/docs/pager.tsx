@@ -9,6 +9,8 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { CATEGORIES } from './toc'
+import { docJsonLd } from './seo'
+import JsonLd from '@/components/seo/JsonLd'
 
 const ORDER = CATEGORIES.flatMap(c => c.items)
 
@@ -23,6 +25,8 @@ export function DocPager({ href }: { href: string }) {
   const { prev, next } = docNeighbours(href)
   return (
     <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
+      {/* The page's structured data rides with the pager every docs page renders. */}
+      <JsonLd data={docJsonLd(href)} />
       {prev ? (
         <Link
           href={prev.href}
