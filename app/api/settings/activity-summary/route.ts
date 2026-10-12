@@ -36,11 +36,16 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createAdminClient()
-    const { error } = await adminClient
+    const { data: changed, error } = await adminClient
       .from('tenant_features')
       .update({ activity_summary_enabled: enabled })
       .eq('tenant_id', authResult.tenant_id)
+      .select('tenant_id')
     if (error) throw error
+    // A company with no features row changed nothing, and was told it had.
+    if (!changed || changed.length === 0) {
+      return NextResponse.json({ success: false, error: 'This company has no feature settings yet — contact Autoura support' }, { status: 409 })
+    }
 
     // In-app notice to every active directory member on enable (fail-soft:
     // the toggle result must not depend on notification delivery).

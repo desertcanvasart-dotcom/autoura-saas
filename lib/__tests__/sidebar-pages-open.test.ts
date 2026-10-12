@@ -25,7 +25,11 @@ describe('the pages under /settings', () => {
     expect(allowed('/settings/email-signatures')).toEqual(['admin', 'manager', 'member'])
     expect(allowed('/settings/copilot-analytics')).toEqual(['admin', 'manager'])
     expect(allowed('/settings/seasons')).toEqual(['admin', 'manager'])
-    for (const p of ['/settings', '/settings/whatsapp', '/settings/email', '/settings/tenant', '/settings/copilot']) {
+    // Personal: your own Gmail (the Inbox sends members here) and your own profile.
+    expect(allowed('/settings/email')).toEqual(['admin', 'manager', 'member'])
+    expect(allowed('/settings/profile')).toEqual(['admin', 'manager', 'member', 'viewer'])
+    expect(allowed('/settings/departments')).toEqual(['admin', 'manager'])
+    for (const p of ['/settings', '/settings/whatsapp', '/settings/tenant', '/settings/copilot']) {
       expect(allowed(p), p).toEqual(['admin'])
     }
   })

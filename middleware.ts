@@ -71,6 +71,14 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/settings/email-signatures': ['admin', 'manager', 'member'],
   '/settings/copilot-analytics': ['admin', 'manager'],
   '/settings/seasons': ['admin', 'manager'],
+  // Your own profile, password and notifications, and your own Gmail
+  // (connected per person): everyone with a login. The Inbox sends members
+  // here to connect Gmail; they were turned away. Office addresses and
+  // templates on the email page stay admin-only inside the page.
+  '/settings/profile': ['admin', 'manager', 'member', 'viewer'],
+  '/settings/email': ['admin', 'manager', 'member'],
+  // Team Members (managers) links here to manage departments.
+  '/settings/departments': ['admin', 'manager'],
   '/users': ['admin'],
   
   // Admin and Manager

@@ -1,5 +1,6 @@
 'use client'
 
+import { swapSignatureBlock } from '@/lib/email/signature'
 import { useEffect, useRef, useState } from 'react'
 import { Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine } from 'lucide-react'
 import RichReplyEditor, { plainTextToHtml, htmlToPlainText } from './RichReplyEditor'
@@ -117,7 +118,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
     if (!stripped) {
       setBodyHtml(`<p><br/></p>${sigToHtml(sig)}`)
     } else if (/<div data-signature="true"/.test(bodyHtml)) {
-      setBodyHtml(bodyHtml.replace(/<div data-signature="true"[\s\S]*?<\/div>/, sigToHtml(sig)))
+      setBodyHtml(swapSignatureBlock(bodyHtml, sigToHtml(sig)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signatureId])

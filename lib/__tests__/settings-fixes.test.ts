@@ -79,3 +79,53 @@ describe('plan and settings limits', () => {
     expect(pv).toMatch(/autoPriceResult\.marginAmount - \(autoPriceResult\.seasonUplift \|\| 0\)/)
   })
 })
+
+describe('settings pages that said one thing and did another', () => {
+  it('billing reads the real subscription, and the portal button reads the URL the route returns', () => {
+    expect(src('app/api/billing/subscription/route.ts')).toMatch(/from\('tenant_subscriptions'\)/)
+    expect(src('app/settings/billing/page.tsx')).toMatch(/data\.portal_url \|\| data\.url/)
+  })
+
+  it('an invitation is resent in one request, and a failed email says so', () => {
+    expect(src('app/api/invitations/route.ts')).toMatch(/existingInvitation && body\.resend === true/)
+    const page = src('app/users/page.tsx')
+    expect(page).toMatch(/resend: true/)
+    expect(page).toMatch(/data\.emailSent === false/)
+    expect(page).toMatch(/invitableRoles\.map/)
+  })
+
+  it('email templates can be edited and deleted (the route had neither)', () => {
+    const r = src('app/api/email/templates/route.ts')
+    expect(r).toMatch(/export async function PUT/)
+    expect(r).toMatch(/export async function DELETE/)
+    expect(r).not.toMatch(/from\('email_templates'\)/)
+  })
+
+  it('only edited exchange rates are saved, each checked', () => {
+    expect(src('app/settings/page.tsx')).toMatch(/exchangeRates\.filter\(r => editedRates\.has/)
+    expect(src('app/api/exchange-rates/route.ts')).toMatch(/Some rates could not be saved/)
+  })
+
+  it('activity ranges are whole days, today included', () => {
+    expect(src('app/api/activity/route.ts')).toMatch(/startOfToday\.getTime\(\) - \(days - 1\)/)
+  })
+
+  it('a logo that fails to upload stops the save', () => {
+    expect(src('app/settings/tenant/page.tsx')).toMatch(/The logo could not be uploaded, so nothing was saved/)
+  })
+})
+
+describe('signatures', () => {
+  it('an HTML signature loses scripts and handlers; plain text is kept as typed', async () => {
+    const { cleanSignature } = await import('../email/signature')
+    const cleaned = cleanSignature('<p onclick="x()">Ali<script>alert(1)</script></p>')
+    expect(cleaned).not.toMatch(/script|onclick/)
+    expect(cleanSignature('Ali & Co\nCairo')).toBe('Ali & Co\nCairo')
+  })
+
+  it('switching signatures replaces the whole block', async () => {
+    const { swapSignatureBlock } = await import('../email/signature')
+    const body = '<p>Hi</p><div data-signature="true">--<br/><div>Ali</div><div>Cairo</div></div>'
+    expect(swapSignatureBlock(body, '<div data-signature="true">--<br/>Omar</div>')).toBe('<p>Hi</p><div data-signature="true">--<br/>Omar</div>')
+  })
+})

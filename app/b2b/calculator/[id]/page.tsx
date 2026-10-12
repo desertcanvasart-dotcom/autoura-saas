@@ -70,6 +70,10 @@ interface PricingResult {
   total_cost: number
   margin_percent: number
   margin_amount: number
+  /** Your seasonal premium on the departure date (Settings → Seasonal Premiums). */
+  season_name?: string | null
+  season_percent?: number
+  season_premium?: number
   selling_price: number
   price_per_person: number
   single_supplement?: number
@@ -492,15 +496,6 @@ export default function TourPriceCalculator() {
     URL.revokeObjectURL(url)
   }
 
-  const getSeasonBadge = (season: string) => {
-    const styles: Record<string, string> = {
-      low: 'bg-green-100 text-green-700',
-      high: 'bg-amber-100 text-amber-700',
-      peak: 'bg-red-100 text-red-700'
-    }
-    return styles[season] || 'bg-gray-100 text-gray-700'
-  }
-
   // Show loading state while checking auth/tenant
   if (authLoading || tenantLoading) {
     return (
@@ -864,9 +859,14 @@ export default function TourPriceCalculator() {
                         +1 Tour Leader
                       </span>
                     )}
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSeasonBadge(result.season)}`}>
-                      {result.season.charAt(0).toUpperCase() + result.season.slice(1)} Season
-                    </span>
+                    {/* Your own season, from Settings → Seasonal Premiums. The badge
+                        showed a built-in Egypt calendar (December–April "high")
+                        that priced nothing. */}
+                    {result.season_name && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        {result.season_name} +{result.season_percent}%
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -888,6 +888,9 @@ export default function TourPriceCalculator() {
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Margin ({result.margin_percent}%)</p>
                     <p className="text-xl font-bold text-green-600">{money(result.margin_amount)}</p>
+                    {(result.season_premium ?? 0) > 0 && (
+                      <p className="text-xs text-amber-700 mt-1">+ {money(result.season_premium ?? 0)} {result.season_name} premium</p>
+                    )}
                   </div>
                   <div className="bg-[#647C47]/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Selling Price</p>
@@ -1011,6 +1014,12 @@ export default function TourPriceCalculator() {
                       <td colSpan={5} className="px-4 py-2 text-right text-green-600">Margin ({result.margin_percent}%):</td>
                       <td className="px-4 py-2 text-right text-green-600">{money(result.margin_amount)}</td>
                     </tr>
+                    {(result.season_premium ?? 0) > 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-2 text-right text-amber-700">{result.season_name} premium (+{result.season_percent}%):</td>
+                        <td className="px-4 py-2 text-right text-amber-700">{money(result.season_premium ?? 0)}</td>
+                      </tr>
+                    )}
                     <tr className="text-lg">
                       <td colSpan={5} className="px-4 py-2 text-right text-[#647C47]">Total:</td>
                       <td className="px-4 py-2 text-right text-[#647C47]">{money(result.selling_price)}</td>

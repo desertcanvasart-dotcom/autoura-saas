@@ -37,17 +37,22 @@ export default function EmailSignaturesPage() {
     setSignatures((prev) =>
       prev.map((s) => ({ ...s, is_default: s.id === sig.id }))
     )
-    await fetch(`/api/email/signatures/${sig.id}`, {
+    const res = await fetch(`/api/email/signatures/${sig.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_default: true }),
-    })
+    }).catch(() => null)
+    if (!res || !res.ok) await dialog.alert('Not changed', 'The default signature could not be changed.', 'warning')
     load()
   }
 
   const remove = async (sig: Signature) => {
     if (!(await dialog.confirm({ message: `Delete signature "${sig.name}"?`, variant: 'danger', confirmText: 'Delete' }))) return
-    await fetch(`/api/email/signatures/${sig.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/email/signatures/${sig.id}`, { method: 'DELETE' }).catch(() => null)
+    if (!res || !res.ok) {
+      await dialog.alert('Not deleted', 'The signature could not be deleted.', 'warning')
+      return
+    }
     setSignatures((prev) => prev.filter((s) => s.id !== sig.id))
   }
 

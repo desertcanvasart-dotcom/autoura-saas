@@ -190,12 +190,36 @@ export async function POST(request: NextRequest) {
     // Check if there's already a pending invitation for this tenant
     const { data: existingInvitation } = await (supabase as any)
       .from('tenant_invitations')
-      .select('id')
+      .select('id, role')
       .eq('tenant_id', tenant_id)
       .eq('email', email.toLowerCase())
       .is('accepted_at', null)
       .gt('expires_at', new Date().toISOString())
-      .single()
+      // limit + maybeSingle: with two pending rows .single() errored, read as
+      // "none", and let a third through.
+      .limit(1)
+      .maybeSingle()
+
+    // Resend: the same invitation, a fresh link and seven more days. The page
+    // deleted the invitation and created a new one without checking either —
+    // a refused create (a role above yours, the rate limit) lost it silently.
+    if (existingInvitation && body.resend === true) {
+      if (existingInvitation.role !== role) {
+        return NextResponse.json({ success: false, error: 'Resend the invitation with its own role' }, { status: 400 })
+      }
+      const freshToken = crypto.randomBytes(32).toString('hex')
+      const freshExpiry = new Date()
+      freshExpiry.setDate(freshExpiry.getDate() + 7)
+      const { error: resendError } = await (supabase as any)
+        .from('tenant_invitations')
+        .update({ invitation_token: freshToken, expires_at: freshExpiry.toISOString() })
+        .eq('id', existingInvitation.id)
+      if (resendError) throw resendError
+      const resendUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'}/invite/accept?token=${freshToken}`
+      let resent = true
+      try { await sendInvitationEmail(email, role, resendUrl) } catch (err) { console.error('Failed to resend invitation email:', err); resent = false }
+      return NextResponse.json({ success: true, emailSent: resent, inviteUrl: resendUrl })
+    }
 
     if (existingInvitation) {
       return NextResponse.json(

@@ -1,5 +1,6 @@
 'use client'
 
+import { swapSignatureBlock } from '@/lib/email/signature'
 import { useEffect, useState } from 'react'
 import {
   Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine, MessageSquare, Mail, Reply, ChevronDown,
@@ -427,7 +428,7 @@ function EmailCompose({
     const stripped = htmlToPlainText(bodyHtml).trim()
     if (!stripped) setBodyHtml(`<p><br/></p>${sigToHtml(sig)}`)
     else if (/<div data-signature="true"/.test(bodyHtml)) {
-      setBodyHtml(bodyHtml.replace(/<div data-signature="true"[\s\S]*?<\/div>/, sigToHtml(sig)))
+      setBodyHtml(swapSignatureBlock(bodyHtml, sigToHtml(sig)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signatureId])

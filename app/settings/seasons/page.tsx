@@ -28,7 +28,10 @@ interface Season {
 }
 
 export default function SeasonsPage() {
-  const { isAdmin } = useRole()
+  // Managers price, so they edit the calendar too (the API and the sidebar
+  // already let them; the page showed them "viewing only").
+  const { isAdmin, isManager } = useRole()
+  const canEdit = isAdmin || isManager
   const [seasons, setSeasons] = useState<Season[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
@@ -88,7 +91,8 @@ export default function SeasonsPage() {
     const ok = await act('new-season', {
       action: 'create_season',
       name: newSeason.name,
-      uplift_percent: Number(newSeason.uplift_percent) || 0,
+      // As typed: the server refuses a blank or a non-number (it was saved as 0%).
+      uplift_percent: newSeason.uplift_percent,
     }, `${newSeason.name.trim()} added`)
     if (ok) setNewSeason({ name: '', uplift_percent: '10' })
   }
@@ -136,9 +140,9 @@ export default function SeasonsPage() {
         </div>
       )}
 
-      {!isAdmin && !loading && (
+      {!canEdit && !loading && (
         <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
-          Viewing only — an admin can change the demand calendar.
+          Viewing only — an admin or a manager can change the demand calendar.
         </div>
       )}
 
@@ -191,8 +195,23 @@ export default function SeasonsPage() {
                       : `${s.dates.length} date range${s.dates.length === 1 ? '' : 's'}`}
                   </p>
                 </div>
-                {isAdmin && (
+                {canEdit && (
                   <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        // The premium and the name can change without
+                        // re-entering every date (delete was the only way).
+                        const pct = window.prompt(`Premium for ${s.name} (%)`, String(s.uplift_percent))
+                        if (pct === null) return
+                        const name = window.prompt('Name', s.name)
+                        if (name === null) return
+                        act(`edit-${s.id}`, { action: 'update_season', id: s.id, name, uplift_percent: pct }, `${name.trim() || s.name} updated`)
+                      }}
+                      disabled={busy !== null}
+                      className="text-xs text-gray-500 hover:text-[#647C47] border border-gray-200 rounded px-2 py-0.5"
+                    >
+                      Edit
+                    </button>
                     <button
                       onClick={() => act(`toggle-${s.id}`, { action: 'update_season', id: s.id, is_active: !s.is_active }, s.is_active ? 'Season switched off' : 'Season switched on')}
                       disabled={busy !== null}
@@ -220,7 +239,7 @@ export default function SeasonsPage() {
                         {d.start_date} → {d.end_date}
                         {d.label && <span className="ml-2 text-xs text-gray-400">{d.label}</span>}
                       </span>
-                      {isAdmin && (
+                      {canEdit && (
                         <button
                           onClick={() => act(`deldate-${d.id}`, { action: 'delete_dates', id: d.id }, 'Dates removed')}
                           disabled={busy !== null}
@@ -234,7 +253,7 @@ export default function SeasonsPage() {
                 </ul>
               )}
 
-              {isAdmin && (
+              {canEdit && (
                 <div className="mt-3 flex flex-wrap items-end gap-2">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
@@ -276,7 +295,7 @@ export default function SeasonsPage() {
             </div>
           ))}
 
-          {isAdmin && (
+          {canEdit && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap items-end gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">New season</label>

@@ -230,8 +230,10 @@ export default function WhatsAppSettingsPage() {
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-amber-800">
-                  <p className="font-medium mb-1">Configuration Required</p>
-                  <p>Please check your <code className="bg-amber-100 px-1.5 py-0.5 rounded text-[10px]">.env.local</code> file and ensure all Twilio credentials are set.</p>
+                  <p className="font-medium mb-1">WhatsApp is not set up yet</p>
+                  {/* An agency cannot edit server files: WhatsApp runs on the
+                      platform's account, and the Autoura team sets it up. */}
+                  <p>WhatsApp runs on Autoura&rsquo;s account. Contact Autoura support to have it switched on, or to get your own WhatsApp number.</p>
                 </div>
               </div>
             </div>
@@ -525,8 +527,8 @@ export default function WhatsAppSettingsPage() {
                 <span className="text-[10px] font-bold">1</span>
               </div>
               <div>
-                <p className="text-xs font-medium">Configure Twilio Credentials</p>
-                <p className="text-white/70 text-[11px] mt-0.5">Add your credentials to <code className="bg-white/20 px-1.5 py-0.5 rounded text-[10px]">.env.local</code></p>
+                <p className="text-xs font-medium">Ask Autoura support</p>
+                <p className="text-white/70 text-[11px] mt-0.5">WhatsApp runs on Autoura&rsquo;s account; the team switches it on and can give you your own number.</p>
               </div>
             </div>
 

@@ -6,7 +6,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 type Period = '7d' | '30d' | '90d' | 'all'
 
@@ -16,6 +17,10 @@ function periodStartISO(period: Period): string | null {
   if (days === null) return null
   return new Date(now - days * 24 * 60 * 60 * 1000).toISOString()
 }
+
+// The columns read below, as the query returns them.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DraftRow = Record<string, any>
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth()
@@ -28,21 +33,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Admins and managers only' }, { status: 403 })
   }
 
-  const period = (request.nextUrl.searchParams.get('period') || '30d') as Period
+  // An unknown period was read as all-time.
+  const asked = request.nextUrl.searchParams.get('period') || '30d'
+  if (!['7d', '30d', '90d', 'all'].includes(asked)) {
+    return NextResponse.json({ success: false, error: 'period must be 7d, 30d, 90d or all' }, { status: 400 })
+  }
+  const period = asked as Period
   const startIso = periodStartISO(period)
 
   // ---------- Pull all drafts for the period ----------
-  let draftsQuery = supabase
-    .from('communication_drafts')
-    .select('id, status, send_channel, ai_flags, ai_confidence, context_used, was_edited, reviewed_by, created_at, sent_at, communication_threads(channel)')
-    .eq('tenant_id', tenant_id)
-    .order('created_at', { ascending: false })
-    .limit(5000)
-
-  if (startIso) draftsQuery = draftsQuery.gte('created_at', startIso)
-
-  const { data: drafts, error: draftsErr } = await draftsQuery
-  if (draftsErr) return NextResponse.json({ success: false, error: draftsErr.message }, { status: 500 })
+  // Every draft, a page at a time: .limit(5000) still stopped at the server's
+  // 1000 rows, so a busy company's totals and rates were undercounted.
+  const { data: drafts, error: draftsErr } = await fetchAllPages<DraftRow>((from, to) => {
+    let q = supabase
+      .from('communication_drafts')
+      .select('id, status, send_channel, ai_flags, ai_confidence, context_used, was_edited, reviewed_by, created_at, sent_at, communication_threads(channel)')
+      .eq('tenant_id', tenant_id)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+    if (startIso) q = q.gte('created_at', startIso)
+    return q.range(from, to)
+  })
+  if (draftsErr) return NextResponse.json({ success: false, error: (draftsErr as { message?: string }).message || 'Could not load drafts' }, { status: 500 })
 
   const rows = drafts || []
   const total = rows.length
@@ -170,10 +182,18 @@ export async function GET(request: NextRequest) {
     const userIds = Array.from(perUserMap.keys())
     // Emails live in auth.users which is not directly queryable under RLS.
     // Best-effort: user_profiles mirrors auth users; fall back to raw ids.
-    const { data: members } = await supabase
-      .from('user_profiles')
-      .select('id, email, full_name')
-      .in('id', userIds)
+    // With the service key, limited to this company's members: under RLS a
+    // user reads only their own profile, so every other reviewer showed as
+    // a raw id.
+    const { data: memberRows } = await createAdminClient()
+      .from('tenant_members')
+      .select('user_id')
+      .eq('tenant_id', tenant_id)
+      .in('user_id', userIds)
+    const ours = (memberRows ?? []).map((m: { user_id: string }) => m.user_id)
+    const { data: members } = ours.length
+      ? await createAdminClient().from('user_profiles').select('id, email, full_name').in('id', ours)
+      : { data: [] as Array<{ id: string; email: string | null; full_name: string | null }> }
 
     perUser = userIds.map((id) => {
       const stats = perUserMap.get(id)!
