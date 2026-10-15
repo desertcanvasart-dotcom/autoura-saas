@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const mailboxTenant = authResult.tenant_id!
     const supabase = createAdminClient()
 
-    const { userId, messageIds, action, labelId } = await request.json()
+    const { userId, messageIds, action, labelId, fromLabelId } = await request.json()
 
     if (!userId || !messageIds || !action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `At most ${MAX_ACTION_IDS.toLocaleString()} emails at a time` }, { status: 400 })
     }
 
-    const change = labelChange(action, labelId)
+    const change = labelChange(action, labelId, fromLabelId)
     if ('error' in change) {
       return NextResponse.json({ error: change.error }, { status: 400 })
     }
