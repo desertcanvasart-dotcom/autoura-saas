@@ -18,7 +18,7 @@ type Header = { name?: string | null; value?: string | null }
 type ThreadMessage = { payload?: { headers?: Header[] | null } | null }
 
 /** "John Smith <john@x.com>" → ["John Smith", "john@x.com"]; a bare address has no name. */
-function parseMailbox(part: string): { name: string | null; email: string } {
+export function parseMailbox(part: string): { name: string | null; email: string } {
   const m = part.match(/^\s*(.*?)\s*<([^>]+)>\s*$/)
   if (!m) return { name: null, email: part.trim().toLowerCase() }
   const name = m[1].trim().replace(/^"(.*)"$/, '$1').trim()
@@ -26,7 +26,7 @@ function parseMailbox(part: string): { name: string | null; email: string } {
 }
 
 /** Split an address list on commas outside quotes ("Smith, John" <j@x.com>). */
-function splitAddresses(value: string): string[] {
+export function splitAddresses(value: string): string[] {
   const out: string[] = []
   let cur = ''
   let quoted = false
@@ -36,6 +36,22 @@ function splitAddresses(value: string): string[] {
     cur += ch
   }
   if (cur.trim()) out.push(cur)
+  return out
+}
+
+/**
+ * Every real address in a header, lowercased, in order: quote-aware, so
+ * `"Smith, John" <j@x.com>` is one address, and group syntax with no address
+ * (`undisclosed-recipients:;`) yields none. The email sync used to keep a
+ * bare multi-address To line whole as one "address".
+ */
+export function headerAddresses(value: string | null | undefined): string[] {
+  const out: string[] = []
+  for (const part of splitAddresses(String(value ?? ''))) {
+    const { email } = parseMailbox(part)
+    const bare = email.replace(/^[^:]*:/, '').replace(/;$/, '').trim()
+    if (/^[^\s@<>",;]+@[^\s@<>",;]+$/.test(bare) && !out.includes(bare)) out.push(bare)
+  }
   return out
 }
 

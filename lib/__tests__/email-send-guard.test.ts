@@ -76,11 +76,17 @@ describe('replyBodyHash', () => {
 })
 
 describe('claimSend', () => {
-  const info = { userId: 'u1', threadId: 't1', bodyHash: 'h1' }
+  const info = { tenantId: 'ten1', userId: 'u1', threadId: 't1', bodyHash: 'h1' }
 
   it('claims a fresh key', async () => {
     const d = db({ email_send_claims: [] })
     expect(await claimSend(d, 'k1', info)).toEqual({ ok: true })
+  })
+
+  it('stamps the company itself — the service role has no auth.uid() for the trigger to use', async () => {
+    const d = db({ email_send_claims: [] })
+    await claimSend(d, 'k1', info)
+    expect(d.tables.email_send_claims[0]).toMatchObject({ tenant_id: 'ten1', user_id: 'u1' })
   })
 
   it('refuses the SAME key — the double click', async () => {
@@ -118,36 +124,36 @@ describe('threadConflict', () => {
 
   it('reports a colleague who replied after the message being answered', async () => {
     const d = db({
-      email_messages: [{ gmail_thread_id: 't1', direction: 'outbound', sent_at: '2027-03-01T11:00:00Z', sent_by: 'u2' }],
+      email_messages: [{ tenant_id: 'ten1', gmail_thread_id: 't1', direction: 'outbound', sent_at: '2027-03-01T11:00:00Z', sent_by: 'u2' }],
       user_profiles: [{ id: 'u2', full_name: 'Sara', email: 's@x.test' }],
     })
-    const c = await threadConflict(d, { threadId: 't1', requestKey: 'k2', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })
+    const c = await threadConflict(d, { tenantId: 'ten1', threadId: 't1', requestKey: 'k2', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })
     expect(c).toMatchObject({ code: 'ALREADY_REPLIED', repliedBy: 'Sara' })
   })
 
   it('reports an attempt still in flight from someone else', async () => {
     const d = db({
       email_messages: [],
-      email_send_claims: [{ request_key: 'other', thread_id: 't1', status: 'sending', created_at: '2027-03-01T11:30:00Z', user_id: null }],
+      email_send_claims: [{ tenant_id: 'ten1', request_key: 'other', thread_id: 't1', status: 'sending', created_at: '2027-03-01T11:30:00Z', user_id: null }],
     })
-    const c = await threadConflict(d, { threadId: 't1', requestKey: 'k2', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })
+    const c = await threadConflict(d, { tenantId: 'ten1', threadId: 't1', requestKey: 'k2', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })
     expect(c).toMatchObject({ code: 'ALREADY_REPLIED' })
   })
 
   it('does not report the sender’s OWN attempt', async () => {
     const d = db({
       email_messages: [],
-      email_send_claims: [{ request_key: 'k2', thread_id: 't1', status: 'sending', created_at: '2027-03-01T11:30:00Z' }],
+      email_send_claims: [{ tenant_id: 'ten1', request_key: 'k2', thread_id: 't1', status: 'sending', created_at: '2027-03-01T11:30:00Z' }],
     })
-    expect(await threadConflict(d, { threadId: 't1', requestKey: 'k2', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })).toBeNull()
+    expect(await threadConflict(d, { tenantId: 'ten1', threadId: 't1', requestKey: 'k2', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })).toBeNull()
   })
 
   it('reports the same text sent to the thread within the window', async () => {
     const d = db({
       email_messages: [],
-      email_send_claims: [{ request_key: 'earlier', thread_id: 't1', body_hash: hash, status: 'sent', created_at: '2027-03-01T11:55:00Z' }],
+      email_send_claims: [{ tenant_id: 'ten1', request_key: 'earlier', thread_id: 't1', body_hash: hash, status: 'sent', created_at: '2027-03-01T11:55:00Z' }],
     })
-    const c = await threadConflict(d, { threadId: 't1', requestKey: 'k2', seenUpTo: undefined, bodyHash: hash, now: NOW })
+    const c = await threadConflict(d, { tenantId: 'ten1', threadId: 't1', requestKey: 'k2', seenUpTo: undefined, bodyHash: hash, now: NOW })
     expect(c).toMatchObject({ code: 'SAME_REPLY' })
   })
 
@@ -155,14 +161,26 @@ describe('threadConflict', () => {
     const old = new Date(NOW.getTime() - (SAME_REPLY_WINDOW_MINUTES + 5) * 60_000).toISOString()
     const d = db({
       email_messages: [],
-      email_send_claims: [{ request_key: 'earlier', thread_id: 't1', body_hash: hash, status: 'sent', created_at: old }],
+      email_send_claims: [{ tenant_id: 'ten1', request_key: 'earlier', thread_id: 't1', body_hash: hash, status: 'sent', created_at: old }],
     })
-    expect(await threadConflict(d, { threadId: 't1', requestKey: 'k2', seenUpTo: undefined, bodyHash: hash, now: NOW })).toBeNull()
+    expect(await threadConflict(d, { tenantId: 'ten1', threadId: 't1', requestKey: 'k2', seenUpTo: undefined, bodyHash: hash, now: NOW })).toBeNull()
   })
 
   it('a clean thread has nothing in the way', async () => {
     const d = db({ email_messages: [], email_send_claims: [] })
-    expect(await threadConflict(d, { threadId: 't1', requestKey: 'k1', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })).toBeNull()
+    expect(await threadConflict(d, { tenantId: 'ten1', threadId: 't1', requestKey: 'k1', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })).toBeNull()
+  })
+
+  it('ignores another company’s reply on the same Gmail thread', async () => {
+    // One mailbox connected in two companies shares thread ids (migration 415).
+    const d = db({
+      email_messages: [{ tenant_id: 'ten2', gmail_thread_id: 't1', direction: 'outbound', sent_at: '2027-03-01T11:00:00Z', sent_by: 'u9' }],
+      email_send_claims: [
+        { tenant_id: 'ten2', request_key: 'other', thread_id: 't1', body_hash: hash, status: 'sent', created_at: '2027-03-01T11:55:00Z' },
+      ],
+      user_profiles: [{ id: 'u9', full_name: 'Outsider', email: 'o@x.test' }],
+    })
+    expect(await threadConflict(d, { tenantId: 'ten1', threadId: 't1', requestKey: 'k2', seenUpTo: '2027-03-01T10:00:00Z', bodyHash: hash, now: NOW })).toBeNull()
   })
 })
 

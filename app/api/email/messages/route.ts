@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const conversationId = searchParams.get('conversation_id')
     const threadId = searchParams.get('thread_id')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    // A bad or huge ?limit= used to reach .limit() as NaN (a 500) or unbounded.
+    const asked = parseInt(searchParams.get('limit') || '50', 10)
+    const limit = Number.isFinite(asked) ? Math.min(Math.max(asked, 1), 200) : 50
 
     if (!conversationId && !threadId) {
       return NextResponse.json({ error: 'conversation_id or thread_id required', success: false }, { status: 400 })

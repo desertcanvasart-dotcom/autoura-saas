@@ -140,7 +140,7 @@ describe('email template placeholders', () => {
   })
 
   it('the inbox escapes the HTML body only', () => {
-    const page = src('app/inbox/page.tsx')
+    const page = src('components/inbox/ComposeModal.tsx') // the inbox's compose window
     expect(page).toMatch(/replacePlaceholders\(selectedTemplate\.content, finalData, \{ escape: true \}\)/)
     expect(page).toMatch(/replacePlaceholders\(selectedTemplate\.subject, finalData\)/)
   })

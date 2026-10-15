@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
 import { createLeadsFromNewConversations, type NewConversation } from '@/lib/email/create-leads'
-import { contactNameFromThread, fillMissingContactNames } from '@/lib/email/contact-name'
+import { contactNameFromThread, fillMissingContactNames, headerAddresses } from '@/lib/email/contact-name'
 
 /** Either client writes the same rows; the sweep's is the service role. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,11 +14,22 @@ import { syncQueries } from '@/lib/inbox-business-filter'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { collectCandidates, storedIds, downloadMessages } from '@/lib/email/gmail-candidates'
+import { tenantClientEmails } from '@/lib/email/tenant-client-emails'
+import { applyRulesToNewMail } from '@/lib/email/apply-rules'
+import type { MailRule } from '@/lib/email/mail-rules'
 
+/** The first real address in a header, or '' (lib/email/contact-name headerAddresses). */
 function extractEmailAddress(from: string | null | undefined): string {
-  if (!from) return ''
-  const match = from.match(/<([^>]+)>/)
-  return match ? match[1].toLowerCase() : from.toLowerCase().trim()
+  return headerAddresses(from)[0] ?? ''
+}
+
+/**
+ * The customer's address when the office wrote first: the first recipient that
+ * is not the office. A To line naming a colleague first, or a bare list
+ * ("a@x.com, b@y.com"), used to become the conversation's "customer" whole.
+ */
+function firstCustomerAddress(header: string | null | undefined, office: OfficeRule): string {
+  return headerAddresses(header).find(a => !isOfficeAddress(office, a)) ?? ''
 }
 
 function extractDisplayName(from: string | null | undefined): string | null {
@@ -174,14 +185,15 @@ export async function POST(request: NextRequest) {
     // (Updates does — hotel and airline confirmations live there). A sender
     // already on record is rescued from those categories by a second pass,
     // so a client Gmail misfiled is never lost. See lib/inbox-business-filter.
-    const { data: knownRows } = await createAdminClient().from('clients').select('email').eq('tenant_id', tenant_id).not('email', 'is', null)
-    const { main: mainQuery, rescues } = syncQueries(query, (knownRows ?? []).map((r: { email: string | null }) => r.email || ''))
+    // Every client, paged — a plain select stops at 1000 rows without saying so.
+    const knownRows = await tenantClientEmails(createAdminClient() as unknown as Parameters<typeof tenantClientEmails>[0], tenant_id)
+    const { main: mainQuery, rescues } = syncQueries(query, knownRows.map(r => r.email))
 
     // Which messages to download (lib/email/gmail-candidates.ts): what Gmail
     // added since the stored history id on a scheduled run, else the date
     // window — then only the ones not already stored.
     const { data: syncState } = await db.from('email_sync_state').select('last_history_id').eq('user_id', userId).eq('tenant_id', tenant_id).maybeSingle()
-    const knownSenders = new Set((knownRows ?? []).map((r: { email: string | null }) => (r.email || '').trim().toLowerCase()).filter(Boolean))
+    const knownSenders = new Set(knownRows.map(r => r.email.trim().toLowerCase()).filter(Boolean))
     const candidates = await collectCandidates(gmail, {
       useHistory: Boolean(use_history) && !full_sync,
       startHistoryId: (syncState as { last_history_id?: string | null } | null)?.last_history_id ?? null,
@@ -208,6 +220,32 @@ export async function POST(request: NextRequest) {
       download_failed: downloaded.failed,
       download_gone: downloaded.gone,
       insert_failed: 0,
+      rules_applied: 0,
+      rules_error: undefined as string | undefined,
+    }
+
+    // Mail rules (migration 422): the company's rules run on what just
+    // arrived — filed, starred, read, out of the Inbox, to Spam or to Trash.
+    // Mail a rule sends to Spam or Trash is not filed into conversations. A
+    // rule that cannot be applied is reported, never a reason to fail the sync.
+    let ruleRemoved = new Set<string>()
+    try {
+      const { data: ruleRows, error: rulesErr } = await createAdminClient()
+        .from('email_rules')
+        .select('id, name, enabled, conditions, actions')
+        .eq('tenant_id', tenant_id)
+        .eq('enabled', true)
+        .order('created_at', { ascending: true })
+      if (rulesErr) throw new Error(rulesErr.message)
+      if (ruleRows && ruleRows.length > 0 && downloaded.messages.length > 0) {
+        const applied = await applyRulesToNewMail(gmail, ruleRows as unknown as MailRule[], downloaded.messages)
+        result.rules_applied = applied.applied
+        ruleRemoved = applied.removedIds
+      }
+    } catch (ruleErr) {
+      const msg = ruleErr instanceof Error ? ruleErr.message : String(ruleErr)
+      console.error('[Email Sync] mail rules failed:', msg)
+      result.rules_error = msg
     }
 
     // Track conversation ids that received at least one new inbound message
@@ -221,6 +259,7 @@ export async function POST(request: NextRequest) {
     // Group by thread (only the newly downloaded messages)
     const threadMessages = new Map<string, any[]>()
     for (const detail of downloaded.messages) {
+      if (detail.id && ruleRemoved.has(detail.id)) continue
       const threadId = detail.threadId!
       if (!threadMessages.has(threadId)) threadMessages.set(threadId, [])
       threadMessages.get(threadId)!.push(detail)
@@ -246,7 +285,9 @@ export async function POST(request: NextRequest) {
         const firstTo = getH(firstHeaders, 'To')
         const firstDir = getDirection(firstFrom, office)
         const customerHeader = firstDir === 'inbound' ? firstFrom : firstTo
-        const contactEmail = extractEmailAddress(customerHeader)
+        const contactEmail = firstDir === 'inbound'
+          ? extractEmailAddress(firstFrom)
+          : firstCustomerAddress(firstTo, office)
         // Any header in the thread that names the customer — not only the
         // first one, which is a bare address when the office wrote first
         // (lib/email/contact-name.ts).
@@ -305,18 +346,39 @@ export async function POST(request: NextRequest) {
             })
             .select('id')
             .single()
-          if (unifiedErr || !newUnified) continue
-          unifiedId = newUnified.id
-          // Judged for a travel request after the loop: a conversation is
-          // judged ONCE, when it first appears.
-          newConversations.push({
-            unifiedId,
-            fromEmail: contactEmail,
-            fromName: contactName,
-            subject: getH(firstHeaders, 'Subject'),
-            body: sorted[0]?.snippet || '',
-          })
-          result.conversations_created++
+          if (unifiedErr || !newUnified) {
+            // Another sync (the scheduled sweep, a Sync click) created this
+            // contact's conversation a moment ago: file the mail there.
+            const { data: raced } = unifiedErr?.code === '23505'
+              ? await db
+                  .from('unified_conversations')
+                  .select('id')
+                  .eq('tenant_id', tenant_id)
+                  .eq('contact_email', contactEmail)
+                  .maybeSingle()
+              : { data: null }
+            if (!raced) {
+              // Counted, so the history id is not advanced past mail that was
+              // never stored (it was dropped silently before).
+              console.error('[Email Sync] conversation insert failed:', unifiedErr?.message)
+              insertFailed += messages.length
+              continue
+            }
+            unifiedId = raced.id
+            result.conversations_updated++
+          } else {
+            unifiedId = newUnified.id
+            // Judged for a travel request after the loop: a conversation is
+            // judged ONCE, when it first appears.
+            newConversations.push({
+              unifiedId,
+              fromEmail: contactEmail,
+              fromName: contactName,
+              subject: getH(firstHeaders, 'Subject'),
+              body: sorted[0]?.snippet || '',
+            })
+            result.conversations_created++
+          }
         }
 
         // Store each message in email_messages (skip duplicates by gmail_message_id)
@@ -360,7 +422,9 @@ export async function POST(request: NextRequest) {
           const toEmail = extractEmailAddress(toRaw)
           const toName = extractDisplayName(toRaw)
           const cc = getMH('Cc')
-          const ccEmails = cc ? cc.split(',').map((e: string) => extractEmailAddress(e)).filter(Boolean) : null
+          // Quote-aware: `"Smith, John" <j@x.com>` is one address, not two.
+          const ccList = headerAddresses(cc)
+          const ccEmails = ccList.length ? ccList : null
 
           const { error: insErr } = await db.from('email_messages').insert({
             tenant_id,
@@ -421,6 +485,9 @@ export async function POST(request: NextRequest) {
           .eq('id', unifiedId)
       } catch (threadErr: any) {
         console.error('[Email Sync] Thread error:', threadErr?.message || threadErr)
+        // Counted like a failed insert: the run is not clean, so its history
+        // id is not stored and the thread is retried rather than lost.
+        insertFailed++
       }
     }
 

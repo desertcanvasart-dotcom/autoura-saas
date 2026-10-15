@@ -8,6 +8,7 @@ import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
 import { gateRole } from '@/lib/api-role-gate'
+import { recentReminderSentAt, nextReminderAfter } from '@/lib/invoice-reminder-guard'
 
 // Sends a reminder email directly via the shared mail helper.
 async function sendReminderEmail(params: {
@@ -93,7 +94,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
@@ -391,6 +392,18 @@ export async function POST(request: NextRequest) {
       else if (daysUntilDue >= -14) reminderType = 'overdue_14'
       else reminderType = 'overdue_30'
 
+      // "Send all due" is the automatic rule run by hand: an invoice already
+      // reminded this week (its next date failed to save) is not sent a second
+      // demand. Invoices picked one by one are sent as asked.
+      if (sendAll && !(invoiceIds && invoiceIds.length > 0)) {
+        const recent = await recentReminderSentAt(supabase, invoice.id)
+        if (recent) {
+          await supabase.from('invoices').update({ next_reminder_date: nextReminderAfter(recent) }).eq('id', invoice.id)
+          results.skipped++
+          continue
+        }
+      }
+
       const { subject, html } = generateReminderEmail(invoice, reminderType)
 
       // Send email
@@ -408,7 +421,7 @@ export async function POST(request: NextRequest) {
         const nextReminderDate = new Date()
         nextReminderDate.setDate(nextReminderDate.getDate() + 7) // Next reminder in 7 days
 
-        await supabase
+        const { error: dateError } = await supabase
           .from('invoices')
           .update({
             last_reminder_sent: new Date().toISOString(),
@@ -416,6 +429,7 @@ export async function POST(request: NextRequest) {
             next_reminder_date: nextReminderDate.toISOString().split('T')[0]
           })
           .eq('id', invoice.id)
+        if (dateError) console.error('reminder sent but next date not saved:', invoice.id, dateError.message)
 
         // Log reminder
         await supabase

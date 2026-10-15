@@ -431,3 +431,49 @@ describe('cron-mail-alerts', { timeout: 30_000 }, () => {
     expect((await run(MAIL_ALERTS, { CRON_TARGET_URL: 'http://127.0.0.1:1' })).code).toBe(1)
   })
 })
+
+// ============================================================================
+// cron-scheduled-send — scheduled emails go out when due (migration 421).
+// Same exit-code rule: a run where any email failed to send exits 1.
+// ============================================================================
+
+const SCHEDULED_SEND = path.join(ROOT, 'scripts/cron-scheduled-send.mjs')
+
+describe('cron-scheduled-send', { timeout: 30_000 }, () => {
+  it('exits 0 on a clean run, and asks with a Bearer secret', async () => {
+    const stub = await stubByPath({
+      '/api/cron/scheduled-send': { body: JSON.stringify({ success: true, due: 2, sent: 2, retrying: 0, failed: 0, interrupted: 0, results: [] }) },
+    })
+    const res = await run(SCHEDULED_SEND, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(res.code).toBe(0)
+    expect(res.stdout).toContain('2/2 due email(s) sent')
+    expect(stub.auth[0]).toBe('Bearer s3cret')
+  })
+
+  it('exits 1 when an email failed to send, and names it', async () => {
+    const stub = await stubByPath({
+      '/api/cron/scheduled-send': {
+        body: JSON.stringify({
+          success: false, due: 1, sent: 0, retrying: 0, failed: 1, interrupted: 0,
+          results: [{ id: 'sch-1', status: 'failed', error: 'The draft was deleted' }],
+        }),
+      },
+    })
+    const res = await run(SCHEDULED_SEND, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(res.code).toBe(1)
+    expect(res.stderr).toContain('sch-1')
+    expect(res.stderr).toContain('The draft was deleted')
+  })
+
+  it('exits 1 when a send was interrupted', async () => {
+    const stub = await stubByPath({
+      '/api/cron/scheduled-send': { body: JSON.stringify({ success: true, due: 0, sent: 0, retrying: 0, failed: 0, interrupted: 1, results: [] }) },
+    })
+    expect((await run(SCHEDULED_SEND, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })).code).toBe(1)
+  })
+
+  it('refuses to run without a target or a secret', async () => {
+    expect((await run(SCHEDULED_SEND, { CRON_SECRET: 's3cret' })).code).toBe(1)
+    expect((await run(SCHEDULED_SEND, { CRON_TARGET_URL: 'http://127.0.0.1:1' })).code).toBe(1)
+  })
+})

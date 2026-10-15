@@ -9,6 +9,7 @@ import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { withJobRun } from '@/lib/support/job-runs'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
+import { recentReminderSentAt, nextReminderAfter } from '@/lib/invoice-reminder-guard'
 
 // Verify cron secret for security
 const CRON_SECRET = process.env.CRON_SECRET
@@ -205,6 +206,15 @@ async function getHandler(request: NextRequest) {
       else if (daysOverdue <= 14) reminderType = 'overdue_14'
       else reminderType = 'overdue_30'
 
+      // Already reminded this week (its next date failed to save after the
+      // send): repair the date, do not send a second demand.
+      const recent = await recentReminderSentAt(supabase, invoice.id)
+      if (recent) {
+        await supabase.from('invoices').update({ next_reminder_date: nextReminderAfter(recent) }).eq('id', invoice.id)
+        skipped++
+        continue
+      }
+
       const { subject, html } = generateReminderEmail(invoice, reminderType, daysOverdue)
 
       const result = await sendReminderEmail({
@@ -218,7 +228,7 @@ async function getHandler(request: NextRequest) {
       })
 
       if (result.success) {
-        await supabase
+        const { error: dateError } = await supabase
           .from('invoices')
           .update({
             last_reminder_sent: new Date().toISOString(),
@@ -226,6 +236,9 @@ async function getHandler(request: NextRequest) {
             next_reminder_date: shiftDateISO(today, 7)
           })
           .eq('id', invoice.id)
+        // The log row below is what stops a repeat (recentReminderSentAt);
+        // say so loudly rather than losing the failure.
+        if (dateError) console.error('reminder sent but next date not saved:', invoice.id, dateError.message)
 
         await supabase
           .from('invoice_reminders')

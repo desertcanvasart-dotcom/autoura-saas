@@ -40,7 +40,13 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get('query') || ''
     const pageToken = searchParams.get('pageToken') || undefined
-    const maxResults = parseInt(searchParams.get('maxResults') || '20')
+    // Each result is one Gmail call, made in parallel: bounded, and a bad value
+    // falls back rather than reaching Gmail as NaN.
+    const askedMax = parseInt(searchParams.get('maxResults') || '20', 10)
+    const maxResults = Number.isFinite(askedMax) ? Math.min(Math.max(askedMax, 1), 100) : 20
+    // A folder (Gmail label) by id: its emails wherever they are, archived
+    // ones included — a search by name inside the Inbox hid those.
+    const labelId = searchParams.get('labelId') || undefined
 
     // ✅ SECURITY: Use authenticated user's ID only - prevents user impersonation
     // Remove ability to specify userId in query params
@@ -92,7 +98,7 @@ export async function GET(request: NextRequest) {
     const { messages, nextPageToken } = await fetchEmails(
       access_token,
       refresh_token,
-      { maxResults, query, pageToken }
+      { maxResults, query, pageToken, labelIds: labelId ? [labelId] : undefined }
     )
 
     return NextResponse.json({ messages, nextPageToken })

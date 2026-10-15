@@ -53,10 +53,14 @@ export type SendClaim =
 export async function claimSend(
   db: Db,
   requestKey: string,
-  info: { userId: string; threadId: string | null; bodyHash: string }
+  info: { tenantId: string; userId: string; threadId: string | null; bodyHash: string }
 ): Promise<SendClaim> {
+  // tenant_id is set here, not left to the auto_set_tenant_id trigger: the
+  // send route writes with the service role, where auth.uid() is NULL, so the
+  // trigger stamps NULL and the NOT NULL column rejects every claim (23502).
   const row = {
     request_key: requestKey,
+    tenant_id: info.tenantId,
     user_id: info.userId,
     thread_id: info.threadId,
     body_hash: info.bodyHash,
@@ -130,15 +134,27 @@ export type ThreadConflict =
  */
 export async function threadConflict(
   db: Db,
-  args: { threadId: string; requestKey: string | null; seenUpTo: string | null | undefined; bodyHash: string; now?: Date }
+  args: {
+    tenantId: string
+    threadId: string
+    requestKey: string | null
+    seenUpTo: string | null | undefined
+    bodyHash: string
+    now?: Date
+  }
 ): Promise<ThreadConflict | null> {
   const now = args.now ?? new Date()
+  // Gmail thread ids are per MAILBOX, and one mailbox can be connected in two
+  // companies (migration 415). The service-role client sees every company, so
+  // each lookup is scoped to the sender's, or one company's reply would block
+  // (and name a colleague from) the other.
 
   if (args.seenUpTo !== undefined) {
     const after = args.seenUpTo ?? '1970-01-01T00:00:00Z'
     const { data: replies } = await db
       .from('email_messages')
       .select('sent_at, sent_by')
+      .eq('tenant_id', args.tenantId)
       .eq('gmail_thread_id', args.threadId)
       .eq('direction', 'outbound')
       .gt('sent_at', after)
@@ -151,6 +167,7 @@ export async function threadConflict(
       const { data: inFlight } = await db
         .from('email_send_claims')
         .select('created_at, user_id, request_key')
+        .eq('tenant_id', args.tenantId)
         .eq('thread_id', args.threadId)
         .in('status', ['sending', 'sent'])
         .gt('created_at', after)
@@ -180,6 +197,7 @@ export async function threadConflict(
   const { data: same } = await db
     .from('email_send_claims')
     .select('created_at, request_key')
+    .eq('tenant_id', args.tenantId)
     .eq('thread_id', args.threadId)
     .eq('body_hash', args.bodyHash)
     .eq('status', 'sent')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { attachmentNameParams } from '@/lib/email/mime-header'
 
 // GET /api/gmail/attachments?userId=xxx&messageId=xxx&attachmentId=xxx&filename=xxx
 export async function GET(request: NextRequest) {
@@ -111,7 +112,9 @@ export async function GET(request: NextRequest) {
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+        // ASCII fallback plus RFC 6266/2231 filename*: a percent-encoded plain
+        // filename= saved "Reservación.pdf" as "Reservaci%C3%B3n.pdf".
+        'Content-Disposition': `attachment; ${attachmentNameParams(filename).disposition}`,
         'Content-Length': buffer.length.toString(),
       },
     })

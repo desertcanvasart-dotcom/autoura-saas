@@ -1,6 +1,6 @@
 # Scheduled jobs
 
-Three background jobs run on a schedule. Both are HTTP-triggered: a tiny Node
+Background jobs run on a schedule. Each is HTTP-triggered: a tiny Node
 script POSTs to an authenticated endpoint and exits with the right code so the
 scheduler records success or failure.
 
@@ -18,6 +18,7 @@ start command that runs once and exits. They do not serve traffic.
 | Agent memory | `npm run cron:agent-memory` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
 | Exchange rates | `npm run cron:exchange-rates` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
 | Reminders | `npm run cron:reminders` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` |
+| Scheduled send | `npm run cron:scheduled-send` | `*/5 * * * *` | `GET /api/cron/scheduled-send` |
 
 (The second column is the START COMMAND **stored on the service** — see the
 Config-as-Code retirement note below. The full topology is defined in

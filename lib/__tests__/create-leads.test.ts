@@ -28,14 +28,21 @@ function db(opts: { clients?: string[]; dismissed?: string[]; insertFails?: bool
     inserted,
     linked,
     from(table: string) {
+      let pattern = ''
       const chain: Record<string, unknown> = {
         select: () => chain,
         eq: () => chain,
-        in: async () => ({
+        // Exact, like PostgREST's in.(…): a client stored in another case is
+        // not returned.
+        in: async (_col: string, vals: string[]) => ({
           data:
             table === 'clients'
-              ? (opts.clients ?? []).map(email => ({ email }))
-              : (opts.dismissed ?? []).map(sender_email => ({ sender_email })),
+              ? (opts.clients ?? []).filter(e => vals.includes(e)).map(email => ({ email }))
+              : (opts.dismissed ?? []).filter(e => vals.includes(e)).map(sender_email => ({ sender_email })),
+        }),
+        ilike: (_col: string, p: string) => { pattern = p.replace(/\\(.)/g, '$1').toLowerCase(); return chain },
+        limit: async () => ({
+          data: (opts.clients ?? []).filter(e => e.toLowerCase() === pattern).map(email => ({ email })),
         }),
         insert: (row: Record<string, unknown>) => {
           inserted.push(row)
@@ -70,6 +77,18 @@ const conv = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   judged.length = 0
   answer = { isRequest: true, reason: 'asks about a trip' }
+})
+
+describe('a client stored in another case', () => {
+  it('is recognised — not judged, and not created again as a lead', async () => {
+    const d = db({ clients: ['John.Smith@Gmail.com'] })
+    const created = await createLeadsFromNewConversations({
+      db: d, tenantId: 't1', office: OFFICE, conversations: [conv({ fromEmail: 'john.smith@gmail.com' })],
+    })
+    expect(created).toBe(0)
+    expect(judged).toEqual([])
+    expect(d.inserted).toEqual([])
+  })
 })
 
 describe('a travel request', () => {

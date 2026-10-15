@@ -84,16 +84,17 @@ export async function getUserEmail(accessToken: string) {
 export async function fetchEmails(
   accessToken: string,
   refreshToken: string,
-  options: { maxResults?: number; query?: string; pageToken?: string } = {}
+  options: { maxResults?: number; query?: string; pageToken?: string; labelIds?: string[] } = {}
 ) {
   const gmail = getGmailClient(accessToken, refreshToken)
-  const { maxResults = 20, query = '', pageToken } = options
+  const { maxResults = 20, query = '', pageToken, labelIds } = options
 
   const response = await gmail.users.messages.list({
     userId: 'me',
     maxResults,
     q: query,
     pageToken,
+    ...(labelIds?.length ? { labelIds } : {}),
   })
 
   const messages = response.data.messages || []
@@ -193,7 +194,7 @@ export async function markAsRead(
 }
 
 // Parse email message from Gmail API response
-function parseEmailMessage(message: any) {
+export function parseEmailMessage(message: any) {
   const headers = message.payload?.headers || []
   const getHeader = (name: string) =>
     headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
@@ -230,7 +231,7 @@ function parseEmailMessage(message: any) {
       // Fallback to plain text
       for (const part of payload.parts) {
         if (part.mimeType === 'text/plain' && part.body?.data) {
-          return `<pre style="white-space: pre-wrap; font-family: inherit;">${Buffer.from(part.body.data, 'base64').toString('utf-8')}</pre>`
+          return `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(Buffer.from(part.body.data, 'base64').toString('utf-8'))}</pre>`
         }
       }
       // Try nested parts
@@ -286,6 +287,13 @@ function parseEmailMessage(message: any) {
     snippet: message.snippet,
     from: getHeader('From'),
     to: getHeader('To'),
+    // Reply all reads Cc; reply honours Reply-To; a reopened draft shows Bcc.
+    cc: getHeader('Cc'),
+    bcc: getHeader('Bcc'),
+    replyTo: getHeader('Reply-To'),
+    // Newsletters' one-click unsubscribe (RFC 2369 / RFC 8058).
+    listUnsubscribe: getHeader('List-Unsubscribe'),
+    listUnsubscribePost: getHeader('List-Unsubscribe-Post'),
     subject: getHeader('Subject'),
     date: getHeader('Date'),
     body,

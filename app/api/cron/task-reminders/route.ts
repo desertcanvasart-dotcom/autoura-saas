@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/email-send'
+import { escapeHtml, appLinkHref } from '@/lib/html-escape'
 import { createClient } from '@supabase/supabase-js'
 import { withJobRun } from '@/lib/support/job-runs'
 import { shiftDateISO, todayInTimeZone } from '@/lib/today'
@@ -236,6 +237,9 @@ async function sendReminderEmail(
   }
   
   const config = typeConfig[type as keyof typeof typeConfig] || typeConfig.task_due_soon
+  // Task titles are free text and go into `message`; escaped, like every
+  // other value interpolated into this HTML.
+  const href = appLinkHref(baseUrl, link) || appLinkHref(baseUrl, '/tasks')
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -255,11 +259,11 @@ async function sendReminderEmail(
           
           <!-- Content -->
           <div style="padding: 24px;">
-            <p style="color: #374151; font-size: 16px; margin: 0 0 16px 0;">Hi ${toName},</p>
-            <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">${message}</p>
+            <p style="color: #374151; font-size: 16px; margin: 0 0 16px 0;">Hi ${escapeHtml(toName)},</p>
+            <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">${escapeHtml(message)}</p>
             
             <div style="text-align: center;">
-              <a href="${baseUrl}${link}" style="display: inline-block; background-color: ${config.color}; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              <a href="${href}" style="display: inline-block; background-color: ${config.color}; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
                 View Tasks
               </a>
             </div>
@@ -284,7 +288,7 @@ async function sendReminderEmail(
   // body shape. No task reminder has ever been delivered.
   const result = await sendMail({
     to: toEmail,
-    subject: `[Autoura] ${subject}`,
+    subject: `[Autoura] ${String(subject).replace(/[\r\n]+/g, ' ')}`,
     html: htmlContent,
   })
 

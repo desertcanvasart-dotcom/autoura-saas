@@ -26,6 +26,7 @@
  */
 
 import { Resend } from 'resend'
+import { displayName } from '@/lib/tenant-email-domain'
 
 export interface MailAttachment {
   filename: string
@@ -101,10 +102,15 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   // A caller-resolved From wins: it already encodes whether the tenant's own
   // domain is verified. Otherwise fromName may change only the DISPLAY name —
   // the address must stay one Resend has verified, or the send is rejected.
+  //
+  // The name is quoted and stripped as resolveSender() does: a raw company
+  // name with a comma, quote or '<' ("Smith, Jones & Co") made an invalid
+  // From that Resend rejected, so the mail silently never went.
+  const label = input.fromName ? displayName(input.fromName) : ''
   const from = input.from
     ? input.from
-    : input.fromName
-      ? `${input.fromName} <${bareAddress(configuredFrom)}>`
+    : label
+      ? `${label} <${bareAddress(configuredFrom)}>`
       : configuredFrom
 
   try {

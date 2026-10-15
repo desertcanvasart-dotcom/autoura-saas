@@ -125,6 +125,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // The client must belong to the caller's company. The admin client bypasses
+    // RLS and email_client_links has no tenant_id, so without this a user could
+    // link mail to another company's client — reading back that client's name,
+    // email and phone in the response, and planting an entry on its timeline.
+    const { data: owned, error: ownErr } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('id', clientId)
+      .eq('tenant_id', authResult.tenant_id)
+      .maybeSingle()
+    if (ownErr) throw ownErr
+    if (!owned) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+    }
+
     // Check if link already exists (scoped to the session user)
     const { data: existingData } = await (supabase as any)
       .from('email_client_links')
