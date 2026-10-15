@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Reply, ReplyAll, Forward } from 'lucide-react'
+import { ChevronDown, Reply, ReplyAll, Forward, Printer, MailX } from 'lucide-react'
+import { unsubscribeMethod, type UnsubscribeMethod } from '@/lib/email/unsubscribe'
 import AttachmentList from '@/components/AttachmentList'
 import ClientLinkButton from '@/components/ClientLinkButton'
 import type { Email } from './types'
@@ -30,6 +31,8 @@ export default function ThreadView({
   isOwn,
   renderBody,
   onCompose,
+  onPrint,
+  onUnsubscribe,
 }: {
   messages: Email[]
   userId: string
@@ -37,6 +40,10 @@ export default function ThreadView({
   /** Sanitises and formats a message body for display. */
   renderBody: (html: string) => string
   onCompose: (mode: ComposeMode, message: Email) => void
+  /** Print one message. */
+  onPrint?: (message: Email) => void
+  /** Unsubscribe from the newsletter this message came from. */
+  onUnsubscribe?: (message: Email, method: UnsubscribeMethod) => void
 }) {
   const lastId = messages[messages.length - 1]?.id
   const [open, setOpen] = useState<Set<string>>(
@@ -88,6 +95,19 @@ export default function ThreadView({
 
             {expanded && (
               <div className="px-4 pb-4">
+                {!mine && (() => {
+                  // Newsletters that support it say how to unsubscribe.
+                  const unsub = onUnsubscribe ? unsubscribeMethod(m.listUnsubscribe, m.listUnsubscribePost) : null
+                  return unsub ? (
+                    <button
+                      type="button"
+                      onClick={() => onUnsubscribe!(m, unsub)}
+                      className="mb-2 inline-flex items-center gap-1 text-xs text-gray-600 underline hover:text-gray-900 print-hide"
+                    >
+                      <MailX className="w-3.5 h-3.5" /> Unsubscribe
+                    </button>
+                  ) : null
+                })()}
                 {!mine && (
                   <div className="mb-3">
                     <ClientLinkButton
@@ -116,6 +136,11 @@ export default function ThreadView({
                   <button type="button" onClick={() => onCompose('forward', m)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">
                     <Forward className="w-3.5 h-3.5" /> Forward
                   </button>
+                  {onPrint && (
+                    <button type="button" onClick={() => onPrint(m)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50" title="Print this message">
+                      <Printer className="w-3.5 h-3.5" /> Print
+                    </button>
+                  )}
                 </div>
               </div>
             )}

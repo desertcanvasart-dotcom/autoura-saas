@@ -15,6 +15,8 @@ import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { collectCandidates, storedIds, downloadMessages } from '@/lib/email/gmail-candidates'
 import { tenantClientEmails } from '@/lib/email/tenant-client-emails'
+import { applyRulesToNewMail } from '@/lib/email/apply-rules'
+import type { MailRule } from '@/lib/email/mail-rules'
 
 /** The first real address in a header, or '' (lib/email/contact-name headerAddresses). */
 function extractEmailAddress(from: string | null | undefined): string {
@@ -218,6 +220,32 @@ export async function POST(request: NextRequest) {
       download_failed: downloaded.failed,
       download_gone: downloaded.gone,
       insert_failed: 0,
+      rules_applied: 0,
+      rules_error: undefined as string | undefined,
+    }
+
+    // Mail rules (migration 422): the company's rules run on what just
+    // arrived — filed, starred, read, out of the Inbox, to Spam or to Trash.
+    // Mail a rule sends to Spam or Trash is not filed into conversations. A
+    // rule that cannot be applied is reported, never a reason to fail the sync.
+    let ruleRemoved = new Set<string>()
+    try {
+      const { data: ruleRows, error: rulesErr } = await createAdminClient()
+        .from('email_rules')
+        .select('id, name, enabled, conditions, actions')
+        .eq('tenant_id', tenant_id)
+        .eq('enabled', true)
+        .order('created_at', { ascending: true })
+      if (rulesErr) throw new Error(rulesErr.message)
+      if (ruleRows && ruleRows.length > 0 && downloaded.messages.length > 0) {
+        const applied = await applyRulesToNewMail(gmail, ruleRows as unknown as MailRule[], downloaded.messages)
+        result.rules_applied = applied.applied
+        ruleRemoved = applied.removedIds
+      }
+    } catch (ruleErr) {
+      const msg = ruleErr instanceof Error ? ruleErr.message : String(ruleErr)
+      console.error('[Email Sync] mail rules failed:', msg)
+      result.rules_error = msg
     }
 
     // Track conversation ids that received at least one new inbound message
@@ -231,6 +259,7 @@ export async function POST(request: NextRequest) {
     // Group by thread (only the newly downloaded messages)
     const threadMessages = new Map<string, any[]>()
     for (const detail of downloaded.messages) {
+      if (detail.id && ruleRemoved.has(detail.id)) continue
       const threadId = detail.threadId!
       if (!threadMessages.has(threadId)) threadMessages.set(threadId, [])
       threadMessages.get(threadId)!.push(detail)

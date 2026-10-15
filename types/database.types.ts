@@ -4394,6 +4394,45 @@ export interface Database {
           },
         ]
       }
+      email_rules: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          enabled: boolean
+          conditions: Json
+          actions: Json
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          enabled?: boolean
+          conditions?: Json
+          actions?: Json
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          enabled?: boolean
+          conditions?: Json
+          actions?: Json
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_send_claims: {
         Row: {
           request_key: string

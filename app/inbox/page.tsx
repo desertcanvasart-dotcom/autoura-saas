@@ -9,6 +9,11 @@ import ComposeModal, { type ComposeMode } from '@/components/inbox/ComposeModal'
 import ThreadView from '@/components/inbox/ThreadView'
 import ScheduledList from '@/components/inbox/ScheduledList'
 import { RenameFolderDialog, DeleteFolderDialog } from '@/components/inbox/FolderDialogs'
+import RulesPanel from '@/components/inbox/RulesPanel'
+import { printEmails } from '@/lib/email/print-email'
+import type { UnsubscribeMethod } from '@/lib/email/unsubscribe'
+import type { RuleConditions } from '@/lib/email/mail-rules'
+import { GMAIL_LABEL_COLORS } from '@/lib/email/label-colors'
 import type { Email, GmailLabel, Client } from '@/components/inbox/types'
 // NEW IMPORTS FOR GMAIL ENHANCEMENTS
 import { AttachmentIndicator } from '@/components/AttachmentList'
@@ -49,6 +54,9 @@ import {
   Forward,
   CalendarClock,
   Pencil,
+  ShieldAlert,
+  Printer,
+  Filter,
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { isBusinessEmail } from '@/lib/inbox-business-filter'
@@ -170,6 +178,11 @@ export default function InboxPage() {
   const [folderMenu, setFolderMenu] = useState<string | null>(null)
   const folderMenuRef = useRef<HTMLDivElement>(null)
   useDismissOnOutside(folderMenu !== null, folderMenuRef, () => setFolderMenu(null))
+  // Mail rules: the panel, and a rule started from an open email.
+  const [rulesPanel, setRulesPanel] = useState<{ prefill: RuleConditions | null } | null>(null)
+  // "Select all N": every email in the folder or search, not just this page.
+  const [allMatching, setAllMatching] = useState<{ ids: string[]; truncated: boolean } | null>(null)
+  const [loadingAll, setLoadingAll] = useState(false)
   const [renameFolder, setRenameFolder] = useState<GmailLabel | null>(null)
   const [deleteFolder, setDeleteFolder] = useState<GmailLabel | null>(null)
   const [showLabelModal, setShowLabelModal] = useState(false)
@@ -532,6 +545,8 @@ ${bodyText}`
     window.location.href = `/pricing-grid?${params.toString()}`
   }
   useEffect(() => {
+    setAllMatching(null)
+    setSelectedEmails(new Set())
     if (isConnected) {
       fetchEmails(searchQuery, folder)
     }
@@ -539,6 +554,7 @@ ${bodyText}`
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    setAllMatching(null)
     fetchEmails(searchQuery)
   }
 
@@ -678,6 +694,106 @@ ${bodyText}`
     handleEmailAction('move', undefined, labelId)
   }
 
+  // ── Bulk actions: the ticked emails, or every email in the folder ────────
+  const ACTION_WORDS: Record<string, string> = {
+    archive: 'Archive', delete: 'Delete', markRead: 'Mark as read', spam: 'Report as spam', move: 'Move',
+  }
+  const bulkAction = (action: string, labelId?: string) => {
+    if (allMatching) {
+      const n = allMatching.ids.length
+      if (!window.confirm(`${ACTION_WORDS[action] || action} all ${n.toLocaleString()} emails in ${folderLabel()}?`)) return
+      void handleEmailAction(action, allMatching.ids, labelId).then(() => setAllMatching(null))
+      return
+    }
+    void handleEmailAction(action, Array.from(selectedEmails), labelId)
+  }
+
+  const folderLabel = () => {
+    if (folder === 'inbox') return 'the Inbox'
+    if (folder === 'sent') return 'Sent'
+    if (folder === 'drafts') return 'Drafts'
+    const l = customLabels.find(x => `label:${x.id}` === folder)
+    return l ? `“${l.name}”` : 'this folder'
+  }
+
+  // The same folder, search and view filter the list shows — across pages.
+  const selectAllMatching = async () => {
+    if (!user) return
+    setLoadingAll(true)
+    try {
+      const req = folderRequest(folder, searchQuery)
+      const extra = filter === 'unread' ? ' is:unread' : filter === 'starred' ? ' is:starred'
+        : filter === 'business' ? ' -category:promotions -category:social -category:forums' : ''
+      const params = new URLSearchParams({ userId: user.id, query: (req.query + extra).trim() })
+      if (req.labelId) params.set('labelId', req.labelId)
+      const res = await fetch(`/api/gmail/ids?${params}`)
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Could not select all')
+      setAllMatching({ ids: d.ids, truncated: Boolean(d.truncated) })
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoadingAll(false)
+    }
+  }
+
+  // ── Print, unsubscribe, rules from an email ──────────────────────────────
+  const printThread = (messages: Email[]) => {
+    const ok = printEmails(
+      messages[messages.length - 1]?.subject || selectedEmail?.subject || '',
+      messages.map(m => ({ ...m, body: sanitizeEmailHtml(m.body || '') })),
+      connectedEmail,
+    )
+    if (!ok) setError('Allow pop-ups for this site to print')
+  }
+
+  const unsubscribe = async (message: Email, method: UnsubscribeMethod) => {
+    const sender = extractName(message.from)
+    if (method.kind === 'oneClick') {
+      // RFC 8058 one-click: a POST from the person's own browser.
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = method.url
+      form.target = '_blank'
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = 'List-Unsubscribe'
+      input.value = 'One-Click'
+      form.appendChild(input)
+      document.body.appendChild(form)
+      form.submit()
+      form.remove()
+      setNotice({ text: `Unsubscribe request sent to ${sender}` })
+    } else if (method.kind === 'link') {
+      window.open(method.url, '_blank', 'noopener,noreferrer')
+      setNotice({ text: `Opened ${sender}'s unsubscribe page — confirm there` })
+    } else {
+      if (!window.confirm(`Send an unsubscribe email to ${method.to}?`)) return
+      const res = await fetch('/api/gmail/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.id, to: method.to, subject: method.subject, body: `<p>${method.body}</p>` }),
+      })
+      if (res.ok) setNotice({ text: `Unsubscribe email sent to ${method.to}` })
+      else setError((await res.json().catch(() => ({}))).error || 'Could not send the unsubscribe email')
+    }
+  }
+
+  const filterLikeThis = (email: Email) => {
+    setRulesPanel({ prefill: { from: extractEmailAddress(email.from), subject: (email.subject || '').replace(/^(re|fwd?|fw):\s*/i, '') } })
+  }
+
+  const setFolderColor = async (label: GmailLabel, backgroundColor: string) => {
+    setFolderMenu(null)
+    const res = await fetch('/api/gmail/labels', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user?.id, labelId: label.id, color: { backgroundColor } }),
+    })
+    if (res.ok) fetchLabels()
+    else setError((await res.json().catch(() => ({}))).error || 'Could not change the colour')
+  }
+
   const toggleEmailSelection = (emailId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedEmails(prev => {
@@ -693,6 +809,7 @@ ${bodyText}`
 
   const selectAllEmails = () => {
     if (selectedEmails.size === filteredEmails.length) {
+      setAllMatching(null)
       setSelectedEmails(new Set())
     } else {
       setSelectedEmails(new Set(filteredEmails.map(e => e.id)))
@@ -1038,6 +1155,21 @@ ${bodyText}`
                             >
                               <Pencil className="w-3.5 h-3.5 text-gray-400" /> Rename
                             </button>
+                            <div className="px-3 py-1.5 border-t border-b border-gray-100 my-1">
+                              <p className="text-[10px] text-gray-400 mb-1">Colour</p>
+                              <div className="grid grid-cols-6 gap-1">
+                                {GMAIL_LABEL_COLORS.map(c => (
+                                  <button
+                                    key={c.backgroundColor}
+                                    onClick={() => setFolderColor(label, c.backgroundColor)}
+                                    className={`w-5 h-5 rounded-full border ${label.color?.backgroundColor === c.backgroundColor ? 'ring-2 ring-offset-1 ring-gray-500' : 'border-gray-200'}`}
+                                    style={{ backgroundColor: c.backgroundColor }}
+                                    aria-label={`Colour ${c.backgroundColor}`}
+                                    title={c.backgroundColor}
+                                  />
+                                ))}
+                              </div>
+                            </div>
                             <button
                               onClick={() => { setFolderMenu(null); setDeleteFolder(label) }}
                               className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -1060,6 +1192,16 @@ ${bodyText}`
               >
                 <FolderPlus className="w-4 h-4" />
                 <span>New Folder</span>
+              </button>
+            )}
+
+            {!isFolderCollapsed && (
+              <button
+                onClick={() => setRulesPanel({ prefill: null })}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Rules</span>
               </button>
             )}
 
@@ -1119,11 +1261,11 @@ ${bodyText}`
               {selectedEmails.size > 0 && (
                 <>
                   <span className="text-xs text-gray-500">
-                    {selectedEmails.size} selected
+                    {allMatching ? `All ${allMatching.ids.length.toLocaleString()} selected` : `${selectedEmails.size} selected`}
                   </span>
                   <div className="flex items-center gap-1 ml-2">
                     <button
-                      onClick={handleArchive}
+                      onClick={() => bulkAction('archive')}
                       disabled={actionLoading}
                       className="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
                       title="Archive"
@@ -1131,7 +1273,7 @@ ${bodyText}`
                       <Archive className="w-4 h-4 text-gray-500" />
                     </button>
                     <button
-                      onClick={handleDelete}
+                      onClick={() => bulkAction('delete')}
                       disabled={actionLoading}
                       className="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
                       title="Delete"
@@ -1139,7 +1281,15 @@ ${bodyText}`
                       <Trash2 className="w-4 h-4 text-gray-500" />
                     </button>
                     <button
-                      onClick={handleMarkRead}
+                      onClick={() => bulkAction('spam')}
+                      disabled={actionLoading}
+                      className="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                      title="Report spam"
+                    >
+                      <ShieldAlert className="w-4 h-4 text-gray-500" />
+                    </button>
+                    <button
+                      onClick={() => bulkAction('markRead')}
                       disabled={actionLoading}
                       className="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
                       title="Mark as read"
@@ -1161,7 +1311,7 @@ ${bodyText}`
                           {customLabels.map((label) => (
                             <button
                               key={label.id}
-                              onClick={() => handleMoveToLabel(label.id)}
+                              onClick={() => bulkAction('move', label.id)}
                               className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2"
                             >
                               <Tag className="w-3.5 h-3.5 text-gray-400" />
@@ -1180,6 +1330,26 @@ ${bodyText}`
                 <span className="text-xs text-gray-400 ml-auto">
                   {filteredEmails.length} emails{hiddenAsNoise > 0 && <span className="text-gray-400"> · {hiddenAsNoise} hidden as noise</span>}
                 </span>
+              )}
+            </div>
+          )}
+
+          {/* "Select all N": the whole folder or search, not only this page. */}
+          {filteredEmails.length > 0 && selectedEmails.size === filteredEmails.length && (hasMore || allMatching) && (
+            <div className="px-3 py-2 text-xs text-center bg-primary-50 border-b border-primary-100 text-gray-700" data-testid="select-all-banner">
+              {allMatching ? (
+                <>
+                  All {allMatching.ids.length.toLocaleString()} emails in {folderLabel()} are selected
+                  {allMatching.truncated ? ' (the first 5,000)' : ''}.{' '}
+                  <button onClick={() => { setAllMatching(null); setSelectedEmails(new Set()) }} className="font-medium text-primary-700 underline">Clear selection</button>
+                </>
+              ) : (
+                <>
+                  All {filteredEmails.length} emails on this page are selected.{' '}
+                  <button onClick={selectAllMatching} disabled={loadingAll} className="font-medium text-primary-700 underline disabled:opacity-50">
+                    {loadingAll ? 'Finding them all…' : `Select all emails in ${folderLabel()}`}
+                  </button>
+                </>
               )}
             </div>
           )}
@@ -1282,6 +1452,16 @@ ${bodyText}`
                               <p className={`text-xs truncate ${email.isUnread && !isSentByMe ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
                                 {decodeHtmlEntities(email.subject || '(No subject)')}
                               </p>
+                              {/* The email's folders, in their colours. */}
+                              {customLabels.filter(l => email.labelIds?.includes(l.id) && folder !== `label:${l.id}`).slice(0, 3).map(l => (
+                                <span
+                                  key={l.id}
+                                  className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 max-w-[90px] truncate"
+                                  style={{ backgroundColor: l.color?.backgroundColor || '#e5e7eb', color: l.color?.textColor || '#374151' }}
+                                >
+                                  {l.name}
+                                </span>
+                              ))}
                             </div>
                             <p className="text-[11px] text-gray-500 truncate mt-0.5">
                               {decodeHtmlEntities(email.snippet)}
@@ -1426,8 +1606,27 @@ ${bodyText}`
                   >
                     <Sparkles className="w-4 h-4 text-purple-500" />
                   </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="More">
-                    <MoreHorizontal className="w-4 h-4 text-gray-500" />
+                  <button
+                    onClick={() => handleEmailAction('spam', thread.length ? thread.filter(m => !isFromMe(m)).map(m => m.id) : [selectedEmail.id])}
+                    disabled={actionLoading}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                    title="Report spam"
+                  >
+                    <ShieldAlert className="w-4 h-4 text-gray-500" />
+                  </button>
+                  <button
+                    onClick={() => printThread(thread.length ? thread : [selectedEmail])}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Print the conversation"
+                  >
+                    <Printer className="w-4 h-4 text-gray-500" />
+                  </button>
+                  <button
+                    onClick={() => filterLikeThis(selectedEmail)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Filter emails like this"
+                  >
+                    <Filter className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
                 <div className="flex items-center gap-1">
@@ -1465,6 +1664,8 @@ ${bodyText}`
                 isOwn={e => folder === 'sent' || Boolean(isFromMe(e))}
                 renderBody={formatEmailBody}
                 onCompose={(mode, message) => openCompose(mode, message)}
+                onPrint={m => printThread([m])}
+                onUnsubscribe={unsubscribe}
               />
             </div>
           </div>
@@ -1553,6 +1754,8 @@ ${bodyText}`
             isOwn={e => folder === 'sent' || Boolean(isFromMe(e))}
             renderBody={sanitizeEmailHtml}
             onCompose={(mode, message) => { setShowExpandedEmail(false); openCompose(mode, message) }}
+            onPrint={m => printThread([m])}
+            onUnsubscribe={unsubscribe}
           />
         </div>
       </div>
@@ -1639,6 +1842,14 @@ ${bodyText}`
         />
       )}
 
+      {rulesPanel && (
+        <RulesPanel
+          folders={customLabels.map(l => l.name)}
+          prefill={rulesPanel.prefill}
+          onClose={() => setRulesPanel(null)}
+          onChanged={() => { fetchLabels(); fetchEmails() }}
+        />
+      )}
       {renameFolder && (
         <RenameFolderDialog
           userId={user?.id || ''}

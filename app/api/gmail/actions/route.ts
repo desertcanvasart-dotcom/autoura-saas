@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { labelChange, MAX_ACTION_IDS } from '@/lib/email/mail-actions'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
@@ -63,112 +64,19 @@ export async function POST(request: NextRequest) {
 
     const gmail = getGmailClient(access_token, refresh_token)
 
-    const ids = Array.isArray(messageIds) ? messageIds : [messageIds]
+    const ids: string[] = (Array.isArray(messageIds) ? messageIds : [messageIds]).map(String).filter(Boolean)
+    // "Select all" across pages acts on up to MAX_ACTION_IDS at once; Gmail
+    // takes 1,000 per batch call, so the work is chunked.
+    if (ids.length > MAX_ACTION_IDS) {
+      return NextResponse.json({ error: `At most ${MAX_ACTION_IDS.toLocaleString()} emails at a time` }, { status: 400 })
+    }
+
+    const change = labelChange(action, labelId)
+    if ('error' in change) {
+      return NextResponse.json({ error: change.error }, { status: 400 })
+    }
 
     switch (action) {
-      case 'delete':
-        // Move to trash
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            addLabelIds: ['TRASH'],
-            removeLabelIds: ['INBOX'],
-          },
-        })
-        break
-
-      case 'archive':
-        // Remove from inbox
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            removeLabelIds: ['INBOX'],
-          },
-        })
-        break
-
-      case 'star':
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            addLabelIds: ['STARRED'],
-          },
-        })
-        break
-
-      case 'unstar':
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            removeLabelIds: ['STARRED'],
-          },
-        })
-        break
-
-      case 'markRead':
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            removeLabelIds: ['UNREAD'],
-          },
-        })
-        break
-
-      case 'markUnread':
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            addLabelIds: ['UNREAD'],
-          },
-        })
-        break
-
-      case 'move':
-        if (!labelId) {
-          return NextResponse.json({ error: 'Label ID required for move action' }, { status: 400 })
-        }
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            addLabelIds: [labelId],
-            removeLabelIds: ['INBOX'],
-          },
-        })
-        break
-
-      case 'addLabel':
-        if (!labelId) {
-          return NextResponse.json({ error: 'Label ID required' }, { status: 400 })
-        }
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            addLabelIds: [labelId],
-          },
-        })
-        break
-
-      case 'removeLabel':
-        if (!labelId) {
-          return NextResponse.json({ error: 'Label ID required' }, { status: 400 })
-        }
-        await gmail.users.messages.batchModify({
-          userId: 'me',
-          requestBody: {
-            ids,
-            removeLabelIds: [labelId],
-          },
-        })
-        break
-
       case 'permanentDelete':
         // messages.delete needs the full https://mail.google.com/ scope, which
         // GMAIL_SCOPES (lib/gmail.ts) does not request — Google answered 403
@@ -181,12 +89,17 @@ export async function POST(request: NextRequest) {
         )
 
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+        for (let i = 0; i < ids.length; i += 1000) {
+          await gmail.users.messages.batchModify({
+            userId: 'me',
+            requestBody: { ids: ids.slice(i, i + 1000), ...change },
+          })
+        }
     }
 
     // Mail you have read, archived or deleted is no longer news: its bell
     // notification (gmail:<id>, see /api/gmail/poll) goes read too.
-    if (['markRead', 'archive', 'delete', 'move'].includes(action)) {
+    if (['markRead', 'archive', 'delete', 'move', 'spam'].includes(action)) {
       const { error: notifError } = await createAdminClient()
         .from('notifications')
         .update({ is_read: true })
@@ -196,7 +109,7 @@ export async function POST(request: NextRequest) {
       if (notifError) console.error('clearing new-email notifications failed:', notifError.message)
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, count: ids.length })
   } catch (err: any) {
     console.error('Email action error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
