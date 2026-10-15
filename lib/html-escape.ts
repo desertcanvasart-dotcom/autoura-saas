@@ -62,3 +62,19 @@ export function safeUrl(value: unknown): string {
     return ''
   }
 }
+
+/**
+ * An in-app link for an email button: `${baseUrl}${path}`, escaped, or '' when
+ * `path` is not a plain app path.
+ *
+ * Notification emails built `href="${baseUrl}${link}"` from a link that can
+ * come from a request body. `@evil.com/x` turned the base into userinfo and
+ * the button pointed at evil.com; a `"` broke out of the attribute. Only a
+ * path starting with a single '/' is accepted — no '//' or '/\' (both read as
+ * another host), no whitespace or control characters.
+ */
+export function appLinkHref(baseUrl: string, path: unknown): string {
+  if (typeof path !== 'string') return ''
+  if (!/^\/(?![/\\])/.test(path) || /[\s\u0000-\u001f\u007f\\]/.test(path)) return ''
+  return escapeHtml(`${baseUrl.replace(/\/+$/, '')}${path}`)
+}

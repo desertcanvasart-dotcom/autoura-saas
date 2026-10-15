@@ -15,6 +15,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { reminderChannels, type NotificationPreferences, type TaskNotificationKind } from '@/lib/tasks/task-reminders'
 import { sendSystemEmail } from '@/lib/email'
+import { escapeHtml, appLinkHref } from '@/lib/html-escape'
 import { sendPushToUsers, type PushPayload } from '@/lib/push'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -299,6 +300,12 @@ async function sendEmailNotification(
 
   const config = typeConfig[type] || { color: '#647C47', icon: '🔔', label: 'Notification', buttonText: 'View' }
 
+  // Every caller-supplied value is escaped. `message` can be a traveller's
+  // own words (the public trip-report form, app/api/share/[token]/report) and
+  // `link` can come from a request body: unescaped, both let outsiders put
+  // markup and links into an email sent from the platform address to staff.
+  const href = appLinkHref(baseUrl, link)
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -317,12 +324,12 @@ async function sendEmailNotification(
 
           <!-- Content -->
           <div style="padding: 24px;">
-            <p style="color: #374151; font-size: 16px; margin: 0 0 8px 0;">Hi ${toName},</p>
-            <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px 0; white-space: pre-line;">${message}</p>
+            <p style="color: #374151; font-size: 16px; margin: 0 0 8px 0;">Hi ${escapeHtml(toName)},</p>
+            <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px 0; white-space: pre-line;">${escapeHtml(message)}</p>
 
-            ${link ? `
+            ${href ? `
               <div style="text-align: center; margin: 24px 0;">
-                <a href="${baseUrl}${link}" style="display: inline-block; background-color: ${config.color}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 14px;">
+                <a href="${href}" style="display: inline-block; background-color: ${config.color}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 14px;">
                   ${config.buttonText}
                 </a>
               </div>
@@ -354,7 +361,7 @@ async function sendEmailNotification(
 
   return sendSystemEmail({
     to: toEmail,
-    subject: `[Autoura] ${subject}`,
+    subject: `[Autoura] ${String(subject).replace(/[\r\n]+/g, ' ')}`,
     html: htmlContent,
   })
 }
