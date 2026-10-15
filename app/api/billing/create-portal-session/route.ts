@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { createPortalSession } from '@/lib/stripe'
 
 /**
@@ -45,8 +45,10 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Get tenant subscription
-    const { data: subscription, error: subError } = await supabase
+    // Get tenant subscription — read with the service role, which (since
+    // migration 423) is the only writer of stripe_customer_id: a value a
+    // signed-in owner could write would open another customer's portal.
+    const { data: subscription, error: subError } = await createAdminClient()
       .from('tenant_subscriptions')
       .select('stripe_customer_id')
       .eq('tenant_id', tenant_id)
