@@ -193,7 +193,7 @@ export async function markAsRead(
 }
 
 // Parse email message from Gmail API response
-function parseEmailMessage(message: any) {
+export function parseEmailMessage(message: any) {
   const headers = message.payload?.headers || []
   const getHeader = (name: string) =>
     headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
@@ -230,7 +230,7 @@ function parseEmailMessage(message: any) {
       // Fallback to plain text
       for (const part of payload.parts) {
         if (part.mimeType === 'text/plain' && part.body?.data) {
-          return `<pre style="white-space: pre-wrap; font-family: inherit;">${Buffer.from(part.body.data, 'base64').toString('utf-8')}</pre>`
+          return `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(Buffer.from(part.body.data, 'base64').toString('utf-8'))}</pre>`
         }
       }
       // Try nested parts

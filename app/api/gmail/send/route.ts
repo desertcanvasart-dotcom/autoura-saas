@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
     let claimed = false
     if (requestKey && user) {
       const claim = await claimSend(supabase, String(requestKey), {
+        tenantId: mailboxTenant,
         userId: user.id,
         threadId: gmailThreadId,
         bodyHash,
@@ -171,6 +172,7 @@ export async function POST(request: NextRequest) {
 
     if (gmailThreadId && !allowDuplicate) {
       const conflict = await threadConflict(supabase, {
+        tenantId: mailboxTenant,
         threadId: gmailThreadId,
         requestKey: requestKey ? String(requestKey) : null,
         seenUpTo: seenUpTo === undefined ? undefined : (seenUpTo as string | null),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import {
   isValidSendingDomain,
   previewSenderAddress,
@@ -110,7 +110,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { error: saveError } = await auth.supabase!
+    // Service role: migration 420 lets only it write the sending-domain
+    // columns, so an admin cannot mark a domain verified straight through
+    // PostgREST. canManage() above is the authorisation.
+    const { error: saveError } = await createAdminClient()
       .from('tenants')
       .update({
         email_domain: domain,
@@ -194,7 +197,8 @@ export async function PUT() {
     const verified = data?.status === 'verified'
     const status = verified ? 'verified' : data?.status === 'failed' ? 'failed' : 'pending'
 
-    await auth.supabase!
+    // Service role, as in POST (migration 420).
+    const { error: saveError } = await createAdminClient()
       .from('tenants')
       .update({
         email_domain_status: status,
@@ -202,6 +206,11 @@ export async function PUT() {
         updated_at: new Date().toISOString(),
       })
       .eq('id', auth.tenant_id!)
+    // Reporting "Verified" when the status was never saved would leave the
+    // From address on the platform sender while the screen says otherwise.
+    if (saveError) {
+      return NextResponse.json({ success: false, error: saveError.message }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,

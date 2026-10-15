@@ -4,6 +4,7 @@ import { formatCurrency } from '@/lib/currency'
 import { currencyDecimals } from '@/lib/currency-totals'
 import { contractDepositPercent, contractSettingsFromTenant } from '@/lib/contract-terms'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
@@ -19,6 +20,10 @@ export async function POST(request: Request) {
     if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
+    // Staff only, like the quote and supplier-document sends: this emails a
+    // client under the company's name and domain, which a viewer must not do.
+    const denied = roleDenied(auth.role, 'staff')
+    if (denied) return denied
 
     // Who the client should see, and where their reply should land. This route
     // hardcoded one operator's name and BCC'd a single Gmail mailbox, which is

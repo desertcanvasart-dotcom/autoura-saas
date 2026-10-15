@@ -16,6 +16,7 @@ import { setMockTables, createMockClient } from '@/lib/__tests__/_mock-supabase'
 
 const TENANT = 'tenant-a'
 const sent: Array<{ to: string; html: string; subject: string }> = []
+let role = 'admin'
 
 vi.mock('@/lib/supabase-server', () => ({
   requireAuth: async () => ({
@@ -24,7 +25,7 @@ vi.mock('@/lib/supabase-server', () => ({
     supabase: createMockClient(),
     tenant_id: TENANT,
     user: { id: 'u1' },
-    role: 'admin',
+    role,
   }),
 }))
 vi.mock('@/lib/email-send', () => ({
@@ -52,6 +53,7 @@ function itinerary(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   sent.length = 0
+  role = 'admin'
   setMockTables({
     tenants: [{ id: TENANT, company_name: 'Agency', contact_email: 'ops@agency.test' }],
     itineraries: [itinerary(), itinerary({ id: 'it-other', tenant_id: 'tenant-b' })],
@@ -64,6 +66,13 @@ beforeEach(() => {
 })
 
 describe('itinerary email', () => {
+  it('is refused to a viewer — sending mails a client under the company name', async () => {
+    role = 'viewer'
+    const res = await post({ itineraryId: 'it-1', clientEmail: 'ada@example.com', clientName: 'Ada' })
+    expect(res.status).toBe(403)
+    expect(sent).toHaveLength(0)
+  })
+
   it('sends, with the total computed from the services (1000 × 1.4 + 500)', async () => {
     const res = await post({ itineraryId: 'it-1', clientEmail: 'ada@example.com', clientName: 'Ada' })
     const json = await res.json()

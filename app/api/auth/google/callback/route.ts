@@ -70,8 +70,11 @@ export async function GET(request: NextRequest) {
     // Get user's email
     const email = await getUserEmail(tokens.access_token)
 
-    // Calculate token expiry
-    const expiryDate = new Date(Date.now() + (tokens.expiry_date || 3600 * 1000))
+    // Token expiry. googleapis' expiry_date is already an absolute epoch-ms
+    // time, not a duration — adding Date.now() to it stored dates ~57 years out,
+    // so the routes' `token_expiry <= now` refresh never fired (migration 420
+    // repairs the stored rows).
+    const expiryDate = new Date(tokens.expiry_date || Date.now() + 3600 * 1000)
 
     // Which company this mailbox is filed under. The row used to be written
     // without one — every production mailbox had tenant_id NULL — and the
