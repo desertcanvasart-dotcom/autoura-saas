@@ -11,7 +11,7 @@ import {
 import { sanitizeEmailHtml } from '@/lib/sanitize-html'
 import {
   replyRecipients, replySubject, forwardSubject, quotedOriginal, forwardedOriginal,
-} from '@/lib/email/compose-mime'
+} from '@/lib/email/reply-rules'
 import RecipientInput from './RecipientInput'
 import { UNDO_SEND_MS, schedulePresets, toDateTimeLocal, scheduleTimeProblem } from '@/lib/email/scheduled-send'
 import type { Email, Attachment, EmailSignature, EmailTemplate, Client } from './types'
