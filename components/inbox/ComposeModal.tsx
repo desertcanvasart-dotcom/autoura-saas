@@ -6,13 +6,14 @@ import RichTextEditor from '@/components/email/RichTextEditor'
 import { replacePlaceholders, getPlaceholders } from '@/lib/template-placeholders'
 import {
   X, AlertCircle, File, Minus, Image, FileText, FileImage, FileArchive, Signature,
-  Users, Building2, Loader2, Paperclip, Send,
+  Users, Building2, Loader2, Paperclip, Send, Clock, ChevronDown,
 } from 'lucide-react'
 import { sanitizeEmailHtml } from '@/lib/sanitize-html'
 import {
   replyRecipients, replySubject, forwardSubject, quotedOriginal, forwardedOriginal,
 } from '@/lib/email/compose-mime'
 import RecipientInput from './RecipientInput'
+import { UNDO_SEND_MS, schedulePresets, toDateTimeLocal, scheduleTimeProblem } from '@/lib/email/scheduled-send'
 import type { Email, Attachment, EmailSignature, EmailTemplate, Client } from './types'
 
 export type ComposeMode = 'new' | 'reply' | 'replyAll' | 'forward'
@@ -82,8 +83,10 @@ export default function ComposeModal({
   mode = 'new',
   source = null,
   draftMessageId = null,
+  draftGmailId = null,
   ownAddresses = [],
   onSent,
+  onScheduled,
   clients = []
 }: {
   onClose: () => void
@@ -93,9 +96,13 @@ export default function ComposeModal({
   source?: Email | null
   /** Open this saved draft (its message id, as the Drafts list shows it). */
   draftMessageId?: string | null
+  /** …or by its Gmail draft id (the Scheduled list's Edit). */
+  draftGmailId?: string | null
   /** The mailbox's own addresses — left out of a reply all. */
   ownAddresses?: string[]
   onSent: () => void
+  /** Called once the message is scheduled, with when it will go. */
+  onScheduled?: (sendAt: Date) => void
   clients?: Client[]
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -117,7 +124,8 @@ export default function ComposeModal({
   // The Gmail draft this message is saved as, and where saving stands.
   const [draftId, setDraftId] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [loadingDraft, setLoadingDraft] = useState(Boolean(draftMessageId))
+  const openingDraft = Boolean(draftMessageId || draftGmailId)
+  const [loadingDraft, setLoadingDraft] = useState(openingDraft)
   // Nothing is saved until the person changes something: opening a reply and
   // closing it again must not leave a draft behind.
   const dirty = useRef(false)
@@ -174,7 +182,7 @@ export default function ComposeModal({
         // A reopened draft already has its signature; anything else gets the
         // default one, above the quoted original when there is one.
         const defaultSig = sigData.signatures?.find((s: EmailSignature) => s.is_default)
-        if (defaultSig && !draftMessageId) {
+        if (defaultSig && !openingDraft) {
           setBody(`<p></p><br/>${defaultSig.content}${initial.quote}`)
         }
       } catch (err) {
@@ -190,11 +198,14 @@ export default function ComposeModal({
   // ── Saved drafts ────────────────────────────────────────────────────────
   // Opening a draft from Drafts: everything it held, attachments included.
   useEffect(() => {
-    if (!draftMessageId || !userId) return
+    if (!openingDraft || !userId) return
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/gmail/drafts?userId=${userId}&messageId=${encodeURIComponent(draftMessageId)}`)
+        const which = draftGmailId
+          ? `draftId=${encodeURIComponent(draftGmailId)}`
+          : `messageId=${encodeURIComponent(draftMessageId!)}`
+        const res = await fetch(`/api/gmail/drafts?userId=${userId}&${which}`)
         const d = await res.json()
         if (cancelled) return
         if (!res.ok) throw new Error(d.error || 'Could not open the draft')
@@ -216,17 +227,19 @@ export default function ComposeModal({
       }
     })()
     return () => { cancelled = true }
-  }, [draftMessageId, userId])
+  }, [draftMessageId, draftGmailId, openingDraft, userId])
 
   const draftPayload = () => ({
     userId, draftId, to, cc, bcc, subject, body, threadId,
     attachments: attachments.map(a => ({ filename: a.filename, mimeType: a.mimeType, data: a.data })),
   })
 
-  const saveDraft = async (): Promise<string | null> => {
+  // `strict`: a failure throws (scheduling needs the draft); otherwise it is
+  // shown and the autosave tries again on the next edit.
+  const saveDraft = async (strict = false): Promise<string | null> => {
     const payload = draftPayload()
     const snapshot = JSON.stringify(payload)
-    if (snapshot === savedSnapshot.current) return draftId
+    if (snapshot === savedSnapshot.current && draftId) return draftId
     setSaveState('saving')
     try {
       const res = await fetch('/api/gmail/drafts', {
@@ -240,8 +253,9 @@ export default function ComposeModal({
       setDraftId(d.draftId)
       setSaveState('saved')
       return d.draftId as string
-    } catch {
+    } catch (err) {
       setSaveState('error')
+      if (strict) throw err
       return draftId
     }
   }
@@ -488,12 +502,84 @@ export default function ComposeModal({
     setSelectedTemplate(null)
   }
 
-  const handleSend = async () => {
+  // ── Undo send / schedule send ────────────────────────────────────────────
+  // Send waits UNDO_SEND_MS with an Undo before the email really goes. The
+  // message is saved to Drafts first, so leaving the page in those seconds
+  // loses nothing: it is waiting in Drafts, unsent.
+  const [pendingUntil, setPendingUntil] = useState<number | null>(null)
+  const [, setTick] = useState(0)
+  const sendTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (sendTimer.current) clearTimeout(sendTimer.current) }, [])
+  useEffect(() => {
+    if (pendingUntil === null) return
+    const t = setInterval(() => setTick(n => n + 1), 250)
+    return () => clearInterval(t)
+  }, [pendingUntil])
+
+  const readyToSend = (): boolean => {
     if (!to.trim() || !subject.trim() || !body) {
       setError('Add a recipient, a subject and a message')
-      return
+      return false
     }
+    return true
+  }
 
+  const handleSend = async () => {
+    if (!readyToSend() || pendingUntil !== null) return
+    setError(null)
+    if (dirty.current) await saveDraft()
+    setPendingUntil(Date.now() + UNDO_SEND_MS)
+    sendTimer.current = setTimeout(() => { sendTimer.current = null; void doSend() }, UNDO_SEND_MS)
+  }
+
+  const undoSend = () => {
+    if (sendTimer.current) clearTimeout(sendTimer.current)
+    sendTimer.current = null
+    setPendingUntil(null)
+  }
+
+  const sendNow = () => {
+    if (sendTimer.current) clearTimeout(sendTimer.current)
+    sendTimer.current = null
+    void doSend()
+  }
+
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [scheduleAt, setScheduleAt] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const scheduleRef = useRef<HTMLDivElement>(null)
+  useDismissOnOutside(showSchedule, scheduleRef, () => setShowSchedule(false))
+
+  const handleSchedule = async (at: Date) => {
+    if (!readyToSend()) return
+    const problem = scheduleTimeProblem(at.toISOString())
+    if (problem) { setError(problem); return }
+    setScheduling(true)
+    setError(null)
+    try {
+      // The scheduled email IS the saved draft: save the latest first.
+      markDirty()
+      const id = await saveDraft(true)
+      if (!id) throw new Error('Could not save the message')
+      const res = await fetch('/api/gmail/scheduled', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, draftId: id, sendAt: at.toISOString() }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Could not schedule the email')
+      dirty.current = false
+      setShowSchedule(false)
+      onScheduled?.(at)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not schedule the email')
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  const doSend = async () => {
     setSending(true)
     setError(null)
 
@@ -528,10 +614,32 @@ export default function ComposeModal({
       dirty.current = false
       onSent()
     } catch (err: any) {
+      // Back to the message, with the reason: nothing was sent.
       setError(err.message)
+      setPendingUntil(null)
     } finally {
       setSending(false)
     }
+  }
+
+  if (pendingUntil !== null) {
+    const seconds = Math.max(0, Math.ceil((pendingUntil - Date.now()) / 1000))
+    return (
+      <div
+        role="status"
+        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-4 py-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl"
+      >
+        {sending ? (
+          <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Sending…</span>
+        ) : (
+          <>
+            <span>Sending in {seconds}s…</span>
+            <button type="button" onClick={undoSend} className="font-semibold text-primary-200 hover:text-white">Undo</button>
+            <button type="button" onClick={sendNow} className="text-gray-300 hover:text-white">Send now</button>
+          </>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -544,7 +652,7 @@ export default function ComposeModal({
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <div className="flex items-center gap-3 min-w-0">
             <h3 className="text-sm font-semibold text-gray-900">
-              {draftMessageId ? 'Draft' : COMPOSE_TITLES[mode]}
+              {openingDraft ? 'Draft' : COMPOSE_TITLES[mode]}
             </h3>
             {/* Where the autosave stands — the person can see their work is kept. */}
             <span className="text-[11px] text-gray-400" aria-live="polite">
@@ -837,6 +945,62 @@ export default function ComposeModal({
             >
               Discard
             </button>
+            <div className="relative" ref={scheduleRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setScheduleAt(toDateTimeLocal(schedulePresets()[0].at))
+                  setShowSchedule(v => !v)
+                }}
+                disabled={sending || loadingDraft || scheduling}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                title="Schedule send"
+              >
+                <Clock className="w-4 h-4" />
+                Schedule
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showSchedule && (
+                <div className="absolute right-0 bottom-full mb-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-30" role="dialog" aria-label="Schedule send">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Schedule send</p>
+                  {schedulePresets().map(p => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => handleSchedule(p.at)}
+                      disabled={scheduling}
+                      className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <span>{p.label}</span>
+                      <span className="text-xs text-gray-500">
+                        {p.at.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </button>
+                  ))}
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <label className="block text-xs text-gray-500 mb-1" htmlFor="schedule-at">Pick a date and time</label>
+                    <div className="flex gap-2">
+                      <input
+                        id="schedule-at"
+                        type="datetime-local"
+                        value={scheduleAt}
+                        min={toDateTimeLocal(new Date(Date.now() + 120_000))}
+                        onChange={e => setScheduleAt(e.target.value)}
+                        className="flex-1 min-w-0 text-sm border border-gray-200 rounded px-2 py-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSchedule(new Date(scheduleAt))}
+                        disabled={scheduling || !scheduleAt}
+                        className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Schedule'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <button 
               onClick={handleSend} 
               disabled={sending || loadingDraft}

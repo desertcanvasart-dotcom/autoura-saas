@@ -24,6 +24,7 @@ export type JobName =
   | 'purge-traveller-documents'
   | 'gmail-sync'
   | 'mail-alerts'
+  | 'scheduled-send'
 
 export { STALE_AFTER_HOURS }
 

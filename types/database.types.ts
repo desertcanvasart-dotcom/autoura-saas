@@ -7728,6 +7728,63 @@ export interface Database {
           },
         ]
       }
+      scheduled_emails: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          gmail_draft_id: string
+          gmail_thread_id: string | null
+          send_at: string
+          status: string
+          to_summary: string | null
+          subject: string | null
+          error: string | null
+          attempts: number
+          claimed_at: string | null
+          sent_at: string | null
+          gmail_message_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          gmail_draft_id: string
+          gmail_thread_id?: string | null
+          send_at: string
+          status?: string
+          to_summary?: string | null
+          subject?: string | null
+          error?: string | null
+          attempts?: number
+          claimed_at?: string | null
+          sent_at?: string | null
+          gmail_message_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          gmail_draft_id?: string
+          gmail_thread_id?: string | null
+          send_at?: string
+          status?: string
+          to_summary?: string | null
+          subject?: string | null
+          error?: string | null
+          attempts?: number
+          claimed_at?: string | null
+          sent_at?: string | null
+          gmail_message_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       scheduled_sends: {
         Row: {
           id: string

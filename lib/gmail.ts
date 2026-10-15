@@ -84,16 +84,17 @@ export async function getUserEmail(accessToken: string) {
 export async function fetchEmails(
   accessToken: string,
   refreshToken: string,
-  options: { maxResults?: number; query?: string; pageToken?: string } = {}
+  options: { maxResults?: number; query?: string; pageToken?: string; labelIds?: string[] } = {}
 ) {
   const gmail = getGmailClient(accessToken, refreshToken)
-  const { maxResults = 20, query = '', pageToken } = options
+  const { maxResults = 20, query = '', pageToken, labelIds } = options
 
   const response = await gmail.users.messages.list({
     userId: 'me',
     maxResults,
     q: query,
     pageToken,
+    ...(labelIds?.length ? { labelIds } : {}),
   })
 
   const messages = response.data.messages || []

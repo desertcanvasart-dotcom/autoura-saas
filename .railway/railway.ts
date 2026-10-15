@@ -146,7 +146,23 @@ export default defineRailway(() => {
     },
   });
 
+  // Schedule send: sends each scheduled email when its time comes (the inbox
+  // composer's "Schedule send", migration 421). Every 5 minutes — Railway's
+  // shortest — so an email goes out within about five minutes of its time.
+  const cronScheduledSend = service("cron:scheduled-send", {
+    source: autouraSaas,
+    build: "",
+    start: "npm run cron:scheduled-send",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    deploy: { cronSchedule: "*/5 * * * *", restartPolicyType: "NEVER" },
+    networking: { privateNetworkEndpoint: "scheduled-send-cron" },
+    env: {
+      CRON_TARGET_URL: preserve(),
+      CRON_SECRET: preserve(),
+    },
+  });
+
   return project("Autoura multi-tenant", {
-    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts],
+    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend],
   });
 });

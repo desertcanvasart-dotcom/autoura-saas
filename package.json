@@ -14,6 +14,7 @@
     "cron:gmail-sync": "node scripts/cron-gmail-sync.mjs",
     "cron:mail-alerts": "node scripts/cron-mail-alerts.mjs",
     "cron:reminders": "node scripts/cron-reminders.mjs",
+    "cron:scheduled-send": "node scripts/cron-scheduled-send.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

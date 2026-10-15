@@ -7,6 +7,8 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
 import ComposeModal, { type ComposeMode } from '@/components/inbox/ComposeModal'
 import ThreadView from '@/components/inbox/ThreadView'
+import ScheduledList from '@/components/inbox/ScheduledList'
+import { RenameFolderDialog, DeleteFolderDialog } from '@/components/inbox/FolderDialogs'
 import type { Email, GmailLabel, Client } from '@/components/inbox/types'
 // NEW IMPORTS FOR GMAIL ENHANCEMENTS
 import { AttachmentIndicator } from '@/components/AttachmentList'
@@ -45,6 +47,8 @@ import {
   Reply,
   ReplyAll,
   Forward,
+  CalendarClock,
+  Pencil,
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { isBusinessEmail } from '@/lib/inbox-business-filter'
@@ -106,7 +110,18 @@ function formatEmailBody(html: string): string {
 }
 
 type FilterType = 'business' | 'all' | 'unread' | 'starred'
-type FolderType = 'inbox' | 'sent' | 'drafts'
+// A built-in folder, Scheduled (emails waiting to be sent), or one of the
+// mailbox's own folders by Gmail label id ("label:Label_12").
+type FolderType = 'inbox' | 'sent' | 'drafts' | 'scheduled' | `label:${string}`
+
+/** What the email list asks Gmail for in a folder. */
+function folderRequest(folder: FolderType, search: string): { query: string; labelId?: string } {
+  const q = search || ''
+  if (folder === 'sent') return { query: `from:me ${q}`.trim() }
+  if (folder === 'drafts') return { query: `in:drafts ${q}`.trim() }
+  if (folder.startsWith('label:')) return { query: q.trim(), labelId: folder.slice('label:'.length) }
+  return { query: `in:inbox -from:me ${q}`.trim() }
+}
 
 export default function InboxPage() {
   const { user } = useAuth()
@@ -121,9 +136,19 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null)
   // The composer: a new message, a reply / reply all / forward of a message,
   // or a saved draft reopened from Drafts.
-  const [compose, setCompose] = useState<{ mode: ComposeMode; source: Email | null; draftMessageId: string | null } | null>(null)
+  const [compose, setCompose] = useState<{
+    mode: ComposeMode; source: Email | null; draftMessageId: string | null; draftGmailId?: string | null
+  } | null>(null)
   const openCompose = (mode: ComposeMode, source: Email | null = null, draftMessageId: string | null = null) =>
     setCompose({ mode, source, draftMessageId })
+  // "Scheduled for …" after scheduling, and a nudge for the Scheduled list.
+  const [notice, setNotice] = useState<{ text: string; scheduled?: boolean } | null>(null)
+  const [scheduledVersion, setScheduledVersion] = useState(0)
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 6000)
+    return () => clearTimeout(t)
+  }, [notice])
   // The open email's whole conversation, oldest first (/api/gmail/threads).
   const [thread, setThread] = useState<Email[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
@@ -141,6 +166,12 @@ export default function InboxPage() {
   const emailFetchController = useRef<AbortController | null>(null)
 
   const [customLabels, setCustomLabels] = useState<GmailLabel[]>([])
+  // A folder's ⋯ menu, and the folder being renamed or deleted.
+  const [folderMenu, setFolderMenu] = useState<string | null>(null)
+  const folderMenuRef = useRef<HTMLDivElement>(null)
+  useDismissOnOutside(folderMenu !== null, folderMenuRef, () => setFolderMenu(null))
+  const [renameFolder, setRenameFolder] = useState<GmailLabel | null>(null)
+  const [deleteFolder, setDeleteFolder] = useState<GmailLabel | null>(null)
   const [showLabelModal, setShowLabelModal] = useState(false)
   const [showMoveMenu, setShowMoveMenu] = useState<string | null>(null)
   const moveMenuRef = useRef<HTMLDivElement>(null)
@@ -325,17 +356,11 @@ export default function InboxPage() {
       }
 
       const folderToUse = currentFolder || folder
-      let folderQuery = query || ''
-
-      if (folderToUse === 'sent') {
-        folderQuery = 'from:me ' + folderQuery
-      } else if (folderToUse === 'drafts') {
-        folderQuery = 'in:drafts ' + folderQuery
-      } else {
-        folderQuery = 'in:inbox -from:me ' + folderQuery
-      }
-
-      if (folderQuery) params.append('query', folderQuery.trim())
+      // The Scheduled folder is its own list (ScheduledList), not Gmail's.
+      if (folderToUse === 'scheduled') return
+      const req = folderRequest(folderToUse, query || '')
+      if (req.query) params.append('query', req.query)
+      if (req.labelId) params.append('labelId', req.labelId)
 
       const response = await fetch(`/api/gmail/emails?${params}`, { signal: controller.signal })
       const data = await response.json()
@@ -396,17 +421,9 @@ export default function InboxPage() {
         pageToken: nextPageToken,
       })
 
-      let folderQuery = searchQuery || ''
-
-      if (folder === 'sent') {
-        folderQuery = 'from:me ' + folderQuery
-      } else if (folder === 'drafts') {
-        folderQuery = 'in:drafts ' + folderQuery
-      } else {
-        folderQuery = 'in:inbox -from:me ' + folderQuery
-      }
-
-      if (folderQuery) params.append('query', folderQuery.trim())
+      const req = folderRequest(folder, searchQuery || '')
+      if (req.query) params.append('query', req.query)
+      if (req.labelId) params.append('labelId', req.labelId)
 
       const response = await fetch(`/api/gmail/emails?${params}`)
       const data = await response.json()
@@ -911,6 +928,17 @@ ${bodyText}`
         </div>
       )}
 
+      {notice && (
+        <div role="status" className="mx-4 mr-6 mt-4 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex-shrink-0">
+          {notice.scheduled && <CalendarClock className="w-4 h-4" />}
+          <span>{notice.text}</span>
+          {notice.scheduled && (
+            <button onClick={() => { setNotice(null); setFolder('scheduled') }} className="ml-2 underline">View scheduled</button>
+          )}
+          <button onClick={() => setNotice(null)} className="ml-auto"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
       {error && (
         <div className="mx-4 mr-6 mt-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 flex-shrink-0">
           <AlertCircle className="w-4 h-4" />
@@ -941,6 +969,7 @@ ${bodyText}`
                 { id: 'inbox' as FolderType, label: 'Inbox', icon: Inbox, count: unreadCount },
                 { id: 'sent' as FolderType, label: 'Sent', icon: Send, count: 0 },
                 { id: 'drafts' as FolderType, label: 'Drafts', icon: File, count: 0 },
+                { id: 'scheduled' as FolderType, label: 'Scheduled', icon: CalendarClock, count: 0 },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -975,16 +1004,51 @@ ${bodyText}`
                   Folders
                 </p>
                 <nav className="space-y-0.5">
-                  {customLabels.map((label) => (
-                    <button
-                      key={label.id}
-                      onClick={() => fetchEmails(`label:${label.name}`)}
-                      className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                      <Tag className="w-3.5 h-3.5 text-gray-400" />
-                      <span className="flex-1 text-left truncate">{label.name}</span>
-                    </button>
-                  ))}
+                  {customLabels.map((label) => {
+                    const id = `label:${label.id}` as FolderType
+                    const active = folder === id
+                    return (
+                      <div key={label.id} className="group relative flex items-center">
+                        <button
+                          onClick={() => setFolder(id)}
+                          className={`flex-1 min-w-0 flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
+                            active ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Tag
+                            className="w-3.5 h-3.5 flex-shrink-0"
+                            style={{ color: label.color?.backgroundColor || undefined }}
+                            fill={label.color?.backgroundColor || 'none'}
+                          />
+                          <span className="flex-1 text-left truncate">{label.name}</span>
+                        </button>
+                        <button
+                          onClick={() => setFolderMenu(folderMenu === label.id ? null : label.id)}
+                          className="p-1 rounded hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          aria-label={`Folder options for ${label.name}`}
+                          title="Folder options"
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                        {folderMenu === label.id && (
+                          <div ref={folderMenuRef} className="absolute left-full top-0 ml-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30">
+                            <button
+                              onClick={() => { setFolderMenu(null); setRenameFolder(label) }}
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-gray-400" /> Rename
+                            </button>
+                            <button
+                              onClick={() => { setFolderMenu(null); setDeleteFolder(label) }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </nav>
               </div>
             )}
@@ -1029,6 +1093,13 @@ ${bodyText}`
 
         {/* Email List */}
         <div className={`${selectedEmail ? 'w-2/5' : 'flex-1'} bg-white border-r border-gray-200 overflow-y-auto`}>
+          {folder === 'scheduled' ? (
+            <ScheduledList
+              userId={user!.id}
+              refreshKey={scheduledVersion}
+              onEditDraft={draftGmailId => setCompose({ mode: 'new', source: null, draftMessageId: null, draftGmailId })}
+            />
+          ) : (<>
 
           {/* Bulk Actions Bar */}
           {filteredEmails.length > 0 && (
@@ -1254,6 +1325,7 @@ ${bodyText}`
               )}
             </div>
           )}
+          </>)}
         </div>
 
         {/* Email Detail Panel */}
@@ -1543,18 +1615,51 @@ ${bodyText}`
             setCompose(null)
             // A closed message is kept in Drafts: show it there.
             if (folder === 'drafts') fetchEmails()
+            if (folder === 'scheduled') setScheduledVersion(v => v + 1)
           }}
           userId={user?.id || ''}
           mode={compose.mode}
           source={compose.source}
           draftMessageId={compose.draftMessageId}
+          draftGmailId={compose.draftGmailId ?? null}
           ownAddresses={connectedEmail ? [connectedEmail] : []}
+          onScheduled={at => {
+            setNotice({
+              text: `Scheduled for ${at.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`,
+              scheduled: true,
+            })
+            setScheduledVersion(v => v + 1)
+          }}
           onSent={() => {
             setCompose(null)
             fetchEmails()
             if (selectedEmail) void loadThread(selectedEmail)
           }}
           clients={clients}
+        />
+      )}
+
+      {renameFolder && (
+        <RenameFolderDialog
+          userId={user?.id || ''}
+          label={renameFolder}
+          onClose={() => setRenameFolder(null)}
+          onDone={() => { setRenameFolder(null); fetchLabels() }}
+        />
+      )}
+      {deleteFolder && (
+        <DeleteFolderDialog
+          userId={user?.id || ''}
+          label={deleteFolder}
+          onClose={() => setDeleteFolder(null)}
+          onDone={moved => {
+            const wasOpen = folder === `label:${deleteFolder.id}`
+            setDeleteFolder(null)
+            setNotice({ text: moved > 0 ? `Folder deleted — ${moved} email${moved === 1 ? '' : 's'} moved back to the Inbox` : 'Folder deleted' })
+            fetchLabels()
+            if (wasOpen) setFolder('inbox')
+            else fetchEmails()
+          }}
         />
       )}
 
