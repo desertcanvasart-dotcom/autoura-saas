@@ -10,7 +10,22 @@ export const MAX_ACTION_IDS = 5000
 
 export type LabelChange = { addLabelIds?: string[]; removeLabelIds?: string[] }
 
-export function labelChange(action: string, labelId?: string | null): LabelChange | { error: string } {
+/** A folder (user label) id as Gmail writes it — never a system label. */
+export function isFolderId(id: unknown): id is string {
+  return typeof id === 'string' && /^Label_[A-Za-z0-9_-]+$/.test(id)
+}
+
+/**
+ * `fromLabelId`: the folder the emails are being moved OUT of. A move used
+ * to add the new folder and drop only Inbox, so mail moved from one folder to
+ * another was left in both.
+ */
+export function labelChange(
+  action: string,
+  labelId?: string | null,
+  fromLabelId?: string | null,
+): LabelChange | { error: string } {
+  const from = isFolderId(fromLabelId) && fromLabelId !== labelId ? [fromLabelId] : []
   switch (action) {
     case 'delete': return { addLabelIds: ['TRASH'], removeLabelIds: ['INBOX'] }
     case 'archive': return { removeLabelIds: ['INBOX'] }
@@ -22,7 +37,11 @@ export function labelChange(action: string, labelId?: string | null): LabelChang
     case 'spam': return { addLabelIds: ['SPAM'], removeLabelIds: ['INBOX'] }
     case 'notSpam': return { addLabelIds: ['INBOX'], removeLabelIds: ['SPAM'] }
     case 'move':
-      return labelId ? { addLabelIds: [labelId], removeLabelIds: ['INBOX'] } : { error: 'Label ID required for move action' }
+      if (!labelId) return { error: 'Label ID required for move action' }
+      if (!isFolderId(labelId)) return { error: 'Choose one of your folders' }
+      return { addLabelIds: [labelId], removeLabelIds: ['INBOX', ...from] }
+    // Back to the Inbox, out of the folder it was filed in.
+    case 'moveToInbox': return { addLabelIds: ['INBOX'], removeLabelIds: from }
     case 'addLabel':
       return labelId ? { addLabelIds: [labelId] } : { error: 'Label ID required' }
     case 'removeLabel':

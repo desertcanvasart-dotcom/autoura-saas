@@ -181,3 +181,18 @@ describe('report spam and select all', () => {
     expect(big.truncated).toBe(true)
   })
 })
+
+describe('move to folder (route)', () => {
+  it('moving out of one folder into another removes the first', async () => {
+    await ACTIONS.POST(req('POST', { userId: 'u1', messageIds: ['a'], action: 'move', labelId: 'Label_2', fromLabelId: 'Label_1' }))
+    expect(batches).toEqual([{ ids: ['a'], addLabelIds: ['Label_2'], removeLabelIds: ['INBOX', 'Label_1'] }])
+  })
+  it('move to the Inbox takes it out of the folder', async () => {
+    await ACTIONS.POST(req('POST', { userId: 'u1', messageIds: ['a', 'b'], action: 'moveToInbox', fromLabelId: 'Label_1' }))
+    expect(batches).toEqual([{ ids: ['a', 'b'], addLabelIds: ['INBOX'], removeLabelIds: ['Label_1'] }])
+  })
+  it('refuses a move into a system label', async () => {
+    expect((await ACTIONS.POST(req('POST', { userId: 'u1', messageIds: ['a'], action: 'move', labelId: 'TRASH' }))).status).toBe(400)
+    expect(batches).toEqual([])
+  })
+})

@@ -10,6 +10,7 @@ import ThreadView from '@/components/inbox/ThreadView'
 import ScheduledList from '@/components/inbox/ScheduledList'
 import { RenameFolderDialog, DeleteFolderDialog } from '@/components/inbox/FolderDialogs'
 import RulesPanel from '@/components/inbox/RulesPanel'
+import MoveMenu from '@/components/inbox/MoveMenu'
 import { printEmails } from '@/lib/email/print-email'
 import type { UnsubscribeMethod } from '@/lib/email/unsubscribe'
 import type { RuleConditions } from '@/lib/email/mail-rules'
@@ -41,7 +42,6 @@ import {
   FolderPlus,
   Tag,
   MailOpen,
-  Move,
   CheckSquare,
   Square,
   Bell,
@@ -186,10 +186,6 @@ export default function InboxPage() {
   const [renameFolder, setRenameFolder] = useState<GmailLabel | null>(null)
   const [deleteFolder, setDeleteFolder] = useState<GmailLabel | null>(null)
   const [showLabelModal, setShowLabelModal] = useState(false)
-  const [showMoveMenu, setShowMoveMenu] = useState<string | null>(null)
-  const moveMenuRef = useRef<HTMLDivElement>(null)
-  // No backdrop — see lib/use-dismiss-on-outside.ts (ported, AUT-W02).
-  useDismissOnOutside(showMoveMenu !== null, moveMenuRef, () => setShowMoveMenu(null))
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set())
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -588,7 +584,8 @@ ${bodyText}`
   const handleEmailAction = async (
     action: string, 
     messageIds?: string[], 
-    labelId?: string
+    labelId?: string,
+    fromLabelId?: string | null,
   ) => {
     if (!user) return
 
@@ -600,7 +597,7 @@ ${bodyText}`
       const response = await fetch('/api/gmail/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, messageIds: ids, action, labelId }),
+        body: JSON.stringify({ userId: user.id, messageIds: ids, action, labelId, ...(fromLabelId ? { fromLabelId } : {}) }),
       })
 
       const data = await response.json()
@@ -608,7 +605,7 @@ ${bodyText}`
 
       // UPDATE CACHE after action
       if (isCacheReady) {
-        if (action === 'delete' || action === 'archive') {
+        if (action === 'delete' || action === 'archive' || action === 'spam' || action === 'move' || action === 'moveToInbox') {
           await removeCached(ids)
         } else if (action === 'markRead') {
           for (const id of ids) {
@@ -625,7 +622,6 @@ ${bodyText}`
       requestInboxUnreadRefresh()
       setSelectedEmail(null)
       setSelectedEmails(new Set())
-      setShowMoveMenu(null)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -690,22 +686,35 @@ ${bodyText}`
   const handleMarkUnread = () => handleEmailAction('markUnread')
   const handleStarEmail = () => handleEmailAction('star')
   const handleUnstarEmail = () => handleEmailAction('unstar')
-  const handleMoveToLabel = (labelId: string) => {
-    handleEmailAction('move', undefined, labelId)
+  // ── Move to folder ───────────────────────────────────────────────────────
+  // The folder being viewed, if any: a move takes the email OUT of it.
+  const currentFolderId = folder.startsWith('label:') ? folder.slice('label:'.length) : null
+  const folderName = (labelId: string) => customLabels.find(l => l.id === labelId)?.name ?? 'the folder'
+
+  // From an open email: the whole conversation moves, as in Gmail — not only
+  // the message on screen (its earlier messages stayed in the Inbox).
+  const moveOpenConversation = async (labelId: string | null) => {
+    if (!selectedEmail) return
+    const ids = [...new Set((thread.length ? thread : [selectedEmail]).map(m => m.id))]
+    await handleEmailAction(labelId ? 'move' : 'moveToInbox', ids, labelId ?? undefined, currentFolderId)
+    setNotice({ text: `Conversation moved to ${labelId ? `“${folderName(labelId)}”` : 'the Inbox'}` })
   }
 
   // ── Bulk actions: the ticked emails, or every email in the folder ────────
   const ACTION_WORDS: Record<string, string> = {
     archive: 'Archive', delete: 'Delete', markRead: 'Mark as read', spam: 'Report as spam', move: 'Move',
+    moveToInbox: 'Move to the Inbox',
   }
   const bulkAction = (action: string, labelId?: string) => {
-    if (allMatching) {
-      const n = allMatching.ids.length
-      if (!window.confirm(`${ACTION_WORDS[action] || action} all ${n.toLocaleString()} emails in ${folderLabel()}?`)) return
-      void handleEmailAction(action, allMatching.ids, labelId).then(() => setAllMatching(null))
-      return
-    }
-    void handleEmailAction(action, Array.from(selectedEmails), labelId)
+    const ids = allMatching ? allMatching.ids : Array.from(selectedEmails)
+    if (allMatching && !window.confirm(`${ACTION_WORDS[action] || action} all ${ids.length.toLocaleString()} emails in ${folderLabel()}?`)) return
+    void handleEmailAction(action, ids, labelId, currentFolderId).then(() => {
+      if (allMatching) setAllMatching(null)
+      if (action === 'move' || action === 'moveToInbox') {
+        const where = action === 'move' && labelId ? `“${folderName(labelId)}”` : 'the Inbox'
+        setNotice({ text: `${ids.length.toLocaleString()} email${ids.length === 1 ? '' : 's'} moved to ${where}` })
+      }
+    })
   }
 
   const folderLabel = () => {
@@ -1297,30 +1306,16 @@ ${bodyText}`
                       <MailOpen className="w-4 h-4 text-gray-500" />
                     </button>
 
-                    <div className="relative" ref={showMoveMenu === 'bulk' ? moveMenuRef : undefined}>
-                      <button
-                        onClick={() => setShowMoveMenu(showMoveMenu ? null : 'bulk')}
-                        disabled={actionLoading || customLabels.length === 0}
-                        className="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-                        title="Move to folder"
-                      >
-                        <Move className="w-4 h-4 text-gray-500" />
-                      </button>
-                      {showMoveMenu === 'bulk' && (
-                        <div className="absolute left-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                          {customLabels.map((label) => (
-                            <button
-                              key={label.id}
-                              onClick={() => bulkAction('move', label.id)}
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <Tag className="w-3.5 h-3.5 text-gray-400" />
-                              {label.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <MoveMenu
+                      userId={user!.id}
+                      folders={customLabels}
+                      currentFolderId={currentFolderId}
+                      disabled={actionLoading}
+                      onMove={labelId => bulkAction('move', labelId)}
+                      onMoveToInbox={() => bulkAction('moveToInbox')}
+                      onFolderCreated={fetchLabels}
+                      buttonClassName="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                    />
                   </div>
                 </>
               )}
@@ -1543,32 +1538,15 @@ ${bodyText}`
                     )}
                   </button>
 
-                  {customLabels.length > 0 && (
-                    <div className="relative" ref={showMoveMenu === 'detail' ? moveMenuRef : undefined}>
-                      <button 
-                        onClick={() => setShowMoveMenu(showMoveMenu === 'detail' ? null : 'detail')}
-                        disabled={actionLoading}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50" 
-                        title="Move to folder"
-                      >
-                        <Move className="w-4 h-4 text-gray-500" />
-                      </button>
-                      {showMoveMenu === 'detail' && (
-                        <div className="absolute left-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                          {customLabels.map((label) => (
-                            <button
-                              key={label.id}
-                              onClick={() => handleMoveToLabel(label.id)}
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <Tag className="w-3.5 h-3.5 text-gray-400" />
-                              {label.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <MoveMenu
+                    userId={user!.id}
+                    folders={customLabels}
+                    currentFolderId={currentFolderId}
+                    disabled={actionLoading}
+                    onMove={labelId => void moveOpenConversation(labelId)}
+                    onMoveToInbox={() => void moveOpenConversation(null)}
+                    onFolderCreated={fetchLabels}
+                  />
 
                   {/* Reply / Forward — this action already existed but only at
                       the very BOTTOM of the message, below the full body and
