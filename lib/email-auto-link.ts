@@ -11,6 +11,7 @@
 // email sync now runs it after every pass (2026-09-07).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { tenantClientEmails } from '@/lib/email/tenant-client-emails'
 
 export interface SyncedEmailRef {
   messageId: string
@@ -56,11 +57,7 @@ export async function autoLinkEmails(
   emails: readonly SyncedEmailRef[]
 ): Promise<AutoLinkResult> {
   if (emails.length === 0) return { linked: 0, total: 0 }
-  const { data: clients, error: clientError } = await admin
-    .from('clients')
-    .select('id, email')
-    .eq('tenant_id', tenantId)
-  if (clientError) throw clientError
+  const clients = await tenantClientEmails(admin as unknown as Parameters<typeof tenantClientEmails>[0], tenantId)
 
   const { data: links } = await admin
     .from('email_client_links')
@@ -69,19 +66,23 @@ export async function autoLinkEmails(
     .in('message_id', emails.map(e => e.messageId))
   const already = new Set<string>((links ?? []).map((l: { message_id: string }) => l.message_id))
 
-  const matches = matchEmailsToClients(emails, (clients ?? []) as { id: string; email: string | null }[], already)
+  const matches = matchEmailsToClients(emails, clients, already)
   if (matches.length === 0) return { linked: 0, total: emails.length }
 
+  // Upsert, ignoring a link that already exists: a plain insert on the unique
+  // (user_id, message_id) index failed the WHOLE batch when one link had been
+  // made meanwhile (a manual link, an overlapping sync), and those messages
+  // were never offered to auto-link again.
   const { data, error } = await admin
     .from('email_client_links')
-    .insert(matches.map(m => ({
+    .upsert(matches.map(m => ({
       user_id: userId,
       message_id: m.messageId,
       thread_id: m.threadId,
       client_id: m.clientId,
       email_address: m.emailAddress,
       auto_linked: true,
-    })))
+    })), { onConflict: 'user_id,message_id', ignoreDuplicates: true })
     .select('id')
   if (error) throw error
   return { linked: data?.length ?? 0, total: emails.length }

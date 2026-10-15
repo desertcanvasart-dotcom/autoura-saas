@@ -203,6 +203,10 @@ export function useEmailPolling({
 /**
  * Hook for managing email cache with polling
  */
+/**
+ * `userId` is the cache OWNER: pass cacheOwnerKey(user, company) so each
+ * company's mailbox is cached apart (lib/email-cache.ts).
+ */
 export function useEmailCache(userId: string | null) {
   const [isCacheReady, setIsCacheReady] = useState(false)
 

@@ -14,6 +14,7 @@ import { syncQueries } from '@/lib/inbox-business-filter'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { collectCandidates, storedIds, downloadMessages } from '@/lib/email/gmail-candidates'
+import { tenantClientEmails } from '@/lib/email/tenant-client-emails'
 
 /** The first real address in a header, or '' (lib/email/contact-name headerAddresses). */
 function extractEmailAddress(from: string | null | undefined): string {
@@ -182,14 +183,15 @@ export async function POST(request: NextRequest) {
     // (Updates does — hotel and airline confirmations live there). A sender
     // already on record is rescued from those categories by a second pass,
     // so a client Gmail misfiled is never lost. See lib/inbox-business-filter.
-    const { data: knownRows } = await createAdminClient().from('clients').select('email').eq('tenant_id', tenant_id).not('email', 'is', null)
-    const { main: mainQuery, rescues } = syncQueries(query, (knownRows ?? []).map((r: { email: string | null }) => r.email || ''))
+    // Every client, paged — a plain select stops at 1000 rows without saying so.
+    const knownRows = await tenantClientEmails(createAdminClient() as unknown as Parameters<typeof tenantClientEmails>[0], tenant_id)
+    const { main: mainQuery, rescues } = syncQueries(query, knownRows.map(r => r.email))
 
     // Which messages to download (lib/email/gmail-candidates.ts): what Gmail
     // added since the stored history id on a scheduled run, else the date
     // window — then only the ones not already stored.
     const { data: syncState } = await db.from('email_sync_state').select('last_history_id').eq('user_id', userId).eq('tenant_id', tenant_id).maybeSingle()
-    const knownSenders = new Set((knownRows ?? []).map((r: { email: string | null }) => (r.email || '').trim().toLowerCase()).filter(Boolean))
+    const knownSenders = new Set(knownRows.map(r => r.email.trim().toLowerCase()).filter(Boolean))
     const candidates = await collectCandidates(gmail, {
       useHistory: Boolean(use_history) && !full_sync,
       startHistoryId: (syncState as { last_history_id?: string | null } | null)?.last_history_id ?? null,

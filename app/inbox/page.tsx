@@ -10,6 +10,7 @@ import RichTextEditor from '@/components/email/RichTextEditor'
 import AttachmentList, { AttachmentIndicator } from '@/components/AttachmentList'
 import ClientLinkButton from '@/components/ClientLinkButton'
 import { useEmailPolling, useEmailCache } from '@/lib/use-email-polling'
+import { cacheOwnerKey } from '@/lib/email-cache'
 import { useInboxUnreadCount, requestInboxUnreadRefresh } from '@/lib/use-inbox-unread'
 import { replacePlaceholders, buildPlaceholderData, getPlaceholders } from '@/lib/template-placeholders'
 import { 
@@ -264,7 +265,7 @@ export default function InboxPage() {
   })
 
   // NEW: Email caching hook
-  const { getCached, cache, updateCached, removeCached, isCacheReady } = useEmailCache(user?.id || null)
+  const { getCached, cache, updateCached, removeCached, isCacheReady } = useEmailCache(cacheOwnerKey(user?.id, tenant?.id))
 
   useEffect(() => {
     if (user) {

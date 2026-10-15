@@ -8,6 +8,7 @@ import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
 import { gateRole } from '@/lib/api-role-gate'
+import { recentReminderSentAt, nextReminderAfter } from '@/lib/invoice-reminder-guard'
 
 // Sends a reminder email directly via the shared mail helper.
 async function sendReminderEmail(params: {
@@ -391,6 +392,18 @@ export async function POST(request: NextRequest) {
       else if (daysUntilDue >= -14) reminderType = 'overdue_14'
       else reminderType = 'overdue_30'
 
+      // "Send all due" is the automatic rule run by hand: an invoice already
+      // reminded this week (its next date failed to save) is not sent a second
+      // demand. Invoices picked one by one are sent as asked.
+      if (sendAll && !(invoiceIds && invoiceIds.length > 0)) {
+        const recent = await recentReminderSentAt(supabase, invoice.id)
+        if (recent) {
+          await supabase.from('invoices').update({ next_reminder_date: nextReminderAfter(recent) }).eq('id', invoice.id)
+          results.skipped++
+          continue
+        }
+      }
+
       const { subject, html } = generateReminderEmail(invoice, reminderType)
 
       // Send email
@@ -408,7 +421,7 @@ export async function POST(request: NextRequest) {
         const nextReminderDate = new Date()
         nextReminderDate.setDate(nextReminderDate.getDate() + 7) // Next reminder in 7 days
 
-        await supabase
+        const { error: dateError } = await supabase
           .from('invoices')
           .update({
             last_reminder_sent: new Date().toISOString(),
@@ -416,6 +429,7 @@ export async function POST(request: NextRequest) {
             next_reminder_date: nextReminderDate.toISOString().split('T')[0]
           })
           .eq('id', invoice.id)
+        if (dateError) console.error('reminder sent but next date not saved:', invoice.id, dateError.message)
 
         // Log reminder
         await supabase

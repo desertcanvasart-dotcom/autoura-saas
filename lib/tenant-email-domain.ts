@@ -43,6 +43,11 @@ export function isValidSendingDomain(domain: string | null | undefined): boolean
   return DOMAIN_RE.test(d) && d.length <= 253
 }
 
+/** Whether `local` can be the part before the @ (letters, digits, . _ -). */
+export function isValidFromLocal(local: string | null | undefined): boolean {
+  return LOCAL_RE.test((local ?? '').trim())
+}
+
 function safeLocal(local: string | null | undefined): string {
   const l = (local ?? '').trim().toLowerCase()
   return LOCAL_RE.test(l) ? l : 'invoices'
@@ -66,7 +71,7 @@ export function bareAddress(from: string): string {
  * that follows cannot be confused for part of the name, then the whole thing is
  * quoted if it still contains anything a parser treats as structure.
  */
-function displayName(name: string): string {
+export function displayName(name: string): string {
   // CR/LF become a space rather than vanishing, so a legitimate multi-line
   // name keeps its word boundary; <>" are removed outright.
   const clean = name.replace(/[\r\n]+/g, ' ').replace(/[<>"]/g, '').replace(/\s+/g, ' ').trim()

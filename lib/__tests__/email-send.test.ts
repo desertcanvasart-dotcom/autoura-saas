@@ -98,6 +98,14 @@ describe('the message Resend actually receives', () => {
     expect(send.mock.calls[0][0].from).toBe('Sillage Egypte <notifications@autoura.net>')
   })
 
+  it('quotes a name with a comma and drops characters that break the header', async () => {
+    // Raw, "Smith, Jones & Co" made an invalid From and Resend refused the mail.
+    await sendMail({ ...basic, fromName: 'Smith, Jones & Co' })
+    expect(send.mock.calls[0][0].from).toBe('"Smith, Jones & Co" <notifications@autoura.net>')
+    await sendMail({ ...basic, fromName: 'Bad "Name" <x@y>' })
+    expect(send.mock.calls[1][0].from).toBe('"Bad Name x@y" <notifications@autoura.net>')
+  })
+
   it('uses the configured from verbatim when no name is given', async () => {
     await sendMail(basic)
     expect(send.mock.calls[0][0].from).toBe('Autoura <notifications@autoura.net>')

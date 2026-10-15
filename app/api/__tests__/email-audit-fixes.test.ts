@@ -77,3 +77,12 @@ describe('the Gmail actions route', () => {
     expect(route).toContain('Permanent delete is not available')
   })
 })
+
+describe('the attachment download', () => {
+  const route = read('app/api/gmail/attachments/route.ts')
+
+  it('names the file with filename*= rather than a percent-encoded filename=', () => {
+    expect(route).not.toContain('filename="${encodeURIComponent(filename)}"')
+    expect(route).toContain('attachmentNameParams(filename).disposition')
+  })
+})

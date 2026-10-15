@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import {
+  isValidFromLocal,
   isValidSendingDomain,
   previewSenderAddress,
   resolveSender,
@@ -96,6 +97,19 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: 'Enter a bare domain, e.g. sawatours.org — no https://, no @, no path.',
+      },
+      { status: 400 }
+    )
+  }
+
+  // Checked here, not quietly replaced at send time: an invalid local part
+  // ("Bookings Team") was saved and shown as the sender, while mail actually
+  // went out from invoices@ (safeLocal in lib/tenant-email-domain.ts).
+  if (fromLocal && !isValidFromLocal(fromLocal)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'The sender name before the @ may use only letters, digits, dots, hyphens and underscores, e.g. bookings.',
       },
       { status: 400 }
     )
@@ -230,4 +244,73 @@ export async function PUT() {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Release the company's sending domain: remove it from Resend and clear it
+ * here. Without this a domain, once claimed, was held for good — by the
+ * unique index even while only `pending` — so a wrong or mistyped domain could
+ * never be replaced, and a domain claimed by the wrong company could never be
+ * onboarded by its real owner. Mail goes back to the platform sender.
+ */
+export async function DELETE() {
+  const auth = await requireAuth()
+  if (auth.error !== null) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  }
+  if (!canManage(auth.role)) {
+    return NextResponse.json(
+      { success: false, error: 'Only owners and admins can change the sending domain' },
+      { status: 403 }
+    )
+  }
+
+  const admin = createAdminClient()
+  const { data: tenant, error: readError } = await admin
+    .from('tenants')
+    .select('resend_domain_id, email_domain')
+    .eq('id', auth.tenant_id!)
+    .single()
+  if (readError) {
+    return NextResponse.json({ success: false, error: readError.message }, { status: 500 })
+  }
+  if (!tenant?.email_domain && !tenant?.resend_domain_id) {
+    return NextResponse.json({ success: true, status: 'not_configured' })
+  }
+
+  if (tenant.resend_domain_id) {
+    const client = resend()
+    if (!client) {
+      return NextResponse.json(
+        { success: false, error: 'RESEND_API_KEY is not configured' },
+        { status: 503 }
+      )
+    }
+    const { error } = await client.domains.remove(tenant.resend_domain_id)
+    // Already gone at Resend is fine — the point is to release it here.
+    if (error && !/not.?found/i.test(`${error.name ?? ''} ${error.message ?? ''}`)) {
+      return NextResponse.json(
+        { success: false, error: error.message || 'Resend would not remove the domain' },
+        { status: 502 }
+      )
+    }
+  }
+
+  // Service role, as in POST and PUT (migration 420).
+  const { error: saveError } = await admin
+    .from('tenants')
+    .update({
+      email_domain: null,
+      email_from_local: 'invoices',
+      resend_domain_id: null,
+      email_domain_status: 'not_configured',
+      email_domain_verified_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', auth.tenant_id!)
+  if (saveError) {
+    return NextResponse.json({ success: false, error: saveError.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, status: 'not_configured', sending_as: process.env.RESEND_FROM_EMAIL })
 }

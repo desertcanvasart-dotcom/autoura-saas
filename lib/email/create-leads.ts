@@ -28,6 +28,21 @@ export interface NewConversation {
  *  spend the afternoon asking about three hundred old newsletters. */
 export const MAX_JUDGED_PER_SYNC = 10
 
+/** ILIKE with no wildcards: the address matched whole, any case. */
+function ilikeExact(value: string): string {
+  return value.replace(/[\\%_]/g, ch => `\\${ch}`)
+}
+
+async function isKnownClientIgnoringCase(db: Db, tenantId: string, email: string): Promise<boolean> {
+  const { data } = await db
+    .from('clients')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .ilike('email', ilikeExact(email))
+    .limit(1)
+  return Array.isArray(data) && data.length > 0
+}
+
 export async function createLeadsFromNewConversations(input: {
   db: Db
   tenantId: string
@@ -64,6 +79,14 @@ export async function createLeadsFromNewConversations(input: {
     if (seen.has(from)) continue
     if (!worthJudging({ fromEmail: from }, { office, knownClientEmails, dismissedEmails })) continue
     seen.add(from)
+    // The batch lookup above is exact, and clients.email keeps whatever case
+    // it was typed in: John.Smith@Gmail.com writing in was not recognised and
+    // became a second, "lead" client. Checked case-insensitively here, only
+    // for a sender about to be judged.
+    if (await isKnownClientIgnoringCase(db, tenantId, from)) {
+      knownClientEmails.add(from)
+      continue
+    }
     judged++
 
     const judgement = await judgeLead({
