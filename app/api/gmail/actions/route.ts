@@ -170,14 +170,15 @@ export async function POST(request: NextRequest) {
         break
 
       case 'permanentDelete':
-        // Permanently delete (use with caution)
-        for (const id of ids) {
-          await gmail.users.messages.delete({
-            userId: 'me',
-            id,
-          })
-        }
-        break
+        // messages.delete needs the full https://mail.google.com/ scope, which
+        // GMAIL_SCOPES (lib/gmail.ts) does not request — Google answered 403
+        // and this route a bare 500, every time. Nothing in the app calls it;
+        // say so plainly rather than fail obscurely. 'delete' moves to Trash,
+        // which Gmail empties after 30 days.
+        return NextResponse.json(
+          { error: 'Permanent delete is not available. Use delete, which moves mail to Trash.' },
+          { status: 400 }
+        )
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -185,7 +186,7 @@ export async function POST(request: NextRequest) {
 
     // Mail you have read, archived or deleted is no longer news: its bell
     // notification (gmail:<id>, see /api/gmail/poll) goes read too.
-    if (['markRead', 'archive', 'delete', 'permanentDelete', 'move'].includes(action)) {
+    if (['markRead', 'archive', 'delete', 'move'].includes(action)) {
       const { error: notifError } = await createAdminClient()
         .from('notifications')
         .update({ is_read: true })

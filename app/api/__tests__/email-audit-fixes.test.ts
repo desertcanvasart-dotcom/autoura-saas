@@ -68,3 +68,12 @@ describe('the Gmail send route', () => {
     expect(route).toMatch(/threadConflict\(supabase, \{\s*tenantId: mailboxTenant/)
   })
 })
+
+describe('the Gmail actions route', () => {
+  const route = read('app/api/gmail/actions/route.ts')
+
+  it('refuses permanent delete plainly — the app never asks for the scope it needs', () => {
+    expect(route).not.toContain('gmail.users.messages.delete(')
+    expect(route).toContain('Permanent delete is not available')
+  })
+})

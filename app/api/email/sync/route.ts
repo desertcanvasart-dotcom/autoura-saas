@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
 import { createLeadsFromNewConversations, type NewConversation } from '@/lib/email/create-leads'
-import { contactNameFromThread, fillMissingContactNames } from '@/lib/email/contact-name'
+import { contactNameFromThread, fillMissingContactNames, headerAddresses } from '@/lib/email/contact-name'
 
 /** Either client writes the same rows; the sweep's is the service role. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,10 +15,18 @@ import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { collectCandidates, storedIds, downloadMessages } from '@/lib/email/gmail-candidates'
 
+/** The first real address in a header, or '' (lib/email/contact-name headerAddresses). */
 function extractEmailAddress(from: string | null | undefined): string {
-  if (!from) return ''
-  const match = from.match(/<([^>]+)>/)
-  return match ? match[1].toLowerCase() : from.toLowerCase().trim()
+  return headerAddresses(from)[0] ?? ''
+}
+
+/**
+ * The customer's address when the office wrote first: the first recipient that
+ * is not the office. A To line naming a colleague first, or a bare list
+ * ("a@x.com, b@y.com"), used to become the conversation's "customer" whole.
+ */
+function firstCustomerAddress(header: string | null | undefined, office: OfficeRule): string {
+  return headerAddresses(header).find(a => !isOfficeAddress(office, a)) ?? ''
 }
 
 function extractDisplayName(from: string | null | undefined): string | null {
@@ -246,7 +254,9 @@ export async function POST(request: NextRequest) {
         const firstTo = getH(firstHeaders, 'To')
         const firstDir = getDirection(firstFrom, office)
         const customerHeader = firstDir === 'inbound' ? firstFrom : firstTo
-        const contactEmail = extractEmailAddress(customerHeader)
+        const contactEmail = firstDir === 'inbound'
+          ? extractEmailAddress(firstFrom)
+          : firstCustomerAddress(firstTo, office)
         // Any header in the thread that names the customer — not only the
         // first one, which is a bare address when the office wrote first
         // (lib/email/contact-name.ts).
@@ -305,18 +315,39 @@ export async function POST(request: NextRequest) {
             })
             .select('id')
             .single()
-          if (unifiedErr || !newUnified) continue
-          unifiedId = newUnified.id
-          // Judged for a travel request after the loop: a conversation is
-          // judged ONCE, when it first appears.
-          newConversations.push({
-            unifiedId,
-            fromEmail: contactEmail,
-            fromName: contactName,
-            subject: getH(firstHeaders, 'Subject'),
-            body: sorted[0]?.snippet || '',
-          })
-          result.conversations_created++
+          if (unifiedErr || !newUnified) {
+            // Another sync (the scheduled sweep, a Sync click) created this
+            // contact's conversation a moment ago: file the mail there.
+            const { data: raced } = unifiedErr?.code === '23505'
+              ? await db
+                  .from('unified_conversations')
+                  .select('id')
+                  .eq('tenant_id', tenant_id)
+                  .eq('contact_email', contactEmail)
+                  .maybeSingle()
+              : { data: null }
+            if (!raced) {
+              // Counted, so the history id is not advanced past mail that was
+              // never stored (it was dropped silently before).
+              console.error('[Email Sync] conversation insert failed:', unifiedErr?.message)
+              insertFailed += messages.length
+              continue
+            }
+            unifiedId = raced.id
+            result.conversations_updated++
+          } else {
+            unifiedId = newUnified.id
+            // Judged for a travel request after the loop: a conversation is
+            // judged ONCE, when it first appears.
+            newConversations.push({
+              unifiedId,
+              fromEmail: contactEmail,
+              fromName: contactName,
+              subject: getH(firstHeaders, 'Subject'),
+              body: sorted[0]?.snippet || '',
+            })
+            result.conversations_created++
+          }
         }
 
         // Store each message in email_messages (skip duplicates by gmail_message_id)
@@ -360,7 +391,9 @@ export async function POST(request: NextRequest) {
           const toEmail = extractEmailAddress(toRaw)
           const toName = extractDisplayName(toRaw)
           const cc = getMH('Cc')
-          const ccEmails = cc ? cc.split(',').map((e: string) => extractEmailAddress(e)).filter(Boolean) : null
+          // Quote-aware: `"Smith, John" <j@x.com>` is one address, not two.
+          const ccList = headerAddresses(cc)
+          const ccEmails = ccList.length ? ccList : null
 
           const { error: insErr } = await db.from('email_messages').insert({
             tenant_id,
@@ -421,6 +454,9 @@ export async function POST(request: NextRequest) {
           .eq('id', unifiedId)
       } catch (threadErr: any) {
         console.error('[Email Sync] Thread error:', threadErr?.message || threadErr)
+        // Counted like a failed insert: the run is not clean, so its history
+        // id is not stored and the thread is retried rather than lost.
+        insertFailed++
       }
     }
 
