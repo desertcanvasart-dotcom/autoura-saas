@@ -5,10 +5,11 @@ import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
-import ComposeModal from '@/components/inbox/ComposeModal'
+import ComposeModal, { type ComposeMode } from '@/components/inbox/ComposeModal'
+import ThreadView from '@/components/inbox/ThreadView'
 import type { Email, GmailLabel, Client } from '@/components/inbox/types'
 // NEW IMPORTS FOR GMAIL ENHANCEMENTS
-import AttachmentList, { AttachmentIndicator } from '@/components/AttachmentList'
+import { AttachmentIndicator } from '@/components/AttachmentList'
 import ClientLinkButton from '@/components/ClientLinkButton'
 import { useEmailPolling, useEmailCache } from '@/lib/use-email-polling'
 import { cacheOwnerKey } from '@/lib/email-cache'
@@ -41,6 +42,9 @@ import {
   Maximize2,
   Sparkles,
   ChevronDown,
+  Reply,
+  ReplyAll,
+  Forward,
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { isBusinessEmail } from '@/lib/inbox-business-filter'
@@ -115,7 +119,14 @@ export default function InboxPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [connectedEmail, setConnectedEmail] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
-  const [showCompose, setShowCompose] = useState(false)
+  // The composer: a new message, a reply / reply all / forward of a message,
+  // or a saved draft reopened from Drafts.
+  const [compose, setCompose] = useState<{ mode: ComposeMode; source: Email | null; draftMessageId: string | null } | null>(null)
+  const openCompose = (mode: ComposeMode, source: Email | null = null, draftMessageId: string | null = null) =>
+    setCompose({ mode, source, draftMessageId })
+  // The open email's whole conversation, oldest first (/api/gmail/threads).
+  const [thread, setThread] = useState<Email[]>([])
+  const [threadLoading, setThreadLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   // Business is the default view: Gmail's noise categories and machine
   // senders hidden, anyone on record always shown (lib/inbox-business-filter).
@@ -593,7 +604,13 @@ ${bodyText}`
   // count only ever went down via the "Mark as read" button. Quiet on purpose:
   // no list reload, no closing the email; a failure just leaves it unread.
   const openEmail = (email: Email, isSentByMe: boolean) => {
+    // A draft opens in the composer, to carry on writing.
+    if (folder === 'drafts') {
+      openCompose('new', null, email.id)
+      return
+    }
     setSelectedEmail(email)
+    void loadThread(email)
     if (!user || !email.isUnread || isSentByMe) return
     const read = { ...email, isUnread: false }
     setEmails(prev => prev.map(e => (e.id === email.id ? { ...e, isUnread: false } : e)))
@@ -610,6 +627,29 @@ ${bodyText}`
       })
       .catch(() => {})
   }
+
+  // The conversation the opened email belongs to. Until it arrives (or if it
+  // cannot be read) the email itself is shown, so opening is never blocked.
+  const threadRequest = useRef(0)
+  const loadThread = async (email: Email) => {
+    const req = ++threadRequest.current
+    setThread([email])
+    if (!user || !email.threadId) return
+    setThreadLoading(true)
+    try {
+      const res = await fetch(`/api/gmail/threads?userId=${user.id}&threadId=${encodeURIComponent(email.threadId)}`)
+      const data = await res.json()
+      if (req !== threadRequest.current) return
+      if (res.ok && Array.isArray(data.messages) && data.messages.length > 0) setThread(data.messages)
+    } catch {
+      // Keep showing the single email.
+    } finally {
+      if (req === threadRequest.current) setThreadLoading(false)
+    }
+  }
+
+  // Reply, reply all and forward from the header act on the newest message.
+  const latestInThread = (): Email | null => thread[thread.length - 1] ?? selectedEmail
 
   const handleDelete = () => handleEmailAction('delete')
   const handleArchive = () => handleEmailAction('archive')
@@ -842,7 +882,7 @@ ${bodyText}`
                 Refresh
               </button>
               <button
-                onClick={() => setShowCompose(true)}
+                onClick={() => openCompose('new')}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
               >
                 <Send className="w-4 h-4" />
@@ -1285,11 +1325,25 @@ ${bodyText}`
                       Same handler; the bottom button stays for people who read
                       to the end. */}
                   <button
-                    onClick={() => setShowCompose(true)}
+                    onClick={() => openCompose('reply', latestInThread())}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title={folder === 'sent' || isFromMe(selectedEmail) ? 'Forward' : 'Reply'}
+                    title="Reply"
                   >
-                    <Send className="w-4 h-4 text-primary-600" />
+                    <Reply className="w-4 h-4 text-primary-600" />
+                  </button>
+                  <button
+                    onClick={() => openCompose('replyAll', latestInThread())}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Reply all"
+                  >
+                    <ReplyAll className="w-4 h-4 text-primary-600" />
+                  </button>
+                  <button
+                    onClick={() => openCompose('forward', latestInThread())}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Forward"
+                  >
+                    <Forward className="w-4 h-4 text-primary-600" />
                   </button>
 
                   {/* Parse Email Button */}
@@ -1326,75 +1380,20 @@ ${bodyText}`
                 {decodeHtmlEntities(selectedEmail.subject || '(No subject)')}
               </h2>
 
-              <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-200">
-                {folder === 'sent' || isFromMe(selectedEmail) ? (
-                  <>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(selectedEmail.to)}`}>
-                      {getInitials(extractName(selectedEmail.to))}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-0.5 bg-primary-100 text-primary-700 rounded font-medium">Sent</span>
-                        <p className="font-medium text-gray-900">To: {extractName(selectedEmail.to)}</p>
-                      </div>
-                      <p className="text-xs text-gray-500">{extractEmailAddress(selectedEmail.to)}</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(selectedEmail.from)}`}>
-                      {getInitials(extractName(selectedEmail.from))}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-900">{extractName(selectedEmail.from)}</p>
-                        {/* NEW: Client Link Button */}
-                        <ClientLinkButton
-                          userId={user!.id}
-                          messageId={selectedEmail.id}
-                          threadId={selectedEmail.threadId}
-                          fromEmail={extractEmailAddress(selectedEmail.from)}
-                  fromName={extractName(selectedEmail.from)}
-                          subject={selectedEmail.subject}
-                          snippet={selectedEmail.snippet}
-                          sentAt={selectedEmail.date}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-500">{extractEmailAddress(selectedEmail.from)}</p>
-                    </div>
-                  </>
-                )}
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">{new Date(selectedEmail.date).toLocaleString()}</p>
-                  {folder !== 'sent' && !isFromMe(selectedEmail) && (
-                    <p className="text-xs text-gray-400">To: me</p>
-                  )}
-                </div>
-              </div>
-
-              <div 
-              className="email-body-content"
-              dangerouslySetInnerHTML={{ __html: formatEmailBody(selectedEmail.body) }}
-            />
-
-              {/* NEW: Attachment List */}
-              {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-                <AttachmentList
-                  attachments={selectedEmail.attachments}
-                  messageId={selectedEmail.id}
-                  userId={user!.id}
-                />
+              {/* The whole conversation, oldest first (ThreadView). */}
+              {threadLoading && thread.length <= 1 && (
+                <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Loading the conversation…
+                </p>
               )}
-
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <button
-                  onClick={() => setShowCompose(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-                >
-                  <Send className="w-4 h-4" />
-                  {folder === 'sent' || isFromMe(selectedEmail) ? 'Forward' : 'Reply'}
-                </button>
-              </div>
+              <ThreadView
+                key={selectedEmail.threadId + ':' + thread.length}
+                messages={thread.length ? thread : [selectedEmail]}
+                userId={user!.id}
+                isOwn={e => folder === 'sent' || Boolean(isFromMe(e))}
+                renderBody={formatEmailBody}
+                onCompose={(mode, message) => openCompose(mode, message)}
+              />
             </div>
           </div>
         )}
@@ -1475,20 +1474,14 @@ ${bodyText}`
             {decodeHtmlEntities(selectedEmail.subject || '(No subject)')}
           </h2>
 
-          <div
-            className="prose prose-sm max-w-none text-gray-700"
-            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(selectedEmail.body) }}
+          <ThreadView
+            key={'expanded:' + selectedEmail.threadId + ':' + thread.length}
+            messages={thread.length ? thread : [selectedEmail]}
+            userId={user!.id}
+            isOwn={e => folder === 'sent' || Boolean(isFromMe(e))}
+            renderBody={sanitizeEmailHtml}
+            onCompose={(mode, message) => { setShowExpandedEmail(false); openCompose(mode, message) }}
           />
-
-          {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <AttachmentList
-                attachments={selectedEmail.attachments}
-                messageId={selectedEmail.id}
-                userId={user!.id}
-              />
-            </div>
-          )}
         </div>
       </div>
 
@@ -1525,30 +1518,41 @@ ${bodyText}`
           </button>
         </div>
 
-        <button
-          onClick={() => {
-            setShowExpandedEmail(false)
-            setShowCompose(true)
-          }}
-          className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-        >
-          <Send className="w-4 h-4" />
-          {folder === 'sent' || isFromMe(selectedEmail) ? 'Forward' : 'Reply'}
-        </button>
+        <div className="flex items-center gap-2">
+          {([['reply', 'Reply', Reply], ['replyAll', 'Reply all', ReplyAll], ['forward', 'Forward', Forward]] as const).map(([mode, label, Icon]) => (
+            <button
+              key={mode}
+              onClick={() => { setShowExpandedEmail(false); openCompose(mode, latestInThread()) }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   </div>
 )}
 
 {/* Compose Modal */}
-{showCompose && (
+{compose && (
         <ComposeModal
-          onClose={() => setShowCompose(false)}
+          key={`${compose.mode}:${compose.source?.id ?? ''}:${compose.draftMessageId ?? ''}`}
+          onClose={() => {
+            setCompose(null)
+            // A closed message is kept in Drafts: show it there.
+            if (folder === 'drafts') fetchEmails()
+          }}
           userId={user?.id || ''}
-          replyTo={selectedEmail && folder !== 'sent' && !isFromMe(selectedEmail) ? selectedEmail : null}
+          mode={compose.mode}
+          source={compose.source}
+          draftMessageId={compose.draftMessageId}
+          ownAddresses={connectedEmail ? [connectedEmail] : []}
           onSent={() => {
-            setShowCompose(false)
+            setCompose(null)
             fetchEmails()
+            if (selectedEmail) void loadThread(selectedEmail)
           }}
           clients={clients}
         />

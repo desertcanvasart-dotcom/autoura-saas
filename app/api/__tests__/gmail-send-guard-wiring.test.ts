@@ -71,12 +71,14 @@ describe('the reply composer', () => {
 describe('threading', () => {
   it('reads the thread’s headers before building the message', () => {
     expect(route).toContain('replyHeaders(gmail, gmailThreadId)')
-    expect(route.indexOf('replyHeaders(')).toBeLessThan(route.indexOf('buildSimpleEmail(to'))
+    expect(route.indexOf('replyHeaders(')).toBeLessThan(route.indexOf('buildRawEmail('))
   })
 
-  it('passes them to both builders — a reply with an attachment threads too', () => {
-    expect(route).toContain('buildEmailWithAttachments(to, subject, body, attachments, threading)')
-    expect(route).toContain('buildSimpleEmail(to, subject, body, threading)')
+  it('passes them to the builder, with or without attachments — a reply with an attachment threads too', () => {
+    // One builder now (lib/email/compose-mime), so there is no second path to miss.
+    const build = route.slice(route.indexOf('buildRawEmail({'), route.indexOf('buildRawEmail({') + 400)
+    expect(build).toContain('threading,')
+    expect(build).toContain('attachments:')
   })
 
   it('asks for them only when there is a thread to answer', () => {

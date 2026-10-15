@@ -286,6 +286,13 @@ export function parseEmailMessage(message: any) {
     snippet: message.snippet,
     from: getHeader('From'),
     to: getHeader('To'),
+    // Reply all reads Cc; reply honours Reply-To; a reopened draft shows Bcc.
+    cc: getHeader('Cc'),
+    bcc: getHeader('Bcc'),
+    replyTo: getHeader('Reply-To'),
+    // Newsletters' one-click unsubscribe (RFC 2369 / RFC 8058).
+    listUnsubscribe: getHeader('List-Unsubscribe'),
+    listUnsubscribePost: getHeader('List-Unsubscribe-Post'),
     subject: getHeader('Subject'),
     date: getHeader('Date'),
     body,

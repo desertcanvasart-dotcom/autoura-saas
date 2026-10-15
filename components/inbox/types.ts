@@ -7,6 +7,12 @@ export interface Email {
   snippet: string
   from: string
   to: string
+  cc?: string
+  bcc?: string
+  replyTo?: string
+  /** RFC 2369 List-Unsubscribe and RFC 8058 List-Unsubscribe-Post. */
+  listUnsubscribe?: string
+  listUnsubscribePost?: string
   subject: string
   date: string
   body: string

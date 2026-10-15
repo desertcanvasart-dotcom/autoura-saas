@@ -1,7 +1,7 @@
-import { attachmentNameParams, encodeEmailHeader, singleLine } from '@/lib/email/mime-header'
 import { NextRequest, NextResponse } from 'next/server'
 import { claimSend, finishSend, threadConflict, replyBodyHash } from '@/lib/email/send-guard'
-import { replyHeaders, threadingLines, type ThreadingHeaders } from '@/lib/email/threading'
+import { replyHeaders } from '@/lib/email/threading'
+import { buildRawEmail, parseRecipients, MAX_RECIPIENTS, type OutgoingAttachment } from '@/lib/email/compose-mime'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { indexEmailReply } from '@/lib/copilot-indexer'
@@ -11,11 +11,16 @@ import { indexEmailReply } from '@/lib/copilot-indexer'
 // A, then user B's request set B's tokens before A's Gmail call ran, so A
 // could act in — or send from — B's mailbox (documents audit, round 12).
 
-interface Attachment {
+/** An attachment of a message in this mailbox, carried over by a forward. */
+interface ForwardedAttachment {
+  messageId: string
+  attachmentId: string
   filename: string
   mimeType: string
-  data: string // base64 encoded
 }
+
+/** Most attachments a forward carries over from the original. */
+const MAX_FORWARDED_ATTACHMENTS = 20
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,7 +54,11 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient()
 
     const {
-      userId, to, subject, body, body_text: bodyTextParam, threadId, attachments,
+      userId, to, cc, bcc, subject, body, body_text: bodyTextParam, threadId, attachments,
+      // A saved Gmail draft this send replaces (deleted once the mail is sent),
+      // and the original's attachments a forward carries over.
+      gmail_draft_id: gmailDraftId,
+      forward_attachments: forwardAttachments,
       conversation_id: conversationId,
       draft_id: draftId,
       // The guard's inputs (migration 365). request_key is one key per reply,
@@ -67,6 +76,21 @@ export async function POST(request: NextRequest) {
 
     if (!userId || !to || !subject || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // To, Cc and Bcc: real addresses only, reported back when not.
+    const toList = parseRecipients(to)
+    const ccList = parseRecipients(cc)
+    const bccList = parseRecipients(bcc)
+    const invalid = [...toList.invalid, ...ccList.invalid, ...bccList.invalid]
+    if (invalid.length > 0) {
+      return NextResponse.json({ error: `Not an email address: ${invalid.slice(0, 5).join(', ')}` }, { status: 400 })
+    }
+    if (toList.valid.length === 0) {
+      return NextResponse.json({ error: 'Add at least one recipient' }, { status: 400 })
+    }
+    if (toList.valid.length + ccList.valid.length + bccList.valid.length > MAX_RECIPIENTS) {
+      return NextResponse.json({ error: `At most ${MAX_RECIPIENTS} recipients per email` }, { status: 400 })
     }
     // Which company's mailbox: a session's current company, or the one a
     // trusted server caller names (migration 415).
@@ -203,14 +227,33 @@ export async function POST(request: NextRequest) {
     // together for THEM.
     const threading = gmailThreadId ? await replyHeaders(gmail, gmailThreadId) : {}
 
-    // Build email with or without attachments
-    let rawEmail: string
-
-    if (attachments && attachments.length > 0) {
-      rawEmail = buildEmailWithAttachments(to, subject, body, attachments, threading)
-    } else {
-      rawEmail = buildSimpleEmail(to, subject, body, threading)
+    // A forward carries the original's attachments: fetched here from the
+    // same mailbox, so they never make a round trip through the browser.
+    const carried: OutgoingAttachment[] = []
+    if (Array.isArray(forwardAttachments)) {
+      for (const f of (forwardAttachments as ForwardedAttachment[]).slice(0, MAX_FORWARDED_ATTACHMENTS)) {
+        if (!f?.messageId || !f?.attachmentId) continue
+        const { data } = await gmail.users.messages.attachments.get({
+          userId: 'me', messageId: String(f.messageId), id: String(f.attachmentId),
+        })
+        if (!data.data) continue
+        carried.push({
+          filename: String(f.filename || 'attachment'),
+          mimeType: String(f.mimeType || 'application/octet-stream'),
+          data: Buffer.from(data.data, 'base64url').toString('base64'),
+        })
+      }
     }
+
+    const rawEmail = buildRawEmail({
+      to: toList.valid,
+      cc: ccList.valid,
+      bcc: bccList.valid,
+      subject,
+      html: body,
+      attachments: [...((attachments as OutgoingAttachment[] | undefined) ?? []), ...carried],
+      threading,
+    })
 
     // Send email
     let response
@@ -226,6 +269,13 @@ export async function POST(request: NextRequest) {
       // A failed attempt releases its key, so the operator can try again.
       if (claimed && requestKey) await finishSend(supabase, String(requestKey), { ok: false })
       throw sendError
+    }
+
+    // The draft this replaced is gone once the mail is sent, as in Gmail.
+    if (gmailDraftId) {
+      await gmail.users.drafts.delete({ userId: 'me', id: String(gmailDraftId) }).catch(err => {
+        console.error('Sent, but the draft could not be removed:', err?.message || err)
+      })
     }
 
     if (claimed && requestKey) {
@@ -267,7 +317,8 @@ export async function POST(request: NextRequest) {
               // Attribution (mig 269): the staff member sending.
               sent_by: user.id,
               from_email: user.email || '',
-              to_email: Array.isArray(to) ? to[0] : to,
+              to_email: toList.valid[0],
+              cc_emails: ccList.valid.length ? ccList.valid : null,
               subject,
               body_text: bodyTextClean,
               body_html: body,
@@ -355,72 +406,4 @@ function stripHtmlServer(html: string): string {
     .replace(/&quot;/g, '"')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-}
-
-// Strip CR/LF from header values to prevent header/Bcc injection via a
-// crafted recipient or subject.
-function stripHeader(value: string): string {
-  return String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
-}
-
-function buildSimpleEmail(to: string, subject: string, body: string, threading: ThreadingHeaders = {}): string {
-  const emailLines = [
-    `To: ${stripHeader(to)}`,
-    `Subject: ${encodeEmailHeader(subject)}`,
-    ...threadingLines(threading),
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=utf-8',
-    '',
-    body,
-  ]
-  
-  return Buffer.from(emailLines.join('\r\n'))
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
-
-function buildEmailWithAttachments(
-  to: string, 
-  subject: string, 
-  body: string, 
-  attachments: Attachment[],
-  threading: ThreadingHeaders = {}
-): string {
-  const boundary = `boundary_${Date.now()}`
-  
-  const emailParts = [
-    `To: ${stripHeader(to)}`,
-    `Subject: ${encodeEmailHeader(subject)}`,
-    ...threadingLines(threading),
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset=utf-8',
-    'Content-Transfer-Encoding: base64',
-    '',
-    Buffer.from(body).toString('base64'),
-  ]
-
-  // Add attachments
-  for (const attachment of attachments) {
-    emailParts.push(
-      `--${boundary}`,
-      `Content-Type: ${singleLine(attachment.mimeType)}; ${attachmentNameParams(attachment.filename).name}`,
-      'Content-Transfer-Encoding: base64',
-      `Content-Disposition: attachment; ${attachmentNameParams(attachment.filename).disposition}`,
-      '',
-      attachment.data
-    )
-  }
-
-  emailParts.push(`--${boundary}--`)
-
-  return Buffer.from(emailParts.join('\r\n'))
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
 }

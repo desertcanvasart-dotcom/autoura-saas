@@ -8,7 +8,57 @@ import {
   X, AlertCircle, File, Minus, Image, FileText, FileImage, FileArchive, Signature,
   Users, Building2, Loader2, Paperclip, Send,
 } from 'lucide-react'
+import { sanitizeEmailHtml } from '@/lib/sanitize-html'
+import {
+  replyRecipients, replySubject, forwardSubject, quotedOriginal, forwardedOriginal,
+} from '@/lib/email/compose-mime'
+import RecipientInput from './RecipientInput'
 import type { Email, Attachment, EmailSignature, EmailTemplate, Client } from './types'
+
+export type ComposeMode = 'new' | 'reply' | 'replyAll' | 'forward'
+
+/** An attachment of the original that a forward carries over (sent server-side). */
+interface CarriedAttachment {
+  messageId: string
+  attachmentId: string
+  filename: string
+  mimeType: string
+  size: number
+}
+
+/** How long typing must pause before the draft is saved. */
+const AUTOSAVE_DELAY_MS = 2500
+
+/** What the composer opens with, from the mode and the message it answers. */
+function initialFields(mode: ComposeMode, source: Email | null | undefined, isOwn: (a: string) => boolean) {
+  if (!source || mode === 'new') return { to: '', cc: '', subject: '', quote: '', threadId: null as string | null, carried: [] as CarriedAttachment[] }
+  const original = { ...source, body: sanitizeEmailHtml(source.body || '') }
+  if (mode === 'forward') {
+    return {
+      to: '',
+      cc: '',
+      subject: forwardSubject(source.subject),
+      quote: forwardedOriginal(original),
+      threadId: null,
+      carried: (source.attachments ?? []).map(a => ({
+        messageId: source.id, attachmentId: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size,
+      })),
+    }
+  }
+  const r = replyRecipients(original, isOwn, mode === 'replyAll')
+  return {
+    to: r.to.join(', '),
+    cc: r.cc.join(', '),
+    subject: replySubject(source.subject),
+    quote: quotedOriginal(original),
+    threadId: source.threadId,
+    carried: [],
+  }
+}
+
+const COMPOSE_TITLES: Record<ComposeMode, string> = {
+  new: 'New Message', reply: 'Reply', replyAll: 'Reply all', forward: 'Forward',
+}
 
 function getFileIcon(mimeType: string) {
   if (mimeType.startsWith('image/')) return FileImage
@@ -26,30 +76,52 @@ function formatFileSize(bytes: number) {
 // UPDATED: Compose Modal Component with CLIENT + PARTNER template integration
 // Replace your existing ComposeModal in app/inbox/page.tsx with this version
 
-export default function ComposeModal({ 
-  onClose, 
-  userId, 
-  replyTo,
+export default function ComposeModal({
+  onClose,
+  userId,
+  mode = 'new',
+  source = null,
+  draftMessageId = null,
+  ownAddresses = [],
   onSent,
   clients = []
-}: { 
+}: {
   onClose: () => void
   userId: string
-  replyTo?: Email | null
+  /** New message, or a reply / reply all / forward of `source`. */
+  mode?: ComposeMode
+  source?: Email | null
+  /** Open this saved draft (its message id, as the Drafts list shows it). */
+  draftMessageId?: string | null
+  /** The mailbox's own addresses — left out of a reply all. */
+  ownAddresses?: string[]
   onSent: () => void
   clients?: Client[]
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
-  const extractEmailAddr = (from: string) => {
-    const match = from.match(/<(.+)>/)
-    return match ? match[1] : from
-  }
+  const ownSet = new Set(ownAddresses.map(a => a.toLowerCase()))
+  const initial = useRef(initialFields(mode, source, a => ownSet.has(a.toLowerCase()))).current
 
-  const [to, setTo] = useState(replyTo ? extractEmailAddr(replyTo.from) : '')
-  const [subject, setSubject] = useState(replyTo ? `Re: ${replyTo.subject}` : '')
-  const [body, setBody] = useState('')
+  const [to, setTo] = useState(initial.to)
+  const [cc, setCc] = useState(initial.cc)
+  const [bcc, setBcc] = useState('')
+  const [showCc, setShowCc] = useState(Boolean(initial.cc))
+  const [showBcc, setShowBcc] = useState(false)
+  const [subject, setSubject] = useState(initial.subject)
+  const [body, setBody] = useState(initial.quote ? `<p></p>${initial.quote}` : '')
+  const [threadId, setThreadId] = useState<string | null>(initial.threadId)
+  const [carried, setCarried] = useState<CarriedAttachment[]>(initial.carried)
+
+  // The Gmail draft this message is saved as, and where saving stands.
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [loadingDraft, setLoadingDraft] = useState(Boolean(draftMessageId))
+  // Nothing is saved until the person changes something: opening a reply and
+  // closing it again must not leave a draft behind.
+  const dirty = useRef(false)
+  const savedSnapshot = useRef('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -99,9 +171,11 @@ export default function ComposeModal({
         if (sigData.signatures) setSignatures(sigData.signatures)
         if (tempData.templates) setTemplates(tempData.templates)
 
+        // A reopened draft already has its signature; anything else gets the
+        // default one, above the quoted original when there is one.
         const defaultSig = sigData.signatures?.find((s: EmailSignature) => s.is_default)
-        if (defaultSig) {
-          setBody(`<p></p><br/>${defaultSig.content}`)
+        if (defaultSig && !draftMessageId) {
+          setBody(`<p></p><br/>${defaultSig.content}${initial.quote}`)
         }
       } catch (err) {
         console.error('Error fetching signatures/templates:', err)
@@ -109,7 +183,94 @@ export default function ComposeModal({
     }
 
     if (userId) fetchData()
+    // Once per composer: the mode, draft and quote are fixed when it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
+
+  // ── Saved drafts ────────────────────────────────────────────────────────
+  // Opening a draft from Drafts: everything it held, attachments included.
+  useEffect(() => {
+    if (!draftMessageId || !userId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/gmail/drafts?userId=${userId}&messageId=${encodeURIComponent(draftMessageId)}`)
+        const d = await res.json()
+        if (cancelled) return
+        if (!res.ok) throw new Error(d.error || 'Could not open the draft')
+        setDraftId(d.draftId)
+        setTo(d.to || '')
+        setCc(d.cc || '')
+        setBcc(d.bcc || '')
+        setShowCc(Boolean(d.cc))
+        setShowBcc(Boolean(d.bcc))
+        setSubject(d.subject || '')
+        setBody(d.body || '')
+        setThreadId(d.threadId || null)
+        setAttachments((d.attachments || []).map((a: Attachment) => ({ ...a })))
+        savedSnapshot.current = ''
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not open the draft')
+      } finally {
+        if (!cancelled) setLoadingDraft(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [draftMessageId, userId])
+
+  const draftPayload = () => ({
+    userId, draftId, to, cc, bcc, subject, body, threadId,
+    attachments: attachments.map(a => ({ filename: a.filename, mimeType: a.mimeType, data: a.data })),
+  })
+
+  const saveDraft = async (): Promise<string | null> => {
+    const payload = draftPayload()
+    const snapshot = JSON.stringify(payload)
+    if (snapshot === savedSnapshot.current) return draftId
+    setSaveState('saving')
+    try {
+      const res = await fetch('/api/gmail/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: snapshot,
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Could not save the draft')
+      savedSnapshot.current = JSON.stringify({ ...payload, draftId: d.draftId })
+      setDraftId(d.draftId)
+      setSaveState('saved')
+      return d.draftId as string
+    } catch {
+      setSaveState('error')
+      return draftId
+    }
+  }
+
+  // Autosave: shortly after typing stops, once something has been changed.
+  useEffect(() => {
+    // Only the person's own edits mark the message changed (markDirty): the
+    // signature arriving or a draft loading must not save anything.
+    if (loadingDraft || !dirty.current || sending) return
+    const t = setTimeout(() => { void saveDraft() }, AUTOSAVE_DELAY_MS)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [to, cc, bcc, subject, body, attachments, loadingDraft])
+
+  const markDirty = () => { dirty.current = true }
+
+  // Closing keeps what was written: the draft is saved first.
+  const handleClose = () => {
+    if (dirty.current && !sending) void saveDraft()
+    onClose()
+  }
+
+  const discardDraft = async () => {
+    dirty.current = false
+    if (draftId) {
+      await fetch(`/api/gmail/drafts?userId=${userId}&draftId=${encodeURIComponent(draftId)}`, { method: 'DELETE' }).catch(() => {})
+    }
+    onClose()
+  }
 
   // Fetch partners when type changes
   const fetchPartners = async (type: string) => {
@@ -259,6 +420,7 @@ export default function ComposeModal({
       const reader = new FileReader()
       reader.onload = () => {
         const base64 = (reader.result as string).split(',')[1]
+        markDirty()
         setAttachments(prev => [...prev, {
           filename: file.name,
           mimeType: file.type,
@@ -273,10 +435,12 @@ export default function ComposeModal({
   }
 
   const removeAttachment = (index: number) => {
+    markDirty()
     setAttachments(prev => prev.filter((_, i) => i !== index))
   }
 
   const insertSignature = (signature: EmailSignature) => {
+    markDirty()
     setBody(prev => `${prev}<br/>${signature.content}`)
     setShowSignatureDropdown(false)
   }
@@ -295,6 +459,7 @@ export default function ComposeModal({
       }
       setShowPlaceholderModal(true)
     } else {
+      markDirty()
       setSubject(template.subject)
       setBody(template.content)
     }
@@ -316,6 +481,7 @@ export default function ComposeModal({
     // markup in the email (documents audit, round 12). The subject is plain.
     const processedContent = replacePlaceholders(selectedTemplate.content, finalData, { escape: true })
 
+    markDirty()
     setSubject(processedSubject)
     setBody(processedContent)
     setShowPlaceholderModal(false)
@@ -323,8 +489,8 @@ export default function ComposeModal({
   }
 
   const handleSend = async () => {
-    if (!to || !subject || !body) {
-      setError('Please fill in all fields')
+    if (!to.trim() || !subject.trim() || !body) {
+      setError('Add a recipient, a subject and a message')
       return
     }
 
@@ -338,10 +504,18 @@ export default function ComposeModal({
         body: JSON.stringify({
           userId,
           to,
+          cc: cc || undefined,
+          bcc: bcc || undefined,
           subject,
           body,
-          threadId: replyTo?.threadId,
+          threadId: threadId ?? undefined,
           attachments: attachments.length > 0 ? attachments : undefined,
+          // The forward's original attachments, fetched by the server.
+          forward_attachments: carried.length > 0
+            ? carried.map(({ messageId, attachmentId, filename, mimeType }) => ({ messageId, attachmentId, filename, mimeType }))
+            : undefined,
+          // The saved draft this send replaces — removed once sent.
+          gmail_draft_id: draftId ?? undefined,
         }),
       })
 
@@ -351,6 +525,7 @@ export default function ComposeModal({
         throw new Error(data.error)
       }
 
+      dirty.current = false
       onSent()
     } catch (err: any) {
       setError(err.message)
@@ -367,9 +542,19 @@ export default function ComposeModal({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900">
-            {replyTo ? 'Reply' : 'New Message'}
-          </h3>
+          <div className="flex items-center gap-3 min-w-0">
+            <h3 className="text-sm font-semibold text-gray-900">
+              {draftMessageId ? 'Draft' : COMPOSE_TITLES[mode]}
+            </h3>
+            {/* Where the autosave stands — the person can see their work is kept. */}
+            <span className="text-[11px] text-gray-400" aria-live="polite">
+              {loadingDraft ? 'Opening draft…'
+                : saveState === 'saving' ? 'Saving…'
+                : saveState === 'saved' ? 'Saved to Drafts'
+                : saveState === 'error' ? 'Not saved — check your connection'
+                : ''}
+            </span>
+          </div>
           <div className="flex items-center gap-1">
             <button 
               onClick={() => setIsExpanded(!isExpanded)}
@@ -378,9 +563,10 @@ export default function ComposeModal({
             >
               <Minus className="w-4 h-4 text-gray-500" />
             </button>
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={handleClose}
               className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Close (saved to Drafts)"
             >
               <X className="w-4 h-4 text-gray-500" />
             </button>
@@ -400,23 +586,35 @@ export default function ComposeModal({
 
         {/* Form */}
         <div className="flex-1 overflow-y-auto flex flex-col">
-          <div className="flex items-center px-5 py-2.5 border-b border-gray-100">
-            <label className="w-16 text-xs font-medium text-gray-400">To</label>
-            <input
-              type="email"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="flex-1 text-sm outline-none bg-transparent"
-              placeholder="recipient@example.com"
-            />
-          </div>
+          <RecipientInput
+            label="To"
+            value={to}
+            onChange={v => { markDirty(); setTo(v) }}
+            placeholder="recipient@example.com"
+            trailing={
+              <div className="flex items-center gap-2 ml-2 text-xs">
+                {!showCc && (
+                  <button type="button" onClick={() => setShowCc(true)} className="text-gray-500 hover:text-gray-800">Cc</button>
+                )}
+                {!showBcc && (
+                  <button type="button" onClick={() => setShowBcc(true)} className="text-gray-500 hover:text-gray-800">Bcc</button>
+                )}
+              </div>
+            }
+          />
+          {showCc && (
+            <RecipientInput label="Cc" value={cc} onChange={v => { markDirty(); setCc(v) }} placeholder="Copy to" />
+          )}
+          {showBcc && (
+            <RecipientInput label="Bcc" value={bcc} onChange={v => { markDirty(); setBcc(v) }} placeholder="Blind copy — hidden from other recipients" />
+          )}
 
           <div className="flex items-center px-5 py-2.5 border-b border-gray-100">
             <label className="w-16 text-xs font-medium text-gray-400">Subject</label>
             <input
               type="text"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => { markDirty(); setSubject(e.target.value) }}
               className="flex-1 text-sm outline-none bg-transparent"
               placeholder="Email subject"
             />
@@ -517,7 +715,10 @@ export default function ComposeModal({
           </div>
 
           {/* Rich Text Editor */}
-          <div className="flex-1 p-4">
+          {/* The editor re-formats content it is given (the signature, the
+              quoted original) and reports that as a change, so only the
+              person's own typing, pasting or dropping counts as an edit. */}
+          <div className="flex-1 p-4" onKeyDown={markDirty} onPaste={markDirty} onDrop={markDirty}>
             <RichTextEditor
               content={body}
               onChange={setBody}
@@ -526,6 +727,36 @@ export default function ComposeModal({
               maxHeight={isExpanded ? '500px' : '300px'}
             />
           </div>
+
+          {/* The forwarded message's own attachments — sent with it unless removed. */}
+          {carried.length > 0 && (
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+              <p className="text-xs font-medium text-gray-600 mb-2">
+                Forwarded attachments ({carried.length})
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {carried.map((file, index) => {
+                  const FileIcon = getFileIcon(file.mimeType)
+                  return (
+                    <div key={`${file.attachmentId}-${index}`} className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+                      <FileIcon className="w-4 h-4 text-gray-400" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-700 truncate max-w-[150px]">{file.filename}</p>
+                        <p className="text-[10px] text-gray-500">{formatFileSize(file.size)}</p>
+                      </div>
+                      <button
+                        onClick={() => { markDirty(); setCarried(prev => prev.filter((_, i) => i !== index)) }}
+                        className="p-1 hover:bg-gray-100 rounded"
+                        title="Don't forward this attachment"
+                      >
+                        <X className="w-3 h-3 text-gray-400" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Attachments */}
           {attachments.length > 0 && (
@@ -599,15 +830,16 @@ export default function ComposeModal({
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={discardDraft}
               className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+              title="Delete this message and its saved draft"
             >
               Discard
             </button>
             <button 
               onClick={handleSend} 
-              disabled={sending} 
+              disabled={sending || loadingDraft}
               className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm"
             >
               {sending ? (
