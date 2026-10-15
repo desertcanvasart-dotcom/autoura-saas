@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 // Helper to create Supabase client
 async function createClient() {
@@ -71,7 +72,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,short_description.ilike.%${search}%,location.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`name.ilike.${pattern},short_description.ilike.${pattern},location.ilike.${pattern}`)
     }
 
     const { data: contentItems, error: contentError } = await query

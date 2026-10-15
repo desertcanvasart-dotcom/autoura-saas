@@ -14,7 +14,8 @@ import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { fetchAllPages } from '@/lib/db/fetch-all-pages'
-import { LEAD_SOURCES, clientLeadSource, orSearchTerm } from '@/lib/clients/client-fields'
+import { LEAD_SOURCES, clientLeadSource } from '@/lib/clients/client-fields'
+import { orIlikeContains } from '@/lib/postgrest-search'
 import { formatCurrency } from '@/lib/currency'
 
 interface ClientSummary {
@@ -114,11 +115,12 @@ export default function ClientsPage() {
         .from('clients')
         .select(LIST_COLUMNS)
 
-      // Apply search filter (use debounced value). Escaped: a comma or a
-      // bracket in the text broke the filter and % matched everything.
-      const term = orSearchTerm(debouncedSearch)
+      // Apply search filter (use debounced value). Quoted and escaped: a comma
+      // or a bracket in the text broke the filter and % matched everything.
+      const term = debouncedSearch.trim()
       if (term) {
-        query = query.or(`full_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,client_code.ilike.%${term}%`)
+        const pattern = orIlikeContains(term)
+        query = query.or(`full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},client_code.ilike.${pattern}`)
       }
 
       // Apply status filter

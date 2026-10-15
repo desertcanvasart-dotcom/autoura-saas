@@ -2,6 +2,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
 import { gateRole } from '@/lib/api-role-gate'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 export async function GET(request: NextRequest) {
   // Authenticate and get tenant context
@@ -58,7 +59,8 @@ export async function GET(request: NextRequest) {
   }
   
   if (search) {
-    query = query.or(`document_number.ilike.%${search}%,supplier_name.ilike.%${search}%,client_name.ilike.%${search}%,city.ilike.%${search}%`)
+    const pattern = orIlikeContains(search)
+    query = query.or(`document_number.ilike.${pattern},supplier_name.ilike.${pattern},client_name.ilike.${pattern},city.ilike.${pattern}`)
   }
   
   if (startDate) {

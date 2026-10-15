@@ -3,6 +3,7 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { markTeamNotificationsRead } from '@/lib/notifications'
 import { conversationPhoneNumber } from '@/lib/whatsapp'
 import { conversationPhoneKeys } from '@/lib/whatsapp-phone'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 // GET /api/whatsapp/conversations - List all conversations
 
@@ -93,7 +94,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`phone_number.ilike.%${search}%,client_name.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`phone_number.ilike.${pattern},client_name.ilike.${pattern}`)
     }
 
     const { data, error } = await query.limit(50)

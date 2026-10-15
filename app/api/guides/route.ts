@@ -12,6 +12,7 @@ import type { TablesInsert } from '@/types/database.types'
 import { sumByCurrency } from '@/lib/currency-totals'
 import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
 import { supplierTypesOrFilter } from '@/lib/suppliers/type-filter'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,7 +54,8 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (search) {
-      query = query.or(`name.ilike.%${search}%,contact_email.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`name.ilike.${pattern},contact_email.ilike.${pattern}`)
     }
 
     // Support both is_active and active_only parameters

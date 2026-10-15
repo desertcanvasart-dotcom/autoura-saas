@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { dayCountOf } from '@/lib/tours/starting-from'
 import { loadVocabulary } from '@/lib/vocabulary-server'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 const MAX_LIMIT = 200
 
@@ -100,7 +101,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`template_name.ilike.%${search}%,short_description.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`template_name.ilike.${pattern},short_description.ilike.${pattern}`)
     }
 
     // Apply pagination

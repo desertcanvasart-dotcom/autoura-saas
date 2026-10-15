@@ -3,6 +3,7 @@
 // =====================================================
 
 import { createClient } from '@/app/supabase'
+import { orIlikeContains } from '@/lib/postgrest-search'
 import type {
   ContentVariation,
   Tier,
@@ -201,6 +202,7 @@ export async function searchContent(
 ): Promise<ContentForGeneration[]> {
   const supabase = createClient()
   
+  const pattern = orIlikeContains(searchTerm)
   const { data, error } = await supabase
     .from('content_library')
     .select(`
@@ -209,7 +211,7 @@ export async function searchContent(
       category:content_categories(name),
       variations:content_variations(*)
     `)
-    .or(`name.ilike.%${searchTerm}%,short_description.ilike.%${searchTerm}%`)
+    .or(`name.ilike.${pattern},short_description.ilike.${pattern}`)
     .eq('is_active', true)
     .limit(limit)
 

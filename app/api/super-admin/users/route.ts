@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/super-admin'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,8 @@ export async function GET(request: NextRequest) {
 
     let query = admin.from('user_profiles').select('*').order('created_at', { ascending: false })
     if (search) {
-      query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`email.ilike.${pattern},full_name.ilike.${pattern}`)
     }
     const { data: users, error } = await query
     if (error) throw error

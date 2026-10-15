@@ -3,7 +3,7 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { gateStructural } from '@/lib/usage-enforcement'
 import { roleDenied } from '@/lib/api-role-gate'
 import { parsePartnerWrite, nextPartnerCode } from '@/lib/b2b/partner-fields'
-import { orSearchTerm } from '@/lib/clients/client-fields'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 // ============================================
 // B2B PARTNERS API
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const search = orSearchTerm(searchParams.get('search') || '')
+    const search = (searchParams.get('search') || '').trim()
     const active_only = searchParams.get('active_only') !== 'false'
 
     let query = supabase
@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`company_name.ilike.%${search}%,partner_code.ilike.%${search}%,contact_name.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`company_name.ilike.${pattern},partner_code.ilike.${pattern},contact_name.ilike.${pattern}`)
     }
 
     const { data, error } = await query

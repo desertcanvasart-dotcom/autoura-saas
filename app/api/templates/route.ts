@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 // GET - List all templates
 export async function GET(request: NextRequest) {
@@ -32,7 +33,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,body.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`name.ilike.${pattern},description.ilike.${pattern},body.ilike.${pattern}`)
     }
 
     const { data, error } = await query

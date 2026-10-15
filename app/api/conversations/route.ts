@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { waitingSince } from '@/lib/email/automated-senders'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,7 +44,8 @@ export async function GET(request: NextRequest) {
 
     // Search by name, email, or phone
     if (search) {
-      query = query.or(`contact_name.ilike.%${search}%,contact_email.ilike.%${search}%,contact_phone.ilike.%${search}%`)
+      const pattern = orIlikeContains(search)
+      query = query.or(`contact_name.ilike.${pattern},contact_email.ilike.${pattern},contact_phone.ilike.${pattern}`)
     }
 
     // Filter by assignment

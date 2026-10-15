@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { waitingSince } from '@/lib/email/automated-senders'
+import { orIlikeContains } from '@/lib/postgrest-search'
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,7 +49,10 @@ export async function GET(request: NextRequest) {
     // unread: a message someone opened and did not answer is exactly the one
     // that goes missing.
     if (searchParams.get('awaiting') === 'true') query = query.not('awaiting_reply_since', 'is', null)
-    if (search) query = query.or(`contact_email.ilike.%${search}%,contact_name.ilike.%${search}%`)
+    if (search) {
+      const pattern = orIlikeContains(search)
+      query = query.or(`contact_email.ilike.${pattern},contact_name.ilike.${pattern}`)
+    }
 
     const { data, error } = await query
     if (error) throw error
