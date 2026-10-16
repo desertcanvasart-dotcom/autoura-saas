@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
@@ -52,6 +53,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const { id } = await params
     const authResult = await requireAuth()

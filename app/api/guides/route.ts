@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 // ============================================
 // API Route: /api/guides
 // ============================================
@@ -158,6 +159,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {

@@ -1,3 +1,4 @@
+import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/email-send'
 import { escapeHtml, appLinkHref } from '@/lib/html-escape'
@@ -33,7 +34,7 @@ async function getHandler(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!bearerMatches(authHeader, cronSecret)) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }

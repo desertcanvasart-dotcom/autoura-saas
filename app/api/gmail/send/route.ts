@@ -1,3 +1,4 @@
+import { secretMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { claimSend, finishSend, threadConflict, replyBodyHash } from '@/lib/email/send-guard'
 import { replyHeaders } from '@/lib/email/threading'
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     // if CRON_SECRET is unset, the header path is always rejected.
     const cronSecret = process.env.CRON_SECRET
     const providedSecret = request.headers.get('x-cron-secret')
-    const isTrustedServerCall = Boolean(cronSecret && providedSecret === cronSecret)
+    const isTrustedServerCall = secretMatches(providedSecret, cronSecret)
 
     let user: { id: string; email?: string | null } | null = null
     let authClient: any = null

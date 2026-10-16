@@ -80,6 +80,16 @@ export const RATE_LIMITS = {
     limit: 300,        // AI requests
     windowMs: 3600000, // per hour
   },
+  // SMS / WhatsApp sent from a template (lib/rate-limit-shared.ts) — a
+  // person, and a whole company.
+  messaging: {
+    limit: 30,         // messages
+    windowMs: 3600000, // per hour
+  },
+  messagingCompany: {
+    limit: 300,        // messages
+    windowMs: 86400000, // per day
+  },
   // Invitations
   invitation: {
     limit: 10,         // invites

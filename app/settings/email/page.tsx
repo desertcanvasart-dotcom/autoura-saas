@@ -103,6 +103,8 @@ function EmailSettingsContent() {
       })
     } else if (error === 'no_company') {
       setMessage({ type: 'error', text: 'Gmail was not connected: you are not an active member of the company you were working in. Switch to your company and connect again.' })
+    } else if (error === 'session_mismatch') {
+      setMessage({ type: 'error', text: 'Gmail was not connected: the Google sign-in was finished by a different account than the one that started it. Sign in to Autoura as yourself and click Connect again — never use a Connect link someone else sent you.' })
     } else if (error) {
       setMessage({ type: 'error', text: `Connection failed: ${error}` })
     }

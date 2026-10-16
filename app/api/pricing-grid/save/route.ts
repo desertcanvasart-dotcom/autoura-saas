@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 // ============================================
 // POST /api/pricing-grid/save
 // Save grid to itinerary + services (B2C/B2B)
@@ -67,6 +68,9 @@ function slotSoldItems(slot: any, pax: number, withGuide: boolean): SavedGridIte
 }
 
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {

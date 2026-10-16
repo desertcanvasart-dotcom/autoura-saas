@@ -1,3 +1,4 @@
+import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createAdminClient } from '@/lib/supabase-server'
@@ -21,7 +22,7 @@ const CRON_SECRET = process.env.CRON_SECRET
 
 async function getHandler(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!bearerMatches(authHeader, CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

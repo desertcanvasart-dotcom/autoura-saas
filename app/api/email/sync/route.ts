@@ -1,3 +1,4 @@
+import { secretMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
     // has the page open. Fails closed: with CRON_SECRET unset the header path
     // is always rejected, exactly as in /api/gmail/send.
     const cronSecret = process.env.CRON_SECRET
-    const isTrustedServerCall = Boolean(cronSecret && request.headers.get('x-cron-secret') === cronSecret)
+    const isTrustedServerCall = secretMatches(request.headers.get('x-cron-secret'), cronSecret)
 
     let db: SupabaseLike
     let tenant_id: string | null = null

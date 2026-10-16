@@ -1,3 +1,4 @@
+import { bearerMatches } from '@/lib/support/probe-auth'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { daysOverdueOn, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
@@ -104,7 +105,7 @@ async function getHandler(request: NextRequest) {
   // Verify authorization. Fail closed: if no secret is configured, or the
   // header doesn't match, reject. Never run unauthenticated.
   const authHeader = request.headers.get('authorization')
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!bearerMatches(authHeader, CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

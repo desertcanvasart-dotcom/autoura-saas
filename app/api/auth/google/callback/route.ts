@@ -1,6 +1,6 @@
 import { tenantForUser, type MembershipRow } from '@/lib/email/scheduled-sync'
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient, createAuthenticatedClient } from '@/lib/supabase-server'
 import { getTokensFromCode, getUserEmail, GMAIL_SCOPES } from '@/lib/gmail'
 import { missingGoogleScopes } from '@/lib/google-scopes'
 import { verifyState } from '@/lib/oauth-state'
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/settings/email?error=${error}`, base)
+      new URL(`/settings/email?error=${encodeURIComponent(error)}`, base)
     )
   }
 
@@ -44,6 +44,18 @@ export async function GET(request: NextRequest) {
   if (!payload || !userId) {
     return NextResponse.redirect(
       new URL('/settings/email?error=invalid_state', base)
+    )
+  }
+
+  // The signed state proves WE minted it, not that the person finishing the
+  // flow is the one who started it. Without this, someone could start Connect
+  // Gmail, send the Google link to a colleague, and have the colleague's
+  // mailbox saved under their own account. The browser completing the flow
+  // must be signed in as the user the state was minted for.
+  const { data: { user: sessionUser } } = await (await createAuthenticatedClient()).auth.getUser()
+  if (!sessionUser || sessionUser.id !== userId) {
+    return NextResponse.redirect(
+      new URL('/settings/email?error=session_mismatch', base)
     )
   }
 

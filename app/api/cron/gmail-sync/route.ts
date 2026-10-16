@@ -1,3 +1,4 @@
+import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
@@ -42,7 +43,7 @@ async function getHandler(request: NextRequest) {
   // Fail closed: with no secret configured, or a header that does not match,
   // this never runs.
   const authHeader = request.headers.get('authorization')
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!bearerMatches(authHeader, CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -83,7 +84,7 @@ async function getHandler(request: NextRequest) {
       const res = await Promise.race([
         syncMailbox(new NextRequest('http://internal/api/email/sync', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
+          headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET ?? '' },
           // use_history: only what Gmail added since the last clean run (the
           // date window is the fallback — lib/email/gmail-candidates.ts).
           body: JSON.stringify({ user_id: box.user_id, tenant_id: box.tenant_id, full_sync: false, max_results: 50, days_back: await daysToLookBack(admin, box.tenant_id), use_history: true }),

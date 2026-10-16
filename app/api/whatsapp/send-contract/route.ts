@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { tripServices } from '@/lib/itineraries/trip-services'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
@@ -13,6 +14,9 @@ import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 import { contractPrice, contractSettingsFromTenant, sanitizeContractEdits } from '@/lib/contract-terms'
 
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()

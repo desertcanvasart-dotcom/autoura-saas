@@ -26,7 +26,7 @@ const itinerary = {
 }
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: db({ itineraries: itinerary, itinerary_days: [] }) }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, role: 'member', supabase: db({ itineraries: itinerary, itinerary_days: [] }) }),
   createAdminClient: () => db({ tenants: { operating_country: 'Egypt', contract_governing_law: 'Egyptian law', deposit_percent: 25 } }),
 }))
 vi.mock('@/lib/sender-tenant', () => ({ loadSenderTenant: async () => ({ company_name: 'Nile Journeys' }) }))
