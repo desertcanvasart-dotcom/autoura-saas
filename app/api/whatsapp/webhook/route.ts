@@ -237,6 +237,9 @@ async function applyMetaStatuses(statuses: MetaStatusUpdate[]) {
     if (error) {
       console.error('❌ Error applying Meta status update:', error)
     }
+    // Sends with no conversation row live in the outbound record (430).
+    const { applyOutboundStatus } = await import('@/lib/whatsapp-outbound')
+    await applyOutboundStatus({ messageSid: s.messageSid, status: s.status, errorCode: s.errorCode, errorMessage: s.errorMessage })
     if (s.status === 'failed') {
       console.error('❌ Message delivery failed:', {
         messageSid: s.messageSid,

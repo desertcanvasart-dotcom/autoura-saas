@@ -117,7 +117,15 @@ export async function POST(request: NextRequest) {
         code: error.code,
         message: error.message,
       })
-    } else if (!updated || updated.length === 0) {
+    }
+    // The outbound record (migration 430): sends from invoices, reminders,
+    // quotes… have no conversation row, only this. A failure notifies the
+    // sender.
+    const { applyOutboundStatus } = await import('@/lib/whatsapp-outbound')
+    const matchedOutbound = await applyOutboundStatus({ messageSid, status, errorCode, errorMessage })
+    if (error) {
+      // already logged above
+    } else if ((!updated || updated.length === 0) && !matchedOutbound) {
       // Nothing changed: either the row is already further along (a stale,
       // out-of-order callback — expected, not an error) or no row has the SID.
       const { data: existing } = await db

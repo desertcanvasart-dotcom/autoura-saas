@@ -11699,6 +11699,48 @@ export interface Database {
           },
         ]
       }
+      whatsapp_outbound: {
+        Row: {
+          id: string
+          tenant_id: string | null
+          message_sid: string
+          to_number: string
+          body_preview: string | null
+          sent_by: string | null
+          status: string
+          error_code: string | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id?: string | null
+          message_sid: string
+          to_number: string
+          body_preview?: string | null
+          sent_by?: string | null
+          status?: string
+          error_code?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string | null
+          message_sid?: string
+          to_number?: string
+          body_preview?: string | null
+          sent_by?: string | null
+          status?: string
+          error_code?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       writing_rules: {
         Row: {
           id: string
