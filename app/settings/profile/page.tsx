@@ -1,4 +1,5 @@
 'use client'
+import YourDataCard from '@/components/account/YourDataCard'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -643,8 +644,8 @@ export default function ProfilePage() {
             )
           })()}
 
-          {/* No self-serve Deactivate / Delete here: the old buttons had no
-              action. An admin deactivates a member in User Management. */}
+          {/* Your own data: a copy, or deleting the account (privacy policy). */}
+          {user?.email && <YourDataCard email={user.email} />}
 
         </div>
       </div>

@@ -752,5 +752,59 @@ describe('migration replay from scratch', () => {
     await expect(
       db.query("INSERT INTO notifications (type, title) VALUES ('x', 'nobody')")
     ).rejects.toThrow(/notifications_has_recipient/)
+
+    // Migration 433: purge_tenant deletes one company completely — through
+    // the bookings → itineraries RESTRICT and the rate audit trigger — and
+    // leaves every other company's rows alone.
+    const seedCompany = async (name: string) => {
+      const t = (await db.query(
+        'INSERT INTO tenants (company_name) VALUES ($1) RETURNING id', [name]
+      )).rows[0] as { id: string }
+      const u = (await db.query(
+        'INSERT INTO auth.users (email) VALUES ($1) RETURNING id', [`${name}@example.com`]
+      )).rows[0] as { id: string }
+      await db.query("INSERT INTO tenant_members (tenant_id, user_id, role, status) VALUES ($1, $2, 'owner', 'active')", [t.id, u.id])
+      await db.query("INSERT INTO clients (tenant_id, first_name, last_name) VALUES ($1, 'Ada', 'Probe')", [t.id])
+      const it = (await db.query(
+        "INSERT INTO itineraries (tenant_id, itinerary_code) VALUES ($1, $2) RETURNING id", [t.id, `IT-${name}`]
+      )).rows[0] as { id: string }
+      await db.query(
+        `INSERT INTO bookings (tenant_id, itinerary_id, booking_number, trip_name, start_date, end_date,
+           total_days, num_travelers, total_amount, balance_due)
+         VALUES ($1, $2, $3, 'Trip', '2026-11-01', '2026-11-05', 5, 2, 1000, 1000)`,
+        [t.id, it.id, `BK-${name}`]
+      )
+      const inv = (await db.query(
+        `INSERT INTO invoices (tenant_id, client_name, total_amount, invoice_number, issue_date, balance_due)
+         VALUES ($1, 'Ada Probe', 100, $2, '2026-10-01', 100) RETURNING id`, [t.id, `INV-${name}`]
+      )).rows[0] as { id: string }
+      await db.query(
+        "INSERT INTO invoice_payments (tenant_id, invoice_id, amount, payment_date) VALUES ($1, $2, 10, '2026-10-02')",
+        [t.id, inv.id]
+      )
+      await db.query('INSERT INTO accommodation_rates (tenant_id) VALUES ($1)', [t.id])
+      await db.query(
+        `INSERT INTO commissions (tenant_id, transaction_date, category, commission_amount, commission_type)
+         VALUES ($1, '2026-10-01', 'hotel', 5, 'earned')`, [t.id]
+      )
+      return t.id
+    }
+    const rowsOf = async (tenantId: string) => {
+      const tables = (await db.query('SELECT table_name FROM tenant_data_tables()')).rows as Array<{ table_name: string }>
+      let n = 0
+      for (const { table_name } of tables) {
+        const r = (await db.query(`SELECT count(*)::int AS n FROM "${table_name}" WHERE tenant_id = $1`, [tenantId])).rows[0] as { n: number }
+        n += r.n
+      }
+      return n
+    }
+    const gone = await seedCompany('purge-a')
+    const kept = await seedCompany('purge-b')
+    const keptBefore = await rowsOf(kept)
+    expect(await rowsOf(gone)).toBeGreaterThan(5)
+    await db.query('SELECT purge_tenant($1)', [gone])
+    expect(await rowsOf(gone)).toBe(0)
+    expect((await db.query('SELECT count(*)::int AS n FROM tenants WHERE id = $1', [gone])).rows[0]).toEqual({ n: 0 })
+    expect(await rowsOf(kept)).toBe(keptBefore)
   }, 120_000)
 })

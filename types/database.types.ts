@@ -3090,6 +3090,36 @@ export interface Database {
           },
         ]
       }
+      company_deletions: {
+        Row: {
+          id: string
+          former_tenant_id: string
+          company_name: string | null
+          requested_by: string | null
+          requested_at: string | null
+          purged_at: string
+          summary: Json
+        }
+        Insert: {
+          id?: string
+          former_tenant_id: string
+          company_name?: string | null
+          requested_by?: string | null
+          requested_at?: string | null
+          purged_at?: string
+          summary?: Json
+        }
+        Update: {
+          id?: string
+          former_tenant_id?: string
+          company_name?: string | null
+          requested_by?: string | null
+          requested_at?: string | null
+          purged_at?: string
+          summary?: Json
+        }
+        Relationships: []
+      }
       concierge_brand_mappings: {
         Row: {
           id: string
@@ -9164,6 +9194,27 @@ export interface Database {
           },
         ]
       }
+      tenant_closures: {
+        Row: {
+          tenant_id: string
+          requested_by: string | null
+          requested_at: string
+          purge_after: string
+        }
+        Insert: {
+          tenant_id: string
+          requested_by?: string | null
+          requested_at?: string
+          purge_after: string
+        }
+        Update: {
+          tenant_id?: string
+          requested_by?: string | null
+          requested_at?: string
+          purge_after?: string
+        }
+        Relationships: []
+      }
       tenant_destinations: {
         Row: {
           id: string
@@ -12003,6 +12054,18 @@ export interface Database {
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
+      }
+      purge_tenant: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
+      tenant_data_tables: {
+        Args: Record<PropertyKey, never>
+        Returns: { table_name: string; column_names: string[] }[]
+      }
+      data_table_columns: {
+        Args: { p_tables: string[] }
+        Returns: { table_name: string; column_names: string[] }[]
       }
       purge_expired_agent_memories: {
         Args: Record<PropertyKey, never>

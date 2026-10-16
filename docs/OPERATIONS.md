@@ -144,9 +144,10 @@ with `CRON_SECRET`. Our own Railway setup is in `docs/CRON-JOBS.md`.
 |---|---|---|---|
 | Exchange rates | `POST /api/cron/refresh-exchange-rates` | daily, 01:00 | `npm run cron:exchange-rates` |
 | Agent memory | `POST /api/cron/process-agent-memory` | daily, 02:00 | `npm run cron:agent-memory` |
-| Reminders | `GET /api/cron/send-reminders` | daily, 06:00 | `npm run cron:reminders` (runs all three) |
+| Reminders | `GET /api/cron/send-reminders` | daily, 06:00 | `npm run cron:reminders` (runs all four) |
 | Task reminders | `GET /api/cron/task-reminders` | daily, 06:00 | ↑ |
 | Document retention | `GET /api/cron/purge-traveller-documents` | daily | ↑ |
+| Closed companies | `GET /api/cron/purge-closed-companies` | daily | ↑ (deletes companies 30 days after an owner closed them) |
 | Gmail sync | `GET /api/cron/gmail-sync` | every 10 minutes | `npm run cron:gmail-sync` |
 | Mail alerts | `GET /api/cron/mail-alerts` | every 5 minutes | `npm run cron:mail-alerts` |
 | Scheduled send | `GET /api/cron/scheduled-send` | every 5 minutes | `npm run cron:scheduled-send` |

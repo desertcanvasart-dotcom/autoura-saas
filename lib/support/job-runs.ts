@@ -22,6 +22,7 @@ export type JobName =
   | 'reminders'
   | 'task-reminders'
   | 'purge-traveller-documents'
+  | 'purge-closed-companies'
   | 'gmail-sync'
   | 'mail-alerts'
   | 'scheduled-send'

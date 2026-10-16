@@ -1,4 +1,5 @@
 'use client'
+import CompanyDataCard from '@/components/account/CompanyDataCard'
 
 import { TIMEZONES } from '@/lib/timezones'
 import { useState, useEffect, useRef } from 'react'
@@ -1093,6 +1094,12 @@ export default function TenantSettingsPage() {
             />
           </div>
         </div>
+
+        {tenant && (
+          <div className="mt-4">
+            <CompanyDataCard companyName={tenant.company_name} role={tenantMember?.role} />
+          </div>
+        )}
       </div>
     </div>
   )

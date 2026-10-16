@@ -129,4 +129,11 @@ const purge = await run(
   (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} purge failure(s): ${p.failures.join('; ')}` : null)
 )
 
-process.exit(invoices && tasks && purge ? 0 : 1)
+// Closed companies whose 30 days are up (Terms 6.3): deleted, files and all.
+const closed = await run(
+  'purge-closed-companies',
+  '/api/cron/purge-closed-companies',
+  (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} company deletion(s) failed: ${p.failures.join('; ')}` : null)
+)
+
+process.exit(invoices && tasks && purge && closed ? 0 : 1)
