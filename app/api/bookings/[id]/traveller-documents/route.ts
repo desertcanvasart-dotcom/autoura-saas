@@ -1,11 +1,12 @@
 // GET /api/bookings/[id]/traveller-documents — the OFFICE side of traveller
 // uploads (C1b): list every document on the booking with short-lived signed
-// URLs. Staff-authenticated and RLS-scoped; the private bucket never serves
-// anyone a permanent URL.
+// URLs. Staff only (viewers do not open passport scans), RLS-scoped; the
+// private bucket never serves anyone a permanent URL.
 
 import { NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { TRAVELLER_DOCS_BUCKET } from '@/lib/portal/traveller-documents'
+import { roleDenied } from '@/lib/api-role-gate'
 
 export async function GET(
   _request: Request,
@@ -16,6 +17,9 @@ export async function GET(
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Passports and visas: a viewer reads the booking, not its documents.
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
     const { id } = await params

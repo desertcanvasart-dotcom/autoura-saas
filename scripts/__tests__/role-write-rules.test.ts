@@ -1,0 +1,166 @@
+import { describe, it, expect, beforeAll } from 'vitest'
+import { PGlite } from '@electric-sql/pglite'
+import { readFileSync, readdirSync } from 'node:fs'
+import path from 'node:path'
+
+// ============================================
+// Who may write, enforced by the database (migrations 424, 425)
+// ============================================
+// The browser holds the user's own Supabase session, so a hidden button or an
+// API check is not the lock: these run the real migrations in Postgres and
+// write as a signed-in viewer, member, admin and owner, straight through RLS.
+
+const MIGRATIONS_DIR = path.join(__dirname, '..', '..', 'supabase', 'migrations')
+
+// auth.uid() reads a setting, so each probe can act as a different person.
+const STUBS = `
+CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+CREATE SCHEMA auth;
+CREATE TABLE auth.users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT, raw_user_meta_data JSONB, banned_until TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.uid', true), '')::uuid$$;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $$SELECT 'authenticated'$$;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql AS $$SELECT '{}'::jsonb$$;
+CREATE SCHEMA storage;
+CREATE TABLE storage.buckets (id TEXT PRIMARY KEY, name TEXT, public BOOLEAN DEFAULT false);
+CREATE TABLE storage.objects (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id TEXT, name TEXT, owner UUID);
+CREATE SCHEMA extensions;
+`
+
+let db: PGlite
+let tenant: string
+const people: Record<'owner' | 'admin' | 'manager' | 'member' | 'viewer', string> = {} as never
+
+/** Run `sql` as a signed-in user, through RLS; resolves to the error text or null. */
+async function as(userId: string, sql: string): Promise<string | null> {
+  try {
+    await db.exec(`BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('test.uid', '${userId}', true); ${sql}; COMMIT;`)
+    return null
+  } catch (e) {
+    await db.exec('ROLLBACK').catch(() => undefined)
+    return String((e as Error).message)
+  }
+}
+
+async function count(sql: string): Promise<number> {
+  const r = await db.query(sql)
+  return Number((r.rows[0] as { n: number }).n)
+}
+
+beforeAll(async () => {
+  db = new PGlite()
+  await db.exec(STUBS)
+  for (const file of readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort()) {
+    try {
+      await db.exec(readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8'))
+    } catch {
+      // The replay test owns "every migration applies"; a handful need real
+      // Supabase features and are exempt there.
+      await db.exec('ROLLBACK').catch(() => undefined)
+    }
+  }
+  // Supabase grants the API roles table access; RLS is what narrows it.
+  await db.exec(`
+    GRANT USAGE ON SCHEMA public, auth TO authenticated;
+    GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+    GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
+  `)
+
+  tenant = ((await db.query(
+    "INSERT INTO tenants (company_name, contact_email) VALUES ('Roles Co', 'roles@example.com') RETURNING id"
+  )).rows[0] as { id: string }).id
+
+  for (const role of ['owner', 'admin', 'manager', 'member', 'viewer'] as const) {
+    const id = ((await db.query(
+      `INSERT INTO auth.users (email) VALUES ('${role}@roles.test') RETURNING id`
+    )).rows[0] as { id: string }).id
+    people[role] = id
+    // Sign-up gave each their own company; put them in Roles Co instead.
+    await db.exec(`
+      DELETE FROM tenant_members WHERE user_id = '${id}';
+      INSERT INTO tenant_members (tenant_id, user_id, role, status, joined_at)
+        VALUES ('${tenant}', '${id}', '${role}', 'active', NOW());
+      UPDATE user_profiles SET active_tenant_id = '${tenant}' WHERE id = '${id}';
+    `)
+  }
+  await db.exec(`INSERT INTO clients (tenant_id, full_name) VALUES ('${tenant}', 'Existing Client')`)
+}, 120_000)
+
+describe('424: viewers read; they do not write', () => {
+  it('a viewer cannot add, edit or delete a client', async () => {
+    expect(await as(people.viewer, `INSERT INTO clients (tenant_id, full_name) VALUES ('${tenant}', 'By Viewer')`))
+      .toMatch(/row-level security/)
+    await as(people.viewer, `UPDATE clients SET full_name = 'Renamed' WHERE full_name = 'Existing Client'`)
+    await as(people.viewer, `DELETE FROM clients WHERE full_name = 'Existing Client'`)
+    expect(await count(`SELECT count(*) AS n FROM clients WHERE full_name = 'Existing Client'`)).toBe(1)
+  })
+
+  it('a viewer can still read', async () => {
+    const r = await db.transaction(async tx => {
+      await tx.exec(`SET LOCAL ROLE authenticated; SELECT set_config('test.uid', '${people.viewer}', true);`)
+      return tx.query(`SELECT count(*) AS n FROM clients WHERE tenant_id = '${tenant}'`)
+    })
+    expect(Number((r.rows[0] as { n: number }).n)).toBeGreaterThan(0)
+  })
+
+  it('a member still writes as before', async () => {
+    expect(await as(people.member, `INSERT INTO clients (tenant_id, full_name) VALUES ('${tenant}', 'By Member')`)).toBeNull()
+    expect(await as(people.member, `UPDATE clients SET notes = 'edited' WHERE full_name = 'By Member'`)).toBeNull()
+    expect(await count(`SELECT count(*) AS n FROM clients WHERE full_name = 'By Member' AND notes = 'edited'`)).toBe(1)
+  })
+
+  it('covers the money and passport tables', async () => {
+    const r = await db.query(`
+      SELECT tablename FROM pg_policies
+       WHERE policyname = 'Viewers cannot insert' AND permissive = 'RESTRICTIVE'`)
+    const names = (r.rows as Array<{ tablename: string }>).map(x => x.tablename)
+    for (const t of ['invoices', 'payments', 'invoice_payments', 'supplier_invoices', 'expenses', 'clients',
+      'itineraries', 'bookings', 'booking_passenger_documents', 'quote_versions']) {
+      expect(names, t).toContain(t)
+    }
+    // A viewer's own mailbox and sign-in records stay theirs to write.
+    for (const t of ['gmail_tokens', 'email_rules', 'push_subscriptions', 'tenant_members']) {
+      expect(names, t).not.toContain(t)
+    }
+  })
+})
+
+describe('425: the team role rules hold in the database', () => {
+  const memberRow = (role: string) => `user_id = '${people[role as keyof typeof people]}' AND tenant_id = '${tenant}'`
+
+  it('an admin cannot make themselves owner', async () => {
+    expect(await as(people.admin, `UPDATE tenant_members SET role = 'owner' WHERE ${memberRow('admin')}`))
+      .toMatch(/own role/)
+  })
+
+  it('an admin cannot demote or remove the owner', async () => {
+    expect(await as(people.admin, `UPDATE tenant_members SET role = 'viewer' WHERE ${memberRow('owner')}`))
+      .toMatch(/owner/)
+    expect(await as(people.admin, `DELETE FROM tenant_members WHERE ${memberRow('owner')}`))
+      .toMatch(/owner/)
+    expect(await count(`SELECT count(*) AS n FROM tenant_members WHERE ${memberRow('owner')} AND role = 'owner'`)).toBe(1)
+  })
+
+  it('an admin cannot promote someone else to owner', async () => {
+    expect(await as(people.admin, `UPDATE tenant_members SET role = 'owner' WHERE ${memberRow('member')}`))
+      .toMatch(/owner/)
+  })
+
+  it('nobody signed in adds a membership directly', async () => {
+    const outsider = ((await db.query(`INSERT INTO auth.users (email) VALUES ('out@roles.test') RETURNING id`)).rows[0] as { id: string }).id
+    expect(await as(people.owner, `INSERT INTO tenant_members (tenant_id, user_id, role, status) VALUES ('${tenant}', '${outsider}', 'admin', 'active')`))
+      .not.toBeNull()
+  })
+
+  it('an admin still changes an ordinary role, and an owner still manages owners', async () => {
+    expect(await as(people.admin, `UPDATE tenant_members SET role = 'manager' WHERE ${memberRow('member')}`)).toBeNull()
+    expect(await count(`SELECT count(*) AS n FROM tenant_members WHERE ${memberRow('member')} AND role = 'manager'`)).toBe(1)
+    expect(await as(people.owner, `UPDATE tenant_members SET role = 'owner' WHERE ${memberRow('admin')}`)).toBeNull()
+  })
+
+  it('an invitation offers only roles below the inviter', async () => {
+    const invite = (role: string) => `INSERT INTO tenant_invitations (tenant_id, email, role, invited_by, invitation_token, expires_at)
+      VALUES ('${tenant}', '${role}-${Math.random()}@x.test', '${role}', '${people.manager}', '${Math.random()}', NOW() + interval '7 days')`
+    expect(await as(people.manager, invite('owner'))).toMatch(/below your own|row-level security/)
+    expect(await as(people.manager, invite('manager'))).toMatch(/below your own|row-level security/)
+  })
+})

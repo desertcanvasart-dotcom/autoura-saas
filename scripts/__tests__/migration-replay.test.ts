@@ -682,6 +682,7 @@ describe('migration replay from scratch', () => {
     const SAFE_FOR_BROWSER_ROLES: Record<string, string> = {
       user_has_role: 'checks auth.uid() against get_user_tenant_id(); argument is a role name, not an id',
       reset_tenant_vocabulary: 'scopes to get_user_tenant_id(); argument is a vocabulary kind',
+      member_can_write: "answers only whether auth.uid() itself is a non-viewer member of the given company (424's write policies call it)",
     }
     const exposed = await db.query(`
       SELECT DISTINCT p.proname,
