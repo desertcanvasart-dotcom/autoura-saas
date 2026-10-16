@@ -15,6 +15,8 @@ import { hydrateDayRates } from './lib/hydrate-rates'
 import { repickVehicles } from './lib/option-filters'
 import { optionItems, cruiseForTier, hotelForTier } from './lib/option-item'
 import { linkParsedTransport, transportTypeWarnings } from './lib/parsed-transport'
+import { applyPackageToDays, describeRemoved } from './lib/package-apply'
+import { PACKAGE_TYPE_CONFIGS, type PackageType } from '@/lib/package-types'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
 import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
@@ -694,6 +696,29 @@ function PricingGridContent() {
   }
 
   // --- Parse Text via AI ---
+  // A package change applies to the days already built: what the new
+  // package does not sell is removed, after the operator agrees to it
+  // (package-apply.ts). It only used to steer the next parse.
+  const changePackageType = async (p: PackageType) => {
+    const pkg = PACKAGE_TYPE_CONFIGS.find(c => c.slug === p)
+    if (pkg && days.length > 0) {
+      const result = applyPackageToDays(days, pkg)
+      const what = describeRemoved(result.removed)
+      if (what) {
+        const ok = await dialog.confirm({
+          title: `Switch to ${pkg.name}?`,
+          message: `${pkg.name} does not include them, so ${what} will be removed from this trip.`,
+          confirmText: 'Switch and remove',
+          cancelText: 'Keep the current package',
+          variant: 'warning',
+        })
+        if (!ok) return
+        setDays(result.days)
+      }
+    }
+    setConfig(prev => ({ ...prev, packageType: p }))
+  }
+
   const handleParseDays = async (text: string) => {
     try {
       setIsParsing(true)
@@ -1070,7 +1095,7 @@ function PricingGridContent() {
         onAddDayFromBlock={addDayFromBlock}
         onLoadItinerary={handleLoadItinerary}
         packageType={config.packageType ?? 'full-package'}
-        onPackageTypeChange={(p) => setConfig(prev => ({ ...prev, packageType: p }))}
+        onPackageTypeChange={changePackageType}
         onClearAll={handleClearAll}
         isParsing={isParsing}
         hasDays={days.length > 0}

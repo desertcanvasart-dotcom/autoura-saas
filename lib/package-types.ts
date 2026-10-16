@@ -23,6 +23,14 @@ export interface PackageTypeIncludes {
   internalTransfers: boolean
   tours: boolean
   meals: 'none' | 'optional' | 'per-hotel'
+  /** The party may move to another city and sleep there. False for day
+   *  trips and shore excursions: every day returns to the same base. */
+  overnightMoves: boolean
+  /** Where each day starts: the airport (arrival/departure transfers sold),
+   *  the client's hotel, or the cruise ship's port. */
+  startPoint: 'airport' | 'hotel' | 'port'
+  /** A cruise is part of the product (its nights on board). */
+  cruise: boolean
 }
 
 export interface PackageTypeConfig {
@@ -36,38 +44,38 @@ export const PACKAGE_TYPE_CONFIGS: PackageTypeConfig[] = [
   {
     slug: 'day-trips',
     name: 'Day Trips',
-    description: 'Single or multiple day excursions from a base location',
-    includes: { accommodation: false, airportTransfers: false, internalTransfers: true, tours: true, meals: 'optional' },
+    description: 'Day excursions from one base — every day returns there. No hotels or airport transfers sold.',
+    includes: { accommodation: false, airportTransfers: false, internalTransfers: true, tours: true, meals: 'optional', overnightMoves: false, startPoint: 'hotel', cruise: false },
   },
   {
     slug: 'tours-only',
     name: 'Tours Only',
-    description: 'Guided tours and activities. Client arranges own hotels.',
-    includes: { accommodation: false, airportTransfers: false, internalTransfers: true, tours: true, meals: 'optional' },
+    description: 'A touring programme that can move between cities. Client arranges own hotels.',
+    includes: { accommodation: false, airportTransfers: false, internalTransfers: true, tours: true, meals: 'optional', overnightMoves: true, startPoint: 'hotel', cruise: false },
   },
   {
     slug: 'land-package',
     name: 'Land Package',
     description: 'Hotels, tours, and internal transfers. No airport pickup.',
-    includes: { accommodation: true, airportTransfers: false, internalTransfers: true, tours: true, meals: 'per-hotel' },
+    includes: { accommodation: true, airportTransfers: false, internalTransfers: true, tours: true, meals: 'per-hotel', overnightMoves: true, startPoint: 'hotel', cruise: false },
   },
   {
     slug: 'full-package',
     name: 'Full Package',
     description: 'Everything included: hotels, all transfers, tours.',
-    includes: { accommodation: true, airportTransfers: true, internalTransfers: true, tours: true, meals: 'per-hotel' },
+    includes: { accommodation: true, airportTransfers: true, internalTransfers: true, tours: true, meals: 'per-hotel', overnightMoves: true, startPoint: 'airport', cruise: false },
   },
   {
     slug: 'cruise-land',
     name: 'Cruise + Land',
     description: 'Nile cruise combined with hotels and land tours.',
-    includes: { accommodation: true, airportTransfers: true, internalTransfers: true, tours: true, meals: 'per-hotel' },
+    includes: { accommodation: true, airportTransfers: true, internalTransfers: true, tours: true, meals: 'per-hotel', overnightMoves: true, startPoint: 'airport', cruise: true },
   },
   {
     slug: 'shore-excursions',
     name: 'Shore Excursions',
     description: 'Port-based day tours for cruise ship passengers.',
-    includes: { accommodation: false, airportTransfers: false, internalTransfers: true, tours: true, meals: 'optional' },
+    includes: { accommodation: false, airportTransfers: false, internalTransfers: true, tours: true, meals: 'optional', overnightMoves: false, startPoint: 'port', cruise: false },
   },
 ]
 

@@ -523,12 +523,35 @@ Generate a reasonable 5-7 day itinerary${country ? ` in ${country}` : ''} coveri
       slot.selectedItems = []
       slot.customAmount = 0
     }
+    // Transport is scrubbed by the journey's TYPE: an airport transfer the
+    // AI put in the route row survived a package that sells none (only the
+    // meet-and-assist row was cleared), and a day-trip product could move
+    // the party to another city overnight.
+    const rowsOfType = (types: string[]) => new Set(
+      (rates.transportation as Array<{ id: string; service_type?: string | null }>)
+        .filter(r => types.includes(String(r.service_type ?? '')))
+        .map(r => String(r.id)),
+    )
+    const airportRows = rowsOfType(['airport_transfer'])
+    const overnightMoveRows = rowsOfType(['intercity_dropoff', 'intercity_overnight', 'intercity_transfer'])
+    const dropRoutes = (day: { slots: ScrubbableSlot[] }, ids: Set<string>) => {
+      const slot = day.slots.find(sl => sl.slotId === 'route')
+      if (!slot?.selectedItems) return
+      slot.selectedItems = slot.selectedItems.filter(it => !ids.has(String((it as { rateId?: string }).rateId)))
+    }
     for (const day of days) {
       if (!pkg.includes.accommodation) {
         clearSlot(day, 'accommodation')
         clearSlot(day, 'hotel_services')
       }
-      if (!pkg.includes.airportTransfers) clearSlot(day, 'airport_services')
+      if (!pkg.includes.airportTransfers) {
+        clearSlot(day, 'airport_services')
+        dropRoutes(day, airportRows)
+      }
+      if (!pkg.includes.overnightMoves) dropRoutes(day, overnightMoveRows)
+      // No accommodation sold = no nights on a ship either. A full package
+      // may still carry a cruise the text names; Cruise + Land requires one.
+      if (!pkg.includes.accommodation) clearSlot(day, 'cruise')
       if (pkg.includes.meals === 'none') clearSlot(day, 'meals')
     }
 
@@ -538,6 +561,9 @@ Generate a reasonable 5-7 day itinerary${country ? ` in ${country}` : ''} coveri
     // hotel saved under another tier than the one chosen is said, so the
     // operator fixes the tier in Rates → Hotels instead of wondering.
     const notes: string[] = []
+    if (pkg.includes.cruise && !days.some((d: { slots: ScrubbableSlot[] }) => (d.slots.find(s => s.slotId === 'cruise')?.selectedItems?.length ?? 0) > 0)) {
+      notes.push(`${pkg.name}: no cruise was matched to your cruise rates — pick the ship on the cruise nights, or choose another package.`)
+    }
     if (pkg.includes.accommodation) {
       const hotels = (rates.accommodation as Array<Record<string, unknown>>).map(r => ({
         id: String(r.id),
