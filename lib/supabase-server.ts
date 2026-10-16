@@ -10,7 +10,7 @@ import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { isSuperAdmin, IMPERSONATE_COOKIE } from '@/lib/super-admin';
+import { isConfirmedSuperAdmin, IMPERSONATE_COOKIE } from '@/lib/super-admin';
 import type { Database } from '@/types/database.types';
 
 /**
@@ -119,7 +119,7 @@ export async function getUserTenantId(): Promise<TenantIdResult> {
   const cookieStore = await cookies();
   const impersonateTenantId = cookieStore.get(IMPERSONATE_COOKIE)?.value;
 
-  if (impersonateTenantId && user.email && isSuperAdmin(user.email)) {
+  if (impersonateTenantId && isConfirmedSuperAdmin(user)) {
     // Super admin is impersonating a tenant — use that tenant_id
     return {
       error: null,
@@ -159,7 +159,7 @@ export async function getUserTenantId(): Promise<TenantIdResult> {
     // middleware's super-admin exemption. Without this, a super admin whose
     // membership happened to say 'manager' passed the client (sidebar) but
     // was refused by admin-gated APIs.
-    role: user.email && isSuperAdmin(user.email) ? 'admin' : membership.role,
+    role: isConfirmedSuperAdmin(user) ? 'admin' : membership.role,
   };
 }
 

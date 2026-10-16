@@ -16,7 +16,7 @@
 //      comes from the profile, so the two now come from two tables.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-let currentUser: { id: string; email: string } | null = null
+let currentUser: { id: string; email: string; email_confirmed_at?: string } | null = null
 let currentProfile: { is_active: boolean } | null = null
 let currentMembership: { role: string } | null = null
 // The user's switched-off memberships (documents audit, round 12): read as a
@@ -79,7 +79,7 @@ beforeEach(() => {
 describe('super-admin / deactivated redirect handling', () => {
   it('lets a super admin through a tenant page even with a deactivated profile', async () => {
     // The exact reported case: owner@platform.test, is_active=false, on /rates.
-    currentUser = { id: 'u1', email: 'owner@platform.test' }
+    currentUser = { id: 'u1', email: 'owner@platform.test', email_confirmed_at: '2026-01-01T00:00:00Z' }
     currentProfile = { is_active: false }
     currentMembership = { role: 'manager' }
     const res = await middleware(req('/rates'))
@@ -90,11 +90,21 @@ describe('super-admin / deactivated redirect handling', () => {
   it('does not gate a super admin by role either', async () => {
     // /settings is admin-only; a super admin whose membership says manager
     // must still pass.
-    currentUser = { id: 'u1', email: 'owner@platform.test' }
+    currentUser = { id: 'u1', email: 'owner@platform.test', email_confirmed_at: '2026-01-01T00:00:00Z' }
     currentProfile = { is_active: true }
     currentMembership = { role: 'manager' }
     const res = await middleware(req('/settings'))
     expect(locationOf(res)).toBeNull()
+  })
+
+  it('an UNCONFIRMED account on the allowlist is gated like anyone else', async () => {
+    // The allowlist names an address; an account that never proved it owns
+    // that address gets no platform power.
+    currentUser = { id: 'u1', email: 'owner@platform.test' }
+    currentProfile = { is_active: true }
+    currentMembership = { role: 'manager' }
+    const res = await middleware(req('/settings'))
+    expect(locationOf(res)).not.toBeNull()
   })
 
   it('signs out a deactivated ORDINARY user before sending them to /login', async () => {

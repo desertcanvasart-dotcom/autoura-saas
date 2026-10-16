@@ -1,6 +1,7 @@
 import { gateStructural } from '@/lib/usage-enforcement'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
+import { sendPasswordSetupEmail, unusablePassword } from '@/lib/invitation-setup-email'
 
 /**
  * POST /api/invitations/accept — turn an invitation into a real membership.
@@ -16,18 +17,26 @@ import { createAdminClient } from '@/lib/supabase-server'
  * address, and two companies may have invited the same one; it therefore
  * creates no membership at all (356) and defers to this route.
  *
- * The account is created HERE, server-side, with email_confirm: true rather
- * than by supabase.auth.signUp() in the browser. Possession of an unguessable
- * token already proves control of the mailbox, so a second confirmation email
- * proves nothing and strands anyone who misses it: the account exists (so
- * signing up again says "already registered") but every login fails.
+ * The token does NOT prove the mailbox. The inviter is handed the same link
+ * (to copy when the email fails, and on every resend), so whoever opens it may
+ * not be the invitee. This route therefore never chooses a password and never
+ * confirms an address:
+ *   - no account yet: one is created UNCONFIRMED with a random password nobody
+ *     knows, and the invitee's own inbox gets a one-time "set your password"
+ *     link (lib/invitation-setup-email.ts) — opening it confirms the address;
+ *   - an unconfirmed account: left exactly as it is, and sent the same link;
+ *   - a working account: only the membership is added.
+ * It used to create the account confirmed with the password typed on the form,
+ * and to overwrite an unconfirmed account's password — so anyone holding the
+ * link (the inviter included) could own the invitee's address, and an address
+ * on the super-admin allowlist with it.
  */
 
-type AcceptAction = 'created' | 'confirmed_existing' | 'linked_existing'
+type AcceptAction = 'created' | 'unconfirmed_existing' | 'linked_existing'
 
 export async function POST(request: NextRequest) {
   try {
-    const { token, password, full_name } = await request.json()
+    const { token, full_name } = await request.json()
 
     if (!token) {
       return NextResponse.json(
@@ -91,23 +100,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!userId) {
-      if (!password || String(password).length < 8) {
-        return NextResponse.json(
-          { success: false, error: 'A password of at least 8 characters is required' },
-          { status: 400 }
-        )
-      }
-
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
-        password,
-        email_confirm: true,
+        password: unusablePassword(),
+        email_confirm: false,
         user_metadata: userMetadata,
       })
 
       if (createError || !created?.user) {
-        // An auth user with no profile row — rare, but never guess a password
-        // onto it. Send them to sign in instead.
+        // An auth user with no profile row — rare. Never touch it; send them
+        // to sign in instead.
         return NextResponse.json(
           {
             success: false,
@@ -121,38 +123,11 @@ export async function POST(request: NextRequest) {
       action = 'created'
     } else {
       const { data: existing } = await admin.auth.admin.getUserById(userId)
-
-      if (existing?.user && !existing.user.email_confirmed_at) {
-        // Stranded by the old browser-side signUp: the account exists but was
-        // never confirmed, so they can neither log in nor sign up again. The
-        // token proves the mailbox, so confirm it and set the password they
-        // just chose.
-        if (!password || String(password).length < 8) {
-          return NextResponse.json(
-            { success: false, error: 'A password of at least 8 characters is required' },
-            { status: 400 }
-          )
-        }
-
-        const { error: repairError } = await admin.auth.admin.updateUserById(userId, {
-          password,
-          email_confirm: true,
-          user_metadata: userMetadata,
-        })
-
-        if (repairError) {
-          return NextResponse.json(
-            { success: false, error: 'Could not complete your account. Please contact whoever invited you.' },
-            { status: 500 }
-          )
-        }
-
-        action = 'confirmed_existing'
-      } else {
-        // A working account. Add the membership and touch NOTHING else — an
-        // invitation link must never be a way to reset a live password.
-        action = 'linked_existing'
-      }
+      // Unconfirmed: nothing about the account changes here — no password,
+      // no confirmation. The setup email below lets the mailbox's owner in.
+      // Confirmed: add the membership and touch NOTHING else — an invitation
+      // link must never be a way to reset a live password.
+      action = existing?.user && !existing.user.email_confirmed_at ? 'unconfirmed_existing' : 'linked_existing'
     }
 
     // ---- 3. The membership — the part that was missing entirely -----------
@@ -188,6 +163,26 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Could not add you to the workspace. Please contact whoever invited you.' },
         { status: 500 }
       )
+    }
+
+    // ---- 3b. The invitee's own mailbox finishes it ------------------------
+    if (action !== 'linked_existing') {
+      const setup = await sendPasswordSetupEmail(admin as any, email, tenant?.company_name ?? null)
+      if (!setup.ok) {
+        console.error('Invitation accepted but the setup email failed:', setup.error)
+        // A new account nobody can reach is worse than none: undo it so the
+        // link can be used again. An existing account keeps its membership —
+        // "Forgot password" on the sign-in page lets its owner in.
+        if (action === 'created' && userId) {
+          const { error: undoError } = await db.from('tenant_members').delete().eq('tenant_id', invitation.tenant_id).eq('user_id', userId)
+          if (undoError) console.error('Could not undo the membership after the setup email failed:', undoError)
+          await admin.auth.admin.deleteUser(userId)
+          return NextResponse.json(
+            { success: false, error: 'We could not email you the link to set your password. Please try again in a few minutes.' },
+            { status: 502 }
+          )
+        }
+      }
     }
 
     // ---- 4. The profile's display fields ----------------------------------
@@ -240,9 +235,10 @@ export async function POST(request: NextRequest) {
         action,
         email,
         company_name: tenant?.company_name ?? null,
-        // 'linked_existing' keeps its own password, so the browser cannot sign
-        // in with whatever was typed on the invite form.
+        // 'linked_existing' signs in with the password it already has.
         needs_existing_password: action === 'linked_existing',
+        // Everyone else sets a password from the link in their inbox.
+        check_email: action !== 'linked_existing',
       },
     })
   } catch (error) {

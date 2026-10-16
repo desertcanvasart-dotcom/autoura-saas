@@ -67,27 +67,46 @@ describe('accepting an invitation creates the membership', () => {
   })
 })
 
-describe('an invitee is never asked to confirm an email', () => {
-  it('the account is created server-side, already confirmed', () => {
-    const body = bodyOf(read('app/api/invitations/accept/route.ts'), 'export async function POST')
-    expect(body).toContain('email_confirm: true')
+describe('holding the invitation link never owns the address', () => {
+  // The inviter is handed the same link (copy-link fallback, resend), so the
+  // token proves nothing about the mailbox. Accepting used to create the
+  // account confirmed with the typed password, and overwrite an unconfirmed
+  // account's password — whoever held the link owned the address.
+  const body = codeOnly(bodyOf(read('app/api/invitations/accept/route.ts'), 'export async function POST'))
+
+  it('creates a new account unconfirmed, with a password nobody is told', () => {
+    expect(body).toContain('email_confirm: false')
+    expect(body).toContain('password: unusablePassword()')
+    expect(body).not.toContain('email_confirm: true')
   })
 
-  it('the invite page does not sign the user up from the browser', () => {
-    // signUp() with confirmation on creates an account that cannot log in and
-    // cannot be recreated — the invitee is stranded with no way forward.
-    const page = read('app/invite/accept/page.tsx')
-    expect(codeOnly(page).match(/supabase\.auth\.signUp\(/)).toBeNull()
-    expect(page).toContain("fetch('/api/invitations/accept'")
+  it('never changes an existing account', () => {
+    expect(body).not.toContain('updateUserById')
   })
 
-  it('never signs in with the typed password for an existing account', () => {
-    const page = read('app/invite/accept/page.tsx')
-    const i = page.indexOf('needs_existing_password')
-    const j = page.indexOf('signInWithPassword')
-    expect(i).toBeGreaterThan(-1)
-    expect(j).toBeGreaterThan(-1)
-    expect(i).toBeLessThan(j) // the early return guards the sign-in
+  it('takes no password from the request', () => {
+    expect(body).toMatch(/const \{ token, full_name \} = await request\.json\(\)/)
+  })
+
+  it('sends the set-password link to the invited address, and undoes a new account if it cannot', () => {
+    expect(body).toContain('sendPasswordSetupEmail(admin as any, email,')
+    const send = body.indexOf('sendPasswordSetupEmail(')
+    expect(body.slice(send)).toContain('deleteUser(userId)')
+  })
+
+  it('the setup link is a one-time recovery link to /reset-password', () => {
+    const lib = read('lib/invitation-setup-email.ts')
+    expect(lib).toContain("type: 'recovery'")
+    expect(lib).toContain('/reset-password')
+  })
+
+  it('the invite page asks for no password and does not sign anyone up or in', () => {
+    const page = codeOnly(read('app/invite/accept/page.tsx'))
+    expect(page.match(/supabase\.auth\.signUp\(/)).toBeNull()
+    expect(page).not.toContain('signInWithPassword')
+    expect(page).not.toContain('type={showPassword')
+    expect(page).toContain('invitation?.has_account ? { token } : { token, full_name: fullName }')
+    expect(page).toContain('check_email')
   })
 
   // An existing login keeps its password, so asking for a new one on the
@@ -98,10 +117,34 @@ describe('an invitee is never asked to confirm an email', () => {
     expect(verify).toContain('email_confirmed_at') // same test as the accept route
   })
 
-  it('an existing login is asked for no password and sends none', () => {
+  it('an existing login sees a note in place of the fields', () => {
     const page = codeOnly(read('app/invite/accept/page.tsx'))
-    expect(page).toMatch(/invitation\?\.has_account \? \(\s*<p/) // the note replaces the fields
-    expect(page).toContain('invitation?.has_account ? { token } : { token, password, full_name: fullName }')
+    expect(page).toMatch(/invitation\?\.has_account \? \(\s*<p/)
+  })
+})
+
+describe('super-admin power needs a confirmed address', () => {
+  it('isConfirmedSuperAdmin refuses an unconfirmed account on the allowlist', async () => {
+    const prev = process.env.SUPER_ADMIN_EMAILS
+    process.env.SUPER_ADMIN_EMAILS = 'boss@autoura.test'
+    try {
+      const { isConfirmedSuperAdmin } = await import('@/lib/super-admin-shared')
+      expect(isConfirmedSuperAdmin({ email: 'Boss@autoura.test', email_confirmed_at: '2026-01-01T00:00:00Z' })).toBe(true)
+      expect(isConfirmedSuperAdmin({ email: 'boss@autoura.test', email_confirmed_at: null })).toBe(false)
+      expect(isConfirmedSuperAdmin({ email: 'boss@autoura.test' })).toBe(false)
+      expect(isConfirmedSuperAdmin({ email: 'other@autoura.test', email_confirmed_at: '2026-01-01T00:00:00Z' })).toBe(false)
+      expect(isConfirmedSuperAdmin(null)).toBe(false)
+    } finally {
+      process.env.SUPER_ADMIN_EMAILS = prev
+    }
+  })
+
+  it('every place that grants super-admin power uses the confirmed check', () => {
+    for (const f of ['middleware.ts', 'lib/super-admin.ts', 'lib/supabase-server.ts', 'app/api/auth/me/route.ts']) {
+      const code = codeOnly(read(f))
+      expect(code, f).toContain('isConfirmedSuperAdmin(')
+      expect(code, f).not.toMatch(/[^.\w]isSuperAdmin\(user\.email\)/)
+    }
   })
 })
 

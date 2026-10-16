@@ -10,3 +10,16 @@ export function isSuperAdmin(email: string): boolean {
   const emails = allowed.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
   return emails.includes(email.toLowerCase())
 }
+
+/**
+ * A signed-in account that holds super-admin power: on the allowlist AND with
+ * its address confirmed. The allowlist names an ADDRESS, and an account can
+ * carry an address its holder has never proven (an unconfirmed sign-up, or
+ * one made from an invitation link someone else opened) — that account must
+ * never be the platform owner.
+ */
+export function isConfirmedSuperAdmin(
+  user: { email?: string | null; email_confirmed_at?: string | null } | null | undefined,
+): boolean {
+  return !!user?.email && !!user.email_confirmed_at && isSuperAdmin(user.email)
+}

@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { NextResponse, type NextRequest } from 'next/server'
-import { isSuperAdmin } from '@/lib/super-admin-shared'
+import { isConfirmedSuperAdmin } from '@/lib/super-admin-shared'
 import { toPermissionRole } from '@/lib/roles'
 import { INACTIVE_MEMBER_STATUSES } from '@/lib/member-status'
 
@@ -275,7 +275,7 @@ export async function middleware(request: NextRequest) {
   // If user is logged in and trying to access login/signup (but not homepage).
   // Platform owners live in /super-admin, not the agency app.
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-    const home = user.email && isSuperAdmin(user.email) ? '/super-admin' : '/dashboard'
+    const home = isConfirmedSuperAdmin(user) ? '/super-admin' : '/dashboard'
     return NextResponse.redirect(new URL(home, request.url))
   }
 
@@ -301,7 +301,7 @@ export async function middleware(request: NextRequest) {
     // super admin is impersonating a tenant they already get an admin role
     // server-side (lib/supabase-server.ts); this simply stops the tenant gate
     // from overriding their platform access.
-    if (user.email && isSuperAdmin(user.email)) {
+    if (isConfirmedSuperAdmin(user)) {
       return response
     }
 
