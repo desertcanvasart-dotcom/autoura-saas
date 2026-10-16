@@ -35,6 +35,8 @@ function AcceptInvitationContent() {
   const [checkEmail, setCheckEmail] = useState(false)
 
   const [fullName, setFullName] = useState('')
+  // A new account agrees to the Terms here, as on /signup.
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   useEffect(() => {
     if (token) {
@@ -72,6 +74,10 @@ function AcceptInvitationContent() {
       setError('Please enter your full name')
       return
     }
+    if (!invitation?.has_account && !acceptedTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy to continue')
+      return
+    }
 
     setSubmitting(true)
 
@@ -82,7 +88,7 @@ function AcceptInvitationContent() {
       const res = await fetch('/api/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(invitation?.has_account ? { token } : { token, full_name: fullName })
+        body: JSON.stringify(invitation?.has_account ? { token } : { token, full_name: fullName, accepted_terms: acceptedTerms })
       })
       const payload = await res.json()
 
@@ -247,6 +253,23 @@ function AcceptInvitationContent() {
                 required
               />
             </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <input
+              id="invite-terms"
+              type="checkbox"
+              required
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-0.5 w-4 h-4 border-gray-300 rounded focus:ring-[#647C47]"
+            />
+            <label htmlFor="invite-terms" className="text-sm text-gray-600">
+              I agree to the{' '}
+              <a href="/terms" target="_blank" className="text-[#647C47] font-medium hover:underline">Terms of Service</a>{' '}
+              and{' '}
+              <a href="/privacy" target="_blank" className="text-[#647C47] font-medium hover:underline">Privacy Policy</a>.
+            </label>
           </div>
 
           <p className="text-xs text-gray-500">

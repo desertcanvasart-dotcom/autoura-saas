@@ -85,7 +85,8 @@ describe('holding the invitation link never owns the address', () => {
   })
 
   it('takes no password from the request', () => {
-    expect(body).toMatch(/const \{ token, full_name \} = await request\.json\(\)/)
+    expect(body).toMatch(/const \{ token, full_name, accepted_terms \} = await request\.json\(\)/)
+    expect(body).not.toMatch(/\bpassword\b[^:]*= await request/)
   })
 
   it('sends the set-password link to the invited address, and undoes a new account if it cannot', () => {
@@ -105,7 +106,7 @@ describe('holding the invitation link never owns the address', () => {
     expect(page.match(/supabase\.auth\.signUp\(/)).toBeNull()
     expect(page).not.toContain('signInWithPassword')
     expect(page).not.toContain('type={showPassword')
-    expect(page).toContain('invitation?.has_account ? { token } : { token, full_name: fullName }')
+    expect(page).toContain('invitation?.has_account ? { token } : { token, full_name: fullName, accepted_terms: acceptedTerms }')
     expect(page).toContain('check_email')
   })
 
@@ -115,6 +116,14 @@ describe('holding the invitation link never owns the address', () => {
     const verify = bodyOf(read('app/api/invitations/verify/route.ts'), 'export async function GET')
     expect(verify).toContain('has_account: hasAccount')
     expect(verify).toContain('email_confirmed_at') // same test as the accept route
+  })
+
+  it('a new invitee agrees to the Terms; the server records when', () => {
+    const page = read('app/invite/accept/page.tsx')
+    expect(page).toContain('id="invite-terms"')
+    const route = read('app/api/invitations/accept/route.ts')
+    expect(route).toContain("terms_accepted_at: new Date().toISOString()")
+    expect(route).toContain("if (!userId && accepted_terms !== true)")
   })
 
   it('an existing login sees a note in place of the fields', () => {

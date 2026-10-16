@@ -280,9 +280,8 @@ export default function ItineraryEditorPage() {
       }
 
       if (!itin) {
-        // Debug: Check user auth and tenant
         const { data: { user }, error: authError } = await supabase.auth.getUser()
-        console.error('Auth debug - user:', user?.id, user?.email, 'error:', authError?.message)
+        if (authError) console.error('Could not read the signed-in user:', authError.message)
 
         if (user) {
           // Check tenant membership

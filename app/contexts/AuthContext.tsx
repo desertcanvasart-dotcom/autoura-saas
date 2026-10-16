@@ -159,6 +159,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Into the app with a full page load, not a client-side push: analytics
+  // the visitor allowed on the public pages (login is one) must not keep
+  // running inside the app (components/MarketingAnalytics loads only there).
+  const enterApp = (path: string) => {
+    window.location.assign(path)
+  }
+
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -170,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Platform owners land in the admin cockpit, not the agency app —
     // they may not belong to any tenant at all.
     if (await checkSuperAdmin()) {
-      router.push('/super-admin')
+      enterApp('/super-admin')
       return
     }
 
@@ -197,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // the wizard sets up the company, and an invited member signing in
         // before the owner finished it landed in it.
         if (featuresData && !featuresData.onboarding_completed && ['owner', 'admin'].includes(String(memberData.role))) {
-          router.push('/onboarding')
+          enterApp('/onboarding')
           return
         }
       }
@@ -205,7 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error checking onboarding status:', error)
     }
 
-    router.push('/dashboard')
+    enterApp('/dashboard')
   }
 
   const signUp = async (email: string, password: string, fullName: string, companyName?: string, termsAcceptedAt?: string) => {

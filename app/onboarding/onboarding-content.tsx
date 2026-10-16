@@ -42,7 +42,7 @@ export default function OnboardingContent() {
       if (!user || authLoading || tenantLoading) return
       // Setting up the company is for its owner and admins.
       if (tenantMember && !['owner', 'admin'].includes(String(tenantMember.role))) {
-        router.push('/dashboard')
+        window.location.assign('/dashboard') // full load: no public-page analytics in the app
         return
       }
 
@@ -52,7 +52,7 @@ export default function OnboardingContent() {
           const result = await response.json()
           if (result.success && result.data.onboarding_completed) {
             // Redirect to dashboard if onboarding already completed
-            router.push('/dashboard')
+            window.location.assign('/dashboard') // full load: no public-page analytics in the app
             return
           }
           // Resume from last step if incomplete
@@ -109,7 +109,7 @@ export default function OnboardingContent() {
 
       if (response.ok) {
         // Redirect to dashboard
-        router.push('/dashboard')
+        window.location.assign('/dashboard') // full load: no public-page analytics in the app
       } else {
         // It failed silently before: the button simply did nothing.
         const json = await response.json().catch(() => ({}))

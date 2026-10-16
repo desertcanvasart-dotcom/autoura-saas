@@ -1,4 +1,5 @@
 'use client'
+import LoadError from '@/components/LoadError'
 
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
@@ -211,6 +212,7 @@ export default function SuppliersContent() {
   const typesOf = (s: { type: string; types?: string[] | null }) => (s.types && s.types.length ? s.types : [s.type]).filter(Boolean)
   const typeLabels = (s: { type: string; types?: string[] | null }) => typesOf(s).map(t => getTypeConfig(t).singular).join(' · ')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   
   const [selectedType, setSelectedType] = useState<string>('all')
@@ -280,14 +282,18 @@ export default function SuppliersContent() {
 
   const fetchSuppliers = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       const response = await fetch('/api/suppliers')
       if (response.ok) {
         const result = await response.json()
         setSuppliers(result.data || [])
+      } else {
+        setLoadError(true)
       }
     } catch (error) {
       console.error('Error fetching suppliers:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -951,6 +957,8 @@ export default function SuppliersContent() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
           </div>
+        ) : loadError ? (
+          <LoadError what="your suppliers" onRetry={fetchSuppliers} />
         ) : filteredSuppliers.length === 0 ? (
           <div className="text-center py-12">
             <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-3" />

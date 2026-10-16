@@ -1,4 +1,5 @@
 'use client'
+import LoadError from '@/components/LoadError'
 
 import { useEffect, useState } from 'react'
 import { sumByCurrency, addToTotals, formatTotals, type CurrencyTotals } from '@/lib/currency-totals'
@@ -46,6 +47,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<UnifiedPayment[]>([])
   const [filteredPayments, setFilteredPayments] = useState<UnifiedPayment[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [stats, setStats] = useState<PaymentStats>({
     totalReceived: {},
     pendingPayments: {},
@@ -67,6 +69,7 @@ export default function PaymentsPage() {
 
   const fetchAllPayments = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       // Fetch from both sources in parallel
       const [itineraryPaymentsRes, invoicesRes] = await Promise.all([
@@ -192,6 +195,7 @@ export default function PaymentsPage() {
 
     } catch (error) {
       console.error('Error fetching payments:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -452,7 +456,9 @@ export default function PaymentsPage() {
           </table>
         </div>
 
-        {filteredPayments.length === 0 && (
+        {loadError ? (
+          <LoadError what="your payments" onRetry={fetchAllPayments} />
+        ) : filteredPayments.length === 0 && (
           <div className="text-center py-8 text-gray-500">
             <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-base font-medium text-gray-900">No payments found</p>

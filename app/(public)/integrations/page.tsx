@@ -1,4 +1,5 @@
 'use client'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -406,6 +407,7 @@ export default function IntegrationsPage() {
               <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
               <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>
               <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
+              <CookieSettingsLink className="hover:text-stone-700 transition-colors" />
               <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
               <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
             </div>

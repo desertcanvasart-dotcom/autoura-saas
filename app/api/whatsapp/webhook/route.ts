@@ -1,3 +1,4 @@
+import { maskPhone } from '@/lib/log-mask'
 // ============================================
 // API: WHATSAPP WEBHOOK HANDLER (dual-provider)
 // ============================================
@@ -245,7 +246,7 @@ async function applyMetaStatuses(statuses: MetaStatusUpdate[]) {
         messageSid: s.messageSid,
         errorCode: s.errorCode,
         errorMessage: s.errorMessage,
-        recipient: s.recipient
+        recipient: maskPhone(s.recipient)
       })
     }
   }
@@ -386,7 +387,7 @@ async function createWhatsAppClient(
     return null
   }
   const fullName = data.full_name ?? (name || phoneNumber)
-  console.log(`👤 New WhatsApp contact filed as client ${data.id} (${fullName})`)
+  console.log(`👤 New WhatsApp contact filed as client ${data.id}`)
   return { id: data.id, full_name: fullName }
 }
 
@@ -536,7 +537,7 @@ async function processInboundWhatsAppMessage({
   } else {
     // A never-seen number writing to the SHARED number: nothing says which
     // company it is for. A company with its own number gets these (step 0).
-    console.error('❌ Cannot create conversation: no tenant found for', phoneNumber)
+    console.error('❌ Cannot create conversation: no tenant found for', maskPhone(phoneNumber))
   }
 
   // ============================================

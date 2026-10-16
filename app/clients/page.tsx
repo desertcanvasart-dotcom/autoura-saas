@@ -1,4 +1,5 @@
 'use client'
+import LoadError from '@/components/LoadError'
 
 import { todayLocal } from '@/lib/today'
 
@@ -50,6 +51,7 @@ export default function ClientsPage() {
   const agencyCurrency = tenant?.default_currency || 'EUR'
   const [clients, setClients] = useState<ClientSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [deleteModal, setDeleteModal] = useState<DeleteModalState>({
     isOpen: false,
@@ -107,6 +109,7 @@ export default function ClientsPage() {
   const fetchClients = async () => {
     try {
       setLoading(true)
+      setLoadError(false)
       // Every matching client, a page at a time: one request stopped at the
       // database's 1000-row cap, so a large agency's list was silently cut.
       const { data, error } = await fetchAllPages<ClientSummary>((from, to) => {
@@ -182,6 +185,7 @@ export default function ClientsPage() {
       setClients(data)
     } catch (error) {
       console.error('Error fetching clients:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -637,6 +641,8 @@ export default function ClientsPage() {
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
               <p className="mt-3 text-sm text-gray-600">Loading clients...</p>
             </div>
+          ) : loadError ? (
+            <LoadError what="your clients" onRetry={fetchClients} />
           ) : clients.length === 0 ? (
             <div className="p-8 text-center">
               <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />

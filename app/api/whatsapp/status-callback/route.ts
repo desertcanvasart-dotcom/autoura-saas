@@ -1,3 +1,4 @@
+import { maskPhone } from '@/lib/log-mask'
 import { NextRequest, NextResponse } from 'next/server'
 import { isValidTwilioSignature } from '@/lib/twilio-signature'
 import { createClient } from '@supabase/supabase-js'
@@ -140,8 +141,8 @@ export async function POST(request: NextRequest) {
         console.error('[whatsapp/status-callback] NO_MATCHING_MESSAGE — status dropped', {
           messageSid,
           messageStatus,
-          to,
-          from,
+          to: maskPhone(to),
+          from: maskPhone(from),
         })
       }
     }
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest) {
         messageSid,
         errorCode,
         errorMessage,
-        to
+        to: maskPhone(to)
       })
     }
 
