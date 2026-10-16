@@ -23,7 +23,7 @@ async function sendReminderEmail(params: {
   /** The operator this invoice belongs to — replies must reach them, not the platform. */
   from?: string
   replyTo?: string
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; suppressed?: boolean }> {
   const result = await sendMail({
     to: params.to,
     subject: params.subject,
@@ -31,7 +31,7 @@ async function sendReminderEmail(params: {
     ...(params.from ? { from: params.from } : {}),
     ...(params.replyTo ? { replyTo: params.replyTo } : {}),
   })
-  return { success: result.success, error: result.error }
+  return { success: result.success, error: result.error, suppressed: result.suppressed }
 }
 
 function generateReminderEmail(invoice: any, reminderType: string, daysOverdueToday?: number): { subject: string; html: string } {
@@ -245,6 +245,15 @@ async function getHandler(request: NextRequest) {
         from: resolveSender(invoice.tenant, process.env.RESEND_FROM_EMAIL || '').from,
         replyTo: invoice.tenant?.contact_email ?? undefined,
       })
+
+      // The client's address bounced or complained before (migration 437):
+      // reminders for this invoice stop until someone fixes the address,
+      // rather than failing — and turning this job red — every day.
+      if (result.suppressed) {
+        await supabase.from('invoices').update({ reminder_paused: true }).eq('id', invoice.id)
+        skipped++
+        continue
+      }
 
       if (result.success) {
         const { error: dateError } = await supabase

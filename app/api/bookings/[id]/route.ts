@@ -243,7 +243,7 @@ export async function PATCH(
     if (error) {
       console.error('❌ Error updating booking:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to update booking', details: error.message },
+        { success: false, error: 'Failed to update booking' },
         { status: 500 }
       )
     }
@@ -365,7 +365,7 @@ export async function DELETE(
     if (error) {
       console.error('❌ Error deleting booking:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to delete booking', details: error.message },
+        { success: false, error: 'Failed to delete booking' },
         { status: 500 }
       )
     }

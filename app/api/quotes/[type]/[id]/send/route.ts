@@ -1,3 +1,4 @@
+import { suppressedAmong } from '@/lib/email-suppression'
 import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
@@ -281,6 +282,15 @@ export async function POST(
     const emailSubject = type === 'b2c'
       ? `Your Travel Quote - ${quote.quote_number}`
       : `B2B Rate Sheet - ${quote.quote_number} - ${tripName}`
+
+    // An address that bounced or complained before is not mailed again
+    // (migration 437): it is what gets the sending domain suspended.
+    if ((await suppressedAmong([toEmail])).size > 0) {
+      return NextResponse.json(
+        { success: false, error: `Not sent: ${toEmail} bounced or reported spam before. Check the address with the client.` },
+        { status: 422 },
+      )
+    }
 
     const { data: emailData, error: emailError } = await getResend().emails.send({
       // The tenant's own verified domain, else the platform address under

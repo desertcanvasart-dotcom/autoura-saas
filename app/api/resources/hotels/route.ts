@@ -99,11 +99,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('Supabase insert error:', insertError)
-      return NextResponse.json({
-        success: false,
-        error: insertError.message,
-        details: insertError
-      }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Could not save the hotel' }, { status: 500 })
     }
 
 
@@ -113,10 +109,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('=== HOTELS API POST ERROR ===')
     console.error('Error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error.message,
-      stack: error.stack
-    }, { status: 500 })
+    // Logged above; the stack and database text stay on the server.
+    return NextResponse.json({ success: false, error: 'Could not save the hotel' }, { status: 500 })
   }
 }

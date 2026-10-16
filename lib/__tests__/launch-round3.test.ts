@@ -165,3 +165,62 @@ describe('round 3 — money', () => {
     expect(read('app/api/bookings/[id]/payments/route.ts')).toContain("code === '23514'")
   })
 })
+
+describe('round 3 — reliability', () => {
+  it('Resend webhooks are verified with their Svix signature', async () => {
+    const crypto = await import('crypto')
+    const { verifySvix } = await import('@/lib/svix')
+    const raw = Buffer.from('test-secret-bytes-0123456789')
+    const secret = `whsec_${raw.toString('base64')}`
+    const body = '{"type":"email.bounced"}'
+    const now = 1_800_000_000
+    const sig = crypto.createHmac('sha256', raw).update(`msg_1.${now}.${body}`).digest('base64')
+    const h = { id: 'msg_1', timestamp: String(now), signature: `v1,${sig}` }
+    expect(verifySvix(secret, h, body, now)).toBe(true)
+    expect(verifySvix(secret, h, body + ' ', now)).toBe(false)
+    expect(verifySvix(secret, h, body, now + 3600)).toBe(false)
+    expect(verifySvix(undefined, h, body, now)).toBe(false)
+  })
+
+  it('a bounced address is not mailed again, and its reminders pause', () => {
+    expect(read('lib/email-send.ts')).toContain('suppressedAmong(recipients)')
+    expect(read('app/api/quotes/[type]/[id]/send/route.ts')).toContain('suppressedAmong([toEmail])')
+    const cron = read('app/api/cron/send-reminders/route.ts')
+    expect(cron).toMatch(/if \(result\.suppressed\) \{\s*await supabase\.from\('invoices'\)\.update\(\{ reminder_paused: true \}\)/)
+  })
+
+  it('AI work started by inbound messages is capped and runs after the response', () => {
+    const wa = read('app/api/whatsapp/webhook/route.ts')
+    expect(wa.match(/inboundAiAllowed\(tenantId, `wa:\$\{conversationId\}`\)/g)?.length).toBe(2)
+    expect(wa).toMatch(/!isDuplicateDelivery\) \{\s*after\(async \(\) => \{/)
+    expect(read('app/api/email/sync/route.ts')).toContain('inboundAiAllowed(tenant_id, `mail:${cid}`)')
+  })
+
+  it('every Gmail call has a timeout', () => {
+    expect(read('lib/google.ts')).toContain('google.options({ timeout: 60_000 })')
+    for (const f of ['lib/gmail.ts', 'lib/gmail-mailbox.ts', 'app/api/cron/mail-alerts/route.ts', 'app/api/gmail/poll/route.ts']) {
+      expect(read(f), f).not.toContain("import { google } from 'googleapis'")
+    }
+  })
+
+  it('a revoked Gmail grant is removed, not a red run every time', () => {
+    expect(read('app/api/cron/mail-alerts/route.ts')).toContain('forgetRevokedMailbox(')
+    expect(read('app/api/cron/gmail-sync/route.ts')).toContain('forgetRevokedMailbox(')
+  })
+
+  it('file parsing refuses oversized bodies and zip bombs before reading them', () => {
+    const src = read('app/api/ai/parse-file/route.ts')
+    expect(src).toContain("request.headers.get('content-length')")
+    expect(src).toContain('MAX_DOCX_XML_BYTES')
+  })
+
+  it('an approved WhatsApp draft is claimed before it is sent', () => {
+    const src = read('app/api/copilot/drafts/[id]/send/route.ts')
+    expect(src.indexOf(".neq('status', 'sent')")).toBeLessThan(src.indexOf('await sendWhatsAppMessage('))
+  })
+
+  it('no stack traces or database details in API responses', () => {
+    expect(read('app/api/resources/hotels/route.ts')).not.toContain('stack: error.stack')
+    expect(read('app/api/suppliers/route.ts')).not.toContain('details: error.message')
+  })
+})

@@ -53,7 +53,7 @@ export async function GET(
 
     if (error) {
       console.error('Error fetching supplier:', error)
-      return NextResponse.json({ error: 'Supplier not found', details: error.message }, { status: 404 })
+      return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, data })
@@ -117,7 +117,7 @@ export async function PUT(
 
     if (error) {
       console.error('Error updating supplier:', error)
-      return NextResponse.json({ error: 'Failed to update supplier', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update supplier' }, { status: 500 })
     }
 
     if (!data) {
@@ -200,7 +200,7 @@ export async function DELETE(
 
     if (error) {
       console.error('Error deleting supplier:', error)
-      return NextResponse.json({ error: 'Failed to delete supplier', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to delete supplier' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, message: `Supplier "${existing.name}" deleted` })

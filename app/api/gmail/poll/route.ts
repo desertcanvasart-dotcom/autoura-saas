@@ -1,7 +1,7 @@
 import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
 import { sealToken, openToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { google } from '@/lib/google'
 import { createClient } from '@supabase/supabase-js'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { notifyNewEmails } from '@/lib/email/new-mail-alerts'

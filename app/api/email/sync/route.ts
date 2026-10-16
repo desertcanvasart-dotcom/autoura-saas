@@ -1,3 +1,4 @@
+import { inboundAiAllowed } from '@/lib/ai-guard'
 import { secretMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
@@ -544,6 +545,9 @@ export async function POST(request: NextRequest) {
             // Serialize to avoid hammering Claude; cap at 10 per sync to stay sensible.
             const capped = convIds.slice(0, 10)
             for (const cid of capped) {
+              // The company's AI ceiling and a per-thread cap (lib/ai-guard):
+              // a flood of inbound mail must not run up the bill.
+              if (!(await inboundAiAllowed(tenant_id, `mail:${cid}`))) continue
               try {
                 await generateDraftReplies({
                   supabase: db as any,

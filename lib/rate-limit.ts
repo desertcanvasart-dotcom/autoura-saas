@@ -79,6 +79,11 @@ export const RATE_LIMITS = {
     limit: 20,         // AI requests
     windowMs: 60000,   // per minute
   },
+  // AI work triggered by inbound messages, per conversation (lib/ai-guard).
+  aiPerConversation: {
+    limit: 10,         // AI runs
+    windowMs: 3600000, // per hour
+  },
   // AI calls — a whole company, across all its people.
   aiCompany: {
     limit: 300,        // AI requests

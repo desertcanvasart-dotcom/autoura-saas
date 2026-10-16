@@ -45,6 +45,14 @@ function adminDb() {
 }
 
 vi.mock('@/lib/supabase-server', () => ({ createAdminClient: () => adminDb() }))
+// The AI reply runs after the response (next/server after()); here it runs at
+// once and the test waits for it.
+const afterWork: Promise<unknown>[] = []
+vi.mock('next/server', async (orig) => ({
+  ...(await orig<typeof import('next/server')>()),
+  after: (fn: () => unknown) => { afterWork.push(Promise.resolve().then(fn)) },
+}))
+vi.mock('@/lib/ai-guard', () => ({ inboundAiAllowed: async () => true }))
 vi.mock('twilio', () => ({ default: { validateRequest: () => true } }))
 vi.mock('@/lib/notifications', () => ({ notifyTeam: async () => {}, bellSnippet: (s: string) => s }))
 vi.mock('@/lib/copilot-suggest', () => ({ generateDraftReplies: async () => {} }))
@@ -79,6 +87,7 @@ describe('an incoming WhatsApp message', () => {
   it('is stored under its conversation’s company, and the AI reply goes out from that company', async () => {
     const res = await POST(inbound())
     expect(res.status).toBe(200)
+    await Promise.all(afterWork)
     expect(inserts.find(i => i.table === 'whatsapp_messages' && i.row.direction === 'inbound')?.row)
       .toMatchObject({ tenant_id: 't1', conversation_id: 'conv1', message_sid: 'SM1', message_body: 'Is my pickup at 8?' })
     expect(sends).toEqual([expect.objectContaining({ to: '+201234567890', tenantId: 't1' })])

@@ -46,7 +46,9 @@ const API_DIR = path.join(ROOT, 'app/api')
 // a string the route file (or a lib file it imports) must contain. `null` =
 // public/pre-session by design, nothing to prove.
 const SELF_AUTH_PROOF: Record<string, string[] | null> = {
-  '/api/webhooks/': ['verifyConciergeSignature'],
+  // Concierge/departure feeds sign with the shared HMAC; Resend (bounces)
+  // signs with Svix.
+  '/api/webhooks/': ['verifyConciergeSignature', 'verifySvix('],
   '/api/integrations/': ['SAWA_SYNC_SECRET'],
   '/api/auth/': null, // OAuth callbacks / pre-session by nature (state verified in-handler)
   '/api/cron/': ['CRON_SECRET'],

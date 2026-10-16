@@ -21,8 +21,19 @@ export async function POST(request: NextRequest) {
     const overBudget = await aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
     if (overBudget) return overBudget
 
+    // Refused before the body is read: parsing a huge JSON body and decoding
+    // it ran the single server out of memory before the 32MB check below.
+    // Base64 is 4/3 the size of the file, plus the JSON around it.
+    const declared = Number(request.headers.get('content-length') || 0)
+    if (declared > Math.ceil(MAX_FILE_SIZE * 4 / 3) + 64 * 1024) {
+      return NextResponse.json({ success: false, error: 'File too large (max 32MB)' }, { status: 413 })
+    }
+
     const body = await request.json()
     const { file, filename, mimeType } = body
+    if (typeof file === 'string' && file.length > Math.ceil(MAX_FILE_SIZE * 4 / 3) + 4) {
+      return NextResponse.json({ success: false, error: 'File too large (max 32MB)' }, { status: 413 })
+    }
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 })
@@ -98,13 +109,22 @@ export async function POST(request: NextRequest) {
 }
 
 // --- Extract text from DOCX (ZIP containing XML) ---
+/** The text of a Word document, uncompressed: far beyond any real one. */
+const MAX_DOCX_XML_BYTES = 20 * 1024 * 1024
+
 async function extractTextFromDocx(buffer: Buffer): Promise<string> {
   try {
     // DOCX is a ZIP file. We use a lightweight approach:
     // Find the word/document.xml inside the ZIP and extract text from XML tags
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(buffer)
-    const docXml = await zip.file('word/document.xml')?.async('string')
+    const entry = zip.file('word/document.xml')
+    if (!entry) return ''
+    // A small .docx can inflate to gigabytes (a "zip bomb"); its declared
+    // size is checked before anything is decompressed.
+    const inflated = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0
+    if (inflated > MAX_DOCX_XML_BYTES) throw new Error('This document is too large to read')
+    const docXml = await entry.async('string')
     if (!docXml) return ''
 
     // Strip XML tags, keep text content

@@ -4549,6 +4549,30 @@ export interface Database {
           },
         ]
       }
+      email_suppressions: {
+        Row: {
+          email: string
+          reason: string
+          detail: string | null
+          first_seen_at: string
+          last_event_at: string
+        }
+        Insert: {
+          email: string
+          reason: string
+          detail?: string | null
+          first_seen_at?: string
+          last_event_at?: string
+        }
+        Update: {
+          email?: string
+          reason?: string
+          detail?: string | null
+          first_seen_at?: string
+          last_event_at?: string
+        }
+        Relationships: []
+      }
       email_sync_state: {
         Row: {
           id: string

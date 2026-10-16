@@ -1,3 +1,4 @@
+import { forgetRevokedMailbox } from '@/lib/gmail-dead-grant'
 import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { sealToken } from '@/lib/token-crypto'
@@ -106,6 +107,13 @@ async function getHandler(request: NextRequest) {
         new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error(`timed out after ${PER_MAILBOX_TIMEOUT_MS / 1000}s`)))),
       ])
       const body = await res.json().catch(() => ({}))
+      // Access revoked at Google: the connection is removed and its owner told
+      // to reconnect (lib/gmail-dead-grant) — not a red run every 10 minutes.
+      if (!res.ok && (body.reconnect === true || /invalid_grant/i.test(String(body.error ?? '')))) {
+        await forgetRevokedMailbox(box.user_id, box.tenant_id ?? null, box.email ?? null)
+        results.push({ user_id: box.user_id, email: box.email, ok: true, mode: 'disconnected', messages: 0 })
+        continue
+      }
       // A run that stored what it could but failed some downloads/saves is a
       // failure here (body.warning), not a quiet success — they are retried.
       results.push(

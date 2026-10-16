@@ -136,7 +136,7 @@ export async function PUT(
       }
 
       return NextResponse.json(
-        { success: false, error: 'Failed to update guide', details: error.message },
+        { success: false, error: 'Failed to update guide' },
         { status: 500 }
       )
     }

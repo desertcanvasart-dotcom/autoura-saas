@@ -51,9 +51,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const editPatch = editedBody ? { edited_body: editedBody, was_edited: true } : {}
 
     if (thread.channel === 'whatsapp') {
+      // Claimed before sending: a double-click or two reviewers on the same
+      // draft each passed the "already sent" check above and the client got
+      // the message twice. Only one request can move it to sent; the other
+      // finds nothing to claim.
+      const { data: claimed } = await supabase
+        .from('communication_drafts')
+        .update({ status: 'sent', sent_at: nowIso })
+        .eq('id', id)
+        .neq('status', 'sent')
+        .select('id')
+      if (!claimed || claimed.length === 0) {
+        return NextResponse.json({ success: false, error: 'Draft already sent' }, { status: 409 })
+      }
       const res = await sendWhatsAppMessage({ to: thread.contact_info, body: finalBody, tenantId: tenant_id })
       if (!res.success) {
-        await supabase.from('communication_drafts').update({ send_error: res.error || 'send failed', ...editPatch }).eq('id', id)
+        // Not sent after all: back to where it was, so it can be retried.
+        await supabase.from('communication_drafts').update({
+          status: draft.status, sent_at: null, send_error: res.error || 'send failed', ...editPatch,
+        }).eq('id', id)
         return NextResponse.json({ success: false, error: res.error || 'Failed to send WhatsApp message' }, { status: 502 })
       }
       await supabase.from('communication_drafts').update({
