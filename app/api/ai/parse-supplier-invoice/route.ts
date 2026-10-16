@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   if (roleGate) return roleGate
   const auth = await requireAuth()
   if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
-  const overBudget = aiBudgetDenied(auth.user!.id, auth.tenant_id)
+  const overBudget = await aiBudgetDenied(auth.user!.id, auth.tenant_id)
   if (overBudget) return overBudget
 
   try {

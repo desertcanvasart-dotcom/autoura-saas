@@ -7,21 +7,27 @@
 // this is only the safety ceiling — far above real use — plus a cap on how
 // much text one request may send.
 //
-// The limiter is in-memory (lib/rate-limit.ts), so the ceiling is per server
-// instance: a bound on runaway cost, not exact accounting.
+// The company ceiling is counted in the database (migration 427), so it holds
+// across deploys and replicas.
 
 import { NextResponse } from 'next/server'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { checkSharedRateLimit } from '@/lib/rate-limit-shared'
 
 /** Characters of free text one AI request may send. */
 export const MAX_AI_INPUT_CHARS = 50_000
 
-/** A 429 when this person or their company is over the AI ceiling, else null. */
-export function aiBudgetDenied(userId: string, tenantId: string | null | undefined): NextResponse | null {
+/**
+ * A 429 when this person or their company is over the AI ceiling, else null.
+ * The person's per-minute count is in memory; the company's hourly ceiling is
+ * counted in the database (lib/rate-limit-shared.ts), so a deploy does not
+ * reset it and every server shares it.
+ */
+export async function aiBudgetDenied(userId: string, tenantId: string | null | undefined): Promise<NextResponse | null> {
   const person = checkRateLimit(userId, 'ai')
   if (!person.success) return rateLimitResponse(person)
   if (tenantId) {
-    const company = checkRateLimit(tenantId, 'aiCompany')
+    const company = await checkSharedRateLimit(tenantId, 'aiCompany')
     if (!company.success) return rateLimitResponse(company)
   }
   return null

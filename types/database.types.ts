@@ -7645,6 +7645,24 @@ export interface Database {
         }
         Relationships: []
       }
+      rate_limit_buckets: {
+        Row: {
+          key: string
+          window_start: string
+          count: number
+        }
+        Insert: {
+          key: string
+          window_start?: string
+          count?: number
+        }
+        Update: {
+          key?: string
+          window_start?: string
+          count?: number
+        }
+        Relationships: []
+      }
       restaurant_contacts: {
         Row: {
           id: string

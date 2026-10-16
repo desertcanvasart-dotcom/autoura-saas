@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// No database in unit tests: the shared (company) count falls back to memory.
+vi.mock('@/lib/supabase-server', () => ({ createAdminClient: () => ({ rpc: async () => ({ data: null, error: new Error('no db') }) }) }))
+vi.spyOn(console, 'warn').mockImplementation(() => {})
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { aiBudgetDenied, aiInputTooLong, MAX_AI_INPUT_CHARS } from '@/lib/ai-guard'
@@ -7,16 +11,16 @@ import { RATE_LIMITS } from '@/lib/rate-limit'
 // Plans stay unlimited for now; this is only the ceiling on runaway AI spend.
 
 describe('the AI ceiling', () => {
-  it('stops one person after the per-minute limit', () => {
+  it('stops one person after the per-minute limit', async () => {
     const user = `u-${Math.random()}`
-    for (let i = 0; i < RATE_LIMITS.ai.limit; i++) expect(aiBudgetDenied(user, null)).toBeNull()
-    expect(aiBudgetDenied(user, null)?.status).toBe(429)
+    for (let i = 0; i < RATE_LIMITS.ai.limit; i++) expect(await aiBudgetDenied(user, null)).toBeNull()
+    expect((await aiBudgetDenied(user, null))?.status).toBe(429)
   })
 
-  it('stops a whole company after the hourly limit, across its people', () => {
+  it('stops a whole company after the hourly limit, across its people', async () => {
     const tenant = `t-${Math.random()}`
     let denied = null
-    for (let i = 0; i <= RATE_LIMITS.aiCompany.limit && !denied; i++) denied = aiBudgetDenied(`p-${i}-${Math.random()}`, tenant)
+    for (let i = 0; i <= RATE_LIMITS.aiCompany.limit && !denied; i++) denied = await aiBudgetDenied(`p-${i}-${Math.random()}`, tenant)
     expect(denied?.status).toBe(429)
   })
 
@@ -43,7 +47,7 @@ describe('every AI route sits under the ceiling', () => {
   ]
   for (const r of routes) {
     it(r, () => {
-      expect(readFileSync(join(process.cwd(), r), 'utf8')).toContain('aiBudgetDenied(')
+      expect(readFileSync(join(process.cwd(), r), 'utf8')).toContain('await aiBudgetDenied(')
     })
   }
 

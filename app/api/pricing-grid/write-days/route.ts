@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     const denied = roleDenied(auth.role, 'staff')
     if (denied) return denied
     const { supabase, tenant_id } = auth
-    const overBudget = aiBudgetDenied(auth.user!.id, tenant_id)
+    const overBudget = await aiBudgetDenied(auth.user!.id, tenant_id)
     if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({})) as Record<string, unknown>
