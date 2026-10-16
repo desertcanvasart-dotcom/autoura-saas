@@ -9,6 +9,8 @@
 // wrong transport. These checks list the likely ones, for the operator to
 // fix in Rates — nothing here changes a rate.
 
+import { isLayoverRoute } from './layover-route'
+
 export interface HotelCheckRow {
   id: string
   property_name?: string | null
@@ -93,7 +95,8 @@ const pretty = (s: string) => s.replace(/_/g, ' ')
 /**
  * Transport whose type contradicts its route or name: an airport route not
  * typed as an airport transfer, or a route named "Full day" / "Half day"
- * typed as something else. One finding per route (a row per vehicle).
+ * typed as something else. Layover tours (airport → tour → airport) are
+ * left alone. One finding per route (a row per vehicle).
  */
 export function transportTypeFindings(rows: TransportCheckRow[]): RateFinding[] {
   const groups = new Map<string, TransportCheckRow[]>()
@@ -105,7 +108,9 @@ export function transportTypeFindings(rows: TransportCheckRow[]): RateFinding[] 
   for (const g of groups.values()) {
     const r = g[0]
     const type = key(r.service_type)
-    if (!type) continue
+    // Airport → Full Day → Airport is a layover tour: saved as an airport
+    // transfer or as a day tour, either is right — neither is a mistake.
+    if (!type || isLayoverRoute(r)) continue
     const name = String(r.route_name || [r.origin_city || r.city, r.destination_city].filter(Boolean).join(' → ') || '').trim()
     const where = [r.origin_city, r.destination_city, r.city].filter(Boolean).join(' ')
     const finding = (expected: string, reason: string) => out.push({
