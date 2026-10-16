@@ -1,9 +1,11 @@
 import { gateRole } from '@/lib/api-role-gate'
+import { requireAuth } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 const ACCEPTED_TYPES: Record<string, 'pdf' | 'image'> = {
   'application/pdf': 'pdf',
@@ -67,6 +69,10 @@ export async function POST(request: NextRequest) {
   // finance-only areas are for managers and admins (lib/api-role-gate).
   const roleGate = await gateRole('manage')
   if (roleGate) return roleGate
+  const auth = await requireAuth()
+  if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  const overBudget = aiBudgetDenied(auth.user!.id, auth.tenant_id)
+  if (overBudget) return overBudget
 
   try {
     let formData: FormData

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
+import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
 
 // ============================================
 // EGYPTIAN TRAVEL ABBREVIATIONS
@@ -401,8 +402,12 @@ export async function POST(request: Request) {
         { status: authResult.status }
       )
     }
+    const overBudget = aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
+    if (overBudget) return overBudget
 
     const { conversation } = await request.json()
+    const tooLong = aiInputTooLong(conversation)
+    if (tooLong) return tooLong
 
     if (!conversation) {
       return NextResponse.json(

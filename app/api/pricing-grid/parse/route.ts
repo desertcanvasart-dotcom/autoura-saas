@@ -15,6 +15,7 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
 
 // Lazy-initialized clients
 let _supabaseAdmin: ReturnType<typeof createSupabaseAdmin> | null = null
@@ -302,6 +303,8 @@ export async function POST(request: NextRequest) {
     if (!tenant_id) {
       return NextResponse.json({ success: false, error: 'No tenant' }, { status: 403 })
     }
+    const overBudget = aiBudgetDenied(authResult.user!.id, tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json()
     const { text, tier = 'standard', pax = 2, mode = 'full', package_type } = body
@@ -314,6 +317,8 @@ export async function POST(request: NextRequest) {
     if (!text || typeof text !== 'string' || text.trim().length < 10) {
       return NextResponse.json({ success: false, error: 'Text input is required (min 10 chars)' }, { status: 400 })
     }
+    const tooLong = aiInputTooLong(text)
+    if (tooLong) return tooLong
 
     // --- Structure-only mode: extract itinerary without rate matching ---
     if (mode === 'structure') {

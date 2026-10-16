@@ -26,6 +26,7 @@ import {
   type LibraryEntry, type WritingRuleRow,
 } from '@/lib/ai/day-writer'
 import type { GridDay } from '@/app/pricing-grid/types'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,8 @@ export async function POST(request: NextRequest) {
     const denied = roleDenied(auth.role, 'staff')
     if (denied) return denied
     const { supabase, tenant_id } = auth
+    const overBudget = aiBudgetDenied(auth.user!.id, tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({})) as Record<string, unknown>
     const days = (Array.isArray(body.days) ? body.days : []).slice(0, MAX_DAYS) as GridDay[]

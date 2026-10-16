@@ -16,6 +16,7 @@ import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { MATCH_SYSTEM, matchDaysToBlocks, matchPrompt, matchSchema, type AiMatchReply, type RawDay } from '@/lib/day-blocks/match'
 import { BLOCK_COLS } from '@/lib/day-blocks/access'
 import type { DayBlock } from '@/lib/day-blocks/blocks'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
     // It calls the AI: staff only (viewers could trigger it).
     const denied = roleDenied(auth.role, 'staff')
     if (denied) return denied
+    const overBudget = aiBudgetDenied(auth.user!.id, tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({})) as { days?: unknown }
     const days: RawDay[] = (Array.isArray(body.days) ? body.days : [])

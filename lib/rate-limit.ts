@@ -69,6 +69,17 @@ export const RATE_LIMITS = {
     limit: 5,          // requests
     windowMs: 60000,   // per minute
   },
+  // AI calls (lib/ai-guard.ts) — a person: generous for real work, a
+  // ceiling for a stuck loop or a script.
+  ai: {
+    limit: 20,         // AI requests
+    windowMs: 60000,   // per minute
+  },
+  // AI calls — a whole company, across all its people.
+  aiCompany: {
+    limit: 300,        // AI requests
+    windowMs: 3600000, // per hour
+  },
   // Invitations
   invitation: {
     limit: 10,         // invites

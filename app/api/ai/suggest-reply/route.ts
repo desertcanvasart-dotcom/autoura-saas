@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: auth.status })
     }
     const { supabase, tenant_id, user } = auth
+    const overBudget = aiBudgetDenied(user.id, tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({}))
     const whatsapp_conversation_id: string | undefined = body.whatsapp_conversation_id
