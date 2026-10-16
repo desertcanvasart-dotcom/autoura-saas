@@ -97,6 +97,13 @@ export async function POST(
       )
     }
 
+    // The ledger's types (migration 100 CHECK): an unknown one failed inside
+    // the RPC as a 500.
+    const PAYMENT_TYPES = ['deposit', 'installment', 'balance', 'full_payment', 'refund', 'penalty']
+    if (!PAYMENT_TYPES.includes(String(payment_type))) {
+      return NextResponse.json({ success: false, error: 'Unknown payment type' }, { status: 400 })
+    }
+
     // Generate payment number. The prior code generated it before the INSERT
     // happened anyway; keeping that call here lets the existing generate_payment_number
     // RPC stay the source of payment numbering, while record_booking_payment

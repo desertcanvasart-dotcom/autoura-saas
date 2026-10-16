@@ -5713,6 +5713,7 @@ export interface Database {
       invoice_payments: {
         Row: {
           id: string
+          idempotency_key: string | null
           tenant_id: string
           invoice_id: string
           amount: number
@@ -5725,6 +5726,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          idempotency_key?: string | null
           tenant_id: string
           invoice_id: string
           amount: number
@@ -5737,6 +5739,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          idempotency_key?: string | null
           tenant_id?: string
           invoice_id?: string
           amount?: number

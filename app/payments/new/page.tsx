@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -33,6 +33,7 @@ type PaymentTarget = 'invoice' | 'itinerary' | null
 
 export default function RecordPaymentPage() {
   const router = useRouter()
+  const paymentKeyRef = useRef<string>(crypto.randomUUID())
   const [loading, setLoading] = useState(false)
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget>(null)
   
@@ -177,7 +178,8 @@ export default function RecordPaymentPage() {
         // Record payment against invoice
         response = await fetch(`/api/invoices/${formData.target_id}/payments`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // One key per page visit: a double click records one payment.
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': paymentKeyRef.current },
           body: JSON.stringify({
             amount: parseFloat(formData.amount),
             currency: formData.currency,

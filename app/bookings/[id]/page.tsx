@@ -139,6 +139,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   // New payment form
   const [showAddPayment, setShowAddPayment] = useState(false)
+  // One click, one record: a double click (or a slow network) saved two.
+  const [saving, setSaving] = useState<'payment' | 'passenger' | null>(null)
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     payment_type: 'deposit',
@@ -344,6 +346,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   const handleAddPassenger = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
+    setSaving('passenger')
     try {
       const response = await fetch(`/api/bookings/${resolvedParams.id}/passengers`, {
         method: 'POST',
@@ -369,11 +373,15 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (err: any) {
       showToast('error', err.message)
+    } finally {
+      setSaving(null)
     }
   }
 
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
+    setSaving('payment')
     try {
       const response = await fetch(`/api/bookings/${resolvedParams.id}/payments`, {
         method: 'POST',
@@ -403,6 +411,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (err: any) {
       showToast('error', err.message)
+    } finally {
+      setSaving(null)
     }
   }
 
@@ -799,9 +809,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      disabled={saving === 'passenger'}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
-                      Add Passenger
+                      {saving === 'passenger' ? 'Adding…' : 'Add Passenger'}
                     </button>
                   </div>
                 </form>
@@ -950,9 +961,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      disabled={saving === 'payment'}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
-                      Record Payment
+                      {saving === 'payment' ? 'Recording…' : 'Record Payment'}
                     </button>
                   </div>
                 </form>

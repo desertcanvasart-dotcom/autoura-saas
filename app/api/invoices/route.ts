@@ -354,12 +354,27 @@ export async function POST(request: NextRequest) {
     // (which filters on invoiced_at IS NULL) cannot bill them again. Loud on
     // failure, because the failure mode is silent double-billing later.
     if (data?.id && billedExtraIds.length && includeAdditions(invoiceType)) {
-      const { error: stampError } = await extrasAdmin()
+      // Claim only extras still unbilled: two invoices raised for the trip at
+      // the same moment both read them as unbilled. Whichever stamps second
+      // claims fewer than it billed — that invoice is withdrawn rather than
+      // charging the client twice.
+      const { data: claimed, error: stampError } = await extrasAdmin()
         .from('booking_extras')
         .update({ invoiced_at: new Date().toISOString(), invoice_id: data.id })
         .in('id', billedExtraIds)
         .eq('tenant_id', tenant_id)
+        .is('invoiced_at', null)
+        .select('id')
       if (stampError) console.error('invoices: could not stamp extras as invoiced', stampError)
+      else if ((claimed ?? []).length < billedExtraIds.length) {
+        await extrasAdmin().from('booking_extras').update({ invoiced_at: null, invoice_id: null }).eq('invoice_id', data.id)
+        const { error: undoError } = await supabase.from('invoices').delete().eq('id', data.id)
+        if (undoError) console.error('invoices: could not withdraw the double-billing invoice', data.id, undoError)
+        return NextResponse.json(
+          { error: 'Another invoice for this trip was created at the same moment and already includes its extras. Refresh and check before creating another.' },
+          { status: 409 }
+        )
+      }
     }
 
     return NextResponse.json(
