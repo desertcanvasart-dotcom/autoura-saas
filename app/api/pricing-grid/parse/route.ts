@@ -10,6 +10,8 @@ import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
+import { gridHotelRate } from '@/lib/rates/grid-hotel-rate'
+import { hotelsMentioned, namedHotelFor } from '@/lib/pricing/hotel-mentions'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
@@ -46,6 +48,12 @@ CRUISE: EMB=Embarkation, DIS=Disembarkation, FB=Full Board onboard
 // ============================================
 // Helper: Fetch all rates for AI context
 // ============================================
+const HOTEL_COLUMNS = 'id, hotel_name, property_name, city, room_type, tier, board_basis, star_rating, seasons, ppd_eur, ppd_non_eur, single_supplement_eur, single_supplement_non_eur, pp_double_eur, pp_double_non_eur, single_supp_eur, single_supp_non_eur, rate_low_season_dbl, rate_high_season_dbl, rate_currency'
+
+/** A hotel row's name, from whichever column family wrote it. */
+const hotelNameOf = (r: { property_name?: string | null; hotel_name?: string | null }) =>
+  String(r.property_name || r.hotel_name || '').trim()
+
 async function fetchAllRates(tenantId: string, tier: string) {
   const admin = getSupabaseAdmin()
 
@@ -60,7 +68,13 @@ async function fetchAllRates(tenantId: string, tier: string) {
     admin.from('hotel_staff_rates').select('id, service_type, hotel_category, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('tipping_rates').select('id, role_type, context, rate_unit, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('activity_rates').select('id, activity_name, activity_category, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
-    admin.from('accommodation_rates').select('id, hotel_name, city, room_type, tier, rate_low_season_dbl, rate_high_season_dbl, rate_low_season_sgl, rate_high_season_sgl, rate_currency').eq('tenant_id', tenantId).eq('tier', tier),
+    // Every tier, active only: a hotel the text NAMES is that hotel whatever
+    // tier it is saved under (lib/pricing/hotel-mentions); the prompt still
+    // steers an unnamed pick to the selected tier. Both column families —
+    // the Rates → Hotels form writes property_name and periods/ppd_eur, the
+    // importer hotel_name and pp_double_eur; reading only the importer's left
+    // every form-added hotel nameless and at 0 in the AI's list.
+    admin.from('accommodation_rates').select(HOTEL_COLUMNS).eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('entrance_fees').select('id, attraction_name, city, eur_rate, non_eur_rate, category, rate_currency').eq('tenant_id', tenantId),
     admin.from('flight_rates').select('id, route_from, route_to, route_name, airline, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('meal_rates').select('id, restaurant_name, meal_type, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
@@ -112,13 +126,14 @@ async function fetchAllRates(tenantId: string, tier: string) {
 // ============================================
 // Build rate catalog string for AI prompt
 // ============================================
-function buildRateCatalog(rates: Record<string, any[]>): string {
+function buildRateCatalog(rates: Record<string, any[]>, tier: string, startDate: string | null): string {
   let catalog = ''
 
   if (rates.accommodation.length > 0) {
-    catalog += '\n## ACCOMMODATION (per person double, filtered by tier)\n'
+    catalog += `\n## ACCOMMODATION (per person double). Selected tier: ${tier}. When the text names a hotel, use THAT hotel whatever its tier; otherwise pick a hotel of the selected tier.\n`
     for (const r of rates.accommodation) {
-      catalog += `ID: ${r.id} | ${r.hotel_name} | ${r.city} | ${r.room_type || 'standard'} | PPD: €${r.rate_low_season_dbl || r.rate_high_season_dbl || 0}\n`
+      const price = gridHotelRate(r, startDate)
+      catalog += `ID: ${r.id} | ${hotelNameOf(r)} | ${r.city || ''} | tier: ${r.tier || 'standard'} | ${r.room_type || r.board_basis || 'standard'} | PPD: €${price.ppdEur || 'unpriced'}\n`
     }
   }
 
@@ -207,11 +222,13 @@ function buildRateCatalog(rates: Record<string, any[]>): string {
 // ============================================
 // Build flat rate lookup map for validation
 // ============================================
-function buildRateMap(rates: Record<string, any[]>): Map<string, { rate: number; rateNonEur: number; label: string; table: string }> {
+function buildRateMap(rates: Record<string, any[]>, startDate: string | null): Map<string, { rate: number; rateNonEur: number; label: string; table: string }> {
   const map = new Map<string, { rate: number; rateNonEur: number; label: string; table: string }>()
 
   for (const r of rates.accommodation) {
-    map.set(r.id, { rate: Number(r.rate_low_season_dbl) || Number(r.rate_high_season_dbl) || 0, rateNonEur: Number(r.rate_low_season_dbl) || 0, label: `${r.hotel_name} | ${r.city}`, table: 'accommodation' })
+    // The grid's own pricing of a hotel (periods, either column family).
+    const price = gridHotelRate(r, startDate)
+    map.set(r.id, { rate: price.ppdEur, rateNonEur: price.ppdNonEur, label: `${hotelNameOf(r)} ${r.city || ''} (${r.tier || 'standard'})`, table: 'accommodation' })
   }
   for (const r of rates.transportation) {
     map.set(r.id, { rate: Number(r.base_rate_eur) || 0, rateNonEur: Number(r.base_rate_eur) || 0, label: `${r.service_type} ${r.vehicle_type || ''} ${r.origin_city || r.city}`, table: 'transportation' })
@@ -309,6 +326,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { text, tier = 'standard', pax = 2, mode = 'full', package_type } = body
+    const startDate = typeof body.start_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.start_date) ? body.start_date : null
     // What the customer is buying. Decides what the AI is TOLD to include and
     // what the scrub allows — until this existed the parser built every trip
     // full-package shaped, and the save stamped them all 'land-package'.
@@ -331,8 +349,8 @@ export async function POST(request: NextRequest) {
     const country = await operatingCountryOf(tenant_id)
     const glossary = isEgypt(country) ? EGYPT_GLOSSARY : ''
     const rates = await fetchAllRates(tenant_id, tier)
-    const rateCatalog = buildRateCatalog(rates)
-    const rateMap = buildRateMap(rates)
+    const rateCatalog = buildRateCatalog(rates, tier, startDate)
+    const rateMap = buildRateMap(rates, startDate)
 
     if (rateCatalog.trim().length < 50) {
       return NextResponse.json({
@@ -505,13 +523,78 @@ Generate a reasonable 5-7 day itinerary${country ? ` in ${country}` : ''} coveri
       slot.selectedItems = []
       slot.customAmount = 0
     }
+    // Transport is scrubbed by the journey's TYPE: an airport transfer the
+    // AI put in the route row survived a package that sells none (only the
+    // meet-and-assist row was cleared), and a day-trip product could move
+    // the party to another city overnight.
+    const rowsOfType = (types: string[]) => new Set(
+      (rates.transportation as Array<{ id: string; service_type?: string | null }>)
+        .filter(r => types.includes(String(r.service_type ?? '')))
+        .map(r => String(r.id)),
+    )
+    const airportRows = rowsOfType(['airport_transfer'])
+    const overnightMoveRows = rowsOfType(['intercity_dropoff', 'intercity_overnight', 'intercity_transfer'])
+    const dropRoutes = (day: { slots: ScrubbableSlot[] }, ids: Set<string>) => {
+      const slot = day.slots.find(sl => sl.slotId === 'route')
+      if (!slot?.selectedItems) return
+      slot.selectedItems = slot.selectedItems.filter(it => !ids.has(String((it as { rateId?: string }).rateId)))
+    }
     for (const day of days) {
       if (!pkg.includes.accommodation) {
         clearSlot(day, 'accommodation')
         clearSlot(day, 'hotel_services')
       }
-      if (!pkg.includes.airportTransfers) clearSlot(day, 'airport_services')
+      if (!pkg.includes.airportTransfers) {
+        clearSlot(day, 'airport_services')
+        dropRoutes(day, airportRows)
+      }
+      if (!pkg.includes.overnightMoves) dropRoutes(day, overnightMoveRows)
+      // No accommodation sold = no nights on a ship either. A full package
+      // may still carry a cruise the text names; Cruise + Land requires one.
+      if (!pkg.includes.accommodation) clearSlot(day, 'cruise')
       if (pkg.includes.meals === 'none') clearSlot(day, 'meals')
+    }
+
+    // 4c. THE NAMED HOTEL — the text named a hotel ("4-Day Stay at Marriott
+    // Mena House"): every night the AI gave another hotel in that city is that
+    // hotel. Decided here from the names, not left to the model; and a named
+    // hotel saved under another tier than the one chosen is said, so the
+    // operator fixes the tier in Rates → Hotels instead of wondering.
+    const notes: string[] = []
+    if (pkg.includes.cruise && !days.some((d: { slots: ScrubbableSlot[] }) => (d.slots.find(s => s.slotId === 'cruise')?.selectedItems?.length ?? 0) > 0)) {
+      notes.push(`${pkg.name}: no cruise was matched to your cruise rates — pick the ship on the cruise nights, or choose another package.`)
+    }
+    if (pkg.includes.accommodation) {
+      const hotels = (rates.accommodation as Array<Record<string, unknown>>).map(r => ({
+        id: String(r.id),
+        name: hotelNameOf(r as { property_name?: string | null; hotel_name?: string | null }),
+        city: (r.city as string | null) ?? null,
+        tier: (r.tier as string | null) ?? null,
+      }))
+      const byId = new Map(hotels.map(h => [h.id, h]))
+      const mentioned = hotelsMentioned(text, hotels)
+      const usedOtherTier = new Map<string, string>()
+      for (const day of days as Array<{ city: string; slots: Array<{ slotId: string; selectedItems: unknown[]; label?: string }> }>) {
+        const slot = day.slots.find(s => s.slotId === 'accommodation')
+        const picked = (slot?.selectedItems?.[0] as { rateId?: string } | undefined)?.rateId ?? null
+        if (!slot || !picked) continue
+        const named = namedHotelFor(picked, day.city, byId, mentioned, tier)
+        const finalId = named ? named.id : picked
+        if (named) {
+          const info = rateMap.get(named.id)
+          if (info) {
+            slot.selectedItems = [{ rateId: named.id, name: info.label, rateEur: info.rate, rateNonEur: info.rateNonEur }]
+            slot.label = info.label
+          }
+        }
+        const final = byId.get(finalId)
+        if (final && mentioned.some(m => m.id === finalId) && (final.tier ?? 'standard') !== tier) {
+          usedOtherTier.set(final.name, final.tier ?? 'standard')
+        }
+      }
+      for (const [name, savedTier] of usedOtherTier) {
+        notes.push(`${name} is saved as "${savedTier}" in Rates → Hotels, not "${tier}" — it is used because the text names it. Correct its tier there if it is wrong.`)
+      }
     }
 
     // 5. Auto-fill water on days that don't have it
@@ -543,6 +626,7 @@ Generate a reasonable 5-7 day itinerary${country ? ` in ${country}` : ''} coveri
       generationMode,
       needsReview,
       needsHumanInputCount,
+      notes,
       reviewReason:
         generationMode === 'generated'
           ? 'AI generated a suggested itinerary — review every line and confirm prices before sending.'

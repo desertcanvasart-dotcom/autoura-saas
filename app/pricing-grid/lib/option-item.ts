@@ -38,3 +38,30 @@ export function cruiseForTier(picked: { name?: string } | undefined, dayCity: st
     ?? options.find(o => norm((o as { city?: string }).city) === norm(dayCity) && norm(dayCity) !== '')
     ?? options[0]
 }
+
+/** A hotel option's name without its "(tier | board)" tail. */
+const hotelBase = (name: unknown) => norm(name).replace(/\s*\([^)]*\)\s*$/, '')
+
+/**
+ * The new tier's stand-in for a picked hotel: the SAME hotel if the new tier
+ * has it; else one in the picked hotel's own city; else one in the day's
+ * city. It used to be the first hotel of the day's city — so moving Marriott
+ * Mena House (Giza) to Luxury on a day called "Cairo" swapped in whichever
+ * Cairo hotel came first, or nothing.
+ */
+export function hotelForTier(picked: { name?: string } | undefined, dayCity: string | undefined, options: RateOption[]): RateOption | undefined {
+  const base = hotelBase(picked?.name)
+  if (!base) return undefined
+  const same = options.find(o => hotelBase(o.name) === base)
+  if (same) return same
+  // The option name is "<hotel> <city> (…)": the picked hotel's city is the
+  // option city its name ends with.
+  const ownCity = options.map(o => norm(o.city)).find(c => c && base.endsWith(` ${c}`))
+  if (ownCity) {
+    const inOwn = options.find(o => norm(o.city) === ownCity)
+    if (inOwn) return inOwn
+  }
+  const day = norm(dayCity)
+  return day ? options.find(o => norm(o.city) === day) : undefined
+}
+
