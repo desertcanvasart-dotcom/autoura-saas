@@ -1,3 +1,5 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken, openToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: tokenData.access_token,
+      access_token: openToken(tokenData.access_token),
       refresh_token: tokenData.refresh_token,
     })
 
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
       await (supabase as any)
         .from('gmail_tokens')
         .update({
-          access_token: credentials.access_token,
+          access_token: sealToken(credentials.access_token),
           token_expiry: new Date(credentials.expiry_date!).toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -120,6 +122,8 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error: any) {
+    const reconnect = gmailReconnectResponse(error)
+    if (reconnect) return reconnect
     console.error('Error downloading attachment:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to download attachment' },

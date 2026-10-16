@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { markTeamNotificationsRead } from '@/lib/notifications'
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`phone_number.ilike.%${search}%,client_name.ilike.%${search}%`)
+      query = query.or(`phone_number.ilike.${orIlikeContains(search)},client_name.ilike.${orIlikeContains(search)}`)
     }
 
     const { data, error } = await query.limit(50)

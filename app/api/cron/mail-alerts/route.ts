@@ -1,3 +1,5 @@
+import { openToken } from '@/lib/token-crypto'
+import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createAdminClient } from '@/lib/supabase-server'
@@ -21,7 +23,7 @@ const CRON_SECRET = process.env.CRON_SECRET
 
 async function getHandler(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!bearerMatches(authHeader, CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -45,7 +47,7 @@ async function getHandler(request: NextRequest) {
         process.env.GOOGLE_REDIRECT_URI
       )
       // An expired access token is refreshed by the client on first call.
-      auth.setCredentials({ access_token: box.access_token, refresh_token: box.refresh_token })
+      auth.setCredentials({ access_token: openToken(box.access_token), refresh_token: openToken(box.refresh_token) })
       await notifyNewEmails(google.gmail({ version: 'v1', auth }), box.user_id)
       results.push({ email: box.email, ok: true })
     } catch (e) {

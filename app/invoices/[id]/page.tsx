@@ -6,7 +6,7 @@ import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -242,6 +242,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // One key per payment being entered: a retry or second click of the same
+  // payment is recorded once (migration 429). A new key after each success.
+  const paymentKeyRef = useRef<string>(crypto.randomUUID())
+
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault()
     setSavingPayment(true)
@@ -249,11 +253,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     try {
       const response = await fetch(`/api/invoices/${resolvedParams.id}/payments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': paymentKeyRef.current },
         body: JSON.stringify(paymentForm)
       })
 
       if (response.ok) {
+        paymentKeyRef.current = crypto.randomUUID()
         setShowPaymentModal(false)
         fetchInvoice()
         fetchPayments()

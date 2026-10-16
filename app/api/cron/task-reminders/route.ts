@@ -1,3 +1,5 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/email-send'
 import { escapeHtml, appLinkHref } from '@/lib/html-escape'
@@ -33,7 +35,7 @@ async function getHandler(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!bearerMatches(authHeader, cronSecret)) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -52,7 +54,9 @@ async function getHandler(request: NextRequest) {
     // timezone's tomorrow — and not done; each task is then judged on its own
     // company's day (tenants.timezone, lib/tenant-today).
     const horizon = shiftDateISO(new Date().toISOString().slice(0, 10), 2)
-    const { data: tasks, error: tasksError } = await db
+    // Every due task across every company, paged: a plain select stopped at
+    // 1000 and an arbitrary subset was reminded once overdue tasks piled up.
+    const { data: tasks, error: tasksError } = await fetchAllPages((from, to) => db
       .from('tasks')
       .select(`
         *,
@@ -63,6 +67,8 @@ async function getHandler(request: NextRequest) {
       .not('assigned_to', 'is', null)
       // An archived task is off the board; it must not keep reminding anyone.
       .or('archived.eq.false,archived.is.null')
+      .order('id', { ascending: true })
+      .range(from, to)) as { data: any[]; error: { message: string } | null }
 
     if (tasksError) {
       results.errors.push(`Task query error: ${tasksError.message}`)
@@ -82,7 +88,31 @@ async function getHandler(request: NextRequest) {
       for (const s of settings ?? []) if (s.notification_preferences) prefsByUser.set(s.user_id, s.notification_preferences)
     }
 
+    // Who was already reminded, for every task at once — one query per 200
+    // tasks instead of one per task. Newest first per (task, type).
+    const lastReminded = new Map<string, string>()
+    const since3d = new Date(Date.now() - 3 * 86_400_000).toISOString()
+    const taskIds = rows.map(t => t.id)
+    for (let i = 0; i < taskIds.length; i += 200) {
+      const { data: recent } = await fetchAllPages((from, to) => db
+        .from('notifications')
+        .select('id, related_task_id, type, created_at')
+        .in('related_task_id', taskIds.slice(i, i + 200))
+        .in('type', ['task_due_soon', 'task_overdue'])
+        .gte('created_at', since3d)
+        .order('id', { ascending: true })
+        .range(from, to)) as { data: Array<{ related_task_id: string; type: string; created_at: string }> }
+      for (const n of recent ?? []) {
+        const key = `${n.related_task_id}|${n.type}`
+        if (!lastReminded.has(key) || String(n.created_at) > String(lastReminded.get(key))) lastReminded.set(key, String(n.created_at))
+      }
+    }
+
+    const startedAt = Date.now()
     for (const task of rows) {
+      // Stop starting new reminders well inside the scheduler's timeout; the
+      // rest go out on the next run.
+      if (Date.now() - startedAt > 4 * 60 * 1000) break
       const member = task.assigned_member
       // A removed (deactivated) team member is not reminded.
       if (!member?.id || member.is_active === false) continue
@@ -98,14 +128,8 @@ async function getHandler(request: NextRequest) {
       const since = kind === 'task_due_soon'
         ? todayStr
         : new Date(Date.now() - 3 * 86_400_000).toISOString()
-      const { data: existing } = await db
-        .from('notifications')
-        .select('id')
-        .eq('related_task_id', task.id)
-        .eq('type', kind)
-        .gte('created_at', since)
-        .limit(1)
-      if (existing && existing.length > 0) continue
+      const last = lastReminded.get(`${task.id}|${kind}`)
+      if (last && last >= since) continue
 
       if (kind === 'task_due_soon') {
         await createNotification({

@@ -127,6 +127,9 @@ export async function POST(
     const paid = paymentCurrencyFor(body.currency, invoice.currency)
     if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: 400 })
 
+    const rawKey = request.headers.get('idempotency-key') ?? body.idempotency_key
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.length > 0 && rawKey.length <= 100 ? rawKey : null
+
     // Check if payment exceeds balance (allow small overpayment for rounding)
     if (Number(body.amount) > Number(invoice.balance_due) + 0.01) {
       return NextResponse.json(
@@ -144,7 +147,10 @@ export async function POST(
       payment_date: body.payment_date || new Date().toISOString().split('T')[0],
       transaction_reference: body.transaction_reference || null,
       notes: body.notes || null,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      // The same key on a retried request is refused by a unique index
+      // (migration 429), so a double submit records one payment, not two.
+      idempotency_key: idempotencyKey,
     }
 
     const { data, error } = await supabase
@@ -154,6 +160,21 @@ export async function POST(
       .single()
 
     if (error) {
+      // Already recorded under this key: answer with that payment.
+      if (error.code === '23505' && idempotencyKey) {
+        const { data: existing } = await supabase
+          .from('invoice_payments')
+          .select('id, invoice_id, amount, currency, payment_method, payment_date, transaction_reference, notes, created_at')
+          .eq('invoice_id', id)
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle()
+        if (existing) return NextResponse.json(existing, { status: 200 })
+      }
+      // The database re-checked the balance under a lock (migration 429): a
+      // payment saved a moment earlier left less to pay than the page showed.
+      if (error.code === '23514') {
+        return NextResponse.json({ error: 'Payment amount exceeds the balance due — another payment was just recorded. Refresh and try again.' }, { status: 409 })
+      }
       console.error('❌ Error creating payment:', error)
       return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 })
     }

@@ -1,4 +1,5 @@
 'use client'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 
 import Link from 'next/link'
 import { TRIAL_DAYS } from '@/lib/pricing-config'
@@ -253,6 +254,7 @@ export default function TermsPage() {
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Privacy
               </Link>
+              <CookieSettingsLink className="text-gray-400 hover:text-white text-sm transition-colors" />
             </div>
           </div>
         </div>

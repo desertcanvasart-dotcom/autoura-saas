@@ -1,3 +1,5 @@
+import { withoutKeys, IDENTITY_KEYS } from '@/lib/without-keys'
+import { gateRole } from '@/lib/api-role-gate'
 // app/api/cruises/[id]/route.ts
 
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -43,6 +45,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -54,7 +59,10 @@ export async function PUT(
 
     const { id } = await params
     const supabase = createAdminClient()
-    const body = await request.json()
+    // tenant_id in the body moved the row into ANY company (this is the
+    // service role, so RLS does not stop it). Identity fields never come
+    // from the body.
+    const body = withoutKeys(await request.json(), IDENTITY_KEYS)
 
     const { data, error } = await supabase
       .from('nile_cruises')
@@ -83,6 +91,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {

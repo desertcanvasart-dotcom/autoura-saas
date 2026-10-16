@@ -17,7 +17,7 @@
 //     hole the engine already knows how to flag — rather than pricing with a
 //     silently wrong number. Each such row is recorded in `misses`.
 
-import { convertCurrency, type ExchangeRate } from '@/lib/currency'
+import { convertCurrency, ratesForTenant, type ExchangeRate } from '@/lib/currency'
 
 export const RUN_CURRENCY = 'EUR'
 
@@ -198,13 +198,15 @@ export function clearFxCache() {
   fxCache = null
 }
 
-async function loadExchangeRates(db: object): Promise<ExchangeRate[]> {
+/** Every active rate row (all companies' + shared), cached briefly; callers
+ *  narrow it with ratesForTenant — never use the raw list. */
+async function loadAllExchangeRates(db: object): Promise<ExchangeRate[]> {
   const now = Date.now()
   if (fxCache && now - fxCache.at < FX_CACHE_MS) return fxCache.rates
   try {
     const { data, error } = await (db as MinimalRatesDb)
       .from('exchange_rates')
-      .select('base_currency, target_currency, rate, is_active')
+      .select('tenant_id, base_currency, target_currency, rate, is_active')
       .eq('is_active', true)
     if (error || !data) return fxCache?.rates ?? []
     fxCache = { rates: data, at: now }
@@ -212,6 +214,11 @@ async function loadExchangeRates(db: object): Promise<ExchangeRate[]> {
   } catch {
     return fxCache?.rates ?? []
   }
+}
+
+/** The rates this company may use (shared + its own overrides). */
+async function loadExchangeRates(db: object, tenantId: string | null | undefined): Promise<ExchangeRate[]> {
+  return ratesForTenant(await loadAllExchangeRates(db), tenantId)
 }
 
 /**
@@ -223,13 +230,15 @@ export async function normalizeRateRows<T extends Record<string, unknown>>(
   db: object,
   table: string,
   rows: T[] | null | undefined,
-  runCurrency: string = RUN_CURRENCY
+  runCurrency: string = RUN_CURRENCY,
+  /** Whose manual exchange rates apply. Unset = the shared rates only. */
+  tenantId?: string | null
 ): Promise<T[]> {
   if (!rows || rows.length === 0) return rows ?? []
   // Fast path: nothing on this page of rows carries a foreign currency.
   if (!rows.some(r => r.rate_currency && r.rate_currency !== runCurrency)) return rows
 
-  const exchangeRates = await loadExchangeRates(db)
+  const exchangeRates = await loadExchangeRates(db, tenantId)
   const normalizer = createRateNormalizer(exchangeRates, runCurrency)
   const out = normalizer.normalize(table, rows)
   for (const miss of normalizer.misses) {

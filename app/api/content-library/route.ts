@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 // =====================================================
 // CONTENT LIBRARY API - FIXED VERSION
 // =====================================================
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,short_description.ilike.%${search}%,location.ilike.%${search}%`)
+      query = query.or(`name.ilike.${orIlikeContains(search)},short_description.ilike.${orIlikeContains(search)},location.ilike.${orIlikeContains(search)}`)
     }
 
     const { data: contentItems, error: contentError } = await query

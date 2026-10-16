@@ -1,3 +1,4 @@
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 // Header and footer for the public blog pages, in the landing page's style.
 // A super admin also sees a way into the editor (adminHref).
 
@@ -43,6 +44,7 @@ export function BlogFooter() {
           <Link href="/pricing" className="hover:text-stone-700">Pricing</Link>
           <Link href="/docs" className="hover:text-stone-700">Docs</Link>
           <Link href="/privacy" className="hover:text-stone-700">Privacy</Link>
+          <CookieSettingsLink className="hover:text-stone-700" />
           <Link href="/terms" className="hover:text-stone-700">Terms</Link>
           <Link href="/contact" className="hover:text-stone-700">Contact</Link>
         </nav>

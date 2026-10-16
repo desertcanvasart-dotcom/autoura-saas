@@ -481,9 +481,9 @@ export async function POST(request: Request) {
       nationality: extracted.nationality || '',
 
       // Trip info
-      trip_name: extracted.trip_name || extracted.tour_requested || 'Egypt Tour',
+      trip_name: extracted.trip_name || extracted.tour_requested || 'New tour',
       tour_requested: extracted.tour_requested || '',
-      tour_name: extracted.tour_name || extracted.trip_name || 'Egypt Tour',
+      tour_name: extracted.tour_name || extracted.trip_name || 'New tour',
       start_date: isValidDate(extracted.start_date) ? extracted.start_date : '',
       end_date: isValidDate(extracted.end_date) ? extracted.end_date : '',
       duration_days: parseInt(extracted.duration_days) || structureDetection.detectedDays || 1,

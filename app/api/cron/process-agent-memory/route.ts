@@ -1,3 +1,4 @@
+import { secretMatches } from '@/lib/support/probe-auth'
 // ============================================================
 // app/api/cron/process-agent-memory/route.ts
 //
@@ -38,7 +39,7 @@ function getSupabaseAdmin() {
 async function postHandler(request: NextRequest) {
   // Verify cron secret — same pattern as your existing cron routes
   const cronSecret = request.headers.get('x-cron-secret')
-  if (cronSecret !== process.env.CRON_SECRET) {
+  if (!secretMatches(cronSecret, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

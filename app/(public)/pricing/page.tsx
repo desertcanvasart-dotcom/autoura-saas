@@ -1,4 +1,5 @@
 'use client'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -305,6 +306,7 @@ export default function PricingPage() {
               <Link href="/pricing" className="text-gray-400 hover:text-white text-sm transition-colors">Pricing</Link>
               <Link href="/docs" className="text-gray-400 hover:text-white text-sm transition-colors">Docs</Link>
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">Privacy</Link>
+              <CookieSettingsLink className="text-gray-400 hover:text-white text-sm transition-colors" />
               <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">Terms</Link>
               <Link href="/contact" className="text-gray-400 hover:text-white text-sm transition-colors">Contact</Link>
             </div>

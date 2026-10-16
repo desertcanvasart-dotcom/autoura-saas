@@ -256,7 +256,7 @@ async function getTransportPackage(
   // A rates table never converts — but a rates CONSUMER must: the row may be
   // priced in any currency (rate_currency, mig 295), and this total is summed
   // with every other line. Convert once, here, at the fetch boundary.
-  const [normalized] = await normalizeRateRows(admin, 'b2b_transport_packages', [pkg], runCurrency)
+  const [normalized] = await normalizeRateRows(admin, 'b2b_transport_packages', [pkg], runCurrency, tenantId)
   return normalized ?? null
 }
 
@@ -329,7 +329,7 @@ async function selectGuideFromB2CTable(language: string, tier: string, tenantId:
 
   // Per-row currency (mig 295): convert into the run currency at the fetch
   // boundary, before this rate joins a total with every other line.
-  const guides = await normalizeRateRows(admin, 'guides', rawGuides, runCurrency)
+  const guides = await normalizeRateRows(admin, 'guides', rawGuides, runCurrency, tenantId)
 
   if (error || !guides || guides.length === 0) {
     // Fallback: any guide
@@ -340,7 +340,7 @@ async function selectGuideFromB2CTable(language: string, tier: string, tenantId:
       .eq('tenant_id', tenantId)
       .order('is_preferred', { ascending: false })
       .limit(1)
-    const anyGuide = await normalizeRateRows(admin, 'guides', anyGuideRaw, runCurrency)
+    const anyGuide = await normalizeRateRows(admin, 'guides', anyGuideRaw, runCurrency, tenantId)
 
     if (!anyGuide || anyGuide.length === 0) return null
 
@@ -709,7 +709,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
               // Per-row currency (mig 295): an EGP-priced cabin must not join
               // the total as if its number were in the run currency.
               const [cruise] = await normalizeRateRows(
-                getSupabaseAdmin(), 'nile_cruises', cruiseRaw ? [cruiseRaw] : [], runCurrency
+                getSupabaseAdmin(), 'nile_cruises', cruiseRaw ? [cruiseRaw] : [], runCurrency, tenantId
               )
 
               if (cruise) {
@@ -751,7 +751,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
               // The variation's own tier, as every other line here.
               .eq('tier', effectiveTier)
             // Per-row currency (mig 295), converted at the fetch boundary.
-            const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', mealRowsRaw, runCurrency)
+            const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', mealRowsRaw, runCurrency, tenantId)
 
             const match = (mealRows ?? []).find(
               (r: any) => String(r.meal_type ?? '').toLowerCase().includes(mealType)

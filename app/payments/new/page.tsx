@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -33,6 +33,7 @@ type PaymentTarget = 'invoice' | 'itinerary' | null
 
 export default function RecordPaymentPage() {
   const router = useRouter()
+  const paymentKeyRef = useRef<string>(crypto.randomUUID())
   const [loading, setLoading] = useState(false)
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget>(null)
   
@@ -177,7 +178,8 @@ export default function RecordPaymentPage() {
         // Record payment against invoice
         response = await fetch(`/api/invoices/${formData.target_id}/payments`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // One key per page visit: a double click records one payment.
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': paymentKeyRef.current },
           body: JSON.stringify({
             amount: parseFloat(formData.amount),
             currency: formData.currency,
@@ -354,7 +356,7 @@ export default function RecordPaymentPage() {
                     <option value="">Choose an itinerary...</option>
                     {itineraries.map((itinerary) => (
                       <option key={itinerary.id} value={itinerary.id}>
-                        {itinerary.itinerary_code} - {itinerary.client_name} ({itinerary.total_cost != null ? `€${itinerary.total_cost.toFixed(2)}` : 'not priced yet'})
+                        {itinerary.itinerary_code} - {itinerary.client_name} ({itinerary.total_cost != null ? `${getCurrencySymbol(itinerary.currency || 'EUR')}${itinerary.total_cost.toFixed(2)}` : 'not priced yet'})
                       </option>
                     ))}
                   </select>
@@ -399,16 +401,16 @@ export default function RecordPaymentPage() {
                       <>
                         <div>
                           <span className="text-gray-600">Total Cost:</span>
-                          <p className="font-bold text-gray-900">{selectedItinerary.total_cost != null ? `€${selectedItinerary.total_cost.toFixed(2)}` : '—'}</p>
+                          <p className="font-bold text-gray-900">{selectedItinerary.total_cost != null ? `${getCurrencySymbol(selectedItinerary.currency || 'EUR')}${selectedItinerary.total_cost.toFixed(2)}` : '—'}</p>
                         </div>
                         <div>
                           <span className="text-gray-600">Already Paid:</span>
-                          <p className="font-bold text-success">€{(selectedItinerary.total_paid || 0).toFixed(2)}</p>
+                          <p className="font-bold text-success">{getCurrencySymbol(selectedItinerary.currency || 'EUR')}{(selectedItinerary.total_paid || 0).toFixed(2)}</p>
                         </div>
                         <div>
                           <span className="text-gray-600">Balance Due:</span>
                           <p className="font-bold text-orange-600">
-                            €{(selectedItinerary.total_cost - (selectedItinerary.total_paid || 0)).toFixed(2)}
+                            {getCurrencySymbol(selectedItinerary.currency || 'EUR')}{(selectedItinerary.total_cost - (selectedItinerary.total_paid || 0)).toFixed(2)}
                           </p>
                         </div>
                         <div>

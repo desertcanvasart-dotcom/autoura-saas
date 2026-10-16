@@ -61,7 +61,7 @@ async function rpc() {
 }
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from, rpc } }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, role: 'member', supabase: { from, rpc } }),
   createAdminClient: () => ({ rpc: adminRpc, from }),
 }))
 // No rates on file: each pick keeps the price it carries.

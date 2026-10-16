@@ -1,4 +1,5 @@
 'use client'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 
 import Link from 'next/link'
 import Image from 'next/image'
@@ -136,6 +137,7 @@ export default function AboutPage() {
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Privacy
               </Link>
+              <CookieSettingsLink className="text-gray-400 hover:text-white text-sm transition-colors" />
               <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Terms
               </Link>

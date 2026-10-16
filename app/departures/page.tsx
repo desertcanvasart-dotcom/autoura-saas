@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { todayLocal } from '@/lib/today'
+import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
 import {
   Calendar,
@@ -78,6 +79,9 @@ const STATUS_CONFIG = {
 
 export default function DeparturesPage() {
   const dialog = useConfirmDialog()
+  // New departures are priced in the company's currency, not EUR.
+  const { tenant } = useTenant()
+  const companyCurrency = tenant?.default_currency || 'EUR'
   const [loading, setLoading] = useState(true)
   const [departures, setDepartures] = useState<TourDeparture[]>([])
   const [templates, setTemplates] = useState<TourTemplate[]>([])
@@ -99,9 +103,13 @@ export default function DeparturesPage() {
     max_pax: 20,
     min_pax: 2,
     price_per_person: '',
-    currency: 'EUR',
+    currency: companyCurrency,
     status: 'open'
   })
+  // The company's currency arrives after the first render.
+  useEffect(() => {
+    setNewDeparture(prev => (prev.price_per_person === '' ? { ...prev, currency: companyCurrency } : prev))
+  }, [companyCurrency])
 
   // "Same tour, new date": open the create modal prefilled from an existing
   // departure with the DATE blank — recurring departures repeat everything
@@ -216,7 +224,7 @@ export default function DeparturesPage() {
         max_pax: 20,
         min_pax: 2,
         price_per_person: '',
-        currency: 'EUR',
+        currency: companyCurrency,
         status: 'open'
       })
       loadData()

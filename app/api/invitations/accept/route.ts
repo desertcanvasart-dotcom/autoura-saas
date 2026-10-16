@@ -36,7 +36,7 @@ type AcceptAction = 'created' | 'unconfirmed_existing' | 'linked_existing'
 
 export async function POST(request: NextRequest) {
   try {
-    const { token, full_name } = await request.json()
+    const { token, full_name, accepted_terms } = await request.json()
 
     if (!token) {
       return NextResponse.json(
@@ -97,6 +97,16 @@ export async function POST(request: NextRequest) {
     const userMetadata = {
       full_name: full_name || '',
       invited_to_tenant: invitation.tenant_id,
+      // When this person agreed to the Terms and Privacy Policy, recorded by
+      // the server (not a browser clock), as for /signup.
+      ...(accepted_terms === true ? { terms_accepted_at: new Date().toISOString() } : {}),
+    }
+
+    if (!userId && accepted_terms !== true) {
+      return NextResponse.json(
+        { success: false, error: 'Please agree to the Terms of Service and Privacy Policy to continue' },
+        { status: 400 }
+      )
     }
 
     if (!userId) {

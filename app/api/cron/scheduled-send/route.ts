@@ -1,3 +1,4 @@
+import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
@@ -30,7 +31,7 @@ interface DueRow {
 }
 
 async function getHandler(request: NextRequest) {
-  if (!CRON_SECRET || request.headers.get('authorization') !== `Bearer ${CRON_SECRET}`) {
+  if (!bearerMatches(request.headers.get('authorization'), CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const db = createAdminClient() as unknown as Db

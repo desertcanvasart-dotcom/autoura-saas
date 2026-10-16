@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -7,6 +8,9 @@ import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 // POST - Send supplier document via WhatsApp with PDF attachment
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
@@ -39,7 +43,12 @@ export async function POST(request: NextRequest) {
 
     // Upload PDF to Supabase Storage (needs admin client for storage access)
     const adminClient = createAdminClient()
-    const pdfBuffer = Buffer.from(pdfBase64, 'base64')
+    const pdfBuffer = Buffer.from(String(pdfBase64), 'base64')
+    // What goes to the supplier under the company's name must be a real PDF
+    // of sensible size — not whatever bytes the request carried.
+    if (pdfBuffer.length > 10 * 1024 * 1024 || pdfBuffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      return NextResponse.json({ success: false, error: 'The attachment must be a PDF under 10 MB' }, { status: 400 })
+    }
     // Private bucket + signed link (lib/storage/shareable-pdf.ts).
     const shared = await uploadShareablePdf(adminClient, {
       tenantId: authResult.tenant_id,

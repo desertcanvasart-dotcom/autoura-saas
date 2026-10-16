@@ -1,4 +1,5 @@
 'use client'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { currentMembership, type MembershipDb } from '@/lib/current-membership'
@@ -993,6 +994,7 @@ export default function AutouraHomepage() {
               <Link href="/blog" className="hover:text-stone-700 transition-colors">Blog</Link>
               <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>
               <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
+              <CookieSettingsLink className="hover:text-stone-700 transition-colors" />
               <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
               <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
             </div>

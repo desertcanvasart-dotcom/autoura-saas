@@ -69,3 +69,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+// DELETE — disconnect this person's mailbox in the current company: the grant
+// is revoked at Google, then the stored tokens are deleted (lib/gmail-revoke).
+// The page used to delete the row from the browser, leaving the grant live.
+export async function DELETE() {
+  const { requireAuth } = await import('@/lib/supabase-server')
+  const auth = await requireAuth()
+  if (auth.error !== null) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (!auth.tenant_id) return NextResponse.json({ error: 'No active company' }, { status: 403 })
+  const { revokeAndForgetMailbox } = await import('@/lib/gmail-revoke')
+  const result = await revokeAndForgetMailbox(auth.user!.id, auth.tenant_id)
+  if (result.error) return NextResponse.json({ error: 'Could not disconnect Gmail' }, { status: 500 })
+  return NextResponse.json({ success: true, revoked: result.revoked })
+}

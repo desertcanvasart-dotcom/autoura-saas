@@ -1,3 +1,4 @@
+import { maskPhone } from '@/lib/log-mask'
 import { NextRequest, NextResponse } from 'next/server'
 import { isValidTwilioSignature } from '@/lib/twilio-signature'
 import { createClient } from '@supabase/supabase-js'
@@ -117,7 +118,15 @@ export async function POST(request: NextRequest) {
         code: error.code,
         message: error.message,
       })
-    } else if (!updated || updated.length === 0) {
+    }
+    // The outbound record (migration 430): sends from invoices, reminders,
+    // quotes… have no conversation row, only this. A failure notifies the
+    // sender.
+    const { applyOutboundStatus } = await import('@/lib/whatsapp-outbound')
+    const matchedOutbound = await applyOutboundStatus({ messageSid, status, errorCode, errorMessage })
+    if (error) {
+      // already logged above
+    } else if ((!updated || updated.length === 0) && !matchedOutbound) {
       // Nothing changed: either the row is already further along (a stale,
       // out-of-order callback — expected, not an error) or no row has the SID.
       const { data: existing } = await db
@@ -132,8 +141,8 @@ export async function POST(request: NextRequest) {
         console.error('[whatsapp/status-callback] NO_MATCHING_MESSAGE — status dropped', {
           messageSid,
           messageStatus,
-          to,
-          from,
+          to: maskPhone(to),
+          from: maskPhone(from),
         })
       }
     }
@@ -144,7 +153,7 @@ export async function POST(request: NextRequest) {
         messageSid,
         errorCode,
         errorMessage,
-        to
+        to: maskPhone(to)
       })
     }
 

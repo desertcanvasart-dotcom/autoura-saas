@@ -98,6 +98,10 @@ export default function TenantSettingsPage() {
   // Run currency (C3.4): '' = EUR default. Reinterprets stored rate amounts;
   // the field warns about that.
   const [ratesCurrency, setRatesCurrency] = useState('')
+  // The company's own currency: invoices, commissions, P&L and the default
+  // for new quotes. Only onboarding could set it, so a skipped onboarding or
+  // a currency it did not list left the company in EUR for good.
+  const [agencyCurrency, setAgencyCurrency] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -129,6 +133,7 @@ export default function TenantSettingsPage() {
       setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
       setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
       setRatesCurrency((tenant as { rates_currency?: string | null }).rates_currency || '')
+      setAgencyCurrency(tenant.default_currency || '')
       setOperatingCountry(tenant.operating_country || '')
       setCompanyTimezone(tenant.timezone || '')
       setGoverningLaw(tenant.contract_governing_law || '')
@@ -329,6 +334,8 @@ export default function TenantSettingsPage() {
         ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
           ? { rates_currency: ratesCurrency || null }
           : {}),
+        // Migration 281 keeps tenants.currency in step.
+        ...(agencyCurrency ? { default_currency: agencyCurrency } : {}),
       }
 
       // .select() returns the row as stored: an update that RLS blocks or
@@ -731,6 +738,28 @@ export default function TenantSettingsPage() {
                 Disputes go to arbitration under this law. Blank: the law of the country you are registered in.
               </p>
             </div>
+          </div>
+
+          <div className="mt-3">
+            <label htmlFor="agency-currency" className="block text-xs font-medium text-gray-700 mb-1">
+              Agency currency
+            </label>
+            <select
+              id="agency-currency"
+              value={agencyCurrency}
+              onChange={(e) => setAgencyCurrency(e.target.value)}
+              disabled={!isAdmin}
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+            >
+              {!agencyCurrency && <option value="">Choose…</option>}
+              {SUPPORTED_CURRENCIES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              Your company&apos;s own currency: invoices, commissions, the P&amp;L and new quotes
+              start in it. Documents already issued keep their currency.
+            </p>
           </div>
 
           <div className="mt-3">

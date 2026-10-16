@@ -1,3 +1,5 @@
+import { withoutKeys, IDENTITY_KEYS } from '@/lib/without-keys'
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
@@ -46,6 +48,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -55,7 +60,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
+    const body = withoutKeys(await request.json(), IDENTITY_KEYS) as Record<string, any>
+
+    // A supplier id from the body must be this company's own: the embed below
+    // would otherwise return another company's supplier name and city.
+    if (body.supplier_id) {
+      const { data: own } = await (createAdminClient() as any)
+        .from('suppliers')
+        .select('id')
+        .eq('id', body.supplier_id)
+        .eq('tenant_id', authResult.tenant_id)
+        .maybeSingle()
+      if (!own) {
+        return NextResponse.json({ success: false, error: 'Supplier not found' }, { status: 404 })
+      }
+    }
 
     const newRate = {
       ...body,

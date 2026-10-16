@@ -9,7 +9,7 @@
 // over the token with a server-side secret — possessing the URL is not
 // possession of the cookie.
 
-import { createHmac, createHash } from 'crypto'
+import { createHmac, createHash, timingSafeEqual } from 'crypto'
 import { sendMail } from '@/lib/email-send'
 import { escapeHtml } from '@/lib/html-escape'
 import { loadSenderTenant } from '@/lib/sender-tenant'
@@ -82,7 +82,10 @@ export function portalVerifyCookieValue(token: string): string {
 }
 
 export function isPortalVerified(token: string, cookieValue: string | undefined | null): boolean {
-  return !!cookieValue && cookieValue === portalVerifyCookieValue(token)
+  if (!cookieValue) return false
+  const given = Buffer.from(cookieValue)
+  const want = Buffer.from(portalVerifyCookieValue(token))
+  return given.length === want.length && timingSafeEqual(given, want)
 }
 
 // ---------------------------------------------------------------------------

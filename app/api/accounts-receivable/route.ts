@@ -1,3 +1,4 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
@@ -54,19 +55,20 @@ export async function GET(request: NextRequest) {
 
     // Fetch all unpaid/partially paid invoices
     // RLS automatically filters by tenant_id
-    let query = supabase
-      .from('invoices')
-      .select('*')
-      .gt('balance_due', 0)
-      // A draft is not sent, so nobody owes it yet.
-      .not('status', 'in', '(cancelled,draft)')
-      .order('due_date', { ascending: true })
-
-    if (clientId) {
-      query = query.eq('client_id', clientId)
-    }
-
-    const { data: invoices, error } = await query
+    // Every unpaid invoice, page by page: a plain select stops at 1000 rows
+    // and the outstanding total and aging buckets were silently short.
+    const { data: invoices, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('invoices')
+        .select('*')
+        .gt('balance_due', 0)
+        // A draft is not sent, so nobody owes it yet.
+        .not('status', 'in', '(cancelled,draft)')
+        .order('due_date', { ascending: true })
+        .order('id', { ascending: true })
+      if (clientId) query = query.eq('client_id', clientId)
+      return query.range(from, to)
+    })
 
     if (error) {
       console.error('Error fetching invoices:', error)

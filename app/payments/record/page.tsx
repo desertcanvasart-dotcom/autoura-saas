@@ -163,7 +163,7 @@ export default function RecordPaymentPage() {
               <option value="">Choose an itinerary...</option>
               {itineraries.map((itinerary) => (
                 <option key={itinerary.id} value={itinerary.id}>
-                  {itinerary.itinerary_code} - {itinerary.client_name} ({itinerary.total_cost != null ? `€${itinerary.total_cost.toFixed(2)}` : 'not priced yet'})
+                  {itinerary.itinerary_code} - {itinerary.client_name} ({itinerary.total_cost != null ? `${getCurrencySymbol(itinerary.currency || 'EUR')}${itinerary.total_cost.toFixed(2)}` : 'not priced yet'})
                 </option>
               ))}
             </select>
@@ -176,15 +176,15 @@ export default function RecordPaymentPage() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-gray-600">Total Cost:</span>
-                  <p className="font-bold text-gray-900">{selectedItinerary.total_cost != null ? `€${selectedItinerary.total_cost.toFixed(2)}` : '—'}</p>
+                  <p className="font-bold text-gray-900">{selectedItinerary.total_cost != null ? `${getCurrencySymbol(selectedItinerary.currency || 'EUR')}${selectedItinerary.total_cost.toFixed(2)}` : '—'}</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Already Paid:</span>
-                  <p className="font-bold text-success">€{(selectedItinerary.total_paid || 0).toFixed(2)}</p>
+                  <p className="font-bold text-success">{getCurrencySymbol(selectedItinerary.currency || 'EUR')}{(selectedItinerary.total_paid || 0).toFixed(2)}</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Balance Due:</span>
-                  <p className="font-bold text-orange-600">€{calculateBalance().toFixed(2)}</p>
+                  <p className="font-bold text-orange-600">{getCurrencySymbol(selectedItinerary.currency || 'EUR')}{calculateBalance().toFixed(2)}</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Payment Status:</span>
@@ -222,7 +222,7 @@ export default function RecordPaymentPage() {
             {/* Amount */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">
-                Amount (€) <span className="text-danger">*</span>
+                Amount ({getCurrencySymbol(selectedItinerary?.currency || 'EUR')}) <span className="text-danger">*</span>
               </label>
               <input
                 type="number"

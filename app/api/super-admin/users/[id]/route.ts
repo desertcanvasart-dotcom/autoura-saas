@@ -78,6 +78,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const guard = guardTarget(target.email)
     if (guard) return NextResponse.json({ success: false, error: guard }, { status: 403 })
 
+    // Every company's mailbox of theirs: revoked at Google, then forgotten.
+    const { revokeAndForgetMailbox } = await import('@/lib/gmail-revoke')
+    const cleared = await revokeAndForgetMailbox(id, null)
+    if (cleared.error) console.error('Deleting user: Gmail connections not cleared:', cleared.error)
+
     const { error } = await admin.auth.admin.deleteUser(id)
     if (error) throw error
 

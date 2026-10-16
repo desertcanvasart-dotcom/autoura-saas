@@ -1,3 +1,4 @@
+import { sealToken } from '@/lib/token-crypto'
 // ============================================
 // The signed-in person's Gmail, in the company being worked in
 // ============================================
@@ -34,7 +35,7 @@ export async function gmailForTokens(
     await db
       .from('gmail_tokens')
       .update({
-        access_token: fresh.access_token,
+        access_token: sealToken(fresh.access_token),
         token_expiry: new Date(fresh.expiry_date || Date.now() + 3600_000).toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -84,7 +85,15 @@ export async function mailboxForSession(requestedUserId?: string | null): Promis
   if (!tokens) {
     return { ok: false, response: NextResponse.json({ error: 'Gmail not connected' }, { status: 401 }) }
   }
-  const gmail = await gmailForTokens(admin as unknown as Db, tokens as MailboxTokens, { userId, tenantId })
+  let gmail: gmail_v1.Gmail
+  try {
+    gmail = await gmailForTokens(admin as unknown as Db, tokens as MailboxTokens, { userId, tenantId })
+  } catch (err) {
+    const { gmailReconnectResponse } = await import('@/lib/gmail-reconnect')
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return { ok: false, response: reconnect }
+    throw err
+  }
   return {
     ok: true,
     gmail,

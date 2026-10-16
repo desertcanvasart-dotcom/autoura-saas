@@ -80,7 +80,7 @@ async function loadFixedDailyCosts(tenantId: string | null, runCurrency?: string
 
   type CostRow = { tenant_id?: string | null; cost_type?: unknown; cost_per_person_per_day?: number | null } & Record<string, unknown>
   const visible = ((rawData ?? []) as CostRow[]).filter(r => r.tenant_id == null || (tenantId != null && r.tenant_id === tenantId))
-  const data = await normalizeRateRows(getSupabaseAdmin(), 'fixed_daily_costs', visible, runCurrency)
+  const data = await normalizeRateRows(getSupabaseAdmin(), 'fixed_daily_costs', visible, runCurrency, tenantId)
   const water = data.filter(r => isWaterCostType(r.cost_type))
   const record = water.find(r => tenantId != null && r.tenant_id === tenantId) ?? water[0]
   return { waterPerPersonPerDay: record?.cost_per_person_per_day ?? DEFAULTS['Water Bottle'] }

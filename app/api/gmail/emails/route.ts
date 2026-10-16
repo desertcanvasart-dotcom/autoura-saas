@@ -1,3 +1,5 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { fetchEmails, refreshAccessToken } from '@/lib/gmail'
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
       await (getSupabaseAdmin() as any)
         .from('gmail_tokens')
         .update({
-          access_token: newTokens.access_token,
+          access_token: sealToken(newTokens.access_token),
           token_expiry: new Date(newTokens.expiry_date || Date.now() + 3600000).toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -103,6 +105,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ messages, nextPageToken })
   } catch (err: any) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     console.error('Fetch emails error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

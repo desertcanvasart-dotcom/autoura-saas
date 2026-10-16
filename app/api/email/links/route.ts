@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { autoLinkEmails } from '@/lib/email-auto-link'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -104,6 +105,9 @@ export async function GET(request: NextRequest) {
 // POST /api/email/links
 // Link an email to a client
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -209,6 +213,9 @@ export async function POST(request: NextRequest) {
 // DELETE /api/email/links
 // Remove an email-client link
 export async function DELETE(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {

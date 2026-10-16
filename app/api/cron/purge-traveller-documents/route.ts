@@ -1,3 +1,4 @@
+import { bearerMatches } from '@/lib/support/probe-auth'
 // ============================================
 // /api/cron/purge-traveller-documents — retention sweep (C1b)
 // ============================================
@@ -29,7 +30,7 @@ async function getHandler(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   // No secret configured = refuse, like the other crons: /api/cron/ is public.
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!bearerMatches(authHeader, cronSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -103,6 +103,8 @@ function EmailSettingsContent() {
       })
     } else if (error === 'no_company') {
       setMessage({ type: 'error', text: 'Gmail was not connected: you are not an active member of the company you were working in. Switch to your company and connect again.' })
+    } else if (error === 'session_mismatch') {
+      setMessage({ type: 'error', text: 'Gmail was not connected: the Google sign-in was finished by a different account than the one that started it. Sign in to Autoura as yourself and click Connect again — never use a Connect link someone else sent you.' })
     } else if (error) {
       setMessage({ type: 'error', text: `Connection failed: ${error}` })
     }
@@ -184,13 +186,13 @@ function EmailSettingsContent() {
       // Only this company's mailbox: the same person's mailbox in another
       // company stays connected.
       if (!tenant?.id) return
-      const { error } = await supabase
-        .from('gmail_tokens')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('tenant_id', tenant.id)
-
-      if (error) throw error
+      // Server-side, so the access is also revoked at Google (not just
+      // forgotten here).
+      const res = await fetch('/api/gmail/connect', { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Could not disconnect Gmail')
+      }
 
       setGmailConnected(false)
       setConnectedEmail(null)

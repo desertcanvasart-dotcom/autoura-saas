@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server';
 import { quoteSeasonFor } from '@/lib/quotes/quote-season'
 import { priceB2cQuote, b2cPriceInputError } from '@/lib/quotes/b2c-quote-price';
@@ -93,6 +94,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     // Require authentication to get user info for versioning
     const authResult = await requireAuth();
@@ -264,6 +268,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const { id } = await params;
 

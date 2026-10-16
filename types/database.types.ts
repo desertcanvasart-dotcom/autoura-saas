@@ -5713,6 +5713,7 @@ export interface Database {
       invoice_payments: {
         Row: {
           id: string
+          idempotency_key: string | null
           tenant_id: string
           invoice_id: string
           amount: number
@@ -5725,6 +5726,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          idempotency_key?: string | null
           tenant_id: string
           invoice_id: string
           amount: number
@@ -5737,6 +5739,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          idempotency_key?: string | null
           tenant_id?: string
           invoice_id?: string
           amount?: number
@@ -11695,6 +11698,48 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_outbound: {
+        Row: {
+          id: string
+          tenant_id: string | null
+          message_sid: string
+          to_number: string
+          body_preview: string | null
+          sent_by: string | null
+          status: string
+          error_code: string | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id?: string | null
+          message_sid: string
+          to_number: string
+          body_preview?: string | null
+          sent_by?: string | null
+          status?: string
+          error_code?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string | null
+          message_sid?: string
+          to_number?: string
+          body_preview?: string | null
+          sent_by?: string | null
+          status?: string
+          error_code?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       writing_rules: {
         Row: {

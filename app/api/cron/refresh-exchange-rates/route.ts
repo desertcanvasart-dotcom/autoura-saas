@@ -1,3 +1,4 @@
+import { secretMatches } from '@/lib/support/probe-auth'
 // ============================================================
 // app/api/cron/refresh-exchange-rates/route.ts
 //
@@ -50,7 +51,7 @@ async function postHandler(request: NextRequest) {
   // Verify cron secret — same pattern as the other cron routes.
   // Fails closed: with CRON_SECRET unset, `null !== undefined` rejects.
   const cronSecret = request.headers.get('x-cron-secret')
-  if (cronSecret !== process.env.CRON_SECRET) {
+  if (!secretMatches(cronSecret, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

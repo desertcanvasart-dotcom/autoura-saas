@@ -1,3 +1,5 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken, openToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
@@ -76,8 +78,8 @@ export async function GET(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: openToken(tokenData.access_token),
+      refresh_token: openToken(tokenData.refresh_token),
     })
 
     // Check if token needs refresh
@@ -87,7 +89,7 @@ export async function GET(request: NextRequest) {
       await (getSupabase() as any)
         .from('gmail_tokens')
         .update({
-          access_token: credentials.access_token,
+          access_token: sealToken(credentials.access_token),
           token_expiry: new Date(credentials.expiry_date!).toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -224,6 +226,8 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error: any) {
+    const reconnect = gmailReconnectResponse(error)
+    if (reconnect) return reconnect
     console.error('Error polling emails:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
@@ -279,8 +283,8 @@ export async function POST(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: openToken(tokenData.access_token),
+      refresh_token: openToken(tokenData.refresh_token),
     })
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
@@ -311,6 +315,8 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
+    const reconnect = gmailReconnectResponse(error)
+    if (reconnect) return reconnect
     console.error('Error getting email counts:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

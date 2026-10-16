@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,body.ilike.%${search}%`)
+      query = query.or(`name.ilike.${orIlikeContains(search)},description.ilike.${orIlikeContains(search)},body.ilike.${orIlikeContains(search)}`)
     }
 
     const { data, error } = await query

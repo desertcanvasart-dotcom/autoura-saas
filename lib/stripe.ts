@@ -88,8 +88,10 @@ export async function createCheckoutSession(
   priceId: string,
   tenantId: string,
   successUrl: string,
-  cancelUrl: string
+  cancelUrl: string,
+  opts: { trial?: boolean } = {}
 ): Promise<Stripe.Checkout.Session> {
+  const trial = opts.trial !== false
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
@@ -104,7 +106,8 @@ export async function createCheckoutSession(
     // charged when the trial ends. The subscription does not auto-convert — the
     // operator must add a payment method — which is exactly what the Terms now
     // say.
-    payment_method_collection: 'if_required',
+    // Without a trial the first invoice is due now, so a card is required.
+    payment_method_collection: trial ? 'if_required' : 'always',
     // NOTE — the one-time onboarding fee (PricingTier.onboardingFeeUsd, $500 /
     // $1,000 / $1,500) is DISPLAYED on both pricing surfaces but is NOT charged
     // here, deliberately.
@@ -127,7 +130,8 @@ export async function createCheckoutSession(
       metadata: {
         tenant_id: tenantId
       },
-      trial_period_days: TRIAL_DAYS // single source: lib/pricing-config.ts
+      // single source: lib/pricing-config.ts — first subscription only
+      ...(trial ? { trial_period_days: TRIAL_DAYS } : {}),
     },
     allow_promotion_codes: true,
     metadata: {

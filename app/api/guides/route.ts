@@ -1,3 +1,5 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
+import { gateRole } from '@/lib/api-role-gate'
 // ============================================
 // API Route: /api/guides
 // ============================================
@@ -53,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (search) {
-      query = query.or(`name.ilike.%${search}%,contact_email.ilike.%${search}%`)
+      query = query.or(`name.ilike.${orIlikeContains(search)},contact_email.ilike.${orIlikeContains(search)}`)
     }
 
     // Support both is_active and active_only parameters
@@ -158,6 +160,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {

@@ -37,10 +37,14 @@ export async function sendWhatsAppMessage(
   message: WhatsAppMessage
 ): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
   const ready = { ...message, to: await internationalNumber(message.to, message.tenantId) }
-  if (getWhatsAppProvider() === 'meta') {
-    return sendViaMeta(ready)
+  const result = getWhatsAppProvider() === 'meta' ? await sendViaMeta(ready) : await sendViaTwilio(ready)
+  // On record, so a delivery failure reported later reaches the sender
+  // (migration 430) instead of being dropped.
+  if (result.success && result.messageId) {
+    const { recordOutboundWhatsApp } = await import('@/lib/whatsapp-outbound')
+    await recordOutboundWhatsApp({ tenantId: message.tenantId, messageSid: result.messageId, to: ready.to, body: message.body })
   }
-  return sendViaTwilio(ready)
+  return result
 }
 
 /**

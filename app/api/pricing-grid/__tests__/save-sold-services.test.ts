@@ -65,7 +65,7 @@ let gridRates: Record<string, unknown[]> = {}
 vi.mock('@/lib/pricing/grid-rates', () => ({ loadGridRates: async () => gridRates }))
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from: table, rpc } }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, role: 'member', supabase: { from: table, rpc } }),
   createAdminClient: () => ({ rpc: async () => ({ data: 'Q-1', error: null }), from: table }),
 }))
 
