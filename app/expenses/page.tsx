@@ -788,125 +788,127 @@ export default function ExpensesPage() {
       {/* List View (Table) */}
       {viewMode === 'list' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Category</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
-                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
-                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Receipt</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {paginatedExpenses.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
-                    No expenses found
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Category</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
+                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
+                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Receipt</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
                 </tr>
-              ) : (
-                paginatedExpenses.map((expense) => {
-                  const statusConfig = STATUS_CONFIG[expense.status] || STATUS_CONFIG.pending
-                  const StatusIcon = statusConfig.icon
-                  return (
-                    <tr key={expense.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div>
-                          <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
-                            {expense.expense_number}
-                          </Link>
-                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{expense.description || '-'}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span>{getCategoryIcon(expense.category)}</span>
-                          <span className="text-sm text-gray-700">{getCategoryLabel(expense.category)}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
-                          {expense.supplier_type && (
-                            <p className="text-xs text-gray-500 capitalize">{expense.supplier_type.replace('_', ' ')}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-600">
-                          {fmtDay(expense.expense_date)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
-                          <StatusIcon className="h-3 w-3" />
-                          {statusConfig.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {expense.receipt_url ? (
-                          <a
-                            href={expense.receipt_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-                          >
-                            <Receipt className="h-3.5 w-3.5" />
-                            View
-                          </a>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/expenses/${expense.id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                          {expense.status === 'approved' && (
-                            <button
-                              onClick={() => handleMarkAsPaid(expense)}
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                              title="Mark as Paid"
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedExpenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
+                      No expenses found
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedExpenses.map((expense) => {
+                    const statusConfig = STATUS_CONFIG[expense.status] || STATUS_CONFIG.pending
+                    const StatusIcon = statusConfig.icon
+                    return (
+                      <tr key={expense.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div>
+                            <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                              {expense.expense_number}
+                            </Link>
+                            <p className="text-xs text-gray-500 truncate max-w-[200px]">{expense.description || '-'}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span>{getCategoryIcon(expense.category)}</span>
+                            <span className="text-sm text-gray-700">{getCategoryLabel(expense.category)}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
+                            {expense.supplier_type && (
+                              <p className="text-xs text-gray-500 capitalize">{expense.supplier_type.replace('_', ' ')}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-600">
+                            {fmtDay(expense.expense_date)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {statusConfig.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {expense.receipt_url ? (
+                            <a
+                              href={expense.receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
                             >
-                              <Wallet className="h-4 w-4" />
-                            </button>
+                              <Receipt className="h-3.5 w-3.5" />
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
                           )}
-                          <button
-                            onClick={() => openEditModal(expense)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(expense.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link
+                              href={`/expenses/${expense.id}`}
+                              className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                              title="View"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            {expense.status === 'approved' && (
+                              <button
+                                onClick={() => handleMarkAsPaid(expense)}
+                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Mark as Paid"
+                              >
+                                <Wallet className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openEditModal(expense)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(expense.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

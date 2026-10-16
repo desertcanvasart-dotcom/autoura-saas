@@ -583,84 +583,86 @@ export default function AccountsReceivablePage() {
       {/* Invoice View */}
       {viewMode === 'invoices' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Invoice</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Client</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Due Date</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Total</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Paid</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Balance</th>
-                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Aging</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(paginatedData as Invoice[]).length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
-                    No outstanding invoices
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Invoice</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Client</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Due Date</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Total</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Paid</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Balance</th>
+                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Aging</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
                 </tr>
-              ) : (
-                (paginatedData as Invoice[]).map((invoice) => (
-                  <tr key={invoice.id} className={`hover:bg-gray-50 ${invoice.is_overdue ? 'bg-red-50/50' : ''}`}>
-                    <td className="px-4 py-3">
-                      <Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
-                        {invoice.invoice_number}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-gray-900">{invoice.client_name}</p>
-                      {invoice.client_email && (
-                        <p className="text-xs text-gray-500">{invoice.client_email}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-gray-600">{(invoice.due_date ? new Date(`${String(invoice.due_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : 'none')}</p>
-                      {invoice.days_past_due > 0 && (
-                        <p className="text-xs text-red-500">{invoice.days_past_due} days overdue</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-900">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-green-600">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.amount_paid).toLocaleString()}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-semibold text-gray-900">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getAgingColor(invoice.aging_bucket)}`}>
-                        {getAgingLabel(invoice.aging_bucket)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleSendReminder(invoice)}
-                          disabled={sendingReminder === invoice.id}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Send Reminder"
-                        >
-                          <Mail className="h-4 w-4" />
-                        </button>
-                        <Link
-                          href={`/invoices/${invoice.id}`}
-                          className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
-                          title="View Invoice"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(paginatedData as Invoice[]).length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
+                      No outstanding invoices
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  (paginatedData as Invoice[]).map((invoice) => (
+                    <tr key={invoice.id} className={`hover:bg-gray-50 ${invoice.is_overdue ? 'bg-red-50/50' : ''}`}>
+                      <td className="px-4 py-3">
+                        <Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                          {invoice.invoice_number}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-gray-900">{invoice.client_name}</p>
+                        {invoice.client_email && (
+                          <p className="text-xs text-gray-500">{invoice.client_email}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-gray-600">{(invoice.due_date ? new Date(`${String(invoice.due_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : 'none')}</p>
+                        {invoice.days_past_due > 0 && (
+                          <p className="text-xs text-red-500">{invoice.days_past_due} days overdue</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm text-gray-900">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm text-green-600">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.amount_paid).toLocaleString()}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm font-semibold text-gray-900">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getAgingColor(invoice.aging_bucket)}`}>
+                          {getAgingLabel(invoice.aging_bucket)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleSendReminder(invoice)}
+                            disabled={sendingReminder === invoice.id}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Send Reminder"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </button>
+                          <Link
+                            href={`/invoices/${invoice.id}`}
+                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                            title="View Invoice"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

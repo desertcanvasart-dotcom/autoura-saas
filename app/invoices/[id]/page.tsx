@@ -720,65 +720,67 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Line Items */}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3">Description</th>
-                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3 w-24">Qty</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3 w-32">Unit Price</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3 w-32">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {(invoice.line_items || []).map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-5 py-4 text-sm text-gray-900">{item.description}</td>
-                    <td className="px-5 py-4 text-sm text-gray-600 text-center">{item.quantity}</td>
-                    <td className="px-5 py-4 text-sm text-gray-600 text-right">
-                      {formatMoney(item.unit_price, invoice.currency)}
-                    </td>
-                    <td className="px-5 py-4 text-sm font-medium text-gray-900 text-right">
-                      {formatMoney(item.amount, invoice.currency)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-gray-50">
-                <tr className="border-t border-gray-200">
-                  <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">Subtotal</td>
-                  <td className="px-5 py-3 text-sm font-medium text-gray-900 text-right">
-                    {formatMoney(invoice.subtotal, invoice.currency)}
-                  </td>
-                </tr>
-                {Number(invoice.tax_amount) > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">
-                      Tax ({invoice.tax_rate}%)
-                    </td>
-                    <td className="px-5 py-3 text-sm text-gray-900 text-right">
-                      {formatMoney(invoice.tax_amount, invoice.currency)}
+                    <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3">Description</th>
+                    <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3 w-24">Qty</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3 w-32">Unit Price</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-5 py-3 w-32">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(invoice.line_items || []).map((item, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-5 py-4 text-sm text-gray-900">{item.description}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 text-center">{item.quantity}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 text-right">
+                        {formatMoney(item.unit_price, invoice.currency)}
+                      </td>
+                      <td className="px-5 py-4 text-sm font-medium text-gray-900 text-right">
+                        {formatMoney(item.amount, invoice.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr className="border-t border-gray-200">
+                    <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">Subtotal</td>
+                    <td className="px-5 py-3 text-sm font-medium text-gray-900 text-right">
+                      {formatMoney(invoice.subtotal, invoice.currency)}
                     </td>
                   </tr>
-                )}
-                {Number(invoice.discount_amount) > 0 && (
-                  <tr>
-                    <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">Discount</td>
-                    <td className="px-5 py-3 text-sm text-green-600 text-right">
-                      -{formatMoney(invoice.discount_amount, invoice.currency)}
+                  {Number(invoice.tax_amount) > 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">
+                        Tax ({invoice.tax_rate}%)
+                      </td>
+                      <td className="px-5 py-3 text-sm text-gray-900 text-right">
+                        {formatMoney(invoice.tax_amount, invoice.currency)}
+                      </td>
+                    </tr>
+                  )}
+                  {Number(invoice.discount_amount) > 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-5 py-3 text-sm text-gray-500 text-right">Discount</td>
+                      <td className="px-5 py-3 text-sm text-green-600 text-right">
+                        -{formatMoney(invoice.discount_amount, invoice.currency)}
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="border-t-2 border-gray-200">
+                    <td colSpan={3} className="px-5 py-4 text-sm font-semibold text-gray-900 text-right">
+                      {invoice.invoice_type === 'deposit' ? 'Deposit Amount' : 
+                       invoice.invoice_type === 'final' ? 'Balance Due' : 'Total'}
+                    </td>
+                    <td className="px-5 py-4 text-lg font-bold text-gray-900 text-right">
+                      {formatMoney(invoice.total_amount, invoice.currency)}
                     </td>
                   </tr>
-                )}
-                <tr className="border-t-2 border-gray-200">
-                  <td colSpan={3} className="px-5 py-4 text-sm font-semibold text-gray-900 text-right">
-                    {invoice.invoice_type === 'deposit' ? 'Deposit Amount' : 
-                     invoice.invoice_type === 'final' ? 'Balance Due' : 'Total'}
-                  </td>
-                  <td className="px-5 py-4 text-lg font-bold text-gray-900 text-right">
-                    {formatMoney(invoice.total_amount, invoice.currency)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </tfoot>
+              </table>
+            </div>
           </div>
 
           {/* Notes & Payment Terms */}

@@ -709,110 +709,112 @@ export default function InvoicesContent() {
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Invoice #</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Type</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Client</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Issue Date</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Due Date</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Total</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Balance</th>
-              <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredInvoices.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
-                  No invoices found
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Invoice #</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Type</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Client</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Issue Date</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Due Date</th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Total</th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Balance</th>
+                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>
               </tr>
-            ) : (
-              filteredInvoices.map((invoice) => {
-                const statusConfig = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.draft
-                const typeConfig = TYPE_CONFIG[invoice.invoice_type] || TYPE_CONFIG.standard
-                const TypeIcon = typeConfig.icon
-                return (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2">
-                      <span className="text-sm font-mono font-medium text-blue-600">{invoice.invoice_number}</span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
-                        <TypeIcon className="h-3 w-3" />
-                        {typeConfig.label}
-                        {invoice.invoice_type !== 'standard' && (
-                          <span className="text-[10px] opacity-75">({invoice.deposit_percent}%)</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{invoice.client_name}</p>
-                        <p className="text-xs text-gray-500">{invoice.client_email}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="text-sm text-gray-600">
-                        {invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={`text-sm ${invoice.status === 'overdue' ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                        {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className="text-sm font-medium text-gray-900">
-                        {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className={`text-sm font-medium ${Number(invoice.balance_due) > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
-                        {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
-                        {statusConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Link
-                          href={`/invoices/${invoice.id}`}
-                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                          title="View"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        {invoice.status === 'draft' && (
-                          <button
-                            onClick={() => handleSendInvoice(invoice.id)}
-                            className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                            title="Mark as Sent"
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
+                    No invoices found
+                  </td>
+                </tr>
+              ) : (
+                filteredInvoices.map((invoice) => {
+                  const statusConfig = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.draft
+                  const typeConfig = TYPE_CONFIG[invoice.invoice_type] || TYPE_CONFIG.standard
+                  const TypeIcon = typeConfig.icon
+                  return (
+                    <tr key={invoice.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2">
+                        <span className="text-sm font-mono font-medium text-blue-600">{invoice.invoice_number}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
+                          <TypeIcon className="h-3 w-3" />
+                          {typeConfig.label}
+                          {invoice.invoice_type !== 'standard' && (
+                            <span className="text-[10px] opacity-75">({invoice.deposit_percent}%)</span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{invoice.client_name}</p>
+                          <p className="text-xs text-gray-500">{invoice.client_email}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="text-sm text-gray-600">
+                          {invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`text-sm ${invoice.status === 'overdue' ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span className="text-sm font-medium text-gray-900">
+                          {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span className={`text-sm font-medium ${Number(invoice.balance_due) > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
+                          {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/invoices/${invoice.id}`}
+                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="View"
                           >
-                            <Send className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          {invoice.status === 'draft' && (
+                            <button
+                              onClick={() => handleSendInvoice(invoice.id)}
+                              className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                              title="Mark as Sent"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(invoice.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(invoice.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Add Invoice Modal */}
@@ -998,68 +1000,70 @@ export default function InvoicesContent() {
                 </div>
                 
                 <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Description</th>
-                        <th className="text-center text-xs font-semibold text-gray-600 px-4 py-3 w-20">Qty</th>
-                        <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-32">Unit Price</th>
-                        <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-28">Amount</th>
-                        <th className="w-12"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {formData.line_items.map((item, index) => (
-                        <tr key={index} className="bg-white">
-                          <td className="px-4 py-3">
-                            <input
-                              type="text"
-                              value={item.description}
-                              onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                              placeholder="Item description"
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                              // A deposit/final line is the server's share of the trip; an edit here was not saved.
-                              readOnly={formData.invoice_type !== 'standard'}
-                              min="1"
-                              className="w-full px-3 py-2 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="number"
-                              value={item.unit_price}
-                              onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                              readOnly={formData.invoice_type !== 'standard'}
-                              step="0.01"
-                              min="0"
-                              className="w-full px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                            {formatMoney(item.amount, formData.currency)}
-                          </td>
-                          <td className="px-3 py-3">
-                            {formData.line_items.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeLineItem(index)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            )}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Description</th>
+                          <th className="text-center text-xs font-semibold text-gray-600 px-4 py-3 w-20">Qty</th>
+                          <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-32">Unit Price</th>
+                          <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-28">Amount</th>
+                          <th className="w-12"></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {formData.line_items.map((item, index) => (
+                          <tr key={index} className="bg-white">
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                                placeholder="Item description"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                                // A deposit/final line is the server's share of the trip; an edit here was not saved.
+                                readOnly={formData.invoice_type !== 'standard'}
+                                min="1"
+                                className="w-full px-3 py-2 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                value={item.unit_price}
+                                onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                readOnly={formData.invoice_type !== 'standard'}
+                                step="0.01"
+                                min="0"
+                                className="w-full px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                              {formatMoney(item.amount, formData.currency)}
+                            </td>
+                            <td className="px-3 py-3">
+                              {formData.line_items.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeLineItem(index)}
+                                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 

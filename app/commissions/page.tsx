@@ -486,143 +486,145 @@ export default function CommissionsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Type</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Category</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Source / Supplier</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Itinerary</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Base Amount</th>
-              <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Rate</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Commission</th>
-              <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Status</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Date</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredCommissions.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="px-4 py-12 text-center">
-                  <Handshake className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">No commissions found</p>
-                  <button
-                    onClick={openAddModal}
-                    className="mt-3 text-sm text-[#647C47] hover:underline font-medium"
-                  >
-                    Add your first commission
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Type</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Category</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Source / Supplier</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Itinerary</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Base Amount</th>
+                <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Rate</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Commission</th>
+                <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Status</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Date</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Actions</th>
               </tr>
-            ) : (
-              filteredCommissions.map((commission) => {
-                const categoryConfig = CATEGORY_CONFIG[commission.category] || CATEGORY_CONFIG.other
-                const statusConfig = STATUS_CONFIG[commission.status] || STATUS_CONFIG.pending
-                const CategoryIcon = categoryConfig.icon
-                const StatusIcon = statusConfig.icon
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredCommissions.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-12 text-center">
+                    <Handshake className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm text-gray-500">No commissions found</p>
+                    <button
+                      onClick={openAddModal}
+                      className="mt-3 text-sm text-[#647C47] hover:underline font-medium"
+                    >
+                      Add your first commission
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                filteredCommissions.map((commission) => {
+                  const categoryConfig = CATEGORY_CONFIG[commission.category] || CATEGORY_CONFIG.other
+                  const statusConfig = STATUS_CONFIG[commission.status] || STATUS_CONFIG.pending
+                  const CategoryIcon = categoryConfig.icon
+                  const StatusIcon = statusConfig.icon
 
-                return (
-                  <tr key={commission.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
-                        commission.commission_type === 'receivable' 
-                          ? 'bg-green-50 text-green-700' 
-                          : 'bg-red-50 text-red-700'
-                      }`}>
-                        {commission.commission_type === 'receivable' ? (
-                          <TrendingUp className="h-3 w-3" />
+                  return (
+                    <tr key={commission.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                          commission.commission_type === 'receivable' 
+                            ? 'bg-green-50 text-green-700' 
+                            : 'bg-red-50 text-red-700'
+                        }`}>
+                          {commission.commission_type === 'receivable' ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {commission.commission_type === 'receivable' ? 'In' : 'Out'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${categoryConfig.color}`}>
+                          <CategoryIcon className="h-3 w-3" />
+                          {categoryConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900">
+                          {commission.supplier?.name || commission.source_name || '-'}
+                        </p>
+                        {commission.source_contact && (
+                          <p className="text-xs text-gray-500">{commission.source_contact}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {commission.itinerary ? (
+                          <Link href={`/itineraries/${commission.itinerary.id}`} className="text-sm text-blue-600 hover:underline">
+                            {commission.itinerary.itinerary_code}
+                          </Link>
                         ) : (
-                          <TrendingDown className="h-3 w-3" />
+                          <span className="text-sm text-gray-400">-</span>
                         )}
-                        {commission.commission_type === 'receivable' ? 'In' : 'Out'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${categoryConfig.color}`}>
-                        <CategoryIcon className="h-3 w-3" />
-                        {categoryConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">
-                        {commission.supplier?.name || commission.source_name || '-'}
-                      </p>
-                      {commission.source_contact && (
-                        <p className="text-xs text-gray-500">{commission.source_contact}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {commission.itinerary ? (
-                        <Link href={`/itineraries/${commission.itinerary.id}`} className="text-sm text-blue-600 hover:underline">
-                          {commission.itinerary.itinerary_code}
-                        </Link>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-600">
-                        {commission.base_amount > 0 ? formatCurrency(commission.base_amount, commission.currency) : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-sm text-gray-600">
-                        {commission.commission_rate ? `${commission.commission_rate}%` : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`text-sm font-semibold ${
-                        commission.commission_type === 'receivable' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {commission.commission_type === 'payable' ? '-' : ''}
-                        {formatCurrency(commission.commission_amount, commission.currency)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-                        <StatusIcon className="h-3 w-3" />
-                        {statusConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">
-                        {commission.transaction_date ? new Date(`${commission.transaction_date.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {['pending', 'invoiced', 'disputed'].includes(commission.status) && (
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm text-gray-600">
+                          {commission.base_amount > 0 ? formatCurrency(commission.base_amount, commission.currency) : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm text-gray-600">
+                          {commission.commission_rate ? `${commission.commission_rate}%` : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`text-sm font-semibold ${
+                          commission.commission_type === 'receivable' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {commission.commission_type === 'payable' ? '-' : ''}
+                          {formatCurrency(commission.commission_amount, commission.currency)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                          <StatusIcon className="h-3 w-3" />
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-gray-600">
+                          {commission.transaction_date ? new Date(`${commission.transaction_date.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {['pending', 'invoiced', 'disputed'].includes(commission.status) && (
+                            <button
+                              onClick={() => handleMarkAs(commission.id, commission.commission_type === 'receivable' ? 'received' : 'paid')}
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title={commission.commission_type === 'receivable' ? 'Mark as Received' : 'Mark as Paid'}
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleMarkAs(commission.id, commission.commission_type === 'receivable' ? 'received' : 'paid')}
-                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title={commission.commission_type === 'receivable' ? 'Mark as Received' : 'Mark as Paid'}
+                            onClick={() => handleEdit(commission)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit"
                           >
-                            <Check className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleEdit(commission)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(commission.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+                          <button
+                            onClick={() => handleDelete(commission.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Add/Edit Modal */}
