@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.rate_limit_buckets (
 
 ALTER TABLE public.rate_limit_buckets ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.rate_limit_buckets FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_limit_buckets TO service_role;
 
 -- One atomic step: start a new window if the old one has passed, else count
 -- one more. Returns whether this request is within the limit.
@@ -46,5 +47,6 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.rate_limit_take(TEXT, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.rate_limit_take(TEXT, INTEGER, INTEGER) TO service_role;
 
 COMMIT;
