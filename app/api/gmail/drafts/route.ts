@@ -1,3 +1,4 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
 import { NextRequest, NextResponse } from 'next/server'
 import type { gmail_v1 } from 'googleapis'
 import { parseEmailMessage } from '@/lib/gmail'
@@ -80,6 +81,8 @@ export async function GET(request: NextRequest) {
       attachments,
     })
   } catch (err) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     const e = err as { code?: number; message?: string }
     if (e?.code === 404) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     console.error('Draft fetch error:', e?.message || err)
@@ -134,6 +137,8 @@ export async function POST(request: NextRequest) {
       savedAt: new Date().toISOString(),
     })
   } catch (err) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     const e = err as { message?: string }
     console.error('Draft save error:', e?.message || err)
     return NextResponse.json({ error: e?.message || 'Could not save the draft' }, { status: 500 })
@@ -152,6 +157,8 @@ export async function DELETE(request: NextRequest) {
     })
     return NextResponse.json({ success: true })
   } catch (err) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     const e = err as { message?: string }
     console.error('Draft delete error:', e?.message || err)
     return NextResponse.json({ error: e?.message || 'Could not discard the draft' }, { status: 500 })

@@ -1,3 +1,5 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
       await (supabase as any)
         .from('gmail_tokens')
         .update({
-          access_token: newTokens.access_token,
+          access_token: sealToken(newTokens.access_token),
           token_expiry: new Date(newTokens.expiry_date || Date.now() + 3600000).toISOString(),
         })
         .eq('user_id', userId)
@@ -83,6 +85,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ labels })
   } catch (err: any) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     console.error('Get labels error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -151,6 +155,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ label: response.data })
   } catch (err: any) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     console.error('Create label error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -226,6 +232,8 @@ export async function PATCH(request: NextRequest) {
     }
     return NextResponse.json({ label, renamedChildren })
   } catch (err) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     return labelError(err, 'Could not change the folder')
   }
 }
@@ -271,6 +279,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, movedToInbox: ids.length })
   } catch (err) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     return labelError(err, 'Could not delete the folder')
   }
 }

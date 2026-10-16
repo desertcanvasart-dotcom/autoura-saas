@@ -1,3 +1,5 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { labelChange, MAX_ACTION_IDS } from '@/lib/email/mail-actions'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
       await (supabase as any)
         .from('gmail_tokens')
         .update({
-          access_token: newTokens.access_token,
+          access_token: sealToken(newTokens.access_token),
           token_expiry: new Date(newTokens.expiry_date || Date.now() + 3600000).toISOString(),
         })
         .eq('user_id', userId)
@@ -111,6 +113,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, count: ids.length })
   } catch (err: any) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     console.error('Email action error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

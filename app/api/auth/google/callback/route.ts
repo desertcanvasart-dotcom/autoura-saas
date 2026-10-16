@@ -1,3 +1,4 @@
+import { sealToken } from '@/lib/token-crypto'
 import { tenantForUser, type MembershipRow } from '@/lib/email/scheduled-sync'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createAuthenticatedClient } from '@/lib/supabase-server'
@@ -113,8 +114,9 @@ export async function GET(request: NextRequest) {
         // One mailbox per person per company (migration 415).
         tenant_id: tenantId,
         email,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
+        // Sealed at rest when TOKEN_ENCRYPTION_KEY is set (lib/token-crypto).
+        access_token: sealToken(tokens.access_token),
+        refresh_token: sealToken(tokens.refresh_token),
         token_expiry: expiryDate.toISOString(),
         updated_at: new Date().toISOString(),
       }, {

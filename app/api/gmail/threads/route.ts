@@ -1,3 +1,4 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
 import { NextRequest, NextResponse } from 'next/server'
 import { parseEmailMessage } from '@/lib/gmail'
 import { mailboxForSession } from '@/lib/gmail-mailbox'
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ threadId, messages })
   } catch (err) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     const e = err as { code?: number; message?: string }
     if (e?.code === 404) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     console.error('Thread fetch error:', e?.message || err)

@@ -237,6 +237,20 @@ export async function DELETE(
 
     if (deleteError) throw deleteError
 
+    // Their mailbox in this company goes with them: revoked at Google and
+    // forgotten. Left behind, a removed person's live Gmail grant stayed in
+    // the database. Best-effort — the removal itself already happened.
+    try {
+      const { revokeAndForgetMailbox } = await import('@/lib/gmail-revoke')
+      const removedUser = (targetMember as { user_id?: string }).user_id
+      if (removedUser) {
+        const r = await revokeAndForgetMailbox(removedUser, tenant_id)
+        if (r.error) console.error('Member removed, but their Gmail connection was not cleared:', r.error)
+      }
+    } catch (err) {
+      console.error('Member removed, but their Gmail connection was not cleared:', err)
+    }
+
     // Log activity
     await logActivity(
       tenant_id,

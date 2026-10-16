@@ -107,6 +107,7 @@ export default defineRailway(() => {
       // once they are set in the dashboard.
       ALERT_WEBHOOK_URL: preserve(),
       PORTAL_VERIFY_SECRET: preserve(),
+      TOKEN_ENCRYPTION_KEY: preserve(),
     },
   });
   const cronexchangeRates = service("cron:exchange-rates", {

@@ -1,3 +1,5 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken } from '@/lib/token-crypto'
 import { secretMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { claimSend, finishSend, threadConflict, replyBodyHash } from '@/lib/email/send-guard'
@@ -155,7 +157,7 @@ export async function POST(request: NextRequest) {
       await (supabase as any)
         .from('gmail_tokens')
         .update({
-          access_token: newTokens.access_token,
+          access_token: sealToken(newTokens.access_token),
           token_expiry: new Date(newTokens.expiry_date || Date.now() + 3600000).toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -383,6 +385,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, messageId: response.data.id })
   } catch (err: any) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     console.error('Send email error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

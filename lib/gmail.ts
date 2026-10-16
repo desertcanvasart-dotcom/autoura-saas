@@ -1,3 +1,4 @@
+import { openToken } from '@/lib/token-crypto'
 import { encodeEmailHeader } from '@/lib/email/mime-header'
 import { google } from 'googleapis'
 import { escapeHtml } from './html-escape'
@@ -6,7 +7,7 @@ import { escapeHtml } from './html-escape'
 // setCredentials() mutates the client, so a shared instance lets concurrent
 // requests for different users clobber each other's tokens between
 // setCredentials() and the actual API call (cross-user token leak).
-function createOAuthClient() {
+export function createOAuthClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -56,7 +57,7 @@ export async function getTokensFromCode(code: string) {
 // Refresh access token using refresh token
 export async function refreshAccessToken(refreshToken: string) {
   const client = createOAuthClient()
-  client.setCredentials({ refresh_token: refreshToken })
+  client.setCredentials({ refresh_token: openToken(refreshToken) })
   const { credentials } = await client.refreshAccessToken()
   return credentials
 }
@@ -65,8 +66,8 @@ export async function refreshAccessToken(refreshToken: string) {
 export function getGmailClient(accessToken: string, refreshToken: string) {
   const client = createOAuthClient()
   client.setCredentials({
-    access_token: accessToken,
-    refresh_token: refreshToken,
+    access_token: openToken(accessToken),
+    refresh_token: openToken(refreshToken),
   })
   return google.gmail({ version: 'v1', auth: client })
 }
@@ -74,7 +75,7 @@ export function getGmailClient(accessToken: string, refreshToken: string) {
 // Get user's email address
 export async function getUserEmail(accessToken: string) {
   const client = createOAuthClient()
-  client.setCredentials({ access_token: accessToken })
+  client.setCredentials({ access_token: openToken(accessToken) })
   const oauth2 = google.oauth2({ version: 'v2', auth: client })
   const { data } = await oauth2.userinfo.get()
   return data.email

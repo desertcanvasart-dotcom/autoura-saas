@@ -186,13 +186,13 @@ function EmailSettingsContent() {
       // Only this company's mailbox: the same person's mailbox in another
       // company stays connected.
       if (!tenant?.id) return
-      const { error } = await supabase
-        .from('gmail_tokens')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('tenant_id', tenant.id)
-
-      if (error) throw error
+      // Server-side, so the access is also revoked at Google (not just
+      // forgotten here).
+      const res = await fetch('/api/gmail/connect', { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Could not disconnect Gmail')
+      }
 
       setGmailConnected(false)
       setConnectedEmail(null)
