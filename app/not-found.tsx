@@ -5,7 +5,7 @@ export const metadata = { title: 'Page not found · Autoura' }
 
 export default function NotFound() {
   return (
-    <div className="min-h-[70vh] bg-[#F7F7F4] flex items-center justify-center px-4 py-16">
+    <div className="min-h-screen bg-[#F7F7F4] flex items-center justify-center px-4 py-16">
       <div className="max-w-md w-full text-center">
         <BrandMark />
         <p className="mt-6 text-sm font-semibold text-[#647C47] tracking-wide">404</p>

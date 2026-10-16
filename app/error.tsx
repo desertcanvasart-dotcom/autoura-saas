@@ -13,7 +13,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
   }, [error])
 
   return (
-    <div className="min-h-[70vh] bg-[#F7F7F4] flex items-center justify-center px-4 py-16">
+    <div className="min-h-screen bg-[#F7F7F4] flex items-center justify-center px-4 py-16">
       <div className="max-w-md w-full text-center">
         <BrandMark />
         <h1 className="mt-6 text-2xl font-bold text-gray-900">Something went wrong</h1>
