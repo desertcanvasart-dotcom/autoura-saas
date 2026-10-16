@@ -115,3 +115,53 @@ describe('round 3 — security', () => {
     expect(read('app/api/supplier-invoices/[id]/upload/route.ts')).toContain('previous.startsWith(`${tenant_id}/`)')
   })
 })
+
+describe('round 3 — money', () => {
+  it('a booking with payments is kept, not deleted with them', () => {
+    const src = read('app/api/bookings/[id]/route.ts')
+    expect(src).toContain(".from('booking_payments')")
+    expect(src).toContain('has payments recorded')
+  })
+
+  it('an invoice with payments is not deleted; its extras are released on delete or cancel', () => {
+    const src = read('app/api/invoices/[id]/route.ts')
+    expect(src).toContain('delete them before deleting it')
+    expect(src.match(/releaseInvoicedExtras\(id\)/g)?.length).toBe(2)
+    expect(src).toContain('update({ invoiced_at: null, invoice_id: null })')
+  })
+
+  it('an invoice total cannot be edited below what was paid', () => {
+    expect(read('app/api/invoices/[id]/route.ts')).toContain('the total cannot be less than that')
+  })
+
+  it('a final invoice subtracts the deposit actually invoiced, from the real trip total', () => {
+    expect(read('app/api/invoices/route.ts')).toContain("parent.invoice_type === 'deposit'")
+    expect(read('app/invoices/[id]/page.tsx')).toContain('tripTotal: tripTotal > 0 ? tripTotal : undefined')
+  })
+
+  it('"send all due" follows the first-reminder rule on the company\'s own day', () => {
+    const src = read('app/api/invoices/reminders/route.ts')
+    expect(src).toContain('daysOverdueOn(invoice.due_date, companyToday)')
+    expect(src).toContain('isFirstReminderDue(invoice.next_reminder_date, overdue)')
+  })
+
+  it('reports leave out drafts and count revenue net of VAT', () => {
+    const src = read('app/api/financial-reports/route.ts')
+    expect(src).toContain("new Set(['cancelled', 'draft'])")
+    expect(src).toContain('const netRevenue = totalRevenue - vatCollected')
+  })
+
+  it('a closing company sends no payment reminders', () => {
+    expect(read('app/api/cron/send-reminders/route.ts')).toContain("from('tenant_closures')")
+  })
+
+  it('an itinerary with expenses or supplier invoices is not deleted', () => {
+    const src = read('app/api/itineraries/[id]/route.ts')
+    expect(src).toContain("from('expenses')")
+    expect(src).toContain("from('supplier_invoices')")
+  })
+
+  it('an over-balance booking payment is a 409 with the reason', () => {
+    expect(read('app/api/bookings/[id]/payments/route.ts')).toContain("code === '23514'")
+  })
+})

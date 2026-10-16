@@ -148,11 +148,16 @@ async function getHandler(request: NextRequest) {
       .order('id', { ascending: true })
       .range(from, to)
 
+    // A company that has asked to close (tenant_closures, 433) does not go
+    // on chasing its clients for payment in its last 30 days.
+    const { data: closing } = await supabase.from('tenant_closures').select('tenant_id')
+    const closingTenants = new Set((closing ?? []).map(c => c.tenant_id))
+
     const invoices: Awaited<ReturnType<typeof dueQuery>>['data'] = []
     for (let from = 0; from < MAX_DUE; from += PAGE) {
       const { data: page, error } = await dueQuery(from, from + PAGE - 1)
       if (error) throw error
-      invoices!.push(...(page ?? []))
+      invoices!.push(...(page ?? []).filter(inv => !closingTenants.has(inv.tenant_id)))
       if (!page || page.length < PAGE) break
     }
     const startedAt = Date.now()

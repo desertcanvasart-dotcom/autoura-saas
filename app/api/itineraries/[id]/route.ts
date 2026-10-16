@@ -333,7 +333,7 @@ export async function DELETE(
     // single atomic statement. Nothing is destroyed unless everything can be.
     // ────────────────────────────────────────────────────────────────────
 
-    const [bookings, invoices, payments, commissions, quotes] = await Promise.all([
+    const [bookings, invoices, payments, commissions, quotes, expenses, supplierInvoices] = await Promise.all([
       supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
       supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
       supabase.from('payments').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
@@ -342,6 +342,9 @@ export async function DELETE(
       // vanish silently.
       supabase.from('b2c_quotes').select('id', { count: 'exact', head: true })
         .eq('itinerary_id', id).neq('status', 'draft'),
+      // Costs too: they were set to null and dropped out of the trip's P&L.
+      supabase.from('expenses').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
+      supabase.from('supplier_invoices').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
     ])
 
     const guard = evaluateDeleteGuard('itinerary', [
@@ -350,6 +353,8 @@ export async function DELETE(
       { label: `${payments.count} payment(s)`, count: payments.count, error: payments.error },
       { label: `${commissions.count} commission(s)`, count: commissions.count, error: commissions.error },
       { label: `${quotes.count} sent quote(s)`, count: quotes.count, error: quotes.error },
+      { label: `${expenses.count} expense(s)`, count: expenses.count, error: expenses.error },
+      { label: `${supplierInvoices.count} supplier invoice(s)`, count: supplierInvoices.count, error: supplierInvoices.error },
     ])
     if (!guard.ok) {
       if (guard.kind === 'error') console.error('❌ Itinerary delete pre-check failed:', guard.label)

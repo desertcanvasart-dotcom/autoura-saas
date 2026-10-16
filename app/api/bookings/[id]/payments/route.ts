@@ -148,6 +148,10 @@ export async function POST(
     if (rpcError) {
       // The RPC raises if the booking is not found for this tenant.
       const msg = rpcError.message || ''
+      // Over the balance, or a refund over what was paid (migration 436).
+      if ((rpcError as { code?: string }).code === '23514') {
+        return NextResponse.json({ success: false, error: msg }, { status: 409 })
+      }
       const status = msg.includes('not found') ? 404 : 500
       console.error('Error recording payment:', rpcError)
       return NextResponse.json(

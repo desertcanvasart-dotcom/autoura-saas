@@ -266,8 +266,23 @@ export async function POST(request: NextRequest) {
         amount: totalAmount
       }]
     } else if (invoiceType === 'final') {
-      // Final invoice: remaining balance after deposit
-      const depositAmount = roundToCurrency((fullTripCost * depositPercent) / 100, currency)
+      // Final invoice: the trip less the deposit ACTUALLY invoiced. Worked
+      // out again from the percentage, it ignored a deposit edited after it
+      // was raised, and rounding twice could leave the two a unit short
+      // (¥1,854,367 at 20%: ¥370,873 + ¥1,483,492 = ¥1,854,365).
+      let depositAmount = roundToCurrency((fullTripCost * depositPercent) / 100, currency)
+      if (body.parent_invoice_id) {
+        const { data: parent } = await supabase
+          .from('invoices')
+          .select('total_amount, invoice_type, status, currency')
+          .eq('id', String(body.parent_invoice_id))
+          .eq('tenant_id', tenant_id)
+          .maybeSingle()
+        if (parent && parent.invoice_type === 'deposit' && parent.status !== 'cancelled'
+            && String(parent.currency || currency).toUpperCase() === String(currency).toUpperCase()) {
+          depositAmount = roundToCurrency(Number(parent.total_amount) || 0, currency)
+        }
+      }
       totalAmount = roundToCurrency(fullTripCost - depositAmount, currency)
       lineItems = [{
         description: `Balance Payment - ${body.line_items?.[0]?.description || 'Tour Package'}`,

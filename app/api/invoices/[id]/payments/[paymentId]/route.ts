@@ -10,7 +10,6 @@
 import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
-import { invoiceBalance, sumPayments } from '@/lib/invoices/invoice-balance'
 
 export async function DELETE(
   _request: NextRequest,
@@ -60,37 +59,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Payment not found or you do not have permission to delete it' }, { status: 404 })
     }
 
-    // Recalculate invoice balance after deletion
-    // RLS filters to tenant's payments only
-    const { data: payments } = await supabase
-      .from('invoice_payments')
-      .select('amount')
-      .eq('invoice_id', id)
-
-    // Get invoice (RLS filters to tenant's invoices only)
-    const { data: invoice } = await supabase
-      .from('invoices')
-      .select('total_amount, status, currency, paid_at')
-      .eq('id', id)
-      .single()
-
-    if (invoice) {
-      const balance = invoiceBalance({
-        total: invoice.total_amount,
-        paid: sumPayments(payments, invoice.currency),
-        currency: invoice.currency,
-        status: invoice.status,
-        paidAt: invoice.paid_at,
-      })
-      const { error: balanceError } = await supabase
-        .from('invoices')
-        .update({ ...balance, updated_at: new Date().toISOString() })
-        .eq('id', id)
-      if (balanceError) {
-        console.error('Invoice balance after payment delete:', balanceError)
-        return NextResponse.json({ error: 'The payment was deleted, but the invoice balance could not be updated — reload and check it' }, { status: 500 })
-      }
-    }
+    // The invoice's paid amount, balance and status are recomputed by the
+    // database as the row is deleted, under a lock (migration 436) — not
+    // re-read and written here, where a payment recorded at the same moment
+    // could be lost from the totals.
 
     return NextResponse.json({ success: true })
   } catch (error) {

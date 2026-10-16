@@ -23,7 +23,7 @@ function mockSupabase(opts: MockOpts) {
     from: [] as string[],
     select: [] as string[],
     like: [] as { column: string; pattern: string }[],
-    limit: [] as number[],
+    ranges: [] as Array<[number, number]>,
   }
   const client = {
     rpc: (fn: string, args: unknown) => {
@@ -39,10 +39,13 @@ function mockSupabase(opts: MockOpts) {
             like: (column: string, pattern: string) => {
               calls.like.push({ column, pattern })
               return {
-                limit: (n: number) => {
-                  calls.limit.push(n)
-                  return Promise.resolve({ data: opts.rows ?? [], error: opts.scanError ?? null })
-                },
+                order: () => ({
+                  range: (from: number, to: number) => {
+                    calls.ranges.push([from, to])
+                    const rows = opts.rows ?? []
+                    return Promise.resolve({ data: rows.slice(from, to + 1), error: opts.scanError ?? null })
+                  },
+                }),
               }
             },
           }
@@ -105,7 +108,7 @@ describe('nextDocumentNumber — the scan path (now the only path)', () => {
     // Year-scoped LIKE needle — this is what isolates 2026 from 2027 and
     // INV from EXP in the fallback.
     expect(calls.like).toEqual([{ column: 'invoice_number', pattern: 'INV-2026-%' }])
-    expect(calls.limit).toEqual([10000])
+    expect(calls.ranges[0]).toEqual([0, 999])
   })
 
   it('increments past the highest existing number for the year', async () => {
@@ -264,5 +267,15 @@ describe('insertWithUniqueRetry — 23505 collision handling', () => {
     const insert = vi.fn(async () => ({ data: null, error: { code: '23505' } }))
     await insertWithUniqueRetry({ generateRow, insert })
     expect(insert).toHaveBeenCalledTimes(5)
+  })
+})
+
+describe('nextDocumentNumber past 1000 documents in a year', () => {
+  it('reads every page, so the 1001st invoice is numbered 1002, not a duplicate', async () => {
+    const rows = Array.from({ length: 1001 }, (_, i) => ({ invoice_number: `INV-2026-${String(i + 1).padStart(3, '0')}` }))
+    const { client, calls } = mockSupabase({ rows })
+    const n = await nextDocumentNumber({ supabase: client, ...baseOpts })
+    expect(n).toBe('INV-2026-1002')
+    expect(calls.ranges).toEqual([[0, 999], [1000, 1999]])
   })
 })

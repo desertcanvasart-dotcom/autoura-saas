@@ -1,4 +1,5 @@
 'use client'
+import { fetchItineraryClientTotal } from '@/lib/invoices/fetch-itinerary-client-total'
 
 import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
 import { formatDateOnly } from '@/lib/date-utils'
@@ -390,12 +391,19 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
     setCreatingFinalInvoice(true)
     try {
+      // From the trip's real total when there is a trip: worked back from the
+      // deposit (deposit ÷ %), a deposit edited after it was raised turned a
+      // 1,000 trip into 1,333.33 and over-billed the balance.
+      const tripTotal = invoice.itinerary_id
+        ? await fetchItineraryClientTotal({ id: invoice.itinerary_id })
+        : 0
       // In the currency's own units: ¥33,333.33 is not an amount of yen.
       const { fullTripCost, balanceAmount } = tripCostBreakdown({
         invoiceType: 'deposit',
         totalAmount: invoice.total_amount,
         depositPercent: invoice.deposit_percent,
         currency: invoice.currency,
+        tripTotal: tripTotal > 0 ? tripTotal : undefined,
       })
 
       const response = await fetch('/api/invoices', {

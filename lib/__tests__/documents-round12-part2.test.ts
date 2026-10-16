@@ -70,7 +70,9 @@ describe('an invoice balance', () => {
   })
 
   it('the routes use it; the edit refuses an empty total and a currency change after payments', () => {
-    expect(src('app/api/invoices/[id]/payments/[paymentId]/route.ts')).toContain('invoiceBalance(')
+    // Deleting a payment: the database recomputes the invoice under a lock
+    // (migration 436), so the route no longer does it.
+    expect(src('supabase/migrations/436_booking_payment_caps.sql')).toContain('AFTER DELETE ON public.invoice_payments')
     const edit = src('app/api/invoices/[id]/route.ts')
     expect(edit).toContain('invoiceBalance(')
     expect(edit).toContain('The total must be a positive amount')
