@@ -27,6 +27,37 @@ export default function ResetPasswordPage() {
       const refreshToken = hashParams.get('refresh_token')
       const type = hashParams.get('type')
 
+      // The other two shapes a reset link can take (Supabase PKCE):
+      //   ?token_hash=…&type=recovery — works on any device or browser (the
+      //     email template sends this: docs/OPERATIONS.md, "Auth emails");
+      //   ?code=… — only exchangeable in the browser that asked for the reset.
+      const query = new URLSearchParams(window.location.search)
+      const tokenHash = query.get('token_hash')
+      const code = query.get('code')
+      if (tokenHash && query.get('type') === 'recovery') {
+        const { error: otpError } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+        if (otpError) setError('This reset link has expired or was already used. Please request a new one.')
+        setHasSession(!otpError)
+        setSessionChecked(true)
+        return
+      }
+      if (code) {
+        // The browser client may already have exchanged it on load.
+        const { data: { session: existing } } = await supabase.auth.getSession()
+        if (!existing) {
+          const { error: codeError } = await supabase.auth.exchangeCodeForSession(code)
+          if (codeError) {
+            setError('This reset link has to be opened in the same browser you requested it from, or it has expired. Request a new link here and open it on this device.')
+            setHasSession(false)
+            setSessionChecked(true)
+            return
+          }
+        }
+        setHasSession(true)
+        setSessionChecked(true)
+        return
+      }
+
       if (accessToken && type === 'recovery') {
         // Set the session using the recovery token
         const { data, error: sessionError } = await supabase.auth.setSession({
@@ -108,7 +139,7 @@ export default function ResetPasswordPage() {
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Invalid or Expired Link</h1>
           <p className="text-gray-600 mb-6">
-            This password reset link is invalid or has expired. Please request a new one.
+            {error || 'This password reset link is invalid or has expired. Please request a new one.'}
           </p>
           <Link
             href="/forgot-password"

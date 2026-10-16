@@ -585,7 +585,7 @@ export default function DeparturesPage() {
                     type="text"
                     value={newDeparture.tour_name}
                     onChange={(e) => setNewDeparture(prev => ({ ...prev, tour_name: e.target.value }))}
-                    placeholder="e.g., 7-Day Cairo & Nile Cruise"
+                    placeholder="e.g., 7-Day Highlights Tour"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
                   />
                 </div>

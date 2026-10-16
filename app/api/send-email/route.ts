@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway with allow_incomplete=true.`,
+          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway.`,
           gaps: itineraryLines.completeness.gaps,
         },
         { status: 422 }

@@ -957,7 +957,7 @@ export default function CruisesPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Ship className="w-5 h-5 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">Nile Cruises</h1>
+              <h1 className="text-xl font-bold text-gray-900">Cruises</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <div className="flex items-center gap-2">

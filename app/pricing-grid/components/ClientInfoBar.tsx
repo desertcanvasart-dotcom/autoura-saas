@@ -68,7 +68,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
                 type="text"
                 value={config.tourName}
                 onChange={(e) => update({ tourName: e.target.value })}
-                placeholder="Egypt Cultural Heritage, Nile Cruise & Red Sea Adventure"
+                placeholder="e.g. Cultural Highlights & Coast"
                 className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
               />
             </div>

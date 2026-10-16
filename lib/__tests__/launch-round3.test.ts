@@ -224,3 +224,55 @@ describe('round 3 — reliability', () => {
     expect(read('app/api/suppliers/route.ts')).not.toContain('details: error.message')
   })
 })
+
+describe('round 3 — first run', () => {
+  it('the itinerary editor and tour manager offer the company\'s own cities', () => {
+    const editor = read('app/itineraries/[id]/edit/page.tsx')
+    expect(editor).toContain('useDestinationCities()')
+    expect(editor).not.toMatch(/'Cairo', 'Giza'/)
+    expect(editor).not.toContain("|| 'Cairo'")
+    const tours = read('app/tours/manage/TourManagerContent.tsx')
+    expect(tours).not.toContain('EGYPTIAN_CITIES')
+  })
+
+  it('confirmation links land on sign-in, lost ones can be resent, and a taken email says so', () => {
+    const auth = read('app/contexts/AuthContext.tsx')
+    expect(auth).toContain('emailRedirectTo: `${window.location.origin}/login?confirmed=1`')
+    expect(auth).toContain('identities.length === 0')
+    expect(read('app/login/login-content.tsx')).toContain('<ResendConfirmation')
+    expect(read('app/signup/signup-content.tsx')).toContain('<ResendConfirmation')
+  })
+
+  it('the reset page takes token-hash and code links, not only the old hash', () => {
+    const src = read('app/reset-password/page.tsx')
+    expect(src).toContain("verifyOtp({ token_hash: tokenHash, type: 'recovery' })")
+    expect(src).toContain('exchangeCodeForSession(code)')
+  })
+
+  it('a company with no subscription has no "current plan"', () => {
+    const src = read('app/settings/billing/plans/page.tsx')
+    expect(src).toContain("useState<string>('')")
+    expect(src).not.toContain("fetch('/api/settings/pricing-tier')")
+  })
+
+  it('back from checkout, the billing page waits for the plan', () => {
+    expect(read('app/settings/billing/page.tsx')).toContain("get('success') !== 'true'")
+  })
+
+  it('an unpriced quote can be sent anyway from the page', () => {
+    const page = read('app/itineraries/[id]/page.tsx')
+    expect(page).toContain('postAllowingIncomplete(')
+    expect(page).toContain('allow_incomplete: true')
+    expect(read('app/api/send-email/route.ts')).not.toContain('allow_incomplete=true.')
+  })
+
+  it('the sending domain can be set up in Settings → Email', () => {
+    expect(read('app/settings/email/page.tsx')).toContain('<SendingDomainCard')
+  })
+
+  it('no "Nile" in the navigation and onboarding', () => {
+    expect(read('components/Sidebar.tsx')).not.toContain('Nile Cruises')
+    expect(read('app/onboarding/steps/BusinessStep.tsx')).not.toContain('Nile Cruises')
+    expect(read('app/templates/page.tsx')).not.toContain("language: 'ar'")
+  })
+})

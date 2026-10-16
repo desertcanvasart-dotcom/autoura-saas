@@ -216,10 +216,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signUp = async (email: string, password: string, fullName: string, companyName?: string, termsAcceptedAt?: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        // Lands on sign-in with "email confirmed" (app/login): left unset, the
+        // link went to the Site URL — the marketing page — with no message.
+        emailRedirectTo: `${window.location.origin}/login?confirmed=1`,
         data: {
           full_name: fullName,
           company_name: companyName || '',
@@ -230,6 +233,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     })
     if (error) throw error
+    // An address that already has an account comes back as a user with no
+    // identities and no email is sent — the form used to say "Check your
+    // email" for a message that would never arrive.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new Error('An account with this email already exists. Sign in, or reset your password if you have forgotten it.')
+    }
   }
 
   const signOut = async () => {

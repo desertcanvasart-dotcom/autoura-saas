@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Link from 'next/link'
 import BrandMark from '@/components/BrandMark'
+import ResendConfirmation from '@/components/auth/ResendConfirmation'
 
 const INPUT =
   'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#263A29] focus:border-transparent'
@@ -65,6 +66,7 @@ export default function SignupContent() {
               We&apos;ve sent a confirmation link to <strong>{email}</strong>. Open it to verify your
               account, then sign in.
             </p>
+            <ResendConfirmation email={email} className="mb-6" />
             <Link
               href="/login"
               className="inline-block bg-[#263A29] text-white px-6 py-3 rounded-lg hover:bg-[#1D2B20] font-medium transition-colors"
