@@ -1,3 +1,4 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { NextRequest, NextResponse } from 'next/server'
 import { defaultCostMode } from '@/lib/itineraries/default-cost-mode'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
@@ -33,10 +34,14 @@ export async function GET(request: NextRequest) {
     // Use authenticated client - RLS will automatically filter by tenant
     const supabase = await createAuthenticatedClient()
 
-    const { data, error } = await supabase
+    // Every itinerary: the list, calendar and every trip picker use this, and
+    // a plain select stopped at 1000 — older trips silently vanished.
+    const { data, error } = await fetchAllPages((from, to) => supabase
       .from('itineraries')
       .select('*')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to))
 
     if (error) {
       console.error('❌ Database error:', error)
@@ -50,10 +55,14 @@ export async function GET(request: NextRequest) {
     const servicesBy = new Map<string, PricedService[]>()
     const ids = list.map(r => r.id)
     for (let i = 0; i < ids.length; i += 200) {
-      const { data: svc } = await supabase
+      // 200 trips can have well over 1000 services between them: paged too,
+      // or some trips' totals were computed from part of their services.
+      const { data: svc } = await fetchAllPages((from, to) => supabase
         .from('itinerary_services')
-        .select('itinerary_id, total_cost, client_price')
+        .select('id, itinerary_id, total_cost, client_price')
         .in('itinerary_id', ids.slice(i, i + 200))
+        .order('id', { ascending: true })
+        .range(from, to))
       for (const row of svc ?? []) {
         if (!row.itinerary_id) continue
         const bucket = servicesBy.get(row.itinerary_id) ?? []

@@ -122,8 +122,10 @@ async function getHandler(request: NextRequest) {
     // the furthest-ahead timezone's today — and the loop narrows it.
     const latestToday = shiftDateISO(new Date().toISOString().slice(0, 10), 1)
 
-    // Get invoices due for reminders today
-    const { data: invoices, error } = await supabase
+    // Get invoices due for reminders today — the whole due list first (up to
+    // MAX_DUE), then send within a time budget. One page of 50 a day across
+    // every company left reminders days behind as companies were added.
+    const dueQuery = (from: number, to: number) => supabase
       .from('invoices')
       // The tenant is joined so each reminder can be sent AS that operator with
       // replies routed to them. This cron spans every tenant, so a single
@@ -144,9 +146,16 @@ async function getHandler(request: NextRequest) {
       // starved every other company's reminders.
       .order('next_reminder_date', { ascending: true, nullsFirst: true })
       .order('id', { ascending: true })
-      .limit(50) // Process max 50 per run
+      .range(from, to)
 
-    if (error) throw error
+    const invoices: Awaited<ReturnType<typeof dueQuery>>['data'] = []
+    for (let from = 0; from < MAX_DUE; from += PAGE) {
+      const { data: page, error } = await dueQuery(from, from + PAGE - 1)
+      if (error) throw error
+      invoices!.push(...(page ?? []))
+      if (!page || page.length < PAGE) break
+    }
+    const startedAt = Date.now()
 
     if (!invoices || invoices.length === 0) {
 
@@ -163,7 +172,11 @@ async function getHandler(request: NextRequest) {
     let failed = 0
     let skipped = 0
 
+    let deferred = 0
     for (const invoice of invoices) {
+      // Leave the rest for the next run (they are first in line then) rather
+      // than outlive the scheduler's request.
+      if (Date.now() - startedAt > TIME_BUDGET_MS) { deferred++; continue }
       const today = todayInTimeZone(resolveTimeZone(invoice.tenant?.timezone))
       if (invoice.next_reminder_date && String(invoice.next_reminder_date) > today) {
         // Due tomorrow in this company's timezone, not yet today.
@@ -283,10 +296,11 @@ async function getHandler(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Processed ${invoices.length} reminders`,
+      message: `Processed ${invoices.length - deferred} reminders`,
       sent,
       failed,
       skipped,
+      deferred,
       timestamp: new Date().toISOString()
     })
 
@@ -306,3 +320,9 @@ async function getHandler(request: NextRequest) {
 // saying so is the only evidence it ever ran. Fail-open: if the recording cannot
 // happen, the job still runs (lib/support/job-runs.ts).
 export const GET = withJobRun('reminders', () => createAdminClient(), getHandler)
+
+const PAGE = 200
+/** Most invoices read in one run; the rest are next in line tomorrow. */
+const MAX_DUE = 2000
+/** Stop starting new sends after this, well inside the scheduler's timeout. */
+const TIME_BUDGET_MS = 4 * 60 * 1000

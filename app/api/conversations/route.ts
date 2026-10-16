@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 // app/api/conversations/route.ts
 // Unified Conversations API - List and create conversations
 
@@ -43,7 +44,10 @@ export async function GET(request: NextRequest) {
 
     // Search by name, email, or phone
     if (search) {
-      query = query.or(`contact_name.ilike.%${search}%,contact_email.ilike.%${search}%,contact_phone.ilike.%${search}%`)
+      // Quoted (lib/postgrest-search), so a comma or bracket in the search is
+      // text, not filter syntax that changes the query.
+      const pattern = orIlikeContains(search)
+      query = query.or(`contact_name.ilike.${pattern},contact_email.ilike.${pattern},contact_phone.ilike.${pattern}`)
     }
 
     // Filter by assignment

@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 import { gateRole } from '@/lib/api-role-gate'
 // ============================================
 // API Route: /api/guides
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (search) {
-      query = query.or(`name.ilike.%${search}%,contact_email.ilike.%${search}%`)
+      query = query.or(`name.ilike.${orIlikeContains(search)},contact_email.ilike.${orIlikeContains(search)}`)
     }
 
     // Support both is_active and active_only parameters

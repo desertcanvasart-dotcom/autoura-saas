@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
   }
   
   if (search) {
-    query = query.or(`document_number.ilike.%${search}%,supplier_name.ilike.%${search}%,client_name.ilike.%${search}%,city.ilike.%${search}%`)
+    query = query.or(`document_number.ilike.${orIlikeContains(search)},supplier_name.ilike.${orIlikeContains(search)},client_name.ilike.${orIlikeContains(search)},city.ilike.${orIlikeContains(search)}`)
   }
   
   if (startDate) {

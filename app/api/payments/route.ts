@@ -1,3 +1,4 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 // app/api/payments/route.ts
 // ============================================
 // AUTOURA - PAYMENTS API
@@ -37,7 +38,9 @@ export async function GET(request: NextRequest) {
       }, { status: 401 })
     }
 
-    const { data: payments, error } = await supabase
+    // Every payment: the pages total them ("total received"), and a plain
+    // select stopped at 1000 rows.
+    const { data: payments, error } = await fetchAllPages((from, to) => supabase
       .from('payments')
       .select(`
         *,
@@ -50,6 +53,8 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to))
 
     if (error) {
       console.error('❌ Database error:', error)

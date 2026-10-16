@@ -1,3 +1,4 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { gateRole } from '@/lib/api-role-gate'
@@ -25,7 +26,9 @@ export async function GET(request: NextRequest) {
     // One itinerary's tasks (the itinerary page's Tasks card).
     const itineraryId = searchParams.get('itineraryId')
 
-    // Build query
+    // Built per page (a PostgREST builder is single-use): every task, not the
+    // first 1000 — auto-generated tasks reach that within a few dozen trips.
+    const buildQuery = () => {
     let query = supabase
       .from('tasks')
       .select(`
@@ -77,8 +80,10 @@ export async function GET(request: NextRequest) {
         query = query.gte('due_date', todayStr)
       }
     }
+    return query
+    }
 
-    const { data: tasks, error } = await query
+    const { data: tasks, error } = await fetchAllPages((from, to) => buildQuery().order('id', { ascending: true }).range(from, to))
 
     if (error) {
       console.error('Error fetching tasks:', error)
@@ -86,9 +91,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate summary from all tasks for accurate counts
-    const { data: allTasks } = await supabase
+    const { data: allTasks } = await fetchAllPages((from, to) => supabase
       .from('tasks')
       .select('id, status, priority, due_date, archived')
+      .order('id', { ascending: true })
+      .range(from, to))
 
     const today = new Date().toISOString().split('T')[0]
     const nonArchivedTasks = (allTasks || []).filter(t => !t.archived)

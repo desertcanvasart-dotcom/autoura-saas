@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 import { NextRequest, NextResponse } from 'next/server'
 import { DEFAULT_CLIENT_STAGE } from '@/lib/client-stage'
 import { requireAuth } from '@/lib/supabase-server'
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
         .order('id', { ascending: true })
         .range(from, Math.min(to, limit - 1))
       if (search) {
-        const q = `%${search}%`
+        const q = orIlikeContains(search)
         query = query.or(`full_name.ilike.${q},first_name.ilike.${q},last_name.ilike.${q},email.ilike.${q},phone.ilike.${q},client_code.ilike.${q}`)
       }
       return query
