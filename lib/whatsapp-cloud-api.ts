@@ -103,7 +103,8 @@ export async function sendViaMeta({
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000),
     })
 
     const json = await response.json().catch(() => null)
@@ -289,7 +290,8 @@ export async function fetchMetaMedia(
 
   try {
     const metaRes = await fetch(`${GRAPH_BASE}/${graphVersion()}/${mediaId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
     })
     if (!metaRes.ok) {
       console.error(`❌ Meta media lookup failed (HTTP ${metaRes.status}) for ${mediaId}`)
@@ -299,7 +301,8 @@ export async function fetchMetaMedia(
     if (!meta?.url) return null
 
     const fileRes = await fetch(meta.url, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(60_000),
     })
     if (!fileRes.ok) {
       console.error(`❌ Meta media download failed (HTTP ${fileRes.status}) for ${mediaId}`)

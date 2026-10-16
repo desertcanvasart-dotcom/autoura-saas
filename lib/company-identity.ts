@@ -145,7 +145,10 @@ export async function fetchLogoDataUrl(
   // browser for client-side jsPDF/pdf-lib generation, where a fetch is the
   // user's own and node:dns cannot be bundled — so the guard cannot live here.
   try {
-    const res = await fetch(logoUrl)
+    // Best-effort, so bounded: 10s, and no redirects — the server routes
+    // vet the URL (lib/ssrf-guard.ts), and a redirect would take the fetch
+    // somewhere that was never vetted.
+    const res = await fetch(logoUrl, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
     if (!res.ok) return undefined
     const type = res.headers.get('content-type') || 'image/png'
     if (!/^image\/(png|jpe?g)/.test(type)) return undefined // jsPDF supports PNG/JPEG
@@ -170,7 +173,10 @@ export async function fetchLogoBytes(
 ): Promise<{ bytes: Uint8Array; format: 'png' | 'jpeg' } | undefined> {
   if (!logoUrl) return undefined
   try {
-    const res = await fetch(logoUrl)
+    // Best-effort, so bounded: 10s, and no redirects — the server routes
+    // vet the URL (lib/ssrf-guard.ts), and a redirect would take the fetch
+    // somewhere that was never vetted.
+    const res = await fetch(logoUrl, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
     if (!res.ok) return undefined
     const m = (res.headers.get('content-type') || '').match(/^image\/(png|jpe?g)/)
     if (!m) return undefined

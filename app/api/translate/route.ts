@@ -16,7 +16,7 @@ function getOpenAI(): OpenAI {
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY is not defined in environment variables')
     }
-    _openai = new OpenAI({ apiKey })
+    _openai = new OpenAI({ apiKey, timeout: 30_000, maxRetries: 1 })
   }
   return _openai
 }
