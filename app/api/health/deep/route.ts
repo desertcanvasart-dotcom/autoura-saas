@@ -40,6 +40,12 @@ export async function GET(request: NextRequest) {
   }
 
   const state = await collectState()
+  // ?ai=1: ask Anthropic whether it accepts the key (one free model listing).
+  // Opt-in — this check otherwise calls no vendor — and the answer for "AI
+  // service authentication failed".
+  const ai = request.nextUrl.searchParams.get('ai') === '1'
+    ? await (await import('@/lib/ai/anthropic-client')).checkAnthropicKey()
+    : undefined
 
   // The findings are computed from a bundle so that a monitor and a support
   // bundle never disagree about what counts as a problem.
@@ -74,6 +80,7 @@ export async function GET(request: NextRequest) {
         database: state.database,
         integrations: state.integrations,
         crons: state.crons,
+        ...(ai ? { anthropic_key: ai } : {}),
       },
       counts: state.counts,
       findings,

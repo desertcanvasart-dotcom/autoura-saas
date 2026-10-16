@@ -276,3 +276,16 @@ describe('round 3 — first run', () => {
     expect(read('app/templates/page.tsx')).not.toContain("language: 'ar'")
   })
 })
+
+describe('the Anthropic key', () => {
+  it('is cleaned of the whitespace and quotes a pasted key picks up', async () => {
+    const { anthropicApiKey } = await import('@/lib/ai/anthropic-client')
+    expect(anthropicApiKey('sk-ant-abc\n')).toBe('sk-ant-abc')
+    expect(anthropicApiKey('"sk-ant-abc"')).toBe('sk-ant-abc')
+    expect(anthropicApiKey(" 'sk-ant-abc' ")).toBe('sk-ant-abc')
+    expect(anthropicApiKey(undefined)).toBe('')
+  })
+  it('can be checked from the deep health endpoint', () => {
+    expect(read('app/api/health/deep/route.ts')).toContain('checkAnthropicKey()')
+  })
+})
