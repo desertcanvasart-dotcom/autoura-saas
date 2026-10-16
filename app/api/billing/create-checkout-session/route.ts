@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getOrCreateStripeCustomer, createCheckoutSession } from '@/lib/stripe'
 import { logActivity } from '@/lib/billing-middleware'
 
@@ -120,11 +120,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create Stripe customer
+    // Service role: the Stripe customer id is server-only (migration 423);
+    // the owner check above is the authorisation.
     const customerId = await getOrCreateStripeCustomer(
       tenant_id,
       tenant.company_name,
       tenant.contact_email,
-      supabase
+      createAdminClient()
     )
 
     // Create checkout session

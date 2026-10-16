@@ -25,6 +25,7 @@ import { requireSuperAdmin } from '@/lib/super-admin'
 import { collectState } from '@/lib/support/collect'
 import { bearerMatches } from '@/lib/support/probe-auth'
 import { bundleFindings, buildBundle } from '@/lib/support/bundle'
+import { jobsNeedAttention } from '@/lib/support/job-health'
 import { version as appVersion } from '../../../../package.json'
 
 export const dynamic = 'force-dynamic'
@@ -57,9 +58,14 @@ export async function GET(request: NextRequest) {
   )
 
   // 503 when a dependency is actually down, so an uptime monitor pages. A
-  // stopped scheduler is reported but does NOT page: it is a real problem and
-  // it is not an outage, and a monitor that cries wolf gets muted.
-  const ok = state.database.reachable && !Object.values(state.integrations).includes('failed')
+  // stopped scheduler is reported but does NOT page by default: it is a real
+  // problem and it is not an outage, and a monitor that cries wolf gets muted.
+  // ?strict=1 is for a second, lower-urgency monitor that SHOULD hear about it:
+  // it also answers 503 when any job is stale, failed or never reported back.
+  const healthy = state.database.reachable && !Object.values(state.integrations).includes('failed')
+  const strict = request.nextUrl.searchParams.get('strict') === '1'
+  const jobTrouble = jobsNeedAttention(state.crons)
+  const ok = healthy && (!strict || jobTrouble.length === 0)
 
   return NextResponse.json(
     {
@@ -71,6 +77,7 @@ export async function GET(request: NextRequest) {
       },
       counts: state.counts,
       findings,
+      jobsNeedingAttention: jobTrouble,
       uptimeSeconds: Math.round(process.uptime()),
       timestamp: new Date().toISOString(),
     },

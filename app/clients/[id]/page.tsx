@@ -819,7 +819,7 @@ export default function ClientProfilePage() {
                           {formatCurrency(Number(booking.display_total ?? 0), booking.currency || tenantCurrency)}
                         </div>
                         <Link
-                          href={`/view-itinerary/${booking.id}`}
+                          href={`/itineraries/${booking.id}`}
                           className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
                         >
                           View Details →

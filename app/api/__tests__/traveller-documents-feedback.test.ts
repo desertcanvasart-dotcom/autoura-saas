@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const h = vi.hoisted(() => ({ error: null as { code?: string; message: string } | null }))
+const h = vi.hoisted(() => ({ error: null as { code?: string; message: string } | null, role: 'member' }))
 
 const db = {
   from: () => {
@@ -22,7 +22,7 @@ const db = {
 
 vi.mock('@/lib/supabase-server', () => ({
   createAdminClient: () => db,
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: db }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, role: h.role, supabase: db }),
 }))
 vi.mock('@/lib/booking-portal', () => ({
   portalVerifyCookieName: () => 'c',
@@ -34,7 +34,7 @@ import { POST as upload } from '@/app/api/portal/[token]/travellers/[id]/documen
 import { GET as staffList } from '@/app/api/bookings/[id]/traveller-documents/route'
 import { REJECTION_MESSAGE } from '@/lib/portal/traveller-documents'
 
-beforeEach(() => { h.error = null })
+beforeEach(() => { h.error = null; h.role = 'member' })
 
 describe('portal upload over the size cap', () => {
   it('says the file is too large, not that none was selected', async () => {
@@ -56,6 +56,11 @@ describe('the office list of traveller documents', () => {
     const res = await list()
     expect(res.status).toBe(500)
     expect((await res.json()).success).toBe(false)
+  })
+
+  it('a viewer cannot open passport scans', async () => {
+    h.role = 'viewer'
+    expect((await list()).status).toBe(403)
   })
 
   it('is empty, not an error, before the documents table exists', async () => {

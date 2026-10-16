@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 const MAX_FILE_SIZE = 32 * 1024 * 1024 // 32MB
 
@@ -17,6 +18,8 @@ export async function POST(request: NextRequest) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    const overBudget = aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json()
     const { file, filename, mimeType } = body

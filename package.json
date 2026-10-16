@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.11.0"
   },
   "scripts": {
     "dev": "unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL && next dev",
@@ -65,7 +65,7 @@
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.553.0",
-    "next": "16.3.2",
+    "next": "16.4.2",
     "openai": "^6.8.1",
     "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",

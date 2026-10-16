@@ -23,7 +23,7 @@ interface AuthContextType {
   loading: boolean
   isSuperAdmin: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<void>
+  signUp: (email: string, password: string, fullName: string, companyName?: string, termsAcceptedAt?: string) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
 }
@@ -208,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/dashboard')
   }
 
-  const signUp = async (email: string, password: string, fullName: string, companyName?: string) => {
+  const signUp = async (email: string, password: string, fullName: string, companyName?: string, termsAcceptedAt?: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -216,6 +216,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: {
           full_name: fullName,
           company_name: companyName || '',
+          // The record that this person ticked "I agree to the Terms and
+          // Privacy Policy" on the sign-up form, and when.
+          ...(termsAcceptedAt ? { terms_accepted_at: termsAcceptedAt } : {}),
         },
       },
     })

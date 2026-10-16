@@ -2,13 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { createClient } from '@/app/supabase'
 import { 
   CheckCircle, 
   XCircle, 
   Loader2,
-  Eye,
-  EyeOff,
   User,
   Mail,
   Shield
@@ -35,13 +32,9 @@ function AcceptInvitationContent() {
   const [invitation, setInvitation] = useState<InvitationData | null>(null)
   const [companyName, setCompanyName] = useState<string | null>(null)
   const [needsSignIn, setNeedsSignIn] = useState(false)
-  
-  const [fullName, setFullName] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [checkEmail, setCheckEmail] = useState(false)
 
-  const supabase = createClient()
+  const [fullName, setFullName] = useState('')
 
   useEffect(() => {
     if (token) {
@@ -75,35 +68,21 @@ function AcceptInvitationContent() {
 
     // Validation — none for an existing login: nothing is created, and
     // their name and password stay as they are.
-    if (!invitation?.has_account) {
-      if (!fullName.trim()) {
-        setError('Please enter your full name')
-        return
-      }
-
-      if (password.length < 8) {
-        setError('Password must be at least 8 characters')
-        return
-      }
-
-      if (password !== confirmPassword) {
-        setError('Passwords do not match')
-        return
-      }
+    if (!invitation?.has_account && !fullName.trim()) {
+      setError('Please enter your full name')
+      return
     }
 
     setSubmitting(true)
 
     try {
-      // The account is created server-side by the accept route, which holds
-      // the invitation token and can therefore confirm the address without a
-      // second email. Calling supabase.auth.signUp() from the browser here is
-      // what stranded invitees: with confirmation on, the account existed but
-      // was unusable, and signing up again only said "already registered".
+      // No password is chosen here. Whoever opens this link may not be the
+      // invitee (the inviter has the same link), so the password is set from
+      // a one-time link the accept route emails to the invited address.
       const res = await fetch('/api/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(invitation?.has_account ? { token } : { token, password, full_name: fullName })
+        body: JSON.stringify(invitation?.has_account ? { token } : { token, full_name: fullName })
       })
       const payload = await res.json()
 
@@ -113,31 +92,16 @@ function AcceptInvitationContent() {
 
       setCompanyName(payload.data?.company_name ?? null)
 
-      // Someone who already had a working account keeps their own password:
-      // the one typed above was deliberately never applied, so there is
-      // nothing to sign in with here.
-      if (payload.data?.needs_existing_password) {
-        setNeedsSignIn(true)
+      if (payload.data?.check_email) {
+        setCheckEmail(true)
         setSuccess(true)
-        setTimeout(() => router.push('/login'), 3000)
         return
       }
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: payload.data?.email ?? invitation!.email,
-        password
-      })
-
-      // The membership exists either way — only the session failed, and
-      // logging in fixes that. Never report this as a failed invitation.
-      if (signInError) setNeedsSignIn(true)
-
+      // An existing login keeps its own password: sign in with it.
+      setNeedsSignIn(true)
       setSuccess(true)
-
-      setTimeout(() => {
-        router.push(signInError ? '/login' : '/dashboard')
-      }, 2000)
-
+      setTimeout(() => router.push('/login'), 3000)
     } catch (err: any) {
       setError(err.message || 'Failed to create account')
     } finally {
@@ -184,19 +148,32 @@ function AcceptInvitationContent() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-600" />
+            {checkEmail ? <Mail className="w-8 h-8 text-green-600" /> : <CheckCircle className="w-8 h-8 text-green-600" />}
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">
             {companyName ? `You've joined ${companyName}` : 'Welcome to Autoura!'}
           </h1>
-          <p className="text-gray-600 mb-4">
-            {needsSignIn
-              ? 'Your place on the team is set up. Please sign in with your existing password to continue.'
-              : 'Your account is ready — no confirmation email needed.'}
-          </p>
-          <p className="text-sm text-gray-500">
-            {needsSignIn ? 'Redirecting to sign in...' : 'Redirecting to dashboard...'}
-          </p>
+          {checkEmail ? (
+            <>
+              <p className="text-gray-600 mb-4">
+                Your place on the team is ready. We&apos;ve emailed{' '}
+                <span className="font-medium text-gray-900">{invitation?.email}</span> a link to set your password.
+              </p>
+              <p className="text-sm text-gray-500">
+                Open it from your inbox to finish. No email? Check spam, or use{' '}
+                <a href="/forgot-password" className="text-[#647C47] hover:underline font-medium">Forgot password</a>.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-600 mb-4">
+                {needsSignIn
+                  ? 'Your place on the team is set up. Please sign in with your existing password to continue.'
+                  : 'Your place on the team is set up.'}
+              </p>
+              <p className="text-sm text-gray-500">Redirecting to sign in...</p>
+            </>
+          )}
         </div>
       </div>
     )
@@ -256,11 +233,12 @@ function AcceptInvitationContent() {
             </p>
           ) : (<>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="invite-full-name" className="block text-sm font-medium text-gray-700 mb-1">
               Full Name
             </label>
             <div className="relative">
               <input
+                id="invite-full-name"
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -271,46 +249,9 @@ function AcceptInvitationContent() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
-                placeholder="Create a password"
-                required
-                minLength={8}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
-                placeholder="Confirm your password"
-                required
-              />
-            </div>
-          </div>
+          <p className="text-xs text-gray-500">
+            Next, we&apos;ll email you a link to set your password.
+          </p>
           </>)}
 
           <button
@@ -321,10 +262,10 @@ function AcceptInvitationContent() {
             {submitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                {invitation?.has_account ? 'Joining...' : 'Creating Account...'}
+                {invitation?.has_account ? 'Joining...' : 'Setting up...'}
               </>
             ) : (
-              invitation?.has_account ? 'Accept & Join Team' : 'Create Account'
+              invitation?.has_account ? 'Accept & Join Team' : 'Accept invitation'
             )}
           </button>
         </form>

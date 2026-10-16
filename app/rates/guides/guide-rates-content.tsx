@@ -622,7 +622,7 @@ export default function GuideRatesContent() {
             Add Rate
           </button>
           <Link
-            href="/guides"
+            href="/resources"
             className="flex items-center gap-2 px-3 py-1.5 text-sm border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50"
           >
             <Users className="w-4 h-4" />

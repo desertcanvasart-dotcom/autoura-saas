@@ -166,6 +166,7 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
     // escaped and its line breaks kept.
     const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
       method: 'POST',
+      signal: AbortSignal.timeout(60_000),
       headers: {
         'Content-Type': 'application/json',
         'x-cron-secret': process.env.CRON_SECRET || '',
@@ -239,6 +240,7 @@ async function sendSMS(to: string, body: string): Promise<{ success: boolean; er
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(15_000),
         headers: {
           'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
           'Content-Type': 'application/x-www-form-urlencoded',

@@ -17,7 +17,10 @@ export function getAnthropicClient(): Anthropic {
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error(MISSING_KEY_MESSAGE)
     }
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    // The SDK waits up to 10 minutes per attempt and retries twice on its own;
+    // under createMessageWithRetry's three retries a hung request could hold a
+    // route for over an hour. Three minutes covers the longest generation.
+    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000, maxRetries: 1 })
   }
   return _client
 }
