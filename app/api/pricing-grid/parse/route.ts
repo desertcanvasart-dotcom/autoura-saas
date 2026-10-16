@@ -12,6 +12,7 @@ import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
 import { gridHotelRate } from '@/lib/rates/grid-hotel-rate'
 import { hotelsMentioned, namedHotelFor } from '@/lib/pricing/hotel-mentions'
+import { isLayoverRoute, plainTransferFor, LAYOVER_TEXT } from '@/lib/rates/layover-route'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
@@ -62,7 +63,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
     activityRes, accommodationRes, entranceRes, flightRes, mealRes,
     cruiseRes, sleepingTrainRes,
   ] = await Promise.all([
-    admin.from('transportation_rates').select('id, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('transportation_rates').select('id, route_name, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('guide_rates').select('id, guide_type, guide_language, city, full_day_rate, half_day_rate, base_rate_eur, rate_currency').eq('tenant_id', tenantId),
     admin.from('airport_staff_rates').select('id, service_type, airport_code, direction, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('hotel_staff_rates').select('id, service_type, hotel_category, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
@@ -140,7 +141,7 @@ function buildRateCatalog(rates: Record<string, any[]>, tier: string, startDate:
   if (rates.transportation.length > 0) {
     catalog += '\n## TRANSPORT (group cost)\n'
     for (const r of rates.transportation) {
-      catalog += `ID: ${r.id} | ${r.service_type} | ${r.vehicle_type || ''} | ${r.origin_city || r.city}${r.destination_city ? ' → ' + r.destination_city : ''} | ${r.capacity_min || '?'}-${r.capacity_max || '?'} pax | €${r.base_rate_eur || 0}\n`
+      catalog += `ID: ${r.id} | ${r.service_type}${isLayoverRoute(r) ? ' (LAYOVER TOUR)' : ''} | ${r.route_name ? r.route_name + ' | ' : ''}${r.vehicle_type || ''} | ${r.origin_city || r.city}${r.destination_city ? ' → ' + r.destination_city : ''} | ${r.capacity_min || '?'}-${r.capacity_max || '?'} pax | €${r.base_rate_eur || 0}\n`
     }
   }
 
@@ -423,6 +424,8 @@ The transport catalog has different service_type values. A single day often need
 
 **Airport transfer and day tour are ALWAYS separate entries, even in the same city on the same day.**
 
+**A LAYOVER TOUR is not a transfer.** An airport_transfer marked (LAYOVER TOUR) — e.g. "Airport → Full Day → Airport" — is for travellers in transit: met at the airport, touring, and back to the airport for an onward flight the same day. Use it ONLY when the text says the party is in transit / on a layover and does not stay at a hotel. An arrival (airport → hotel) or departure (hotel → airport) takes a plain airport_transfer, plus a day_tour if they sightsee.
+
 **Where the party sleeps decides the road rate.** A day that sightsees in one city and sleeps in another (an "Alexandria day trip" from a Cairo hotel, "CAI/ALX/CAI") takes the intercity_day_trip from the hotel's city to the sightseeing city — never intercity_overnight, never intercity_dropoff, and not a day_tour inside the sightseeing city. Its hotel stays in the city where they sleep. If the catalog has no intercity_day_trip for that road, a day_tour from the hotel's city to that city; otherwise leave the route empty for the operator rather than take another kind of journey.
 
 Common patterns (select ALL that apply for each day):
@@ -555,12 +558,38 @@ Generate a reasonable 5-7 day itinerary${country ? ` in ${country}` : ''} coveri
       if (pkg.includes.meals === 'none') clearSlot(day, 'meals')
     }
 
+    // 4b'. NO LAYOVER TOUR ON AN ARRIVAL — "Airport → Full Day → Airport" is
+    // saved as an airport transfer, so the model took it for the arrival day's
+    // transfer. Unless the text says the party is in transit, it is swapped
+    // for the plain transfer in that city (same vehicle), or named for the
+    // operator when there is none.
+    const notes: string[] = []
+    if (!LAYOVER_TEXT.test(text)) {
+      type TRow = { id: string; route_name?: string | null; service_type?: string | null; vehicle_type?: string | null; city?: string | null; origin_city?: string | null; destination_city?: string | null }
+      const tRows = (rates.transportation as TRow[]).map(r => ({ ...r, id: String(r.id) }))
+      const tById = new Map(tRows.map(r => [r.id, r]))
+      for (const day of days as Array<{ dayNumber: number; slots: Array<{ slotId: string; selectedItems?: unknown[] }> }>) {
+        const slot = day.slots.find(sl => sl.slotId === 'route')
+        if (!slot?.selectedItems) continue
+        slot.selectedItems = slot.selectedItems.map(it => {
+          const row = tById.get(String((it as { rateId?: string }).rateId))
+          if (!row || !isLayoverRoute(row)) return it
+          const plain = plainTransferFor(row, tRows)
+          const info = plain ? rateMap.get(plain.id) : undefined
+          if (!plain || !info) {
+            notes.push(`Day ${day.dayNumber}: "${row.route_name}" is a layover tour (airport → tour → airport), and no plain airport transfer is saved in ${row.city || row.origin_city || 'that city'} — pick the transfer by hand.`)
+            return it
+          }
+          return { rateId: plain.id, name: info.label, rateEur: info.rate, rateNonEur: info.rateNonEur }
+        })
+      }
+    }
+
     // 4c. THE NAMED HOTEL — the text named a hotel ("4-Day Stay at Marriott
     // Mena House"): every night the AI gave another hotel in that city is that
     // hotel. Decided here from the names, not left to the model; and a named
     // hotel saved under another tier than the one chosen is said, so the
     // operator fixes the tier in Rates → Hotels instead of wondering.
-    const notes: string[] = []
     if (pkg.includes.cruise && !days.some((d: { slots: ScrubbableSlot[] }) => (d.slots.find(s => s.slotId === 'cruise')?.selectedItems?.length ?? 0) > 0)) {
       notes.push(`${pkg.name}: no cruise was matched to your cruise rates — pick the ship on the cruise nights, or choose another package.`)
     }

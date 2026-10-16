@@ -16,6 +16,7 @@
 import type { GridDay, RateOption } from '../types'
 import { optionItems } from './option-item'
 import { vehicleForPax } from './option-filters'
+import { isLayoverRoute } from '@/lib/rates/layover-route'
 
 const routeIdOf = (optionId: string) => {
   const sep = optionId.indexOf('__')
@@ -61,6 +62,8 @@ export function transportTypeWarnings(days: GridDay[], routeOptions: RateOption[
     for (const item of route?.selectedItems ?? []) {
       const o = byId.get(item.rateId) as (RateOption & { origin_city?: string | null; destination_city?: string | null }) | undefined
       if (!o?.service_type || o.service_type === 'airport_transfer') continue
+      // Airport → Full Day → Airport is a layover tour: a day-tour type is right for it.
+      if (isLayoverRoute({ route_name: o.name, origin_city: o.origin_city, destination_city: o.destination_city })) continue
       const where = [o.origin_city, o.destination_city].filter(Boolean).join(' ')
       if (AIRPORT.test(where)) {
         out.push(`Day ${day.dayNumber}: "${o.name}" is an airport route saved as "${String(o.service_type).replace(/_/g, ' ')}", not an airport transfer — check its type in Rates → Transport.`)
