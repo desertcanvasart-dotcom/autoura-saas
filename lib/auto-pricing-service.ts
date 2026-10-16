@@ -1262,7 +1262,7 @@ export async function getCruiseRates(
       // Layer 1: the itinerary's pin. An id is a decision — no tier, city or
       // preference logic; a missing/deactivated id is a re-pick hole (null).
       const { data: rawPinned } = await base().eq('id', opts.rateId).limit(1)
-      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!pinned || pinned.length === 0) return null
       cruise = pinned[0]
     } else {
@@ -1289,7 +1289,7 @@ export async function getCruiseRates(
         }
         rows = data
       }
-      const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rows as Record<string, unknown>[], await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rows as Record<string, unknown>[], await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
       const pick = pickCandidate(cruises as any[], (c: any) => c.ship_name || c.id)
       if (pick.kind === 'ambiguous') {
@@ -1649,7 +1649,7 @@ export async function getHotelRates(
       // Layer 1: the itinerary's pin. An id is a decision — no tier, city or
       // preference logic; a missing/deactivated id is a re-pick hole (null).
       const { data: rawPinned } = await base().eq('id', opts.rateId).limit(1)
-      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!pinned || pinned.length === 0) return null
       return mapRow(pinned[0], 'db')
     }
@@ -1661,7 +1661,7 @@ export async function getHotelRates(
       .eq('tier', tier)
       .ilike('city', `%${city}%`)
       .limit(AMBIGUITY_SCAN_LIMIT)
-    const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!error && hotels && hotels.length > 0) {
       // ilike can match a DIFFERENT city ("Cairo" ~ "New Cairo"). Only an exact
@@ -1692,7 +1692,7 @@ export async function getHotelRates(
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .limit(1)
-    const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (anyHotel && anyHotel.length > 0) {
       return mapRow(anyHotel[0], 'fuzzy')
@@ -1733,7 +1733,7 @@ export async function getEntranceFeeById(
 
     if (!fees || fees.length === 0) return null
 
-    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     const fee = fees[0] as { id: string; attraction_name: string; eur_rate: number | null; non_eur_rate: number | null }
     // NULL = not priced yet (hole); 0 = genuinely free — see getEntranceFee.
     const rate = resolveEntranceRate(fee, isEurPassport)
@@ -1812,7 +1812,7 @@ export async function getEntranceFee(
       return null
     }
 
-    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     const fee = fees[0] as any
 
     // `??`, not `||`. Since migration 278 the schema distinguishes the two
@@ -1895,7 +1895,7 @@ export async function getGuideRate(
         .eq('is_active', true)
         .eq('guide_type', grade)
         .eq('tour_duration', duration)
-      return (await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))) ?? []
+      return (await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)) ?? []
     })
     // A row with no mode is a Spot rate — the column's default (380).
     const forLanguage = (rateRows as Array<GuideRateRow & { guide_mode?: string | null }>)
@@ -1930,7 +1930,7 @@ export async function getGuideRate(
       .eq('is_active', true)
       .contains('languages', [language])
       .order('is_preferred', { ascending: false })
-    const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!error && guides && guides.length > 0) {
       // Several guides in the requested tier: the preferred one, else a hole
@@ -2022,7 +2022,7 @@ export async function getMealRates(
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('tier', tier)
-    const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     const rows = (mealRows ?? []) as Array<{
       id?: string
@@ -2170,7 +2170,7 @@ export async function getAirportServiceRateDetail(
       // arbitrary one. Deterministic beats incidental.
       .order('rate_eur', { ascending: true })
       .limit(1)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'airport_staff_rates', rawAirportRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'airport_staff_rates', rawAirportRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!rates || rates.length === 0) {
       return null
@@ -2215,7 +2215,7 @@ export async function getHotelServiceRateDetail(
         // second row is added.
         .order('rate_eur', { ascending: true })
         .limit(1)
-      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!rates || rates.length === 0) return null
       return staffRateOf(rates[0])
     }
@@ -2266,7 +2266,7 @@ export async function getTippingRates(
       .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!rates || rates.length === 0) {
       return null
@@ -2321,7 +2321,7 @@ export async function loadTippingRows(scope: CatalogScope): Promise<TippingRow[]
       .select('id, tenant_id, role_type, context, rate_unit, rate_eur, rate_currency, city')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
-    const rows = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     return (rows ?? []) as TippingRow[]
   } catch {
     return []
@@ -2390,7 +2390,7 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
     .select('*')
     .or(catalogOrExpr(scope))
     .eq('is_active', true)
-  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
   const cache = new Map<string, TransportRate>()
 
@@ -2676,7 +2676,7 @@ async function loadCruisePackages(scope: CatalogScope): Promise<Array<PackageVeh
       .or(catalogOrExpr(scope))
       .eq('package_type', 'cruise_sightseeing')
       .eq('is_active', true)
-    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     return (rows ?? []) as unknown as Array<PackageVehicleRates & { id: string; package_name: string; duration_days: number | null }>
   })
 }
@@ -2693,7 +2693,7 @@ async function loadRoadPackages(scope: CatalogScope): Promise<Array<PackageVehic
       .or(catalogOrExpr(scope))
       .in('package_type', ['day_tour', 'multi_day'])
       .eq('is_active', true)
-    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     return (rows ?? []) as unknown as Array<PackageVehicleRates & {
       id: string; package_name: string; package_type: string; origin_city: string | null; destination_city: string | null; duration_days: number | null
     }>
@@ -2713,7 +2713,7 @@ async function loadActivitiesByIds(scope: CatalogScope, ids: string[]): Promise<
     .or(catalogOrExpr(scope))
     .in('id', ids)
     .eq('is_active', true)
-  const rows = await normalizeRateRows(getSupabaseAdmin(), 'activity_rates', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+  const rows = await normalizeRateRows(getSupabaseAdmin(), 'activity_rates', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
   for (const r of (rows ?? []) as unknown as ActivityRow[]) map.set(r.id, r)
   return map
 }
@@ -3496,7 +3496,7 @@ export async function calculateDayBasedPricing(
         .select(TICKET_COLUMNS[table])
         .or(catalogOrExpr(catalogScope))
         .eq('is_active', true)
-      return normalizeRateRows(getSupabaseAdmin(), table, (data ?? []) as unknown as Record<string, unknown>[], runCurrencyForTickets)
+      return normalizeRateRows(getSupabaseAdmin(), table, (data ?? []) as unknown as Record<string, unknown>[], runCurrencyForTickets, catalogScope.tenantId)
     }
     const [flightRows, trainRows, sleeperRows] = await Promise.all([
       ticketLegs.some(l => l.mode === 'flight') ? fetchMode('flight_rates') : Promise.resolve([]),

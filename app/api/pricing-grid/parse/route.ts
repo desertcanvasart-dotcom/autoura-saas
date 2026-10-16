@@ -82,7 +82,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
   // number, and "600" in EGP would price as 600 in the run currency.
   const runCurrency = await getTenantRunCurrency(admin, tenantId)
   const norm = (table: string, rows: unknown) =>
-    normalizeRateRows(admin, table, (rows || []) as Record<string, unknown>[], runCurrency)
+    normalizeRateRows(admin, table, (rows || []) as Record<string, unknown>[], runCurrency, tenantId)
 
   const [
     transportation, guides, airport_staff, hotel_staff, tipping, activities,

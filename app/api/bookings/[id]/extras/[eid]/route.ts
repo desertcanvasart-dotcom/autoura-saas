@@ -1,3 +1,4 @@
+import { ratesForTenant } from '@/lib/currency'
 // ============================================
 // /api/bookings/[id]/extras/[eid] — pricing, confirming, withdrawing
 // ============================================
@@ -227,9 +228,11 @@ async function addToSupplierManifest(tenantId: string, bookingId: string, extra:
 
   const [{ data: booking }, { data: rates }] = await Promise.all([
     admin.from('bookings').select('currency').eq('id', bookingId).maybeSingle(),
-    admin.from('exchange_rates').select('base_currency, target_currency, rate, is_active').eq('is_active', true),
+    admin.from('exchange_rates').select('tenant_id, base_currency, target_currency, rate, is_active').eq('is_active', true),
   ])
-  const { quotedCost, note } = manifestCost(extra, booking?.currency, (rates ?? []) as ExchangeRate[])
+  // The service role sees every company's manual rates: keep the shared ones
+  // and this company's own.
+  const { quotedCost, note } = manifestCost(extra, booking?.currency, ratesForTenant((rates ?? []) as ExchangeRate[], tenantId))
 
   const { error } = await admin.from('booking_supplier_status').insert({
     tenant_id: tenantId,

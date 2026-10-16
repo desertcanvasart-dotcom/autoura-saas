@@ -1,3 +1,4 @@
+import { ratesForTenant } from '@/lib/currency'
 import { NextResponse } from 'next/server'
 import { roleAllows } from '@/lib/api-role-gate'
 import { evaluateDeleteGuard } from '@/lib/delete-guard'
@@ -177,10 +178,12 @@ export async function PUT(
         .maybeSingle()
       const row = current as (Record<string, unknown> & { status?: string }) | null
       if (row && 'fx_frozen' in row && row.fx_frozen == null && row.status !== 'confirmed') {
-        const { data: fxRates } = await supabase
+        const { data: fxAll } = await supabase
           .from('exchange_rates')
-          .select('base_currency, target_currency, rate, is_active')
+          .select('tenant_id, base_currency, target_currency, rate, is_active')
           .eq('is_active', true)
+        // Shared rates plus this company's overrides (its own winning).
+        const fxRates = ratesForTenant(fxAll, typeof row.tenant_id === 'string' ? row.tenant_id : null)
         if (fxRates && fxRates.length > 0) {
           const { data: { user: fxUser } } = await supabase.auth.getUser()
           const fxBase = typeof row.tenant_id === 'string'

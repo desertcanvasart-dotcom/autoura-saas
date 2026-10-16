@@ -269,3 +269,26 @@ export function batchConvert(
 
   return result
 }
+
+/**
+ * The exchange rates one company may use: the shared rates (tenant_id null)
+ * plus its own manual overrides, its own winning for the same currency pair —
+ * never another company's. Reads through the service role (and some RLS reads,
+ * which return global + own in no order) handed every caller the first match
+ * for a pair, which could be ANOTHER company's manual rate. With no company
+ * given, only the shared rates.
+ */
+export function ratesForTenant<R extends { tenant_id?: string | null; base_currency: string; target_currency: string }>(
+  rows: readonly R[] | null | undefined,
+  tenantId: string | null | undefined,
+): R[] {
+  const byPair = new Map<string, R>()
+  for (const r of rows ?? []) {
+    const owner = r.tenant_id ?? null
+    if (owner !== null && owner !== tenantId) continue
+    const key = `${r.base_currency}>${r.target_currency}`
+    const prev = byPair.get(key)
+    if (!prev || (owner !== null && (prev.tenant_id ?? null) === null)) byPair.set(key, r)
+  }
+  return [...byPair.values()]
+}
