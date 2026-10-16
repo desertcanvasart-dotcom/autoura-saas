@@ -46,6 +46,9 @@ export const SELF_AUTH_API_PREFIXES = [
   // Public marketing contact form: the sender is a prospect with no session.
   // Self-protects with a per-IP rate limit + honeypot inside the handler.
   '/api/contact',
+  // Browsers POST Content-Security-Policy violations here from any page,
+  // signed in or not. Rate limited per IP; it only logs.
+  '/api/csp-report',
 ]
 
 /**
