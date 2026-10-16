@@ -24,7 +24,7 @@ describe('rate_limit_take (migration 427) in Postgres', () => {
     // An elapsed window starts over.
     await db.exec(`UPDATE rate_limit_buckets SET window_start = NOW() - interval '2 hours' WHERE key = 'a'`)
     expect(await take('a')).toMatchObject({ allowed: true, remaining: 1 })
-  })
+  }, 60_000) // starting Postgres in-process is slow under a full parallel run
 })
 
 describe('checkSharedRateLimit', () => {
