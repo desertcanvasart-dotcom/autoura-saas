@@ -14,6 +14,7 @@ import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
 import { repickVehicles } from './lib/option-filters'
 import { optionItems, cruiseForTier, hotelForTier } from './lib/option-item'
+import { linkParsedTransport, transportTypeWarnings } from './lib/parsed-transport'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
 import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
@@ -710,7 +711,12 @@ function PricingGridContent() {
       })
       const data = await res.json()
       if (data.success && data.days) {
-        const parsedDays: GridDay[] = parsedDaysToGrid(data.days, () => crypto.randomUUID())
+        const parsedPax = Number(data.metadata?.pax) > 0 ? Number(data.metadata.pax) : config.pax
+        // The parser picks transport ROWS; the grid lists routes by vehicle —
+        // linked here, at the vehicle for the party (parsed-transport.ts).
+        const parsedDays: GridDay[] = rates
+          ? linkParsedTransport(parsedDaysToGrid(data.days, () => crypto.randomUUID()), rates.route, parsedPax)
+          : parsedDaysToGrid(data.days, () => crypto.randomUUID())
         // The parser's prices are its own derivation (a seasonal hotel came in
         // at 0); the grid's rate list is the authority (hydrate-rates.ts).
         let hydrated = rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays
@@ -722,7 +728,10 @@ function PricingGridContent() {
           if (!config.guideLanguage) setConfig(prev => ({ ...prev, guideLanguage }))
         }
         setDays(hydrated)
-        setParseNotes(Array.isArray(data.notes) ? data.notes.map(String) : [])
+        setParseNotes([
+          ...(Array.isArray(data.notes) ? data.notes.map(String) : []),
+          ...(rates ? transportTypeWarnings(hydrated, rates.route) : []),
+        ])
         // The parse wrote its own brief descriptions: offer the library's.
         setWrittenFrom({})
         setLibraryMissing([])

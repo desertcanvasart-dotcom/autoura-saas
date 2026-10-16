@@ -69,3 +69,32 @@ describe('the parser reads hotels the form saved', () => {
     expect(src).toContain('namedHotelFor(')
   })
 })
+
+describe('parsed transport on the grid', async () => {
+  const { linkParsedTransport, transportTypeWarnings } = await import('@/app/pricing-grid/lib/parsed-transport')
+  const route = (id: string, row: string, type: string, origin: string, min: number, max: number, eur: number) => ({
+    id, row_id: row, name: `Vehicle ${min}-${max} — ${origin}`, rateEur: eur, rateNonEur: eur,
+    service_type: type, origin_city: origin, destination_city: null, capacity_min: min, capacity_max: max,
+  }) as unknown as RateOption
+  const options = [
+    route('r1__sedan', 'row-sedan', 'airport_transfer', 'Cairo Airport', 1, 2, 30),
+    route('r1__van', 'row-van', 'airport_transfer', 'Cairo Airport', 3, 7, 50),
+    route('r2__sedan', 'row-bad', 'day_tour', 'Cairo Airport', 1, 2, 90),
+  ]
+  const day = (rateId: string) => ({
+    id: 'd1', dayNumber: 1, title: 'Arrival', city: 'Cairo', description: '', isExpanded: false,
+    slots: [{ slotId: 'route', selectedItems: [{ rateId, name: 'airport_transfer sedan Cairo', rateEur: 30, rateNonEur: 30 }], customAmount: 0 }],
+  }) as never
+
+  it('turns the parser\'s row into the grid option, at the vehicle for the party', () => {
+    const [d] = linkParsedTransport([day('row-sedan')], options, 4)
+    expect((d as { slots: Array<{ selectedItems: Array<{ rateId: string }> }> }).slots[0].selectedItems[0].rateId).toBe('r1__van')
+  })
+
+  it('says when an airport route is saved as another type', () => {
+    const [d] = linkParsedTransport([day('row-bad')], options, 2)
+    expect(transportTypeWarnings([d], options)[0]).toMatch(/airport route saved as "day tour"/)
+    const [ok] = linkParsedTransport([day('row-sedan')], options, 2)
+    expect(transportTypeWarnings([ok], options)).toEqual([])
+  })
+})
