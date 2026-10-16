@@ -34,6 +34,7 @@ import type { ExchangeRate } from '@/lib/currency'
 import { displayRate } from './lib/display-rate'
 import { takeConversation } from '@/lib/grid-handoff'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { readbackDays, readbackText } from './lib/readback'
 import type { LibraryGap, WrittenSource } from './components/DayRow'
 
 // ============================================
@@ -543,6 +544,9 @@ function PricingGridContent() {
   // What the parser wants the operator to know (a named hotel saved under
   // another tier, a transport rate whose type contradicts its route …).
   const [parseNotes, setParseNotes] = useState<string[]>([])
+  // After a parse: the grid read back as lines, to check the reading at a glance.
+  const [showReadback, setShowReadback] = useState(false)
+  const readback = useMemo(() => (showReadback ? readbackDays(days) : []), [showReadback, days])
   const [offerWrite, setOfferWrite] = useState(false)
   const writeDescriptions = async (mode: 'fill' | 'rewrite', dayNumbers?: number[]) => {
     if (writing !== null || days.length === 0) return
@@ -728,6 +732,7 @@ function PricingGridContent() {
       setDays([])
       setBlockNotes({})
       setParseNotes([])
+      setShowReadback(false)
       setConfig(prev => ({ ...prev, itineraryId: null, itineraryCode: null }))
       const res = await fetch('/api/pricing-grid/parse', {
         method: 'POST',
@@ -753,6 +758,7 @@ function PricingGridContent() {
           if (!config.guideLanguage) setConfig(prev => ({ ...prev, guideLanguage }))
         }
         setDays(hydrated)
+        setShowReadback(hydrated.length > 0)
         setParseNotes([
           ...(Array.isArray(data.notes) ? data.notes.map(String) : []),
           ...(rates ? transportTypeWarnings(hydrated, rates.route) : []),
@@ -1196,6 +1202,37 @@ function PricingGridContent() {
                 {parseNotes.map((n, i) => <li key={i}>{n}</li>)}
               </ul>
             </div>
+          )}
+          {showReadback && readback.length > 0 && (
+            <details open className="mb-2 px-3 py-2 text-xs bg-white border border-gray-200 rounded-lg text-gray-800">
+              <summary className="cursor-pointer font-medium select-none">
+                What I understood — check each day before pricing
+              </summary>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {readback.map(d => (
+                  <div key={d.title}>
+                    <p className="font-semibold text-gray-900">{d.title}</p>
+                    <ul className="text-gray-700">
+                      {d.lines.map((l, i) => <li key={i}>{l}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-3">
+                <button
+                  type="button"
+                  className="font-medium text-[#556B2F] hover:underline"
+                  onClick={() => {
+                    const pkg = PACKAGE_TYPE_CONFIGS.find(c => c.slug === config.packageType)
+                    void navigator.clipboard?.writeText(readbackText(days, { packageName: pkg?.name, tier: config.tier, pax: config.pax, startDate: config.startDate }))
+                      .then(() => showToast('success', 'Copied'), () => showToast('error', 'Could not copy'))
+                  }}
+                >
+                  Copy as text
+                </button>
+                <button type="button" onClick={() => setShowReadback(false)} className="text-gray-500 hover:underline">Hide</button>
+              </div>
+            </details>
           )}
           {libraryMissing.length > 0 && (
             <details className="mb-2 px-3 py-2 text-xs bg-amber-50 border border-amber-200 rounded-lg">
