@@ -5,6 +5,7 @@ import { captureFirstTouch } from '@/lib/marketing-attribution'
 import Sidebar from "@/components/Sidebar"
 import ImpersonationBanner from "@/components/ImpersonationBanner"
 import SupportChatWidget from "@/components/SupportChatWidget"
+import ClosureBanner from "@/components/account/ClosureBanner"
 import { AuthProvider } from './contexts/AuthContext'
 import { TenantProvider } from './contexts/TenantContext'
 import { ConfirmDialogProvider } from '@/components/ConfirmDialog'
@@ -79,6 +80,7 @@ export default function ClientShell({
                   isCollapsed ? 'lg:ml-16' : 'lg:ml-56'
                 }`}
               >
+                <ClosureBanner />
                 {children}
               </main>
               <SupportChatWidget />

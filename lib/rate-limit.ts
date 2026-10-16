@@ -90,6 +90,11 @@ export const RATE_LIMITS = {
     limit: 300,        // messages
     windowMs: 86400000, // per day
   },
+  // Data exports (app/api/account/export): each one reads every table.
+  dataExport: {
+    limit: 5,          // exports
+    windowMs: 3600000, // per hour
+  },
   // Invitations
   invitation: {
     limit: 10,         // invites

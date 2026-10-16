@@ -260,6 +260,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
   it('exits 0 on a clean run and calls BOTH endpoints with a Bearer secret', async () => {
     const { url, hits, auth } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: OK_INVOICES },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })
@@ -269,7 +270,9 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     expect(result.code).toBe(0)
     expect(hits).toContain('/api/cron/send-reminders')
     expect(hits).toContain('/api/cron/task-reminders')
-    expect(auth).toEqual(['Bearer shh', 'Bearer shh', 'Bearer shh'])
+    expect(hits).toContain('/api/cron/purge-closed-companies')
+    expect(auth).toEqual(['Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh'])
+    expect(result.stdout).toContain('purge-closed-companies ok')
     expect(result.stdout).toContain('send-reminders ok')
     expect(result.stdout).toContain('task-reminders ok')
     expect(result.stdout).toContain('purge-traveller-documents ok')
@@ -278,6 +281,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
   it('exits 0 when there was simply nothing to do', async () => {
     const { url } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'No reminders to send', processed: 0 }) },
       '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'Task reminders sent: 0 due soon, 0 overdue', results: { dueSoon: 0, overdue: 0, errors: [] } }) },
     })
@@ -288,6 +292,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
   it('exits 1 when dunning emails failed inside a 200', async () => {
     const { url } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'Processed 4 reminders', sent: 1, failed: 3, skipped: 0 }) },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })
@@ -299,6 +304,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
   it('exits 1 when the task sweep reported errors inside a 200', async () => {
     const { url } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: OK_INVOICES },
       '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'done', results: { dueSoon: 0, overdue: 0, errors: ['Due soon query error: boom'] } }) },
     })
@@ -311,6 +317,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     // One broken job must not hide the state of the other.
     const { url, hits } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/send-reminders': { status: 500, body: 'kaboom' },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })

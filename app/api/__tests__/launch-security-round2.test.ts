@@ -72,7 +72,7 @@ describe('smaller holes', () => {
     expect(secretMatches('abc', undefined)).toBe(false)
     expect(secretMatches(null, 'abc')).toBe(false)
     expect(bearerMatches('Bearer s', 's')).toBe(true)
-    for (const f of ['refresh-exchange-rates', 'process-agent-memory', 'mail-alerts', 'gmail-sync', 'send-reminders', 'scheduled-send', 'purge-traveller-documents', 'task-reminders']) {
+    for (const f of ['refresh-exchange-rates', 'process-agent-memory', 'mail-alerts', 'gmail-sync', 'send-reminders', 'scheduled-send', 'purge-traveller-documents', 'purge-closed-companies', 'task-reminders']) {
       const src = read(`app/api/cron/${f}/route.ts`)
       expect(src, f).toMatch(/bearerMatches\(|secretMatches\(/)
       expect(src, f).not.toMatch(/!== `Bearer \$\{/)

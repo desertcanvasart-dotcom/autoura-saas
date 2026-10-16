@@ -24,7 +24,7 @@ describe('operations', () => {
     const endpoint: Record<string, string> = {
       'exchange-rates': 'refresh-exchange-rates', 'agent-memory': 'process-agent-memory',
       reminders: 'send-reminders', 'task-reminders': 'task-reminders',
-      'purge-traveller-documents': 'purge-traveller-documents', 'gmail-sync': 'gmail-sync',
+      'purge-traveller-documents': 'purge-traveller-documents', 'purge-closed-companies': 'purge-closed-companies', 'gmail-sync': 'gmail-sync',
       'mail-alerts': 'mail-alerts', 'scheduled-send': 'scheduled-send',
     }
     for (const job of JOB_NAMES) expect(ops, job).toContain(`/api/cron/${endpoint[job]}`)
