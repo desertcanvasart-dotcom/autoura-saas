@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { attachmentNameParams, encodeEmailHeader } from '@/lib/email/mime-header'
 import { NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
@@ -9,6 +10,9 @@ import { gateRole } from '@/lib/api-role-gate'
 
 // POST - Send supplier document via Gmail with PDF attachment
 export async function POST(request: Request) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     const roleGate = await gateRole('staff')
     if (roleGate) return roleGate

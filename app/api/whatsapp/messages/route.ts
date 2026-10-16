@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { indexWhatsAppReply } from '@/lib/copilot-indexer'
@@ -53,6 +54,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/whatsapp/messages - Send a new message
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     // ✅ SECURITY: Require authentication - prevents SMS spam abuse
     const authResult = await requireAuth()

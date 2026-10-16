@@ -60,14 +60,15 @@ function getDirection(from: string | null | undefined, office: OfficeRule): 'inb
 }
 
 // GET - Sync status
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
 
-    const userId = request.nextUrl.searchParams.get('user_id') || authResult.user?.id
+    // Your own mailbox's progress only: ?user_id= let one member read another's.
+    const userId = authResult.user?.id
     if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
     // Sync progress is per mailbox: this person in this company (migration 415).

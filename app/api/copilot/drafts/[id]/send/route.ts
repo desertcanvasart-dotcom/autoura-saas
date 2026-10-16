@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 // POST /api/copilot/drafts/[id]/send — operator-approved dispatch.
 //   WhatsApp: sends immediately via Twilio, marks the draft sent + thread resolved.
 //   Email:    approves the draft and hands off to the Inbox composer (gmail-
@@ -7,6 +8,9 @@ import { requireAuth } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase || !auth.tenant_id || !auth.user) {

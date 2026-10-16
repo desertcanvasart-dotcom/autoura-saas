@@ -101,6 +101,15 @@ export async function GET(request: NextRequest) {
   })
 }
 
+const SUPPLIER_DOCUMENT_FIELDS = [
+  'document_type', 'document_number', 'itinerary_id', 'supplier_id', 'supplier_name',
+  'supplier_contact_name', 'supplier_contact_email', 'supplier_contact_phone', 'supplier_address',
+  'client_name', 'client_nationality', 'num_adults', 'num_children', 'city', 'service_date',
+  'check_in', 'check_out', 'pickup_time', 'pickup_location', 'dropoff_location', 'driver_name',
+  'vehicle_type', 'services', 'currency', 'total_cost', 'payment_terms', 'special_requests',
+  'internal_notes',
+] as const
+
 export async function POST(request: NextRequest) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
@@ -122,10 +131,25 @@ export async function POST(request: NextRequest) {
   try {
     const roleGate = await gateRole('staff')
     if (roleGate) return roleGate
-    const body = await request.json()
+    const raw = await request.json()
 
-    // Add tenant_id for multi-tenancy
+    // Only the fields a new document is made of: the whole body used to be
+    // inserted, so a caller could set status, sent_at or confirmed_at — a
+    // document "confirmed" by a supplier who never saw it.
+    const body: typeof raw = {}
+    for (const k of SUPPLIER_DOCUMENT_FIELDS) if (raw && k in raw) body[k] = raw[k]
     body.tenant_id = tenant_id
+
+    // The supplier and trip must be this company's (the RLS client sees only
+    // its own; a foreign id was stored anyway when the lookup came back empty).
+    if (body.supplier_id) {
+      const { data: own } = await supabase.from('suppliers').select('id').eq('id', String(body.supplier_id)).maybeSingle()
+      if (!own) return NextResponse.json({ success: false, error: 'Supplier not found' }, { status: 404 })
+    }
+    if (body.itinerary_id) {
+      const { data: own } = await supabase.from('itineraries').select('id').eq('id', String(body.itinerary_id)).maybeSingle()
+      if (!own) return NextResponse.json({ success: false, error: 'Itinerary not found' }, { status: 404 })
+    }
 
     // If supplier_id provided, fetch supplier details
     if (body.supplier_id && !body.supplier_name) {

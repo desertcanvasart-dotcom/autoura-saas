@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextResponse } from 'next/server'
 import { generateEmailTemplate } from '@/lib/communication-utils'
 import { formatCurrency } from '@/lib/currency'
@@ -13,6 +14,9 @@ import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
 import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 export async function POST(request: Request) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     // Authenticated users only — this route sends mail through the company
     // mailbox, so it must never be callable anonymously.

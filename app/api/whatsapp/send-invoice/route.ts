@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { gateRole } from '@/lib/api-role-gate'
 import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
 import { formatMoney } from '@/lib/currency-totals'
@@ -29,6 +30,9 @@ async function invoicePdfBytes(invoice: any, senderTenant: SenderTenant | null):
 }
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   // Viewers read nothing here and change nothing; deletes and the
   // finance-only areas are for managers and admins (lib/api-role-gate).
   const roleGate = await gateRole('staff')

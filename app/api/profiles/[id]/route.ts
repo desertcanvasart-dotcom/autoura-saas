@@ -184,6 +184,15 @@ export async function PUT(
     // The role too: tenant_members.role is the only role column — writing
     // user_profiles.role (dropped by migration 357) failed every change.
     const { is_active: isActive, role: newRole, ...profileUpdate } = updateData
+    // The profile (name, phone…) is the person's own, across every company
+    // they belong to: only they change it. A manager changes role and access
+    // here, never someone else's name — including the owner's.
+    if (!isSelf && Object.keys(profileUpdate).length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Only the person themselves can change their profile details' },
+        { status: 403 }
+      )
+    }
     if (newRole !== undefined) {
       const { data: target } = await adminClient
         .from('tenant_members')

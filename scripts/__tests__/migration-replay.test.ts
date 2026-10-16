@@ -816,5 +816,15 @@ describe('migration replay from scratch', () => {
       "SELECT key_columns FROM data_table_columns(ARRAY['clients'])"
     )).rows[0] as { key_columns: string[] }
     expect(clientsKey.key_columns).toEqual(['id'])
+
+    // Migration 435: two companies may each add the same country privately;
+    // the shared catalogue still holds one row per code.
+    await db.query("INSERT INTO destination_catalog (country_code, name, added_by_tenant) VALUES ('QQ', 'Probe A', $1)", [kept])
+    const other = (await db.query("INSERT INTO tenants (company_name) VALUES ('purge-c') RETURNING id")).rows[0] as { id: string }
+    await db.query("INSERT INTO destination_catalog (country_code, name, added_by_tenant) VALUES ('QQ', 'Probe C', $1)", [other.id])
+    await db.query("INSERT INTO destination_catalog (country_code, name) VALUES ('QQ', 'Shared')")
+    await expect(
+      db.query("INSERT INTO destination_catalog (country_code, name) VALUES ('QQ', 'Shared again')")
+    ).rejects.toThrow(/duplicate key/)
   }, 120_000)
 })

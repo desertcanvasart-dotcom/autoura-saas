@@ -4006,6 +4006,7 @@ export interface Database {
       destination_catalog: {
         Row: {
           id: string
+          added_by_tenant: string | null
           country_code: string
           name: string
           name_ja: string | null
@@ -4015,6 +4016,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          added_by_tenant?: string | null
           country_code: string
           name: string
           name_ja?: string | null
@@ -4024,6 +4026,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          added_by_tenant?: string | null
           country_code?: string
           name?: string
           name_ja?: string | null
@@ -4036,6 +4039,7 @@ export interface Database {
       destination_cities: {
         Row: {
           id: string
+          added_by_tenant: string | null
           catalog_id: string
           name: string
           name_ja: string | null
@@ -4050,6 +4054,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          added_by_tenant?: string | null
           catalog_id: string
           name: string
           name_ja?: string | null
@@ -4064,6 +4069,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          added_by_tenant?: string | null
           catalog_id?: string
           name?: string
           name_ja?: string | null

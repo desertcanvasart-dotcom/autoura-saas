@@ -128,7 +128,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     if (!removed || removed.length === 0) return NextResponse.json({ success: false, error: 'Supplier invoice not found' }, { status: 404 })
     // Its document goes with it (the file stayed in storage).
     const path = (removed[0] as { document_storage_path?: string | null }).document_storage_path
-    if (path && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // Only a path under this company's folder: the service role deletes
+    // whatever it is given, and the column can be edited.
+    if (path && auth.tenant_id && path.startsWith(`${auth.tenant_id}/`) && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const { createClient } = await import('@supabase/supabase-js')
       const { error: rmError } = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY)
         .storage.from('supplier-invoices').remove([path])

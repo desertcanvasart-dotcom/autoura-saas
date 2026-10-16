@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { gateRole } from '@/lib/api-role-gate'
 import { tripServices } from '@/lib/itineraries/trip-services'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
@@ -14,6 +15,9 @@ import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 import { contractPrice, contractSettingsFromTenant, sanitizeContractEdits } from '@/lib/contract-terms'
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   // Viewers read; they do not change anything (lib/api-role-gate).
   const roleGate = await gateRole('staff')
   if (roleGate) return roleGate

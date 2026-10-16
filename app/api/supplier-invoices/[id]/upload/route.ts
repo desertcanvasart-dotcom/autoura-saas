@@ -86,7 +86,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     // The document it replaces is removed (each upload left the last behind).
     const previous = (existing as { document_storage_path?: string | null }).document_storage_path
-    if (previous && previous !== filePath) await admin().storage.from(BUCKET).remove([previous])
+    // Only a path under this company's folder: the service role deletes
+    // whatever it is given, and the column can be edited.
+    if (previous && previous !== filePath && previous.startsWith(`${tenant_id}/`)) {
+      await admin().storage.from(BUCKET).remove([previous])
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (e: any) {

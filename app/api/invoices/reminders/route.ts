@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { daysOverdueOrNull, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
@@ -299,6 +300,9 @@ export async function GET(request: NextRequest) {
 
 // POST: Process and send reminders
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     const roleGate = await gateRole('staff')
     if (roleGate) return roleGate
