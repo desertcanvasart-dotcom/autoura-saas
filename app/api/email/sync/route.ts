@@ -1,3 +1,4 @@
+import { inboundAiAllowed } from '@/lib/ai-guard'
 import { secretMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
@@ -60,14 +61,15 @@ function getDirection(from: string | null | undefined, office: OfficeRule): 'inb
 }
 
 // GET - Sync status
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
 
-    const userId = request.nextUrl.searchParams.get('user_id') || authResult.user?.id
+    // Your own mailbox's progress only: ?user_id= let one member read another's.
+    const userId = authResult.user?.id
     if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
     // Sync progress is per mailbox: this person in this company (migration 415).
@@ -543,6 +545,9 @@ export async function POST(request: NextRequest) {
             // Serialize to avoid hammering Claude; cap at 10 per sync to stay sensible.
             const capped = convIds.slice(0, 10)
             for (const cid of capped) {
+              // The company's AI ceiling and a per-thread cap (lib/ai-guard):
+              // a flood of inbound mail must not run up the bill.
+              if (!(await inboundAiAllowed(tenant_id, `mail:${cid}`))) continue
               try {
                 await generateDraftReplies({
                   supabase: db as any,

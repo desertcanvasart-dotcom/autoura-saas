@@ -10,7 +10,7 @@
 import { gateRole } from '@/lib/api-role-gate'
 import { invoiceMoney } from '@/lib/invoices/invoice-money'
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAdminClient, createAuthenticatedClient } from '@/lib/supabase-server'
 import { invoiceBalance } from '@/lib/invoices/invoice-balance'
 import { roundToCurrency } from '@/lib/currency-totals'
 
@@ -164,6 +164,14 @@ export async function PUT(
         )
       }
       const total = updateData.total_amount ?? current.total_amount
+      // Never below what was already paid: a paid 1,000 invoice edited to
+      // 800 stayed "paid" with a balance of -200 and the overpayment unseen.
+      if (updateData.total_amount !== undefined && Number(total) < Number(current.amount_paid || 0) - 0.01) {
+        return NextResponse.json(
+          { error: `Payments of ${current.amount_paid} are recorded on this invoice — the total cannot be less than that. Record a refund first.` },
+          { status: 409 }
+        )
+      }
       if (updateData.total_amount !== undefined) updateData.total_amount = roundToCurrency(Number(total), currency)
       const balance = invoiceBalance({
         total,
@@ -189,6 +197,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 })
     }
 
+    // A cancelled invoice bills nothing: its booking extras are free to go on
+    // the next one (they stayed stamped invoiced and were never billed again).
+    if (data?.status === 'cancelled') {
+      const released = await releaseInvoicedExtras(id)
+      if (released) console.error('[invoices PUT] extras not released:', released)
+    }
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error in invoice PUT:', error)
@@ -210,7 +225,28 @@ export async function DELETE(
     // Use authenticated client - RLS policies enforce tenant isolation + manager role
     const supabase = await createAuthenticatedClient()
 
-    // First delete related payments (RLS will filter to tenant's payments only)
+    // An invoice with money recorded on it is not deleted: the payments went
+    // with it, and so did the record that the client paid. Same rule as
+    // cancelling (PUT): delete the payments first, deliberately.
+    const { data: target } = await supabase
+      .from('invoices')
+      .select('id, amount_paid')
+      .eq('id', id)
+      .maybeSingle()
+    if (!target) {
+      return NextResponse.json({ error: 'Invoice not found or you do not have permission to delete it' }, { status: 404 })
+    }
+    if (Number(target.amount_paid || 0) > 0) {
+      return NextResponse.json({ error: 'Payments were recorded on this invoice — delete them before deleting it' }, { status: 409 })
+    }
+
+    // Its booking extras are free to be billed again.
+    const released = await releaseInvoicedExtras(id)
+    if (released) {
+      return NextResponse.json({ error: 'Could not release the invoice\'s booking extras. The invoice was not removed.' }, { status: 500 })
+    }
+
+    // Then any zero-amount payment rows (RLS filters to the tenant's own).
     // Checked, and it aborts before the invoice is removed. Unchecked, a
     // failure here left payment records attached to an invoice that no longer
     // exists — orphaned financial data, and the route reported success.
@@ -255,4 +291,16 @@ export async function DELETE(
     console.error('❌ Error in invoice DELETE:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+/** Clears the "invoiced" stamp on the booking extras this invoice billed.
+ *  Called only after the caller's own client has found (or changed) the
+ *  invoice, so it is theirs; the admin client because extras are written
+ *  server-side. Returns an error message, or null. */
+async function releaseInvoicedExtras(invoiceId: string): Promise<string | null> {
+  const { error } = await createAdminClient()
+    .from('booking_extras')
+    .update({ invoiced_at: null, invoice_id: null })
+    .eq('invoice_id', invoiceId)
+  return error ? error.message : null
 }

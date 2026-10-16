@@ -59,10 +59,14 @@ export const RATE_LIMITS = {
     limit: 10,         // uploads
     windowMs: 3600000, // per hour
   },
-  // Email sending
+  // Email sending (lib/send-guard.ts) — a person, and a whole company.
   email: {
-    limit: 20,         // emails
+    limit: 60,         // emails
     windowMs: 3600000, // per hour
+  },
+  emailCompany: {
+    limit: 1000,       // emails
+    windowMs: 86400000, // per day
   },
   // Expensive operations (reports, exports)
   heavy: {
@@ -74,6 +78,11 @@ export const RATE_LIMITS = {
   ai: {
     limit: 20,         // AI requests
     windowMs: 60000,   // per minute
+  },
+  // AI work triggered by inbound messages, per conversation (lib/ai-guard).
+  aiPerConversation: {
+    limit: 10,         // AI runs
+    windowMs: 3600000, // per hour
   },
   // AI calls — a whole company, across all its people.
   aiCompany: {

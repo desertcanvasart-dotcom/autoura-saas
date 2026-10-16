@@ -198,6 +198,30 @@ export default function ViewItineraryPage() {
     window.history.replaceState(window.history.state, '', url.toString())
   }
   const { confirm: confirmDialog } = useConfirmDialog()
+
+  // A send the API refuses because some services have no price (422 with
+  // `gaps`) asks whether to go ahead, and if so sends again with
+  // allow_incomplete. The refusal used to end in a toast that said "send it
+  // anyway with allow_incomplete=true" and gave no way to do so.
+  const postAllowingIncomplete = async (url: string, payload: Record<string, unknown>, verb: string): Promise<Response> => {
+    const post = (extra: Record<string, unknown>) => fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, ...extra }),
+    })
+    const first = await post({})
+    if (first.status !== 422) return first
+    const data = await first.clone().json().catch(() => null) as { error?: string; gaps?: unknown[] } | null
+    if (!data?.gaps?.length) return first
+    const ok = await confirmDialog({
+      title: 'Some services have no price',
+      message: `${data.error ?? ''} ${verb} it anyway?`,
+      confirmText: `${verb} anyway`,
+      cancelText: 'Cancel',
+      variant: 'warning',
+    })
+    return ok ? post({ allow_incomplete: true }) : first
+  }
   const [sendingEmail, setSendingEmail] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendSuccess, setSendSuccess] = useState<string | null>(null)
@@ -556,7 +580,7 @@ export default function ViewItineraryPage() {
     if (!itinerary) return
     setSharing(true)
     try {
-      const res = await fetch(`/api/itineraries/${itinerary.id}/share`, { method: 'POST' })
+      const res = await postAllowingIncomplete(`/api/itineraries/${itinerary.id}/share`, {}, 'Share')
       const data = await res.json()
       if (!data.success) {
         showToast('error', data.error || 'Could not create the share link')
@@ -634,15 +658,11 @@ export default function ViewItineraryPage() {
     setSendingEmail(true) // Reuse loading state for UI feedback
   
     try {
-      const response = await fetch('/api/whatsapp/send-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itineraryId: itinerary.id,
-          clientPhone: itinerary.client_phone,
-          clientName: itinerary.client_name
-        })
-      })
+      const response = await postAllowingIncomplete('/api/whatsapp/send-quote', {
+        itineraryId: itinerary.id,
+        clientPhone: itinerary.client_phone,
+        clientName: itinerary.client_name,
+      }, 'Send')
   
       const data = await response.json()
   
@@ -691,18 +711,14 @@ export default function ViewItineraryPage() {
       const pdfBlob = pdf.output('blob')
       const pdfBase64 = await blobToBase64(pdfBlob)
 
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itineraryId: itinerary.id,
-          clientName: itinerary.client_name,
-          clientEmail: itinerary.client_email,
-          itineraryCode: itinerary.itinerary_code,
-          tripName: itinerary.trip_name,
-          pdfBase64: pdfBase64.split(',')[1]
-        })
-      })
+      const response = await postAllowingIncomplete('/api/send-email', {
+        itineraryId: itinerary.id,
+        clientName: itinerary.client_name,
+        clientEmail: itinerary.client_email,
+        itineraryCode: itinerary.itinerary_code,
+        tripName: itinerary.trip_name,
+        pdfBase64: pdfBase64.split(',')[1],
+      }, 'Send')
 
       const data = await response.json()
 

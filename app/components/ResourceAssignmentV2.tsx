@@ -171,7 +171,7 @@ const RESOURCE_TYPES = [
   },
   { 
     key: 'cruise', 
-    label: 'Nile Cruises', 
+    label: 'Cruises', 
     icon: Ship, 
     color: 'indigo',
     apiEndpoint: '/api/cruises/assignable',

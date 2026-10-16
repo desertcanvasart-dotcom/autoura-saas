@@ -1,9 +1,13 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()

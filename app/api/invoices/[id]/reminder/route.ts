@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
@@ -132,6 +133,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     const roleGate = await gateRole('staff')
     if (roleGate) return roleGate

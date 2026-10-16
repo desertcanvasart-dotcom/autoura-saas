@@ -1213,7 +1213,7 @@ export default function WhatsAppInboxPage() {
                 <Phone className="w-5 h-5 text-gray-400" />
                 <input type="tel" value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#25D366]" />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Include country code (e.g., +20 for Egypt)</p>
+              <p className="text-xs text-gray-500 mt-1">Include the country code (e.g. +44, +1, +20)</p>
             </div>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowNewChat(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>

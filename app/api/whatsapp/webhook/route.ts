@@ -1,3 +1,4 @@
+import { inboundAiAllowed } from '@/lib/ai-guard'
 import { maskPhone } from '@/lib/log-mask'
 // ============================================
 // API: WHATSAPP WEBHOOK HANDLER (dual-provider)
@@ -678,65 +679,72 @@ async function processInboundWhatsAppMessage({
   // STEP 4: AI-Powered Auto-Response
   // ============================================
   // Only process if AI is globally enabled and we have a message body
+  // After the response: an AI reply can take tens of seconds, and Twilio
+  // (15s) and Meta (~20s) treat a slow webhook as failed and retry or disable
+  // it. Within the company's AI ceiling and a per-conversation cap, so an
+  // outside sender cannot run up the bill (lib/ai-guard inboundAiAllowed).
   if (process.env.WHATSAPP_AI_ENABLED === 'true' && body && conversationId && tenantId && !isDuplicateDelivery) {
-    try {
-      // Check tenant-specific AI setting
-      let tenantAiEnabled = false
-      if (tenantId) {
-        const { data: tenantFeatures } = await supabase
-          .from('tenant_features')
-          .select('whatsapp_ai_enabled')
-          .eq('tenant_id', tenantId)
-          .single()
+    after(async () => {
+      try {
+        // Check tenant-specific AI setting
+        let tenantAiEnabled = false
+        if (tenantId) {
+          const { data: tenantFeatures } = await supabase
+            .from('tenant_features')
+            .select('whatsapp_ai_enabled')
+            .eq('tenant_id', tenantId)
+            .single()
 
-        tenantAiEnabled = tenantFeatures?.whatsapp_ai_enabled || false
-      }
+          tenantAiEnabled = tenantFeatures?.whatsapp_ai_enabled || false
+        }
 
-      if (tenantAiEnabled) {
-        const aiResponse = await processIncomingMessage(
-          supabase,
-          conversationId,
-          clientId,
-          phoneNumber,
-          body,
-          tenantId
-        )
-
-        if (aiResponse.success && aiResponse.shouldRespond && aiResponse.reply) {
-          // Send the AI-generated response (via the active provider)
-          const sendResult = await sendWhatsAppMessage({
-            to: phoneNumber,
-            body: aiResponse.reply,
+        if (tenantAiEnabled) {
+          if (!(await inboundAiAllowed(tenantId, `wa:${conversationId}`))) return
+          const aiResponse = await processIncomingMessage(
+            supabase,
+            conversationId,
+            clientId,
+            phoneNumber,
+            body,
             tenantId
-          })
+          )
 
-          if (sendResult.success) {
-            // Store the outbound message
-            await supabase.from('whatsapp_messages').insert({
-              tenant_id: tenantId,
-              conversation_id: conversationId,
-              message_sid: sendResult.messageId,
-              direction: 'outbound',
-              message_body: aiResponse.reply,
-              status: 'sent',
-              sent_at: new Date().toISOString(),
-              metadata: {
-                ai_generated: true,
-                ai_confidence: aiResponse.confidence,
-                ai_model: whatsappModel(),
-                tools_used: aiResponse.toolsUsed || [],
-                actions_performed: aiResponse.actionsPerformed || []
-              }
+          if (aiResponse.success && aiResponse.shouldRespond && aiResponse.reply) {
+            // Send the AI-generated response (via the active provider)
+            const sendResult = await sendWhatsAppMessage({
+              to: phoneNumber,
+              body: aiResponse.reply,
+              tenantId
             })
-          } else {
-            console.error('❌ Failed to send AI response:', sendResult.error)
+
+            if (sendResult.success) {
+              // Store the outbound message
+              await supabase.from('whatsapp_messages').insert({
+                tenant_id: tenantId,
+                conversation_id: conversationId,
+                message_sid: sendResult.messageId,
+                direction: 'outbound',
+                message_body: aiResponse.reply,
+                status: 'sent',
+                sent_at: new Date().toISOString(),
+                metadata: {
+                  ai_generated: true,
+                  ai_confidence: aiResponse.confidence,
+                  ai_model: whatsappModel(),
+                  tools_used: aiResponse.toolsUsed || [],
+                  actions_performed: aiResponse.actionsPerformed || []
+                }
+              })
+            } else {
+              console.error('❌ Failed to send AI response:', sendResult.error)
+            }
           }
         }
+      } catch (aiError) {
+        console.error('❌ AI processing error:', aiError)
+        // Don't fail the webhook - just log the error
       }
-    } catch (aiError) {
-      console.error('❌ AI processing error:', aiError)
-      // Don't fail the webhook - just log the error
-    }
+    })
   }
 
   // ============================================
@@ -755,6 +763,7 @@ async function processInboundWhatsAppMessage({
 
       if (features?.copilot_pregenerate_enabled) {
         after(async () => {
+          if (!(await inboundAiAllowed(tenantId, `wa:${conversationId}`))) return
           try {
             await generateDraftReplies({
               supabase: supabase as any,

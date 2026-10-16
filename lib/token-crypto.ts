@@ -8,7 +8,7 @@
 // routes that build their own Google client).
 //
 // Backward compatible both ways: a plain-text value (written before the key
-// was set) is read as is, and is sealed on its next refresh; with no key,
+// was set) is read as is, and is sealed by the next gmail-sync run; with no key,
 // nothing is sealed. Losing the key means every mailbox must reconnect — keep
 // it with the other secrets.
 

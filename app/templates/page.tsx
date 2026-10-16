@@ -368,7 +368,9 @@ export default function TemplatesPage() {
       channel: template.channel as any,
       subject: template.subject || '',
       body: template.body,
-      language: 'ar', // Default to Arabic for Egypt travel
+      // A translation starts in a language other than the original's (it was
+      // always Arabic, whatever the agency's market).
+      language: template.language === 'en' ? 'fr' : 'en',
       parent_template_id: template.parent_template_id || template.id, // Link to parent
     })
     setSelectedTemplate(null) // Creating new, not editing
@@ -1274,7 +1276,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
     if (isSupplierTemplate) {
       switch (supplierType) {
         case 'hotel': return 'Select Hotel'
-        case 'cruise': return 'Select Nile Cruise'
+        case 'cruise': return 'Select Cruise'
         case 'transport': return 'Select Transport Supplier'
         case 'guide': return 'Select Guide'
         default: return 'Select Supplier'

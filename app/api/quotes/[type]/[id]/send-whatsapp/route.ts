@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
@@ -18,6 +19,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ type: string; id: string }> }
 ) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     const { type, id } = await params
     // B2B quotes are managers' and admins'; viewers send nothing.

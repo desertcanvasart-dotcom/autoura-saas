@@ -35,7 +35,9 @@ import { mergeFxSummary, emptyFxSummary, type FxHole } from '@/lib/fx-conversion
 // Both previously inflated the figures they appeared in.
 
 /** Invoices in this state are not revenue. */
-const EXCLUDED_INVOICE_STATUSES = new Set(['cancelled'])
+// Drafts too: an invoice nobody has sent is not revenue or a receivable (a
+// 5,000 draft counted in both).
+const EXCLUDED_INVOICE_STATUSES = new Set(['cancelled', 'draft'])
 /** A rejected expense is not a cost. */
 const EXCLUDED_EXPENSE_STATUSES = new Set(['rejected'])
 
@@ -407,13 +409,17 @@ export async function GET(request: NextRequest) {
     // wearing a report. vat_paid is NULL because expenses carry no tax
     // field at all: input VAT is genuinely untracked, and an honest hole
     // beats a fabricated 14%-of-expenses.
+    // Revenue for tax is net of the VAT collected on it: total_amount includes
+    // tax, so a 1,140 invoice at 14% counted 1,140 of income AND 140 of VAT.
+    const vatCollected = yearInvoices.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0)
+    const netRevenue = totalRevenue - vatCollected
     const taxSummary = {
-      gross_revenue: totalRevenue,
+      gross_revenue: netRevenue,
       total_expenses: totalExpensesAmount,
       deductible_expenses: deductibleTotal,
-      taxable_income: totalRevenue - deductibleTotal,
+      taxable_income: netRevenue - deductibleTotal,
       expense_breakdown: categoryBreakdown,
-      vat_collected: yearInvoices.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
+      vat_collected: vatCollected,
       vat_paid: null as number | null,
       net_vat: null as number | null,
     }

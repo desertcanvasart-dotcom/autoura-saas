@@ -53,7 +53,7 @@ const CATEGORY_CONFIG: Record<string, { icon: string; label: string }> = {
   airport_staff: { icon: '✈️', label: 'Airport Staff' },
   hotel_staff: { icon: '🛎️', label: 'Hotel Staff' },
   ground_handler: { icon: '🧳', label: 'Ground Handler' },
-  cruise: { icon: '🚢', label: 'Nile Cruise' },
+  cruise: { icon: '🚢', label: 'Cruise' },
   flights: { icon: '🛫', label: 'Flights' },
   activity: { icon: '🎈', label: 'Activities & Tours' },
   tipping: { icon: '💵', label: 'Tipping' },

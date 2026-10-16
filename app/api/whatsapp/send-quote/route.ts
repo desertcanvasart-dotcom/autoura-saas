@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 // ============================================
 // API: SEND QUOTE VIA WHATSAPP
 // ============================================
@@ -13,6 +14,9 @@ import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
@@ -70,7 +74,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway with allow_incomplete=true.`,
+          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway.`,
           gaps: itineraryLines.completeness.gaps,
         },
         { status: 422 }

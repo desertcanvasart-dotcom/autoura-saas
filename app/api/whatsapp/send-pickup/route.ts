@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
@@ -82,6 +83,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   const auth = await requireAuth()
   if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   const { supabase } = auth

@@ -1,4 +1,5 @@
 'use client'
+import { isLive } from '@/lib/billing/subscription-sync'
 
 import { useState, useEffect } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -27,7 +28,11 @@ export default function BillingPlansPage() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const [currentTier, setCurrentTier] = useState<'starter' | 'professional' | 'business' | 'enterprise'>('professional')
+  // The plan the company is actually on — from a live subscription only.
+  // It defaulted to "professional" (as did the pricing-tier column), so a new
+  // company with no subscription saw Professional marked "Current Plan" with
+  // its button disabled, and could not start that plan.
+  const [currentTier, setCurrentTier] = useState<string>('')
 
   useEffect(() => {
     if (tenant) {
@@ -38,21 +43,13 @@ export default function BillingPlansPage() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const tierResponse = await fetch('/api/settings/pricing-tier')
-      if (tierResponse.ok) {
-        const tierData = await tierResponse.json()
-        if (tierData.success && tierData.tier) {
-          setCurrentTier(tierData.tier)
-        }
-      }
-
       const subResponse = await fetch('/api/billing/subscription')
       if (subResponse.ok) {
         const subData = await subResponse.json()
         if (subData.success && subData.subscription) {
           setCurrentSubscription(subData.subscription)
-          if (subData.subscription.plan_slug) {
-            setCurrentTier(subData.subscription.plan_slug as any)
+          if (subData.subscription.plan_slug && isLive(subData.subscription.status)) {
+            setCurrentTier(subData.subscription.plan_slug)
           }
         }
       }

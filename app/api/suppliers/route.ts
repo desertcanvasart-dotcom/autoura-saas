@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching suppliers:', error)
-      return NextResponse.json({ error: 'Failed to fetch suppliers', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch suppliers' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data: data || [] })
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating supplier:', error)
-      return NextResponse.json({ error: 'Failed to create supplier', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to create supplier' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 })

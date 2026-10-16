@@ -55,9 +55,11 @@ type Page = PromiseLike<{ data: Row[] | null; error: { message: string } | null 
 type Filter = {
   eq: (c: string, v: string) => Filter
   in: (c: string, v: string[]) => Filter
-  order: (c: string) => { range: (a: number, b: number) => Page }
+  order: (c: string) => Ordered
 }
 /** The admin client, loosely: tables are named at run time here. */
+type Ordered = { order: (c: string) => Ordered; range: (a: number, b: number) => Page }
+type TableInfo = { table_name: string; column_names: string[]; key_columns?: string[] | null }
 type Db = {
   from: (table: string) => unknown
   rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>
@@ -72,35 +74,44 @@ const DERIVED_COLUMNS = new Set(['embedding'])
 const exportable = (columns: string[]) => columns.filter(c => !SECRET_COLUMNS.has(c) && !DERIVED_COLUMNS.has(c))
 
 /** Pages on the primary key where there is one, so no row falls between pages. */
-const orderColumn = (columns: string[]) => (columns.includes('id') ? 'id' : columns[0])
+const orderColumns = (info: TableInfo): string[] =>
+  info.key_columns?.length ? info.key_columns
+    : info.column_names.includes('id') ? ['id']
+    : exportable(info.column_names)
 
 async function readAll(
   db: Db,
-  table: string,
-  columns: string[],
+  info: TableInfo,
   filter: (q: Filter) => Filter,
 ): Promise<Row[]> {
-  const cols = exportable(columns)
-  const { data, error } = await fetchAllPages<Row, { message: string }>((from, to) =>
-    filter(query(db, table, cols)).order(orderColumn(cols)).range(from, to),
-  )
-  if (error) throw new Error(`${table}: ${error.message}`)
+  const cols = exportable(info.column_names)
+  const keys = orderColumns(info)
+  const { data, error } = await fetchAllPages<Row, { message: string }>((from, to) => {
+    // Every primary-key column, so the order is total and no row falls
+    // between two pages (a table keyed (tenant_id, user_id, day) ordered on
+    // tenant_id alone is in no particular order inside one company).
+    let q = filter(query(db, info.table_name, cols)).order(keys[0])
+    for (const k of keys.slice(1)) q = q.order(k)
+    return q.range(from, to)
+  })
+  if (error) throw new Error(`${info.table_name}: ${error.message}`)
   return data
 }
 
-async function columnsOf(db: Db, tables: string[]): Promise<Map<string, string[]>> {
+async function columnsOf(db: Db, tables: string[]): Promise<Map<string, TableInfo>> {
   const { data, error } = await db.rpc('data_table_columns', { p_tables: tables })
   if (error) throw new Error(`Reading the table list failed: ${error.message}`)
-  const rows = (data ?? []) as Array<{ table_name: string; column_names: string[] }>
-  return new Map(rows.map(r => [r.table_name, r.column_names]))
+  const rows = (data ?? []) as TableInfo[]
+  return new Map(rows.map(r => [r.table_name, r]))
 }
 
 /** One CSV cell: objects as JSON, and every cell quoted when it needs to be.
- *  A leading = + - @ is prefixed with ' so a spreadsheet does not run it. */
+ *  Text starting = + - @ is prefixed with ' so a spreadsheet does not run it;
+ *  numbers are left alone (a refund of -150 must stay a number). */
 export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return ''
   let s = typeof value === 'object' ? JSON.stringify(value) : String(value)
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
@@ -121,26 +132,27 @@ export async function collectCompanyData(client: object, tenantId: string): Prom
 
   const { data, error } = await db.rpc('tenant_data_tables')
   if (error) throw new Error(`Reading the table list failed: ${error.message}`)
-  const tables = (data ?? []) as Array<{ table_name: string; column_names: string[] }>
+  const tables = (data ?? []) as TableInfo[]
 
-  for (const { table_name, column_names } of tables) {
+  for (const info of tables) {
+    const { table_name } = info
     if (EXCLUDED_TABLES.has(table_name)) continue
-    const rows = await readAll(db, table_name, column_names, q => q.eq('tenant_id', tenantId))
+    const rows = await readAll(db, info, q => q.eq('tenant_id', tenantId))
     if (rows.length) out.set(table_name, rows)
   }
 
   const tenantColumns = await columnsOf(db, ['tenants', ...CHILD_TABLES.map(c => c.table)])
-  const tenantCols = tenantColumns.get('tenants')
-  if (tenantCols) out.set('tenants', await readAll(db, 'tenants', tenantCols, q => q.eq('id', tenantId)))
+  const tenantInfo = tenantColumns.get('tenants')
+  if (tenantInfo) out.set('tenants', await readAll(db, tenantInfo, q => q.eq('id', tenantId)))
 
   for (const child of CHILD_TABLES) {
-    const cols = tenantColumns.get(child.table)
+    const childInfo = tenantColumns.get(child.table)
     const parentIds = (out.get(child.parent) ?? []).map(r => String(r.id))
-    if (!cols || parentIds.length === 0) continue
+    if (!childInfo || parentIds.length === 0) continue
     const rows: Row[] = []
     for (let i = 0; i < parentIds.length; i += 200) {
       const ids = parentIds.slice(i, i + 200)
-      rows.push(...(await readAll(db, child.table, cols, q => q.in(child.key, ids))))
+      rows.push(...(await readAll(db, childInfo, q => q.in(child.key, ids))))
     }
     if (rows.length) out.set(child.table, rows)
   }
@@ -163,9 +175,9 @@ export async function collectPersonalData(
   }])
   const columns = await columnsOf(db, PERSONAL_TABLES.map(t => t.table))
   for (const { table, key } of PERSONAL_TABLES) {
-    const cols = columns.get(table)
-    if (!cols) continue
-    const rows = await readAll(db, table, cols, q => q.eq(key, user.id))
+    const info = columns.get(table)
+    if (!info) continue
+    const rows = await readAll(db, info, q => q.eq(key, user.id))
     if (rows.length) out.set(table, rows)
   }
   return out

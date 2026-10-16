@@ -30,16 +30,15 @@ function fakeDb(rows: Record<string, Array<Record<string, unknown>>>, tables: Ar
         const q = {
           eq: (c: string, v: string) => { call.filters.push(['eq', c, v]); return q },
           in: (c: string, v: string[]) => { call.filters.push(['in', c, v]); return q },
-          order: () => ({
-            range: async (from: number) => {
+          order: function order() { return { order, range } as never },
+        }
+        const range = async (from: number) => {
               let data = rows[table] ?? []
               for (const [op, c, v] of call.filters) {
                 data = data.filter(r => (op === 'eq' ? r[c] === v : (v as string[]).includes(String(r[c]))))
               }
               const keep = columns.split(',')
               return { data: from === 0 ? data.map(r => Object.fromEntries(keep.map(k => [k, r[k]]))) : [], error: null }
-            },
-          }),
         }
         return q
       },

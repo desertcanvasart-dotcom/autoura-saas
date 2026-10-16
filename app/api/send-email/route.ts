@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextResponse } from 'next/server'
 import { generateEmailTemplate } from '@/lib/communication-utils'
 import { formatCurrency } from '@/lib/currency'
@@ -13,6 +14,9 @@ import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
 import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 export async function POST(request: Request) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     // Authenticated users only — this route sends mail through the company
     // mailbox, so it must never be callable anonymously.
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway with allow_incomplete=true.`,
+          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway.`,
           gaps: itineraryLines.completeness.gaps,
         },
         { status: 422 }

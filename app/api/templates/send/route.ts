@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     let result
 
     if (channel === 'email') {
-      result = await sendEmail(recipient, subject, messageBody, authResult.user!.id, tenant_id, request.headers.get('cookie') || '')
+      result = await sendEmail(recipient, subject, messageBody, authResult.user!.id, tenant_id, request.headers.get('cookie') || '', new URL(request.url).origin)
     } else if (channel === 'whatsapp') {
       result = await sendWhatsApp(recipient, messageBody, tenant_id)
     } else if (channel === 'sms') {
@@ -156,7 +156,7 @@ function plainTextEmailHtml(text: string): string {
   return `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${escapeHtml(text)}</div>`
 }
 
-async function sendEmail(to: string, subject: string, body: string, userId: string, tenantId: string | null, cookie: string): Promise<{ success: boolean; error?: string }> {
+async function sendEmail(to: string, subject: string, body: string, userId: string, tenantId: string | null, cookie: string, origin: string): Promise<{ success: boolean; error?: string }> {
   // The sender's mailbox in the company being worked in (migration 415).
   if (!tenantId) return { success: false, error: 'No active company' }
   try {
@@ -186,7 +186,7 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
     // without one ("Missing required fields") — it was never passed, so every
     // template email failed. It sends HTML: the template's plain text is
     // escaped and its line breaks kept.
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
+    const response = await fetch(new URL('/api/gmail/send', process.env.NEXT_PUBLIC_APP_URL || origin), {
       method: 'POST',
       signal: AbortSignal.timeout(60_000),
       headers: {

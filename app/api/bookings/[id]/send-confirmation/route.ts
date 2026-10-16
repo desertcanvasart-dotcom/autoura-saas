@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -19,6 +20,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   // Viewers read; they do not change anything (lib/api-role-gate).
   const roleGate = await gateRole('staff')
   if (roleGate) return roleGate

@@ -1,6 +1,6 @@
 import { openToken } from '@/lib/token-crypto'
 import { encodeEmailHeader } from '@/lib/email/mime-header'
-import { google } from 'googleapis'
+import { google } from '@/lib/google'
 import { escapeHtml } from './html-escape'
 
 // A FRESH OAuth2 client per call — never a shared module-level singleton.

@@ -11,6 +11,8 @@ vi.mock('@/lib/supabase-server', () => ({
     from: () => ({ select: async () => ({ data: boxes, error: null }) }),
   }),
 }))
+const forgetRevokedMailbox = vi.fn(async () => {})
+vi.mock('@/lib/gmail-dead-grant', () => ({ forgetRevokedMailbox: (...a: unknown[]) => forgetRevokedMailbox(...(a as [])) }))
 vi.mock('@/lib/support/job-runs', () => ({ withJobRun: (_n: string, _db: unknown, h: unknown) => h }))
 vi.mock('@/lib/email/new-mail-alerts', () => ({ notifyNewEmails: (...a: [unknown, string]) => notifyNewEmails(...a) }))
 vi.mock('googleapis', () => ({
@@ -25,7 +27,7 @@ const { GET } = await import('@/app/api/cron/mail-alerts/route')
 const call = (auth?: string) =>
   GET(new NextRequest('http://x/api/cron/mail-alerts', auth ? { headers: { authorization: auth } } : undefined))
 
-beforeEach(() => { boxes = []; notifyNewEmails.mockReset() })
+beforeEach(() => { boxes = []; notifyNewEmails.mockReset(); forgetRevokedMailbox.mockClear() })
 
 describe('GET /api/cron/mail-alerts', () => {
   it('refuses without the cron secret', async () => {
@@ -40,11 +42,22 @@ describe('GET /api/cron/mail-alerts', () => {
       { user_id: 'u2', email: 'b@x.com', access_token: 'a', refresh_token: 'r' },
       { user_id: 'u3', email: 'c@x.com', access_token: 'a', refresh_token: null },
     ]
-    notifyNewEmails.mockImplementationOnce(async () => { throw new Error('invalid_grant') })
+    notifyNewEmails.mockImplementationOnce(async () => { throw new Error('Gmail hiccup') })
     const res = await call('Bearer test-secret')
     const body = await res.json()
     expect(notifyNewEmails.mock.calls.map(c => c[1])).toEqual(['u1', 'u2'])
     expect(body).toMatchObject({ success: false, mailboxes: 3, checked: 1, failed: 2 })
     expect(body.results[2].error).toMatch(/reconnect Gmail/)
+  })
+
+  it('a revoked grant removes the connection and is not a failure of the job', async () => {
+    boxes = [
+      { user_id: 'u1', tenant_id: 't1', email: 'a@x.com', access_token: 'a', refresh_token: 'r' },
+      { user_id: 'u2', tenant_id: 't1', email: 'b@x.com', access_token: 'a', refresh_token: 'r' },
+    ]
+    notifyNewEmails.mockImplementationOnce(async () => { throw new Error('invalid_grant') })
+    const body = await (await call('Bearer test-secret')).json()
+    expect(forgetRevokedMailbox).toHaveBeenCalledWith('u1', 't1', 'a@x.com')
+    expect(body).toMatchObject({ success: true, failed: 0 })
   })
 })

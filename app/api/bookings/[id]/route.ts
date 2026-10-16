@@ -243,7 +243,7 @@ export async function PATCH(
     if (error) {
       console.error('❌ Error updating booking:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to update booking', details: error.message },
+        { success: false, error: 'Failed to update booking' },
         { status: 500 }
       )
     }
@@ -326,6 +326,24 @@ export async function DELETE(
       )
     }
 
+    // Money was received or refunded on it: deleting would take those
+    // payment rows with it (ON DELETE CASCADE) and the money would vanish
+    // from the books. A cancelled booking with payments stays, as a record.
+    const { count: paymentCount, error: paymentError } = await adminClient
+      .from('booking_payments')
+      .select('id', { count: 'exact', head: true })
+      .eq('booking_id', id)
+      .eq('tenant_id', tenant_id)
+    if (paymentError) {
+      return NextResponse.json({ success: false, error: 'Could not check the booking\'s payments' }, { status: 500 })
+    }
+    if ((paymentCount ?? 0) > 0) {
+      return NextResponse.json(
+        { success: false, error: 'This booking has payments recorded, so it is kept for your records. Cancel it instead of deleting it.' },
+        { status: 409 }
+      )
+    }
+
     // The cascade takes the passport rows with it, but not the files: remove
     // those first, and keep the booking if that fails, so nothing is orphaned.
     const filesError = await removeBookingDocumentFiles(adminClient, id)
@@ -347,7 +365,7 @@ export async function DELETE(
     if (error) {
       console.error('❌ Error deleting booking:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to delete booking', details: error.message },
+        { success: false, error: 'Failed to delete booking' },
         { status: 500 }
       )
     }

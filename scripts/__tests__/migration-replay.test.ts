@@ -806,5 +806,49 @@ describe('migration replay from scratch', () => {
     expect(await rowsOf(gone)).toBe(0)
     expect((await db.query('SELECT count(*)::int AS n FROM tenants WHERE id = $1', [gone])).rows[0]).toEqual({ n: 0 })
     expect(await rowsOf(kept)).toBe(keptBefore)
+
+    // Migration 434: the export pages on the whole primary key.
+    const keyed = (await db.query(
+      "SELECT key_columns FROM tenant_data_tables() WHERE table_name = 'user_activity_daily'"
+    )).rows[0] as { key_columns: string[] } | undefined
+    if (keyed) expect(keyed.key_columns.length).toBeGreaterThan(1)
+    const clientsKey = (await db.query(
+      "SELECT key_columns FROM data_table_columns(ARRAY['clients'])"
+    )).rows[0] as { key_columns: string[] }
+    expect(clientsKey.key_columns).toEqual(['id'])
+
+    // Migration 435: two companies may each add the same country privately;
+    // the shared catalogue still holds one row per code.
+    await db.query("INSERT INTO destination_catalog (country_code, name, added_by_tenant) VALUES ('QQ', 'Probe A', $1)", [kept])
+    const other = (await db.query("INSERT INTO tenants (company_name) VALUES ('purge-c') RETURNING id")).rows[0] as { id: string }
+    await db.query("INSERT INTO destination_catalog (country_code, name, added_by_tenant) VALUES ('QQ', 'Probe C', $1)", [other.id])
+    await db.query("INSERT INTO destination_catalog (country_code, name) VALUES ('QQ', 'Shared')")
+    await expect(
+      db.query("INSERT INTO destination_catalog (country_code, name) VALUES ('QQ', 'Shared again')")
+    ).rejects.toThrow(/duplicate key/)
+
+    // Migration 436: a booking payment is capped at the balance, a refund at
+    // what was paid (the seeded booking is 1,000 with nothing paid).
+    const bk = (await db.query('SELECT id FROM bookings WHERE tenant_id = $1', [kept])).rows[0] as { id: string }
+    const pay = (n: string, amount: number, type: string) => db.query(
+      "SELECT * FROM record_booking_payment($1, $2, $3, $4, $5, 'cash', '2026-10-01', null, null, null)",
+      [bk.id, kept, n, amount, type]
+    )
+    await expect(pay('BP-1', 10000, 'deposit')).rejects.toThrow(/exceeds the balance due/)
+    await pay('BP-2', 300, 'deposit')
+    await expect(pay('BP-3', 500, 'refund')).rejects.toThrow(/Refund exceeds/)
+    await pay('BP-4', 100, 'refund')
+    const paidNow = (await db.query('SELECT total_paid FROM bookings WHERE id = $1', [bk.id])).rows[0] as { total_paid: string }
+    expect(Number(paidNow.total_paid)).toBe(200)
+
+    // Migration 436: deleting an invoice payment recomputes the invoice.
+    const inv = (await db.query(
+      'SELECT i.id FROM invoices i WHERE i.tenant_id = $1', [kept]
+    )).rows[0] as { id: string }
+    expect(Number(((await db.query('SELECT amount_paid FROM invoices WHERE id = $1', [inv.id])).rows[0] as { amount_paid: string }).amount_paid)).toBe(10)
+    await db.query('DELETE FROM invoice_payments WHERE invoice_id = $1', [inv.id])
+    const after = (await db.query('SELECT amount_paid, balance_due FROM invoices WHERE id = $1', [inv.id])).rows[0] as { amount_paid: string; balance_due: string }
+    expect(Number(after.amount_paid)).toBe(0)
+    expect(Number(after.balance_due)).toBe(100)
   }, 120_000)
 })

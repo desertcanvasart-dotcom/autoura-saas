@@ -33,6 +33,22 @@ export async function aiBudgetDenied(userId: string, tenantId: string | null | u
   return null
 }
 
+/**
+ * For AI work nobody clicked for — an auto-reply to an inbound WhatsApp, draft
+ * replies pre-written for new mail. The same company ceiling as above (an
+ * outside sender or a newsletter flood must not run up the bill without it),
+ * plus, when given, a per-conversation cap so one chatty thread cannot spend
+ * the company's whole allowance. True when the work may go ahead.
+ */
+export async function inboundAiAllowed(tenantId: string, conversationKey?: string): Promise<boolean> {
+  if (conversationKey) {
+    const thread = await checkSharedRateLimit(conversationKey, 'aiPerConversation')
+    if (!thread.success) return false
+  }
+  const company = await checkSharedRateLimit(tenantId, 'aiCompany')
+  return company.success
+}
+
 /** A 413 when `text` is longer than an AI request may send, else null. */
 export function aiInputTooLong(text: unknown, max = MAX_AI_INPUT_CHARS): NextResponse | null {
   if (typeof text !== 'string' || text.length <= max) return null

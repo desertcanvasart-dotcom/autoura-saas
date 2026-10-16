@@ -73,6 +73,34 @@ export default function BillingPage() {
     }
   }, [tenant])
 
+  // Back from Stripe Checkout (?success=true): the subscription is recorded
+  // by Stripe's webhook, which can land a few seconds after the redirect —
+  // the page showed "No active plan" to someone who had just paid. It says
+  // the plan is being activated and checks again until it is there.
+  const [activating, setActivating] = useState<'no' | 'waiting' | 'done' | 'slow'>('no')
+  useEffect(() => {
+    if (!tenant || new URLSearchParams(window.location.search).get('success') !== 'true') return
+    let tries = 0
+    let stopped = false
+    setActivating('waiting')
+    const check = async () => {
+      if (stopped) return
+      tries++
+      const res = await fetch('/api/billing/subscription').catch(() => null)
+      const data = res && res.ok ? await res.json().catch(() => null) : null
+      if (data?.success && data.subscription) {
+        setSubscription(data.subscription)
+        fetchBillingData()
+        setActivating('done')
+        return
+      }
+      if (tries >= 10) { setActivating('slow'); return }
+      setTimeout(check, 3000)
+    }
+    check()
+    return () => { stopped = true }
+  }, [tenant])
+
   const fetchBillingData = async () => {
     setLoading(true)
     setError(null)
@@ -242,6 +270,21 @@ export default function BillingPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
         {/* Error */}
+        {activating === 'waiting' && (
+          <div role="status" className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Thanks — activating your plan. This takes a few seconds…
+          </div>
+        )}
+        {activating === 'done' && (
+          <div role="status" className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            Your plan is active.
+          </div>
+        )}
+        {activating === 'slow' && (
+          <div role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Your payment went through; the plan is taking longer than usual to show. Refresh in a minute — if it is still missing, message us via the support chat.
+          </div>
+        )}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />

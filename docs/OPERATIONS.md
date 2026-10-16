@@ -329,3 +329,21 @@ secret.
   super-admin console; set it to charge subscriptions.
 - **Cron wiring** is described under "Scheduled jobs" above, and in
   `docs/CRON-JOBS.md` for the Railway deployment specifically.
+- **Email bounces (Resend).** In Resend → Webhooks, add the endpoint
+  `<APP_URL>/api/webhooks/resend` with the `email.bounced` and
+  `email.complained` events, and put its signing secret in
+  `RESEND_WEBHOOK_SECRET`. Bounced and complaining addresses are then not
+  mailed again (migration 437) and their invoice reminders pause.
+
+## Auth emails
+
+Supabase sends the sign-up confirmation and password-reset emails. Two
+settings in the Supabase dashboard make them work from any device:
+
+- **URL configuration:** Site URL = `<APP_URL>`; add `<APP_URL>/login` and
+  `<APP_URL>/reset-password` to the redirect allow-list.
+- **Email templates → Reset password:** link to
+  `{{ .SiteURL }}/reset-password?token_hash={{ .TokenHash }}&type=recovery`.
+  The default `{{ .ConfirmationURL }}` link only works in the browser that
+  asked for the reset (PKCE); the token-hash link works anywhere. The reset
+  page accepts both.

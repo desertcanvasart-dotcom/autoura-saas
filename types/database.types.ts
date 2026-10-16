@@ -4006,6 +4006,7 @@ export interface Database {
       destination_catalog: {
         Row: {
           id: string
+          added_by_tenant: string | null
           country_code: string
           name: string
           name_ja: string | null
@@ -4015,6 +4016,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          added_by_tenant?: string | null
           country_code: string
           name: string
           name_ja?: string | null
@@ -4024,6 +4026,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          added_by_tenant?: string | null
           country_code?: string
           name?: string
           name_ja?: string | null
@@ -4036,6 +4039,7 @@ export interface Database {
       destination_cities: {
         Row: {
           id: string
+          added_by_tenant: string | null
           catalog_id: string
           name: string
           name_ja: string | null
@@ -4050,6 +4054,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          added_by_tenant?: string | null
           catalog_id: string
           name: string
           name_ja?: string | null
@@ -4064,6 +4069,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          added_by_tenant?: string | null
           catalog_id?: string
           name?: string
           name_ja?: string | null
@@ -4542,6 +4548,30 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_suppressions: {
+        Row: {
+          email: string
+          reason: string
+          detail: string | null
+          first_seen_at: string
+          last_event_at: string
+        }
+        Insert: {
+          email: string
+          reason: string
+          detail?: string | null
+          first_seen_at?: string
+          last_event_at?: string
+        }
+        Update: {
+          email?: string
+          reason?: string
+          detail?: string | null
+          first_seen_at?: string
+          last_event_at?: string
+        }
+        Relationships: []
       }
       email_sync_state: {
         Row: {
@@ -9200,18 +9230,27 @@ export interface Database {
           requested_by: string | null
           requested_at: string
           purge_after: string
+          attempts: number
+          last_attempt_at: string | null
+          last_error: string | null
         }
         Insert: {
           tenant_id: string
           requested_by?: string | null
           requested_at?: string
           purge_after: string
+          attempts?: number
+          last_attempt_at?: string | null
+          last_error?: string | null
         }
         Update: {
           tenant_id?: string
           requested_by?: string | null
           requested_at?: string
           purge_after?: string
+          attempts?: number
+          last_attempt_at?: string | null
+          last_error?: string | null
         }
         Relationships: []
       }
@@ -12061,11 +12100,11 @@ export interface Database {
       }
       tenant_data_tables: {
         Args: Record<PropertyKey, never>
-        Returns: { table_name: string; column_names: string[] }[]
+        Returns: { table_name: string; column_names: string[]; key_columns: string[] | null }[]
       }
       data_table_columns: {
         Args: { p_tables: string[] }
-        Returns: { table_name: string; column_names: string[] }[]
+        Returns: { table_name: string; column_names: string[]; key_columns: string[] | null }[]
       }
       purge_expired_agent_memories: {
         Args: Record<PropertyKey, never>

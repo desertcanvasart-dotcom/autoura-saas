@@ -1,6 +1,7 @@
+import { sendGuard } from '@/lib/send-guard'
 import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
-import { daysOverdueOrNull, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { daysOverdueOn, daysOverdueOrNull, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
 import { escapeHtml } from '@/lib/html-escape'
 import { requireAuth } from '@/lib/supabase-server'
 import { tenantToday } from '@/lib/tenant-today'
@@ -299,6 +300,9 @@ export async function GET(request: NextRequest) {
 
 // POST: Process and send reminders
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     const roleGate = await gateRole('staff')
     if (roleGate) return roleGate
@@ -365,6 +369,9 @@ export async function POST(request: NextRequest) {
       skipped: 0,
       details: [] as any[]
     }
+    // The company's calendar day, not the server's UTC one: at 10:00 UTC an
+    // invoice due tomorrow in Tokyo read "Payment Due Today".
+    const companyToday = await tenantToday(supabase, tenant_id)
 
     for (const invoice of invoices) {
       // The query filters client_email IS NOT NULL, but keep a row-level
@@ -377,8 +384,15 @@ export async function POST(request: NextRequest) {
 
       // No due date => NaN => every branch below false => 'overdue_30',
       // i.e. a Final Notice for an invoice that was never even due.
-      const overdue = daysOverdueOrNull(invoice.due_date)
+      const overdue = daysOverdueOn(invoice.due_date, companyToday)
       if (overdue === null) {
+        results.skipped++
+        continue
+      }
+      // "Send all due" follows the automatic rule, as the cron does: the first
+      // reminder goes a week before the due date, not the moment an invoice
+      // is raised (one due in 60 days was told "due in 7 days", then weekly).
+      if (sendAll && !(invoiceIds && invoiceIds.length > 0) && !isFirstReminderDue(invoice.next_reminder_date, overdue)) {
         results.skipped++
         continue
       }

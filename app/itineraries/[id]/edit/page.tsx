@@ -3,6 +3,8 @@
 import { VocabSelect } from '@/components/vocabulary'
 import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
+import { cityOptionsFor } from '@/components/CitySelect'
 
 import { useState, useEffect, useCallback } from 'react'
 import { shiftDateISO, todayLocal } from '@/lib/today'
@@ -138,10 +140,10 @@ interface ItineraryService {
 // CONSTANTS
 // ============================================
 
-const CITIES = [
-  'Cairo', 'Giza', 'Luxor', 'Aswan', 'Alexandria',
-  'Hurghada', 'Sharm El Sheikh', 'Dahab', 'Siwa', 'Marsa Alam', 'El Gouna'
-]
+// The day's city comes from the company's own destinations
+// (useDestinationCities: the shared catalogue through the company's
+// selections) — a fixed list of Egyptian cities left an agency selling
+// anywhere else unable to set a day's city at all.
 
 const CITY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   'Cairo': { bg: 'bg-olive-100', text: 'text-olive-700', dot: 'bg-olive-500' },
@@ -158,9 +160,9 @@ const PACKAGE_TYPES = [
   { id: 'day-trips', name: 'Day Trips', icon: '🗓️', desc: 'No accommodation', advanced: false },
   { id: 'tours-only', name: 'Tours Only', icon: '🚐', desc: 'Client has own hotel', advanced: false },
   { id: 'land-package', name: 'Land Package', icon: '🏨', desc: 'Tours + Hotels', advanced: false },
-  { id: 'cruise-package', name: 'Nile Cruise', icon: '🛳️', desc: 'Cruise only', advanced: false },
+  { id: 'cruise-package', name: 'Cruise', icon: '🛳️', desc: 'Cruise only', advanced: false },
   { id: 'full-package', name: 'Full Package', icon: '✈️', desc: 'All inclusive + Airport', advanced: true },
-  { id: 'cruise-land', name: 'Cruise + Land', icon: '🚢', desc: 'Nile cruise combo', advanced: true },
+  { id: 'cruise-land', name: 'Cruise + Land', icon: '🚢', desc: 'Cruise and land combo', advanced: true },
   { id: 'shore-excursions', name: 'Shore Excursions', icon: '⚓', desc: 'Port pickup, time-limited', advanced: true }
 ]
 
@@ -221,6 +223,7 @@ export default function ItineraryEditorPage() {
   const [calculating, setCalculating] = useState(false)
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [days, setDays] = useState<ItineraryDay[]>([])
+  const { cities: destinationCities } = useDestinationCities()
   // Saved days removed since the last save: the save deletes them.
   const [removedDayIds, setRemovedDayIds] = useState<string[]>([])
   // A cruise that boards on a day its ship does not sail (migration 382),
@@ -334,7 +337,7 @@ export default function ItineraryEditorPage() {
         id: day.id,
         day_number: day.day_number,
         title: day.title || '',
-        city: day.city || 'Cairo',
+        city: day.city || '',
         description: day.description || '',
         overnight_city: day.overnight_city,
         attractions: day.attractions || [],
@@ -557,10 +560,10 @@ export default function ItineraryEditorPage() {
       id: generateId(),
       day_number: days.length + 1,
       title: 'New Day',
-      city: lastDay?.city || 'Cairo',
+      city: lastDay?.city || destinationCities[0] || '',
       description: '',
       // A new day sleeps where the night before was (overnight-city.ts).
-      overnight_city: lastDay?.overnight_city || lastDay?.city || 'Cairo',
+      overnight_city: lastDay?.overnight_city || lastDay?.city || destinationCities[0] || null,
       attractions: [],
       services: { guide: true, lunch: true, dinner: false, hotel: true, water: true, tips: true }
     }
@@ -1362,7 +1365,7 @@ export default function ItineraryEditorPage() {
                       City
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {CITIES.map(city => (
+                      {cityOptionsFor(destinationCities, day.city).map(city => (
                         <button
                           key={city}
                           // Where the day is SPENT. It used to move the night too,
@@ -1402,7 +1405,7 @@ export default function ItineraryEditorPage() {
                       </div>
                     ) : (
                     <div className="flex flex-wrap gap-2">
-                      {CITIES.map(city => (
+                      {cityOptionsFor(destinationCities, day.overnight_city || '').map(city => (
                         <button
                           key={city}
                           onClick={() => updateDay(day.id, { overnight_city: city })}

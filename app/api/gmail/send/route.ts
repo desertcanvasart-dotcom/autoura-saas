@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
 import { sealToken } from '@/lib/token-crypto'
 import { secretMatches } from '@/lib/support/probe-auth'
@@ -52,6 +53,9 @@ export async function POST(request: NextRequest) {
       user = authResult.user
       authClient = authResult.supabase
       sessionTenant = authResult.tenant_id
+      // Staff only, with a per-person and per-company ceiling (lib/send-guard).
+      const sendGate = await sendGuard('email')
+      if (sendGate) return sendGate
     }
 
     const supabase = createAdminClient()

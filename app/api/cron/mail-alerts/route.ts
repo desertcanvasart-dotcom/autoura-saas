@@ -1,7 +1,9 @@
+import { isInvalidGrant } from '@/lib/gmail-revoke'
+import { forgetRevokedMailbox } from '@/lib/gmail-dead-grant'
 import { openToken } from '@/lib/token-crypto'
 import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { google } from '@/lib/google'
 import { createAdminClient } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
 import { notifyNewEmails } from '@/lib/email/new-mail-alerts'
@@ -29,7 +31,7 @@ async function getHandler(request: NextRequest) {
 
   const { data, error } = await createAdminClient()
     .from('gmail_tokens')
-    .select('user_id, email, access_token, refresh_token')
+    .select('user_id, tenant_id, email, access_token, refresh_token')
   if (error) {
     return NextResponse.json({ success: false, error: `Could not read the connected mailboxes: ${error.message}` }, { status: 500 })
   }
@@ -51,8 +53,14 @@ async function getHandler(request: NextRequest) {
       await notifyNewEmails(google.gmail({ version: 'v1', auth }), box.user_id)
       results.push({ email: box.email, ok: true })
     } catch (e) {
-      // One mailbox's failure (revoked access, Gmail hiccup) is recorded and
-      // the sweep carries on.
+      // Access revoked at Google: not a failure of this job — the connection
+      // is removed and its owner told to reconnect (lib/gmail-dead-grant).
+      if (isInvalidGrant(e)) {
+        await forgetRevokedMailbox(box.user_id, box.tenant_id ?? null, box.email)
+        results.push({ email: box.email, ok: true, error: 'access revoked — removed, owner asked to reconnect' })
+        continue
+      }
+      // One mailbox's failure (Gmail hiccup) is recorded and the sweep carries on.
       results.push({ email: box.email, ok: false, error: e instanceof Error ? e.message : 'check failed' })
     }
   }

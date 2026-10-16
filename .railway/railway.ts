@@ -89,6 +89,7 @@ export default defineRailway(() => {
       OUTBOUND_REPLY_TO: preserve(),
       RESEND_API_KEY: preserve(),
       RESEND_FROM_EMAIL: preserve(),
+      RESEND_WEBHOOK_SECRET: preserve(),
       SAWA_SYNC_SECRET: preserve(),
       STRIPE_SECRET_KEY: preserve(),
       STRIPE_WEBHOOK_SECRET: preserve(),

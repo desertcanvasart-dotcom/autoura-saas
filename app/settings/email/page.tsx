@@ -6,6 +6,7 @@ import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
+import SendingDomainCard from '@/components/settings/SendingDomainCard'
 import { TemplateEditor } from '@/components/email/RichTextEditor'
 import { 
   Mail, 
@@ -445,6 +446,8 @@ function EmailSettingsContent() {
               )}
             </div>
           )}
+
+          <SendingDomainCard canManage={isAdmin} />
         </div>
       </div>
 

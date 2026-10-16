@@ -34,6 +34,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 interface NextDocumentNumberOpts {
   /** The CALLER's client, so RLS scopes the scan to their agency — that is
@@ -78,12 +79,21 @@ export async function nextDocumentNumber(opts: NextDocumentNumberOpts): Promise<
   // unique-retry loop deadlocks). So: scan the year's values and take the
   // numeric max in code. Fallback-only path; the cap is far above any
   // realistic yearly volume and prevents an unbounded read.
+  //
+  // Every row of the year, a page at a time: a plain select stops at the
+  // database's 1000-row cap (the old .limit(10000) did not lift it), so from
+  // the 1001st invoice of a year the max came from a partial scan, the next
+  // number already existed, and every retry rebuilt the same one — creating
+  // invoices failed for the rest of the year.
   const likeNeedle = `${opts.prefix}-${year}-%`
-  const { data: rows, error: scanError } = await opts.supabase
-    .from(opts.table)
-    .select(opts.column)
-    .like(opts.column, likeNeedle)
-    .limit(10000)
+  const { data: rows, error: scanError } = await fetchAllPages<Record<string, unknown>, { message: string }>((from, to) =>
+    opts.supabase
+      .from(opts.table)
+      .select(opts.column)
+      .like(opts.column, likeNeedle)
+      .order('id')
+      .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,
+  )
   if (scanError) {
     throw new Error(`Failed to generate ${opts.prefix} number: scan failed (${scanError.message})`)
   }

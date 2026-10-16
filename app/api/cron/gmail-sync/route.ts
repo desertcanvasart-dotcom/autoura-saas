@@ -1,5 +1,7 @@
+import { forgetRevokedMailbox } from '@/lib/gmail-dead-grant'
 import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { sealToken } from '@/lib/token-crypto'
 import { createAdminClient } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
 import { planMailboxSweep, lookBackDays, type MailboxRow, type MembershipRow } from '@/lib/email/scheduled-sync'
@@ -56,6 +58,19 @@ async function getHandler(request: NextRequest) {
     return NextResponse.json({ success: false, error: `Could not read the connected mailboxes: ${error.message}` }, { status: 500 })
   }
 
+  // Tokens stored before TOKEN_ENCRYPTION_KEY was set are sealed here, once
+  // (refreshes only rewrite the access token, so a plain refresh token would
+  // otherwise stay plain until the mailbox reconnected). No key: no-op.
+  for (const row of data ?? []) {
+    const refresh = sealToken(row.refresh_token)
+    const access = sealToken(row.access_token)
+    if (!row.user_id || (refresh === row.refresh_token && access === row.access_token)) continue
+    let q = admin.from('gmail_tokens').update({ refresh_token: refresh, access_token: access }).eq('user_id', row.user_id)
+    q = row.tenant_id ? q.eq('tenant_id', row.tenant_id) : q.is('tenant_id', null)
+    const { error: sealError } = await q
+    if (sealError) console.error('gmail-sync: could not seal a stored token', sealError.message)
+  }
+
   // The company comes from the owner's membership when the mailbox row does
   // not carry one — and on production none of them did (see scheduled-sync).
   const rows = (data ?? []) as MailboxRow[]
@@ -92,6 +107,13 @@ async function getHandler(request: NextRequest) {
         new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error(`timed out after ${PER_MAILBOX_TIMEOUT_MS / 1000}s`)))),
       ])
       const body = await res.json().catch(() => ({}))
+      // Access revoked at Google: the connection is removed and its owner told
+      // to reconnect (lib/gmail-dead-grant) — not a red run every 10 minutes.
+      if (!res.ok && (body.reconnect === true || /invalid_grant/i.test(String(body.error ?? '')))) {
+        await forgetRevokedMailbox(box.user_id, box.tenant_id ?? null, box.email ?? null)
+        results.push({ user_id: box.user_id, email: box.email, ok: true, mode: 'disconnected', messages: 0 })
+        continue
+      }
       // A run that stored what it could but failed some downloads/saves is a
       // failure here (body.warning), not a quiet success — they are retried.
       results.push(

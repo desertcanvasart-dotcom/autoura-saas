@@ -206,7 +206,7 @@ const navigation: NavSection[] = [
         label: 'Accommodation', href: '/rates#accommodation', icon: Hotel,
         children: [
           { label: 'Hotels', href: '/rates/hotels', icon: Hotel },
-          { label: 'Nile Cruises', href: '/rates/cruises', icon: Ship },
+          { label: 'Cruises', href: '/rates/cruises', icon: Ship },
           { label: 'Sleeping Trains', href: '/rates/sleeping-train', icon: BedDouble },
           { label: 'Hotel Services', href: '/rates/hotel-services', icon: ConciergeBell },
         ],

@@ -151,7 +151,7 @@ export const SLOT_DEFINITIONS: SlotDefinition[] = [
   { slotId: 'experiences',      label: 'Experiences',      bucket: 'per_person', selectionMode: 'multi',  icon: '🎈', rateTable: 'activity_rates' },
   { slotId: 'meals',            label: 'Meals',            bucket: 'per_person', selectionMode: 'multi',  icon: '🍽️', rateTable: 'meal_rates' },
   { slotId: 'water',            label: 'Water',            bucket: 'per_person', selectionMode: 'single', icon: '💧', rateTable: null },
-  { slotId: 'cruise',           label: 'Nile Cruise',      bucket: 'per_person', selectionMode: 'single', icon: '🚢', rateTable: 'cruise_rates' },
+  { slotId: 'cruise',           label: 'Cruise',           bucket: 'per_person', selectionMode: 'single', icon: '🚢', rateTable: 'cruise_rates' },
   { slotId: 'other_pp',         label: 'Other (PP)',       bucket: 'per_person', selectionMode: 'custom', icon: '📋', rateTable: null },
 ]
 

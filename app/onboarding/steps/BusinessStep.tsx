@@ -34,7 +34,7 @@ const SERVICES = [
   { value: 'tours', label: 'Multi-Day Tours', icon: '🗺️' },
   { value: 'day-trips', label: 'Day Trips', icon: '🚌' },
   { value: 'packages', label: 'Travel Packages', icon: '📦' },
-  { value: 'cruises', label: 'Nile Cruises', icon: '🚢' },
+  { value: 'cruises', label: 'Cruises', icon: '🚢' },
   { value: 'transfers', label: 'Airport Transfers', icon: '✈️' },
   { value: 'experiences', label: 'Activities & Experiences', icon: '🎭' }
 ]

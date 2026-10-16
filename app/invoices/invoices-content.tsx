@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { shiftDateISO, todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
-import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
+import { fetchItineraryClientTotal } from '@/lib/invoices/fetch-itinerary-client-total'
 import { sumByCurrency, formatTotals, currencySymbol, formatMoney } from '@/lib/currency-totals'
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { invoiceMoney } from '@/lib/invoices/invoice-money'
@@ -99,20 +99,6 @@ interface FormData {
   notes: string
   payment_terms: string
   payment_instructions: string
-}
-
-/** A trip's client total: its services' client prices, else the stored total. */
-async function itineraryClientTotalFor(itinerary: Itinerary): Promise<number> {
-  try {
-    const res = await fetch(`/api/itineraries/${itinerary.id}?include=days`)
-    const json = await res.json()
-    const data = json?.data ?? json
-    const services = ((data?.itinerary_days ?? []) as Array<{ itinerary_services?: PricedService[] | null }>)
-      .flatMap(d => d.itinerary_services ?? [])
-    return effectiveItineraryTotal({ total_cost: itinerary.total_cost, margin_percent: data?.margin_percent }, services)
-  } catch {
-    return Number(itinerary.total_cost) || 0
-  }
 }
 
 const initialFormData: FormData = {
@@ -318,7 +304,7 @@ export default function InvoicesContent() {
       
       // The trip's client total from its services (lib/itinerary-client-total)
       // — itineraries.total_cost is a cache that can be 0 or stale.
-      const fullCost = await itineraryClientTotalFor(itinerary)
+      const fullCost = await fetchItineraryClientTotal(itinerary)
       const invoiceType = formData.invoice_type
       const depositPercent = formData.deposit_percent
 

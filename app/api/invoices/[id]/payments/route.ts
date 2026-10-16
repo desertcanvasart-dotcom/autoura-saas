@@ -113,6 +113,23 @@ export async function POST(
       )
     }
 
+    const rawKey = request.headers.get('idempotency-key') ?? body.idempotency_key
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.length > 0 && rawKey.length <= 100 ? rawKey : null
+
+    // A retry of a payment that already went through answers with it — before
+    // the balance checks, which that payment itself has since satisfied (a
+    // retried full payment otherwise read "exceeds balance due" for money
+    // that was recorded).
+    if (idempotencyKey) {
+      const { data: existing } = await supabase
+        .from('invoice_payments')
+        .select('id, invoice_id, amount, currency, payment_method, payment_date, transaction_reference, notes, created_at')
+        .eq('invoice_id', id)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle()
+      if (existing) return NextResponse.json(existing, { status: 200 })
+    }
+
     // A cancelled invoice is owed by no one (the balance trigger then marked
     // it paid); a draft has not been sent — send it first.
     if (invoice.status === 'cancelled') {
@@ -126,9 +143,6 @@ export async function POST(
     // sums amounts with no currency of their own.
     const paid = paymentCurrencyFor(body.currency, invoice.currency)
     if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: 400 })
-
-    const rawKey = request.headers.get('idempotency-key') ?? body.idempotency_key
-    const idempotencyKey = typeof rawKey === 'string' && rawKey.length > 0 && rawKey.length <= 100 ? rawKey : null
 
     // Check if payment exceeds balance (allow small overpayment for rounding)
     if (Number(body.amount) > Number(invoice.balance_due) + 0.01) {

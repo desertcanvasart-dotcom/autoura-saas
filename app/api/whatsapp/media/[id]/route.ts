@@ -60,7 +60,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     // read comes back empty, and this 404s before anything is signed.
     const { data: message, error } = await supabase
       .from('whatsapp_messages')
-      .select('media_storage_path')
+      .select('media_storage_path, message_sid')
       .eq('id', id)
       .single()
 
@@ -72,6 +72,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     if (!storagePath) {
       // Either no attachment, or one hosted elsewhere (Twilio's own media URL,
       // an outbound PDF) — those are in media_url and are not ours to sign.
+      return NextResponse.json({ success: false, error: 'No stored attachment' }, { status: 404 })
+    }
+
+    // The path must be the one the webhook writes for THIS message
+    // (inbound/<sid>.<ext>): members can edit the row, and the service role
+    // signs whatever path it is given — another company's file included.
+    const safeSid = String(message.message_sid ?? '').replace(/[^a-zA-Z0-9_-]/g, '_')
+    if (!safeSid || !new RegExp(`^inbound/${safeSid}\\.[a-z0-9]+$`).test(storagePath)) {
       return NextResponse.json({ success: false, error: 'No stored attachment' }, { status: 404 })
     }
 

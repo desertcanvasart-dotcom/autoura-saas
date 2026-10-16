@@ -1,4 +1,6 @@
 'use client'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
+import { cityOptionsFor } from '@/components/CitySelect'
 
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
@@ -198,13 +200,8 @@ type ViewMode = 'table' | 'cards' | 'compact'
 // ============================================
 // CONSTANTS
 // ============================================
-const EGYPTIAN_CITIES = [
-  'Cairo', 'Giza', 'Alexandria', 'Luxor', 'Aswan', 'Hurghada',
-  'Sharm El Sheikh', 'Dahab', 'Marsa Alam', 'El Gouna', 'Siwa',
-  'Fayoum', 'Port Said', 'Suez', 'Ismailia', 'Taba', 'Nuweiba',
-  'Safaga', 'Ain Sokhna', 'Saint Catherine', 'Bahariya Oasis',
-  'White Desert', 'Black Desert', 'Kharga Oasis', 'Dakhla Oasis'
-]
+// Cities come from the company's own destinations (useDestinationCities) —
+// a fixed list of Egyptian cities offered nothing to an agency elsewhere.
 
 // The WORDS for tour types, physical levels, "best for" and themes are the
 // agency's own now — Settings → Your vocabulary (migration 358). The KEYS
@@ -426,6 +423,7 @@ interface ItineraryEditorProps {
 }
 
 function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptions, ticketOptions, tiers, tourType }: ItineraryEditorProps) {
+  const { cities: destinationCities } = useDestinationCities()
   // The same test the engine applies. `+ 1` while adding: a first day being
   // written into an empty programme is about to be a one-day tour.
   const isDayTour = isDayTourProgramme(tourType, Math.max(itinerary.length, 1))
@@ -819,7 +817,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
             />
             <datalist id="tour-day-cities">
-              {EGYPTIAN_CITIES.map(c => <option key={c} value={c} />)}
+              {destinationCities.map(c => <option key={c} value={c} />)}
             </datalist>
             {namesSeveralPlaces(dayCity) ? (
               <p className="text-[11px] text-red-600 mt-1" role="alert">
@@ -1796,6 +1794,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
 // ============================================
 
 export default function TourManagerContent() {
+  const { cities: destinationCities } = useDestinationCities()
   // The agency's tiers, configured for variations (Settings → Your vocabulary).
   const { entries: tierEntries, byKey: tierConfigs } = useTierConfigs()
   const dialog = useConfirmDialog()
@@ -3369,7 +3368,7 @@ export default function TourManagerContent() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">Cities Covered</label>
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                      {EGYPTIAN_CITIES.map(city => (
+                      {cityOptionsFor(destinationCities, '').concat(formData.cities_covered.filter(c => !destinationCities.includes(c))).map(city => (
                         <label key={city} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"

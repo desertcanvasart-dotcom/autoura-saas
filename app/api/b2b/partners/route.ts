@@ -4,7 +4,6 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { gateStructural } from '@/lib/usage-enforcement'
 import { roleDenied } from '@/lib/api-role-gate'
 import { parsePartnerWrite, nextPartnerCode } from '@/lib/b2b/partner-fields'
-import { orSearchTerm } from '@/lib/clients/client-fields'
 
 // ============================================
 // B2B PARTNERS API
@@ -26,7 +25,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const search = orSearchTerm(searchParams.get('search') || '')
+    // Raw text: orIlikeContains escapes it (once).
+    const search = (searchParams.get('search') || '').trim()
     const active_only = searchParams.get('active_only') !== 'false'
 
     let query = supabase
