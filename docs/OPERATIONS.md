@@ -135,24 +135,25 @@ diagnosis.
 
 ## Scheduled jobs
 
-Five jobs run on a schedule. **This app does not schedule anything itself**, so
+Eight jobs run on a schedule. **This app does not schedule anything itself**, so
 arranging them belongs to whoever runs the instance. Point the scheduler
 (cron, systemd timers, your platform's job runner) at these, each authenticated
-with `CRON_SECRET`:
+with `CRON_SECRET`. Our own Railway setup is in `docs/CRON-JOBS.md`.
 
-| Job | Endpoint | Suggested schedule |
-|---|---|---|
-| Exchange rates | `POST /api/cron/refresh-exchange-rates` | daily, 01:00 |
-| Agent memory | `POST /api/cron/process-agent-memory` | daily, 02:00 |
-| Reminders | `GET /api/cron/send-reminders` | daily, 06:00 |
-| Task reminders | `GET /api/cron/task-reminders` | daily, 06:00 |
-| Document retention | `GET /api/cron/purge-traveller-documents` | daily, 03:45 |
+| Job | Endpoint | Suggested schedule | Driver |
+|---|---|---|---|
+| Exchange rates | `POST /api/cron/refresh-exchange-rates` | daily, 01:00 | `npm run cron:exchange-rates` |
+| Agent memory | `POST /api/cron/process-agent-memory` | daily, 02:00 | `npm run cron:agent-memory` |
+| Reminders | `GET /api/cron/send-reminders` | daily, 06:00 | `npm run cron:reminders` (runs all three) |
+| Task reminders | `GET /api/cron/task-reminders` | daily, 06:00 | ↑ |
+| Document retention | `GET /api/cron/purge-traveller-documents` | daily | ↑ |
+| Gmail sync | `GET /api/cron/gmail-sync` | every 10 minutes | `npm run cron:gmail-sync` |
+| Mail alerts | `GET /api/cron/mail-alerts` | every 5 minutes | `npm run cron:mail-alerts` |
+| Scheduled send | `GET /api/cron/scheduled-send` | every 5 minutes | `npm run cron:scheduled-send` |
 
-Three of the five have a bundled driver — `scripts/cron-exchange-rates.mjs`,
-`cron-reminders.mjs` and `cron-agent-memory.mjs` — which call the endpoint for
-you and exit with the right code, so a scheduler records success or failure.
-Task reminders and document retention have no driver; call their endpoints
-directly with `CRON_SECRET`.
+Each driver calls its endpoint(s) and exits with the right code, so the
+scheduler records success or failure. **Scheduled send** is the one users
+notice: an email someone scheduled simply does not go out while it is stopped.
 
 **Exchange rates is the one to get right.** Without it, every historical
 conversion in the P&L and the financial reports silently falls back to today's
@@ -201,6 +202,44 @@ actually down, so a monitor pages; a scheduler that has stopped is REPORTED but
 does not page, because it is a real problem and it is not an outage, and a
 monitor that cries wolf gets muted.
 
+Add `?strict=1` for a second, lower-urgency monitor that SHOULD hear about the
+scheduler: it also answers 503 when any job has gone quiet for longer than its
+own limit (1 hour for scheduled send and mail alerts, 2 hours for Gmail sync,
+48 hours for the daily jobs), failed, or started and never finished. The body's
+`jobsNeedingAttention` names them.
+
+### Error alerts
+
+Every uncaught server error is written to the log as one JSON line
+(`"event":"server_error"`, scrubbed of addresses, keys and tokens) by
+`instrumentation.ts`. Set `ALERT_WEBHOOK_URL` to a Slack or Discord incoming
+webhook (anything that accepts `POST {"text": …}`) and each **distinct** error is
+also posted there — at most once per 10 minutes, so a hot loop sends one
+message, not thousands. A failed Stripe webhook alerts the same way.
+
+### Deploys only go live when healthy
+
+The web service has a Railway healthcheck on `/api/health`
+(`.railway/railway.ts`, 120-second window). A new deployment takes traffic only
+once that answers 200 — a build that cannot start, or cannot reach Supabase,
+never replaces the running one; the deploy fails and the old version keeps
+serving.
+
+### Content-Security-Policy
+
+`lib/security/csp.js` sets two headers. The safe directives (no plugins, no
+`<base>` hijack, no framing by other sites) are **enforced**. The full
+allowlist of what pages may load is **report-only**: browsers report anything
+it would have blocked to `/api/csp-report`, which logs one line per distinct
+violation per hour (`"event":"csp_violation"`, the blocked origin and the
+page path — never a query string).
+
+To switch it on: after a week of normal traffic, search the logs for
+`csp_violation`. Add any legitimate origin (for example a pixel that Google Tag
+Manager loads) to the matching directive in `lib/security/csp.js`, then send
+the full policy as `Content-Security-Policy` instead of `-Report-Only` in
+`next.config.js`.
+
 ### Sending it to support
 
 `support-bundle.json` is written for you to read before you send it. It
@@ -229,6 +268,48 @@ One rule from it applies to any instance, including ours, and is worth keeping
 in front of whoever operates this: **never send a service-role key or a database
 password by email or chat.** That key bypasses row-level security entirely; once
 it is in a mailbox it is in that mailbox forever, and in every backup of it.
+
+## Backups and restore
+
+**What Supabase keeps.** The database is backed up by Supabase on the paid
+plans — daily, kept for 7 days on Pro (longer on higher tiers); Point-in-Time
+Recovery is an add-on that lets you restore to any second. Check what your
+project has under Database → Backups. The free plan has **no** backups.
+
+**What it does not keep.** Database backups do **not** include files in
+Storage: company logos, quote PDFs, supplier contracts, sent documents and
+traveller passport scans live in buckets, outside those backups. Deleting a
+bucket, or a file in one, cannot be undone from a database backup.
+
+**Your own copy, independent of Supabase** — worth doing weekly and before any
+risky migration:
+
+```bash
+# Schema + data, as a compressed custom-format dump
+pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges \
+  --schema=public --file="autoura-$(date +%F).dump"
+```
+
+Keep it somewhere that is not the same account (encrypted — it holds client
+and passport data). For the buckets, the Supabase CLI or any S3 client can copy
+them (Storage → Settings gives the S3 endpoint and keys).
+
+**Restoring** into a fresh project (never over the live one):
+
+1. Create a new Supabase project.
+2. `pg_restore --no-owner --no-privileges --dbname="$NEW_DATABASE_URL" autoura-YYYY-MM-DD.dump`
+3. `DATABASE_URL=$NEW_DATABASE_URL node scripts/migrate.mjs` — applies any
+   migration newer than the dump.
+4. Copy the buckets back, point a staging deploy at the new project, check it,
+   then switch the production environment variables over.
+
+**Test a restore** at least once a quarter. A backup nobody has restored is a
+hope, not a backup.
+
+**Secrets** are not in either backup. They live in Railway's variables (and
+`.railway/railway.ts` lists their names); keep a copy of the values in your
+password manager so a lost Railway project is not also a lost Stripe webhook
+secret.
 
 ## Releases
 
