@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     oauth2Client.setCredentials({
       access_token: openToken(tokenData.access_token),
-      refresh_token: tokenData.refresh_token,
+      refresh_token: openToken(tokenData.refresh_token),
     })
 
     // Check if token needs refresh

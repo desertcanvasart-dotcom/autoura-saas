@@ -806,5 +806,15 @@ describe('migration replay from scratch', () => {
     expect(await rowsOf(gone)).toBe(0)
     expect((await db.query('SELECT count(*)::int AS n FROM tenants WHERE id = $1', [gone])).rows[0]).toEqual({ n: 0 })
     expect(await rowsOf(kept)).toBe(keptBefore)
+
+    // Migration 434: the export pages on the whole primary key.
+    const keyed = (await db.query(
+      "SELECT key_columns FROM tenant_data_tables() WHERE table_name = 'user_activity_daily'"
+    )).rows[0] as { key_columns: string[] } | undefined
+    if (keyed) expect(keyed.key_columns.length).toBeGreaterThan(1)
+    const clientsKey = (await db.query(
+      "SELECT key_columns FROM data_table_columns(ARRAY['clients'])"
+    )).rows[0] as { key_columns: string[] }
+    expect(clientsKey.key_columns).toEqual(['id'])
   }, 120_000)
 })

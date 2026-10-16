@@ -25,7 +25,15 @@ export async function revokeAndForgetMailbox(userId: string, tenantId: string | 
 
   let revoked = 0
   for (const row of (rows ?? []) as Array<{ refresh_token: string | null; access_token: string | null }>) {
-    const token = openToken(row.refresh_token) || openToken(row.access_token)
+    let token: string | null = null
+    try {
+      token = openToken(row.refresh_token) || openToken(row.access_token)
+    } catch (err) {
+      // Sealed under a key we no longer hold: it cannot be revoked, but the
+      // row is still deleted below — an unreadable token must not keep an
+      // account or a company from being deleted.
+      console.warn('gmail-revoke: token could not be opened', err instanceof Error ? err.message : err)
+    }
     if (!token) continue
     try {
       await Promise.race([

@@ -71,7 +71,9 @@ export async function applyOutboundStatus(update: {
         updated_at: new Date().toISOString(),
       })
       .eq('message_sid', update.messageSid)
-      .neq('status', 'failed')
+      // A failure is final: a late 'sent' must not paper over it, and a
+      // repeated failure callback matches nothing, so nobody is told twice.
+      .not('status', 'in', '(failed,undelivered)')
       .select('tenant_id, to_number, body_preview, sent_by')
     if (error || !rows || rows.length === 0) return false
     const row = rows[0] as { tenant_id: string | null; to_number: string; body_preview: string | null; sent_by: string | null }

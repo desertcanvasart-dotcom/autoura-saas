@@ -29,8 +29,11 @@ async function getHandler(request: NextRequest) {
   const admin = createAdminClient()
   const { data: due, error } = await admin
     .from('tenant_closures')
-    .select('tenant_id')
+    .select('tenant_id, attempts')
     .lte('purge_after', new Date().toISOString())
+    // Least recently tried first (migration 434): a company whose deletion
+    // fails every night must not hold its place ahead of the rest.
+    .order('last_attempt_at', { ascending: true, nullsFirst: true })
     .order('purge_after')
     .limit(PER_RUN)
   if (error) {
@@ -41,13 +44,19 @@ async function getHandler(request: NextRequest) {
   let purged = 0
   const failures: string[] = []
   const warnings: string[] = []
-  for (const { tenant_id } of due ?? []) {
+  for (const { tenant_id, attempts } of due ?? []) {
+    await admin
+      .from('tenant_closures')
+      .update({ attempts: (attempts ?? 0) + 1, last_attempt_at: new Date().toISOString() })
+      .eq('tenant_id', tenant_id)
     try {
       const summary = await purgeCompany(admin, tenant_id)
       purged++
       warnings.push(...summary.problems.map(p => `${tenant_id}: ${p}`))
     } catch (err) {
-      failures.push(`${tenant_id}: ${err instanceof Error ? err.message : String(err)}`)
+      const message = err instanceof Error ? err.message : String(err)
+      failures.push(`${tenant_id}: ${message}`)
+      await admin.from('tenant_closures').update({ last_error: message.slice(0, 1000) }).eq('tenant_id', tenant_id)
     }
   }
 

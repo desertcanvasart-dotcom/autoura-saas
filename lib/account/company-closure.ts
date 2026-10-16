@@ -23,6 +23,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 import { isLive } from '@/lib/billing/subscription-sync'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { isSuperAdmin } from '@/lib/super-admin-shared'
 import { TRAVELLER_DOCS_BUCKET } from '@/lib/portal/traveller-documents'
 import { SUPPLIER_CONTRACTS_BUCKET } from '@/lib/supplier-contracts'
@@ -98,20 +99,33 @@ async function removeAll(admin: Admin, bucket: string, paths: string[]): Promise
 
 /** Every stored path a company's rows point at, in buckets not keyed by company. */
 async function pathsFromRows(admin: Admin, tenantId: string): Promise<Array<[string, string[]]>> {
-  const out: Array<[string, string[]]> = []
-  const { data: docs } = await admin
-    .from('booking_passenger_documents')
-    .select('storage_path')
-    .eq('tenant_id', tenantId)
-    .not('storage_path', 'is', null)
-  out.push([TRAVELLER_DOCS_BUCKET, (docs ?? []).map(d => d.storage_path).filter(Boolean) as string[]])
-  const { data: media } = await admin
-    .from('whatsapp_messages')
-    .select('media_storage_path')
-    .eq('tenant_id', tenantId)
-    .not('media_storage_path', 'is', null)
-  out.push(['whatsapp-media', (media ?? []).map(m => m.media_storage_path).filter(Boolean) as string[]])
-  return out
+  // Every row, not the first 1000: once purge_tenant deletes the rows, a path
+  // not read here is a file nobody can find again. A failed read throws, so
+  // the purge stops before the rows go.
+  const docs = await fetchAllPages<{ storage_path: string | null }, { message: string }>((from, to) =>
+    admin
+      .from('booking_passenger_documents')
+      .select('storage_path')
+      .eq('tenant_id', tenantId)
+      .not('storage_path', 'is', null)
+      .order('id')
+      .range(from, to),
+  )
+  if (docs.error) throw new Error(`reading traveller documents: ${docs.error.message}`)
+  const media = await fetchAllPages<{ media_storage_path: string | null }, { message: string }>((from, to) =>
+    admin
+      .from('whatsapp_messages')
+      .select('media_storage_path')
+      .eq('tenant_id', tenantId)
+      .not('media_storage_path', 'is', null)
+      .order('id')
+      .range(from, to),
+  )
+  if (media.error) throw new Error(`reading WhatsApp media: ${media.error.message}`)
+  return [
+    [TRAVELLER_DOCS_BUCKET, docs.data.map(d => d.storage_path).filter(Boolean) as string[]],
+    ['whatsapp-media', media.data.map(m => m.media_storage_path).filter(Boolean) as string[]],
+  ]
 }
 
 export type PurgeSummary = {
@@ -144,9 +158,13 @@ export async function purgeCompany(admin: Admin, tenantId: string): Promise<Purg
   // 2. Gmail
   const { revokeAndForgetMailbox } = await import('@/lib/gmail-revoke')
   for (const userId of memberIds) {
-    const r = await revokeAndForgetMailbox(userId, tenantId)
-    summary.gmail_revoked += r.revoked
-    if (r.error) summary.problems.push(`gmail: ${r.error}`)
+    try {
+      const r = await revokeAndForgetMailbox(userId, tenantId)
+      summary.gmail_revoked += r.revoked
+      if (r.error) summary.problems.push(`gmail: ${r.error}`)
+    } catch (err) {
+      summary.problems.push(`gmail: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   // 3. Files
@@ -173,8 +191,16 @@ export async function purgeCompany(admin: Admin, tenantId: string): Promise<Purg
 
   // 5. Logins that belonged only to this company
   for (const userId of memberIds) {
-    const { count } = await admin.from('tenant_members').select('id', { count: 'exact', head: true }).eq('user_id', userId)
-    if ((count ?? 0) > 0) continue
+    const { count, error: countError } = await admin
+      .from('tenant_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+    // Unknown is not "none": a failed count keeps the login.
+    if (countError || count === null) {
+      summary.problems.push(`login kept (membership check failed): ${countError?.message ?? 'no count'}`)
+      continue
+    }
+    if (count > 0) continue
     const { data: u } = await admin.auth.admin.getUserById(userId)
     if (!u?.user || isSuperAdmin(u.user.email ?? '')) continue
     const { error } = await admin.auth.admin.deleteUser(userId)

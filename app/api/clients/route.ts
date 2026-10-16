@@ -4,7 +4,7 @@ import { DEFAULT_CLIENT_STAGE } from '@/lib/client-stage'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { fetchAllPages } from '@/lib/db/fetch-all-pages'
-import { parseClientWrite, clientFullName, orSearchTerm, LEAD_SOURCES } from '@/lib/clients/client-fields'
+import { parseClientWrite, clientFullName, LEAD_SOURCES } from '@/lib/clients/client-fields'
 
 /** No caller should need more than this in one list. */
 const MAX_LIST = 5000
@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
     const { supabase, tenant_id } = authResult
 
     const { searchParams } = new URL(request.url)
-    const search = orSearchTerm(searchParams.get('search') || '')
+    // Raw text: orIlikeContains does the escaping (orSearchTerm escaped it a
+    // second time, so a search for an email with `_` matched nothing).
+    const search = (searchParams.get('search') || '').trim()
     const asked = parseInt(searchParams.get('limit') || '', 10)
     const limit = Number.isFinite(asked) && asked > 0 ? Math.min(asked, MAX_LIST) : MAX_LIST
 

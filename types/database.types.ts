@@ -9200,18 +9200,27 @@ export interface Database {
           requested_by: string | null
           requested_at: string
           purge_after: string
+          attempts: number
+          last_attempt_at: string | null
+          last_error: string | null
         }
         Insert: {
           tenant_id: string
           requested_by?: string | null
           requested_at?: string
           purge_after: string
+          attempts?: number
+          last_attempt_at?: string | null
+          last_error?: string | null
         }
         Update: {
           tenant_id?: string
           requested_by?: string | null
           requested_at?: string
           purge_after?: string
+          attempts?: number
+          last_attempt_at?: string | null
+          last_error?: string | null
         }
         Relationships: []
       }
@@ -12061,11 +12070,11 @@ export interface Database {
       }
       tenant_data_tables: {
         Args: Record<PropertyKey, never>
-        Returns: { table_name: string; column_names: string[] }[]
+        Returns: { table_name: string; column_names: string[]; key_columns: string[] | null }[]
       }
       data_table_columns: {
         Args: { p_tables: string[] }
-        Returns: { table_name: string; column_names: string[] }[]
+        Returns: { table_name: string; column_names: string[]; key_columns: string[] | null }[]
       }
       purge_expired_agent_memories: {
         Args: Record<PropertyKey, never>

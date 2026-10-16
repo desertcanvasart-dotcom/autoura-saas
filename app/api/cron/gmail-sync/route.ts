@@ -1,5 +1,6 @@
 import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { sealToken } from '@/lib/token-crypto'
 import { createAdminClient } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
 import { planMailboxSweep, lookBackDays, type MailboxRow, type MembershipRow } from '@/lib/email/scheduled-sync'
@@ -54,6 +55,19 @@ async function getHandler(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ success: false, error: `Could not read the connected mailboxes: ${error.message}` }, { status: 500 })
+  }
+
+  // Tokens stored before TOKEN_ENCRYPTION_KEY was set are sealed here, once
+  // (refreshes only rewrite the access token, so a plain refresh token would
+  // otherwise stay plain until the mailbox reconnected). No key: no-op.
+  for (const row of data ?? []) {
+    const refresh = sealToken(row.refresh_token)
+    const access = sealToken(row.access_token)
+    if (!row.user_id || (refresh === row.refresh_token && access === row.access_token)) continue
+    let q = admin.from('gmail_tokens').update({ refresh_token: refresh, access_token: access }).eq('user_id', row.user_id)
+    q = row.tenant_id ? q.eq('tenant_id', row.tenant_id) : q.is('tenant_id', null)
+    const { error: sealError } = await q
+    if (sealError) console.error('gmail-sync: could not seal a stored token', sealError.message)
   }
 
   // The company comes from the owner's membership when the mailbox row does
