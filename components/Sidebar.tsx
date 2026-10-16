@@ -29,6 +29,7 @@ import {
   UtensilsCrossed,
   Plane,
   Coins,
+  ClipboardCheck,
   LogOut,
   Mail,
   Ticket,
@@ -202,6 +203,7 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Suppliers', href: '/suppliers', icon: Building },
       { label: 'Rates Hub', href: '/rates', icon: Coins },
+      { label: 'Rates Check', href: '/rates/check', icon: ClipboardCheck },
       {
         label: 'Accommodation', href: '/rates#accommodation', icon: Hotel,
         children: [

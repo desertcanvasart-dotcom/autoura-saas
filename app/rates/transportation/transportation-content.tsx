@@ -4,6 +4,7 @@ import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy, LayoutGrid, List, Table2 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
@@ -124,7 +125,9 @@ export default function TransportationContent() {
   const [rates, setRates] = useState<TransportationRate[]>([])
   const routes = useMemo(() => groupRoutes(rates), [rates])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
+  // ?q= opens the list filtered (the Rates check page links each finding here).
+  const searchParams = useSearchParams()
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '')
   const [cityFilter, setCityFilter] = useState('')
   const [serviceTypeFilter, setServiceTypeFilter] = useState('')
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('')

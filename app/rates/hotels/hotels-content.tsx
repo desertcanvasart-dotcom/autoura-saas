@@ -333,7 +333,8 @@ export default function HotelsContent() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
+  // ?q= opens the list filtered (the Rates check page links each finding here).
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '')
   const [selectedCity, setSelectedCity] = useState('all')
   const [selectedSupplier, setSelectedSupplier] = useState('all')
   const [showInactive, setShowInactive] = useState(false)
