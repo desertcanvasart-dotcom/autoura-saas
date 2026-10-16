@@ -1,3 +1,4 @@
+import { operatingCountryOf, regionTravelPhrase, isEgypt } from '@/lib/tenant-region'
 // ============================================
 // POST /api/pricing-grid/parse
 // AI-powered text-to-grid parser
@@ -322,10 +323,13 @@ export async function POST(request: NextRequest) {
 
     // --- Structure-only mode: extract itinerary without rate matching ---
     if (mode === 'structure') {
-      return handleStructureParse(text, pax)
+      return handleStructureParse(text, pax, await operatingCountryOf(tenant_id))
     }
 
     // 1. Fetch all rates for this tenant
+    // The company's own country (Settings → Organization), not Egypt for all.
+    const country = await operatingCountryOf(tenant_id)
+    const glossary = isEgypt(country) ? EGYPT_GLOSSARY : ''
     const rates = await fetchAllRates(tenant_id, tier)
     const rateCatalog = buildRateCatalog(rates)
     const rateMap = buildRateMap(rates)
@@ -339,12 +343,12 @@ export async function POST(request: NextRequest) {
 
     // 2. Stage 1: AI structured parse
 
-    const systemPrompt = `You are an Egypt travel itinerary parser for a tour operator pricing system.
+    const systemPrompt = `You are a ${regionTravelPhrase(country)} itinerary parser for a tour operator pricing system.
 
 Given a text input (WhatsApp message, email, booking request, or itinerary), extract a structured day-by-day itinerary.
 ${packageRules(pkg)}
 
-${EGYPT_GLOSSARY}
+${glossary}
 
 ## AVAILABLE RATE CATALOG
 Match services to these exact IDs from the database:
@@ -444,16 +448,16 @@ Match the origin_city and destination_city of each transport entry to the day's 
     // 3. Stage 2: Generative fallback if 0 days
     if (!aiResult || !aiResult.days || aiResult.days.length === 0) {
       generationMode = 'generated'
-      const genPrompt = `You are an Egypt travel expert. The user sent a vague inquiry. Generate a suggested ${pax}-person itinerary.
+      const genPrompt = `You are a ${regionTravelPhrase(country)} expert. The user sent a vague inquiry. Generate a suggested ${pax}-person itinerary.
 ${packageRules(pkg)}
 
-${EGYPT_GLOSSARY}
+${glossary}
 
 ## AVAILABLE RATES
 ${rateCatalog}
 
 Return the same JSON format as before with suggested days, matching real rate IDs from the catalog.
-Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
+Generate a reasonable 5-7 day itinerary${country ? ` in ${country}` : ''} covering popular sites, using only places that appear in the rates above.`
 
       aiResult = await askForJson(genPrompt, `Generate a suggested itinerary for this inquiry:\n\n${text}`)
       if (!aiResult) {
@@ -636,10 +640,10 @@ export function buildSlotsFromAI(
 // ============================================
 // Structure-only parse (no rate matching)
 // ============================================
-async function handleStructureParse(text: string, pax: number) {
-  const systemPrompt = `You are an Egypt travel itinerary parser. Extract a structured day-by-day itinerary from the input text WITHOUT matching any rates or prices.
+async function handleStructureParse(text: string, pax: number, country: string | null) {
+  const systemPrompt = `You are a ${regionTravelPhrase(country)} itinerary parser. Extract a structured day-by-day itinerary from the input text WITHOUT matching any rates or prices.
 
-${EGYPT_GLOSSARY}
+${isEgypt(country) ? EGYPT_GLOSSARY : ''}
 
 ## OUTPUT FORMAT
 Return valid JSON only (no markdown, no backticks):

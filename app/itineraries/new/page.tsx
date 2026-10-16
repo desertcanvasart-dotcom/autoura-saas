@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check, User, Plane, Users, FileText } from 'lucide-react'
 
 export default function NewItineraryPage() {
   const router = useRouter()
+  const { tenant } = useTenant()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -22,6 +25,12 @@ export default function NewItineraryPage() {
     currency: 'EUR',
     notes: ''
   })
+  // Start in the company's own currency (Settings → Organization), not EUR.
+  const companyCurrency = tenant?.default_currency || null
+  const [currencyTouched, setCurrencyTouched] = useState(false)
+  useEffect(() => {
+    if (companyCurrency && !currencyTouched) setFormData(prev => ({ ...prev, currency: companyCurrency }))
+  }, [companyCurrency, currencyTouched])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -258,12 +267,12 @@ export default function NewItineraryPage() {
                 <select
                   name="currency"
                   value={formData.currency}
-                  onChange={handleChange}
+                  onChange={(e) => { setCurrencyTouched(true); handleChange(e) }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
-                  <option value="EUR">EUR (€)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="GBP">GBP (£)</option>
+                  {SUPPORTED_CURRENCIES.map(c => (
+                    <option key={c} value={c}>{c} ({getCurrencySymbol(c)})</option>
+                  ))}
                 </select>
               </div>
             </div>

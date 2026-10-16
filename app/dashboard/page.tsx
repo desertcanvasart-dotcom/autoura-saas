@@ -1,4 +1,5 @@
 'use client'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -63,6 +64,7 @@ interface DashboardData {
 const supabase = createClient()
 
 export default function DashboardPage() {
+  const { tenant } = useTenant()
   const { role } = useRole()
   // Links only where the role can go: a viewer clicking "Outstanding" was
   // bounced back here by the middleware, so the card looked dead.
@@ -147,7 +149,9 @@ export default function DashboardPage() {
     `${getCurrencySymbol(currency)}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const moneyTotals = (totals: Record<string, number>) => {
     const parts = Object.entries(totals).filter(([, v]) => v > 0).map(([c, v]) => money(v, c))
-    return parts.length ? parts.join(' + ') : money(0, Object.keys(totals)[0] || 'EUR')
+    // Nothing owed yet: show 0 in the company's own currency (it read €0.00
+    // to every new non-EUR company).
+    return parts.length ? parts.join(' + ') : money(0, Object.keys(totals)[0] || tenant?.default_currency || 'EUR')
   }
   const daysAway = (d: string | null) => daysFromToday(d, data.today)
 
