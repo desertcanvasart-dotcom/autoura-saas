@@ -5,6 +5,7 @@ import { ArrowRight, ArrowLeft, Palette, Image as ImageIcon, Upload, X } from 'l
 import { showToast } from '@/app/contexts/ToastContext'
 import { createClient } from '@/app/supabase'
 import Image from 'next/image'
+import { LOGO_ACCEPT, logoFileProblem } from '@/lib/logo-file'
 
 interface BrandingStepProps {
   onNext: () => void
@@ -46,15 +47,10 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      showToast('error', 'Please select an image file')
-      return
-    }
-
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      showToast('error', 'Image must be less than 2MB')
+    // PNG or JPEG, at most 2MB (lib/logo-file.ts).
+    const problem = logoFileProblem(file)
+    if (problem) {
+      showToast('error', problem)
       return
     }
 
@@ -316,7 +312,7 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={LOGO_ACCEPT}
                   onChange={handleFileSelect}
                   className="hidden"
                   aria-label="Upload company logo"
@@ -331,7 +327,7 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
                   Upload Logo
                 </button>
                 <p className="text-xs text-gray-500 mt-2">
-                  PNG, JPG or SVG (max 2MB)
+                  PNG or JPG (max 2MB)
                 </p>
               </div>
             ) : (

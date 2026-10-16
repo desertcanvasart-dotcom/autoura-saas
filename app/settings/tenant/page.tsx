@@ -27,6 +27,7 @@ import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { identityFromTenant } from '@/lib/company-identity'
 import { DocumentFooter } from '@/components/documents/Letterhead'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { LOGO_ACCEPT, logoFileProblem } from '@/lib/logo-file'
 
 const supabase = createClient()
 
@@ -190,15 +191,10 @@ export default function TenantSettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: 'Please select an image file' })
-      return
-    }
-
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'Image must be less than 2MB' })
+    // PNG or JPEG, at most 2MB (lib/logo-file.ts).
+    const problem = logoFileProblem(file)
+    if (problem) {
+      setMessage({ type: 'error', text: problem })
       return
     }
 
@@ -882,7 +878,7 @@ export default function TenantSettingsPage() {
               Company Logo
             </label>
             <p className="text-[10px] text-gray-400 mb-2">
-              Recommended: Square image (500x500px), PNG or SVG. Max 2MB
+              Recommended: Square image (500x500px), PNG or JPEG. Max 2MB
             </p>
 
             {!logoPreview ? (
@@ -890,7 +886,7 @@ export default function TenantSettingsPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={LOGO_ACCEPT}
                   onChange={handleFileSelect}
                   className="hidden"
                 />
