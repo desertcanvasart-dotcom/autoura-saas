@@ -13,7 +13,7 @@ import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
 import { repickVehicles } from './lib/option-filters'
-import { optionItems, cruiseForTier } from './lib/option-item'
+import { optionItems, cruiseForTier, hotelForTier } from './lib/option-item'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
 import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
@@ -254,10 +254,8 @@ function PricingGridContent() {
       slots: day.slots.map(slot => {
         // Swap accommodation: match by city
         if (slot.slotId === 'accommodation' && slot.selectedItems.length > 0) {
-          const dayCity = day.city?.toLowerCase()?.trim()
-          const newHotel = (rates as AllRates).accommodation.find(
-            (r: any) => r.city?.toLowerCase()?.trim() === dayCity
-          )
+          // The same hotel in the new tier when it has it (option-item.ts).
+          const newHotel = hotelForTier(slot.selectedItems[0], day.city, (rates as AllRates).accommodation)
           // With its single supplement, as a pick in the row makes it.
           if (newHotel) return { ...slot, selectedItems: optionItems('accommodation', newHotel) }
           // No hotel in new tier for this city — clear selection
@@ -539,6 +537,9 @@ function PricingGridContent() {
   const [writing, setWriting] = useState<'all' | number | null>(null)
   const [writtenFrom, setWrittenFrom] = useState<Record<number, WrittenSource[]>>({})
   const [libraryMissing, setLibraryMissing] = useState<LibraryGap[]>([])
+  // What the parser wants the operator to know (a named hotel saved under
+  // another tier, a transport rate whose type contradicts its route …).
+  const [parseNotes, setParseNotes] = useState<string[]>([])
   const [offerWrite, setOfferWrite] = useState(false)
   const writeDescriptions = async (mode: 'fill' | 'rewrite', dayNumbers?: number[]) => {
     if (writing !== null || days.length === 0) return
@@ -700,11 +701,12 @@ function PricingGridContent() {
       // and the user knows a fresh parse is starting
       setDays([])
       setBlockNotes({})
+      setParseNotes([])
       setConfig(prev => ({ ...prev, itineraryId: null, itineraryCode: null }))
       const res = await fetch('/api/pricing-grid/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, tier: config.tier, pax: config.pax, package_type: config.packageType })
+        body: JSON.stringify({ text, tier: config.tier, pax: config.pax, package_type: config.packageType, start_date: config.startDate || null })
       })
       const data = await res.json()
       if (data.success && data.days) {
@@ -720,6 +722,7 @@ function PricingGridContent() {
           if (!config.guideLanguage) setConfig(prev => ({ ...prev, guideLanguage }))
         }
         setDays(hydrated)
+        setParseNotes(Array.isArray(data.notes) ? data.notes.map(String) : [])
         // The parse wrote its own brief descriptions: offer the library's.
         setWrittenFrom({})
         setLibraryMissing([])
@@ -1150,6 +1153,14 @@ function PricingGridContent() {
                 </button>
                 <button type="button" onClick={() => setOfferWrite(false)} className="text-gray-500 hover:underline">Not now</button>
               </span>
+            </div>
+          )}
+          {parseNotes.length > 0 && (
+            <div role="status" className="mb-2 px-3 py-2 text-xs bg-amber-50 border border-amber-200 rounded-lg text-amber-900">
+              <p className="font-medium mb-1">Check before pricing</p>
+              <ul className="space-y-0.5 list-disc pl-4">
+                {parseNotes.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
             </div>
           )}
           {libraryMissing.length > 0 && (
