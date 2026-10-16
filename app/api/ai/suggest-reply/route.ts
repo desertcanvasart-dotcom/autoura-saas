@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: auth.status })
     }
     const { supabase, tenant_id, user } = auth
-    const overBudget = aiBudgetDenied(user.id, tenant_id)
+    const overBudget = await aiBudgetDenied(user.id, tenant_id)
     if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({}))

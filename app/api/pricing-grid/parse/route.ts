@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
     if (!tenant_id) {
       return NextResponse.json({ success: false, error: 'No tenant' }, { status: 403 })
     }
-    const overBudget = aiBudgetDenied(authResult.user!.id, tenant_id)
+    const overBudget = await aiBudgetDenied(authResult.user!.id, tenant_id)
     if (overBudget) return overBudget
 
     const body = await request.json()

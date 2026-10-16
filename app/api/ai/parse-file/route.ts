@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
-    const overBudget = aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
+    const overBudget = await aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
     if (overBudget) return overBudget
 
     const body = await request.json()

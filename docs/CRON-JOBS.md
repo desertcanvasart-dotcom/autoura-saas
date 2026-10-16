@@ -17,8 +17,25 @@ start command that runs once and exits. They do not serve traffic.
 |---|---|---|---|
 | Agent memory | `npm run cron:agent-memory` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
 | Exchange rates | `npm run cron:exchange-rates` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
-| Reminders | `npm run cron:reminders` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` |
+| Reminders | `npm run cron:reminders` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` + `GET /api/cron/purge-traveller-documents` |
+| Gmail sync | `npm run cron:gmail-sync` | `*/10 * * * *` | `GET /api/cron/gmail-sync` |
+| Mail alerts | `npm run cron:mail-alerts` | `*/5 * * * *` | `GET /api/cron/mail-alerts` |
 | Scheduled send | `npm run cron:scheduled-send` | `*/5 * * * *` | `GET /api/cron/scheduled-send` |
+
+The reminders service also runs the **traveller-document retention sweep**
+(passport and visa scans are deleted once the trip is over) — it has no
+service of its own, so if the reminders service stops, that promise stops
+being kept too.
+
+### Is each job still running?
+
+Every run is recorded in `job_runs`. Each job has its own limit for how long
+it may be quiet before it counts as stopped (`lib/support/bundle-core.mjs`,
+`STALE_AFTER_HOURS_BY_JOB`): **1 hour** for scheduled send and mail alerts,
+**2 hours** for Gmail sync, **48 hours** for the daily jobs.
+`GET /api/health/deep?strict=1` (with `Authorization: Bearer $CRON_SECRET`)
+answers **503** and names the job when one has stopped, failed or never
+finished — point a second, low-urgency monitor at it.
 
 (The second column is the START COMMAND **stored on the service** — see the
 Config-as-Code retirement note below. The full topology is defined in
@@ -67,7 +84,8 @@ endpoint outside `/api/cron/` will fail that sweep.
 
 | Var | Value |
 |---|---|
-| `APP_URL` | Public URL of the **web** service, e.g. `https://getautoura.net` |
+| `APP_URL` | Public URL of the **web** service, e.g. `https://getautoura.net` (agent memory, exchange rates, reminders) |
+| `CRON_TARGET_URL` | The web service's URL for the newer jobs (Gmail sync, mail alerts, scheduled send); can be the private-network address. Falls back to `NEXT_PUBLIC_APP_URL` |
 | `CRON_SECRET` | **Exactly** the value set on the web service |
 
 `CRON_SECRET` is compared directly by the endpoint. If it is unset or differs,

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     // It calls the AI: staff only (viewers could trigger it).
     const denied = roleDenied(auth.role, 'staff')
     if (denied) return denied
-    const overBudget = aiBudgetDenied(auth.user!.id, tenant_id)
+    const overBudget = await aiBudgetDenied(auth.user!.id, tenant_id)
     if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({})) as { days?: unknown }

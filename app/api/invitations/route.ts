@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/email-send'
 import crypto from 'crypto'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
-import { checkRateLimit, getRateLimitIdentifier, rateLimitResponse } from '@/lib/rate-limit'
+import { getRateLimitIdentifier, rateLimitResponse } from '@/lib/rate-limit'
+import { checkSharedRateLimit } from '@/lib/rate-limit-shared'
 
 // Role hierarchy for invitation gating. An inviter may only assign roles
 // strictly below their own rank, so no invitation can escalate privileges
@@ -126,7 +127,8 @@ export async function POST(request: NextRequest) {
     if (!seatGate.ok) return seatGate.response!
 
     // Throttle invite creation per authenticated user (un-spoofable id).
-    const rl = checkRateLimit(getRateLimitIdentifier(request, authResult.user!.id), 'invitation')
+    // Counted in the database: a deploy must not hand out a fresh allowance.
+    const rl = await checkSharedRateLimit(getRateLimitIdentifier(request, authResult.user!.id), 'invitation')
     if (!rl.success) {
       return rateLimitResponse(rl)
     }

@@ -4,6 +4,8 @@ import { verifyWebhookSignature } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
+import { reportServerError } from '@/lib/monitoring/error-alerts'
+import { isRetrySafeEvent } from '@/lib/billing/webhook-retry'
 import {
   decideOnboardingFee,
   chargedMetadata,
@@ -39,6 +41,7 @@ function getSupabaseAdmin() {
 export async function POST(request: NextRequest) {
   // Declared outside the try so the catch can close out a claimed event.
   let eventId: string | null = null
+  let eventType: string | null = null
   try {
     const body = await request.text()
     const headersList = await headers()
@@ -76,6 +79,7 @@ export async function POST(request: NextRequest) {
 
 
     eventId = event.id
+    eventType = event.type
 
     // Claim the event before doing anything with money. The INSERT is the
     // claim: the PK makes a concurrent duplicate lose with 23505 rather than
@@ -133,15 +137,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (error: any) {
     console.error('Webhook error:', error)
-    // Record why, then let Stripe retry. The claim row stays, so the retry is
-    // skipped as a duplicate — deliberate: a handler that failed halfway must
-    // be inspected (processed_at IS NULL finds it), not silently re-run over
-    // money. The message is preserved for exactly that triage.
-    await markEventProcessed(eventId, error?.message ?? String(error))
+    // Someone must hear about it either way: this route answers the error
+    // itself, so instrumentation.ts never sees it.
+    await reportServerError(error, { method: 'POST', routePath: `/api/billing/webhook (${eventType ?? 'unknown event'})` })
+    if (eventId && eventType && isRetrySafeEvent(eventType)) {
+      // State syncs only (lib/billing/webhook-retry): release the claim so
+      // Stripe's retry runs it again. Kept, a passing database blip left the
+      // subscription out of step with Stripe for good.
+      await releaseClaim(eventId)
+    } else {
+      // Money moves here (an invoice item raised or withdrawn): the claim
+      // stays, so the retry is skipped as a duplicate — a handler that failed
+      // halfway must be inspected (processed_at with an error finds it), not
+      // silently re-run. The message is preserved for exactly that triage.
+      await markEventProcessed(eventId, error?.message ?? String(error))
+    }
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
     )
+  }
+}
+
+/** Let a retry of this event run again. Best-effort, like the close-out. */
+async function releaseClaim(eventId: string) {
+  try {
+    const { error } = await (getSupabaseAdmin() as any)
+      .from('stripe_webhook_events')
+      .delete()
+      .eq('event_id', eventId)
+    if (error) console.error('billing webhook: could not release claim', eventId, error)
+  } catch (err) {
+    console.error('billing webhook: could not release claim', eventId, err)
   }
 }
 

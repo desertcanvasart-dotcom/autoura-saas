@@ -402,7 +402,7 @@ export async function POST(request: Request) {
         { status: authResult.status }
       )
     }
-    const overBudget = aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
+    const overBudget = await aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
     if (overBudget) return overBudget
 
     const { conversation } = await request.json()

@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   // Only the AI-extract mode calls the model; both embed every chunk.
   const tooLong = aiInputTooLong(text, 200_000)
   if (tooLong) return tooLong
-  const overBudget = auth.user ? aiBudgetDenied(auth.user.id, tenant_id) : null
+  const overBudget = auth.user ? await aiBudgetDenied(auth.user.id, tenant_id) : null
   if (overBudget) return overBudget
   const mode: 'as_is' | 'ai_extract' = body.mode === 'ai_extract' ? 'ai_extract' : 'as_is'
   const defaultType: KbSourceType = KB_TYPES.includes(body.source_type) ? body.source_type : 'kb_custom'

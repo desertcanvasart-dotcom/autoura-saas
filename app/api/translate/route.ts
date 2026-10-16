@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
-    const overBudget = aiBudgetDenied(auth.user!.id, auth.tenant_id)
+    const overBudget = await aiBudgetDenied(auth.user!.id, auth.tenant_id)
     if (overBudget) return overBudget
 
     // Check API key first
