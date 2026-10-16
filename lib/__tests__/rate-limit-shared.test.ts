@@ -13,7 +13,7 @@ beforeEach(() => { vi.spyOn(console, 'warn').mockImplementation(() => {}) })
 describe('rate_limit_take (migration 427) in Postgres', () => {
   it('counts per key within the window, then starts a new window', async () => {
     const db = new PGlite()
-    await db.exec('CREATE ROLE anon; CREATE ROLE authenticated;')
+    await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;')
     await db.exec(readFileSync(join(process.cwd(), 'supabase/migrations/427_shared_rate_limits.sql'), 'utf8'))
     const take = async (key: string, limit = 2, secs = 3600) =>
       (await db.query(`SELECT * FROM rate_limit_take($1, $2, $3)`, [key, limit, secs])).rows[0] as { allowed: boolean; remaining: number }
