@@ -35,6 +35,7 @@ import { displayRate } from './lib/display-rate'
 import { takeConversation } from '@/lib/grid-handoff'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { readbackDays, readbackText } from './lib/readback'
+import { isStructuredItinerary, parseStructuredItinerary, readStructuredHeader, itineraryTemplate, namesList } from './lib/structured-itinerary'
 import type { LibraryGap, WrittenSource } from './components/DayRow'
 
 // ============================================
@@ -723,6 +724,44 @@ function PricingGridContent() {
     setConfig(prev => ({ ...prev, packageType: p }))
   }
 
+  // The format's text names this tier's rates: when it asks for another
+  // tier, that tier's list is fetched first, and the tier switch is not
+  // treated as a change (its hotels are already the ones written).
+  const readStructuredText = async (text: string) => {
+    const header = readStructuredHeader(text)
+    let list = rates as AllRates
+    const tier = header.tier && header.tier !== config.tier ? header.tier : null
+    if (tier) {
+      const params = new URLSearchParams({ tier })
+      const startDate = header.startDate ?? config.startDate
+      if (startDate) params.set('date', startDate)
+      const data = await fetch(`/api/pricing-grid/rates?${params}`).then(r => r.json()).catch(() => null)
+      if (!data?.success) { showToast('error', `Could not load your ${tier} rates`); return }
+      list = data.data
+      prevTierRef.current = tier
+    }
+    const { days: read, unmatched } = parseStructuredItinerary(text, list, header.pax ?? config.pax, () => crypto.randomUUID())
+    setDays(read)
+    setShowReadback(read.length > 0)
+    setParseNotes([...unmatched, ...transportTypeWarnings(read, list.route)])
+    setWrittenFrom({})
+    setLibraryMissing([])
+    setOfferWrite(read.length > 0)
+    setConfig(prev => ({
+      ...prev,
+      ...(header.packageType && { packageType: header.packageType }),
+      ...(tier && { tier }),
+      ...(header.pax && { pax: header.pax }),
+      ...(header.startDate && { startDate: header.startDate }),
+    }))
+    setSaveMessage(`Read from your itinerary format — ${read.length} day${read.length === 1 ? '' : 's'}, matched by name, no AI used`)
+  }
+
+  const formatTemplate = () => {
+    const pkg = PACKAGE_TYPE_CONFIGS.find(c => c.slug === config.packageType)
+    return itineraryTemplate(rates, { packageName: pkg?.name, tier: config.tier, pax: config.pax, startDate: config.startDate })
+  }
+
   const handleParseDays = async (text: string) => {
     try {
       setIsParsing(true)
@@ -734,6 +773,12 @@ function PricingGridContent() {
       setParseNotes([])
       setShowReadback(false)
       setConfig(prev => ({ ...prev, itineraryId: null, itineraryCode: null }))
+      // Written in the agency's format: read here, by name, without the AI
+      // (structured-itinerary.ts) — exact, instant, and free.
+      if (rates && isStructuredItinerary(text)) {
+        await readStructuredText(text)
+        return
+      }
       const res = await fetch('/api/pricing-grid/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1096,6 +1141,8 @@ function PricingGridContent() {
       {/* Input Panel */}
       <InputPanel
         onParseDays={handleParseDays}
+        formatTemplate={rates ? formatTemplate : undefined}
+        namesList={rates ? () => namesList(rates) : undefined}
         onAddDay={addDay}
         blocks={rates ? blocks : []}
         onAddDayFromBlock={addDayFromBlock}
