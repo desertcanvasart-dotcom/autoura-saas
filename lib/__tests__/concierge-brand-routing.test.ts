@@ -69,10 +69,11 @@ describe('resolveConciergeTenant', () => {
     expect(r).toEqual({ ok: true, tenantId: TENANT_A, via: 'env', brand: null })
   })
 
-  it('falls back to the oldest tenant when no brand and no env', async () => {
+  it('refuses, rather than guessing the oldest company, when no brand and no env', async () => {
     const db = stubDb({ tenants: { id: TENANT_A } })
     const r = await resolveConciergeTenant(db, undefined, NO_ENV)
-    expect(r).toEqual({ ok: true, tenantId: TENANT_A, via: 'first_tenant', brand: null })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.code).toBe('no_tenant')
   })
 
   it('errors when no brand, no env, and no tenants exist', async () => {

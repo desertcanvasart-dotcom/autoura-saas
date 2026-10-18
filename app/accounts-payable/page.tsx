@@ -193,9 +193,13 @@ export default function AccountsPayablePage() {
       })
       if (response.ok) {
         fetchData()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not mark the expense paid')
       }
     } catch (error) {
       console.error('Error marking as paid:', error)
+      showToast('error', 'Could not mark the expense paid')
     }
   }
 
@@ -208,9 +212,13 @@ export default function AccountsPayablePage() {
       })
       if (response.ok) {
         fetchData()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not approve the expense')
       }
     } catch (error) {
       console.error('Error approving expense:', error)
+      showToast('error', 'Could not approve the expense')
     }
   }
 
@@ -354,7 +362,7 @@ export default function AccountsPayablePage() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">💰</span>
@@ -392,6 +400,16 @@ export default function AccountsPayablePage() {
             </div>
             <p className="text-xs text-gray-500 mb-1">Not due yet</p>
             <p className="text-2xl font-semibold text-green-600">{formatTotals(summary.aging.current)}</p>
+          </div>
+
+          {/* The cards add up to the total: 1-30 days was missing. */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">⏳</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+            </div>
+            <p className="text-xs text-gray-500 mb-1">1-30 days overdue</p>
+            <p className="text-2xl font-semibold text-yellow-600">{formatTotals(summary.aging.days30)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -661,7 +679,7 @@ export default function AccountsPayablePage() {
                                     {expense.expense_number}
                                   </Link>
                                   <p className="text-xs text-gray-500">
-                                    {expense.description || catConfig.label} • {new Date(expense.expense_date).toLocaleDateString()}
+                                    {expense.description || catConfig.label} • {new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                                     {expense.is_overdue && (
                                       <span className="text-orange-500 ml-2">({expense.days_past_due} days overdue)</span>
                                     )}
@@ -723,177 +741,181 @@ export default function AccountsPayablePage() {
       {/* Expense View */}
       {viewMode === 'expenses' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
-                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
-                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Aging</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(paginatedData as Expense[]).length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
-                    No outstanding expenses
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
+                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
+                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Aging</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
                 </tr>
-              ) : (
-                (paginatedData as Expense[]).map((expense) => {
-                  const catConfig = CATEGORY_CONFIG[expense.category] || CATEGORY_CONFIG.other
-                  return (
-                    <tr key={expense.id} className={`hover:bg-gray-50 ${expense.is_overdue ? 'bg-orange-50/50' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span>{catConfig.icon}</span>
-                          <div>
-                            <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
-                              {expense.expense_number}
-                            </Link>
-                            <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(paginatedData as Expense[]).length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                      No outstanding expenses
+                    </td>
+                  </tr>
+                ) : (
+                  (paginatedData as Expense[]).map((expense) => {
+                    const catConfig = CATEGORY_CONFIG[expense.category] || CATEGORY_CONFIG.other
+                    return (
+                      <tr key={expense.id} className={`hover:bg-gray-50 ${expense.is_overdue ? 'bg-orange-50/50' : ''}`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span>{catConfig.icon}</span>
+                            <div>
+                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                                {expense.expense_number}
+                              </Link>
+                              <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
-                        {expense.supplier_type && (
-                          <p className="text-xs text-gray-500">{SUPPLIER_TYPES[expense.supplier_type]?.label || expense.supplier_type}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-600">{new Date(expense.expense_date).toLocaleDateString()}</p>
-                        <p className={`text-xs ${expense.is_overdue ? 'text-orange-500' : 'text-gray-400'}`}>
-                          Due {new Date(expense.due_date).toLocaleDateString()}
-                          {expense.due_from_invoice ? ` (bill ${expense.due_from_invoice})` : ''}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(expense.status)}`}>
-                          {expense.status === 'pending' ? 'Pending' : 'Approved'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getAgingColor(expense.aging_bucket)}`}>
-                          {getAgingLabel(expense.aging_bucket)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {expense.status === 'pending' && (
-                            <button
-                              onClick={() => handleApprove(expense)}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                              title="Approve"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
+                          {expense.supplier_type && (
+                            <p className="text-xs text-gray-500">{SUPPLIER_TYPES[expense.supplier_type]?.label || expense.supplier_type}</p>
                           )}
-                          {expense.status === 'approved' && (
-                            <button
-                              onClick={() => handleMarkAsPaid(expense)}
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                              title="Mark as Paid"
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-gray-600">{new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}</p>
+                          <p className={`text-xs ${expense.is_overdue ? 'text-orange-500' : 'text-gray-400'}`}>
+                            Due {new Date(`${String(expense.due_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
+                            {expense.due_from_invoice ? ` (bill ${expense.due_from_invoice})` : ''}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(expense.status)}`}>
+                            {expense.status === 'pending' ? 'Pending' : 'Approved'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getAgingColor(expense.aging_bucket)}`}>
+                            {getAgingLabel(expense.aging_bucket)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {expense.status === 'pending' && (
+                              <button
+                                onClick={() => handleApprove(expense)}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="Approve"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                            {expense.status === 'approved' && (
+                              <button
+                                onClick={() => handleMarkAsPaid(expense)}
+                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Mark as Paid"
+                              >
+                                <Wallet className="h-4 w-4" />
+                              </button>
+                            )}
+                            <Link
+                              href={`/expenses/${expense.id}`}
+                              className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                              title="View"
                             >
-                              <Wallet className="h-4 w-4" />
-                            </button>
-                          )}
-                          <Link
-                            href={`/expenses/${expense.id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Payment History View */}
       {viewMode === 'payments' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Payment Date</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Method</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(paginatedData as Expense[]).length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
-                    No recent payments
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Payment Date</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Method</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
                 </tr>
-              ) : (
-                (paginatedData as Expense[]).map((expense) => {
-                  const catConfig = CATEGORY_CONFIG[expense.category] || CATEGORY_CONFIG.other
-                  return (
-                    <tr key={expense.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span>{catConfig.icon}</span>
-                          <div>
-                            <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
-                              {expense.expense_number}
-                            </Link>
-                            <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(paginatedData as Expense[]).length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                      No recent payments
+                    </td>
+                  </tr>
+                ) : (
+                  (paginatedData as Expense[]).map((expense) => {
+                    const catConfig = CATEGORY_CONFIG[expense.category] || CATEGORY_CONFIG.other
+                    return (
+                      <tr key={expense.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span>{catConfig.icon}</span>
+                            <div>
+                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                                {expense.expense_number}
+                              </Link>
+                              <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-600">
-                          {expense.payment_date ? new Date(expense.payment_date).toLocaleDateString() : '-'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-600 capitalize">
-                          {expense.payment_method?.replace('_', ' ') || '-'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-semibold text-green-600">
-                          {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/expenses/${expense.id}`}
-                          className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors inline-block"
-                          title="View"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-gray-600">
+                            {expense.payment_date ? new Date(`${String(expense.payment_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '-'}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-gray-600 capitalize">
+                            {expense.payment_method?.replace('_', ' ') || '-'}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm font-semibold text-green-600">
+                            {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Link
+                            href={`/expenses/${expense.id}`}
+                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors inline-block"
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -1,14 +1,14 @@
+import { sendGuard } from '@/lib/send-guard'
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
-import { loadDocumentIdentity } from '@/lib/document-identity'
+import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
-import { renderToBuffer } from '@react-pdf/renderer'
-import { createElement } from 'react'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
-import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
-import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
-import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
+import { freshQuotePdf } from '@/lib/quotes/fresh-quote-pdf'
+import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * POST /api/quotes/[type]/[id]/send-whatsapp
@@ -19,8 +19,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ type: string; id: string }> }
 ) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     const { type, id } = await params
+    // B2B quotes are managers' and admins'; viewers send nothing.
+    const gate = await gateRole(type === 'b2b' ? 'manage' : 'staff')
+    if (gate) return gate
 
     if (type !== 'b2c' && type !== 'b2b') {
       return NextResponse.json(
@@ -145,6 +151,19 @@ export async function POST(
       )
     }
 
+    // The same completeness gate as the PDF download (see the email route).
+    const completeness = quoteCompleteness(quote.services_snapshot)
+    if (!completeness.complete && !allowsIncomplete(body.allow_incomplete)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
+      )
+    }
+
     // Output gate (harness Layer 2): never WhatsApp a non-deliverable price.
     const priceCheck = checkQuoteRowDeliverable(quote, type)
     if (!priceCheck.ok) {
@@ -158,93 +177,64 @@ export async function POST(
       )
     }
 
-    // Check if PDF already exists, generate if not
-    let pdfUrl = quote.pdf_url
-
-    if (!pdfUrl) {
-      // Generate PDF
-      let pdfBuffer: Buffer
-      if (type === 'b2c') {
-        const pdfDoc = createElement(B2CQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
-        pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
-      } else {
-        const pdfDoc = createElement(B2BQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
-        pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
-      }
-
-      // quote-pdfs is PRIVATE (migration 004): a public URL for it cannot be
-      // opened, so the WhatsApp provider could never fetch the PDF. Signed
-      // link instead (lib/storage/shareable-pdf.ts).
-      const shared = await uploadShareablePdf(supabaseAdmin, {
-        tenantId,
-        kind: 'quotes',
-        fileName: `${type}-${id}.pdf`,
-        bytes: pdfBuffer,
-        bucket: 'quote-pdfs',
-      })
-      if (!shared.ok) {
-        console.error('Error uploading PDF:', shared.error)
-        return NextResponse.json(
-          { success: false, error: 'Failed to generate PDF for WhatsApp' },
-          { status: 500 }
-        )
-      }
-      pdfUrl = shared.url
-
-      // Update quote with PDF URL
-      const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
-      await supabaseAdmin
-        .from(tableName)
-        .update({
-          pdf_url: pdfUrl,
-          pdf_generated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
+    // A fresh PDF for every send (lib/quotes/fresh-quote-pdf): it reused
+    // quote.pdf_url, which expired after 7 days or showed old prices.
+    const fresh = await freshQuotePdf(supabaseAdmin, { type, quote, tenantId })
+    if (!fresh.ok) {
+      console.error('Error uploading PDF:', fresh.error)
+      return NextResponse.json(
+        { success: false, error: 'Failed to generate PDF for WhatsApp' },
+        { status: 500 }
+      )
     }
+    const pdfUrl = fresh.url
 
     // Build WhatsApp message
+    // The tenant's own name and email (Settings → Organization) — the email
+    // was the platform's (BUSINESS_EMAIL, else hello@getautoura.net).
     const senderTenant = await loadSenderTenant(tenant_id)
     const businessName = senderTenant?.company_name || ''
-    const businessEmail = process.env.BUSINESS_EMAIL || 'hello@getautoura.net'
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const businessEmail = senderTenant?.contact_email || ''
+    // A calculator quote has no itinerary: its own trip_name (the tour).
+    const tripName = quote.itineraries?.trip_name || quote.trip_name || 'Your tour'
+    // "8 November 2026", never toLocaleDateString()'s bare "11/8/2026" (read
+    // as 8 Nov or 11 Aug depending on who reads it); money in its currency's
+    // decimals and separators, never "EUR 1,250.5".
+    const day = (d: string | null | undefined) => {
+      const t = d ? new Date(d) : null
+      return t && !Number.isNaN(t.getTime()) ? t.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null
+    }
+    const contactLines = businessEmail ? `📧 ${businessEmail}\n` : ''
 
     let message = ''
 
     if (type === 'b2c') {
-      const startDate = new Date(quote.itineraries?.start_date || new Date()).toLocaleDateString('en-GB', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      })
-      const endDate = new Date(quote.itineraries?.end_date || new Date()).toLocaleDateString('en-GB', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      })
+      // No dates yet: no Dates line, never today's date.
+      const startDate = day(quote.itineraries?.start_date)
+      const endDate = day(quote.itineraries?.end_date)
 
-      message = `🌟 *${businessName}* 🌟\n\n` +
+      message = (businessName ? `🌟 *${businessName}* 🌟\n\n` : '') +
         `Dear ${recipientName},\n\n` +
-        `Thank you for your interest in exploring Egypt with us! 🇪🇬\n\n` +
+        `Thank you for your interest in travelling with us!\n\n` +
         `📋 *Your Travel Quote - ${quote.quote_number}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🎯 *Tour:* ${quote.itineraries?.trip_name || 'Egypt Tour'}\n` +
-        `📅 *Dates:* ${startDate} - ${endDate}\n` +
-        `⏱️ *Duration:* ${quote.itineraries?.total_days || 0} days\n` +
+        `🎯 *Tour:* ${tripName}\n` +
+        (startDate ? `📅 *Dates:* ${startDate}${endDate ? ` - ${endDate}` : ''}\n` : '') +
+        (quote.itineraries?.total_days ? `⏱️ *Duration:* ${quote.itineraries.total_days} days\n` : '') +
         `👥 *Travelers:* ${quote.num_travelers} ${quote.num_travelers === 1 ? 'person' : 'people'}\n` +
         `🏆 *Service Level:* ${quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}\n\n` +
-        `💰 *TOTAL PRICE: ${quote.currency} ${quote.selling_price.toLocaleString()}*\n` +
-        `💵 *Per Person: ${quote.currency} ${quote.price_per_person.toLocaleString()}*\n\n` +
-        `📄 *Your detailed quote with full pricing breakdown is attached as a PDF.*\n\n` +
-        `✨ *What's Included:*\n` +
-        `✅ Professional tour guide\n` +
-        `✅ All entrance fees\n` +
-        `✅ Private transportation\n` +
-        `✅ Meals as specified\n` +
-        `✅ Hotel pickups\n\n` +
-        (quote.valid_until ? `⏰ *This quote is valid until:* ${new Date(quote.valid_until).toLocaleDateString()}\n\n` : '') +
+        `💰 *TOTAL PRICE: ${formatMoney(quote.selling_price, quote.currency)}*\n` +
+        `💵 *Per Person: ${formatMoney(quote.price_per_person, quote.currency)}*\n\n` +
+        // What is included is in the attached quote — not a fixed list that
+        // promised a guide, entrance fees and meals whatever was quoted.
+        `📄 *Your detailed quote with what is included is attached as a PDF.*\n\n` +
+        (quote.valid_until ? `⏰ *This quote is valid until:* ${day(quote.valid_until)}\n\n` : '') +
         (quote.client_notes ? `📝 *Special Notes:* ${quote.client_notes}\n\n` : '') +
         `💳 *Ready to Book?*\n` +
-        `Reply to this message or contact us:\n` +
-        `📧 ${businessEmail}\n` +
-        `🌐 View online: ${baseUrl}/quotes/b2c/${quote.id}\n\n` +
-        `We look forward to creating unforgettable memories with you! 🐪✨\n\n` +
-        `Best regards,\n${businessName} Team`
+        `Reply to this message${businessEmail ? ' or contact us:' : '.'}\n` +
+        contactLines +
+        `We look forward to creating unforgettable memories with you! ✨\n\n` +
+        (businessName ? `Best regards,\n${businessName} Team` : 'Best regards,')
     } else {
       // B2B message
       const paxCounts = Object.keys(quote.pricing_table).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b)
@@ -252,31 +242,31 @@ export async function POST(
       const maxPax = paxCounts[paxCounts.length - 1]
       const lowestPP = quote.pricing_table[maxPax]?.pp || 0
 
-      message = `🌟 *${businessName} - B2B Rate Sheet* 🌟\n\n` +
+      message = `🌟 *${businessName ? `${businessName} - ` : ''}B2B Rate Sheet* 🌟\n\n` +
         `Dear ${recipientName},\n\n` +
         `Please find below your customized B2B rate sheet.\n\n` +
         `📋 *Rate Sheet - ${quote.quote_number}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🎯 *Tour:* ${quote.itineraries?.trip_name || 'Egypt Tour'}\n` +
-        `⏱️ *Duration:* ${quote.itineraries?.total_days || 0} days\n` +
+        `🎯 *Tour:* ${tripName}\n` +
+        (quote.itineraries?.total_days ? `⏱️ *Duration:* ${quote.itineraries.total_days} days\n` : '') +
         `🏆 *Service Tier:* ${quote.tier.toUpperCase()}\n` +
         `👥 *Pax Range:* ${minPax} - ${maxPax} pax\n` +
         `${quote.tour_leader_included ? '✅ Tour Leader +1 Included\n' : ''}\n` +
-        `💰 *Best Rate (Per Person):* ${quote.currency} ${lowestPP.toLocaleString()} @ ${maxPax} pax\n\n` +
-        `📄 *Complete multi-pax pricing table and cost breakdown attached as PDF.*\n\n` +
+        `💰 *Best Rate (Per Person):* ${formatMoney(lowestPP, quote.currency)} @ ${maxPax} pax\n\n` +
+        `📄 *Complete multi-pax pricing table attached as PDF.*\n\n` +
         (quote.season ? `🌞 *Season:* ${quote.season}\n` : '') +
         (quote.valid_from && quote.valid_until ?
-          `📅 *Valid:* ${new Date(quote.valid_from).toLocaleDateString()} - ${new Date(quote.valid_until).toLocaleDateString()}\n\n` : '\n') +
-        `🌐 *View Full Rate Sheet Online:*\n` +
-        `${baseUrl}/quotes/b2b/${quote.id}\n\n` +
-        `For bookings or questions, please contact:\n` +
-        `📧 ${businessEmail}\n\n` +
+          `📅 *Valid:* ${day(quote.valid_from)} - ${day(quote.valid_until)}\n\n` : '\n') +
+        '\n' +
+        (businessEmail ? `For bookings or questions, please contact:\n${contactLines}\n` : '') +
         `We look forward to working with you! 🤝\n\n` +
-        `Best regards,\n${businessName} B2B Team`
+        (businessName ? `Best regards,\n${businessName} B2B Team` : 'Best regards,')
     }
 
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: tenantId,
       to: toPhone,
       body: message,
       mediaUrl: pdfUrl
@@ -289,18 +279,17 @@ export async function POST(
       )
     }
 
-    // Update quote status
-    const updateData: any = {
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      sent_via: 'whatsapp',
-    }
-
+    // Update quote status (lib/quotes/quote-sent-update: b2b_quotes has no
+    // sent_at/sent_via, and only a draft becomes 'sent').
+    const updateData = quoteSentUpdate(type, quote.status, 'whatsapp')
     const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
-    const { error: updateError } = await supabaseAdmin
-      .from(tableName)
-      .update(updateData)
-      .eq('id', id)
+    const { error: updateError } = updateData
+      ? await supabaseAdmin
+          .from(tableName)
+          .update(updateData)
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+      : { error: null }
 
     if (updateError) {
       console.error('Quote update error:', updateError)

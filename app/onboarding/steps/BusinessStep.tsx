@@ -1,5 +1,6 @@
 'use client'
 
+import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 import { useState, useEffect } from 'react'
 import { ArrowRight, ArrowLeft, Building2, DollarSign, Package } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -11,12 +12,17 @@ interface BusinessStepProps {
   tenant: any
 }
 
-const CURRENCIES = [
-  { value: 'EUR', label: 'EUR (€)', flag: '🇪🇺' },
-  { value: 'USD', label: 'USD ($)', flag: '🇺🇸' },
-  { value: 'GBP', label: 'GBP (£)', flag: '🇬🇧' },
-  { value: 'EGP', label: 'EGP (E£)', flag: '🇪🇬' }
-]
+// Every currency the app supports (lib/currency) — four were offered, so a
+// Moroccan or Jordanian company started in EUR with no way out.
+const FLAGS: Record<string, string> = {
+  EUR: '🇪🇺', USD: '🇺🇸', GBP: '🇬🇧', EGP: '🇪🇬', AED: '🇦🇪', SAR: '🇸🇦',
+  JOD: '🇯🇴', MAD: '🇲🇦', TND: '🇹🇳', KES: '🇰🇪', TZS: '🇹🇿', ZAR: '🇿🇦',
+}
+const CURRENCIES = SUPPORTED_CURRENCIES.map(c => ({
+  value: c,
+  label: `${c} (${getCurrencySymbol(c)})`,
+  flag: FLAGS[c] ?? '💱',
+}))
 
 const LANGUAGES = [
   { value: 'en', label: 'English', flag: '🇬🇧', note: null },
@@ -28,7 +34,7 @@ const SERVICES = [
   { value: 'tours', label: 'Multi-Day Tours', icon: '🗺️' },
   { value: 'day-trips', label: 'Day Trips', icon: '🚌' },
   { value: 'packages', label: 'Travel Packages', icon: '📦' },
-  { value: 'cruises', label: 'Nile Cruises', icon: '🚢' },
+  { value: 'cruises', label: 'Cruises', icon: '🚢' },
   { value: 'transfers', label: 'Airport Transfers', icon: '✈️' },
   { value: 'experiences', label: 'Activities & Experiences', icon: '🎭' }
 ]
@@ -69,7 +75,8 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
           services_offered: services,
           company_phone: phone,
           company_website: website,
-          current_step: currentStep
+          // The step to resume on: the next one, not this one again.
+          current_step: currentStep + 1
         })
       })
 

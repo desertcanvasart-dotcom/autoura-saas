@@ -2,10 +2,14 @@
 // Professional Supplier Document PDF Generator
 // Unified branding with Travel2Egypt / Autoura colors
 
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
+import { formatMoney } from '@/lib/currency-totals'
 import jsPDF from 'jspdf'
 import { brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
 import { formatDateOnly, daysBetween } from '@/lib/date-utils'
+import { voucherLines } from '@/lib/documents/voucher-lines'
+import { VOUCHER_VEHICLE_TYPES } from '@/lib/documents/vehicle-types'
 
 interface ServiceItem {
   date?: string
@@ -148,13 +152,15 @@ const DOCUMENT_ICONS: Record<string, string> = {
   entrance_fees: '🎟️'
 }
 
-export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
+export function generateSupplierDocumentPDF(doc: SupplierDocument, font?: JsPdfFont | null): jsPDF {
   ACTIVE = derivePalette(doc.company ?? undefined)
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
   })
+  // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+  applyDocumentFont(pdf, font)
 
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -404,16 +410,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
 
     // Vehicle Type & Driver for transport
     if (doc.document_type === 'transport_voucher' && (doc.vehicle_type || doc.driver_name)) {
-      const vehicleTypeLabels: Record<string, string> = {
-        'sedan': 'Sedan (1-3 pax)',
-        'suv': 'SUV / 4x4 (1-4 pax)',
-        'minivan': 'Minivan (4-6 pax)',
-        'van': 'Van (7-10 pax)',
-        'minibus': 'Minibus (11-20 pax)',
-        'bus': 'Bus (21+ pax)',
-        'luxury_sedan': 'Luxury Sedan',
-        'luxury_van': 'Luxury Van / Sprinter'
-      }
+      const vehicleTypeLabels = VOUCHER_VEHICLE_TYPES
 
       const halfWidth = (contentWidth - 6) / 2
 
@@ -454,9 +451,10 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
 
   // ==================== SERVICES TABLE ====================
   
-  const hasServices = (doc.services && doc.services.length > 0) || (doc.selected_attractions && doc.selected_attractions.length > 0) || (doc.selected_routes && doc.selected_routes.length > 0) || (doc.selected_meals && doc.selected_meals.length > 0) || (doc.selected_guides && doc.selected_guides.length > 0)
-  
-  if (hasServices) {
+  // The voucher's lines: `services`, else another list with lines (lib/documents/voucher-lines).
+  const items = voucherLines(doc)
+
+  if (items.length > 0) {
     ensureSpace(32)
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'bold')
@@ -473,14 +471,18 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.setFontSize(8)
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-    pdf.text('Description', margin + 4, y + 6.5)
+    // A voucher's lines span days (a guide on days 2, 4 and 6; a transport
+    // supplier's whole week), and only the page showed which line was which
+    // day: the PDF the supplier receives printed none.
+    const dated = items.some((item: { date?: unknown }) => !!item.date)
+    const descX = dated ? margin + 26 : margin + 4
+    const descWidth = contentWidth - 60 - (descX - margin - 4)
+    if (dated) pdf.text('Date', margin + 4, y + 6.5)
+    pdf.text('Description', descX, y + 6.5)
     pdf.text('Qty', pageWidth - margin - 40, y + 6.5, { align: 'center' })
     pdf.text('Amount', pageWidth - margin - 4, y + 6.5, { align: 'right' })
     
     y += 12
-    
-    // Use selected_routes for transport, selected_meals for meals, selected_attractions for entrance fees, otherwise use services
-    const items = doc.selected_routes || doc.selected_meals || doc.selected_guides || doc.selected_attractions || doc.services || []
     
     items.forEach((item: any, idx: number) => {
       // Get item name
@@ -490,10 +492,10 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       // ran past the 60 characters this used to cut at — and the line's
       // notes under it ("Inside: … | Photo stops: …"), never printed before.
       pdf.setFontSize(8)
-      const nameLines: string[] = pdf.splitTextToSize(itemName + itemCity, contentWidth - 60).slice(0, 3)
+      const nameLines: string[] = pdf.splitTextToSize(itemName + itemCity, descWidth).slice(0, 3)
       pdf.setFontSize(7)
       const noteLines: string[] = item.notes && typeof item.notes === 'string'
-        ? pdf.splitTextToSize(item.notes, contentWidth - 60).slice(0, 2)
+        ? pdf.splitTextToSize(item.notes, descWidth).slice(0, 2)
         : []
       const rowHeight = Math.max(10, 4 + nameLines.length * 4 + noteLines.length * 3.5)
 
@@ -506,11 +508,14 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
       pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-      pdf.text(nameLines, margin + 4, y + 6.5)
+      if (dated && item.date) {
+        pdf.text(formatDateOnly(String(item.date), 'en-US', { day: 'numeric', month: 'short' }), margin + 4, y + 6.5)
+      }
+      pdf.text(nameLines, descX, y + 6.5)
       if (noteLines.length > 0) {
         pdf.setFontSize(7)
         pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
-        pdf.text(noteLines, margin + 4, y + 6.5 + nameLines.length * 4)
+        pdf.text(noteLines, descX, y + 6.5 + nameLines.length * 4)
         pdf.setFontSize(8)
         pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
       }
@@ -520,9 +525,10 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       pdf.text(qty.toString(), pageWidth - margin - 40, y + 6.5, { align: 'center' })
 
       // Amount
-      const amount = item.total_cost || item.total_price || item.eur_rate || item.unit_price || 0
+      // numeric columns arrive as strings: "100.00".toFixed threw.
+      const amount = Number(item.total_cost || item.total_price || item.eur_rate || item.unit_price || 0) || 0
       if (amount > 0) {
-        pdf.text(`${doc.currency} ${amount.toFixed(2)}`, pageWidth - margin - 4, y + 6.5, { align: 'right' })
+        pdf.text(formatMoney(amount, doc.currency), pageWidth - margin - 4, y + 6.5, { align: 'right' })
       } else {
         pdf.text('—', pageWidth - margin - 4, y + 6.5, { align: 'right' })
       }
@@ -539,24 +545,36 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   // ==================== SPECIAL REQUESTS ====================
   
   if (doc.special_requests) {
-    ensureSpace(28)
-    pdf.setFillColor(255, 250, 240)
-    pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-    pdf.setLineWidth(0.5)
-    pdf.roundedRect(margin, y, contentWidth, 22, 3, 3, 'FD')
-    
-    pdf.setFontSize(7)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
-    pdf.text('SPECIAL REQUESTS', margin + 4, y + 5)
-    
+    // Every line of it, the box sized to the text and broken across pages.
+    // It printed three lines in a fixed box: a dietary note, an access need
+    // or a guide's languages past the third line never reached the supplier.
     pdf.setFontSize(9)
-    pdf.setFont('helvetica', 'normal')
-    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-    const requestLines = pdf.splitTextToSize(doc.special_requests, contentWidth - 8)
-    pdf.text(requestLines.slice(0, 3), margin + 4, y + 12)
-    
-    y += 28
+    const requestLines: string[] = pdf.splitTextToSize(doc.special_requests, contentWidth - 8)
+    const lineHeight = 4.2
+    let start = 0
+    while (start < requestLines.length) {
+      ensureSpace(12 + lineHeight * Math.min(3, requestLines.length - start))
+      const room = Math.max(1, Math.floor((bottomLimit - y - 12) / lineHeight))
+      const chunk = requestLines.slice(start, start + room)
+      const boxHeight = 10 + chunk.length * lineHeight
+      pdf.setFillColor(255, 250, 240)
+      pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
+      pdf.setLineWidth(0.5)
+      pdf.roundedRect(margin, y, contentWidth, boxHeight, 3, 3, 'FD')
+
+      pdf.setFontSize(7)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
+      pdf.text(start === 0 ? 'SPECIAL REQUESTS' : 'SPECIAL REQUESTS (CONTINUED)', margin + 4, y + 5)
+
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
+      pdf.text(chunk, margin + 4, y + 10.5, { lineHeightFactor: 1.32 })
+
+      y += boxHeight + 6
+      start += chunk.length
+    }
   }
 
   // ==================== TOTAL & PAYMENT ====================
@@ -600,7 +618,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.setFontSize(14)
   pdf.setFont('helvetica', 'bold')
   pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
-  pdf.text(`${doc.currency} ${doc.total_cost.toFixed(2)}`, totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
+  pdf.text(formatMoney(doc.total_cost, doc.currency), totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
   
   y += 28
 

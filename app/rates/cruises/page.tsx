@@ -4,7 +4,7 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Ship, Plus, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { SAILING_DAYS, dayName, sailingDaysLabel, sanitizeSailingDays, type SailingDay } from '@/lib/rates/cruise-sailing'
@@ -16,14 +16,13 @@ import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurre
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { seasonsForRow, displayPpd, type RateSeason } from '@/lib/rates/rate-seasons'
 import { RatePeriodLines } from '@/components/rates/RatePeriodLines'
-import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 // ============================================
 // CONSTANTS
 // ============================================
-
-const CITIES = ['Luxor', 'Aswan', 'Cairo', 'Abu Simbel']
 const DURATION_OPTIONS = [3, 4, 7, 10, 12, 13, 14]
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
@@ -386,6 +385,16 @@ export default function CruisesPage() {
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [cruises, setCruises] = useState<Cruise[]>([])
+
+  // The agency's destination cities (Settings → Destinations), plus any city
+  // its rates already name — a fixed Egypt list was required here, so a
+  // non-Egypt agency could not add a rate and an imported route could not be
+  // saved until a listed city was picked.
+  const { cities: destinationCities } = useDestinationCities()
+  const CITIES = useMemo(() => {
+    const stored = cruises.flatMap(r => [r.embark_city, r.disembark_city]).filter((c): c is string => Boolean(c))
+    return [...new Set([...destinationCities, ...stored])].sort((a, b) => a.localeCompare(b))
+  }, [destinationCities, cruises])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -397,6 +406,8 @@ export default function CruisesPage() {
   const [editingCruise, setEditingCruise] = useState<Cruise | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // The currency these amounts are in: the rate's own, else the agency's.
+  const { code: rateCode } = useRateCurrency(rateCurrency)
   // Labels must name the currency the amounts are actually in (C3.4b).
   // Dated contract periods (C3.2). While any exist they price the cruise and
   // the fixed season blocks below are only a fallback.
@@ -416,8 +427,8 @@ export default function CruisesPage() {
     ship_name: '',
     ship_category: 'deluxe',
     route_name: '',
-    embark_city: 'Luxor',
-    disembark_city: 'Aswan',
+    embark_city: '',
+    disembark_city: '',
     // None preselected: a new cruise used to start as a four-night one.
     duration_nights: [],
     sailing_days: [],
@@ -946,7 +957,7 @@ export default function CruisesPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Ship className="w-5 h-5 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">Nile Cruises</h1>
+              <h1 className="text-xl font-bold text-gray-900">Cruises</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <div className="flex items-center gap-2">
@@ -1422,7 +1433,7 @@ export default function CruisesPage() {
                 entity="cruise"
                 periods={periods}
                 onChange={setPeriods}
-                currencyLabel={rateCurrency || 'EUR'}
+                currencyLabel={rateCode}
               />
 
               {/* A rate IS its dated periods (migration 379) — see the hotel editor.

@@ -1,5 +1,6 @@
+import { isLive } from '@/lib/billing/subscription-sync'
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getOrCreateStripeCustomer, createCheckoutSession } from '@/lib/stripe'
 import { logActivity } from '@/lib/billing-middleware'
 
@@ -104,27 +105,35 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Check if tenant already has an active subscription
+    // One subscription on the go per company. Checking only active/trialing
+    // let a past_due, unpaid or paused company start a SECOND subscription
+    // while the first was still billing (lib/billing/subscription-sync.ts).
     const { data: existingSub } = await supabase
       .from('tenant_subscriptions')
       .select('id, status')
       .eq('tenant_id', tenant_id)
-      .in('status', ['active', 'trialing'])
-      .single()
+      .maybeSingle()
 
-    if (existingSub) {
+    if (existingSub && isLive(existingSub.status)) {
       return NextResponse.json({
         success: false,
-        error: 'Tenant already has an active subscription. Use the billing portal to change plans.'
+        error: existingSub.status === 'active' || existingSub.status === 'trialing'
+          ? 'Tenant already has an active subscription. Use the billing portal to change plans.'
+          : 'This company already has a subscription that needs attention. Open the billing portal to update the payment method.'
       }, { status: 400 })
     }
+    // The free trial is for a company's first subscription only: every
+    // cancel-and-return used to start a fresh one.
+    const hadTrial = Boolean(existingSub) // any earlier subscription row
 
     // Get or create Stripe customer
+    // Service role: the Stripe customer id is server-only (migration 423);
+    // the owner check above is the authorisation.
     const customerId = await getOrCreateStripeCustomer(
       tenant_id,
       tenant.company_name,
       tenant.contact_email,
-      supabase
+      createAdminClient()
     )
 
     // Create checkout session
@@ -139,7 +148,8 @@ export async function POST(request: NextRequest) {
       priceId,
       tenant_id,
       successUrl,
-      cancelUrl
+      cancelUrl,
+      { trial: !hadTrial }
     )
 
     // Log activity

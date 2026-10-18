@@ -34,12 +34,16 @@ describe('customer-facing routes are public in BOTH senses', () => {
     // /pricing used to be exempted here as "marketing-only" — which is exactly
     // how it shipped rendering the operator sidebar to logged-in visitors.
     // No exemptions: access-public ⇒ chrome-free.
-    for (const route of ['/login', '/signup', '/pricing', '/privacy', '/terms', '/contact', '/about', '/integrations', '/demo']) {
+    for (const route of ['/login', '/signup', '/pricing', '/privacy', '/terms', '/contact', '/about', '/integrations', '/demo', '/blog']) {
       const inMiddleware = middleware.includes(`'${route}'`)
       const inLayout = layout.includes(`'${route}'`)
       if (inMiddleware) {
         expect(inLayout, `${route} is access-public but still renders app chrome`).toBe(true)
       }
     }
+  })
+
+  it("a blog post (/blog/<slug>) is chrome-free too, not just the index", () => {
+    expect(layout).toContain("pathname.startsWith('/blog/')")
   })
 })

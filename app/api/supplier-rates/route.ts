@@ -6,17 +6,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // Map supplier type to rate table(s)
+// vehicle_rates, seasonal_rates and assistant_rates were listed here too, but
+// no migration creates them: their queries failed and were skipped — read
+// with the admin client and no tenant filter had they existed.
 const SUPPLIER_RATE_TABLES: Record<string, string[]> = {
-  transport_company: ['transportation_rates', 'vehicle_rates'],
-  transport: ['transportation_rates', 'vehicle_rates'],
+  transport_company: ['transportation_rates'],
+  transport: ['transportation_rates'],
   driver: ['transportation_rates'],
-  hotel: ['accommodation_rates', 'seasonal_rates'],
-  guide: ['guide_rates', 'assistant_rates'],
-  cruise: ['nile_cruises', 'seasonal_rates'],
+  hotel: ['accommodation_rates'],
+  guide: ['guide_rates'],
+  cruise: ['nile_cruises'],
   activity_provider: ['activity_rates'],
   attraction: ['activity_rates'],
   restaurant: ['meal_rates'],
   tour_operator: ['train_rates', 'sleeping_train_rates'],
+  // Airlines, rail, and airport / hotel assistants showed no rates: their
+  // tables carry supplier_id (flight_rates since 113, the staff tables since
+  // 339) but were never listed here (documents audit, round 12).
+  airline: ['flight_rates'],
+  train_operator: ['train_rates', 'sleeping_train_rates'],
+  ground_handler: ['airport_staff_rates', 'hotel_staff_rates'],
+  airport_assistant: ['airport_staff_rates'],
+  hotel_assistant: ['hotel_staff_rates'],
 }
 
 // Tables whose rows are tenant-owned (tenant_id NOT NULL)
@@ -25,8 +36,13 @@ const TENANT_SCOPED_TABLES = new Set([
   'nile_cruises', 'activity_rates', 'meal_rates',
 ])
 
-// Tables with shared/global catalog rows (tenant_id nullable)
-const SHARED_CATALOG_TABLES = new Set(['train_rates', 'sleeping_train_rates'])
+// Tables with shared/global catalog rows (tenant_id nullable). The round-12
+// additions live here too: their tenant_id may be empty, and this admin
+// client must still scope them to the caller's tenant.
+const SHARED_CATALOG_TABLES = new Set([
+  'train_rates', 'sleeping_train_rates',
+  'flight_rates', 'airport_staff_rates', 'hotel_staff_rates',
+])
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,17 +80,16 @@ export async function GET(request: NextRequest) {
     // Fetch rates from each table
     for (const table of rateTables) {
       try {
-        let query = (supabaseAdmin as any)
+        // Fail closed: this admin client bypasses row security, so a table
+        // not known to carry this company's tenant_id is never read — a table
+        // added to the map without a filter read every company's rates.
+        if (!TENANT_SCOPED_TABLES.has(table) && !SHARED_CATALOG_TABLES.has(table)) continue
+
+        const query = (supabaseAdmin as any)
           .from(table)
           .select('*')
           .eq('supplier_id', supplierId)
-
-        if (TENANT_SCOPED_TABLES.has(table)) {
-          query = query.eq('tenant_id', authResult.tenant_id)
-        } else if (SHARED_CATALOG_TABLES.has(table)) {
-          // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
-          query = query.eq('tenant_id', authResult.tenant_id)
-        }
+          .eq('tenant_id', authResult.tenant_id)
 
         const { data, error } = await query
           .order('created_at', { ascending: false })

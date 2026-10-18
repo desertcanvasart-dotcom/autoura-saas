@@ -171,7 +171,7 @@ const RESOURCE_TYPES = [
   },
   { 
     key: 'cruise', 
-    label: 'Nile Cruises', 
+    label: 'Cruises', 
     icon: Ship, 
     color: 'indigo',
     apiEndpoint: '/api/cruises/assignable',
@@ -654,7 +654,7 @@ export default function ResourceAssignmentV2({
       })
       // formatPhoneForWhatsApp normalizes local numbers ('01…' -> '201…');
       // a raw digit-strip mints dead wa.me links for most Egyptian entries.
-      const waUrl = generateWhatsAppLink(formatPhoneForWhatsApp(phone), text)
+      const waUrl = generateWhatsAppLink(formatPhoneForWhatsApp(phone, tenant?.operating_country), text)
       if (waTab) waTab.location.href = waUrl
       else window.location.href = waUrl
     } catch (err) {

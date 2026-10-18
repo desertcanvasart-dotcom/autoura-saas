@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleAllows } from '@/lib/api-role-gate'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { tenantToday } from '@/lib/tenant-today'
+import { sumByCurrency } from '@/lib/currency-totals'
 import {
   DEPARTURE_WINDOW_DAYS,
   OPEN_INVOICE_STATUSES,
@@ -10,6 +14,7 @@ import {
   isDepartingSoon,
   isEngagedProposal,
   byMostRecentlyViewed,
+  daysUntil,
   money,
 } from '@/lib/dashboard-metrics'
 
@@ -42,11 +47,19 @@ export async function GET() {
   const supabase = auth.supabase!
   const degraded: Degraded[] = []
 
-  const now = Date.now()
+  // Money (balances, what clients owe) is for staff; a viewer's dashboard
+  // shows the counts without it.
+  const seesMoney = roleAllows(auth.role, 'staff')
+
+  // "Today" is the company's (Settings → Organization timezone), not the
+  // server's UTC date: an Egypt operator at 01:00 saw yesterday's departures
+  // as today's. `now` is that day's midnight, so the UTC-anchored day maths in
+  // lib/dashboard-metrics counts from the company's today.
+  const today = await tenantToday(supabase, auth.tenant_id)
+  const now = Date.parse(`${today}T00:00:00Z`)
   const windowEnd = new Date(now + DEPARTURE_WINDOW_DAYS * 86_400_000)
     .toISOString()
     .split('T')[0]
-  const today = new Date(now).toISOString().split('T')[0]
 
   const [departuresRes, invoicesRes, inboxRes, sharesRes, quotesRes, clientsRes] =
     await Promise.all([
@@ -54,24 +67,31 @@ export async function GET() {
       //    window rule lives in one tested place.
       supabase
         .from('bookings')
-        .select('id, booking_number, trip_name, start_date, status, balance_due, total_amount')
+        // count: the card's number is every departure in the window, not the
+        // rows this read returns (it was capped at 25).
+        .select('id, booking_number, trip_name, start_date, status, balance_due, total_amount, currency', { count: 'exact' })
         .in('status', LIVE_BOOKING_STATUSES as unknown as string[])
         .gte('start_date', today)
         .lte('start_date', windowEnd)
         .order('start_date', { ascending: true })
         .limit(25),
 
-      // 2. Money outstanding
-      supabase
-        .from('invoices')
-        .select('id, invoice_number, client_name, status, balance_due, due_date')
-        .in('status', OPEN_INVOICE_STATUSES as unknown as string[])
-        .limit(500),
+      // 2. Money outstanding — every open invoice (it stopped at 500), and
+      //    only for staff.
+      seesMoney
+        ? fetchAllPages<{ id: string; invoice_number: string; client_name: string; status: string; balance_due: unknown; due_date: string | null; currency: string | null }, { message?: string }>((from, to) =>
+            supabase
+              .from('invoices')
+              .select('id, invoice_number, client_name, status, balance_due, due_date, currency')
+              .in('status', OPEN_INVOICE_STATUSES as unknown as string[])
+              .order('id')
+              .range(from, to))
+        : Promise.resolve({ data: [], error: null }),
 
       // 3. Needs a reply
       supabase
         .from('communication_inbox')
-        .select('id, thread_id, sender_name, message_snippet, channel, received_at')
+        .select('id, thread_id, sender_name, message_snippet, channel, received_at', { count: 'exact' })
         .eq('status', 'new')
         .order('received_at', { ascending: false })
         .limit(25),
@@ -82,14 +102,19 @@ export async function GET() {
         .select('id, itinerary_id, view_count, last_viewed_at, revoked_at, itineraries(trip_name, client_name, status)')
         .is('revoked_at', null)
         .gt('view_count', 0)
+        // Most recently read first BEFORE the cut, or the newest reads could
+        // fall outside an arbitrary 50.
+        .order('last_viewed_at', { ascending: false, nullsFirst: false })
         .limit(50),
 
-      // 5. Quotes awaiting the client
-      supabase
-        .from('b2c_quotes')
-        .select('id, quote_number, status, sent_at, valid_until, selling_price')
-        .in('status', AWAITING_CLIENT_QUOTE_STATUSES as unknown as string[])
-        .limit(200),
+      // 5. Quotes awaiting the client — all of them (it stopped at 200).
+      fetchAllPages<{ id: string; status: string; sent_at: string | null; valid_until: string | null }, { message?: string }>((from, to) =>
+        supabase
+          .from('b2c_quotes')
+          .select('id, status, sent_at, valid_until')
+          .in('status', AWAITING_CLIENT_QUOTE_STATUSES as unknown as string[])
+          .order('id')
+          .range(from, to)),
 
       supabase.from('clients').select('id', { count: 'exact', head: true }),
     ])
@@ -112,12 +137,22 @@ export async function GET() {
       tripName: b.trip_name,
       startDate: b.start_date,
       status: b.status,
-      balanceDue: money(b.balance_due),
+      balanceDue: seesMoney ? money(b.balance_due) : 0,
+      currency: b.currency || 'EUR',
     }))
 
-  const outstanding = summariseOutstanding(invoicesRes.data ?? [], now)
-  const topOwing = (invoicesRes.data ?? [])
-    .filter((i) => money(i.balance_due) > 0)
+  const openRows = invoicesRes.data ?? []
+  const outstanding = summariseOutstanding(openRows, now)
+  // Money in different currencies does not add: the card shows one total per
+  // currency (an EGP and a EUR invoice read as one euro figure before).
+  const owed = openRows.filter((i) => money(i.balance_due) > 0)
+  const totals = sumByCurrency(owed, (i) => i.balance_due, (i) => i.currency)
+  const overdueTotals = sumByCurrency(
+    owed.filter((i) => { const d = daysUntil(i.due_date, now); return d !== null && d < 0 }),
+    (i) => i.balance_due,
+    (i) => i.currency,
+  )
+  const topOwing = owed
     .sort((a, b) => money(b.balance_due) - money(a.balance_due))
     .slice(0, 5)
     .map((i) => ({
@@ -125,6 +160,7 @@ export async function GET() {
       reference: i.invoice_number,
       clientName: i.client_name,
       balanceDue: money(i.balance_due),
+      currency: i.currency || 'EUR',
       dueDate: i.due_date,
     }))
 
@@ -165,12 +201,13 @@ export async function GET() {
     success: true,
     generatedAt: new Date(now).toISOString(),
     windowDays: DEPARTURE_WINDOW_DAYS,
-    departures: { count: departures.length, items: departures.slice(0, 5) },
-    outstanding: { ...outstanding, items: topOwing },
-    inbox: { count: inbox.length, items: inbox.slice(0, 3) },
+    today,
+    departures: { count: departuresRes.count ?? departures.length, items: departures.slice(0, 5) },
+    outstanding: seesMoney ? { ...outstanding, totals, overdueTotals, items: topOwing } : null,
+    inbox: { count: inboxRes.count ?? inbox.length, items: inbox.slice(0, 3) },
     proposals: { count: proposals.length, items: proposals },
     quotes,
-    clients: { total: clientsRes.count ?? 0 },
+    clients: { total: clientsRes.error ? null : clientsRes.count ?? 0 },
     // Empty means every card is trustworthy. Non-empty means SAY SO in the UI.
     degraded,
   })

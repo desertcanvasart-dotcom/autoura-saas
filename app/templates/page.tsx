@@ -36,6 +36,9 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
+/** No job sends scheduled_sends yet; the Schedule option stays hidden until one does. */
+const SCHEDULED_SENDS_PROCESSED = false
+
 // ============================================
 // TYPES
 // ============================================
@@ -365,7 +368,9 @@ export default function TemplatesPage() {
       channel: template.channel as any,
       subject: template.subject || '',
       body: template.body,
-      language: 'ar', // Default to Arabic for Egypt travel
+      // A translation starts in a language other than the original's (it was
+      // always Arabic, whatever the agency's market).
+      language: template.language === 'en' ? 'fr' : 'en',
       parent_template_id: template.parent_template_id || template.id, // Link to parent
     })
     setSelectedTemplate(null) // Creating new, not editing
@@ -1271,7 +1276,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
     if (isSupplierTemplate) {
       switch (supplierType) {
         case 'hotel': return 'Select Hotel'
-        case 'cruise': return 'Select Nile Cruise'
+        case 'cruise': return 'Select Cruise'
         case 'transport': return 'Select Transport Supplier'
         case 'guide': return 'Select Guide'
         default: return 'Select Supplier'
@@ -1432,7 +1437,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
         }
       } else if (isInternalTemplate) {
         // Internal team members
-        endpoint = '/api/team-members'
+        endpoint = '/api/team-members?active=true' // a deactivated member is not a recipient
         recipientType = 'client' // Using client type for team members
       }
       // else: Customer templates use /api/clients (default)
@@ -1681,7 +1686,10 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Schedule Mode Toggle */}
+            {/* Schedule Mode Toggle — hidden: nothing sends scheduled_sends
+                rows (no job reads them), so "Message scheduled for …" was a
+                message that never went out. Restore with a processor. */}
+            {SCHEDULED_SENDS_PROCESSED && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -1696,6 +1704,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
               />
               <span className="text-sm text-gray-600">Schedule</span>
             </label>
+            )}
             {/* Bulk Mode Toggle */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input

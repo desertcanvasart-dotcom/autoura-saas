@@ -1,5 +1,7 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(request: NextRequest) {
   // Use authenticated client - RLS automatically filters by tenant_id
@@ -24,7 +26,9 @@ export async function GET(request: NextRequest) {
     // One itinerary's tasks (the itinerary page's Tasks card).
     const itineraryId = searchParams.get('itineraryId')
 
-    // Build query
+    // Built per page (a PostgREST builder is single-use): every task, not the
+    // first 1000 — auto-generated tasks reach that within a few dozen trips.
+    const buildQuery = () => {
     let query = supabase
       .from('tasks')
       .select(`
@@ -76,8 +80,10 @@ export async function GET(request: NextRequest) {
         query = query.gte('due_date', todayStr)
       }
     }
+    return query
+    }
 
-    const { data: tasks, error } = await query
+    const { data: tasks, error } = await fetchAllPages((from, to) => buildQuery().order('id', { ascending: true }).range(from, to))
 
     if (error) {
       console.error('Error fetching tasks:', error)
@@ -85,9 +91,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate summary from all tasks for accurate counts
-    const { data: allTasks } = await supabase
+    const { data: allTasks } = await fetchAllPages((from, to) => supabase
       .from('tasks')
       .select('id, status, priority, due_date, archived')
+      .order('id', { ascending: true })
+      .range(from, to))
 
     const today = new Date().toISOString().split('T')[0]
     const nonArchivedTasks = (allTasks || []).filter(t => !t.archived)
@@ -117,6 +125,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     // Authenticated client + tenant lookup - RLS filters by tenant_id
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -143,7 +153,9 @@ export async function POST(request: NextRequest) {
         linked_id: body.linked_id || null,
         notes: body.notes || null,
         archived: false,
-        archived_at: null
+        archived_at: null,
+        // Who made it, so they hear when it is done (migration 418).
+        created_by: authResult.user?.id ?? null,
       })
       .select(`
         *,

@@ -60,7 +60,12 @@ export function itineraryCompleteness(days: readonly ItineraryDayRow[] | null | 
 }
 
 export type ItineraryLinesResult =
-  | { ok: true; completeness: QuoteCompleteness }
+  | {
+      ok: true
+      completeness: QuoteCompleteness
+      /** The lines' cost and client price, for the client total (lib/itinerary-client-total). */
+      services: Array<{ total_cost: number | string | null; client_price: number | string | null }>
+    }
   | { ok: false; status: 404 | 503; error: string }
 
 /**
@@ -98,5 +103,8 @@ export async function loadItineraryCompleteness(
     .eq('itinerary_id', itineraryId)
   if (error) return { ok: false, status: 503, error: "Could not check this itinerary's services. Try again." }
 
-  return { ok: true, completeness: itineraryCompleteness((days ?? []) as ItineraryDayRow[]) }
+  const rows = (days ?? []) as ItineraryDayRow[]
+  const services = rows.flatMap(d => ((d as { services?: unknown }).services as Array<{ total_cost?: number | string | null; client_price?: number | string | null }> | null) ?? [])
+    .map(s => ({ total_cost: s.total_cost ?? null, client_price: s.client_price ?? null }))
+  return { ok: true, completeness: itineraryCompleteness(rows), services }
 }

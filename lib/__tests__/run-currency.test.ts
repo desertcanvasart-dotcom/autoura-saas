@@ -48,6 +48,14 @@ describe('getTenantRunCurrency', () => {
     expect(await getTenantRunCurrency(db, 't1')).toBe('EGP')
     expect(reads).toBe(1)
   })
+
+  it('does not cache a missing row (a client RLS hides the tenant from)', async () => {
+    let row: unknown = null
+    const db = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row }) }) }) }) }
+    expect(await getTenantRunCurrency(db, 't2')).toBe(DEFAULT_RUN_CURRENCY)
+    row = { rates_currency: 'USD' }
+    expect(await getTenantRunCurrency(db, 't2')).toBe('USD')
+  })
 })
 
 describe('cross rate via EUR legs', () => {

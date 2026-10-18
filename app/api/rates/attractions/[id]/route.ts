@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // GET - Fetch single attraction
 export async function GET(
@@ -97,6 +98,10 @@ export async function PUT(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(
@@ -192,6 +197,10 @@ export async function DELETE(
         { status: authResult.status }
       )
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(
@@ -213,11 +222,15 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: 'Attraction not found' }, { status: 404 })
     }
     
-    // Check if attraction is used in any itinerary services
+    // Check if attraction is used in any itinerary services. A line keeps no
+    // rate id, so its NAME is matched — exactly, whatever the case. A substring
+    // match refused "Karnak Temple" because some trip had "Karnak Temple Sound
+    // & Light", and a name with % or _ matched unrelated lines.
+    const exactName = String(existing.attraction_name ?? '').replace(/[\\%_]/g, ch => `\\${ch}`)
     const { data: usedIn } = await supabase
       .from('itinerary_services')
       .select('id')
-      .ilike('service_name', `%${existing.attraction_name}%`)
+      .ilike('service_name', exactName)
       .limit(1)
     
     if (usedIn && usedIn.length > 0) {

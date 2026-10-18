@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
+import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
 
 // ============================================
 // EGYPTIAN TRAVEL ABBREVIATIONS
@@ -401,8 +402,12 @@ export async function POST(request: Request) {
         { status: authResult.status }
       )
     }
+    const overBudget = await aiBudgetDenied(authResult.user!.id, authResult.tenant_id)
+    if (overBudget) return overBudget
 
     const { conversation } = await request.json()
+    const tooLong = aiInputTooLong(conversation)
+    if (tooLong) return tooLong
 
     if (!conversation) {
       return NextResponse.json(
@@ -476,9 +481,9 @@ export async function POST(request: Request) {
       nationality: extracted.nationality || '',
 
       // Trip info
-      trip_name: extracted.trip_name || extracted.tour_requested || 'Egypt Tour',
+      trip_name: extracted.trip_name || extracted.tour_requested || 'New tour',
       tour_requested: extracted.tour_requested || '',
-      tour_name: extracted.tour_name || extracted.trip_name || 'Egypt Tour',
+      tour_name: extracted.tour_name || extracted.trip_name || 'New tour',
       start_date: isValidDate(extracted.start_date) ? extracted.start_date : '',
       end_date: isValidDate(extracted.end_date) ? extracted.end_date : '',
       duration_days: parseInt(extracted.duration_days) || structureDetection.detectedDays || 1,

@@ -1,3 +1,5 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 // Money in different currencies does not add (see lib/currency-totals.ts).
@@ -25,6 +27,11 @@ interface ClientReceivable {
 }
 
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication
     const authResult = await requireAuth()
@@ -48,18 +55,20 @@ export async function GET(request: NextRequest) {
 
     // Fetch all unpaid/partially paid invoices
     // RLS automatically filters by tenant_id
-    let query = supabase
-      .from('invoices')
-      .select('*')
-      .gt('balance_due', 0)
-      .not('status', 'eq', 'cancelled')
-      .order('due_date', { ascending: true })
-
-    if (clientId) {
-      query = query.eq('client_id', clientId)
-    }
-
-    const { data: invoices, error } = await query
+    // Every unpaid invoice, page by page: a plain select stops at 1000 rows
+    // and the outstanding total and aging buckets were silently short.
+    const { data: invoices, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('invoices')
+        .select('*')
+        .gt('balance_due', 0)
+        // A draft is not sent, so nobody owes it yet.
+        .not('status', 'in', '(cancelled,draft)')
+        .order('due_date', { ascending: true })
+        .order('id', { ascending: true })
+      if (clientId) query = query.eq('client_id', clientId)
+      return query.range(from, to)
+    })
 
     if (error) {
       console.error('Error fetching invoices:', error)
@@ -71,15 +80,20 @@ export async function GET(request: NextRequest) {
 
     // Calculate aging for each invoice
     const invoicesWithAging = (invoices || []).map((inv: any) => {
-      const dueDate = new Date(inv.due_date)
-      dueDate.setHours(0, 0, 0, 0)
-      const daysPastDue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
-      
+      // No due date is not due (it read as 1 January 1970 — 20,000 days late).
+      let daysPastDue = 0
+      if (inv.due_date) {
+        const [y, m, d] = String(inv.due_date).slice(0, 10).split('-').map(Number)
+        const dueDate = new Date(y, m - 1, d)
+        daysPastDue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      }
+
+      // The same four buckets as the cards and the filter: current, 1-30,
+      // 31-60, over 60 days past due (an invoice 45 days late was labelled 1-30).
       let agingBucket = 'current'
-      if (daysPastDue > 90) agingBucket = '90plus'
-      else if (daysPastDue > 60) agingBucket = '60'
-      else if (daysPastDue > 30) agingBucket = '30'
-      else if (daysPastDue > 0) agingBucket = 'overdue'
+      if (daysPastDue > 60) agingBucket = '90plus'
+      else if (daysPastDue > 30) agingBucket = '60'
+      else if (daysPastDue > 0) agingBucket = '30'
 
       return {
         ...inv,

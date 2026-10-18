@@ -109,10 +109,10 @@ ${SIGN_OFF}
 `,
   },
 
-  // ---------- Nile cruises ----------
+  // ---------- Cruises ----------
   {
     name: 'Cruise — cabin hold request',
-    description: 'Asks a Nile cruise to hold cabins while the client decides.',
+    description: 'Asks a cruise to hold cabins while the client decides.',
     category: 'supplier',
     subcategory: 'cruise_hold',
     channel: 'email',

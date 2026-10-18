@@ -8,8 +8,10 @@
 // Trigger: Auto-updates invoice balance on payment
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { paymentCurrencyFor } from '@/lib/payment-currency'
 
 /**
  * GET /api/invoices/[id]/payments
@@ -20,6 +22,11 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS automatically filters by tenant
@@ -53,6 +60,11 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
 
@@ -75,7 +87,7 @@ export async function POST(
     const body = await request.json()
 
     // Validate required fields
-    if (!body.amount || body.amount <= 0) {
+    if (!Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0) {
       return NextResponse.json(
         { error: 'Valid payment amount is required' },
         { status: 400 }
@@ -85,7 +97,7 @@ export async function POST(
     // Verify invoice exists and belongs to this tenant (RLS filters automatically)
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
-      .select('id, balance_due, currency, tenant_id')
+      .select('id, balance_due, currency, tenant_id, status')
       .eq('id', id)
       .single()
 
@@ -101,8 +113,39 @@ export async function POST(
       )
     }
 
+    const rawKey = request.headers.get('idempotency-key') ?? body.idempotency_key
+    const idempotencyKey = typeof rawKey === 'string' && rawKey.length > 0 && rawKey.length <= 100 ? rawKey : null
+
+    // A retry of a payment that already went through answers with it — before
+    // the balance checks, which that payment itself has since satisfied (a
+    // retried full payment otherwise read "exceeds balance due" for money
+    // that was recorded).
+    if (idempotencyKey) {
+      const { data: existing } = await supabase
+        .from('invoice_payments')
+        .select('id, invoice_id, amount, currency, payment_method, payment_date, transaction_reference, notes, created_at')
+        .eq('invoice_id', id)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle()
+      if (existing) return NextResponse.json(existing, { status: 200 })
+    }
+
+    // A cancelled invoice is owed by no one (the balance trigger then marked
+    // it paid); a draft has not been sent — send it first.
+    if (invoice.status === 'cancelled') {
+      return NextResponse.json({ error: 'This invoice is cancelled — no payment can be recorded on it' }, { status: 409 })
+    }
+    if (invoice.status === 'draft') {
+      return NextResponse.json({ error: 'This invoice is still a draft — mark it sent before recording a payment' }, { status: 409 })
+    }
+
+    // In the invoice's currency (lib/payment-currency): the balance trigger
+    // sums amounts with no currency of their own.
+    const paid = paymentCurrencyFor(body.currency, invoice.currency)
+    if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: 400 })
+
     // Check if payment exceeds balance (allow small overpayment for rounding)
-    if (body.amount > Number(invoice.balance_due) + 0.01) {
+    if (Number(body.amount) > Number(invoice.balance_due) + 0.01) {
       return NextResponse.json(
         { error: `Payment amount exceeds balance due (${invoice.balance_due})` },
         { status: 400 }
@@ -112,13 +155,16 @@ export async function POST(
     const newPayment = {
       tenant_id, // ✅ Explicit tenant_id (also auto-populated by trigger)
       invoice_id: id,
-      amount: body.amount,
-      currency: body.currency || invoice.currency || 'EUR',
+      amount: Number(body.amount),
+      currency: paid.currency,
       payment_method: body.payment_method || 'bank_transfer',
       payment_date: body.payment_date || new Date().toISOString().split('T')[0],
       transaction_reference: body.transaction_reference || null,
       notes: body.notes || null,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      // The same key on a retried request is refused by a unique index
+      // (migration 429), so a double submit records one payment, not two.
+      idempotency_key: idempotencyKey,
     }
 
     const { data, error } = await supabase
@@ -128,6 +174,21 @@ export async function POST(
       .single()
 
     if (error) {
+      // Already recorded under this key: answer with that payment.
+      if (error.code === '23505' && idempotencyKey) {
+        const { data: existing } = await supabase
+          .from('invoice_payments')
+          .select('id, invoice_id, amount, currency, payment_method, payment_date, transaction_reference, notes, created_at')
+          .eq('invoice_id', id)
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle()
+        if (existing) return NextResponse.json(existing, { status: 200 })
+      }
+      // The database re-checked the balance under a lock (migration 429): a
+      // payment saved a moment earlier left less to pay than the page showed.
+      if (error.code === '23514') {
+        return NextResponse.json({ error: 'Payment amount exceeds the balance due — another payment was just recorded. Refresh and try again.' }, { status: 409 })
+      }
       console.error('❌ Error creating payment:', error)
       return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 })
     }

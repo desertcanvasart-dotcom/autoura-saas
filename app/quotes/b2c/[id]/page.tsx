@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import StatusManager from '@/components/quotes/StatusManager'
 import {
   FileText, User, Mail, Phone, Calendar, DollarSign, Percent,
   ArrowLeft, Edit, Download, Send, Eye, CheckCircle, XCircle,
-  Clock, AlertCircle, Loader2, MapPin, Users, MessageCircle, BookOpen
+  Clock, AlertCircle, Loader2, MapPin, Users, MessageCircle
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import ConvertToBookingButton from '@/components/quotes/ConvertToBookingButton'
+import { postQuoteSend } from '@/lib/quotes/send-quote-client'
 
 interface CostBreakdown {
   accommodation?: number
@@ -35,6 +36,9 @@ interface B2CQuote {
   margin_percent: number
   selling_price: number
   price_per_person: number
+  season_name?: string | null
+  season_percent?: number | null
+  season_premium?: number | null
   currency: string
   cost_breakdown: CostBreakdown | null
   created_at: string | null
@@ -72,43 +76,17 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
   expired: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: AlertCircle }
 }
 
-export default function B2CQuoteDetailPage({ params }: { params: { id: string } }) {
+// params is a Promise in a client page (Next 15+): reading params.id
+// directly gave undefined, and the page asked for quote "undefined".
+export default function B2CQuoteDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise)
   const supabase = createClient()
-  const router = useRouter()
   const dialog = useConfirmDialog()
   const [quote, setQuote] = useState<B2CQuote | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pdfGenerating, setPdfGenerating] = useState(false)
   const [sending, setSending] = useState(false)
-  const [converting, setConverting] = useState(false)
-
-  const handleConvertToBooking = async () => {
-    if (!quote) return
-    if (!(await dialog.confirm({
-      message: `Create a booking from quote ${quote.quote_number}? A quote can only be converted once.`,
-      confirmText: 'Create booking',
-    }))) return
-    setConverting(true)
-    try {
-      const res = await fetch('/api/bookings/from-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quote_id: quote.id, quote_type: 'b2c' }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        showToast('error', data.error || 'Failed to create booking')
-        setConverting(false)
-        return
-      }
-      showToast('success', 'Booking created')
-      router.push(`/bookings/${data.data.id}`)
-    } catch {
-      showToast('error', 'Failed to create booking')
-      setConverting(false)
-    }
-  }
 
   useEffect(() => {
     fetchQuote()
@@ -201,14 +179,10 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2c/${quote.id}/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2c/${quote.id}/send`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send quote')
@@ -239,14 +213,10 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2c/${quote.id}/send-whatsapp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2c/${quote.id}/send-whatsapp`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send quote')
@@ -313,12 +283,12 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
               <span className="text-sm font-medium">Back to B2C Quotes</span>
             </Link>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={handleDownloadPDF}
                 disabled={pdfGenerating}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {pdfGenerating ? (
                   <>
@@ -336,7 +306,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                 type="button"
                 onClick={() => handleSendQuote('email')}
                 disabled={sending || !quote.clients?.email}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <>
@@ -354,7 +324,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                 type="button"
                 onClick={() => handleSendQuote('whatsapp')}
                 disabled={sending || !quote.clients?.phone}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!quote.clients?.phone ? 'No phone number available' : 'Send via WhatsApp'}
               >
                 {sending ? (
@@ -369,25 +339,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                   </>
                 )}
               </button>
-              <button
-                type="button"
-                onClick={handleConvertToBooking}
-                disabled={converting || quote.status !== 'accepted'}
-                title={quote.status !== 'accepted' ? 'Only accepted quotes can be converted — set the status to Accepted first' : 'Create a booking from this quote'}
-                className="px-4 py-2 bg-[#647C47] text-white rounded-lg text-sm font-medium hover:bg-[#566b3c] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {converting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <BookOpen className="w-4 h-4" />
-                    Convert to Booking
-                  </>
-                )}
-              </button>
+              <ConvertToBookingButton quoteId={quote.id} quoteType="b2c" quoteNumber={quote.quote_number} status={quote.status} />
             </div>
           </div>
 
@@ -412,10 +364,10 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
             <div className="text-right">
               <div className="text-sm text-gray-500 mb-1">Total Selling Price</div>
               <div className="text-3xl font-bold text-gray-900">
-                {quote.currency} {quote.selling_price.toLocaleString()}
+                {quote.currency} {Number(quote.selling_price ?? 0).toLocaleString()}
               </div>
               <div className="text-sm text-gray-500 mt-1">
-                {quote.currency} {quote.price_per_person.toLocaleString()} per person × {quote.num_travelers}
+                {quote.currency} {Number(quote.price_per_person ?? 0).toLocaleString()} per person × {quote.num_travelers}
               </div>
             </div>
           </div>
@@ -556,15 +508,27 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                   Margin ({quote.margin_percent}%)
                 </span>
                 <span className="text-sm font-bold text-blue-700">
-                  {quote.currency} {(quote.selling_price - quote.total_cost).toLocaleString()}
+                  {quote.currency} {(quote.selling_price - Number(quote.season_premium ?? 0) - quote.total_cost).toLocaleString()}
                 </span>
               </div>
+
+              {/* Seasonal premium (Settings → Seasonal Premiums), its own line */}
+              {Number(quote.season_premium ?? 0) > 0 && (
+                <div className="flex items-center justify-between py-2 bg-amber-50 rounded-lg px-3 mt-2">
+                  <span className="text-sm text-amber-800">
+                    Seasonal premium{quote.season_name ? ` — ${quote.season_name}` : ''} ({Number(quote.season_percent ?? 0)}%)
+                  </span>
+                  <span className="text-sm font-bold text-amber-800">
+                    {quote.currency} {Number(quote.season_premium).toLocaleString()}
+                  </span>
+                </div>
+              )}
 
               {/* Selling Price */}
               <div className="flex items-center justify-between py-3 border-t-2 border-gray-300 mt-3">
                 <span className="text-lg font-bold text-gray-900">Selling Price</span>
                 <span className="text-lg font-bold text-blue-600">
-                  {quote.currency} {quote.selling_price.toLocaleString()}
+                  {quote.currency} {Number(quote.selling_price ?? 0).toLocaleString()}
                 </span>
               </div>
 
@@ -572,7 +536,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
               <div className="flex items-center justify-between py-2 bg-gray-50 rounded-lg px-3 mt-2">
                 <span className="text-sm text-gray-600">Price per Person ({quote.num_travelers} travelers)</span>
                 <span className="text-sm font-bold text-gray-900">
-                  {quote.currency} {quote.price_per_person.toLocaleString()}
+                  {quote.currency} {Number(quote.price_per_person ?? 0).toLocaleString()}
                 </span>
               </div>
             </div>

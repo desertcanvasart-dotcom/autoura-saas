@@ -40,7 +40,7 @@ async function clientId(db: PGlite, name: string): Promise<string> {
 const SUPABASE_STUBS = `
 CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
 CREATE SCHEMA auth;
-CREATE TABLE auth.users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT, raw_user_meta_data JSONB, created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE auth.users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT, raw_user_meta_data JSONB, banned_until TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS 'SELECT NULL::uuid';
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $$SELECT 'authenticated'$$;
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql AS $$SELECT '{}'::jsonb$$;
@@ -682,6 +682,7 @@ describe('migration replay from scratch', () => {
     const SAFE_FOR_BROWSER_ROLES: Record<string, string> = {
       user_has_role: 'checks auth.uid() against get_user_tenant_id(); argument is a role name, not an id',
       reset_tenant_vocabulary: 'scopes to get_user_tenant_id(); argument is a vocabulary kind',
+      member_can_write: "answers only whether auth.uid() itself is a non-viewer member of the given company (424's write policies call it)",
     }
     const exposed = await db.query(`
       SELECT DISTINCT p.proname,
@@ -751,5 +752,103 @@ describe('migration replay from scratch', () => {
     await expect(
       db.query("INSERT INTO notifications (type, title) VALUES ('x', 'nobody')")
     ).rejects.toThrow(/notifications_has_recipient/)
+
+    // Migration 433: purge_tenant deletes one company completely — through
+    // the bookings → itineraries RESTRICT and the rate audit trigger — and
+    // leaves every other company's rows alone.
+    const seedCompany = async (name: string) => {
+      const t = (await db.query(
+        'INSERT INTO tenants (company_name) VALUES ($1) RETURNING id', [name]
+      )).rows[0] as { id: string }
+      const u = (await db.query(
+        'INSERT INTO auth.users (email) VALUES ($1) RETURNING id', [`${name}@example.com`]
+      )).rows[0] as { id: string }
+      await db.query("INSERT INTO tenant_members (tenant_id, user_id, role, status) VALUES ($1, $2, 'owner', 'active')", [t.id, u.id])
+      await db.query("INSERT INTO clients (tenant_id, first_name, last_name) VALUES ($1, 'Ada', 'Probe')", [t.id])
+      const it = (await db.query(
+        "INSERT INTO itineraries (tenant_id, itinerary_code) VALUES ($1, $2) RETURNING id", [t.id, `IT-${name}`]
+      )).rows[0] as { id: string }
+      await db.query(
+        `INSERT INTO bookings (tenant_id, itinerary_id, booking_number, trip_name, start_date, end_date,
+           total_days, num_travelers, total_amount, balance_due)
+         VALUES ($1, $2, $3, 'Trip', '2026-11-01', '2026-11-05', 5, 2, 1000, 1000)`,
+        [t.id, it.id, `BK-${name}`]
+      )
+      const inv = (await db.query(
+        `INSERT INTO invoices (tenant_id, client_name, total_amount, invoice_number, issue_date, balance_due)
+         VALUES ($1, 'Ada Probe', 100, $2, '2026-10-01', 100) RETURNING id`, [t.id, `INV-${name}`]
+      )).rows[0] as { id: string }
+      await db.query(
+        "INSERT INTO invoice_payments (tenant_id, invoice_id, amount, payment_date) VALUES ($1, $2, 10, '2026-10-02')",
+        [t.id, inv.id]
+      )
+      await db.query('INSERT INTO accommodation_rates (tenant_id) VALUES ($1)', [t.id])
+      await db.query(
+        `INSERT INTO commissions (tenant_id, transaction_date, category, commission_amount, commission_type)
+         VALUES ($1, '2026-10-01', 'hotel', 5, 'earned')`, [t.id]
+      )
+      return t.id
+    }
+    const rowsOf = async (tenantId: string) => {
+      const tables = (await db.query('SELECT table_name FROM tenant_data_tables()')).rows as Array<{ table_name: string }>
+      let n = 0
+      for (const { table_name } of tables) {
+        const r = (await db.query(`SELECT count(*)::int AS n FROM "${table_name}" WHERE tenant_id = $1`, [tenantId])).rows[0] as { n: number }
+        n += r.n
+      }
+      return n
+    }
+    const gone = await seedCompany('purge-a')
+    const kept = await seedCompany('purge-b')
+    const keptBefore = await rowsOf(kept)
+    expect(await rowsOf(gone)).toBeGreaterThan(5)
+    await db.query('SELECT purge_tenant($1)', [gone])
+    expect(await rowsOf(gone)).toBe(0)
+    expect((await db.query('SELECT count(*)::int AS n FROM tenants WHERE id = $1', [gone])).rows[0]).toEqual({ n: 0 })
+    expect(await rowsOf(kept)).toBe(keptBefore)
+
+    // Migration 434: the export pages on the whole primary key.
+    const keyed = (await db.query(
+      "SELECT key_columns FROM tenant_data_tables() WHERE table_name = 'user_activity_daily'"
+    )).rows[0] as { key_columns: string[] } | undefined
+    if (keyed) expect(keyed.key_columns.length).toBeGreaterThan(1)
+    const clientsKey = (await db.query(
+      "SELECT key_columns FROM data_table_columns(ARRAY['clients'])"
+    )).rows[0] as { key_columns: string[] }
+    expect(clientsKey.key_columns).toEqual(['id'])
+
+    // Migration 435: two companies may each add the same country privately;
+    // the shared catalogue still holds one row per code.
+    await db.query("INSERT INTO destination_catalog (country_code, name, added_by_tenant) VALUES ('QQ', 'Probe A', $1)", [kept])
+    const other = (await db.query("INSERT INTO tenants (company_name) VALUES ('purge-c') RETURNING id")).rows[0] as { id: string }
+    await db.query("INSERT INTO destination_catalog (country_code, name, added_by_tenant) VALUES ('QQ', 'Probe C', $1)", [other.id])
+    await db.query("INSERT INTO destination_catalog (country_code, name) VALUES ('QQ', 'Shared')")
+    await expect(
+      db.query("INSERT INTO destination_catalog (country_code, name) VALUES ('QQ', 'Shared again')")
+    ).rejects.toThrow(/duplicate key/)
+
+    // Migration 436: a booking payment is capped at the balance, a refund at
+    // what was paid (the seeded booking is 1,000 with nothing paid).
+    const bk = (await db.query('SELECT id FROM bookings WHERE tenant_id = $1', [kept])).rows[0] as { id: string }
+    const pay = (n: string, amount: number, type: string) => db.query(
+      "SELECT * FROM record_booking_payment($1, $2, $3, $4, $5, 'cash', '2026-10-01', null, null, null)",
+      [bk.id, kept, n, amount, type]
+    )
+    await expect(pay('BP-1', 10000, 'deposit')).rejects.toThrow(/exceeds the balance due/)
+    await pay('BP-2', 300, 'deposit')
+    await expect(pay('BP-3', 500, 'refund')).rejects.toThrow(/Refund exceeds/)
+    await pay('BP-4', 100, 'refund')
+    const paidNow = (await db.query('SELECT total_paid FROM bookings WHERE id = $1', [bk.id])).rows[0] as { total_paid: string }
+    expect(Number(paidNow.total_paid)).toBe(200)
+
+    // Migration 436: deleting an invoice payment recomputes the invoice.
+    const inv = (await db.query(
+      'SELECT i.id FROM invoices i WHERE i.tenant_id = $1', [kept]
+    )).rows[0] as { id: string }
+    expect(Number(((await db.query('SELECT amount_paid FROM invoices WHERE id = $1', [inv.id])).rows[0] as { amount_paid: string }).amount_paid)).toBe(10)
+    await db.query('DELETE FROM invoice_payments WHERE invoice_id = $1', [inv.id])
+    const after = (await db.query('SELECT amount_paid, balance_due FROM invoices WHERE id = $1', [inv.id])).rows[0] as { amount_paid: string; balance_due: string }
+    expect(Number(after.amount_paid)).toBe(0)
+    expect(Number(after.balance_due)).toBe(100)
   }, 120_000)
 })

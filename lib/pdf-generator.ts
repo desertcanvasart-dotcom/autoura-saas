@@ -3,11 +3,13 @@
 // File: lib/pdf-generator.ts
 // ============================================
 
+import { formatMoney, roundLinesToTotal } from '@/lib/currency-totals'
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import { jsPDF } from 'jspdf'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { formatDateOnly } from '@/lib/date-utils'
 import { identityFooterLine, brandColorRgb, tint, type CompanyIdentity } from './company-identity'
-import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
+import { effectiveItineraryTotal, serviceClientPrice, type PricedService } from '@/lib/itinerary-client-total'
 
 // ============================================
 // TYPES
@@ -67,6 +69,8 @@ interface AggregatedService {
 interface PDFOptions {
   showPricingBreakdown?: boolean  // true = show service breakdown, false = total only
   showServiceDetails?: boolean    // show individual service lines
+  /** Noto Sans JP for non-Latin text (lib/pdf/jspdf-font); omitted = Helvetica. */
+  font?: JsPdfFont | null
 }
 
 const DEFAULT_OPTIONS: PDFOptions = {
@@ -77,6 +81,22 @@ const DEFAULT_OPTIONS: PDFOptions = {
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
+
+/** The inclusions a trip's services stand for, in a fixed order. */
+export function tripInclusions(services: Array<{ service_type?: string | null; service_name?: string | null }>): string[] {
+  const types = new Set(services.map(s => String(s.service_type ?? '').toLowerCase()))
+  const has = (...t: string[]) => t.some(x => types.has(x))
+  const out: string[] = []
+  if (has('accommodation', 'hotel')) out.push('Accommodation as listed in the itinerary')
+  if (has('cruise')) out.push('Cruise as listed in the itinerary')
+  if (has('transportation', 'transport', 'transfer')) out.push('Transport for the transfers and tours listed')
+  if (has('guide')) out.push('Guiding for the tours listed')
+  if (has('entrance', 'entrance_fee', 'activity', 'tour', 'excursion')) out.push('Entrance fees for the sites listed')
+  if (has('meal', 'breakfast', 'lunch', 'dinner')) out.push('Meals as listed in the itinerary')
+  if (has('flight')) out.push('Flights as listed in the itinerary')
+  if (services.some(s => /\bwater\b/i.test(String(s.service_name ?? '')) || String(s.service_type ?? '').toLowerCase() === 'water')) out.push('Bottled water')
+  return out
+}
 
 /**
  * Clean up service names for display
@@ -131,18 +151,12 @@ function formatShortDate(dateStr: string): string {
 }
 
 /**
- * Get currency symbol
- */
-function getCurrencySymbol(currency: string): string {
-  return canonicalCurrencySymbol(currency)
-}
-
-/**
  * Format currency amount
  */
 function formatCurrency(amount: number, currency: string): string {
-  const symbol = getCurrencySymbol(currency)
-  return `${symbol}${Number(amount).toFixed(2)}`
+  // The currency's own decimals and separators — "JPY450000.00" was the yen
+  // total, beside an email body reading "¥450,000".
+  return formatMoney(Number(amount), currency)
 }
 
 /**
@@ -160,37 +174,56 @@ function drawTable(
 ): number {
   const rowHeight = 8
   const headerHeight = 10
+  const width = colWidths.reduce((a, b) => a + b, 0)
+  const pageHeight = doc.internal.pageSize.getHeight()
   let y = startY
-
-  // Draw header background
-  doc.setFillColor(...brand)
-  doc.rect(margin, y, colWidths.reduce((a, b) => a + b, 0), headerHeight, 'F')
-
-  // Draw header text
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(255, 255, 255)
-
+  let segmentStart = startY
   let x = margin + 2
-  headers.forEach((header, i) => {
-    doc.text(header, x, y + 7)
-    x += colWidths[i]
-  })
 
-  y += headerHeight
+  // The header row, drawn again at the top of every page the table runs onto.
+  const drawHeader = () => {
+    doc.setFillColor(...brand)
+    doc.rect(margin, y, width, headerHeight, 'F')
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    x = margin + 2
+    headers.forEach((header, i) => {
+      doc.text(header, x, y + 7)
+      x += colWidths[i]
+    })
+    y += headerHeight
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+  }
+  // The border around the rows on the current page. It was drawn once, at the
+  // end, from the first page's top — a negative-height frame on the last page
+  // and none on the first when the table broke across pages.
+  const drawBorder = () => {
+    doc.setDrawColor(200, 200, 200)
+    doc.setLineWidth(0.3)
+    doc.rect(margin, segmentStart, width, y - segmentStart)
+  }
 
-  // Draw rows
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(60, 60, 60)
+  drawHeader()
 
   rows.forEach((row, rowIndex) => {
+    // A long service list continues on a new page instead of running off it.
+    if (y + rowHeight > pageHeight - 20) {
+      drawBorder()
+      doc.addPage()
+      y = margin
+      segmentStart = y
+      drawHeader()
+    }
     // Alternate row background
     if (rowIndex % 2 === 0) {
       doc.setFillColor(...brandTintLight)
-      doc.rect(margin, y, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F')
+      doc.rect(margin, y, width, rowHeight, 'F')
     }
 
     x = margin + 2
+    doc.setFontSize(9)
     row.forEach((cell, i) => {
       // Truncate if too long
       const maxWidth = colWidths[i] - 4
@@ -208,10 +241,7 @@ function drawTable(
     y += rowHeight
   })
 
-  // Draw border
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.rect(margin, startY, colWidths.reduce((a, b) => a + b, 0), y - startY)
+  drawBorder()
 
   return y + 5
 }
@@ -253,6 +283,8 @@ export function generateItineraryPDF(
       unit: 'mm',
       format: 'a4'
     })
+    // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+    applyDocumentFont(doc, opts.font)
 
     const pageWidth = doc.internal.pageSize.getWidth()
     const pageHeight = doc.internal.pageSize.getHeight()
@@ -300,7 +332,7 @@ export function generateItineraryPDF(
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(40, 40, 40)
-    doc.text(itinerary.trip_name || 'Egypt Tour Package', margin, yPos)
+    doc.text(itinerary.trip_name || 'Tour Package', margin, yPos)
 
     yPos += 10
 
@@ -360,6 +392,17 @@ export function generateItineraryPDF(
     // DAY DETAILS
     // ============================================
 
+    // A new page when the next line would cross the footer. Only the start of
+    // each block was checked, so a long day description or a long list ran
+    // past the footer and off the page — text the client never saw.
+    const FOOTER_SPACE = 20
+    const ensureRoom = (height: number) => {
+      if (yPos + height > pageHeight - FOOTER_SPACE) {
+        doc.addPage()
+        yPos = margin
+      }
+    }
+
     days.forEach((day, index) => {
       if (yPos > pageHeight - 60) {
         doc.addPage()
@@ -391,9 +434,13 @@ export function generateItineraryPDF(
         doc.setFont('helvetica', 'normal')
         doc.setTextColor(60, 60, 60)
 
-        const lines = doc.splitTextToSize(day.description, contentWidth - 10)
-        doc.text(lines, margin + 5, yPos)
-        yPos += lines.length * 4 + 5
+        const lines = doc.splitTextToSize(day.description, contentWidth - 10) as string[]
+        for (const line of lines) {
+          ensureRoom(4)
+          doc.text(line, margin + 5, yPos)
+          yPos += 4
+        }
+        yPos += 5
       }
 
       yPos += 5
@@ -417,25 +464,31 @@ export function generateItineraryPDF(
 
     // Show service breakdown only if enabled
     if (opts.showPricingBreakdown && opts.showServiceDetails) {
-      // Aggregate services across all days
+      // Aggregate services across all days — at the CLIENT's price. This
+      // printed each line's total_cost, the supplier cost, under a TOTAL PRICE
+      // that is the client's: the lines summed to 2,400 under a 3,000 total,
+      // so the client could read the margin and every supplier rate.
+      const marginPercent = (itinerary as { margin_percent?: unknown }).margin_percent
       const serviceMap = new Map<string, AggregatedService>()
 
       days.forEach((day) => {
         if (!day.services || !Array.isArray(day.services)) return
 
         day.services
-          .filter((s) => s && (s.total_cost || 0) > 0)
+          .filter((s) => s && serviceClientPrice(s as PricedService, marginPercent) > 0)
           .forEach((service) => {
             const name = cleanServiceName(service.service_name, service.service_type)
             const key = `${service.service_type}-${name}`
+            const price = serviceClientPrice(service as PricedService, marginPercent)
 
             if (serviceMap.has(key)) {
               const existing = serviceMap.get(key)!
               existing.quantity += service.quantity || 0
-              existing.total += service.total_cost || 0
+              existing.total += price
+              existing.rate = existing.quantity > 0 ? existing.total / existing.quantity : existing.total
             } else {
               const qty = service.quantity || 1
-              const total = service.total_cost || 0
+              const total = price
               serviceMap.set(key, {
                 name,
                 type: service.service_type,
@@ -447,11 +500,15 @@ export function generateItineraryPDF(
           })
       })
 
-      const serviceRows = Array.from(serviceMap.values()).map(s => [
+      // Rounded together, so the rows add up to the total box: rounded one by
+      // one, yen rows summed to a few yen off the TOTAL PRICE.
+      const services = Array.from(serviceMap.values())
+      const rowTotals = roundLinesToTotal(services.map(s => s.total), currency)
+      const serviceRows = services.map((s, i) => [
         s.name,
         s.quantity.toString(),
-        formatCurrency(s.rate, currency),
-        formatCurrency(s.total, currency)
+        formatCurrency(s.quantity > 0 ? rowTotals[i] / s.quantity : rowTotals[i], currency),
+        formatCurrency(rowTotals[i], currency)
       ])
 
       if (serviceRows.length > 0) {
@@ -477,7 +534,17 @@ export function generateItineraryPDF(
     // ============================================
 
     yPos += 5
-    const totalPrice = itinerary.total_cost || 0
+    // The total box (22 mm) and the per-person line below it stay on one page:
+    // they were drawn wherever the table ended, on top of the footer or off
+    // the page — a client PDF without its total.
+    ensureRoom(22 + 10)
+    // The services' client total, as the itinerary page and the client email
+    // show it: the stored total_cost is a cache that is often 0, so the
+    // email said EUR 3,000 while the attached PDF said EUR 0.00.
+    const totalPrice = effectiveItineraryTotal(
+      { total_cost: itinerary.total_cost ?? null, margin_percent: (itinerary as { margin_percent?: unknown }).margin_percent },
+      days.flatMap(day => (day.services || []) as PricedService[])
+    )
     const totalPax = (itinerary.num_adults || 0) + (itinerary.num_children || 0)
 
     doc.setFillColor(...brand)
@@ -513,35 +580,34 @@ export function generateItineraryPDF(
       yPos = margin
     }
 
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...brand)
-    doc.text('INCLUSIONS', margin, yPos)
-    yPos += 6
+    // What THIS trip includes, read off its services. The list was fixed —
+    // a private vehicle, an English-speaking guide, entrance fees, bottled
+    // water — printed on a hotel-only trip as much as a full tour.
+    const inclusions = tripInclusions(days.flatMap(d => (d.services || []) as Array<{ service_type?: string | null; service_name?: string | null }>))
 
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(60, 60, 60)
+    if (inclusions.length > 0) {
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...brand)
+      doc.text('INCLUSIONS', margin, yPos)
+      yPos += 6
 
-    const inclusions = [
-      'Private air-conditioned vehicle for all transfers and tours',
-      'Professional English-speaking Egyptologist guide',
-      'All entrance fees to sites mentioned in the itinerary',
-      'Bottled water during tours',
-      'All applicable taxes and service charges'
-    ]
-
-    inclusions.forEach(item => {
-      doc.text(`• ${item}`, margin + 3, yPos)
-      yPos += 5
-    })
-
-    yPos += 6
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      inclusions.forEach(item => {
+        ensureRoom(5)
+        doc.text(`• ${item}`, margin + 3, yPos)
+        yPos += 5
+      })
+      yPos += 6
+    }
 
     // ============================================
     // EXCLUSIONS
     // ============================================
 
+    ensureRoom(6 + 4 * 5)
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...brand)
@@ -560,6 +626,7 @@ export function generateItineraryPDF(
     ]
 
     exclusions.forEach(item => {
+      ensureRoom(5)
       doc.text(`• ${item}`, margin + 3, yPos)
       yPos += 5
     })
@@ -575,24 +642,24 @@ export function generateItineraryPDF(
       yPos = margin
     }
 
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...brand)
-    doc.text('PAYMENT TERMS', margin, yPos)
-    yPos += 6
+    if (company.paymentTerms) {
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...brand)
+      doc.text('PAYMENT TERMS', margin, yPos)
+      yPos += 6
+    }
 
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(60, 60, 60)
 
-    const terms = [
-      '30% deposit required to confirm booking',
-      'Remaining balance due 14 days before arrival',
-      'Payment accepted via bank transfer or credit card'
-    ]
-
+    // The agency's own deposit and terms (Settings → Organization). This
+    // printed "30% deposit… balance due 14 days before arrival" for everyone.
+    const terms = company.paymentTerms ? (doc.splitTextToSize(company.paymentTerms, contentWidth - 6) as string[]) : []
     terms.forEach(term => {
-      doc.text(`• ${term}`, margin + 3, yPos)
+      ensureRoom(5)
+      doc.text(term, margin + 3, yPos)
       yPos += 5
     })
 

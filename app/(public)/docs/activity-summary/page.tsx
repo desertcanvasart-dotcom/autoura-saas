@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { DocScreenshot, Tip } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/activity-summary')
 
 export default function ActivitySummaryDocs() {
   return (
@@ -14,7 +18,7 @@ export default function ActivitySummaryDocs() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Team Activity</h1>
       <p className="text-gray-600 mb-8">
-        Team Activity gives owners and managers an honest picture of how engaged each team member is inside Autoura:
+        Team Activity gives admins and managers an honest picture of how engaged each team member is inside Autoura:
         when they last logged in, roughly how much focused time they spent, and what they actually produced &mdash; tasks,
         itineraries, messages, quotes, and invoices. It is <strong>off by default</strong>, <strong>transparent by design</strong>
         (every member sees exactly the numbers their manager sees), and measures <strong>output over presence</strong>.
@@ -32,7 +36,7 @@ export default function ActivitySummaryDocs() {
           <li>Click <strong>Enable</strong> &mdash; every active team member receives an in-app notice that activity summaries are on</li>
         </ol>
         <p className="text-gray-600 mb-3">
-          Turning it off takes effect immediately; no activity is visible while disabled.
+          Turning it off takes effect immediately: nothing is shown and no new presence or focused time is recorded while it is off. Last login always comes from the sign-in records, and only admins and managers see other people&rsquo;s.
         </p>
         <DocScreenshot src="/docs/activity-summary/team-activity-settings.jpg" alt="Organization settings with the Team Activity card and informed-confirmation flow" />
       </section>
@@ -42,9 +46,9 @@ export default function ActivitySummaryDocs() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">What It Shows</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li><strong>Last login</strong> &mdash; from the sign-in records; accurate from day one</li>
-          <li><strong>Last seen</strong> &mdash; refreshed every few minutes while an Autoura tab is open</li>
-          <li><strong>Focused time</strong> &mdash; an estimate (&plusmn;5 minutes) counted only while the tab is visible <em>and</em> the person is actually interacting; a tab left open in the background accrues nothing</li>
-          <li><strong>Output counts</strong> for the selected range (Today / 7 days / 30 days): tasks completed, itineraries touched, messages sent (WhatsApp + email), quotes created, invoices issued, and Copilot drafts reviewed/sent</li>
+          <li><strong>Last seen</strong> &mdash; refreshed every 5 minutes while an Autoura tab is open, and only recorded while summaries are on</li>
+          <li><strong>Focused time</strong> &mdash; an estimate in 5-minute steps, counted only while the tab is visible <em>and</em> the person has used it in the last 5 minutes; a tab left open in the background accrues nothing, and several tabs count once</li>
+          <li><strong>Output counts</strong> for the selected range (Today / 7 days / 30 days, whole days counted in UTC): tasks completed (tasks assigned to the person and completed in the range), itineraries touched, messages sent (WhatsApp + email), quotes created, invoices issued, and Copilot drafts reviewed/sent</li>
         </ul>
         <Tip>
           Automated replies never count &mdash; messages sent by the WhatsApp auto-reply or the AI agent are not attributed
@@ -57,7 +61,7 @@ export default function ActivitySummaryDocs() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Where To Find It</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li><strong>Team Members</strong> &mdash; members with a login show an <strong>Activity</strong> button (admins and managers) that opens the summary</li>
-          <li><strong>Your Profile</strong> &mdash; every member sees their own <strong>Your Activity</strong> card with the same numbers their manager sees</li>
+          <li><strong>My profile</strong> &mdash; click your name at the bottom of the sidebar: every member sees their own <strong>Your Activity</strong> card, with the same numbers their manager sees</li>
         </ul>
         <DocScreenshot src="/docs/activity-summary/activity-modal.jpg" alt="Activity summary for a team member: last login and last seen, focused-time bars, and output tiles" />
         <DocScreenshot src="/docs/activity-summary/your-activity.jpg" alt="The Your Activity self-view on the profile page" />
@@ -78,11 +82,8 @@ export default function ActivitySummaryDocs() {
         </Tip>
       </section>
 
-      <div className="pt-4 border-t border-gray-100">
-        <Link href="/docs" className="text-sm text-primary-600 hover:text-primary-700 transition-colors">
-          &larr; All Docs
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/activity-summary" />
     </div>
   )
 }

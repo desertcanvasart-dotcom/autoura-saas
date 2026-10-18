@@ -16,6 +16,7 @@ import { setMockTables, createMockClient } from '@/lib/__tests__/_mock-supabase'
 
 const TENANT = 'tenant-a'
 const sent: Array<{ to: string; html: string; subject: string }> = []
+let role = 'admin'
 
 vi.mock('@/lib/supabase-server', () => ({
   requireAuth: async () => ({
@@ -24,7 +25,7 @@ vi.mock('@/lib/supabase-server', () => ({
     supabase: createMockClient(),
     tenant_id: TENANT,
     user: { id: 'u1' },
-    role: 'admin',
+    role,
   }),
 }))
 vi.mock('@/lib/email-send', () => ({
@@ -52,6 +53,7 @@ function itinerary(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   sent.length = 0
+  role = 'admin'
   setMockTables({
     tenants: [{ id: TENANT, company_name: 'Agency', contact_email: 'ops@agency.test' }],
     itineraries: [itinerary(), itinerary({ id: 'it-other', tenant_id: 'tenant-b' })],
@@ -64,13 +66,21 @@ beforeEach(() => {
 })
 
 describe('itinerary email', () => {
+  it('is refused to a viewer — sending mails a client under the company name', async () => {
+    role = 'viewer'
+    const res = await post({ itineraryId: 'it-1', clientEmail: 'ada@example.com', clientName: 'Ada' })
+    expect(res.status).toBe(403)
+    expect(sent).toHaveLength(0)
+  })
+
   it('sends, with the total computed from the services (1000 × 1.4 + 500)', async () => {
     const res = await post({ itineraryId: 'it-1', clientEmail: 'ada@example.com', clientName: 'Ada' })
     const json = await res.json()
     expect(res.status, JSON.stringify(json)).toBe(200)
     expect(json.success).toBe(true)
     expect(sent).toHaveLength(1)
-    expect(sent[0].html).toContain('EUR 1900.00')
+    // Formatted for its currency: 1,900.00 with the EUR symbol.
+    expect(sent[0].html).toContain('1,900.00')
     expect(sent[0].subject).toContain('Nile Week (IT-001)')
   })
 
@@ -79,8 +89,9 @@ describe('itinerary email', () => {
       itineraryId: 'it-1', clientEmail: 'ada@example.com', totalCost: '1.00', currency: 'USD',
     })
     expect(res.status).toBe(200)
-    expect(sent[0].html).toContain('EUR 1900.00')
+    expect(sent[0].html).toContain('1,900.00')
     expect(sent[0].html).not.toContain('USD')
+    expect(sent[0].html).not.toContain('$1.00')
   })
 
   it("does not find another tenant's itinerary", async () => {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
+// No job sends scheduled_sends yet (see POST).
+const SCHEDULED_SENDS_PROCESSED = false
+
 /**
  * GET /api/templates/schedule
  * List scheduled sends for the current tenant
@@ -73,6 +76,16 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+    // Nothing processes scheduled_sends — no cron or job reads the table —
+    // so a row stored here was a message that never went out while the page
+    // said "Message scheduled". Refuse until a processor exists.
+    if (!SCHEDULED_SENDS_PROCESSED) {
+      return NextResponse.json({
+        success: false,
+        error: 'Scheduled sending is not available yet. Send the message now instead.',
+      }, { status: 501 })
+    }
+
     const body = await request.json()
     const {
       templateId,

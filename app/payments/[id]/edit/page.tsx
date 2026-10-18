@@ -1,5 +1,6 @@
 'use client'
 
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -219,9 +220,8 @@ export default function EditPaymentPage() {
                 onChange={handleChange}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="EUR">EUR (€)</option>
-                <option value="USD">USD ($)</option>
-                <option value="GBP">GBP (£)</option>
+                {/* Every supported currency: a payment in EGP showed as EUR here. */}
+                {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
@@ -238,6 +238,7 @@ export default function EditPaymentPage() {
               >
                 <option value="bank_transfer">Bank Transfer</option>
                 <option value="tab">Tab</option>
+                <option value="credit_card">Credit Card</option>
                 <option value="cash">Cash</option>
                 <option value="paypal">PayPal</option>
                 <option value="stripe">Stripe</option>
@@ -257,9 +258,6 @@ export default function EditPaymentPage() {
               >
                 <option value="completed">Completed</option>
                 <option value="pending">Pending</option>
-                <option value="deposit_received">Deposit Received</option>
-                <option value="partially_paid">Partially Paid</option>
-                <option value="partially_refunded">Partially Refunded</option>
                 <option value="failed">Failed</option>
                 <option value="refunded">Fully Refunded</option>
               </select>

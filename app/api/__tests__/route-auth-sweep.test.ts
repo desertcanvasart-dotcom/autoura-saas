@@ -46,17 +46,19 @@ const API_DIR = path.join(ROOT, 'app/api')
 // a string the route file (or a lib file it imports) must contain. `null` =
 // public/pre-session by design, nothing to prove.
 const SELF_AUTH_PROOF: Record<string, string[] | null> = {
-  '/api/webhooks/': ['verifyConciergeSignature'],
+  // Concierge/departure feeds sign with the shared HMAC; Resend (bounces)
+  // signs with Svix.
+  '/api/webhooks/': ['verifyConciergeSignature', 'verifySvix('],
   '/api/integrations/': ['SAWA_SYNC_SECRET'],
   '/api/auth/': null, // OAuth callbacks / pre-session by nature (state verified in-handler)
   '/api/cron/': ['CRON_SECRET'],
   '/api/version': null, // sha + uptime only, public by design
   '/api/health': null, // pass/fail + latency only, public by design
   '/api/billing/webhook': ['verifyWebhookSignature', 'stripe-signature'],
-  // Dual-provider webhook: Twilio requests prove via validateRequest,
+  // Dual-provider webhook: Twilio requests prove via isValidTwilioSignature (lib/twilio-signature),
   // Meta Cloud API requests via verifyMetaSignature (X-Hub-Signature-256).
-  '/api/whatsapp/webhook': ['validateRequest', 'verifyMetaSignature'],
-  '/api/whatsapp/status-callback': ['validateRequest'],
+  '/api/whatsapp/webhook': ['isValidTwilioSignature', 'verifyMetaSignature'],
+  '/api/whatsapp/status-callback': ['isValidTwilioSignature'],
   // The invitee has no session yet — the secret invitation_token IS the
   // credential, and both handlers look the row up by it.
   '/api/invitations/verify': ['invitation_token'],
@@ -64,6 +66,8 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // Public marketing contact form — prospect has no session by definition.
   // Self-auth = abuse controls: per-IP rate limit + honeypot field.
   '/api/contact': ['checkRateLimit', 'website_hp'],
+  // CSP violation reports — any page, signed in or not; logs only.
+  '/api/csp-report': ['checkRateLimit', 'summariseCspReport'],
   // Staff tap-links: the driver has no session by design — the secret staff
   // token in the path IS the credential. The handler validates its shape and
   // looks up an unrevoked staff_links row by it.

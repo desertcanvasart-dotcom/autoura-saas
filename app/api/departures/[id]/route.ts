@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { shiftDateISO } from '@/lib/today'
+import { validatePaxFields, checkPaxAgainstRow } from '@/lib/departures/departure-pax'
+import { gateRole } from '@/lib/api-role-gate'
 
 // ============================================
 // SINGLE TOUR DEPARTURE API
@@ -83,6 +86,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -102,10 +107,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const { id } = await params
     const body = await request.json()
 
-    // Fields that can be updated
+    // Fields that can be updated. booked_pax is not one: the
+    // departure_bookings trigger keeps it as the sum of active bookings, and a
+    // hand-set value only drifted from them (documents audit, round 12).
     const allowedFields = [
       'tour_name', 'tour_code', 'start_date', 'end_date', 'duration_days',
-      'max_pax', 'min_pax', 'booked_pax', 'status', 'cutoff_days',
+      'max_pax', 'min_pax', 'status', 'cutoff_days',
       'is_guaranteed', 'price_per_person', 'currency',
       'assigned_guide_id', 'assigned_vehicle_id',
       'public_notes', 'internal_notes'
@@ -129,24 +136,51 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Recalculate end_date if start_date or duration_days changed
-    if (updateData.start_date || updateData.duration_days) {
+    // Pax counts must be whole numbers, max can't drop below the seats already
+    // booked, and min can't exceed max (documents audit, round 12).
+    const paxShape = validatePaxFields(updateData)
+    if (!paxShape.ok) {
+      return NextResponse.json(
+        { success: false, error: paxShape.error },
+        { status: paxShape.status }
+      )
+    }
+    const paxChanged = updateData.max_pax !== undefined || updateData.min_pax !== undefined
+    const datesChanged = Boolean(updateData.start_date || updateData.duration_days)
+
+    if (paxChanged || datesChanged) {
       // Fetch current departure to get existing values
       const { data: current } = await supabase
         .from('tour_departures')
-        .select('start_date, duration_days')
+        .select('start_date, duration_days, max_pax, min_pax, booked_pax')
         .eq('id', id)
         .eq('tenant_id', tenant_id)
         .single()
 
-      if (current) {
+      if (!current) {
+        return NextResponse.json(
+          { success: false, error: 'Departure not found' },
+          { status: 404 }
+        )
+      }
+
+      if (paxChanged) {
+        const pax = checkPaxAgainstRow(updateData, current)
+        if (!pax.ok) {
+          return NextResponse.json(
+            { success: false, error: pax.error },
+            { status: pax.status }
+          )
+        }
+      }
+
+      // Recalculate end_date if start_date or duration_days changed
+      if (datesChanged) {
         const startDate = (updateData.start_date as string) || current.start_date
         const durationDays = (updateData.duration_days as number) || current.duration_days
 
-        const startDateObj = new Date(startDate)
-        const endDateObj = new Date(startDateObj)
-        endDateObj.setDate(endDateObj.getDate() + durationDays - 1)
-        updateData.end_date = endDateObj.toISOString().split('T')[0]
+        // Calendar arithmetic, immune to daylight-saving changes.
+        updateData.end_date = shiftDateISO(String(startDate), durationDays - 1)
       }
     }
 
@@ -197,6 +231,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

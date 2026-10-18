@@ -11,6 +11,9 @@ interface WhatsAppButtonProps {
   clientName?: string
   guideId?: string
   contractPdfUrl?: string
+  /** type 'contract': what the operator set on the contract page, so the
+   *  client receives that contract rather than the defaults. */
+  contractEdits?: Record<string, unknown>
   onSuccess?: () => void
   className?: string
   /** 'quiet': a small outlined button that sits in a row with others (the
@@ -26,6 +29,7 @@ export default function WhatsAppButton({
   clientName,
   guideId,
   contractPdfUrl,
+  contractEdits,
   onSuccess,
   className = '',
   variant = 'solid'
@@ -57,7 +61,7 @@ export default function WhatsAppButton({
           break
         case 'contract':
           endpoint = '/api/whatsapp/send-contract'
-          body = { itineraryId, contractPdfUrl }
+          body = { itineraryId, contractPdfUrl, contract: contractEdits }
           break
       }
 

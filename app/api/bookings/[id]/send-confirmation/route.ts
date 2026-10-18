@@ -1,3 +1,5 @@
+import { sendGuard } from '@/lib/send-guard'
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
@@ -18,6 +20,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const { id } = await params
 
@@ -80,7 +88,7 @@ export async function POST(
     if (!to.whatsapp) {
       return NextResponse.json({ success: false, error: 'No WhatsApp or phone number for this client' }, { status: 400 })
     }
-    const result = await sendWhatsAppMessage({ to: to.whatsapp, body: confirmationText(b, company) })
+    const result = await sendWhatsAppMessage({ to: to.whatsapp, body: confirmationText(b, company), tenantId: tenant_id })
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error || 'WhatsApp send failed' }, { status: 502 })
     }

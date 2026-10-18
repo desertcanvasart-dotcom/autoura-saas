@@ -295,7 +295,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     kind: 'guide_grade',
     group: 'Guides & tipping',
     title: 'Guide grades',
-    description: 'The grades of guide you price. The engine asks for these by key (egyptologist by default, senior on request); older grades are kept hidden so old rates still read.',
+    description: 'The grades of guide you price. A quote asks for one of these — the first is the default — and is priced from a guide rate of that grade; older grades are kept hidden so old rates still read.',
     usedIn: 'Guide rates, quotes, pricing engine',
     minItems: 1,
     example: 'Egyptologist / Senior guide',
@@ -723,4 +723,18 @@ export function resolveRecordKeys(
     else errors.push(`${column}: "${String(value)}" is not in your ${kind.replace(/_/g, ' ')} list (Settings → Your vocabulary)`)
   }
   return { record: out, errors }
+}
+
+/** Rows still filed under a vehicle key (lib/vocabulary-server.ts). */
+export interface VehicleTypeUsage { transport_rates: number; transport_packages: number }
+
+/** The warning shown before deleting a vehicle rows still use; null when
+ *  nothing does. */
+export function vehicleInUseWarning(label: string, usage: VehicleTypeUsage): string | null {
+  const parts: string[] = []
+  const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
+  if (usage.transport_rates > 0) parts.push(n(usage.transport_rates, 'transport rate', 'transport rates'))
+  if (usage.transport_packages > 0) parts.push(n(usage.transport_packages, 'B2B transport package', 'B2B transport packages'))
+  if (parts.length === 0) return null
+  return `"${label}" is still used by ${parts.join(' and ')}. Deleting it leaves them filed under a vehicle your list no longer has — quotes will show its old key instead of your word. Rename the vehicle or hide it instead, or re-file those rates first in Rates → Transportation.`
 }

@@ -11,6 +11,7 @@ import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyTe
 import { whatsappModel } from '@/lib/ai/models'
 import { requireAuth } from '@/lib/supabase-server'
 import { chunkText, embedBatch, EMBEDDING_MODEL, toPgVector } from '@/lib/embeddings'
+import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
 
 type KbSourceType = 'kb_faq' | 'kb_policy' | 'kb_tour' | 'kb_custom'
 const KB_TYPES: KbSourceType[] = ['kb_faq', 'kb_policy', 'kb_tour', 'kb_custom']
@@ -86,6 +87,11 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   const text: string = (body.text || '').toString()
+  // Only the AI-extract mode calls the model; both embed every chunk.
+  const tooLong = aiInputTooLong(text, 200_000)
+  if (tooLong) return tooLong
+  const overBudget = auth.user ? await aiBudgetDenied(auth.user.id, tenant_id) : null
+  if (overBudget) return overBudget
   const mode: 'as_is' | 'ai_extract' = body.mode === 'ai_extract' ? 'ai_extract' : 'as_is'
   const defaultType: KbSourceType = KB_TYPES.includes(body.source_type) ? body.source_type : 'kb_custom'
   const defaultTitle: string | null = (body.title || '').toString().trim() || null

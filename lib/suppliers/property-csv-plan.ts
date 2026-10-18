@@ -193,6 +193,9 @@ export function planPropertyCsv(opts: {
 
       // Plain text. An EMPTY cell clears the field — this is an edit sheet, and
       // deleting a phone number by emptying its cell is what a person means.
+      // A column the sheet does not HAVE is left alone: a four-column sheet
+      // retiring two ships nulled every property's city, contacts and notes.
+      if (!(field in raw)) continue
       const value = cell(field)
       patch[field] = value === '' ? null : value
     }

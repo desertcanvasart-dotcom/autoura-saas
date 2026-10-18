@@ -1,5 +1,6 @@
 'use client'
 
+import { swapSignatureBlock } from '@/lib/email/signature'
 import { useEffect, useRef, useState } from 'react'
 import { Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine } from 'lucide-react'
 import RichReplyEditor, { plainTextToHtml, htmlToPlainText } from './RichReplyEditor'
@@ -47,6 +48,10 @@ const MAX_TOTAL_BYTES = 24 * 1024 * 1024        // 24MB combined — Gmail hard 
 
 export default function EmailReplyComposer({ conversation, userId, onSent }: Props) {
   const [subject, setSubject] = useState('')
+  // Cc / Bcc, revealed on request — most replies have neither.
+  const [cc, setCc] = useState('')
+  const [bcc, setBcc] = useState('')
+  const [showCopies, setShowCopies] = useState(false)
   const [bodyHtml, setBodyHtml] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
@@ -87,6 +92,10 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
     const sig = signatures.find((s) => s.id === signatureId)
     setBodyHtml(sig ? `<p><br/></p>${sigToHtml(sig)}` : '')
     setAttachments([])
+    // Copies belong to one reply, never carried into another conversation.
+    setCc('')
+    setBcc('')
+    setShowCopies(false)
     setDrafts([])
     setSendError(null)
     setPanelError(null)
@@ -117,7 +126,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
     if (!stripped) {
       setBodyHtml(`<p><br/></p>${sigToHtml(sig)}`)
     } else if (/<div data-signature="true"/.test(bodyHtml)) {
-      setBodyHtml(bodyHtml.replace(/<div data-signature="true"[\s\S]*?<\/div>/, sigToHtml(sig)))
+      setBodyHtml(swapSignatureBlock(bodyHtml, sigToHtml(sig)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signatureId])
@@ -246,6 +255,8 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
         body: JSON.stringify({
           userId,
           to,
+          cc: cc.trim() || undefined,
+          bcc: bcc.trim() || undefined,
           subject,
           body: bodyHtml,
           body_text: plain,
@@ -279,6 +290,8 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
       sendKeyRef.current = null
       setBodyHtml('')
       setAttachments([])
+      setCc('')
+      setBcc('')
       setAcceptedDraftId(null)
       onSent?.()
     } catch (e: any) {
@@ -372,7 +385,24 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 w-14">To</span>
           <input value={conversation.client_email || ''} readOnly className="flex-1 text-sm px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700" />
+          {!showCopies && (
+            <button type="button" onClick={() => setShowCopies(true)} className="text-xs text-gray-500 hover:text-gray-800 px-1">
+              Cc/Bcc
+            </button>
+          )}
         </div>
+        {showCopies && (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 w-14">Cc</span>
+              <input value={cc} onChange={(e) => setCc(e.target.value)} aria-label="Cc" placeholder="Copy to" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 w-14">Bcc</span>
+              <input value={bcc} onChange={(e) => setBcc(e.target.value)} aria-label="Bcc" placeholder="Blind copy" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+            </div>
+          </>
+        )}
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 w-14">Subject</span>
           <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />

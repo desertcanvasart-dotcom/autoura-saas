@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // GET - List all tour templates with variations
 export async function GET(request: NextRequest) {
@@ -103,6 +104,10 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    // Tours are the managers' catalogue (the sidebar's Tours group); RLS
+    // checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
     if (!supabase) {

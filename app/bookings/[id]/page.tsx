@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { use } from 'react'
 import {
-  BookOpen, User, Calendar, DollarSign, ArrowLeft, Edit2,
+  BookOpen, User, Calendar, DollarSign, Edit2,
   Users, CreditCard, FileText, CheckCircle2, Clock, Plane,
   PartyPopper, XCircle, Mail, MessageSquare, Plus, Trash2,
   Download, AlertCircle, X as XIcon
@@ -14,6 +14,7 @@ import BookingExtrasPanel from '@/components/BookingExtrasPanel'
 import BookingStatusControl, { type StatusOverride } from '@/components/booking/BookingStatusControl'
 import BookingSuppliersPanel from '@/components/booking/BookingSuppliersPanel'
 import { useRole } from '@/hooks/useRole'
+import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
 
 interface Booking {
   id: string
@@ -102,6 +103,19 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
   cancelled: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle }
 }
 
+// What the statuses read as: "Paid Full" and "Pending Deposit" were the raw
+// codes title-cased, and the payment toast showed the code itself.
+const STATUS_LABELS: Record<string, string> = {
+  pending_deposit: 'Awaiting deposit',
+  confirmed: 'Confirmed',
+  paid_full: 'Paid in full',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+const statusLabel = (status: string | null | undefined) =>
+  STATUS_LABELS[status ?? ''] ?? String(status ?? '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+
 export default function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
@@ -125,6 +139,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   // New payment form
   const [showAddPayment, setShowAddPayment] = useState(false)
+  // One click, one record: a double click (or a slow network) saved two.
+  const [saving, setSaving] = useState<'payment' | 'passenger' | null>(null)
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     payment_type: 'deposit',
@@ -148,15 +164,28 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   }
   const [travellerDocs, setTravellerDocs] = useState<TravellerDoc[]>([])
   const [travellerDocsLoaded, setTravellerDocsLoaded] = useState(false)
+  const [travellerDocsError, setTravellerDocsError] = useState(false)
   const fetchTravellerDocs = async () => {
     try {
       const res = await fetch(`/api/bookings/${resolvedParams.id}/traveller-documents`)
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.success) setTravellerDocs(data.documents)
-    } catch {} finally { setTravellerDocsLoaded(true) }
+      if (res.ok && data.success) {
+        setTravellerDocs(data.documents)
+        setTravellerDocsError(false)
+      } else {
+        setTravellerDocsError(true)
+      }
+    } catch {
+      setTravellerDocsError(true)
+    } finally { setTravellerDocsLoaded(true) }
   }
+  // The View links are signed for 10 minutes: reload them each time the tab
+  // opens and every 9 minutes while it stays open, so none is ever dead.
   useEffect(() => {
-    if (activeTab === 'documents' && !travellerDocsLoaded) fetchTravellerDocs()
+    if (activeTab !== 'documents') return
+    fetchTravellerDocs()
+    const timer = setInterval(fetchTravellerDocs, 9 * 60 * 1000)
+    return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
@@ -235,6 +264,30 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // Lock the travellers' details once they are final (form_locked): the
+  // portal then shows them but takes no more changes.
+  const [portalLock, setPortalLock] = useState<{ hasLink: boolean; locked: boolean } | null>(null)
+  useEffect(() => {
+    fetch(`/api/bookings/${resolvedParams.id}/portal-link`).then(r => r.json()).then(d => {
+      if (d?.success) setPortalLock({ hasLink: !!d.hasLink, locked: !!d.locked })
+    }).catch(() => undefined)
+  }, [resolvedParams.id, mintingPortal])
+  const togglePortalLock = async () => {
+    if (!portalLock) return
+    const res = await fetch(`/api/bookings/${resolvedParams.id}/portal-link`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locked: !portalLock.locked }),
+    })
+    const d = await res.json().catch(() => ({}))
+    if (res.ok && d.success) {
+      setPortalLock({ ...portalLock, locked: d.locked })
+      showToast('success', d.locked ? 'Traveller details locked' : 'Traveller details unlocked')
+    } else {
+      showToast('error', d.error || 'Could not change the lock')
+    }
+  }
+
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
     setToasts(prev => [...prev, { id, type, message }])
@@ -293,6 +346,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   const handleAddPassenger = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
+    setSaving('passenger')
     try {
       const response = await fetch(`/api/bookings/${resolvedParams.id}/passengers`, {
         method: 'POST',
@@ -318,11 +373,15 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (err: any) {
       showToast('error', err.message)
+    } finally {
+      setSaving(null)
     }
   }
 
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
+    setSaving('payment')
     try {
       const response = await fetch(`/api/bookings/${resolvedParams.id}/payments`, {
         method: 'POST',
@@ -336,7 +395,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       const data = await response.json()
 
       if (data.success) {
-        showToast('success', `Payment recorded. Booking status: ${data.booking_status}`)
+        showToast('success', `Payment recorded. Booking: ${statusLabel(data.booking_status)}`)
         setShowAddPayment(false)
         setPaymentForm({
           amount: '',
@@ -352,6 +411,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (err: any) {
       showToast('error', err.message)
+    } finally {
+      setSaving(null)
     }
   }
 
@@ -397,26 +458,30 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
   const statusConfig = STATUS_COLORS[booking.status] || STATUS_COLORS.pending_deposit
   const StatusIcon = statusConfig.icon
-  const paymentProgress = (booking.total_paid / booking.total_amount) * 100
+  // 0–100, and 0 for a booking with no total yet (it read NaN%, or past 100%
+  // after an overpayment).
+  const paymentProgress = booking.total_amount > 0
+    ? Math.min(100, Math.max(0, (booking.total_paid / booking.total_amount) * 100))
+    : 0
+  // The trip this booking belongs to, for the back link and breadcrumb.
+  const trip = booking.itineraries
+    ? { id: booking.itineraries.id, code: booking.itineraries.itinerary_code, name: booking.itineraries.trip_name }
+    : null
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
+          <TripBreadcrumb itineraryId={booking.itineraries?.id} trip={trip} current={booking.booking_number} />
           <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={() => router.push('/bookings')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
+            <BackLink fallbackHref="/bookings" fallbackLabel="Bookings" trip={trip} />
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-gray-900">{booking.booking_number}</h1>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bg} ${statusConfig.text} flex items-center gap-1`}>
                   <StatusIcon className="w-4 h-4" />
-                  {booking.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {statusLabel(booking.status)}
                 </span>
               </div>
               <p className="text-sm text-gray-500 mt-1">{booking.trip_name}</p>
@@ -434,7 +499,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             {/* Action Buttons */}
             {/* A direct booking often has no CRM client: its itinerary's own
                 contact is used then (same rule as the send route). */}
-            {booking.quote_type !== 'b2b' && (booking.clients?.email || booking.itineraries?.client_email || booking.clients?.whatsapp || booking.clients?.phone || booking.itineraries?.client_phone) && (
+            {(isAdmin || isManager) && booking.quote_type !== 'b2b' && (booking.clients?.email || booking.itineraries?.client_email || booking.clients?.whatsapp || booking.clients?.phone || booking.itineraries?.client_phone) && (
               <div className="flex gap-2">
                 {(booking.clients?.email || booking.itineraries?.client_email) && (
                   <button
@@ -589,8 +654,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {/* Passengers Tab */}
-        {changeRequests.some(cr => cr.status === 'pending') && (
+        {/* Passengers Tab — its change requests show there, not on every tab */}
+        {activeTab === 'passengers' && changeRequests.some(cr => cr.status === 'pending') && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
             {changeRequests.filter(cr => cr.status === 'pending').map(cr => (
               <div key={cr.id} className="flex items-center justify-between gap-3">
@@ -639,6 +704,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <h3 className="text-lg font-semibold text-gray-900">
                 Passengers ({passengers.length})
               </h3>
+              {!isViewer && (<>
               <button
                 onClick={() => setShowAddPassenger(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
@@ -654,6 +720,16 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               >
                 {mintingPortal ? 'Creating…' : 'Portal link'}
               </button>
+              </>)}
+              {portalLock?.hasLink && !isViewer && (
+                <button
+                  onClick={togglePortalLock}
+                  title={portalLock.locked ? 'Let the travellers change their details again' : 'Stop changes in the portal once the details are final'}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  {portalLock.locked ? 'Unlock details' : 'Lock details'}
+                </button>
+              )}
             </div>
 
             {/* Add Passenger Form */}
@@ -733,9 +809,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      disabled={saving === 'passenger'}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
-                      Add Passenger
+                      {saving === 'passenger' ? 'Adding…' : 'Add Passenger'}
                     </button>
                   </div>
                 </form>
@@ -790,6 +867,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <h3 className="text-lg font-semibold text-gray-900">
                 Payment History ({payments.length})
               </h3>
+              {/* Recording a payment is managers' and admins' (the API's rule). */}
+              {(isAdmin || isManager) && (
               <button
                 onClick={() => setShowAddPayment(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
@@ -797,6 +876,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <Plus className="w-4 h-4" />
                 Record Payment
               </button>
+              )}
             </div>
 
             {/* Add Payment Form */}
@@ -881,9 +961,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      disabled={saving === 'payment'}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
-                      Record Payment
+                      {saving === 'payment' ? 'Recording…' : 'Record Payment'}
                     </button>
                   </div>
                 </form>
@@ -958,6 +1039,11 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </p>
               {!travellerDocsLoaded ? (
                 <p className="text-sm text-gray-400">Loading…</p>
+              ) : travellerDocsError && travellerDocs.length === 0 ? (
+                <p className="text-sm text-red-600">
+                  Could not load the travellers&apos; documents.{' '}
+                  <button type="button" onClick={fetchTravellerDocs} className="underline">Try again</button>
+                </p>
               ) : travellerDocs.length === 0 ? (
                 <p className="text-sm text-gray-400">Nothing uploaded yet.</p>
               ) : (

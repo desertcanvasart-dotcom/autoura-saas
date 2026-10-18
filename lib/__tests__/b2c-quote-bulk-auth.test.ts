@@ -21,6 +21,7 @@ const sessionClient = {
 
 vi.mock('@/lib/supabase-server', () => ({
   createAuthenticatedClient: vi.fn(async () => sessionClient),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', role: 'member', user: { id: 'u1' } }),
 }))
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => { throw new Error('bulk routes must not build their own client') },

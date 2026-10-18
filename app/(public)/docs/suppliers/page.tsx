@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { ScreenshotPlaceholder, Tip } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/suppliers')
 
 export default function SuppliersPage() {
   return (
@@ -14,133 +18,171 @@ export default function SuppliersPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Suppliers</h1>
       <p className="text-gray-600 mb-8">
-        The Suppliers page is your central directory of every company and individual you work with &mdash; hotels, transport companies, guides, cruises, restaurants, and more. You&rsquo;ll find it in the sidebar under <strong>Suppliers &amp; Rates</strong>; it&rsquo;s available to admin and manager roles.
+        The Suppliers page is your directory of every company and person you buy from &mdash; hotels,
+        transport companies, guides, cruise lines, restaurants and more. Find it under{' '}
+        <strong>Suppliers &amp; Rates &rarr; Suppliers</strong> (admins and managers).
       </p>
 
-      {/* Supplier Types */}
+      {/* Types */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Supplier Types</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Supplier types</h2>
         <p className="text-gray-600 mb-3">
-          Every supplier belongs to one of 12 types:
+          The types are <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">your own</Link>{' '}
+          (Settings &rarr; Your vocabulary &rarr; Supplier types). The starter list has Hotel,
+          Transport Company, Driver, Guide, Cruise, Train Operator, Airline, Activity Provider,
+          Attraction, Tour Operator, Ground Handler, Restaurant, Shop and Other; rename, hide or add
+          your own. A supplier can fill <strong>several</strong> roles &mdash; a ground handler that
+          also runs a cruise &mdash; and what each role can own (ships, hotels, trains) follows from it.
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-          {['Hotel', 'Transport Company', 'Driver', 'Guide', 'Cruise', 'Train Operator', 'Activity Provider', 'Attraction', 'Tour Operator', 'Ground Handler', 'Restaurant', 'Shop', 'Other'].map((type) => (
-            <div key={type} className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 text-center">{type}</div>
-          ))}
-        </div>
-        <p className="text-gray-600 mb-3">
-          Each supplier also carries a status &mdash; <strong>active</strong>, <strong>inactive</strong>, or <strong>pending</strong> &mdash; so you can keep old contacts on record without them cluttering your working list.
-        </p>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Parent companies and properties</h3>
         <p className="text-gray-600">
-          Hotels, restaurants, and cruises are hierarchical: a parent company can own child properties. For example, a hotel chain is stored once as the parent company, with each individual hotel added as a property under it. The supplier form includes a parent-company selector for this, and the directory has <strong>properties only</strong> / <strong>companies only</strong> toggles to filter by level.
+          Each supplier has a status &mdash; <strong>active</strong>, <strong>inactive</strong> or{' '}
+          <strong>pending</strong> &mdash; so old contacts stay on record without crowding the list.
         </p>
       </section>
 
       {/* Browsing */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Browsing the Directory</h2>
-        <p className="text-gray-600 mb-3">
-          The directory offers three views &mdash; <strong>grid</strong>, <strong>table</strong>, and <strong>list</strong> &mdash; with pagination for large directories. You can:
-        </p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The directory</h2>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
-          <li><strong>Sort</strong> by name, type, city, status, or commission</li>
-          <li><strong>Filter by type</strong> &mdash; the selected type is mirrored in the URL, so you can bookmark or share a filtered view</li>
-          <li><strong>Search</strong> across supplier name, contact name, and contact email</li>
-          <li><strong>Toggle</strong> between properties only and companies only</li>
+          <li><strong>Views</strong> &mdash; grid, table and list, with pages of 12 or more</li>
+          <li><strong>Type tabs</strong> &mdash; the chosen type is kept in the address, so a filtered view can be bookmarked</li>
+          <li><strong>Search</strong> &mdash; name, contact name, email and city; and a <strong>status</strong> filter</li>
+          <li><strong>Sort</strong> (table view) &mdash; by name, type, city or status</li>
+          <li><strong>Select</strong> several and <strong>Delete Selected</strong>; WhatsApp, email and phone links on each supplier</li>
         </ul>
         <p className="text-gray-600">
-          The header carries two actions: <strong>Export</strong> downloads the directory as CSV, and <strong>Add Supplier</strong> opens the creation form.
+          The header has <strong>Add Supplier</strong>, the <strong>Import / Export</strong> menu and{' '}
+          <strong>Reconcile Codes</strong> (below).
         </p>
-        <DocScreenshot src="/docs/suppliers/suppliers-grid.jpg" alt="Suppliers directory in grid view with the type filter, search bar, and the Export and Add Supplier buttons in the header" />
-      </section>
-
-      {/* Supplier code + CSV */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">The supplier code (SUP-####)</h2>
-        <p className="text-gray-600 mb-3">
-          Every supplier is given a short, stable code &mdash; <strong>SUP-0001</strong>,
-          <strong> SUP-0002</strong>, and so on &mdash; assigned automatically in order. It is yours
-          to edit if you keep your own numbering, as long as it stays unique.
-        </p>
-        <p className="text-gray-600">
-          This code is what makes rates <em>portable</em>. A supplier&rsquo;s internal id is unique
-          to this install, so it means nothing anywhere else; the SUP-#### code travels with the
-          supplier. When you export rates and import them elsewhere, each rate carries its supplier
-          code and re-attaches to the supplier with the matching code &mdash; instead of every rate
-          becoming an orphan you re-link by hand.
-        </p>
-      </section>
-
-      {/* CSV import / export */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Importing &amp; exporting suppliers</h2>
-        <p className="text-gray-600 mb-3">
-          Alongside <strong>Export</strong>, the directory has <strong>Sample CSV</strong> and{' '}
-          <strong>Import</strong>. Import reads a filled-in sheet, matching each row on its supplier
-          code so an existing supplier updates rather than duplicates, and everything lands in your
-          own organization&rsquo;s directory.
-        </p>
-        <Tip>
-          Import suppliers <em>before</em> their rates. A rate whose supplier code is not yet in your
-          organization is reported and skipped, not guessed &mdash; so the order is suppliers first,
-          then rates. The shared CSV rules live in{' '}
-          <Link href="/docs/bulk-csv" className="text-primary-600 hover:underline">Bulk Import (CSV)</Link>.
-        </Tip>
+        <ScreenshotPlaceholder caption="Suppliers directory: type tabs, search, status filter, and the Import / Export menu" />
       </section>
 
       {/* Adding */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Adding a Supplier</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Adding a supplier</h2>
         <p className="text-gray-600 mb-3">
-          The supplier form adapts to the type you pick. Type-specific fields draw on canned lists so data stays consistent:
+          <strong>Add Supplier</strong> asks for the name and at least one type, then the contact
+          details (contact name, email, phone, a second phone, WhatsApp, website, address, city), the
+          commission &mdash; a rate, and whether you receive it or pay it &mdash; payment terms, status
+          and notes. The form is the same for every type. The country is your agency&rsquo;s operating
+          country (Settings &rarr; Organization); the cities are your destination cities.
         </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
-          <li><strong>Egyptian cities</strong> for locations</li>
-          <li><strong>Vehicle types</strong> for transport companies and drivers</li>
-          <li><strong>Guide languages</strong> for guides</li>
-          <li><strong>Cuisine types</strong> for restaurants</li>
-          <li><strong>Nile cruise routes</strong> for cruises</li>
-        </ul>
         <p className="text-gray-600">
-          For hotels, restaurants, and cruises, use the parent-company selector to attach a property to the company that owns it.
+          Saving a hotel, cruise company or train operator opens its <strong>Properties</strong> tab, so
+          you can add its hotels, ships or trains straight away.
         </p>
-        <DocScreenshot src="/docs/suppliers/supplier-form.jpg" alt="Add Supplier form with the type selector and type-specific fields" />
+      </section>
+
+      {/* Code */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The supplier code (SUP-####)</h2>
+        <p className="text-gray-600 mb-3">
+          Every new supplier is given the next code of your agency &mdash; <strong>SUP-0001</strong>,{' '}
+          <strong>SUP-0002</strong> and so on &mdash; shown on its Details tab. A code that arrives in an
+          import is kept as it is, so you can bring your own numbering. Codes are unique within your
+          agency; another agency&rsquo;s SUP-0001 is its own.
+        </p>
+        <p className="text-gray-600">
+          The code is what makes rates <em>portable</em>: a rate sheet names its supplier by code, so
+          rates exported here and imported elsewhere re-attach to the supplier with the same code instead
+          of arriving unlinked. <strong>Reconcile Codes</strong> stamps the codes from another
+          install&rsquo;s supplier export onto your suppliers, matching them by email or phone, after a
+          preview.
+        </p>
+      </section>
+
+      {/* CSV */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Importing &amp; exporting suppliers</h2>
+        <p className="text-gray-600 mb-3">
+          The <strong>Import / Export</strong> menu has two sheets.
+        </p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">The suppliers sheet</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-4">
+          <li><strong>Sample sheet</strong>, <strong>Export suppliers</strong>, <strong>Import suppliers</strong>.</li>
+          <li>
+            Import <strong>updates</strong> the supplier a row matches &mdash; by its <strong>Code</strong>{' '}
+            (whatever the letter case), else by its <strong>Name</strong> &mdash; and <strong>creates</strong>{' '}
+            the rest, each with a new code when the row has none. A renamed supplier is found by its
+            code. A row whose name belongs to a supplier with a different code is refused.
+          </li>
+          <li>
+            On an update, the cells a row fills in are written; a blank cell leaves the stored value.
+            A row with no Type keeps the supplier&rsquo;s roles (a new one lands as Other, and is reported).
+          </li>
+          <li>
+            The <strong>Type</strong> cell may list several roles (<code>hotel | transport_company</code>),
+            in your words or keys. <strong>Commission</strong> is a number (<code>10</code> or{' '}
+            <code>10%</code>). A <strong>Properties</strong> cell (<code>hotel:Nile Star | ship:MS Hapi</code>)
+            adds the hotels, ships or trains the supplier does not have yet.
+          </li>
+          <li>
+            Refused, not guessed: an unknown type, a commission that is not a number, a name or code
+            twice in one file. The rest still imports. The sample&rsquo;s example row (code{' '}
+            <code>EXAMPLE-SUP-0001</code>) is skipped.
+          </li>
+        </ul>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">The properties sheet</h3>
+        <p className="text-gray-600 mb-3">
+          <strong>Export properties</strong> and <strong>Import properties</strong>: one row per hotel,
+          ship or train, under its supplier (by Supplier Code, else name). A row updates the property
+          with its Property ID, else the one with the same supplier, kind and name, and creates the rest.
+          A blank cell clears that field; a column the sheet does not have is left alone. Nothing is
+          ever deleted &mdash; retire a property with Active = false.
+        </p>
+        <Tip>
+          Import suppliers <em>before</em> their rates. A rate whose supplier code is not in your
+          agency is reported and skipped &mdash; so suppliers first, then rates. The shared CSV rules
+          are in <Link href="/docs/bulk-csv" className="text-primary-600 hover:underline">Bulk Import (CSV)</Link>.
+        </Tip>
       </section>
 
       {/* Viewing */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing a Supplier</h2>
-        <p className="text-gray-600 mb-3">
-          Opening a supplier shows a view modal with four tabs:
-        </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Details</strong> &mdash; Contact information, type, status, and commission</li>
-          <li><strong>Rates</strong> &mdash; Rates associated with this supplier</li>
-          <li><strong>Properties</strong> &mdash; The ships, hotels or trains the supplier operates. A hotel property also carries its accommodation type (resort, camp, and so on, from Settings &rarr; Your vocabulary), which hotel rates inherit when you pick the property.</li>
-          <li><strong>Documents</strong> &mdash; The contracts, rate sheets, allotment agreements, licences and insurance you hold with the supplier. Upload a PDF, image, Word or Excel file, set its validity dates, and optionally tie it to one of the supplier&rsquo;s properties (a specific ship or hotel). Documents ending within 60 days are flagged <em>Expiring soon</em>; files open through a short-lived private link, never a permanent URL.</li>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">A supplier&rsquo;s tabs</h2>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Details</strong> &mdash; contacts, code, status, commission and payment terms, notes.</li>
+          <li><strong>Rates</strong> &mdash; for transport companies and drivers: the transport rates priced with them.</li>
+          <li>
+            <strong>Properties</strong> &mdash; for a supplier that runs hotels, ships or trains. A hotel
+            also carries its accommodation type (from your vocabulary), which its hotel rates inherit.
+            Renaming a property renames it on its rates too; a property its rates still use cannot be
+            deleted &mdash; mark it inactive instead.
+          </li>
+          <li>
+            <strong>Documents</strong> &mdash; contracts, rate sheets, allotments, licences and insurance:
+            a PDF, image, .docx or .xlsx file with its validity dates, optionally tied to one property.
+            Documents ending within 60 days are flagged <em>Expiring soon</em>; files open through a
+            short-lived private link.
+          </li>
         </ul>
-        <ScreenshotPlaceholder caption="Supplier view modal on /suppliers showing the Details, Rates, Properties, and Documents tabs" />
-        <Tip>
-          <strong>Rates live in their own section:</strong> supplier rate tables (hotels, transport, entrance fees, and more) are managed under Tours &amp; Rates &mdash; see <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>.
-        </Tip>
+        <ScreenshotPlaceholder caption="A supplier's Details, Rates, Properties and Documents tabs" />
+      </section>
+
+      {/* Delete */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Deleting a supplier</h2>
+        <p className="text-gray-600">
+          Deleting a supplier deletes its properties and documents with it. If rates are priced on one
+          of its hotels, ships or trains, the delete is refused and says how many &mdash; delete those
+          rates first, or mark the supplier inactive.
+        </p>
       </section>
 
       {/* Finance */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Suppliers and Money</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Suppliers and money</h2>
         <p className="text-gray-600">
-          The financial side of your supplier relationships lives elsewhere: record what suppliers bill you under <strong>Supplier Invoices</strong> (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/supplier-invoices</code>) and track what you owe under <strong>Payables</strong> (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/accounts-payable</code>). Both are documented in <Link href="/docs/invoices-payments" className="text-primary-600 hover:underline">Invoices &amp; Payments</Link>. Supplier costs on trips are covered in <Link href="/docs/expenses-commissions" className="text-primary-600 hover:underline">Expenses &amp; Commissions</Link>.
+          What suppliers bill you is recorded under <strong>Supplier Invoices</strong> and what you owe
+          under <strong>Payables</strong> &mdash; see{' '}
+          <Link href="/docs/invoices-payments" className="text-primary-600 hover:underline">Invoices &amp; Payments</Link>.
+          Their rates are on the rate pages of this group &mdash; see{' '}
+          <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>.
         </p>
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200">
-        <Link href="/docs" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          All Docs
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/suppliers" />
     </div>
   )
 }

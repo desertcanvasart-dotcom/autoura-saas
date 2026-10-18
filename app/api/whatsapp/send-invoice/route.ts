@@ -1,3 +1,7 @@
+import { sendGuard } from '@/lib/send-guard'
+import { gateRole } from '@/lib/api-role-gate'
+import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant, type SenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
@@ -8,7 +12,6 @@ import { generateInvoicePDF } from '@/lib/invoice-pdf-generator'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
-import { getCurrencySymbol } from '@/lib/currency'
 
 // The invoice PDF a customer receives on WhatsApp is the SAME document the
 // app downloads (lib/invoice-pdf-generator.ts) on the agency's letterhead —
@@ -19,11 +22,22 @@ async function invoicePdfBytes(invoice: any, senderTenant: SenderTenant | null):
   const logoDataUrl = logoUrl && (await checkPublicHttpUrl(logoUrl)).ok
     ? await fetchLogoDataUrl(logoUrl)
     : undefined
-  const pdf = generateInvoicePDF(invoice, { ...identityFromTenant(senderTenant), logoDataUrl })
+  const company = { ...identityFromTenant(senderTenant), logoDataUrl }
+  // The letterhead's own text (address, footer, tagline) counts too: a
+  // Japanese address was drawn in Helvetica when only the invoice was checked.
+  const pdf = generateInvoicePDF(invoice, company, await serverPdfFontFor(invoice, identityFromTenant(senderTenant)))
   return new Uint8Array(pdf.output('arraybuffer'))
 }
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
@@ -113,7 +127,12 @@ export async function POST(request: NextRequest) {
     // Generate PDF
 
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
-    const pdfBytes = await invoicePdfBytes(invoice, senderTenant)
+    // The customer receives it SENT — the status flips to 'sent' below, after
+    // the PDF was built, so a draft went out stamped "DRAFT".
+    const pdfBytes = await invoicePdfBytes(
+      { ...invoice, status: invoice.status === 'draft' ? 'sent' : invoice.status },
+      senderTenant
+    )
 
     // Upload to Supabase Storage (use admin client for storage)
 
@@ -134,7 +153,6 @@ export async function POST(request: NextRequest) {
 
     const businessName = senderTenant?.company_name || ''
     const businessEmail = senderTenant?.contact_email || ''
-    const currencySymbol = getCurrencySymbol(invoice.currency)
 
     const issueDate = new Date(invoice.issue_date).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'long', year: 'numeric'
@@ -143,7 +161,8 @@ export async function POST(request: NextRequest) {
       ? new Date(invoice.due_date).toLocaleDateString('en-GB', {
           day: 'numeric', month: 'long', year: 'numeric'
         })
-      : 'On Arrival'
+      // No due date: the terms on the invoice say when — never "On Arrival".
+      : 'As per the payment terms on the invoice'
 
     const typeLabel = invoice.invoice_type === 'deposit' 
       ? `Deposit Invoice (${invoice.deposit_percent}%)`
@@ -159,14 +178,15 @@ export async function POST(request: NextRequest) {
       `📋 *Invoice:* ${invoice.invoice_number}\n` +
       `📅 *Issue Date:* ${issueDate}\n` +
       `⏰ *Due Date:* ${dueDate}\n\n` +
-      `💰 *Balance Due: ${currencySymbol}${Number(invoice.balance_due).toFixed(2)}*\n\n` +
-      `For questions, contact us:\n` +
-      (businessEmail ? `📧 ${businessEmail}\n\n` : '') +
+      `💰 *Balance Due: ${formatMoney(invoice.balance_due, invoice.currency)}*\n\n` +
+      (businessEmail ? `For questions, contact us:\n📧 ${businessEmail}\n\n` : '') +
       `Thank you! 🙏\n${businessName ? businessName + ' Team' : 'Your travel team'}`
 
 
 
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: clientPhone,
       body: message,
       mediaUrl: pdfUrl

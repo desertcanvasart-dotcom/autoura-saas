@@ -74,8 +74,13 @@ export default function UserManagementPage() {
   const router = useRouter()
   const { isAdmin, canManageTeam } = useRole()
   const { user } = useAuth()
-  const { tenant } = useTenant()
+  const { tenant, tenantMember } = useTenant()
   const dialog = useConfirmDialog()
+  // You invite roles below your own: an admin invites managers and down,
+  // only the owner invites admins (the API refused the rest; the form offered them).
+  const myRank = ({ owner: 4, admin: 3, manager: 2, member: 1, viewer: 0 } as Record<string, number>)[tenantMember?.role || ''] ?? 0
+  const rankOf = (r: string) => ({ admin: 3, manager: 2, member: 1, viewer: 0 } as Record<string, number>)[r] ?? 0
+  const invitableRoles = ROLE_OPTIONS.filter(r => rankOf(r.value) < myRank)
 
   const [activeTab, setActiveTab] = useState<'users' | 'invitations'>('users')
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -151,7 +156,12 @@ export default function UserManagementPage() {
 
       const data = await response.json()
 
-      if (data.success) {
+      if (data.success && data.emailSent === false) {
+        // The invitation exists but the email did not go: say so, and give
+        // the link to send by hand (it said "Invitation sent" regardless).
+        setInviteError(`The invitation was created but the email could not be sent. Send ${inviteForm.email} this link yourself: ${data.inviteUrl}`)
+        fetchInvitations()
+      } else if (data.success) {
         setInviteSuccess(`Invitation sent to ${inviteForm.email}`)
         setInviteForm({ email: '', role: 'member' })
         fetchInvitations()
@@ -179,6 +189,9 @@ export default function UserManagementPage() {
 
       if (response.ok) {
         fetchInvitations()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        await dialog.alert('Invitation not cancelled', data.error || 'The invitation could not be cancelled.', 'warning')
       }
     } catch (error) {
       console.error('Error cancelling invitation:', error)
@@ -187,18 +200,21 @@ export default function UserManagementPage() {
 
   const resendInvitation = async (invitation: Invitation) => {
     try {
-      await fetch(`/api/invitations?id=${invitation.id}`, { method: 'DELETE' })
-
-      await fetch('/api/invitations', {
+      // One request that refreshes the same invitation: deleting it first
+      // and re-creating it lost it whenever the create was refused.
+      const response = await fetch('/api/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: invitation.email,
-          role: invitation.role,
-          tenant_id: tenant?.id,
-          invited_by: user?.id
-        })
+        body: JSON.stringify({ email: invitation.email, role: invitation.role, resend: true })
       })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        await dialog.alert('Invitation not resent', data.error || 'The invitation could not be resent.', 'warning')
+      } else if (data.emailSent === false) {
+        await dialog.alert('Email not sent', `The link was renewed but the email could not be sent. Send this link yourself: ${data.inviteUrl}`, 'warning')
+      } else {
+        await dialog.alert('Invitation resent', `A fresh link was sent to ${invitation.email}.`, 'info')
+      }
 
       fetchInvitations()
     } catch (error) {
@@ -216,6 +232,12 @@ export default function UserManagementPage() {
 
       if (response.ok) {
         fetchMembers()
+      } else {
+        // A refused change (not an owner/admin, your own role, the owner role)
+        // used to leave the dropdown on the new value and change nothing.
+        const data = await response.json().catch(() => ({}))
+        await dialog.alert('Role not changed', data.error || 'The role could not be changed.', 'warning')
+        fetchMembers()
       }
     } catch (error) {
       console.error('Error updating role:', error)
@@ -232,6 +254,9 @@ export default function UserManagementPage() {
 
       if (response.ok) {
         fetchMembers()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        await dialog.alert('Status not changed', data.error || 'The user could not be updated.', 'warning')
       }
     } catch (error) {
       console.error('Error updating status:', error)
@@ -703,7 +728,7 @@ export default function UserManagementPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
                   <div className="space-y-2">
-                    {ROLE_OPTIONS.map(role => (
+                    {invitableRoles.map(role => (
                       <label
                         key={role.value}
                         className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${

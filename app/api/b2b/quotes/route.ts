@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { partnerInTenant } from '@/lib/quotes/partner-in-tenant'
+import { calculatorPricingTable, pickEditable, rateSheetFromPaxTable } from '@/lib/quotes/calculator-pricing-table'
+import { priceVariation } from '@/lib/b2b/price-variation'
+import { isBookableLine } from '@/lib/pricing/breakdown-order'
+import { roleDenied } from '@/lib/api-role-gate'
+import { isQuoteStatus, quoteStatusError } from '@/lib/quotes/quote-status'
 
 // ============================================
 // B2B QUOTES API — calculator save/list/update
@@ -21,6 +27,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -79,6 +87,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const body = await request.json()
     const {
@@ -88,27 +98,6 @@ export async function POST(request: NextRequest) {
       client_email,
       client_phone,
       client_nationality,
-      travel_date,
-      num_adults = 2,
-      num_children = 0,
-      // Pre-calculated pricing from UI
-      services_snapshot,
-      total_cost,
-      margin_percent,
-      margin_amount,
-      selling_price,
-      price_per_person,
-      // New fields
-      tour_leader_included = false,
-      tour_leader_cost,
-      single_supplement,
-      is_eur_passport = true,
-      season,
-      // Guide grade/mode (B-item 1) — nullable, NULL = the defaults.
-      guide_grade = null,
-      guide_mode = null,
-      // Other
-      currency = 'EUR',
       valid_days = 30,
       notes,
       created_by
@@ -118,55 +107,168 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'variation_id is required' }, { status: 400 })
     }
 
-    if (!total_cost || !selling_price) {
+    // The price is the server's own: the calculator's inputs (`pricing`, the
+    // body it sent to /api/b2b/calculate-price) are priced again here, and
+    // nothing the browser computed — totals, margin, per-person price, the
+    // services or the rate sheet — is stored. Rates changed since the
+    // calculation are the ones saved.
+    const pricing = body.pricing
+    if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) {
+      return NextResponse.json({ success: false, error: 'Calculate the price before saving the quote' }, { status: 400 })
+    }
+    const priced = await priceVariation(authResult.tenant_id, { ...pricing, variation_id })
+    const result = priced.body.data
+    if (priced.status !== 200 || !result) {
+      return NextResponse.json(
+        { success: false, error: priced.body.error || 'The price could not be calculated' },
+        { status: priced.status === 200 ? 500 : priced.status }
+      )
+    }
+    if (!(result.total_cost > 0) || !(result.selling_price > 0)) {
       return NextResponse.json({ success: false, error: 'Pricing data is required' }, { status: 400 })
     }
+    // A price with holes (a service with no rate, counted at 0) is not a rate
+    // sheet to send a partner. Saved only when the operator says to keep it
+    // as it is — the calculator asks.
+    if (result.complete === false && body.allow_incomplete !== true) {
+      return NextResponse.json({
+        success: false,
+        incomplete: true,
+        holes: result.holes ?? [],
+        error: `${(result.holes ?? []).length || 'Some'} service(s) have no rate, so this price is incomplete.`,
+      }, { status: 422 })
+    }
+    // The CHOSEN optional services travel with the quote as real services. A
+    // no-rate line is a service to book; a line already inside another (a
+    // meal in the hotel rate) is not.
+    const servicesSnapshot = [
+      ...result.services.filter(isBookableLine),
+      ...(result.optional_services || []).filter(s => s.is_selected),
+    ]
+    const guideGrade = typeof pricing.guide_grade === 'string' ? pricing.guide_grade : null
+    const guideMode = typeof pricing.guide_mode === 'string' ? pricing.guide_mode : null
+
+    // The partner must be this tenant's: the quote is later read and sent to
+    // it through the admin client (lib/quotes/partner-in-tenant).
+    const partnerCheck = await partnerInTenant(getSupabaseAdmin(), partner_id, authResult.tenant_id)
+    if (!partnerCheck.ok) {
+      return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
+    }
+
+    // NOT NULL, read by every partner page: the quote's own size plus the
+    // rate sheet generated on the calculator, when there is one.
+    const pricingTable = calculatorPricingTable(
+      { pax: result.num_pax, sellingPrice: result.selling_price, pricePerPerson: result.price_per_person },
+      body.include_rate_sheet ? rateSheetFromPaxTable(result.pax_pricing_table, result.tour_leader_included) : undefined
+    )
+    if (!pricingTable) {
+      return NextResponse.json({ success: false, error: 'A group size, selling price and per-person price are required' }, { status: 400 })
+    }
+
+    // The tour this rate sheet is for: a calculator quote has no itinerary,
+    // so without its own trip_name the email, WhatsApp and PDF said "Your
+    // tour" and "0 days". From this tenant's own template.
+    const { data: variation } = await getSupabaseAdmin()
+      .from('tour_variations')
+      .select('variation_name, tour_templates!inner(template_name, tenant_id)')
+      .eq('id', variation_id)
+      .eq('tour_templates.tenant_id', authResult.tenant_id)
+      .maybeSingle()
+    const templateName = (variation?.tour_templates as { template_name?: string } | null | undefined)?.template_name
+    const tripName = [templateName, variation?.variation_name].filter(Boolean).join(' — ') || null
 
     // Calculate valid_until date
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + valid_days)
 
-    // b2b_quotes numbering comes from the shared RPC (tour_quotes had a
-    // trigger; this table does not)
-    const { data: quoteNum } = await (getSupabaseAdmin() as any).rpc('generate_b2b_quote_number')
-    const { data: quote, error } = await (getSupabaseAdmin() as any)
-      .from('b2b_quotes')
-      .insert({
-        tenant_id: authResult.tenant_id,
+    const fields = {
         variation_id,
         partner_id: partner_id || null,
+        trip_name: tripName,
         client_name,
         client_email,
         client_phone,
         client_nationality,
-        travel_date,
-        num_adults,
-        num_children,
-        services_snapshot,
-        total_cost,
-        margin_percent,
-        margin_amount,
-        selling_price,
-        price_per_person,
-        currency,
-        tour_leader_included,
-        tour_leader_cost,
-        single_supplement,
-        // Store only non-default values (mig 326): NULL = egyptologist/spot.
-        guide_grade: guide_grade === 'egyptologist' ? null : guide_grade,
-        guide_mode: guide_mode === 'spot' ? null : guide_mode,
-        is_eur_passport,
-        season,
-        status: 'draft',
+        travel_date: result.travel_date,
+        num_adults: result.num_pax,
+        num_children: 0,
+        services_snapshot: servicesSnapshot,
+        total_cost: result.total_cost,
+        margin_percent: result.margin_percent,
+        margin_amount: result.margin_amount,
+        selling_price: result.selling_price,
+        price_per_person: result.price_per_person,
+        // The run's currency (the tenant's rates currency), not EUR.
+        currency: result.currency,
+        tour_leader_included: result.tour_leader_included,
+        tour_leader_cost: result.tour_leader_cost || null,
+        // NOT NULL: a quote with no supplement stores 0, never null.
+        single_supplement: Number(result.single_supplement) || 0,
+        pricing_table: pricingTable,
+        // Store only non-default values (mig 326): NULL = the agency's first
+        // grade / spot.
+        guide_grade: guideGrade || null,
+        guide_mode: !guideMode || guideMode === 'spot' ? null : guideMode,
+        is_eur_passport: result.is_eur_passport,
+        season: result.season,
         valid_until: validUntil.toISOString().split('T')[0],
         notes,
-        source: 'calculator',
-        quote_number: quoteNum || `B2B-${Date.now()}`,
-        // Attribution (mig 269/270): the staff member saving the quote.
-        created_by: created_by || authResult.user!.id
-      } as any)
-      .select()
-      .single()
+    }
+
+    // The Quote Builder already made this programme's quote and opened the
+    // calculator on it (?quote=…): saving here reprices THAT quote while it
+    // is still open, instead of leaving the partner two.
+    let target: { id: string } | null = null
+    if (typeof body.quote_id === 'string' && body.quote_id) {
+      const { data: open } = await getSupabaseAdmin()
+        .from('b2b_quotes')
+        .select('id')
+        .eq('id', body.quote_id)
+        .eq('tenant_id', authResult.tenant_id)
+        .in('status', ['draft', 'sent'])
+        .maybeSingle()
+      target = open
+    }
+
+    let quote: unknown
+    let error: { message: string } | null
+    if (target) {
+      ;({ data: quote, error } = await (getSupabaseAdmin() as any)
+        .from('b2b_quotes')
+        .update({ ...fields, updated_at: new Date().toISOString() })
+        .eq('id', target.id)
+        .eq('tenant_id', authResult.tenant_id)
+        .select()
+        .single())
+      if (!error) {
+        try {
+          await getSupabaseAdmin().rpc('create_b2b_quote_version', {
+            p_quote_id: target.id,
+            p_changed_by: authResult.user!.id,
+            p_change_reason: 'Repriced in the B2B Calculator',
+          })
+        } catch (versionError) {
+          console.error('Error creating quote version:', versionError instanceof Error ? versionError.message : versionError)
+        }
+      }
+    } else {
+      // b2b_quotes numbering comes from the shared RPC (tour_quotes had a
+      // trigger; this table does not)
+      const { data: quoteNum } = await (getSupabaseAdmin() as any).rpc('generate_b2b_quote_number')
+      ;({ data: quote, error } = await (getSupabaseAdmin() as any)
+        .from('b2b_quotes')
+        .insert({
+          ...fields,
+          tenant_id: authResult.tenant_id,
+          status: 'draft',
+          source: 'calculator',
+          quote_number: quoteNum || `B2B-${Date.now()}`,
+          // Attribution (mig 269/270): the staff member saving the quote.
+          created_by: created_by || authResult.user!.id,
+        } as any)
+        .select()
+        .single())
+    }
 
     if (error) {
       console.error('Error creating quote:', error)
@@ -175,7 +277,7 @@ export async function POST(request: NextRequest) {
 
     const q = quote as any
 
-    return NextResponse.json({ success: true, data: q }, { status: 201 })
+    return NextResponse.json({ success: true, data: q, action: target ? 'updated' : 'created' }, { status: target ? 200 : 201 })
 
   } catch (error: any) {
     console.error('Error in POST /api/b2b/quotes:', error)
@@ -192,12 +294,28 @@ export async function PUT(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const body = await request.json()
-    const { id, tenant_id: _ignoredTenantId, ...updates } = body
+    const id = body?.id
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
+    }
+
+    // Only the editable fields — the body was spread into the update, so a
+    // request could set any column, prices and partner included.
+    const updates = pickEditable(body)
+    if (updates.status !== undefined && !isQuoteStatus('b2b', updates.status)) {
+      return NextResponse.json({ success: false, error: quoteStatusError('b2b') }, { status: 400 })
+    }
+    if (updates.partner_id !== undefined) {
+      const partnerCheck = await partnerInTenant(getSupabaseAdmin(), updates.partner_id, authResult.tenant_id)
+      if (!partnerCheck.ok) {
+        return NextResponse.json({ success: false, error: partnerCheck.error }, { status: partnerCheck.status })
+      }
+      updates.partner_id = updates.partner_id || null
     }
 
     updates.updated_at = new Date().toISOString()
@@ -226,6 +344,8 @@ export async function DELETE(request: NextRequest) {
       { status: authResult.status }
     )
   }
+  const denied = roleDenied(authResult.role, 'manage')
+  if (denied) return denied
 
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')

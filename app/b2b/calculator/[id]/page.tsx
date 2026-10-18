@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMoney } from '@/lib/currency-totals'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { Fragment, useState, useEffect, useMemo } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
@@ -7,7 +9,7 @@ import Link from 'next/link'
 import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { isBookableLine, sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
+import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { DayBandRow, groupByDay } from '@/components/pricing/DayBand'
 import { useVocabulary } from '@/components/vocabulary'
 
@@ -68,6 +70,10 @@ interface PricingResult {
   total_cost: number
   margin_percent: number
   margin_amount: number
+  /** Your seasonal premium on the departure date (Settings → Seasonal Premiums). */
+  season_name?: string | null
+  season_percent?: number
+  season_premium?: number
   selling_price: number
   price_per_person: number
   single_supplement?: number
@@ -93,6 +99,7 @@ interface Partner {
   id: string
   company_name: string
   partner_code: string
+  default_margin_percent: number | null
 }
 
 // A sellable catalogue extra (Rates → Extras). Chosen per quote and priced
@@ -110,6 +117,7 @@ interface CatalogueExtraOption {
 interface SavedQuote {
   id: string
   quote_number: string
+  repricedTo: number | null
 }
 
 export default function TourPriceCalculator() {
@@ -122,6 +130,10 @@ export default function TourPriceCalculator() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<PricingResult | null>(null)
+  const dialog = useConfirmDialog()
+  // The quote the Quote Builder opened this calculator on, if any.
+  const [linkedQuote, setLinkedQuote] = useState<string | null>(null)
+  useEffect(() => { setLinkedQuote(new URLSearchParams(window.location.search).get('quote')) }, [])
 
   // The breakdown reads like the day runs — the same rule the engine sorts by
   // (lib/pricing/breakdown-order.ts), so extras folded in after pricing land in
@@ -147,7 +159,9 @@ export default function TourPriceCalculator() {
   const [selectedOptionals, setSelectedOptionals] = useState<string[]>([])
   const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
   // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
-  const [guideGrade, setGuideGrade] = useState<'egyptologist' | 'senior'>('egyptologist')
+  // '' = the agency's first guide grade (the default ask); else a grade key.
+  const [guideGrade, setGuideGrade] = useState<string>('')
+  const { items: guideGradeItems, labelFor: guideGradeLabel } = useVocabulary('guide_grade')
   const [guideMode, setGuideMode] = useState<'spot' | 'throughout'>('spot')
   // The buttons carry the agency's own words for the two modes (Settings → Vocabulary → Guide modes).
   const { labelFor: guideModeLabel } = useVocabulary('guide_mode')
@@ -167,6 +181,9 @@ export default function TourPriceCalculator() {
   const [availableExtras, setAvailableExtras] = useState<CatalogueExtraOption[]>([])
   const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([])
   const rateCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
+  // Prices are in the run's currency (the tenant's rates currency); they
+  // were all labelled in euros whatever the operator priced in.
+  const money = (n: unknown) => formatMoney(n, result?.currency || rateCurrency)
 
   // Save Quote state
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -263,6 +280,25 @@ export default function TourPriceCalculator() {
     </div>
   )
 
+  // What the price is calculated from. The quote save sends the same inputs
+  // and the server prices them again — the figures shown here are a preview.
+  const pricingInputs = (optionalIds: string[]) => ({
+    variation_id: variationId,
+    num_pax: numPax,
+    travel_date: travelDate,
+    is_eur_passport: isEurPassport,
+    margin_percent: marginPercent,
+    tour_leader_included: tourLeaderIncluded,
+    guide_grade: guideGrade,
+    guide_mode: guideMode,
+    language,
+    extras: selectedExtraIds,
+    selected_optional_ids: optionalIds
+  })
+  // The inputs of the price on screen: changing a field after calculating
+  // must not save a quote for inputs nobody has seen priced.
+  const [pricedInputs, setPricedInputs] = useState<ReturnType<typeof pricingInputs> | null>(null)
+
   const calculatePrice = async (optionalIdsOverride?: string[]) => {
     // Priced from the argument when given — state has not updated yet when a
     // checkbox handler calls this.
@@ -274,22 +310,13 @@ export default function TourPriceCalculator() {
       const res = await fetch('/api/b2b/calculate-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          variation_id: variationId,
-          num_pax: numPax,
-          travel_date: travelDate,
-          is_eur_passport: isEurPassport,
-          margin_percent: marginPercent,
-          tour_leader_included: tourLeaderIncluded,
-          guide_grade: guideGrade,
-          guide_mode: guideMode,
-          language,
-          extras: selectedExtraIds,
-          selected_optional_ids: optionalIds
-        })
+        body: JSON.stringify(pricingInputs(optionalIds))
       })
       const data = await res.json()
-      if (data.success) setResult(data.data)
+      if (data.success) {
+        setResult(data.data)
+        setPricedInputs(pricingInputs(optionalIds))
+      }
       else setError(data.error || 'Failed to calculate price')
     } catch (err) {
       setError('Failed to calculate price')
@@ -334,6 +361,30 @@ export default function TourPriceCalculator() {
             }
           })
         setRateSheet(sheet)
+      } else if (data.success) {
+        // A programme that lists its own services is priced one size at a
+        // time (that path has no table of its own) — it used to fail here.
+        const sizes = Array.from({ length: 10 }, (_, i) => i + 1)
+        const rows = await Promise.all(sizes.map(async pax => {
+          const r = await fetch('/api/b2b/calculate-price', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              variation_id: variationId, num_pax: pax, travel_date: travelDate,
+              is_eur_passport: isEurPassport, margin_percent: marginPercent,
+              tour_leader_included: tourLeaderIncluded, guide_grade: guideGrade, guide_mode: guideMode,
+              language, extras: selectedExtraIds, selected_optional_ids: selectedOptionals,
+            }),
+          }).then(x => x.json()).catch(() => null)
+          const d = r?.success ? r.data : null
+          return d ? {
+            pax, total_cost: d.total_cost, margin_amount: d.margin_amount,
+            selling_price: d.selling_price, price_per_person: d.price_per_person,
+          } : null
+        }))
+        const sheet = rows.filter((x): x is RateSheetRow => x !== null)
+        if (sheet.length === sizes.length) setRateSheet(sheet)
+        else setError('Some group sizes could not be priced — the rate sheet was not made')
       } else {
         setError(data.error || 'Failed to generate rate sheet')
       }
@@ -344,13 +395,16 @@ export default function TourPriceCalculator() {
     }
   }
 
-  const handleSaveQuote = async () => {
-    if (!result) return
+  const handleSaveQuote = async (allowIncomplete = false) => {
+    if (!result || !pricedInputs) return
     
     setSaving(true)
     setError(null)
     
     try {
+      // Opened from the Quote Builder on the quote it just made (?quote=…):
+      // saving reprices that quote rather than adding a second one.
+      const linkedQuoteId = linkedQuote
       const res = await fetch('/api/b2b/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -361,42 +415,43 @@ export default function TourPriceCalculator() {
           client_email: quoteForm.client_email || null,
           client_phone: quoteForm.client_phone || null,
           client_nationality: quoteForm.client_nationality || null,
-          travel_date: travelDate,
-          num_adults: numPax,
-          num_children: 0,
-          // The CHOSEN optional services travel with the quote as real services,
-          // so their money and their lines stay together downstream.
-          services_snapshot: [
-            // A no-rate line IS a service to book, so it travels with the
-            // quote; a line that only makes the day read whole (a meal already
-            // inside the hotel rate) does not, or it converts into a zero-cost
-            // booking nobody can act on.
-            ...result.services.filter(isBookableLine),
-            ...(result.optional_services || []).filter(s => s.is_selected),
-          ],
-          total_cost: result.total_cost,
-          margin_percent: result.margin_percent,
-          margin_amount: result.margin_amount,
-          selling_price: result.selling_price,
-          price_per_person: result.price_per_person,
-          tour_leader_included: tourLeaderIncluded,
-          tour_leader_cost: result.tour_leader_cost || null,
-          // Store only non-default values — NULL means the defaults (mig 326).
-          guide_grade: guideGrade === 'egyptologist' ? null : guideGrade,
-          guide_mode: guideMode === 'spot' ? null : guideMode,
-          single_supplement: result.single_supplement || null,
-          is_eur_passport: isEurPassport,
-          season: result.season,
-          notes: quoteForm.notes || null
+          // Priced again on the server from the inputs of the price shown;
+          // the totals, services and rate sheet are never sent.
+          pricing: pricedInputs,
+          include_rate_sheet: rateSheet.length > 0,
+          notes: quoteForm.notes || null,
+          ...(linkedQuoteId ? { quote_id: linkedQuoteId } : {}),
+          ...(allowIncomplete ? { allow_incomplete: true } : {}),
         })
       })
       
       const data = await res.json()
+
+      // Services with no rate: the price is short of them. Saved only when
+      // the operator chooses to keep it as it is.
+      if (data.incomplete && !allowIncomplete) {
+        setSaving(false)
+        const holes = (data.holes || []) as { message: string }[]
+        const ok = await dialog.confirm({
+          title: 'Incomplete price',
+          message: `${data.error}\n\n${holes.map(h => `• ${h.message}`).join('\n')}\n\nSave the quote anyway? Add the missing rates before sending it to a partner.`,
+          confirmText: 'Save anyway',
+          variant: 'warning',
+        })
+        if (ok) await handleSaveQuote(true)
+        return
+      }
       
       if (data.success) {
         setSavedQuote({
           id: data.data.id,
-          quote_number: data.data.quote_number
+          quote_number: data.data.quote_number,
+          // Rates changed between the calculation and the save: the quote
+          // holds the current price, so say so rather than let the screen
+          // disagree with it.
+          repricedTo: Number(data.data.selling_price) !== Number(result.selling_price)
+            ? Number(data.data.selling_price)
+            : null
         })
         setShowSaveModal(false)
         // Reset form
@@ -420,9 +475,10 @@ export default function TourPriceCalculator() {
 
   const exportToCSV = () => {
     if (rateSheet.length === 0) return
-    const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade === 'senior' ? ' Senior' : ''})` : ''
+    const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade ? ` ${guideGradeLabel(guideGrade)}` : ''})` : ''
     const tourLeaderSuffix = (tourLeaderIncluded ? ' (+1 TL)' : ' (+0)') + guideSuffix
-    const headers = ['Passengers', 'Total Cost (€)', 'Margin (€)', 'Selling Price (€)', 'Per Person (€)']
+    const cur = result?.currency || rateCurrency
+    const headers = ['Passengers', `Total Cost (${cur})`, `Margin (${cur})`, `Selling Price (${cur})`, `Per Person (${cur})`]
     const rows = rateSheet.map(row => [
       row.pax,
       row.total_cost.toFixed(2),
@@ -438,15 +494,6 @@ export default function TourPriceCalculator() {
     a.download = `rate-sheet-${result?.variation_name || 'tour'}${tourLeaderSuffix}-${travelDate}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }
-
-  const getSeasonBadge = (season: string) => {
-    const styles: Record<string, string> = {
-      low: 'bg-green-100 text-green-700',
-      high: 'bg-amber-100 text-amber-700',
-      peak: 'bg-red-100 text-red-700'
-    }
-    return styles[season] || 'bg-gray-100 text-gray-700'
   }
 
   // Show loading state while checking auth/tenant
@@ -521,6 +568,9 @@ export default function TourPriceCalculator() {
             <div>
               <p className="text-sm font-medium text-green-800">Quote saved successfully!</p>
               <p className="text-sm text-green-600">Reference: <span className="font-mono font-bold">{savedQuote.quote_number}</span></p>
+              {savedQuote.repricedTo !== null && (
+                <p className="text-sm text-amber-700">Rates changed since this price was calculated — the quote was saved at {money(savedQuote.repricedTo)}.</p>
+              )}
             </div>
           </div>
           <Link
@@ -629,13 +679,16 @@ export default function TourPriceCalculator() {
                     <option key={l.key} value={l.key} disabled={!l.hasRate}>{l.label}{l.hasRate ? '' : ' — no rate'}</option>
                   ))}
                 </select>
+                {/* The agency's own grades (Settings → Your vocabulary); the
+                    first is the default. It offered Egyptologist and Senior only. */}
                 <select
-                  value={guideGrade}
-                  onChange={(e) => setGuideGrade(e.target.value as 'egyptologist' | 'senior')}
+                  value={guideGrade || guideGradeItems[0]?.key || ''}
+                  onChange={(e) => setGuideGrade(e.target.value === guideGradeItems[0]?.key ? '' : e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
                 >
-                  <option value="egyptologist">Egyptologist (default)</option>
-                  <option value="senior">Senior guide</option>
+                  {guideGradeItems.map((g, i) => (
+                    <option key={g.key} value={g.key}>{g.label}{i === 0 ? ' (default)' : ''}</option>
+                  ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-2">
                   {guideMode === 'throughout'
@@ -671,6 +724,32 @@ export default function TourPriceCalculator() {
                   <option value="non-eur">Non-European Passport</option>
                 </select>
               </div>
+
+              {/* Partner — picking one applies its default margin (B2B Partners).
+                  It is the same choice the Save dialog offers. */}
+              {partners.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Building2 className="w-4 h-4 inline mr-1" />Partner
+                  </label>
+                  <select
+                    value={quoteForm.partner_id}
+                    onChange={(e) => {
+                      const picked = partners.find(p => p.id === e.target.value)
+                      setQuoteForm({ ...quoteForm, partner_id: e.target.value })
+                      if (picked?.default_margin_percent != null) setMarginPercent(Number(picked.default_margin_percent))
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg bg-white"
+                  >
+                    <option value="">No partner / Direct client</option>
+                    {partners.map(partner => (
+                      <option key={partner.id} value={partner.id}>
+                        {partner.company_name}{partner.default_margin_percent != null ? ` · ${partner.default_margin_percent}%` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Profit Margin */}
               <div>
@@ -780,17 +859,23 @@ export default function TourPriceCalculator() {
                         +1 Tour Leader
                       </span>
                     )}
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSeasonBadge(result.season)}`}>
-                      {result.season.charAt(0).toUpperCase() + result.season.slice(1)} Season
-                    </span>
+                    {/* Your own season, from Settings → Seasonal Premiums. The badge
+                        showed a built-in Egypt calendar (December–April "high")
+                        that priced nothing. */}
+                    {result.season_name && (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        {result.season_name} +{result.season_percent}%
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {result.tour_leader_included && (result.num_paying_pax ?? 0) > 0 && (
+                {/* The engine's num_pax is the paying guests; the leader travels on top. */}
+                {result.tour_leader_included && result.num_pax > 0 && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-                    <strong>Group:</strong> {result.num_pax} total ({result.num_paying_pax} paying guests + 1 tour leader)
+                    <strong>Group:</strong> {result.num_pax + 1} total ({result.num_pax} paying guests + 1 tour leader)
                     {typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
-                      <span className="ml-2">• <strong>TL Cost:</strong> €{result.tour_leader_cost.toFixed(2)}</span>
+                      <span className="ml-2">• <strong>TL Cost:</strong> {money(result.tour_leader_cost)}</span>
                     )}
                   </div>
                 )}
@@ -798,19 +883,22 @@ export default function TourPriceCalculator() {
                 <div className="grid grid-cols-4 gap-4">
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Total Cost</p>
-                    <p className="text-xl font-bold">€{result.total_cost.toFixed(2)}</p>
+                    <p className="text-xl font-bold">{money(result.total_cost)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Margin ({result.margin_percent}%)</p>
-                    <p className="text-xl font-bold text-green-600">€{result.margin_amount.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-green-600">{money(result.margin_amount)}</p>
+                    {(result.season_premium ?? 0) > 0 && (
+                      <p className="text-xs text-amber-700 mt-1">+ {money(result.season_premium ?? 0)} {result.season_name} premium</p>
+                    )}
                   </div>
                   <div className="bg-[#647C47]/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Selling Price</p>
-                    <p className="text-xl font-bold text-[#647C47]">€{result.selling_price.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-[#647C47]">{money(result.selling_price)}</p>
                   </div>
                   <div className="bg-[#647C47]/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Per Person</p>
-                    <p className="text-xl font-bold text-[#647C47]">€{result.price_per_person.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-[#647C47]">{money(result.price_per_person)}</p>
                   </div>
                 </div>
 
@@ -823,7 +911,7 @@ export default function TourPriceCalculator() {
                         Single Supplement (for solo travelers)
                       </span>
                       <span className="text-lg font-bold text-amber-700">
-                        €{result.single_supplement.toFixed(2)}
+                        {money(result.single_supplement)}
                       </span>
                     </div>
                     <p className="text-xs text-amber-600 mt-1">
@@ -839,7 +927,7 @@ export default function TourPriceCalculator() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                   >
                     <Save className="w-4 h-4" />
-                    Save as Quote
+                    {linkedQuote ? 'Update Quote' : 'Save as Quote'}
                   </button>
                 </div>
               </div>
@@ -904,8 +992,8 @@ export default function TourPriceCalculator() {
                         </td>
                         <td className="px-4 py-2 text-center text-gray-500">{service.quantity_mode}</td>
                         <td className="px-4 py-2 text-right">{service.quantity}</td>
-                        <td className="px-4 py-2 text-right">€{service.unit_cost.toFixed(2)}</td>
-                        <td className="px-4 py-2 text-right font-medium">€{service.line_total.toFixed(2)}</td>
+                        <td className="px-4 py-2 text-right">{money(service.unit_cost)}</td>
+                        <td className="px-4 py-2 text-right font-medium">{money(service.line_total)}</td>
                       </tr>
                         ))}
                       </Fragment>
@@ -914,21 +1002,27 @@ export default function TourPriceCalculator() {
                   <tfoot className="bg-gray-50 font-medium">
                     <tr>
                       <td colSpan={5} className="px-4 py-2 text-right">Subtotal:</td>
-                      <td className="px-4 py-2 text-right">€{result.subtotal_cost.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">{money(result.subtotal_cost)}</td>
                     </tr>
                     {result.tour_leader_included && typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
                       <tr>
                         <td colSpan={5} className="px-4 py-2 text-right text-blue-600">Tour Leader Cost:</td>
-                        <td className="px-4 py-2 text-right text-blue-600">€{result.tour_leader_cost.toFixed(2)}</td>
+                        <td className="px-4 py-2 text-right text-blue-600">{money(result.tour_leader_cost)}</td>
                       </tr>
                     )}
                     <tr>
                       <td colSpan={5} className="px-4 py-2 text-right text-green-600">Margin ({result.margin_percent}%):</td>
-                      <td className="px-4 py-2 text-right text-green-600">€{result.margin_amount.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-green-600">{money(result.margin_amount)}</td>
                     </tr>
+                    {(result.season_premium ?? 0) > 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-2 text-right text-amber-700">{result.season_name} premium (+{result.season_percent}%):</td>
+                        <td className="px-4 py-2 text-right text-amber-700">{money(result.season_premium ?? 0)}</td>
+                      </tr>
+                    )}
                     <tr className="text-lg">
                       <td colSpan={5} className="px-4 py-2 text-right text-[#647C47]">Total:</td>
-                      <td className="px-4 py-2 text-right text-[#647C47]">€{result.selling_price.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-[#647C47]">{money(result.selling_price)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1020,10 +1114,10 @@ export default function TourPriceCalculator() {
                         {row.pax}
                         {tourLeaderIncluded && <span className="text-xs text-blue-500 ml-1">(+1)</span>}
                       </td>
-                      <td className="px-4 py-2 text-right">€{row.total_cost.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right text-green-600">€{row.margin_amount.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right font-medium">€{row.selling_price.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right font-bold text-[#647C47]">€{row.price_per_person.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">{money(row.total_cost)}</td>
+                      <td className="px-4 py-2 text-right text-green-600">{money(row.margin_amount)}</td>
+                      <td className="px-4 py-2 text-right font-medium">{money(row.selling_price)}</td>
+                      <td className="px-4 py-2 text-right font-bold text-[#647C47]">{money(row.price_per_person)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1065,6 +1159,17 @@ export default function TourPriceCalculator() {
                     </option>
                   ))}
                 </select>
+                {(() => {
+                  const picked = partners.find(p => p.id === quoteForm.partner_id)
+                  if (!picked || picked.default_margin_percent == null || !result) return null
+                  if (Number(picked.default_margin_percent) === Number(result.margin_percent)) return null
+                  return (
+                    <p className="text-xs text-amber-700 mt-1">
+                      {picked.company_name}&apos;s default margin is {picked.default_margin_percent}%; this quote was priced at {result.margin_percent}%.
+                      To price it at theirs, pick the partner beside the margin and calculate again.
+                    </p>
+                  )
+                })()}
               </div>
 
               <div className="border-t pt-4">
@@ -1144,15 +1249,15 @@ export default function TourPriceCalculator() {
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Pax:</span>
-                  <span className="font-medium">{numPax} {tourLeaderIncluded ? '(+1 TL)' : ''}</span>
+                  <span className="font-medium">{result?.num_pax} {result?.tour_leader_included ? '(+1 TL)' : ''}</span>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-600">Travel Date:</span>
-                  <span className="font-medium">{travelDate}</span>
+                  <span className="font-medium">{result?.travel_date}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t mt-2">
                   <span className="text-gray-600">Selling Price:</span>
-                  <span className="font-bold text-[#647C47]">€{result?.selling_price.toFixed(2)}</span>
+                  <span className="font-bold text-[#647C47]">{money(result?.selling_price)}</span>
                 </div>
               </div>
             </div>
@@ -1165,7 +1270,7 @@ export default function TourPriceCalculator() {
                 Cancel
               </button>
               <button
-                onClick={handleSaveQuote}
+                onClick={() => handleSaveQuote()}
                 disabled={saving}
                 className="flex-1 px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >

@@ -1,11 +1,13 @@
-import { google } from 'googleapis'
+import { openToken } from '@/lib/token-crypto'
+import { encodeEmailHeader } from '@/lib/email/mime-header'
+import { google } from '@/lib/google'
 import { escapeHtml } from './html-escape'
 
 // A FRESH OAuth2 client per call — never a shared module-level singleton.
 // setCredentials() mutates the client, so a shared instance lets concurrent
 // requests for different users clobber each other's tokens between
 // setCredentials() and the actual API call (cross-user token leak).
-function createOAuthClient() {
+export function createOAuthClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -55,7 +57,7 @@ export async function getTokensFromCode(code: string) {
 // Refresh access token using refresh token
 export async function refreshAccessToken(refreshToken: string) {
   const client = createOAuthClient()
-  client.setCredentials({ refresh_token: refreshToken })
+  client.setCredentials({ refresh_token: openToken(refreshToken) })
   const { credentials } = await client.refreshAccessToken()
   return credentials
 }
@@ -64,8 +66,8 @@ export async function refreshAccessToken(refreshToken: string) {
 export function getGmailClient(accessToken: string, refreshToken: string) {
   const client = createOAuthClient()
   client.setCredentials({
-    access_token: accessToken,
-    refresh_token: refreshToken,
+    access_token: openToken(accessToken),
+    refresh_token: openToken(refreshToken),
   })
   return google.gmail({ version: 'v1', auth: client })
 }
@@ -73,7 +75,7 @@ export function getGmailClient(accessToken: string, refreshToken: string) {
 // Get user's email address
 export async function getUserEmail(accessToken: string) {
   const client = createOAuthClient()
-  client.setCredentials({ access_token: accessToken })
+  client.setCredentials({ access_token: openToken(accessToken) })
   const oauth2 = google.oauth2({ version: 'v2', auth: client })
   const { data } = await oauth2.userinfo.get()
   return data.email
@@ -83,16 +85,17 @@ export async function getUserEmail(accessToken: string) {
 export async function fetchEmails(
   accessToken: string,
   refreshToken: string,
-  options: { maxResults?: number; query?: string; pageToken?: string } = {}
+  options: { maxResults?: number; query?: string; pageToken?: string; labelIds?: string[] } = {}
 ) {
   const gmail = getGmailClient(accessToken, refreshToken)
-  const { maxResults = 20, query = '', pageToken } = options
+  const { maxResults = 20, query = '', pageToken, labelIds } = options
 
   const response = await gmail.users.messages.list({
     userId: 'me',
     maxResults,
     q: query,
     pageToken,
+    ...(labelIds?.length ? { labelIds } : {}),
   })
 
   const messages = response.data.messages || []
@@ -143,7 +146,8 @@ export async function sendEmail(
   // containing "\r\nBcc: victim@x.com" injects arbitrary MIME headers
   // (header/Bcc injection). Header values are single-line by definition.
   const toHeader = sanitizeHeaderValue(to)
-  const subjectHeader = sanitizeHeaderValue(subject)
+  // RFC 2047 when the subject is not plain ASCII (lib/email/mime-header).
+  const subjectHeader = encodeEmailHeader(sanitizeHeaderValue(subject))
 
   // Create email in RFC 2822 format
   const emailLines = [
@@ -191,7 +195,7 @@ export async function markAsRead(
 }
 
 // Parse email message from Gmail API response
-function parseEmailMessage(message: any) {
+export function parseEmailMessage(message: any) {
   const headers = message.payload?.headers || []
   const getHeader = (name: string) =>
     headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
@@ -228,7 +232,7 @@ function parseEmailMessage(message: any) {
       // Fallback to plain text
       for (const part of payload.parts) {
         if (part.mimeType === 'text/plain' && part.body?.data) {
-          return `<pre style="white-space: pre-wrap; font-family: inherit;">${Buffer.from(part.body.data, 'base64').toString('utf-8')}</pre>`
+          return `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(Buffer.from(part.body.data, 'base64').toString('utf-8'))}</pre>`
         }
       }
       // Try nested parts
@@ -284,6 +288,13 @@ function parseEmailMessage(message: any) {
     snippet: message.snippet,
     from: getHeader('From'),
     to: getHeader('To'),
+    // Reply all reads Cc; reply honours Reply-To; a reopened draft shows Bcc.
+    cc: getHeader('Cc'),
+    bcc: getHeader('Bcc'),
+    replyTo: getHeader('Reply-To'),
+    // Newsletters' one-click unsubscribe (RFC 2369 / RFC 8058).
+    listUnsubscribe: getHeader('List-Unsubscribe'),
+    listUnsubscribePost: getHeader('List-Unsubscribe-Post'),
     subject: getHeader('Subject'),
     date: getHeader('Date'),
     body,

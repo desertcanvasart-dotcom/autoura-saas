@@ -1,5 +1,6 @@
 'use client'
 
+import { swapSignatureBlock } from '@/lib/email/signature'
 import { useEffect, useState } from 'react'
 import {
   Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine, MessageSquare, Mail, Reply, ChevronDown,
@@ -402,6 +403,15 @@ function EmailCompose({
     fetch(`/api/ai/suggest-email-reply?unified_conversation_id=${conversation.id}`)
       .then((r) => r.json())
       .then((data) => {
+        // Approved in Copilot: the reply opens with it, ready to check and
+        // send; sending marks the draft sent (draft_id).
+        if (data?.success && data.approved?.body) {
+          const draftHtml = plainTextToHtml(data.approved.body)
+          setBodyHtml(sig ? `${draftHtml}${sigToHtml(sig)}` : draftHtml)
+          if (data.approved.subject) setSubject(data.approved.subject)
+          setAcceptedDraftId(data.approved.id)
+          return
+        }
         if (data?.success && data.drafts?.length > 0) {
           setDrafts(data.drafts)
           setLastParentId(data.drafts[0]?.id || null)
@@ -418,7 +428,7 @@ function EmailCompose({
     const stripped = htmlToPlainText(bodyHtml).trim()
     if (!stripped) setBodyHtml(`<p><br/></p>${sigToHtml(sig)}`)
     else if (/<div data-signature="true"/.test(bodyHtml)) {
-      setBodyHtml(bodyHtml.replace(/<div data-signature="true"[\s\S]*?<\/div>/, sigToHtml(sig)))
+      setBodyHtml(swapSignatureBlock(bodyHtml, sigToHtml(sig)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signatureId])

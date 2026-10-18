@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { buildCapacityWrite, groupByColumns, type CapacityFields } from '@/lib/capacity/capacity-write'
+import { gateRole } from '@/lib/api-role-gate'
 
 // ============================================
 // OPERATOR CAPACITY API
@@ -111,6 +113,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const roleGate = await gateRole('admin')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -137,41 +141,51 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate and prepare entries
-    const validStatuses = ['available', 'limited', 'busy', 'blackout']
-    const preparedEntries = entries.map((entry: Partial<CapacityEntry>) => {
-      if (!entry.date) {
-        throw new Error('Each entry must have a date')
+    // Validate and prepare entries. Only the columns each entry carries are
+    // written: a save that left out booked counts or notes used to reset them
+    // to 0 / blank (documents audit, round 12).
+    const preparedEntries: (CapacityFields & { tenant_id: string; date: string; created_by?: string })[] = []
+    for (const entry of entries as Record<string, unknown>[]) {
+      if (!entry || typeof entry !== 'object' || typeof entry.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) {
+        return NextResponse.json(
+          { success: false, error: 'Each entry must have a date (YYYY-MM-DD)' },
+          { status: 400 }
+        )
       }
-      if (entry.status && !validStatuses.includes(entry.status)) {
-        throw new Error(`Invalid status: ${entry.status}`)
+      const write = buildCapacityWrite(entry)
+      if (!write.ok) {
+        return NextResponse.json(
+          { success: false, error: `${entry.date}: ${write.error}` },
+          { status: 400 }
+        )
       }
-
-      return {
+      preparedEntries.push({
+        ...write.fields,
         tenant_id,
         date: entry.date,
-        status: entry.status || 'available',
-        max_groups: entry.max_groups ?? 3,
-        booked_groups: entry.booked_groups ?? 0,
-        max_guides: entry.max_guides,
-        booked_guides: entry.booked_guides ?? 0,
-        max_vehicles: entry.max_vehicles,
-        booked_vehicles: entry.booked_vehicles ?? 0,
-        notes: entry.notes,
-        internal_notes: entry.internal_notes,
-        reason: entry.reason,
         created_by: user?.id
-      }
-    })
-
-    // Upsert entries (update if date exists, insert if not)
-    const { data, error } = await supabase
-      .from('operator_capacity')
-      .upsert(preparedEntries, {
-        onConflict: 'tenant_id,date',
-        ignoreDuplicates: false
       })
-      .select()
+    }
+
+    // Upsert entries (update if date exists, insert if not). Batched by column
+    // set: a bulk upsert sends the union of keys and fills a row's missing ones,
+    // which would reset the columns that row left out.
+    const data: unknown[] = []
+    let error: { message: string } | null = null
+    for (const batch of groupByColumns(preparedEntries)) {
+      const res = await supabase
+        .from('operator_capacity')
+        .upsert(batch, {
+          onConflict: 'tenant_id,date',
+          ignoreDuplicates: false
+        })
+        .select()
+      if (res.error) {
+        error = res.error
+        break
+      }
+      data.push(...(res.data || []))
+    }
 
     if (error) {
       console.error('Error saving capacity:', error)
@@ -207,6 +221,8 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const roleGate = await gateRole('admin')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

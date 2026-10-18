@@ -132,9 +132,9 @@ export default function DestinationSettingsPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Destinations</h1>
         </div>
         <p className="text-sm text-gray-500 mt-1">
-          The countries your agency operates. City dropdowns, itinerary generation and
-          document vocabulary all follow this list. The default destination is where new
-          itineraries start.
+          The countries your agency operates, and the cities you sell. Every city dropdown
+          follows this list. (The default destination and each destination&rsquo;s brief are kept
+          here but not used anywhere yet.)
         </p>
       </div>
 
@@ -224,7 +224,11 @@ export default function DestinationSettingsPage() {
                           <span className="text-xs text-gray-400">
                             <button onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: null }, 'Every city')} disabled={busy !== null} className="hover:text-[#647C47]">All</button>
                             {' · '}
-                            <button onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: [d.all_cities[0].id] }, 'Pick the cities you sell')} disabled={busy !== null} className="hover:text-[#647C47]">Just one</button>
+                            <button onClick={() => {
+                              // It replaces the whole selection with the first city: ask when that drops a choice.
+                              if (d.cities.length > 1 && d.cities.length < d.all_cities.length && !window.confirm(`Keep only ${d.all_cities[0].name}? Your other ${d.cities.length - 1} chosen cities will be unticked.`)) return
+                              act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: [d.all_cities[0].id] }, 'Pick the cities you sell')
+                            }} disabled={busy !== null} className="hover:text-[#647C47]">Just one</button>
                           </span>
                         )}
                       </div>

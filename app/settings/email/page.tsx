@@ -3,7 +3,10 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
+import SendingDomainCard from '@/components/settings/SendingDomainCard'
 import { TemplateEditor } from '@/components/email/RichTextEditor'
 import { 
   Mail, 
@@ -32,6 +35,8 @@ interface EmailTemplate {
 
 function EmailSettingsContent() {
   const { user } = useAuth()
+  const { tenant } = useTenant()
+  const { isAdmin } = useRole()
   const dialog = useConfirmDialog()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -90,6 +95,17 @@ function EmailSettingsContent() {
     
     if (success) {
       setMessage({ type: 'success', text: 'Gmail connected successfully!' })
+    } else if (error === 'missing_scopes') {
+      // Google's consent screen lets each permission be unticked; the
+      // callback refuses such a connection (documents audit, round 12).
+      setMessage({
+        type: 'error',
+        text: 'Gmail was not connected: some permissions were left unticked on the Google consent screen. Connect again and tick every box (read, send and manage email).',
+      })
+    } else if (error === 'no_company') {
+      setMessage({ type: 'error', text: 'Gmail was not connected: you are not an active member of the company you were working in. Switch to your company and connect again.' })
+    } else if (error === 'session_mismatch') {
+      setMessage({ type: 'error', text: 'Gmail was not connected: the Google sign-in was finished by a different account than the one that started it. Sign in to Autoura as yourself and click Connect again — never use a Connect link someone else sent you.' })
     } else if (error) {
       setMessage({ type: 'error', text: `Connection failed: ${error}` })
     }
@@ -101,16 +117,19 @@ function EmailSettingsContent() {
       fetchTemplates()
       loadOfficeAddresses()
     }
-  }, [user])
+  }, [user, tenant?.id])
 
   const checkGmailConnection = async () => {
     if (!user) return
     try {
+      // This person's mailbox in the company being worked in (migration 415).
+      if (!tenant?.id) return
       const { data, error } = await supabase
         .from('gmail_tokens')
         .select('email')
         .eq('user_id', user.id)
-        .single()
+        .eq('tenant_id', tenant.id)
+        .maybeSingle()
 
       if (data && !error) {
         setGmailConnected(true)
@@ -165,12 +184,16 @@ function EmailSettingsContent() {
     if (!(await dialog.confirm({ message: 'Are you sure you want to disconnect Gmail?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
-      const { error } = await supabase
-        .from('gmail_tokens')
-        .delete()
-        .eq('user_id', user.id)
-
-      if (error) throw error
+      // Only this company's mailbox: the same person's mailbox in another
+      // company stays connected.
+      if (!tenant?.id) return
+      // Server-side, so the access is also revoked at Google (not just
+      // forgotten here).
+      const res = await fetch('/api/gmail/connect', { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Could not disconnect Gmail')
+      }
 
       setGmailConnected(false)
       setConnectedEmail(null)
@@ -185,14 +208,17 @@ function EmailSettingsContent() {
     if (!(await dialog.confirm({ message: 'Delete this template?', variant: 'danger', confirmText: 'Delete' }))) return
     
     try {
-      await fetch('/api/email/templates', {
+      const res = await fetch('/api/email/templates', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, userId: user.id }),
+        body: JSON.stringify({ id }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) setMessage({ type: 'error', text: data.error || 'Could not delete the template' })
       fetchTemplates()
     } catch (err) {
       console.error('Error deleting template:', err)
+      setMessage({ type: 'error', text: 'Could not delete the template' })
     }
   }
 
@@ -329,6 +355,8 @@ function EmailSettingsContent() {
               </div>
 
               {/* The office's other addresses (migration 367) */}
+              {/* Company-wide, so admins only (the API is too); everyone connects their own Gmail above. */}
+              {isAdmin && (
               <div className="bg-white rounded-lg border border-gray-200 p-4 mt-4">
                 <h3 className="text-sm font-semibold text-gray-900">Our other email addresses</h3>
                 <p className="text-xs text-gray-500 mt-1">
@@ -358,6 +386,7 @@ function EmailSettingsContent() {
                   </span>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -417,6 +446,8 @@ function EmailSettingsContent() {
               )}
             </div>
           )}
+
+          <SendingDomainCard canManage={isAdmin} />
         </div>
       </div>
 
@@ -454,9 +485,11 @@ function TemplateModal({
   const [content, setContent] = useState(template?.content || '')
   const [category, setCategory] = useState(template?.category || 'general')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const handleSave = async () => {
     if (!name || !subject || !content) return
+    setSaveError(null)
     
     setSaving(true)
     try {
@@ -465,14 +498,20 @@ function TemplateModal({
         ? { id: template.id, userId, name, subject, content, category }
         : { userId, name, subject, content, category }
 
-      await fetch('/api/email/templates', {
+      const res = await fetch('/api/email/templates', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        setSaveError(data.error || 'Could not save the template')
+        return
+      }
       onSaved()
     } catch (err) {
       console.error('Error saving template:', err)
+      setSaveError('Could not save the template')
     } finally {
       setSaving(false)
     }
@@ -545,6 +584,7 @@ function TemplateModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
+          {saveError && <p className="mr-auto text-sm text-red-600">{saveError}</p>}
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg"

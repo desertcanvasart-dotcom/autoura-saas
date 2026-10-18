@@ -10,7 +10,7 @@
 // worse than no support feature. Every write here is wrapped and swallowed,
 // matching the fail-open telemetry convention in lib/usage-limits.ts.
 
-import { redactText, STALE_AFTER_HOURS } from '@/lib/support/bundle'
+import { redactText, STALE_AFTER_HOURS, staleAfterHours } from '@/lib/support/bundle'
 
 /** The vocabulary, owned by job-names.mjs so the scheduler, the bundle and the
  *  doctor script cannot drift apart. Every scheduled job appears exactly once. */
@@ -22,8 +22,10 @@ export type JobName =
   | 'reminders'
   | 'task-reminders'
   | 'purge-traveller-documents'
+  | 'purge-closed-companies'
   | 'gmail-sync'
   | 'mail-alerts'
+  | 'scheduled-send'
 
 export { STALE_AFTER_HOURS }
 
@@ -129,12 +131,13 @@ export async function latestJobRuns(db: DbClient): Promise<JobRunSummary[]> {
   }))
 }
 
-/** Has this job gone quiet? Null lastRun is "never", handled separately. */
-export function isStale(lastRun: string | null, now: Date = new Date()): boolean {
+/** Has this job gone quiet? Null lastRun is "never", handled separately.
+ *  With a job name, that job's own limit (staleAfterHours); without, 48h. */
+export function isStale(lastRun: string | null, now: Date = new Date(), name?: string): boolean {
   if (!lastRun) return false
   const then = Date.parse(lastRun)
   if (!Number.isFinite(then)) return false
-  return now.getTime() - then > STALE_AFTER_HOURS * 3600000
+  return now.getTime() - then > (name ? staleAfterHours(name) : STALE_AFTER_HOURS) * 3600000
 }
 
 /**

@@ -1,9 +1,9 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
-
-type BookingStatus = 'confirmed' | 'cancelled' | 'pending_payment' | 'paid' | 'completed'
+import { statusAfterMessage, type StatusMessage as BookingStatus } from '@/lib/whatsapp-status-after-message'
 
 function getStatusMessage(
   businessName: string,
@@ -26,7 +26,7 @@ function getStatusMessage(
   switch (status) {
     case 'confirmed':
       message += `Great news! Your booking for *${tourName}* has been confirmed! 🎉\n\n`
-      message += `We're excited to show you the wonders of Egypt! Your guide will contact you 24 hours before your tour with pickup details.\n\n`
+      message += `We're excited to welcome you! Your guide will contact you 24 hours before your tour with pickup details.\n\n`
       message += `If you have any questions, feel free to reach out anytime.`
       break
 
@@ -40,19 +40,21 @@ function getStatusMessage(
 
     case 'pending_payment':
       message += `Your booking for *${tourName}* is confirmed! We're just waiting for your payment to finalize everything.\n\n`
-      message += `💳 Payment details have been sent to your email.\n\n`
+      // Nothing is emailed by this message: it said the payment details had
+      // been, whether or not anyone had sent them.
+      message += `💳 We'll send you the payment details — just reply here if you need them again.\n\n`
       message += `Once payment is received, you're all set! 🎯`
       break
 
     case 'paid':
       message += `Thank you! We've received your payment for *${tourName}*. ✅\n\n`
       message += `Everything is confirmed and ready to go! Your guide will contact you 24 hours before your tour.\n\n`
-      message += `Get ready for an amazing adventure! 🐪✨`
+      message += `Get ready for an amazing adventure! ✨`
       break
 
     case 'completed':
       message += `Thank you for choosing ${businessName || 'us'} for your *${tourName}*! 🎉\n\n`
-      message += `We hope you had an incredible experience exploring Egypt! 🇪🇬\n\n`
+      message += `We hope you had an incredible trip!\n\n`
       message += `We'd love to hear your feedback. If you enjoyed your tour, please consider leaving us a review!\n\n`
       message += `We hope to see you again soon! 🌟`
       break
@@ -63,6 +65,9 @@ function getStatusMessage(
 }
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
@@ -135,7 +140,7 @@ export async function POST(request: NextRequest) {
     const message = getStatusMessage(
       senderTenant?.company_name || '',
       itinerary.client_name || 'Valued Client',
-      itinerary.trip_name || 'Egypt Tour',
+      itinerary.trip_name || 'your trip',
       status as BookingStatus,
       notes
     )
@@ -144,6 +149,8 @@ export async function POST(request: NextRequest) {
 
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: itinerary.client_phone,
       body: message
     })
@@ -155,14 +162,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update itinerary status
-    await supabase
-      .from('itineraries')
-      .update({
-        status: status,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', itineraryId)
+    // The trip's status moves only where the message says it has: a draft or
+    // sent trip is confirmed, a trip is completed or cancelled. Every message
+    // used to write itself into itineraries.status: the "payment reminder"
+    // turned a confirmed trip into 'pending_payment' and "paid" into 'paid' —
+    // statuses no trip list or report counts, so it dropped out of them.
+    const next = statusAfterMessage(itinerary.status, status as BookingStatus)
+    if (next) {
+      await supabase
+        .from('itineraries')
+        .update({ status: next, updated_at: new Date().toISOString() })
+        .eq('id', itineraryId)
+    }
 
 
 

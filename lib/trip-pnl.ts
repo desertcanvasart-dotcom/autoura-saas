@@ -75,6 +75,10 @@ export interface PnlInvoice {
   itinerary_id: string | null
   invoice_number?: string | null
   total_amount?: number | string | null
+  /** VAT/sales tax inside total_amount — collected for the state, not revenue. */
+  tax_amount?: number | string | null
+  /** 'deposit' invoices bill part of the trip; 'standard' / 'final' bill the rest. */
+  invoice_type?: string | null
   amount_paid?: number | string | null
   currency?: string | null
   status?: string | null
@@ -131,6 +135,14 @@ export interface TripPnL {
   extras_supplier_cost: number
   total_revenue: number
   total_paid: number
+  /**
+   * What gross_profit is measured against: 'invoiced' (the trip's invoices,
+   * net of tax), 'quoted' (the quote plus extras — nothing or only deposits
+   * invoiced yet), or 'none' (a cancelled trip with nothing invoiced).
+   */
+  revenue_basis: 'invoiced' | 'quoted' | 'none'
+  /** The revenue gross_profit and profit_margin are computed on. */
+  revenue_for_margin: number
 
   total_expenses: number
   expenses_paid: number
@@ -189,6 +201,9 @@ export interface PnlSummary {
   incomplete_trips: number
   /** Trips that could not be expressed in the reporting currency at all. */
   untranslated_trips: number
+  /** Each trip's profit in the reporting currency (null: no rate), so the
+   *  list can sort by profit across currencies. */
+  trip_profit_reporting: Record<string, number | null>
   fx: FxSummary
 }
 
@@ -263,6 +278,7 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
   let totalRevenue = 0
   let totalPaid = 0
   let invoiceCount = 0
+  let finalInvoiced = false
 
   for (const invoice of invoices) {
     if (EXCLUDED_INVOICE_STATUSES.has((invoice.status || '').toLowerCase())) continue
@@ -271,14 +287,18 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     const from = currencyOf(invoice.currency, tripCurrency)
     const date = effectiveInvoiceDate(invoice)
 
-    const total = convertOnDate(fxIndex, num(invoice.total_amount), from, tripCurrency, date, liveRate)
+    // Revenue is the invoice net of tax: VAT is collected for the state, and
+    // the quote it is compared with is tax-free.
+    const net = num(invoice.total_amount) - num(invoice.tax_amount)
+    const total = convertOnDate(fxIndex, net, from, tripCurrency, date, liveRate)
     tallyFx(fx, total.basis)
+    if ((invoice.invoice_type || 'standard').toLowerCase() !== 'deposit') finalInvoiced = true
 
     if (total.amount === null) {
       holes.push({
         kind: 'invoice',
         reference: invoice.invoice_number || 'invoice',
-        amount: num(invoice.total_amount),
+        amount: net,
         fromCurrency: from,
         toCurrency: tripCurrency,
         date,
@@ -411,15 +431,34 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     if (num(extra.supplier_cost) > 0) {
       const cost = convertOnDate(fxIndex, num(extra.supplier_cost) * qty, currencyOf(extra.supplier_currency, tripCurrency), tripCurrency, date, liveRate)
       tallyFx(fx, cost.basis)
-      if (cost.amount !== null) extrasSupplierCost += cost.amount
+      if (cost.amount === null) {
+        holes.push({ kind: 'extra', reference: extra.title || 'extra', amount: num(extra.supplier_cost) * qty, fromCurrency: currencyOf(extra.supplier_currency, tripCurrency), toCurrency: tripCurrency, date, message: `The supplier cost of extra "${extra.title || ''}" is in ${currencyOf(extra.supplier_currency, tripCurrency)} and no rate to ${tripCurrency} is available — excluded.`.trim() })
+      } else extrasSupplierCost += cost.amount
     }
   }
 
   // ---------- Margin ----------
-  // Revenue falls back to the quoted amount when nothing has been invoiced
-  // yet, so a trip in progress still shows a margin. The quote is already in
-  // the trip currency by construction.
-  const revenueForCalc = totalRevenue > 0 ? totalRevenue : num(itinerary.total_cost) + extrasRevenue
+  // What the trip earns:
+  //  - its invoices (net of tax), once a standard or final invoice exists;
+  //  - while only deposits are invoiced, the quote plus extras — a 20%
+  //    deposit is not the trip's revenue (it read as a loss) — or the
+  //    deposits, if they come to more;
+  //  - with nothing invoiced, the quote plus extras, so a trip in progress
+  //    still shows a margin — except a CANCELLED trip, which earns only
+  //    what was invoiced (a cancelled 20,000 quote is not 20,000 of revenue).
+  const quoted = num(itinerary.total_cost) + extrasRevenue
+  const cancelled = (itinerary.status || '').toLowerCase() === 'cancelled'
+  let revenueBasis: TripPnL['revenue_basis']
+  let revenueForCalc: number
+  if (finalInvoiced && totalRevenue > 0) {
+    revenueBasis = 'invoiced'; revenueForCalc = totalRevenue
+  } else if (cancelled) {
+    revenueBasis = totalRevenue > 0 ? 'invoiced' : 'none'; revenueForCalc = totalRevenue
+  } else if (totalRevenue > quoted) {
+    revenueBasis = 'invoiced'; revenueForCalc = totalRevenue
+  } else {
+    revenueBasis = 'quoted'; revenueForCalc = quoted
+  }
 
   const grossProfit = roundMoney(
     revenueForCalc - totalExpenses - extrasSupplierCost - commissionsPayable + commissionsReceivable
@@ -443,6 +482,8 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     extras_supplier_cost: roundMoney(extrasSupplierCost),
     total_revenue: roundMoney(totalRevenue),
     total_paid: roundMoney(totalPaid),
+    revenue_basis: revenueBasis,
+    revenue_for_margin: roundMoney(revenueForCalc),
 
     total_expenses: roundMoney(totalExpenses),
     expenses_paid: roundMoney(expensesPaid),
@@ -503,14 +544,13 @@ export function buildPnlSummary(input: BuildSummaryInput): PnlSummary {
   let totalPayable = 0
   let totalDisputedReceivable = 0
   let totalProfit = 0
-  let marginSum = 0
-  let marginCount = 0
   let untranslated = 0
+  const tripProfitReporting: Record<string, number | null> = {}
 
   for (const trip of trips) {
     mergeFxSummary(fx, trip.fx)
 
-    const revenueBasis = trip.total_revenue > 0 ? trip.total_revenue : trip.quoted_amount
+    const revenueBasis = trip.revenue_for_margin
     const rateProbe = convertOnDate(
       fxIndex,
       1,
@@ -521,6 +561,7 @@ export function buildPnlSummary(input: BuildSummaryInput): PnlSummary {
     )
 
     if (rateProbe.rate === null) {
+      tripProfitReporting[trip.itinerary_id] = null
       untranslated++
       tallyFx(fx, 'none')
       continue
@@ -531,15 +572,15 @@ export function buildPnlSummary(input: BuildSummaryInput): PnlSummary {
 
     const rate = rateProbe.rate
     totalRevenue += roundMoney(revenueBasis * rate)
-    totalExpenses += roundMoney(trip.total_expenses * rate)
+    // Extras' supplier cost is a cost like any expense: left out, the cards
+    // did not add up to the profit beneath them.
+    totalExpenses += roundMoney((trip.total_expenses + trip.extras_supplier_cost) * rate)
     totalReceivable += roundMoney(trip.commissions_receivable * rate)
     totalPayable += roundMoney(trip.commissions_payable * rate)
     totalDisputedReceivable += roundMoney(trip.disputed_receivable * rate)
     totalProfit += roundMoney(trip.gross_profit * rate)
+    tripProfitReporting[trip.itinerary_id] = roundMoney(trip.gross_profit * rate)
 
-    // Margin is a ratio — currency-independent, so it averages directly.
-    marginSum += trip.profit_margin
-    marginCount++
   }
 
   return {
@@ -551,11 +592,15 @@ export function buildPnlSummary(input: BuildSummaryInput): PnlSummary {
     total_commissions_payable: roundMoney(totalPayable),
     total_disputed_receivable: roundMoney(totalDisputedReceivable),
     total_profit: roundMoney(totalProfit),
-    average_margin: marginCount > 0 ? marginSum / marginCount : 0,
+    // Profit over revenue across the portfolio — not the average of each
+    // trip's margin, which let a 200 day trip weigh as much as a 20,000 tour
+    // and counted unpriced drafts as 0%.
+    average_margin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
     profitable_trips: trips.filter(t => t.gross_profit > 0).length,
     loss_trips: trips.filter(t => t.gross_profit < 0).length,
     incomplete_trips: trips.filter(t => !t.complete).length,
     untranslated_trips: untranslated,
+    trip_profit_reporting: tripProfitReporting,
     fx,
   }
 }

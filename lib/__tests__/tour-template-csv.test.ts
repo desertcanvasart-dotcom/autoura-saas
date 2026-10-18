@@ -117,9 +117,18 @@ describe('the vocabulary fields survive the round trip', () => {
       serializeTemplatesCsv([{ ...row, tour_theme: null, physical_level: null, best_for: [] }]),
       papa
     )
-    expect(records[0].tour_theme).toBeUndefined()
-    expect(records[0].physical_level).toBeUndefined()
-    expect(records[0].best_for).toBeUndefined()
+    // Blank in a column the sheet has = empty, so a re-import can clear a
+    // field; still never a value the sheet did not give.
+    expect(records[0].tour_theme).toBeNull()
+    expect(records[0].physical_level).toBeNull()
+    expect(records[0].best_for).toEqual([])
+  })
+
+  it('a blank cell clears the field; a column the sheet lacks is left alone', () => {
+    const { records } = parseTemplatesCsv('Code,Name,Type,Duration Days,Duration Nights,Image URL,Highlights,Active\nX-1,Foo,day_tour,1,,,,\n', papa)
+    expect(records[0]).toMatchObject({ image_url: null, highlights: [], duration_nights: 0 })
+    expect(records[0]).not.toHaveProperty('is_active') // a yes/no has nothing to clear to
+    expect(records[0]).not.toHaveProperty('long_description') // not in the sheet
   })
 
   it('the sample sheet shows all three filled in', () => {

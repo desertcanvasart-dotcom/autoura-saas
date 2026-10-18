@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { syncSupplierExpense } from '@/lib/bookings/supplier-expense'
+import { roleDenied } from '@/lib/api-role-gate'
 
 const SUPPLIER_STATUSES = ['pending', 'contacted', 'confirmed', 'no_response', 'cancelled']
 
@@ -58,6 +59,8 @@ export async function POST(
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 

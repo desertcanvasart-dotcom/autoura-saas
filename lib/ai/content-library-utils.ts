@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 // =====================================================
 // AI CONTENT LIBRARY UTILITIES
 // =====================================================
@@ -209,7 +210,7 @@ export async function searchContent(
       category:content_categories(name),
       variations:content_variations(*)
     `)
-    .or(`name.ilike.%${searchTerm}%,short_description.ilike.%${searchTerm}%`)
+    .or(`name.ilike.${orIlikeContains(searchTerm)},short_description.ilike.${orIlikeContains(searchTerm)}`)
     .eq('is_active', true)
     .limit(limit)
 

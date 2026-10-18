@@ -1,7 +1,11 @@
+import { gateRole } from '@/lib/api-role-gate'
+import { requireAuth } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 const ACCEPTED_TYPES: Record<string, 'pdf' | 'image'> = {
   'application/pdf': 'pdf',
@@ -33,7 +37,8 @@ CURRENCY DETECTION:
 - $ or USD = USD
 - £ or GBP = GBP
 - EGP, E£, LE, ج.م = EGP
-- If unclear, default to EUR
+- Any other currency: its ISO code, if it is one of ${SUPPORTED_CURRENCIES.join(', ')}
+- If unclear, or not one of those, null — never a guess
 
 Return ONLY a valid JSON object (no markdown, no explanation) with this exact structure:
 
@@ -42,7 +47,7 @@ Return ONLY a valid JSON object (no markdown, no explanation) with this exact st
   "supplier_invoice_number": "string or null",
   "invoice_date": "YYYY-MM-DD or null",
   "due_date": "YYYY-MM-DD or null",
-  "currency": "EUR|USD|GBP|EGP",
+  "currency": "${SUPPORTED_CURRENCIES.join('|')} or null",
   "subtotal": number or null,
   "tax_amount": number or null,
   "total_amount": number or null,
@@ -60,6 +65,15 @@ Return ONLY a valid JSON object (no markdown, no explanation) with this exact st
 }`
 
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+  const auth = await requireAuth()
+  if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  const overBudget = await aiBudgetDenied(auth.user!.id, auth.tenant_id)
+  if (overBudget) return overBudget
+
   try {
     let formData: FormData
     try {
@@ -128,7 +142,9 @@ export async function POST(request: NextRequest) {
         supplier_invoice_number: extracted.supplier_invoice_number || '',
         invoice_date: extracted.invoice_date || '',
         due_date: extracted.due_date || '',
-        currency: extracted.currency || 'EUR',
+        // Only a currency the app supports, and none rather than a guess: an
+        // AED or MAD bill was read as EUR (the prompt allowed only four).
+        currency: (SUPPORTED_CURRENCIES as readonly string[]).includes(String(extracted.currency || '').toUpperCase()) ? String(extracted.currency).toUpperCase() : null,
         subtotal: extracted.subtotal,
         tax_amount: extracted.tax_amount || 0,
         total_amount: extracted.total_amount || extracted.subtotal || 0,

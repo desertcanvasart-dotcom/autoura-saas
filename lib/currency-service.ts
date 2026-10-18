@@ -42,7 +42,7 @@ export async function fetchExchangeRates(baseCurrency: string = 'USD'): Promise<
     // ExchangeRate-API open endpoint - free, no API key required
     const response = await fetch(
       `https://open.er-api.com/v6/latest/${baseCurrency}`,
-      { next: { revalidate: 3600 } } // Cache for 1 hour in Next.js
+      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10_000) } // Cache for 1 hour in Next.js
     )
 
     if (!response.ok) {

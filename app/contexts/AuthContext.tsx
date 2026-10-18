@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
@@ -22,7 +23,7 @@ interface AuthContextType {
   loading: boolean
   isSuperAdmin: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<void>
+  signUp: (email: string, password: string, fullName: string, companyName?: string, termsAcceptedAt?: string) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
 }
@@ -107,7 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fire-and-forget — presence must never affect the auth flow.
   useEffect(() => {
     if (!user) return
-    let lastInput = Date.now()
+    // No input yet: opening a page is not five minutes of work (the first
+    // beat on every load and new tab counted as focused).
+    let lastInput = 0
     const markInput = () => { lastInput = Date.now() }
     const INPUT_EVENTS: (keyof WindowEventMap)[] = ['keydown', 'pointerdown', 'scroll']
     INPUT_EVENTS.forEach(e => window.addEventListener(e, markInput, { passive: true }))
@@ -156,6 +159,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Into the app with a full page load, not a client-side push: analytics
+  // the visitor allowed on the public pages (login is one) must not keep
+  // running inside the app (components/MarketingAnalytics loads only there).
+  const enterApp = (path: string) => {
+    window.location.assign(path)
+  }
+
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -167,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Platform owners land in the admin cockpit, not the agency app —
     // they may not belong to any tenant at all.
     if (await checkSuperAdmin()) {
-      router.push('/super-admin')
+      enterApp('/super-admin')
       return
     }
 
@@ -177,15 +187,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // single() errors on 2+ rows — which silently skipped the onboarding
       // redirect. status is filtered too, so a suspended membership cannot
       // decide where login lands.
-      const { data: memberData } = await supabase
-        .from('tenant_members')
-        .select('tenant_id')
-        .eq('user_id', data.user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .order('tenant_id', { ascending: true })
-        .limit(1)
-        .maybeSingle()
+      const { data: memberData } = await currentMembership<{ tenant_id: string; role: string }>(
+        supabase as unknown as MembershipDb,
+        data.user.id,
+        'tenant_id, role',
+      )
 
       if (memberData?.tenant_id) {
         const { data: featuresData } = await supabase
@@ -194,9 +200,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq('tenant_id', memberData.tenant_id)
           .single()
 
-        // Redirect to onboarding if not completed
-        if (featuresData && !featuresData.onboarding_completed) {
-          router.push('/onboarding')
+        // Redirect to onboarding if not completed — owners and admins only:
+        // the wizard sets up the company, and an invited member signing in
+        // before the owner finished it landed in it.
+        if (featuresData && !featuresData.onboarding_completed && ['owner', 'admin'].includes(String(memberData.role))) {
+          enterApp('/onboarding')
           return
         }
       }
@@ -204,21 +212,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error checking onboarding status:', error)
     }
 
-    router.push('/dashboard')
+    enterApp('/dashboard')
   }
 
-  const signUp = async (email: string, password: string, fullName: string, companyName?: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (email: string, password: string, fullName: string, companyName?: string, termsAcceptedAt?: string) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        // Lands on sign-in with "email confirmed" (app/login): left unset, the
+        // link went to the Site URL — the marketing page — with no message.
+        emailRedirectTo: `${window.location.origin}/login?confirmed=1`,
         data: {
           full_name: fullName,
           company_name: companyName || '',
+          // The record that this person ticked "I agree to the Terms and
+          // Privacy Policy" on the sign-up form, and when.
+          ...(termsAcceptedAt ? { terms_accepted_at: termsAcceptedAt } : {}),
         },
       },
     })
     if (error) throw error
+    // An address that already has an account comes back as a user with no
+    // identities and no email is sent — the form used to say "Check your
+    // email" for a message that would never arrive.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new Error('An account with this email already exists. Sign in, or reset your password if you have forgotten it.')
+    }
   }
 
   const signOut = async () => {

@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 // POST /api/copilot/drafts/[id]/send — operator-approved dispatch.
 //   WhatsApp: sends immediately via Twilio, marks the draft sent + thread resolved.
 //   Email:    approves the draft and hands off to the Inbox composer (gmail-
@@ -7,6 +8,9 @@ import { requireAuth } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase || !auth.tenant_id || !auth.user) {
@@ -32,7 +36,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: thread, error: tErr } = await supabase
       .from('communication_threads')
-      .select('id, channel, contact_info')
+      .select('id, channel, contact_info, unified_conversation_id')
       .eq('id', draft.thread_id)
       .single()
     if (tErr || !thread) {
@@ -47,9 +51,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const editPatch = editedBody ? { edited_body: editedBody, was_edited: true } : {}
 
     if (thread.channel === 'whatsapp') {
-      const res = await sendWhatsAppMessage({ to: thread.contact_info, body: finalBody })
+      // Claimed before sending: a double-click or two reviewers on the same
+      // draft each passed the "already sent" check above and the client got
+      // the message twice. Only one request can move it to sent; the other
+      // finds nothing to claim.
+      const { data: claimed } = await supabase
+        .from('communication_drafts')
+        .update({ status: 'sent', sent_at: nowIso })
+        .eq('id', id)
+        .neq('status', 'sent')
+        .select('id')
+      if (!claimed || claimed.length === 0) {
+        return NextResponse.json({ success: false, error: 'Draft already sent' }, { status: 409 })
+      }
+      const res = await sendWhatsAppMessage({ to: thread.contact_info, body: finalBody, tenantId: tenant_id })
       if (!res.success) {
-        await supabase.from('communication_drafts').update({ send_error: res.error || 'send failed', ...editPatch }).eq('id', id)
+        // Not sent after all: back to where it was, so it can be retried.
+        await supabase.from('communication_drafts').update({
+          status: draft.status, sent_at: null, send_error: res.error || 'send failed', ...editPatch,
+        }).eq('id', id)
         return NextResponse.json({ success: false, error: res.error || 'Failed to send WhatsApp message' }, { status: 502 })
       }
       await supabase.from('communication_drafts').update({
@@ -61,15 +81,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: true, sent: true, message_id: res.messageId || null })
     }
 
-    // Email — approve and hand off to the Inbox composer for threaded sending.
+    // Email — approve and hand off. The email is sent from Conversations,
+    // whose reply box opens with this approved draft filled in
+    // (/api/ai/suggest-email-reply) and threads the reply in Gmail. Nothing
+    // used to carry the text across: the draft was approved and the operator
+    // retyped it.
     await supabase.from('communication_drafts').update({
       status: 'approved', reviewed_by: user.id, reviewed_at: nowIso, ...editPatch,
     }).eq('id', id)
+    const conversationId = (thread as { unified_conversation_id?: string | null }).unified_conversation_id ?? null
     return NextResponse.json({
       success: true,
       sent: false,
       requiresManualSend: true,
-      message: 'Draft approved. Open the conversation in the Inbox to send the email reply.',
+      open_url: conversationId ? `/conversations?id=${conversationId}` : null,
+      message: conversationId
+        ? 'Draft approved. Open the conversation to send it — the reply is filled in for you.'
+        : 'Draft approved. Open the conversation in Conversations to send the email reply.',
     })
   } catch (e: any) {
     console.error('copilot draft send error:', e?.message)

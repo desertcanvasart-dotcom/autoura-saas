@@ -1,3 +1,4 @@
+import { operatingCountryOf, regionTravelPhrase, isEgypt } from '@/lib/tenant-region'
 // ============================================
 // POST /api/pricing-grid/parse
 // AI-powered text-to-grid parser
@@ -9,12 +10,16 @@ import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
+import { gridHotelRate } from '@/lib/rates/grid-hotel-rate'
+import { hotelsMentioned, namedHotelFor } from '@/lib/pricing/hotel-mentions'
+import { isLayoverRoute, plainTransferFor, LAYOVER_TEXT } from '@/lib/rates/layover-route'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
 
 // Lazy-initialized clients
 let _supabaseAdmin: ReturnType<typeof createSupabaseAdmin> | null = null
@@ -44,6 +49,12 @@ CRUISE: EMB=Embarkation, DIS=Disembarkation, FB=Full Board onboard
 // ============================================
 // Helper: Fetch all rates for AI context
 // ============================================
+const HOTEL_COLUMNS = 'id, hotel_name, property_name, city, room_type, tier, board_basis, star_rating, seasons, ppd_eur, ppd_non_eur, single_supplement_eur, single_supplement_non_eur, pp_double_eur, pp_double_non_eur, single_supp_eur, single_supp_non_eur, rate_low_season_dbl, rate_high_season_dbl, rate_currency'
+
+/** A hotel row's name, from whichever column family wrote it. */
+const hotelNameOf = (r: { property_name?: string | null; hotel_name?: string | null }) =>
+  String(r.property_name || r.hotel_name || '').trim()
+
 async function fetchAllRates(tenantId: string, tier: string) {
   const admin = getSupabaseAdmin()
 
@@ -52,13 +63,19 @@ async function fetchAllRates(tenantId: string, tier: string) {
     activityRes, accommodationRes, entranceRes, flightRes, mealRes,
     cruiseRes, sleepingTrainRes,
   ] = await Promise.all([
-    admin.from('transportation_rates').select('id, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('transportation_rates').select('id, route_name, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('guide_rates').select('id, guide_type, guide_language, city, full_day_rate, half_day_rate, base_rate_eur, rate_currency').eq('tenant_id', tenantId),
     admin.from('airport_staff_rates').select('id, service_type, airport_code, direction, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('hotel_staff_rates').select('id, service_type, hotel_category, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('tipping_rates').select('id, role_type, context, rate_unit, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('activity_rates').select('id, activity_name, activity_category, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
-    admin.from('accommodation_rates').select('id, hotel_name, city, room_type, tier, rate_low_season_dbl, rate_high_season_dbl, rate_low_season_sgl, rate_high_season_sgl, rate_currency').eq('tenant_id', tenantId).eq('tier', tier),
+    // Every tier, active only: a hotel the text NAMES is that hotel whatever
+    // tier it is saved under (lib/pricing/hotel-mentions); the prompt still
+    // steers an unnamed pick to the selected tier. Both column families —
+    // the Rates → Hotels form writes property_name and periods/ppd_eur, the
+    // importer hotel_name and pp_double_eur; reading only the importer's left
+    // every form-added hotel nameless and at 0 in the AI's list.
+    admin.from('accommodation_rates').select(HOTEL_COLUMNS).eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('entrance_fees').select('id, attraction_name, city, eur_rate, non_eur_rate, category, rate_currency').eq('tenant_id', tenantId),
     admin.from('flight_rates').select('id, route_from, route_to, route_name, airline, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('meal_rates').select('id, restaurant_name, meal_type, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
@@ -81,7 +98,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
   // number, and "600" in EGP would price as 600 in the run currency.
   const runCurrency = await getTenantRunCurrency(admin, tenantId)
   const norm = (table: string, rows: unknown) =>
-    normalizeRateRows(admin, table, (rows || []) as Record<string, unknown>[], runCurrency)
+    normalizeRateRows(admin, table, (rows || []) as Record<string, unknown>[], runCurrency, tenantId)
 
   const [
     transportation, guides, airport_staff, hotel_staff, tipping, activities,
@@ -110,20 +127,21 @@ async function fetchAllRates(tenantId: string, tier: string) {
 // ============================================
 // Build rate catalog string for AI prompt
 // ============================================
-function buildRateCatalog(rates: Record<string, any[]>): string {
+function buildRateCatalog(rates: Record<string, any[]>, tier: string, startDate: string | null): string {
   let catalog = ''
 
   if (rates.accommodation.length > 0) {
-    catalog += '\n## ACCOMMODATION (per person double, filtered by tier)\n'
+    catalog += `\n## ACCOMMODATION (per person double). Selected tier: ${tier}. When the text names a hotel, use THAT hotel whatever its tier; otherwise pick a hotel of the selected tier.\n`
     for (const r of rates.accommodation) {
-      catalog += `ID: ${r.id} | ${r.hotel_name} | ${r.city} | ${r.room_type || 'standard'} | PPD: €${r.rate_low_season_dbl || r.rate_high_season_dbl || 0}\n`
+      const price = gridHotelRate(r, startDate)
+      catalog += `ID: ${r.id} | ${hotelNameOf(r)} | ${r.city || ''} | tier: ${r.tier || 'standard'} | ${r.room_type || r.board_basis || 'standard'} | PPD: €${price.ppdEur || 'unpriced'}\n`
     }
   }
 
   if (rates.transportation.length > 0) {
     catalog += '\n## TRANSPORT (group cost)\n'
     for (const r of rates.transportation) {
-      catalog += `ID: ${r.id} | ${r.service_type} | ${r.vehicle_type || ''} | ${r.origin_city || r.city}${r.destination_city ? ' → ' + r.destination_city : ''} | ${r.capacity_min || '?'}-${r.capacity_max || '?'} pax | €${r.base_rate_eur || 0}\n`
+      catalog += `ID: ${r.id} | ${r.service_type}${isLayoverRoute(r) ? ' (LAYOVER TOUR)' : ''} | ${r.route_name ? r.route_name + ' | ' : ''}${r.vehicle_type || ''} | ${r.origin_city || r.city}${r.destination_city ? ' → ' + r.destination_city : ''} | ${r.capacity_min || '?'}-${r.capacity_max || '?'} pax | €${r.base_rate_eur || 0}\n`
     }
   }
 
@@ -205,11 +223,13 @@ function buildRateCatalog(rates: Record<string, any[]>): string {
 // ============================================
 // Build flat rate lookup map for validation
 // ============================================
-function buildRateMap(rates: Record<string, any[]>): Map<string, { rate: number; rateNonEur: number; label: string; table: string }> {
+function buildRateMap(rates: Record<string, any[]>, startDate: string | null): Map<string, { rate: number; rateNonEur: number; label: string; table: string }> {
   const map = new Map<string, { rate: number; rateNonEur: number; label: string; table: string }>()
 
   for (const r of rates.accommodation) {
-    map.set(r.id, { rate: Number(r.rate_low_season_dbl) || Number(r.rate_high_season_dbl) || 0, rateNonEur: Number(r.rate_low_season_dbl) || 0, label: `${r.hotel_name} | ${r.city}`, table: 'accommodation' })
+    // The grid's own pricing of a hotel (periods, either column family).
+    const price = gridHotelRate(r, startDate)
+    map.set(r.id, { rate: price.ppdEur, rateNonEur: price.ppdNonEur, label: `${hotelNameOf(r)} ${r.city || ''} (${r.tier || 'standard'})`, table: 'accommodation' })
   }
   for (const r of rates.transportation) {
     map.set(r.id, { rate: Number(r.base_rate_eur) || 0, rateNonEur: Number(r.base_rate_eur) || 0, label: `${r.service_type} ${r.vehicle_type || ''} ${r.origin_city || r.city}`, table: 'transportation' })
@@ -302,9 +322,12 @@ export async function POST(request: NextRequest) {
     if (!tenant_id) {
       return NextResponse.json({ success: false, error: 'No tenant' }, { status: 403 })
     }
+    const overBudget = await aiBudgetDenied(authResult.user!.id, tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json()
     const { text, tier = 'standard', pax = 2, mode = 'full', package_type } = body
+    const startDate = typeof body.start_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.start_date) ? body.start_date : null
     // What the customer is buying. Decides what the AI is TOLD to include and
     // what the scrub allows — until this existed the parser built every trip
     // full-package shaped, and the save stamped them all 'land-package'.
@@ -314,16 +337,21 @@ export async function POST(request: NextRequest) {
     if (!text || typeof text !== 'string' || text.trim().length < 10) {
       return NextResponse.json({ success: false, error: 'Text input is required (min 10 chars)' }, { status: 400 })
     }
+    const tooLong = aiInputTooLong(text)
+    if (tooLong) return tooLong
 
     // --- Structure-only mode: extract itinerary without rate matching ---
     if (mode === 'structure') {
-      return handleStructureParse(text, pax)
+      return handleStructureParse(text, pax, await operatingCountryOf(tenant_id))
     }
 
     // 1. Fetch all rates for this tenant
+    // The company's own country (Settings → Organization), not Egypt for all.
+    const country = await operatingCountryOf(tenant_id)
+    const glossary = isEgypt(country) ? EGYPT_GLOSSARY : ''
     const rates = await fetchAllRates(tenant_id, tier)
-    const rateCatalog = buildRateCatalog(rates)
-    const rateMap = buildRateMap(rates)
+    const rateCatalog = buildRateCatalog(rates, tier, startDate)
+    const rateMap = buildRateMap(rates, startDate)
 
     if (rateCatalog.trim().length < 50) {
       return NextResponse.json({
@@ -334,12 +362,12 @@ export async function POST(request: NextRequest) {
 
     // 2. Stage 1: AI structured parse
 
-    const systemPrompt = `You are an Egypt travel itinerary parser for a tour operator pricing system.
+    const systemPrompt = `You are a ${regionTravelPhrase(country)} itinerary parser for a tour operator pricing system.
 
 Given a text input (WhatsApp message, email, booking request, or itinerary), extract a structured day-by-day itinerary.
 ${packageRules(pkg)}
 
-${EGYPT_GLOSSARY}
+${glossary}
 
 ## AVAILABLE RATE CATALOG
 Match services to these exact IDs from the database:
@@ -396,6 +424,8 @@ The transport catalog has different service_type values. A single day often need
 
 **Airport transfer and day tour are ALWAYS separate entries, even in the same city on the same day.**
 
+**A LAYOVER TOUR is not a transfer.** An airport_transfer marked (LAYOVER TOUR) — e.g. "Airport → Full Day → Airport" — is for travellers in transit: met at the airport, touring, and back to the airport for an onward flight the same day. Use it ONLY when the text says the party is in transit / on a layover and does not stay at a hotel. An arrival (airport → hotel) or departure (hotel → airport) takes a plain airport_transfer, plus a day_tour if they sightsee.
+
 **Where the party sleeps decides the road rate.** A day that sightsees in one city and sleeps in another (an "Alexandria day trip" from a Cairo hotel, "CAI/ALX/CAI") takes the intercity_day_trip from the hotel's city to the sightseeing city — never intercity_overnight, never intercity_dropoff, and not a day_tour inside the sightseeing city. Its hotel stays in the city where they sleep. If the catalog has no intercity_day_trip for that road, a day_tour from the hotel's city to that city; otherwise leave the route empty for the operator rather than take another kind of journey.
 
 Common patterns (select ALL that apply for each day):
@@ -418,6 +448,7 @@ Match the origin_city and destination_city of each transport entry to the day's 
 - For entrance fees: use EU or non-EU rates based on passport type
 - Multi-select slots (route, entrance_fees, meals, etc.) use arrays of IDs
 - Single-select slots (guide, accommodation, cruise) use a single ID string
+- Guides: ONE language for the whole trip — the language the text asks for ("Spanish-speaking guide"), else the same language on every day; pick each day's guide in that language from the day's city
 - Custom slots (water, other_group, other_pp) use a number (EUR amount) or null
 - Set water to 1 EUR per person per day by default
 - For cruise days: set the cruise slot, suppress route (transport included in cruise)
@@ -438,16 +469,16 @@ Match the origin_city and destination_city of each transport entry to the day's 
     // 3. Stage 2: Generative fallback if 0 days
     if (!aiResult || !aiResult.days || aiResult.days.length === 0) {
       generationMode = 'generated'
-      const genPrompt = `You are an Egypt travel expert. The user sent a vague inquiry. Generate a suggested ${pax}-person itinerary.
+      const genPrompt = `You are a ${regionTravelPhrase(country)} expert. The user sent a vague inquiry. Generate a suggested ${pax}-person itinerary.
 ${packageRules(pkg)}
 
-${EGYPT_GLOSSARY}
+${glossary}
 
 ## AVAILABLE RATES
 ${rateCatalog}
 
 Return the same JSON format as before with suggested days, matching real rate IDs from the catalog.
-Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
+Generate a reasonable 5-7 day itinerary${country ? ` in ${country}` : ''} covering popular sites, using only places that appear in the rates above.`
 
       aiResult = await askForJson(genPrompt, `Generate a suggested itinerary for this inquiry:\n\n${text}`)
       if (!aiResult) {
@@ -495,13 +526,104 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
       slot.selectedItems = []
       slot.customAmount = 0
     }
+    // Transport is scrubbed by the journey's TYPE: an airport transfer the
+    // AI put in the route row survived a package that sells none (only the
+    // meet-and-assist row was cleared), and a day-trip product could move
+    // the party to another city overnight.
+    const rowsOfType = (types: string[]) => new Set(
+      (rates.transportation as Array<{ id: string; service_type?: string | null }>)
+        .filter(r => types.includes(String(r.service_type ?? '')))
+        .map(r => String(r.id)),
+    )
+    const airportRows = rowsOfType(['airport_transfer'])
+    const overnightMoveRows = rowsOfType(['intercity_dropoff', 'intercity_overnight', 'intercity_transfer'])
+    const dropRoutes = (day: { slots: ScrubbableSlot[] }, ids: Set<string>) => {
+      const slot = day.slots.find(sl => sl.slotId === 'route')
+      if (!slot?.selectedItems) return
+      slot.selectedItems = slot.selectedItems.filter(it => !ids.has(String((it as { rateId?: string }).rateId)))
+    }
     for (const day of days) {
       if (!pkg.includes.accommodation) {
         clearSlot(day, 'accommodation')
         clearSlot(day, 'hotel_services')
       }
-      if (!pkg.includes.airportTransfers) clearSlot(day, 'airport_services')
+      if (!pkg.includes.airportTransfers) {
+        clearSlot(day, 'airport_services')
+        dropRoutes(day, airportRows)
+      }
+      if (!pkg.includes.overnightMoves) dropRoutes(day, overnightMoveRows)
+      // No accommodation sold = no nights on a ship either. A full package
+      // may still carry a cruise the text names; Cruise + Land requires one.
+      if (!pkg.includes.accommodation) clearSlot(day, 'cruise')
       if (pkg.includes.meals === 'none') clearSlot(day, 'meals')
+    }
+
+    // 4b'. NO LAYOVER TOUR ON AN ARRIVAL — "Airport → Full Day → Airport" is
+    // saved as an airport transfer, so the model took it for the arrival day's
+    // transfer. Unless the text says the party is in transit, it is swapped
+    // for the plain transfer in that city (same vehicle), or named for the
+    // operator when there is none.
+    const notes: string[] = []
+    if (!LAYOVER_TEXT.test(text)) {
+      type TRow = { id: string; route_name?: string | null; service_type?: string | null; vehicle_type?: string | null; city?: string | null; origin_city?: string | null; destination_city?: string | null }
+      const tRows = (rates.transportation as TRow[]).map(r => ({ ...r, id: String(r.id) }))
+      const tById = new Map(tRows.map(r => [r.id, r]))
+      for (const day of days as Array<{ dayNumber: number; slots: Array<{ slotId: string; selectedItems?: unknown[] }> }>) {
+        const slot = day.slots.find(sl => sl.slotId === 'route')
+        if (!slot?.selectedItems) continue
+        slot.selectedItems = slot.selectedItems.map(it => {
+          const row = tById.get(String((it as { rateId?: string }).rateId))
+          if (!row || !isLayoverRoute(row)) return it
+          const plain = plainTransferFor(row, tRows)
+          const info = plain ? rateMap.get(plain.id) : undefined
+          if (!plain || !info) {
+            notes.push(`Day ${day.dayNumber}: "${row.route_name}" is a layover tour (airport → tour → airport), and no plain airport transfer is saved in ${row.city || row.origin_city || 'that city'} — pick the transfer by hand.`)
+            return it
+          }
+          return { rateId: plain.id, name: info.label, rateEur: info.rate, rateNonEur: info.rateNonEur }
+        })
+      }
+    }
+
+    // 4c. THE NAMED HOTEL — the text named a hotel ("4-Day Stay at Marriott
+    // Mena House"): every night the AI gave another hotel in that city is that
+    // hotel. Decided here from the names, not left to the model; and a named
+    // hotel saved under another tier than the one chosen is said, so the
+    // operator fixes the tier in Rates → Hotels instead of wondering.
+    if (pkg.includes.cruise && !days.some((d: { slots: ScrubbableSlot[] }) => (d.slots.find(s => s.slotId === 'cruise')?.selectedItems?.length ?? 0) > 0)) {
+      notes.push(`${pkg.name}: no cruise was matched to your cruise rates — pick the ship on the cruise nights, or choose another package.`)
+    }
+    if (pkg.includes.accommodation) {
+      const hotels = (rates.accommodation as Array<Record<string, unknown>>).map(r => ({
+        id: String(r.id),
+        name: hotelNameOf(r as { property_name?: string | null; hotel_name?: string | null }),
+        city: (r.city as string | null) ?? null,
+        tier: (r.tier as string | null) ?? null,
+      }))
+      const byId = new Map(hotels.map(h => [h.id, h]))
+      const mentioned = hotelsMentioned(text, hotels)
+      const usedOtherTier = new Map<string, string>()
+      for (const day of days as Array<{ city: string; slots: Array<{ slotId: string; selectedItems: unknown[]; label?: string }> }>) {
+        const slot = day.slots.find(s => s.slotId === 'accommodation')
+        const picked = (slot?.selectedItems?.[0] as { rateId?: string } | undefined)?.rateId ?? null
+        if (!slot || !picked) continue
+        const named = namedHotelFor(picked, day.city, byId, mentioned, tier)
+        const finalId = named ? named.id : picked
+        if (named) {
+          const info = rateMap.get(named.id)
+          if (info) {
+            slot.selectedItems = [{ rateId: named.id, name: info.label, rateEur: info.rate, rateNonEur: info.rateNonEur }]
+            slot.label = info.label
+          }
+        }
+        const final = byId.get(finalId)
+        if (final && mentioned.some(m => m.id === finalId) && (final.tier ?? 'standard') !== tier) {
+          usedOtherTier.set(final.name, final.tier ?? 'standard')
+        }
+      }
+      for (const [name, savedTier] of usedOtherTier) {
+        notes.push(`${name} is saved as "${savedTier}" in Rates → Hotels, not "${tier}" — it is used because the text names it. Correct its tier there if it is wrong.`)
+      }
     }
 
     // 5. Auto-fill water on days that don't have it
@@ -533,6 +655,7 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
       generationMode,
       needsReview,
       needsHumanInputCount,
+      notes,
       reviewReason:
         generationMode === 'generated'
           ? 'AI generated a suggested itinerary — review every line and confirm prices before sending.'
@@ -630,10 +753,10 @@ export function buildSlotsFromAI(
 // ============================================
 // Structure-only parse (no rate matching)
 // ============================================
-async function handleStructureParse(text: string, pax: number) {
-  const systemPrompt = `You are an Egypt travel itinerary parser. Extract a structured day-by-day itinerary from the input text WITHOUT matching any rates or prices.
+async function handleStructureParse(text: string, pax: number, country: string | null) {
+  const systemPrompt = `You are a ${regionTravelPhrase(country)} itinerary parser. Extract a structured day-by-day itinerary from the input text WITHOUT matching any rates or prices.
 
-${EGYPT_GLOSSARY}
+${isEgypt(country) ? EGYPT_GLOSSARY : ''}
 
 ## OUTPUT FORMAT
 Return valid JSON only (no markdown, no backticks):

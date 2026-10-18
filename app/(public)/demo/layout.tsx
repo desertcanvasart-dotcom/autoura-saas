@@ -1,18 +1,11 @@
-import type { Metadata } from 'next'
+import { buildPageMetadata } from '@/lib/seo/site'
 
-export const metadata: Metadata = {
+export const metadata = buildPageMetadata({
   title: 'Watch the Demo',
   description:
-    'See Autoura in action — how tour operators take an inquiry from WhatsApp to itinerary, quote, booking and invoice in one place.',
-  alternates: { canonical: '/demo' },
-  openGraph: {
-    title: 'Autoura — Watch the Demo',
-    description:
-      'See how tour operators run inquiries, itineraries, bookings and invoices in one place with Autoura.',
-    url: '/demo',
-    type: 'video.other',
-  },
-}
+    'See Autoura in action: how a tour operator takes a client enquiry from WhatsApp to a priced itinerary, branded quote, booking and invoice in one place.',
+  path: '/demo',
+})
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children

@@ -1,7 +1,11 @@
 import { createAdminClient } from '@/lib/supabase-server'
+import { bookingCapacityProblems, describeCapacityProblems } from '@/lib/capacity/booking-capacity'
 import { itineraryBookingFacts } from '@/lib/bookings/booking-on-confirm'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
+import { roundToCurrency } from '@/lib/currency-totals'
+import { shiftDateISO } from '@/lib/today'
+import { tenantToday } from '@/lib/tenant-today'
 
 /**
  * Create the booking a freshly-confirmed itinerary implies (B-item 7).
@@ -14,8 +18,9 @@ import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
  */
 export async function createBookingOnConfirm(
   itineraryId: string,
-  itinerary: Record<string, unknown>
-): Promise<{ booking: Record<string, unknown> | null; note: string | null }> {
+  itinerary: Record<string, unknown>,
+  options: { overrideCapacity?: boolean } = {},
+): Promise<{ booking: Record<string, unknown> | null; note: string | null; capacityFull?: boolean }> {
   try {
     const tenantId = itinerary.tenant_id
     if (typeof tenantId !== 'string') {
@@ -44,6 +49,20 @@ export async function createBookingOnConfirm(
       return { booking: null, note: `Booking not created: ${facts.reason}.` }
     }
 
+    // The Capacity Calendar: a full or closed day takes no booking unless a
+    // manager or admin confirmed with override (lib/capacity/booking-capacity).
+    // The itinerary is still confirmed; the note says why there is no booking.
+    if (!options.overrideCapacity) {
+      const problems = await bookingCapacityProblems(admin, tenantId, facts.value.start_date, facts.value.end_date)
+      if (problems.length > 0) {
+        return {
+          booking: null,
+          note: `Booking not created: the Capacity Calendar is ${describeCapacityProblems(problems)}. Free a day or raise its limit; a manager or admin can book it anyway.`,
+          capacityFull: true,
+        }
+      }
+    }
+
     const { data: tenantRow } = await admin
       .from('tenants')
       .select('deposit_percent, deposit_due_days')
@@ -56,9 +75,10 @@ export async function createBookingOnConfirm(
       return { booking: null, note: 'Booking not created: could not generate a booking number.' }
     }
 
-    const deposit_amount = Math.round(((facts.value.total_amount * rule.depositPercent) / 100) * 100) / 100
-    const deadline = new Date()
-    deadline.setDate(deadline.getDate() + rule.depositDueDays)
+    const deposit_amount = roundToCurrency((facts.value.total_amount * rule.depositPercent) / 100, facts.value.currency)
+    // The company's own day: on the UTC server, a booking made in Tokyo
+    // before 09:00 was dated yesterday and its deadline a day early.
+    const today = await tenantToday(admin, tenantId)
 
     const { data: booking, error: insertError } = await admin
       .from('bookings')
@@ -69,7 +89,7 @@ export async function createBookingOnConfirm(
         quote_type: null,
         client_id: (itinerary.client_id as string | null) ?? null,
         booking_number: bookingNumber,
-        booking_date: new Date().toISOString().split('T')[0],
+        booking_date: today,
         trip_name: facts.value.trip_name,
         start_date: facts.value.start_date,
         end_date: facts.value.end_date,
@@ -83,7 +103,7 @@ export async function createBookingOnConfirm(
         total_paid: 0,
         balance_due: facts.value.total_amount,
         status: 'pending_deposit',
-        payment_deadline: deadline.toISOString().split('T')[0],
+        payment_deadline: shiftDateISO(today, rule.depositDueDays),
       })
       .select()
       .single()

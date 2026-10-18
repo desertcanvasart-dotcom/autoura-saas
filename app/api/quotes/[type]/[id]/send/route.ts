@@ -1,4 +1,7 @@
+import { suppressedAmong } from '@/lib/email-suppression'
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
+import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
 import { loadDocumentIdentity } from '@/lib/document-identity'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
@@ -10,6 +13,9 @@ import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 import B2CQuoteEmail from '@/components/emails/B2CQuoteEmail'
 import B2BQuoteEmail from '@/components/emails/B2BQuoteEmail'
+import { resolveSender } from '@/lib/tenant-email-domain'
+import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
+import { gateRole } from '@/lib/api-role-gate'
 
 // Lazy-initialized Resend client (avoids build-time errors when env vars unavailable)
 let _resend: Resend | null = null
@@ -34,8 +40,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ type: string; id: string }> }
 ) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     const { type, id } = await params
+    // B2B quotes are managers' and admins'; viewers send nothing.
+    const gate = await gateRole(type === 'b2b' ? 'manage' : 'staff')
+    if (gate) return gate
 
     if (type !== 'b2c' && type !== 'b2b') {
       return NextResponse.json(
@@ -160,6 +172,21 @@ export async function POST(
       )
     }
 
+    // The same completeness gate as the PDF download: a quote with services
+    // still at no price was emailed without a word. `allow_incomplete` is the
+    // operator saying they mean it (the page asks them first).
+    const completeness = quoteCompleteness(quote.services_snapshot)
+    if (!completeness.complete && !allowsIncomplete(body.allow_incomplete)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
+      )
+    }
+
     // Output gate (harness Layer 2): never email a non-deliverable price.
     const priceCheck = checkQuoteRowDeliverable(quote, type)
     if (!priceCheck.ok) {
@@ -173,19 +200,39 @@ export async function POST(
       )
     }
 
+    // Who it is from: the tenant (Settings → Organization). The email said
+    // "AUTOURA" and "Egypt", listed the platform's own email and phone, and
+    // went from the platform's address with no reply-to the agency. Pinned to
+    // the tenant requireAuth resolved, as loadSenderTenant is.
+    const { data: sender } = await supabaseAdmin
+      .from('tenants')
+      .select('company_name, tagline, contact_email, company_phone, company_website, email_domain, email_from_local, email_domain_status')
+      .eq('id', tenantId)
+      .maybeSingle()
+    const company = {
+      name: sender?.company_name,
+      tagline: sender?.tagline,
+      email: sender?.contact_email,
+      phone: sender?.company_phone,
+      website: sender?.company_website,
+    }
+    // A calculator quote has no itinerary: its own trip_name (the tour).
+    const tripName = quote.itineraries?.trip_name || quote.trip_name || 'Your tour'
+
     // Generate PDF
+    const identity = await loadDocumentIdentity(tenantId)
     let pdfBuffer: Buffer
     if (type === 'b2c') {
-      const pdfDoc = createElement(B2CQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
+      const pdfDoc = createElement(B2CQuotePDF, { quote, company: identity })
       pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     } else {
-      const pdfDoc = createElement(B2BQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
+      const pdfDoc = createElement(B2BQuotePDF, { quote, company: identity })
       pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     }
 
-    // Prepare view quote URL (you can customize this based on your domain)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const viewQuoteUrl = `${baseUrl}/quotes/${type}/${quote.id}`
+    // No "view online" link: /quotes/… is the staff page, and every client and
+    // partner who clicked it landed on /login. The quote is the attached PDF.
+    const viewQuoteUrl = undefined
 
     // Render email HTML
     let emailHtml: string
@@ -194,8 +241,9 @@ export async function POST(
         createElement(B2CQuoteEmail, {
           clientName: recipientName,
           quoteNumber: quote.quote_number,
-          tripName: quote.itineraries?.trip_name || 'Egypt Tour',
-          startDate: quote.itineraries?.start_date || new Date().toISOString(),
+          tripName,
+          // No dates yet: the row is left out, not filled with today.
+          startDate: quote.itineraries?.start_date ?? null,
           duration: quote.itineraries?.total_days || 0,
           numTravelers: quote.num_travelers,
           pricePerPerson: quote.price_per_person,
@@ -204,6 +252,7 @@ export async function POST(
           validUntil: quote.valid_until,
           clientNotes: quote.client_notes,
           viewQuoteUrl,
+          company,
         })
       )
     } else {
@@ -212,8 +261,9 @@ export async function POST(
           partnerName: quote.b2b_partners?.company_name || 'Partner',
           contactName: quote.b2b_partners?.contact_name,
           quoteNumber: quote.quote_number,
-          tripName: quote.itineraries?.trip_name || 'Egypt Tour',
-          startDate: quote.itineraries?.start_date || new Date().toISOString(),
+          tripName,
+          // No dates yet: the row is left out, not filled with today.
+          startDate: quote.itineraries?.start_date ?? null,
           duration: quote.itineraries?.total_days || 0,
           tier: quote.tier,
           tourLeaderIncluded: quote.tour_leader_included,
@@ -223,17 +273,30 @@ export async function POST(
           validUntil: quote.valid_until,
           season: quote.season,
           viewQuoteUrl,
+          company,
         })
       )
     }
 
     // Send email with Resend
     const emailSubject = type === 'b2c'
-      ? `Your Egypt Travel Quote - ${quote.quote_number}`
-      : `B2B Rate Sheet - ${quote.quote_number} - ${quote.itineraries?.trip_name || 'Egypt Tour'}`
+      ? `Your Travel Quote - ${quote.quote_number}`
+      : `B2B Rate Sheet - ${quote.quote_number} - ${tripName}`
+
+    // An address that bounced or complained before is not mailed again
+    // (migration 437): it is what gets the sending domain suspended.
+    if ((await suppressedAmong([toEmail])).size > 0) {
+      return NextResponse.json(
+        { success: false, error: `Not sent: ${toEmail} bounced or reported spam before. Check the address with the client.` },
+        { status: 422 },
+      )
+    }
 
     const { data: emailData, error: emailError } = await getResend().emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'Autoura <quotes@getautoura.net>',
+      // The tenant's own verified domain, else the platform address under
+      // the tenant's name (lib/tenant-email-domain) — as /api/send-email.
+      from: resolveSender(sender, process.env.RESEND_FROM_EMAIL || 'quotes@getautoura.net').from,
+      ...(sender?.contact_email ? { replyTo: sender.contact_email } : {}),
       to: toEmail,
       subject: emailSubject,
       html: emailHtml,
@@ -250,18 +313,17 @@ export async function POST(
       throw new Error(`Failed to send email: ${emailError.message}`)
     }
 
-    // Update quote status
-    const updateData: any = {
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      sent_via: 'email',
-    }
-
+    // Update quote status (lib/quotes/quote-sent-update: b2b_quotes has no
+    // sent_at/sent_via, and only a draft becomes 'sent').
+    const updateData = quoteSentUpdate(type, quote.status, 'email')
     const tableName = type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
-    const { error: updateError } = await supabaseAdmin
-      .from(tableName)
-      .update(updateData)
-      .eq('id', id)
+    const { error: updateError } = updateData
+      ? await supabaseAdmin
+          .from(tableName)
+          .update(updateData)
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+      : { error: null }
 
     if (updateError) {
       console.error('Quote update error:', updateError)

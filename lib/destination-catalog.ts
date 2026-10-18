@@ -96,6 +96,8 @@ export function focusCities(all: CatalogCity[], cityIds: string[] | null | undef
  */
 export function citiesForDropdown(catalog: CatalogDestination[]): string[] {
   const rows = catalog.filter(d => d.selected).flatMap(d => d.cities)
-  return rows.length === 0 ? [...EGYPT_CITIES] : rows.map(c => c.name)
+  if (rows.length === 0) return [...EGYPT_CITIES]
+  // Once each: two countries with a city of the same name gave two options.
+  return [...new Set(rows.map(c => c.name))]
 }
 

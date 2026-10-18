@@ -1,14 +1,18 @@
+import { formatMoney } from '@/lib/currency-totals'
+import { tripCostBreakdown } from '@/lib/invoices/trip-cost-breakdown'
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import jsPDF from 'jspdf'
 import { brandColorRgb, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
 import { formatDateOnly } from '@/lib/date-utils'
-import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
 
 interface LineItem {
   description: string
   quantity: number
   unit_price: number
   amount: number
+  /** An extra billed with the balance (lib/invoice-additions). */
+  addition?: boolean
 }
 
 interface Invoice {
@@ -16,6 +20,9 @@ interface Invoice {
   invoice_number: string
   invoice_type?: 'standard' | 'deposit' | 'final'
   deposit_percent?: number
+  /** The whole trip's cost, when known. The breakdown otherwise works it back
+   *  from deposit_percent — which was a guess for payment invoices (lib/payment-invoice). */
+  trip_total?: number | null
   parent_invoice_id?: string | null
   client_name: string
   client_email: string
@@ -62,10 +69,8 @@ function letterheadIdentity(company: CompanyInfo): CompanyIdentity {
 // identity (lib/company-identity.ts).
 const DEFAULT_COMPANY: CompanyInfo = { name: '' }
 
-const getCurrencySymbol = (currency: string): string => canonicalCurrencySymbol(currency)
-
 const formatCurrency = (amount: number, currency: string): string => {
-  return `${getCurrencySymbol(currency)}${Number(amount).toFixed(2)}`
+  return formatMoney(amount, currency)
 }
 
 const formatDate = (dateString: string): string => {
@@ -89,9 +94,12 @@ const getInvoiceTypeConfig = (type: string | undefined): { label: string; color:
 
 export function generateInvoicePDF(
   invoice: Invoice, 
-  company: CompanyInfo = DEFAULT_COMPANY
+  company: CompanyInfo = DEFAULT_COMPANY,
+  font?: JsPdfFont | null
 ): jsPDF {
   const doc = new jsPDF()
+  // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+  applyDocumentFont(doc, font)
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
   const contentWidth = pageWidth - (margin * 2)
@@ -151,12 +159,14 @@ export function generateInvoicePDF(
   // ============================================
 
   if (invoiceType !== 'standard' && invoice.deposit_percent) {
-    const fullTripCost = invoiceType === 'deposit'
-      ? (Number(invoice.total_amount) * 100) / invoice.deposit_percent
-      : Number(invoice.total_amount) + (Number(invoice.total_amount) * invoice.deposit_percent) / (100 - invoice.deposit_percent)
-
-    const depositAmount = (fullTripCost * invoice.deposit_percent) / 100
-    const balanceAmount = fullTripCost - depositAmount
+    const { fullTripCost, depositAmount, balanceAmount } = tripCostBreakdown({
+      invoiceType,
+      totalAmount: invoice.total_amount,
+      depositPercent: invoice.deposit_percent,
+      currency: invoice.currency,
+      lineItems: invoice.line_items,
+      tripTotal: invoice.trip_total,
+    })
 
     // Background box
     doc.setFillColor(250, 250, 250)
@@ -183,7 +193,7 @@ export function generateInvoicePDF(
     doc.setFont('helvetica', 'normal')
     doc.text('Full Trip Cost', col1X, y)
     doc.text(`Deposit (${invoice.deposit_percent}%)`, col2X, y)
-    doc.text('Balance on Arrival', col3X, y)
+    doc.text('Balance', col3X, y)
 
     y += 5
 
@@ -241,7 +251,9 @@ export function generateInvoicePDF(
   doc.text('Due Date:', leftColX, y)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...darkGray)
-  const dueDateText = invoice.due_date ? formatDate(invoice.due_date) : (invoiceType === 'final' ? 'On Arrival' : '-')
+  // No due date: the payment terms below say when. "On Arrival" contradicted
+  // a final invoice's own "payable before the first day of service".
+  const dueDateText = invoice.due_date ? formatDate(invoice.due_date) : (invoiceType === 'final' ? 'See payment terms' : '-')
   doc.text(dueDateText, leftColX + 35, y)
 
   // Client email
@@ -510,7 +522,7 @@ export function generateInvoicePDF(
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(146, 64, 14)
-    doc.text('This deposit is required to confirm your booking. The remaining balance is payable upon arrival.', margin + 5, y + 14)
+    doc.text('This deposit is required to confirm your booking. The remaining balance is due as set out in the payment terms.', margin + 5, y + 14)
     
     y += 25
   }
@@ -531,7 +543,8 @@ export function generateInvoicePDF(
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(6, 95, 70)
-    doc.text('This invoice represents the remaining balance after your deposit. Payable in cash upon arrival in Cairo.', margin + 5, y + 14)
+    // It said "Payable in cash upon arrival in Cairo" on every agency's invoice.
+    doc.text('This invoice is the remaining balance after your deposit, payable as set out in the payment terms.', margin + 5, y + 14)
     
     y += 25
   }
@@ -552,8 +565,8 @@ export function generateInvoicePDF(
   return doc
 }
 
-export function downloadInvoicePDF(invoice: Invoice, company?: CompanyInfo): void {
-  const pdf = generateInvoicePDF(invoice, company)
+export function downloadInvoicePDF(invoice: Invoice, company?: CompanyInfo, font?: JsPdfFont | null): void {
+  const pdf = generateInvoicePDF(invoice, company, font)
   
   // Include invoice type in filename
   const typePrefix = invoice.invoice_type && invoice.invoice_type !== 'standard' 

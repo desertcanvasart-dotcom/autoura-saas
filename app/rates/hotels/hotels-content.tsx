@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
@@ -332,7 +333,8 @@ export default function HotelsContent() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
+  // ?q= opens the list filtered (the Rates check page links each finding here).
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '')
   const [selectedCity, setSelectedCity] = useState('all')
   const [selectedSupplier, setSelectedSupplier] = useState('all')
   const [showInactive, setShowInactive] = useState(false)
@@ -361,7 +363,7 @@ export default function HotelsContent() {
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
   // Labels must name the currency the amounts are actually in (C3.4b).
-  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
+  const { symbol: rateSymbol, code: rateCode } = useRateCurrency(rateCurrency)
   // Dated contract periods (C3.2). While any exist, they price the rate and
   // the fixed low/high/peak blocks below are only a fallback.
   const [periods, setPeriods] = useState<RateSeason[]>([])
@@ -1752,7 +1754,7 @@ export default function HotelsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
                     >
                       <option value="">Select City...</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
@@ -1871,7 +1873,7 @@ export default function HotelsContent() {
                     entity="accommodation"
                     periods={periods}
                     onChange={setPeriods}
-                    currencyLabel={rateCurrency || 'EUR'}
+                    currencyLabel={rateCode}
                   />
                 </div>
 
@@ -1889,6 +1891,9 @@ export default function HotelsContent() {
                   Supplements
                   <span className="text-xs font-normal text-gray-500 ml-2">(Optional add-ons per night)</span>
                 </h3>
+                <p className="text-xs text-gray-500 -mt-2 mb-3">
+                  Offered in the Quote Builder under Hotel Services on nights at this hotel, per person per night — the low, high or peak price by the season of the hotel&apos;s rate period. Never added on their own.
+                </p>
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                   {/* Add Supplement Dropdown */}
                   <div className="mb-4">

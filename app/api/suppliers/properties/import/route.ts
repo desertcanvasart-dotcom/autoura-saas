@@ -14,10 +14,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import Papa from 'papaparse'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { propertyCsvHeaderMap } from '@/lib/suppliers/property-csv-schema'
 import { planPropertyCsv, type PropertyCsvRow, type SupplierRef, type ExistingProperty } from '@/lib/suppliers/property-csv-plan'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,6 +27,10 @@ export async function POST(request: NextRequest) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
@@ -64,8 +70,10 @@ export async function POST(request: NextRequest) {
     })
 
     const [{ data: suppliers }, { data: existing }, supplierTypeVocab, accommodationVocab] = await Promise.all([
-      supabase.from('suppliers').select('id, name, supplier_code, type, types').eq('tenant_id', tenant_id),
-      supabase.from('supplier_properties').select('id, supplier_id, property_type, name').eq('tenant_id', tenant_id),
+      // Paged: a plain select stops at 1000 rows, and a supplier or property
+      // past it read as unknown or new.
+      fetchAllPages((from, to) => supabase.from('suppliers').select('id, name, supplier_code, type, types').eq('tenant_id', tenant_id).order('id', { ascending: true }).range(from, to)),
+      fetchAllPages((from, to) => supabase.from('supplier_properties').select('id, supplier_id, property_type, name').eq('tenant_id', tenant_id).order('id', { ascending: true }).range(from, to)),
       loadVocabulary(supabase, 'supplier_type'),
       loadVocabulary(supabase, 'hotel_property_type'),
     ])

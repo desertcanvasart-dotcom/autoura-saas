@@ -53,8 +53,10 @@ describe('uniqueKey per table is a pinned decision', () => {
     )
     expect(src).toContain('partitionImportRows(')
     expect(src).toContain('importRowKey(')
-    // The tenant-scoped existence check must not regress either.
-    expect(src).toMatch(/\.in\(uniqueKeyColumn, keyValues\)\s*\n?\s*\.eq\('tenant_id', tenant_id\)/)
+    // The tenant-scoped existence check must not regress either: the whole
+    // tenant table is read (paged) and the update aims at the stored row's id.
+    expect(src).toMatch(/\.select\(\[\.\.\.new Set\(\['id', \.\.\.uniqueKey[\s\S]{0,200}\.eq\('tenant_id', tenant_id\)/)
+    expect(src).toContain(".eq('tenant_id', tenant_id).eq('id', target.id)")
   })
 })
 

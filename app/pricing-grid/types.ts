@@ -34,6 +34,10 @@ export interface GridConfig {
    *  needs no control — the guide slot's dropdown lists every guide-rate
    *  row (senior and Meet & Assist included). */
   guideMode?: 'spot' | 'throughout'
+  /** The trip's guide language (a guide rate's language, in the agency's
+   *  word). Every guide pick follows it; '' or unset = taken from the guides
+   *  most days already have (lib/guide-language.ts). */
+  guideLanguage?: string
   currency: string
   marginPercent: number
   exchangeRate: number | null  // EUR → target currency
@@ -147,7 +151,7 @@ export const SLOT_DEFINITIONS: SlotDefinition[] = [
   { slotId: 'experiences',      label: 'Experiences',      bucket: 'per_person', selectionMode: 'multi',  icon: '🎈', rateTable: 'activity_rates' },
   { slotId: 'meals',            label: 'Meals',            bucket: 'per_person', selectionMode: 'multi',  icon: '🍽️', rateTable: 'meal_rates' },
   { slotId: 'water',            label: 'Water',            bucket: 'per_person', selectionMode: 'single', icon: '💧', rateTable: null },
-  { slotId: 'cruise',           label: 'Nile Cruise',      bucket: 'per_person', selectionMode: 'single', icon: '🚢', rateTable: 'cruise_rates' },
+  { slotId: 'cruise',           label: 'Cruise',           bucket: 'per_person', selectionMode: 'single', icon: '🚢', rateTable: 'cruise_rates' },
   { slotId: 'other_pp',         label: 'Other (PP)',       bucket: 'per_person', selectionMode: 'custom', icon: '📋', rateTable: null },
 ]
 
@@ -207,6 +211,10 @@ export interface GridDay {
   hotelCheckIn?: boolean
   hotelCheckOut?: boolean
   intercity?: Intercity
+  /** The code of the day block this day was built from (migration 405);
+   *  null/undefined = not built from one. Saved with the itinerary, so a
+   *  reload or another device still knows the day is from the catalog. */
+  blockCode?: string | null
 }
 
 // --- Rate Options (fetched from DB, used in dropdowns) ---
@@ -219,6 +227,10 @@ export interface RateOption {
   city?: string
   category?: string
   details?: string  // e.g., "4★", "Standard cabin", "Aswan → Luxor"
+  /** Guides: the language, in the agency's word (a dropdown filter). */
+  language?: string
+  /** Hotels: the board basis (BB, HB …) — a dropdown filter. */
+  board_basis?: string
   // Optional metadata used by the rich gate. Transport rates carry
   // service_type (airport_transfer / day_tour / intercity_transfer / etc.);
   // entrance fees carry pricing_class (mandatory / optional / free). Slot
@@ -233,6 +245,9 @@ export interface RateOption {
   // vehicle as group size grows — the one cost that is non-linear in pax.
   capacity_min?: number
   capacity_max?: number
+  /** Transport only: the vehicle's own transportation_rates row (the option
+   *  id is the route's keeper row + the vehicle). */
+  row_id?: string
   /** The throughout guide's rate on this option (B-item 3): a hotel/cruise
    *  option's FIRST-period guide bed (null = no concession — an amber
    *  unpriced night, never a silent zero), or a flight's negotiated guide

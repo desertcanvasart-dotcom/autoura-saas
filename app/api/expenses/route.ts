@@ -7,6 +7,10 @@
 // Security: Requires authentication for all operations
 // ============================================
 
+import { gateRole, roleDenied } from '@/lib/api-role-gate'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { checkExpenseFields } from '@/lib/expenses/expense-fields'
+import { EXPENSE_STATUSES, expenseStatusUpdate } from '@/lib/expense-status'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-numbering'
@@ -18,6 +22,11 @@ import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-number
  * RLS policies automatically filter by tenant_id
  */
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Use authenticated client - RLS automatically filters by tenant
     const supabase = await createAuthenticatedClient()
@@ -39,36 +48,22 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    let query = supabase
-      .from('expenses')
-      .select('*')
-      .order('expense_date', { ascending: false })
-
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    if (category) {
-      query = query.eq('category', category)
-    }
-
-    if (supplierType) {
-      query = query.eq('supplier_type', supplierType)
-    }
-
-    if (itineraryId) {
-      query = query.eq('itinerary_id', itineraryId)
-    }
-
-    if (startDate) {
-      query = query.gte('expense_date', startDate)
-    }
-
-    if (endDate) {
-      query = query.lte('expense_date', endDate)
-    }
-
-    const { data, error } = await query
+    // Every matching expense, a page at a time — one read stopped at 1000
+    // rows and the totals on the page were worked out from the cut list.
+    const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => {
+      let query = supabase
+        .from('expenses')
+        .select('*')
+        .order('expense_date', { ascending: false })
+        .order('id', { ascending: true })
+      if (status) query = query.eq('status', status)
+      if (category) query = query.eq('category', category)
+      if (supplierType) query = query.eq('supplier_type', supplierType)
+      if (itineraryId) query = query.eq('itinerary_id', itineraryId)
+      if (startDate) query = query.gte('expense_date', startDate)
+      if (endDate) query = query.lte('expense_date', endDate)
+      return query.range(from, to)
+    })
 
     if (error) {
       console.error('❌ Error fetching expenses:', error)
@@ -88,6 +83,11 @@ export async function GET(request: NextRequest) {
  * Requires authentication and validates tenant ownership
  */
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
@@ -108,11 +108,37 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validate required fields
-    if (!body.category || !body.amount || !body.expense_date) {
+    if (!body.category || body.amount === undefined || body.amount === '' || !body.expense_date) {
       return NextResponse.json(
         { error: 'Category, amount, and expense date are required' },
         { status: 400 }
       )
+    }
+    const checked: Record<string, unknown> = {
+      amount: body.amount,
+      currency: body.currency || null,
+      expense_date: body.expense_date,
+      payment_date: body.payment_date || null,
+      receipt_url: typeof body.receipt_url === 'string' && body.receipt_url.trim() ? body.receipt_url.trim() : null,
+    }
+    const bad = checkExpenseFields(checked)
+    if (bad) return NextResponse.json({ error: bad }, { status: 400 })
+
+    // A new expense may start approved or paid — a manager's call — and
+    // goes through the same status rule as an edit, so "Paid" gets its
+    // payment date (it was stored with none, and Payables missed it).
+    const statusUpdate = expenseStatusUpdate(body.status || 'pending', body.payment_date || undefined)
+    if (!statusUpdate) {
+      return NextResponse.json({ error: `status must be one of: ${EXPENSE_STATUSES.join(', ')}` }, { status: 400 })
+    }
+    if (statusUpdate.status !== 'pending' && roleDenied(authResult.role, 'manage')) {
+      return roleDenied(authResult.role, 'manage')!
+    }
+    // The agency's currency when none is picked (it was always EUR).
+    let currency = checked.currency as string | null
+    if (!currency) {
+      const { data: t } = await supabase.from('tenants').select('default_currency').eq('id', tenant_id).maybeSingle()
+      currency = (t as { default_currency?: string | null } | null)?.default_currency || 'EUR'
     }
 
     // If itinerary_id provided, verify it belongs to this tenant
@@ -159,16 +185,15 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null,
       category: body.category,
       description: body.description || null,
-      amount: body.amount,
-      currency: body.currency || 'EUR',
+      amount: checked.amount as number,
+      currency,
       expense_date: body.expense_date,
       supplier_name: body.supplier_name || null,
       supplier_type: body.supplier_type || null,
-      receipt_url: body.receipt_url || null,
+      receipt_url: checked.receipt_url as string | null,
       receipt_filename: body.receipt_filename || null,
-      status: body.status || 'pending',
       payment_method: body.payment_method || null,
-      payment_date: body.payment_date || null,
+      ...statusUpdate,
       payment_reference: body.payment_reference || null,
       notes: body.notes || null,
       created_at: new Date().toISOString(),

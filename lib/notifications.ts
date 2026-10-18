@@ -13,7 +13,9 @@
  */
 
 import { createAdminClient } from '@/lib/supabase-server'
+import { reminderChannels, type NotificationPreferences, type TaskNotificationKind } from '@/lib/tasks/task-reminders'
 import { sendSystemEmail } from '@/lib/email'
+import { escapeHtml, appLinkHref } from '@/lib/html-escape'
 import { sendPushToUsers, type PushPayload } from '@/lib/push'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -189,6 +191,20 @@ export function bellSnippet(text: string | null | undefined, max = 140): string 
 export async function createNotification(input: CreateNotificationInput) {
   const supabase = createAdminClient() as any
 
+  // Task notifications follow the recipient's Settings → Notifications:
+  // the per-event switch (Task Assigned, Due Soon, Overdue, Completed) and
+  // the email / in-app switches. Task Assigned and Task Completed were shown
+  // there but nothing read them.
+  if (TASK_KINDS.has(input.type)) {
+    const channels = await taskChannelsFor(supabase, input.team_member_id, input.type as TaskNotificationKind)
+    if (!channels.remind) return null
+    if (!channels.email) input = { ...input, send_email: false }
+    if (!channels.inApp) {
+      if (input.send_email) await emailOnly(supabase, input)
+      return null
+    }
+  }
+
   const { data: notification, error } = await supabase
     .from('notifications')
     .insert({
@@ -232,6 +248,36 @@ export async function createNotification(input: CreateNotificationInput) {
   return notification
 }
 
+const TASK_KINDS = new Set(['task_assigned', 'task_completed', 'task_due_soon', 'task_overdue'])
+
+/** A team member's switches, through their login (matched by email, as staff records have no user id). */
+async function taskChannelsFor(supabase: ReturnType<typeof createAdminClient>, teamMemberId: string, kind: TaskNotificationKind) {
+  try {
+    const { data: member } = await supabase.from('team_members').select('email').eq('id', teamMemberId).maybeSingle()
+    const email = member?.email ? String(member.email).trim().toLowerCase() : ''
+    if (!email) return reminderChannels(null, kind)
+    const { data: profile } = await supabase.from('user_profiles').select('id').ilike('email', email).limit(1).maybeSingle()
+    if (!profile?.id) return reminderChannels(null, kind)
+    const { data: settings } = await supabase.from('user_settings').select('notification_preferences').eq('user_id', profile.id).maybeSingle()
+    return reminderChannels((settings?.notification_preferences ?? null) as NotificationPreferences | null, kind)
+  } catch {
+    // Settings that cannot be read: the defaults (everything on).
+    return reminderChannels(null, kind)
+  }
+}
+
+/** Email the person without a bell entry (in-app switched off). */
+async function emailOnly(supabase: ReturnType<typeof createAdminClient>, input: CreateNotificationInput) {
+  try {
+    const { data: member } = await supabase.from('team_members').select('name, email').eq('id', input.team_member_id).maybeSingle()
+    if (member?.email) {
+      await sendEmailNotification(member.email, member.name, input.title, input.message, input.link ?? null, input.type)
+    }
+  } catch (err) {
+    console.error('Failed to send email notification:', err)
+  }
+}
+
 // Helper function to send an email notification via Resend (system transport).
 async function sendEmailNotification(
   toEmail: string,
@@ -254,6 +300,12 @@ async function sendEmailNotification(
 
   const config = typeConfig[type] || { color: '#647C47', icon: '🔔', label: 'Notification', buttonText: 'View' }
 
+  // Every caller-supplied value is escaped. `message` can be a traveller's
+  // own words (the public trip-report form, app/api/share/[token]/report) and
+  // `link` can come from a request body: unescaped, both let outsiders put
+  // markup and links into an email sent from the platform address to staff.
+  const href = appLinkHref(baseUrl, link)
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -272,12 +324,12 @@ async function sendEmailNotification(
 
           <!-- Content -->
           <div style="padding: 24px;">
-            <p style="color: #374151; font-size: 16px; margin: 0 0 8px 0;">Hi ${toName},</p>
-            <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px 0; white-space: pre-line;">${message}</p>
+            <p style="color: #374151; font-size: 16px; margin: 0 0 8px 0;">Hi ${escapeHtml(toName)},</p>
+            <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px 0; white-space: pre-line;">${escapeHtml(message)}</p>
 
-            ${link ? `
+            ${href ? `
               <div style="text-align: center; margin: 24px 0;">
-                <a href="${baseUrl}${link}" style="display: inline-block; background-color: ${config.color}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 14px;">
+                <a href="${href}" style="display: inline-block; background-color: ${config.color}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 14px;">
                   ${config.buttonText}
                 </a>
               </div>
@@ -309,7 +361,7 @@ async function sendEmailNotification(
 
   return sendSystemEmail({
     to: toEmail,
-    subject: `[Autoura] ${subject}`,
+    subject: `[Autoura] ${String(subject).replace(/[\r\n]+/g, ' ')}`,
     html: htmlContent,
   })
 }

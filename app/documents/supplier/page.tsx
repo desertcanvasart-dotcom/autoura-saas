@@ -2,12 +2,15 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { withReturnTo, safeReturnPath, FROM_PARAM } from '@/lib/nav/return-to'
+import { BackLink } from '@/components/nav/TripNav'
 import { 
   FileText, Send, Eye, Trash2, Pencil,
   Hotel, Car, Ship, MapPin, Users, CheckCircle,
-  Clock, RotateCcw
+  Clock, RotateCcw, AlertTriangle
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface SupplierDocument {
   id: string
@@ -73,9 +76,26 @@ export default function SupplierDocumentsPage() {
   // every document from every trip (reported 2026-10-06). Read off window,
   // as app/team-members does, so the page needs no Suspense boundary.
   const [itineraryFilter, setItineraryFilter] = useState<string | null>(null)
+  // Where this list was opened from (a trip, its booking): ?from=, kept through
+  // the list's own links so back from a document, then back again, gets there.
+  const [returnTo, setReturnTo] = useState<string | null>(null)
+  // The trip's services that are on no document yet. The documents are a
+  // snapshot of the trip when Generate ran; a trip saved again afterwards
+  // (the Pricing Grid rewrites every line) left services with no document and
+  // nothing here to say so (live ITN-S-2026-8987).
+  const [missing, setMissing] = useState<Array<{ document_type: string; supplier_name: string; lines: number }>>([])
+  const [generatingMissing, setGeneratingMissing] = useState(false)
+  // Documents holding lines the trip no longer has (removed, renamed or moved
+  // to another day since Generate). They were left as they were, silently.
+  const [stale, setStale] = useState<Array<{ id: string; document_number: string | null; supplier_name: string | null; gone: number }>>([])
 
   useEffect(() => {
-    setItineraryFilter(new URLSearchParams(window.location.search).get('itineraryId'))
+    const params = new URLSearchParams(window.location.search)
+    setItineraryFilter(params.get('itineraryId'))
+    setReturnTo(safeReturnPath(params.get(FROM_PARAM)))
+    // The documents hub's cards link here with ?type=…; only a known type filters.
+    const type = params.get('type')
+    if (type && DOCUMENT_TYPES.some(d => d.value === type)) setTypeFilter(type)
     setMounted(true)
   }, [])
 
@@ -85,10 +105,54 @@ export default function SupplierDocumentsPage() {
     }
   }, [mounted, typeFilter, statusFilter, itineraryFilter])
 
+  const fetchMissing = async (id: string | null) => {
+    if (!id) { setMissing([]); setStale([]); return }
+    try {
+      const response = await fetch(`/api/itineraries/${encodeURIComponent(id)}/generate-documents`)
+      const result = response.ok ? await response.json() : null
+      setMissing(Array.isArray(result?.missing) ? result.missing : [])
+      setStale(Array.isArray(result?.stale) ? result.stale : [])
+    } catch {
+      setMissing([])
+      setStale([])
+    }
+  }
+
+  useEffect(() => {
+    if (mounted) fetchMissing(itineraryFilter)
+  }, [mounted, itineraryFilter])
+
+  const generateMissing = async () => {
+    if (!itineraryFilter) return
+    setGeneratingMissing(true)
+    try {
+      const response = await fetch(`/api/itineraries/${encodeURIComponent(itineraryFilter)}/generate-documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !result?.success) {
+        await dialog.alert('Documents not generated', result?.error || 'Could not generate the missing documents.', 'warning')
+      }
+    } finally {
+      setGeneratingMissing(false)
+      fetchDocuments()
+      fetchMissing(itineraryFilter)
+    }
+  }
+
+  const listPath = (id: string | null) =>
+    id ? `/documents/supplier?itineraryId=${encodeURIComponent(id)}` : '/documents/supplier'
+
   const showItinerary = (id: string | null) => {
     setItineraryFilter(id)
-    window.history.replaceState(null, '', id ? `/documents/supplier?itineraryId=${encodeURIComponent(id)}` : '/documents/supplier')
+    window.history.replaceState(null, '', withReturnTo(listPath(id), returnTo))
   }
+
+  // This list as it stands (trip filter and ?from=), for a document's back link.
+  const listHref = withReturnTo(listPath(itineraryFilter), returnTo)
+  const fromList = (href: string) => (listHref === '/documents/supplier' ? href : withReturnTo(href, listHref))
 
   const fetchDocuments = async () => {
     setLoading(true)
@@ -129,9 +193,15 @@ export default function SupplierDocumentsPage() {
       
       if (response.ok) {
         fetchDocuments()
+        fetchMissing(itineraryFilter)
+      } else {
+        // A refusal (your role, a document gone) used to change nothing silently.
+        const body = await response.json().catch(() => ({}))
+        showToast('error', body.error || 'Could not change the status')
       }
     } catch (error) {
       console.error('Error updating status:', error)
+      showToast('error', 'Could not change the status')
     }
   }
 
@@ -145,9 +215,14 @@ export default function SupplierDocumentsPage() {
       
       if (response.ok) {
         fetchDocuments()
+        fetchMissing(itineraryFilter)
+      } else {
+        const body = await response.json().catch(() => ({}))
+        showToast('error', body.error || 'Could not delete the document')
       }
     } catch (error) {
       console.error('Error deleting document:', error)
+      showToast('error', 'Could not delete the document')
     }
   }
 
@@ -215,12 +290,8 @@ export default function SupplierDocumentsPage() {
             )}
             {itineraryFilter ? (
               <div className="flex items-center gap-4">
-                <Link
-                  href={`/itineraries/${itineraryFilter}`}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-                >
-                  ← Back to itinerary
-                </Link>
+                {/* Back to where it was opened from (the trip, or its booking). */}
+                <BackLink fallbackHref={`/itineraries/${itineraryFilter}`} fallbackLabel="Itinerary" />
                 <button
                   type="button"
                   onClick={() => showItinerary(null)}
@@ -230,12 +301,7 @@ export default function SupplierDocumentsPage() {
                 </button>
               </div>
             ) : (
-              <Link
-                href="/documents"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                ← Back to All Documents
-              </Link>
+              <BackLink fallbackHref="/documents" fallbackLabel="All Documents" />
             )}
           </div>
         </div>
@@ -252,6 +318,59 @@ export default function SupplierDocumentsPage() {
             >
               Try Again
             </button>
+          </div>
+        )}
+
+        {/* Services on the trip that no document carries yet. */}
+        {itineraryFilter && missing.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  {missing.length === 1 ? 'One document is' : `${missing.length} documents are`} not generated yet
+                </p>
+                <p className="text-sm text-amber-800">
+                  {missing.map(m => m.supplier_name).join(' · ')}
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  The trip has services no document carries, usually because it changed after documents were generated.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={generateMissing}
+              disabled={generatingMissing}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 whitespace-nowrap"
+            >
+              {generatingMissing ? 'Generating…' : 'Generate missing'}
+            </button>
+          </div>
+        )}
+
+        {/* Documents the trip has changed under. */}
+        {itineraryFilter && stale.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                {stale.length === 1 ? 'One document no longer matches' : `${stale.length} documents no longer match`} the trip
+              </p>
+              <ul className="text-sm text-amber-800 mt-1 space-y-0.5">
+                {stale.map(d => (
+                  <li key={d.id}>
+                    <Link href={fromList(`/documents/supplier/${d.id}`)} className="font-medium underline hover:text-amber-900">
+                      {d.document_number || d.supplier_name}
+                    </Link>
+                    {' '}· {d.supplier_name} — {d.gone} line{d.gone === 1 ? '' : 's'} no longer on the trip
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-700 mt-1">
+                The trip changed after these were generated. Edit them, or cancel them and generate again; tell the supplier if one was already sent.
+              </p>
+            </div>
           </div>
         )}
 
@@ -452,7 +571,8 @@ export default function SupplierDocumentsPage() {
                               <div className="flex items-center justify-end gap-1">
                                 {/* View */}
                                 <Link
-                                  href={`/documents/supplier/${doc.id}`}
+                                  // Back from the document returns to this list, still filtered to the trip.
+                                  href={fromList(`/documents/supplier/${doc.id}`)}
                                   className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                                   title="View"
                                 >
@@ -462,7 +582,7 @@ export default function SupplierDocumentsPage() {
                                 {/* Edit - available for all statuses EXCEPT cancelled */}
                                 {doc.status !== 'cancelled' && (
                                   <Link
-                                    href={`/documents/supplier/${doc.id}/edit`}
+                                    href={fromList(`/documents/supplier/${doc.id}/edit`)}
                                     className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
                                     title="Edit"
                                   >

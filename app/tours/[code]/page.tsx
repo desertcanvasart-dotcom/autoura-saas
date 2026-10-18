@@ -1,4 +1,5 @@
 'use client'
+import { getCurrencySymbol } from '@/lib/currency'
 
 // ============================================
 // TOUR DETAIL PAGE WITH DYNAMIC PRICING
@@ -8,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { DayBandBlock, groupByDay } from '@/components/pricing/DayBand'
 import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
-import { todayLocal } from '@/lib/today'
+import { shiftDateISO, todayLocal } from '@/lib/today'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -114,13 +115,13 @@ export default function TourDetailPage() {
   
   // Pricing state
   const [selectedPax, setSelectedPax] = useState(2)
-  const [travelDate, setTravelDate] = useState(() => {
-    const date = new Date()
-    date.setDate(date.getDate() + 14) // Default 2 weeks from now
-    return date.toISOString().split('T')[0]
-  })
+  // Two weeks from the visitor's own today: through UTC it was 13 days ahead
+  // on mornings east of UTC.
+  const [travelDate, setTravelDate] = useState(() => shiftDateISO(todayLocal(), 14))
   const [isEurPassport, setIsEurPassport] = useState(true)
   const [pricing, setPricing] = useState<PricingResult | null>(null)
+  // The price's own currency: € was printed whatever it was priced in.
+  const sym = getCurrencySymbol((pricing as { currency?: string } | null)?.currency || 'EUR')
   const [pricingLoading, setPricingLoading] = useState(false)
   const [pricingError, setPricingError] = useState<string | null>(null)
   const [showBreakdown, setShowBreakdown] = useState(false)
@@ -347,7 +348,7 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[#647C47]">€</span>
+            <span className="text-[#647C47]">{sym}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">From</p>
@@ -355,9 +356,9 @@ export default function TourDetailPage() {
             {pricingLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : pricing ? (
-              `€${pricing.price_per_person.toFixed(0)}`
+              `${sym}${pricing.price_per_person.toFixed(0)}`
             ) : (
-              '€N/A'
+              '—'
             )}
           </p>
         </div>
@@ -623,11 +624,11 @@ export default function TourDetailPage() {
                     </span>
                   </div>
                   <p className="text-3xl font-bold text-[#647C47]">
-                    €{pricing.price_per_person.toFixed(0)}
+                    {sym}{pricing.price_per_person.toFixed(0)}
                   </p>
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#647C47]/20">
                     <span className="text-sm text-gray-600">Total for {selectedPax} {selectedPax === 1 ? 'person' : 'people'}</span>
-                    <span className="text-lg font-semibold text-gray-900">€{pricing.selling_price.toFixed(0)}</span>
+                    <span className="text-lg font-semibold text-gray-900">{sym}{pricing.selling_price.toFixed(0)}</span>
                   </div>
                 </div>
 
@@ -668,7 +669,7 @@ export default function TourDetailPage() {
                               {(service as { unpriced?: boolean }).unpriced ? (
                                 <span className="text-red-600 font-medium">No rate</span>
                               ) : (
-                                <span className="text-gray-900 font-medium">€{service.line_total.toFixed(0)}</span>
+                                <span className="text-gray-900 font-medium">{sym}{service.line_total.toFixed(0)}</span>
                               )}
                             </div>
                           ))}
@@ -677,7 +678,7 @@ export default function TourDetailPage() {
                     </div>
                     <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between text-sm font-medium">
                       <span className="text-gray-700">Subtotal</span>
-                      <span className="text-gray-900">€{pricing.subtotal_cost.toFixed(0)}</span>
+                      <span className="text-gray-900">{sym}{pricing.subtotal_cost.toFixed(0)}</span>
                     </div>
                   </div>
                 )}
@@ -690,7 +691,7 @@ export default function TourDetailPage() {
                       {pricing.optional_services.map((service, idx) => (
                         <div key={idx} className="flex items-center justify-between text-sm">
                           <span className="text-amber-800">{service.service_name}</span>
-                          <span className="text-amber-900 font-medium">+€{service.line_total.toFixed(0)}</span>
+                          <span className="text-amber-900 font-medium">+{sym}{service.line_total.toFixed(0)}</span>
                         </div>
                       ))}
                     </div>

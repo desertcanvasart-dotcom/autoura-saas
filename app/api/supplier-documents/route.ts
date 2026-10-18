@@ -1,39 +1,8 @@
-import { requireAuth } from '@/lib/supabase-server'
+import { orIlikeContains } from '@/lib/postgrest-search'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
-
-// Document number prefixes
-const DOC_PREFIXES: Record<string, string> = {
-  hotel_voucher: 'HV',
-  service_order: 'SO',
-  transport_voucher: 'TV',
-  activity_voucher: 'AV',
-  guide_assignment: 'GA',
-  cruise_voucher: 'CV'
-}
-
-async function generateDocumentNumber(supabase: any, docType: string): Promise<string> {
-  const prefix = DOC_PREFIXES[docType] || 'SD'
-  const year = new Date().getFullYear()
-  const pattern = `${prefix}-${year}-%`
-  
-  const { data } = await supabase
-    .from('supplier_documents')
-    .select('document_number')
-    .like('document_number', pattern)
-    .order('document_number', { ascending: false })
-    .limit(1)
-  
-  let nextNum = 1
-  if (data && data.length > 0) {
-    const lastNum = data[0].document_number
-    const match = lastNum.match(/-(\d+)$/)
-    if (match) {
-      nextNum = parseInt(match[1], 10) + 1
-    }
-  }
-  
-  return `${prefix}-${year}-${String(nextNum).padStart(4, '0')}`
-}
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(request: NextRequest) {
   // Authenticate and get tenant context
@@ -90,7 +59,7 @@ export async function GET(request: NextRequest) {
   }
   
   if (search) {
-    query = query.or(`document_number.ilike.%${search}%,supplier_name.ilike.%${search}%,client_name.ilike.%${search}%,city.ilike.%${search}%`)
+    query = query.or(`document_number.ilike.${orIlikeContains(search)},supplier_name.ilike.${orIlikeContains(search)},client_name.ilike.${orIlikeContains(search)},city.ilike.${orIlikeContains(search)}`)
   }
   
   if (startDate) {
@@ -132,6 +101,15 @@ export async function GET(request: NextRequest) {
   })
 }
 
+const SUPPLIER_DOCUMENT_FIELDS = [
+  'document_type', 'document_number', 'itinerary_id', 'supplier_id', 'supplier_name',
+  'supplier_contact_name', 'supplier_contact_email', 'supplier_contact_phone', 'supplier_address',
+  'client_name', 'client_nationality', 'num_adults', 'num_children', 'city', 'service_date',
+  'check_in', 'check_out', 'pickup_time', 'pickup_location', 'dropoff_location', 'driver_name',
+  'vehicle_type', 'services', 'currency', 'total_cost', 'payment_terms', 'special_requests',
+  'internal_notes',
+] as const
+
 export async function POST(request: NextRequest) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
@@ -151,15 +129,27 @@ export async function POST(request: NextRequest) {
     }
 
   try {
-    const body = await request.json()
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
+    const raw = await request.json()
 
-    // Generate document number if not provided
-    if (!body.document_number) {
-      body.document_number = await generateDocumentNumber(supabase, body.document_type)
-    }
-
-    // Add tenant_id for multi-tenancy
+    // Only the fields a new document is made of: the whole body used to be
+    // inserted, so a caller could set status, sent_at or confirmed_at — a
+    // document "confirmed" by a supplier who never saw it.
+    const body: typeof raw = {}
+    for (const k of SUPPLIER_DOCUMENT_FIELDS) if (raw && k in raw) body[k] = raw[k]
     body.tenant_id = tenant_id
+
+    // The supplier and trip must be this company's (the RLS client sees only
+    // its own; a foreign id was stored anyway when the lookup came back empty).
+    if (body.supplier_id) {
+      const { data: own } = await supabase.from('suppliers').select('id').eq('id', String(body.supplier_id)).maybeSingle()
+      if (!own) return NextResponse.json({ success: false, error: 'Supplier not found' }, { status: 404 })
+    }
+    if (body.itinerary_id) {
+      const { data: own } = await supabase.from('itineraries').select('id').eq('id', String(body.itinerary_id)).maybeSingle()
+      if (!own) return NextResponse.json({ success: false, error: 'Itinerary not found' }, { status: 404 })
+    }
 
     // If supplier_id provided, fetch supplier details
     if (body.supplier_id && !body.supplier_name) {
@@ -193,11 +183,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase
-      .from('supplier_documents')
-      .insert([body])
-      .select()
-      .single()
+    // A number the caller chose is used as is. Otherwise number it against
+    // every tenant's numbers (the column is UNIQUE across the table; the
+    // caller's RLS client sees only its own), retrying on a clash.
+    const insert = (rows: typeof body[]) => supabase.from('supplier_documents').insert(rows).select().single()
+    const { data, error } = body.document_number
+      ? await insert([body])
+      : await insertNumbered([body], createAdminClient(), insert)
 
     if (error) {
       console.error('Error creating supplier document:', error)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(
   request: NextRequest,
@@ -43,6 +44,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
@@ -148,6 +151,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 

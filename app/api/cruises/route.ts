@@ -1,3 +1,6 @@
+import type { TablesInsert } from '@/types/database.types'
+import { withoutKeys, IDENTITY_KEYS } from '@/lib/without-keys'
+import { gateRole } from '@/lib/api-role-gate'
 // app/api/cruises/route.ts
 
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -56,6 +59,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -66,7 +72,8 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminClient()
-    const body = await request.json()
+    // The company and row identity come from the session, never the body.
+    const body = withoutKeys(await request.json(), IDENTITY_KEYS) as Omit<TablesInsert<'nile_cruises'>, 'tenant_id'>
 
     const { data, error } = await supabase
       .from('nile_cruises')

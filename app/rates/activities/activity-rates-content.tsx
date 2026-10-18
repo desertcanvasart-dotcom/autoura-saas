@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
@@ -100,7 +101,7 @@ export default function ActivityRatesContent() {
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
   // Labels must name the currency the amounts are actually in (C3.4b).
-  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
+  const { symbol: rateSymbol, code: rateCode } = useRateCurrency(rateCurrency)
   // Group-size bands (C3.3); used when pricing_type is 'tiered'.
   const [tiers, setTiers] = useState<ActivityTier[]>([])
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
@@ -170,7 +171,9 @@ export default function ActivityRatesContent() {
   const fetchRates = async () => {
     try {
       const params = new URLSearchParams()
-      if (!showInactive) params.append('active_only', 'true')
+      // Every rate, inactive too: the list filters them (matchesActive). The
+      // fetch ran once, on mount, with active_only — so "Show All" had nothing
+      // to show and a deactivated rate could never be found to switch back on.
 
       const response = await fetch(`/api/rates/activities?${params}`)
       const data = await response.json()
@@ -789,7 +792,7 @@ export default function ActivityRatesContent() {
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
           >
             <option value="">All Cities</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, selectedCity || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1254,7 +1257,7 @@ export default function ActivityRatesContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select City</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
@@ -1352,7 +1355,7 @@ export default function ActivityRatesContent() {
                       </div>
                     </div>
                     <p className="text-xs text-blue-600">
-                      💡 Example: Felucca ride costs €25/boat and can hold 1-6 passengers
+                      💡 Example: Felucca ride costs {rateSymbol}25/boat and can hold 1-6 passengers
                     </p>
                   </div>
                 )}
@@ -1398,7 +1401,7 @@ export default function ActivityRatesContent() {
                         <ActivityTiersEditor
                           tiers={tiers}
                           onChange={setTiers}
-                          currencyLabel={rateCurrency || 'EUR'}
+                          currencyLabel={rateCode}
                         />
                         <p className="text-xs text-purple-600 mt-2">
                           💡 Example: 1–4 pax at a higher per-person rate, 5–12 pax at a lower one. The matching band&apos;s rate is used at quote time.

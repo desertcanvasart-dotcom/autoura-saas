@@ -16,9 +16,12 @@ interface BlockPickerProps {
   disabled?: boolean
   /** Small, for a day's header. */
   compact?: boolean
+  /** The block the day is already built from: shown as its code (a badge,
+   *  not the "use a block" icon) and marked in the list. */
+  current?: string | null
 }
 
-export default function BlockPicker({ blocks, onPick, label, title, disabled, compact }: BlockPickerProps) {
+export default function BlockPicker({ blocks, onPick, label, title, disabled, compact, current }: BlockPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const box = useRef<HTMLDivElement>(null)
@@ -43,12 +46,14 @@ export default function BlockPicker({ blocks, onPick, label, title, disabled, co
         onClick={() => setOpen(o => !o)}
         disabled={disabled || blocks.length === 0}
         title={blocks.length === 0 ? 'No day blocks yet: add them in Settings → Day blocks' : title}
-        className={compact
-          ? 'flex items-center gap-1 p-1.5 text-gray-400 hover:text-green-700 rounded-md hover:bg-green-50 transition-colors disabled:opacity-40'
-          : 'flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:border-green-500 hover:text-green-700 transition-colors disabled:opacity-40 whitespace-nowrap'}
+        className={compact && current
+          ? 'flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-mono font-medium text-green-800 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-40 whitespace-nowrap'
+          : compact
+            ? 'flex items-center gap-1 p-1.5 text-gray-400 hover:text-green-700 rounded-md hover:bg-green-50 transition-colors disabled:opacity-40'
+            : 'flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:border-green-500 hover:text-green-700 transition-colors disabled:opacity-40 whitespace-nowrap'}
       >
         <Blocks className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-        {!compact && label}
+        {compact ? (current ?? null) : label}
       </button>
       {open && (
         <div className="absolute right-0 z-30 mt-1 w-[min(22rem,calc(100vw-2rem))] bg-white border border-gray-200 rounded-lg shadow-lg">
@@ -68,11 +73,12 @@ export default function BlockPicker({ blocks, onPick, label, title, disabled, co
                 <button
                   type="button"
                   onClick={() => { onPick(b); setOpen(false); setQuery('') }}
-                  className="w-full text-left px-3 py-2 hover:bg-green-50"
+                  className={`w-full text-left px-3 py-2 hover:bg-green-50 ${b.code === current ? 'bg-green-50/70' : ''}`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] px-1 py-0.5 bg-gray-100 rounded text-gray-600">{b.code}</span>
                     <span className="text-sm text-gray-900 truncate">{b.name}</span>
+                    {b.code === current && <span className="ml-auto shrink-0 text-[10px] font-medium text-green-700">This day</span>}
                   </div>
                   <div className="text-[11px] text-gray-500 mt-0.5">
                     {b.city ?? 'Any city'}{b.to_city && b.to_city !== b.city ? ` → ${b.to_city}` : ''} · {nightLabel(b)}

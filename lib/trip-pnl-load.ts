@@ -18,6 +18,7 @@ import {
   type TripPnL,
 } from '@/lib/trip-pnl'
 import { extrasAdmin } from '@/lib/booking-extras-db'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 /**
  * Above this many itinerary ids, an `.in()` filter makes the query string
@@ -33,6 +34,34 @@ export interface LoadedTripPnls {
   commissionsAvailable: boolean
 }
 
+/** A financial read that failed: the report must not show it as nothing. */
+export class PnlLoadError extends Error {}
+
+/**
+ * Every row of `table` for the given trips: ids in chunks short enough for a
+ * URL, each chunk read a page at a time. One unpaged read stopped at the
+ * database's 1000-row cap, and past 300 trips the tenant-wide read did too,
+ * so a busy agency's costs were silently cut and its profit overstated.
+ */
+async function readForTrips<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
+  table: string,
+  columns: string,
+  ids: string[],
+): Promise<{ data: T[]; error: unknown }> {
+  const rows: T[] = []
+  for (let i = 0; i < ids.length; i += MAX_IN_FILTER_IDS) {
+    const chunk = ids.slice(i, i + MAX_IN_FILTER_IDS)
+    const { data, error } = await fetchAllPages<T>((from, to) =>
+      supabase.from(table).select(columns).in('itinerary_id', chunk).order('id', { ascending: true }).range(from, to) as unknown as PromiseLike<{ data: T[] | null; error: unknown }>
+    )
+    if (error) return { data: rows, error }
+    rows.push(...data)
+  }
+  return { data: rows, error: null }
+}
+
 export async function loadTripPnls(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>,
@@ -42,36 +71,20 @@ export async function loadTripPnls(
     const itineraryIds = itineraries.map(i => i.id)
 
     // ---------- Financial rows (RLS filters by tenant) ----------
-    // Narrow to the itineraries in view so a single-trip report does not pull
-    // the tenant's entire financial history. Past a few hundred ids the
-    // filter itself becomes a very long query string, so beyond that we fetch
-    // tenant-wide (RLS still scopes it) and group in memory instead.
-    const scopeToTrips = itineraryIds.length <= MAX_IN_FILTER_IDS
-    const scoped = <T>(query: T): T =>
-      scopeToTrips
-        ? ((query as { in: (col: string, vals: string[]) => T }).in('itinerary_id', itineraryIds))
-        : query
-
     const [invoiceResult, expenseResult, commissionResult] = await Promise.all([
-      scoped(
-        supabase
-          .from('invoices')
-          .select('itinerary_id, invoice_number, total_amount, amount_paid, currency, status, issue_date, paid_at')
-      ),
-      scoped(
-        supabase
-          .from('expenses')
-          .select('itinerary_id, expense_number, amount, currency, category, status, expense_date, payment_date, booking_supplier_status_id')
-      ),
-      scoped(
-        supabase
-          .from('commissions')
-          .select('itinerary_id, description, source_name, commission_amount, currency, commission_type, category, status, transaction_date, paid_date, due_date')
-      ),
+      readForTrips<PnlInvoice>(supabase, 'invoices',
+        'itinerary_id, invoice_number, total_amount, tax_amount, invoice_type, amount_paid, currency, status, issue_date, paid_at', itineraryIds),
+      readForTrips<PnlExpense>(supabase, 'expenses',
+        'itinerary_id, expense_number, amount, currency, category, status, expense_date, payment_date, booking_supplier_status_id', itineraryIds),
+      readForTrips<PnlCommission>(supabase, 'commissions',
+        'itinerary_id, description, source_name, commission_amount, currency, commission_type, category, status, transaction_date, paid_date, due_date', itineraryIds),
     ])
 
-    if (invoiceResult.error) console.error('Error fetching invoices:', invoiceResult.error)
-    if (expenseResult.error) console.error('Error fetching expenses:', expenseResult.error)
+    // Invoices and expenses are the report: if either cannot be read, a
+    // trip's revenue fell back to its quote and its costs to 0 — figures
+    // that looked real. Refuse instead.
+    if (invoiceResult.error) { console.error('Error fetching invoices:', invoiceResult.error); throw new PnlLoadError('Could not read invoices') }
+    if (expenseResult.error) { console.error('Error fetching expenses:', expenseResult.error); throw new PnlLoadError('Could not read expenses') }
     // Commissions are new to this report. A tenant whose commissions table is
     // unreadable still gets a P&L — but it must not silently look complete,
     // so the failure is surfaced on the response.
@@ -81,15 +94,48 @@ export async function loadTripPnls(
     const expenses = (expenseResult.data || []) as PnlExpense[]
     const commissions = (commissionResult.data || []) as PnlCommission[]
 
+    // ---------- Extras sold after the trips were priced (migration 321) ----------
+    // CONFIRMED booking_extras, joined to the trip through bookings.itinerary_id.
+    // A database without the table contributes nothing rather than 500ing.
+    const extrasByTrip = new Map<string, PnlExtra[]>()
+    if (itineraryIds.length) {
+      // Service-role read (the table is not RLS-readable by staff), so it is
+      // scoped to the tenant explicitly; and every trip, not the first 300.
+      const tenantId = tenantIdOf(itineraries)
+      const extraRows: Array<PnlExtra & { bookings: { itinerary_id?: string } | null }> = []
+      for (let i = 0; i < itineraryIds.length; i += MAX_IN_FILTER_IDS) {
+        let q = extrasAdmin()
+          .from('booking_extras')
+          .select('title, quantity, unit_price, currency, supplier_cost, supplier_currency, confirmed_at, bookings!inner(itinerary_id, tenant_id)')
+          .eq('status', 'confirmed')
+          .in('bookings.itinerary_id', itineraryIds.slice(i, i + MAX_IN_FILTER_IDS))
+        if (tenantId) q = q.eq('bookings.tenant_id', tenantId)
+        const { data, error: extrasError } = await q
+        if (extrasError) { console.error('profit-loss: could not read booking extras', extrasError); break }
+        extraRows.push(...((data ?? []) as unknown as typeof extraRows))
+      }
+      for (const row of extraRows) {
+        const itinId = row.bookings?.itinerary_id
+        if (!itinId) continue
+        const list = extrasByTrip.get(itinId) ?? []
+        list.push(row)
+        extrasByTrip.set(itinId, list)
+      }
+    }
+
     // ---------- Exchange rates (shared loader, see lib/fx-report.ts) ----------
     const reportingCurrency = resolveReportingCurrency(
       itineraries as PnlItinerary[],
       requestedCurrency
     )
     const fxContext = await loadFxContext(supabase, {
-      currencies: collectCurrencies(
-        itineraries as PnlItinerary[], invoices, expenses, commissions
-      ),
+      // The extras' currencies too: a USD extra on a EUR-only agency's trip
+      // found no rate and its cost was dropped.
+      currencies: [...new Set([
+        ...collectCurrencies(itineraries as PnlItinerary[], invoices, expenses, commissions),
+        ...[...extrasByTrip.values()].flat().flatMap(x => [x.currency, x.supplier_currency])
+          .filter((c): c is string => !!c).map(c => c.trim().toUpperCase()),
+      ])],
       reportingCurrency,
     })
     const { fxIndex, liveRate } = fxContext
@@ -115,26 +161,6 @@ export async function loadTripPnls(
     pushInto(expensesByTrip, expenses)
     pushInto(commissionsByTrip, commissions)
 
-    // ---------- Extras sold after the trips were priced (migration 321) ----------
-    // CONFIRMED booking_extras, joined to the trip through bookings.itinerary_id.
-    // A database without the table contributes nothing rather than 500ing.
-    const extrasByTrip = new Map<string, PnlExtra[]>()
-    if (itineraryIds.length) {
-      const { data: extraRows, error: extrasError } = await extrasAdmin()
-        .from('booking_extras')
-        .select('title, quantity, unit_price, currency, supplier_cost, supplier_currency, confirmed_at, bookings!inner(itinerary_id, tenant_id)')
-        .eq('status', 'confirmed')
-        .in('bookings.itinerary_id', itineraryIds.slice(0, MAX_IN_FILTER_IDS))
-      if (extrasError) console.error('profit-loss: could not read booking extras', extrasError)
-      for (const row of (extraRows ?? []) as Array<PnlExtra & { bookings: { itinerary_id?: string } | null }>) {
-        const itinId = row.bookings?.itinerary_id
-        if (!itinId) continue
-        const list = extrasByTrip.get(itinId) ?? []
-        list.push(row)
-        extrasByTrip.set(itinId, list)
-      }
-    }
-
     // ---------- Compute ----------
     const pnlData: TripPnL[] = itineraries.map(itinerary =>
       computeTripPnL({
@@ -155,4 +181,10 @@ export async function loadTripPnls(
     fxContext,
     commissionsAvailable: !commissionResult.error,
   }
+}
+
+/** The tenant of the trips, when the rows carry it. */
+function tenantIdOf(itineraries: PnlItinerary[]): string | null {
+  const t = (itineraries[0] as { tenant_id?: string | null } | undefined)?.tenant_id
+  return t ?? null
 }

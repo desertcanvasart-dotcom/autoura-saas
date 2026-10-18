@@ -5,6 +5,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF';
 import React from 'react';
 import type { Json, Tables } from '@/types/database.types';
+import { gateRole } from '@/lib/api-role-gate'
 
 type PdfQuote = React.ComponentProps<typeof B2CQuotePDF>['quote'];
 
@@ -73,6 +74,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('staff');
+    if (gate) return gate;
     const { id: quoteId } = await params;
 
     // Authenticate and get user
@@ -145,12 +148,19 @@ export async function POST(
       );
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
+    // quote-pdfs is PRIVATE (migration 004): a public URL of it opens for
+    // nobody. A signed link, valid for a week, as the WhatsApp sends use.
+    const { data: signed, error: signError } = await supabase.storage
       .from('quote-pdfs')
-      .getPublicUrl(fileName);
-
-    const pdfUrl = urlData.publicUrl;
+      .createSignedUrl(fileName, 7 * 24 * 60 * 60);
+    if (signError || !signed?.signedUrl) {
+      console.error('Error signing PDF URL:', signError);
+      return NextResponse.json(
+        { success: false, error: 'PDF stored, but a link to it could not be made' },
+        { status: 500 }
+      );
+    }
+    const pdfUrl = signed.signedUrl;
 
     // Update quote with PDF URL
     const { error: updateError } = await supabase

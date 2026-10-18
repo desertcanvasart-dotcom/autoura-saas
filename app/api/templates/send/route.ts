@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { escapeHtml } from '@/lib/html-escape'
+import { roleDenied } from '@/lib/api-role-gate'
+import { rateLimitResponse } from '@/lib/rate-limit'
+import { checkSharedRateLimit } from '@/lib/rate-limit-shared'
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +24,9 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+    // Staff only: a viewer sends nothing.
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
     const body = await request.json()
     const { 
       templateId, 
@@ -39,12 +46,28 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // SMS goes out on the platform's own Twilio account and WhatsApp on the
+    // company's number: with no ceiling, one account could send unlimited
+    // texts of any content to any number (toll fraud, spam under our sender).
+    // Counted in the database, so a deploy does not reset the allowance.
+    if (channel === 'sms' || channel === 'whatsapp') {
+      const person = await checkSharedRateLimit(authResult.user!.id, 'messaging')
+      if (!person.success) return rateLimitResponse(person)
+      if (tenant_id) {
+        const company = await checkSharedRateLimit(tenant_id, 'messagingCompany')
+        if (!company.success) return rateLimitResponse(company)
+      }
+    }
+    if (String(messageBody).length > 4000) {
+      return NextResponse.json({ success: false, error: 'Message is too long' }, { status: 400 })
+    }
+
     let result
 
     if (channel === 'email') {
-      result = await sendEmail(recipient, subject, messageBody, authResult.user!.id)
+      result = await sendEmail(recipient, subject, messageBody, authResult.user!.id, tenant_id, request.headers.get('cookie') || '', new URL(request.url).origin)
     } else if (channel === 'whatsapp') {
-      result = await sendWhatsApp(recipient, messageBody)
+      result = await sendWhatsApp(recipient, messageBody, tenant_id)
     } else if (channel === 'sms') {
       result = await sendSMS(recipient, messageBody)
     } else {
@@ -128,7 +151,14 @@ export async function POST(request: NextRequest) {
 // EMAIL SENDING (via Gmail API)
 // ============================================
 
-async function sendEmail(to: string, subject: string, body: string, userId: string): Promise<{ success: boolean; error?: string }> {
+/** A plain-text template as an HTML email body. */
+function plainTextEmailHtml(text: string): string {
+  return `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${escapeHtml(text)}</div>`
+}
+
+async function sendEmail(to: string, subject: string, body: string, userId: string, tenantId: string | null, cookie: string, origin: string): Promise<{ success: boolean; error?: string }> {
+  // The sender's mailbox in the company being worked in (migration 415).
+  if (!tenantId) return { success: false, error: 'No active company' }
   try {
     // Gmail tokens for the signed-in user.
     //
@@ -142,52 +172,44 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
       .from('gmail_tokens')
       .select('access_token, refresh_token, email')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
 
     if (!tokens) {
-      // Fallback: Try internal email API if exists
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-cron-secret': process.env.CRON_SECRET || '',
-        },
-        body: JSON.stringify({
-          to,
-          subject,
-          body,
-          isHtml: false,
-        }),
-      })
-
-      if (response.ok) {
-        return { success: true }
-      }
-
-      return { 
-        success: false, 
-        error: 'Gmail not connected. Please connect your Gmail account in Settings.' 
+      return {
+        success: false,
+        error: 'Gmail not connected. Please connect your Gmail account in Settings.'
       }
     }
 
-    // Use Gmail API
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
+    // /api/gmail/send sends from the mailbox of `userId` and refuses a request
+    // without one ("Missing required fields") — it was never passed, so every
+    // template email failed. It sends HTML: the template's plain text is
+    // escaped and its line breaks kept.
+    const response = await fetch(new URL('/api/gmail/send', process.env.NEXT_PUBLIC_APP_URL || origin), {
       method: 'POST',
+      signal: AbortSignal.timeout(60_000),
       headers: {
         'Content-Type': 'application/json',
         'x-cron-secret': process.env.CRON_SECRET || '',
+        // The middleware demands a session for /api/gmail/send before the
+        // handler (and its cron-secret branch) ever runs: without the
+        // caller's own cookie every template email was answered 401.
+        cookie,
       },
       body: JSON.stringify({
+        userId,
+        tenant_id: tenantId,
         to,
         subject,
-        body,
-        isHtml: false,
+        body: plainTextEmailHtml(body),
+        body_text: body,
       }),
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      return { success: false, error: error.message || 'Failed to send email' }
+      const error = await response.json().catch(() => ({}))
+      return { success: false, error: error.error || error.message || 'Failed to send email' }
     }
 
     return { success: true }
@@ -202,8 +224,8 @@ async function sendEmail(to: string, subject: string, body: string, userId: stri
 // WHATSAPP SENDING (via active provider)
 // ============================================
 
-async function sendWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  const result = await sendWhatsAppMessage({ to, body })
+async function sendWhatsApp(to: string, body: string, tenantId?: string | null): Promise<{ success: boolean; error?: string }> {
+  const result = await sendWhatsAppMessage({ to, body, tenantId: tenantId ?? null })
   if (!result.success) {
     return { success: false, error: result.error || 'Failed to send WhatsApp message' }
   }
@@ -244,6 +266,7 @@ async function sendSMS(to: string, body: string): Promise<{ success: boolean; er
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(15_000),
         headers: {
           'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
           'Content-Type': 'application/x-www-form-urlencoded',

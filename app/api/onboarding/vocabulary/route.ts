@@ -4,12 +4,15 @@
 // operator resumes after it.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth()
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    const denied = roleDenied(auth.role, 'admin')
+    if (denied) return denied
     const { supabase, tenant_id } = auth
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
 

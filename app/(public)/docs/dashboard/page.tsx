@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/dashboard')
 
 export default function DashboardPage() {
   return (
@@ -14,48 +18,74 @@ export default function DashboardPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
       <p className="text-gray-600 mb-8">
-        The dashboard is your home base. It greets you by name and shows the things that need your attention today: trips about to depart, money still owed, messages waiting for a reply, and quotes your clients haven&apos;t answered yet.
+        The dashboard is your home base: what departs soon, what clients owe, what is waiting for a reply, and what must be
+        fixed before a group travels. Dates are counted in your company&rsquo;s timezone (Settings &rarr; Organization).
       </p>
 
       <DocScreenshot src="/docs/dashboard/full-dashboard.jpg" alt="Dashboard with greeting, four action cards, list panels, and quick action buttons" />
 
       {/* Action Cards */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Action Cards</h2>
-        <p className="text-gray-600 mb-3">Four cards at the top summarize what needs attention. Click a card to jump straight to the relevant page:</p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Action cards</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Departing in N days</strong> &mdash; Bookings with upcoming departure dates. Click through to <strong>Bookings</strong>.</li>
-          <li><strong>Outstanding</strong> &mdash; The total amount clients still owe you. Click through to <strong>Invoices</strong>.</li>
-          <li><strong>Needs a reply</strong> &mdash; Conversations waiting on you. Click through to the <strong>Inbox</strong>.</li>
-          <li><strong>Quotes awaiting client</strong> &mdash; Quotes sent but not yet answered. Click through to <strong>B2C Quotes</strong>.</li>
+          <li><strong>Departing in 14 days</strong> &mdash; live bookings (not completed or cancelled) leaving today or in the next 14 days, with the next date. Opens <strong>Bookings</strong>.</li>
+          <li><strong>Outstanding</strong> &mdash; what clients still owe on sent, viewed, part-paid and overdue invoices, totalled <em>per currency</em> (an EGP invoice and a USD invoice show as two amounts, never added together), with how many are overdue. Opens <strong>Invoices</strong>.</li>
+          <li><strong>Needs a reply</strong> &mdash; new, unanswered messages in the Inbox, across email and WhatsApp.</li>
+          <li><strong>Quotes awaiting client</strong> &mdash; B2C quotes sent or viewed and not yet answered, with how many have had no reply for 5 days or more, or have expired.</li>
         </ul>
         <Tip>
-          If a figure can&apos;t be loaded, the card shows a dash (&mdash;) instead of a misleading zero, and a warning banner appears at the top of the page.
+          A figure that could not be loaded shows a dash (&mdash;), never a zero, and a banner names it.
         </Tip>
       </section>
 
-      {/* List Panels */}
+      {/* Needs attention */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">List Panels</h2>
-        <p className="text-gray-600 mb-3">Below the cards, four panels list the specific items behind the numbers:</p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Needs attention</h2>
+        <p className="text-gray-600 mb-3">
+          The things to fix before a group travels, for departures in the next 45 days, each with a link to the screen that fixes it:
+        </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Departing soon</strong> &mdash; The next trips to depart, so nothing sneaks up on you</li>
-          <li><strong>Clients reading their proposal</strong> &mdash; Clients who have opened the itinerary link you shared with them. This is proposal open/view tracking &mdash; a great signal for a well-timed follow-up call.</li>
-          <li><strong>Largest balances owed</strong> &mdash; The invoices with the biggest outstanding amounts</li>
-          <li><strong>Waiting on your reply</strong> &mdash; Conversations where the client spoke last</li>
+          <li>a balance unpaid with its deadline reached or within 14 days;</li>
+          <li>travellers with passport details or date of birth missing;</li>
+          <li>no guide assigned on the trip&rsquo;s itinerary;</li>
+          <li>a change request or extra from the traveller portal still pending;</li>
+          <li>a conversation where the client has waited more than 24 hours for a reply (urgent after 48).</li>
+        </ul>
+        <p className="text-gray-600 mt-3">
+          <strong>Dismiss</strong> hides an item for the whole team until something about it changes; <strong>Undo</strong> brings it back.
+        </p>
+      </section>
+
+      {/* Other panels */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Panels</h2>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Expiring contracts</strong> (managers and admins) &mdash; supplier contracts expiring in the next 60 days or expired in the last 30.</li>
+          <li><strong>Today on the ground</strong> &mdash; every trip running today with its latest check-in from the staff on it; <strong>ops view</strong> opens the full view.</li>
+          <li><strong>Departing soon</strong> &mdash; the next five departures, with any balance due.</li>
+          <li><strong>Clients reading their proposal</strong> &mdash; the five itineraries most recently opened from a shared link, with how many times and when. Trips already confirmed, completed or cancelled are left out. A good moment to call.</li>
+          <li><strong>Largest balances owed</strong> &mdash; the five largest open invoice balances, each in its own currency, red when overdue.</li>
+          <li><strong>Waiting on your reply</strong> &mdash; the three newest unanswered messages; click to open the Inbox.</li>
         </ul>
       </section>
 
       {/* Quick Actions */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <p className="text-gray-600 mb-3">Shortcut buttons for the most common tasks:</p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick actions</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>New Quote</strong> &mdash; Start a new itinerary/quote.</li>
-          <li><strong>Rates Hub</strong> &mdash; View and update your pricing</li>
-          <li><strong>B2B Packages</strong> &mdash; Browse ready-made tour packages</li>
-          <li><strong>Clients</strong> &mdash; Jump to your client list</li>
+          <li><strong>New Quote</strong> &mdash; start a new itinerary.</li>
+          <li><strong>Rates Hub</strong> and <strong>B2B Packages</strong> &mdash; managers and admins.</li>
+          <li><strong>Clients</strong> &mdash; your client list, with the total.</li>
         </ul>
+      </section>
+
+      {/* Roles */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">What each role sees</h2>
+        <p className="text-gray-600">
+          Members see everything except Expiring contracts. Viewers see the departure, reply and quote counts and the panels
+          without money &mdash; no Outstanding, no balances, no Needs attention &mdash; and nothing links to pages they cannot open.
+        </p>
       </section>
 
       {/* Analytics */}
@@ -67,23 +97,8 @@ export default function DashboardPage() {
         <DocScreenshot src="/docs/dashboard/analytics.jpg" alt="Analytics page with revenue and booking trend charts" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link
-          href="/docs/getting-started"
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Getting Started
-        </Link>
-        <Link
-          href="/docs/communication"
-          className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-        >
-          Next: Communication
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/dashboard" />
     </div>
   )
 }

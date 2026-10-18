@@ -5,6 +5,7 @@ import { todayLocal } from '@/lib/today'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save } from 'lucide-react'
+import { getCurrencySymbol, SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 interface Itinerary {
   id: string
@@ -13,6 +14,7 @@ interface Itinerary {
   total_cost: number
   total_paid: number
   payment_status: string
+  currency?: string | null
 }
 
 export default function RecordPaymentPage() {
@@ -43,6 +45,8 @@ export default function RecordPaymentPage() {
     if (formData.itinerary_id) {
       const itinerary = itineraries.find(it => it.id === formData.itinerary_id)
       setSelectedItinerary(itinerary || null)
+      // A trip payment is in the trip's currency (lib/payment-currency).
+      if (itinerary?.currency) setFormData(prev => ({ ...prev, currency: itinerary.currency as string }))
       
       // Auto-calculate deposit amount based on percentage
       if (itinerary && formData.payment_type.startsWith('deposit_')) {
@@ -159,7 +163,7 @@ export default function RecordPaymentPage() {
               <option value="">Choose an itinerary...</option>
               {itineraries.map((itinerary) => (
                 <option key={itinerary.id} value={itinerary.id}>
-                  {itinerary.itinerary_code} - {itinerary.client_name} ({itinerary.total_cost != null ? `€${itinerary.total_cost.toFixed(2)}` : 'not priced yet'})
+                  {itinerary.itinerary_code} - {itinerary.client_name} ({itinerary.total_cost != null ? `${getCurrencySymbol(itinerary.currency || 'EUR')}${itinerary.total_cost.toFixed(2)}` : 'not priced yet'})
                 </option>
               ))}
             </select>
@@ -172,15 +176,15 @@ export default function RecordPaymentPage() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-gray-600">Total Cost:</span>
-                  <p className="font-bold text-gray-900">{selectedItinerary.total_cost != null ? `€${selectedItinerary.total_cost.toFixed(2)}` : '—'}</p>
+                  <p className="font-bold text-gray-900">{selectedItinerary.total_cost != null ? `${getCurrencySymbol(selectedItinerary.currency || 'EUR')}${selectedItinerary.total_cost.toFixed(2)}` : '—'}</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Already Paid:</span>
-                  <p className="font-bold text-success">€{(selectedItinerary.total_paid || 0).toFixed(2)}</p>
+                  <p className="font-bold text-success">{getCurrencySymbol(selectedItinerary.currency || 'EUR')}{(selectedItinerary.total_paid || 0).toFixed(2)}</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Balance Due:</span>
-                  <p className="font-bold text-orange-600">€{calculateBalance().toFixed(2)}</p>
+                  <p className="font-bold text-orange-600">{getCurrencySymbol(selectedItinerary.currency || 'EUR')}{calculateBalance().toFixed(2)}</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Payment Status:</span>
@@ -218,7 +222,7 @@ export default function RecordPaymentPage() {
             {/* Amount */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">
-                Amount (€) <span className="text-danger">*</span>
+                Amount ({getCurrencySymbol(selectedItinerary?.currency || 'EUR')}) <span className="text-danger">*</span>
               </label>
               <input
                 type="number"
@@ -242,11 +246,12 @@ export default function RecordPaymentPage() {
                 name="currency"
                 value={formData.currency}
                 onChange={handleChange}
+                disabled={!!selectedItinerary?.currency}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="EUR">EUR (€)</option>
-                <option value="USD">USD ($)</option>
-                <option value="GBP">GBP (£)</option>
+                {[...new Set([formData.currency, ...SUPPORTED_CURRENCIES])].map(c => (
+                  <option key={c} value={c}>{c} ({getCurrencySymbol(c)})</option>
+                ))}
               </select>
             </div>
 
@@ -283,9 +288,6 @@ export default function RecordPaymentPage() {
               >
                 <option value="completed">Completed</option>
                 <option value="pending">Pending</option>
-                <option value="deposit_received">Deposit Received</option>
-                <option value="partially_paid">Partially Paid</option>
-                <option value="partially_refunded">Partially Refunded</option>
                 <option value="failed">Failed</option>
                 <option value="refunded">Fully Refunded</option>
               </select>

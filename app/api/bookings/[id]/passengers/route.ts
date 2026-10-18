@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // GET passengers for a booking
 export async function GET(
@@ -62,6 +63,8 @@ export async function POST(
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
     const { tenant_id } = authResult
     const adminClient = createAdminClient()
@@ -148,7 +151,7 @@ export async function POST(
     if (error) {
       console.error('Error creating passenger:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to create passenger', details: error.message },
+        { success: false, error: 'Failed to create passenger' },
         { status: 500 }
       )
     }

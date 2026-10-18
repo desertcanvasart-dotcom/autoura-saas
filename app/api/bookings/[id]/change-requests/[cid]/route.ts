@@ -45,7 +45,7 @@ export async function POST(
         // missing, so oldBaseTotal was always undefined and approving extra
         // travellers divided a total that included the extras — charging
         // every new traveller a share of them.
-        .select('id, num_travelers, total_amount, base_total_cost, deposit_percent, balance_due')
+        .select('id, num_travelers, total_amount, base_total_cost, deposit_percent, balance_due, currency')
         .eq('id', id)
         .maybeSingle(),
       supabase
@@ -85,6 +85,7 @@ export async function POST(
       addedPax: cr.requested_count,
       depositPercent: booking.deposit_percent,
       oldBalanceDue: booking.balance_due,
+      currency: booking.currency,
     })
 
     const seedRows = Array.from({ length: cr.requested_count }, () => ({

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { gateRole } from '@/lib/api-role-gate'
+import { parsePartnerWrite } from '@/lib/b2b/partner-fields'
 
 // ============================================
 // B2B PARTNERS INDIVIDUAL API
@@ -81,17 +83,21 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage')
+    if (gate) return gate
     const { id } = await params
 
     // Use authenticated client - RLS will automatically filter by tenant
     const supabase = await createAuthenticatedClient()
 
-    const body = await request.json()
-    const { id: _, created_at, tenant_id, ...updateData } = body
+    // Only the fields a partner's form edits (lib/b2b/partner-fields).
+    const parsed = parsePartnerWrite(await request.json(), 'update')
+    if ('error' in parsed) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 })
+    const updateData = { ...parsed.data, updated_at: new Date().toISOString() }
 
     const { data, error } = await supabase
       .from('b2b_partners')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id)
       .select()
       .single()
@@ -111,6 +117,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const gate = await gateRole('manage')
+    if (gate) return gate
     const { id } = await params
 
     // Use authenticated client - RLS will automatically filter by tenant
@@ -125,6 +133,21 @@ export async function DELETE(
     if (quotes && quotes.length > 0) {
       return NextResponse.json(
         { error: 'Cannot delete partner with existing quotes. Deactivate instead.' },
+        { status: 400 }
+      )
+    }
+
+    // Bookings and trips made for the partner: deleting it would strip the
+    // partner from its bookings (SET NULL) and leave trips naming an id that
+    // no longer exists. Refused the same way.
+    const [{ count: bookingCount }, { count: tripCount }] = await Promise.all([
+      supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('partner_id', id),
+      supabase.from('itineraries').select('id', { count: 'exact', head: true }).eq('partner_id', id),
+    ])
+    if ((bookingCount ?? 0) > 0 || (tripCount ?? 0) > 0) {
+      const what = [bookingCount ? `${bookingCount} booking(s)` : '', tripCount ? `${tripCount} trip(s)` : ''].filter(Boolean).join(' and ')
+      return NextResponse.json(
+        { error: `Cannot delete a partner with ${what}. Deactivate instead.` },
         { status: 400 }
       )
     }

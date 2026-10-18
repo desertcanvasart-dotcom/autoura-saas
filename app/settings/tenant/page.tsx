@@ -1,5 +1,7 @@
 'use client'
+import CompanyDataCard from '@/components/account/CompanyDataCard'
 
+import { TIMEZONES } from '@/lib/timezones'
 import { useState, useEffect, useRef } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { createClient } from '@/app/supabase'
@@ -25,6 +27,8 @@ import Image from 'next/image'
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { identityFromTenant } from '@/lib/company-identity'
 import { DocumentFooter } from '@/components/documents/Letterhead'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { LOGO_ACCEPT, logoFileProblem } from '@/lib/logo-file'
 
 const supabase = createClient()
 
@@ -41,6 +45,7 @@ function isMissingColumnError(err: { code?: string; message?: string }, columns:
 }
 
 export default function TenantSettingsPage() {
+  const dialog = useConfirmDialog()
   const { tenant, tenantMember, features, isAdmin, loading, refetchTenant } = useTenant()
 
   // Tenant basic info state
@@ -86,9 +91,18 @@ export default function TenantSettingsPage() {
   // The org's deposit rule (mig 325): blank = the defaults (30% / 7 days).
   const [depositPercent, setDepositPercent] = useState('')
   const [depositDueDays, setDepositDueDays] = useState('')
+  // What travel contracts name (mig 403): '' = no country / the operator's
+  // own country's law (lib/contract-terms.ts).
+  const [operatingCountry, setOperatingCountry] = useState('')
+  const [companyTimezone, setCompanyTimezone] = useState('')
+  const [governingLaw, setGoverningLaw] = useState('')
   // Run currency (C3.4): '' = EUR default. Reinterprets stored rate amounts;
   // the field warns about that.
   const [ratesCurrency, setRatesCurrency] = useState('')
+  // The company's own currency: invoices, commissions, P&L and the default
+  // for new quotes. Only onboarding could set it, so a skipped onboarding or
+  // a currency it did not list left the company in EUR for good.
+  const [agencyCurrency, setAgencyCurrency] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -120,6 +134,10 @@ export default function TenantSettingsPage() {
       setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
       setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
       setRatesCurrency((tenant as { rates_currency?: string | null }).rates_currency || '')
+      setAgencyCurrency(tenant.default_currency || '')
+      setOperatingCountry(tenant.operating_country || '')
+      setCompanyTimezone(tenant.timezone || '')
+      setGoverningLaw(tenant.contract_governing_law || '')
     }
 
     if (features) {
@@ -179,15 +197,10 @@ export default function TenantSettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: 'Please select an image file' })
-      return
-    }
-
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'Image must be less than 2MB' })
+    // PNG or JPEG, at most 2MB (lib/logo-file.ts).
+    const problem = logoFileProblem(file)
+    if (problem) {
+      setMessage({ type: 'error', text: problem })
       return
     }
 
@@ -234,8 +247,9 @@ export default function TenantSettingsPage() {
       return publicUrl
     } catch (error) {
       console.error('Error uploading logo:', error)
-      setMessage({ type: 'error', text: 'Failed to upload logo' })
-      return logoUrl
+      // null = the upload failed; the save stops and says so (it carried
+      // on and replaced this message with "Settings saved successfully!").
+      return null
     } finally {
       setUploading(false)
     }
@@ -244,14 +258,50 @@ export default function TenantSettingsPage() {
   const handleSave = async () => {
     if (!tenant || !features || !isAdmin) return
 
-    setSaving(true)
     setMessage(null)
 
+    // Checked here: this page writes the row directly, and the boxes' min and
+    // max were never enforced — a -5% house margin or a 999% deposit saved.
+    const num = (v: string) => (v.trim() === '' ? null : Number(v))
+    const pct = (v: string) => { const n = num(v); return n === null || (Number.isFinite(n) && n >= 0 && n <= 100) }
+    const problems: string[] = []
+    if (!pct(defaultMargin)) problems.push('House margin is a percentage from 0 to 100')
+    if (!pct(minMargin)) problems.push('Minimum margin is a percentage from 0 to 100')
+    const house = num(defaultMargin), floor = num(minMargin)
+    if (house !== null && floor !== null && floor > house) problems.push('The minimum margin cannot be above the house margin')
+    if (!pct(depositPercent)) problems.push('Deposit is a percentage from 0 to 100')
+    const due = num(depositDueDays)
+    if (due !== null && !(Number.isInteger(due) && due >= 0 && due <= 365)) problems.push('Deposit due days is a whole number from 0 to 365')
+    for (const [label, c] of [['Primary colour', primaryColor], ['Secondary colour', secondaryColor]] as const) {
+      if (c && !/^#[0-9a-fA-F]{6}$/.test(c)) problems.push(`${label} must be a hex colour like #647C47`)
+    }
+    if (problems.length) {
+      setMessage({ type: 'error', text: problems.join('. ') + '.' })
+      return
+    }
+    // The rates currency reinterprets every stored rate: confirm it.
+    const storedRates = (tenant as { rates_currency?: string | null }).rates_currency || ''
+    if ((ratesCurrency || '') !== storedRates) {
+      const ok = await dialog.confirm({
+        title: 'Change the rates currency?',
+        message: `Every stored rate will be read as ${ratesCurrency || 'EUR'} instead of ${storedRates || 'EUR'}. The amounts are not converted. Continue?`,
+        variant: 'warning',
+        confirmText: 'Change it',
+      })
+      if (!ok) return
+    }
+
+    setSaving(true)
     try {
       // Upload logo if a new one was selected
       let finalLogoUrl = logoUrl
       if (logoFile) {
-        finalLogoUrl = await uploadLogo()
+        const uploaded = await uploadLogo()
+        if (!uploaded) {
+          setMessage({ type: 'error', text: 'The logo could not be uploaded, so nothing was saved. Try a smaller PNG or JPG.' })
+          return
+        }
+        finalLogoUrl = uploaded
       }
 
       // Identity AND branding live on tenants — one table, one write.
@@ -280,9 +330,13 @@ export default function TenantSettingsPage() {
         // Blank -> NULL -> resolveDepositRule falls back to the defaults.
         deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
         deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
+        // Blank -> NULL -> UTC (lib/tenant-today).
+        timezone: companyTimezone || null,
         ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
           ? { rates_currency: ratesCurrency || null }
           : {}),
+        // Migration 281 keeps tenants.currency in step.
+        ...(agencyCurrency ? { default_currency: agencyCurrency } : {}),
       }
 
       // .select() returns the row as stored: an update that RLS blocks or
@@ -328,6 +382,25 @@ export default function TenantSettingsPage() {
         else if (minError) throw minError
       }
 
+      // The contract's country and law arrive with migration 403: saved on
+      // their own, only when changed, like the minimum margin above.
+      let contractTermsMissing = false
+      const contractTerms = {
+        operating_country: operatingCountry.trim() || null,
+        contract_governing_law: governingLaw.trim() || null,
+      }
+      if (
+        contractTerms.operating_country !== (tenant.operating_country ?? null) ||
+        contractTerms.contract_governing_law !== (tenant.contract_governing_law ?? null)
+      ) {
+        const { error: termsError } = await supabase
+          .from('tenants')
+          .update(contractTerms)
+          .eq('id', tenant.id)
+        if (termsError && isMissingColumnError(termsError, Object.keys(contractTerms))) contractTermsMissing = true
+        else if (termsError) throw termsError
+      }
+
       // What we asked for vs what the database kept, field by field.
       const stored = saved[0] as Record<string, unknown>
       const notKept = letterheadMissing ? [] : Object.entries(letterhead)
@@ -337,6 +410,13 @@ export default function TenantSettingsPage() {
       // Refetch tenant data
       await refetchTenant()
 
+      if (contractTermsMissing) {
+        setMessage({
+          type: 'error',
+          text: 'Saved — except the contract country and governing law: the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
+        })
+        return
+      }
       if (minMarginMissing) {
         setMessage({
           type: 'error',
@@ -596,6 +676,93 @@ export default function TenantSettingsPage() {
             </div>
           </div>
 
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Company timezone
+              </label>
+              <select
+                value={companyTimezone}
+                onChange={(e) => setCompanyTimezone(e.target.value)}
+                disabled={!isAdmin}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white disabled:bg-gray-50"
+              >
+                <option value="">Not set (UTC)</option>
+                {TIMEZONES.filter(tz => tz.value !== 'UTC').map(tz => (
+                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                ))}
+                {companyTimezone && !TIMEZONES.some(tz => tz.value === companyTimezone) && (
+                  <option value={companyTimezone}>{companyTimezone}</option>
+                )}
+              </select>
+              <p className="mt-1 text-[10px] text-gray-400">
+                What &ldquo;today&rdquo; means for due dates, reminders and emails sent by the system.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Country you operate in
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+              </label>
+              <input
+                type="text"
+                maxLength={100}
+                value={operatingCountry}
+                onChange={(e) => setOperatingCountry(e.target.value)}
+                disabled={!isAdmin}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                placeholder="e.g. Egypt"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Contracts say the balance is paid on arrival here, and that clients need visas for travel here.
+                Blank: no country is named.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Governing law
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+              </label>
+              <input
+                type="text"
+                maxLength={255}
+                value={governingLaw}
+                onChange={(e) => setGoverningLaw(e.target.value)}
+                disabled={!isAdmin}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                placeholder="e.g. Egyptian law"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Disputes go to arbitration under this law. Blank: the law of the country you are registered in.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label htmlFor="agency-currency" className="block text-xs font-medium text-gray-700 mb-1">
+              Agency currency
+            </label>
+            <select
+              id="agency-currency"
+              value={agencyCurrency}
+              onChange={(e) => setAgencyCurrency(e.target.value)}
+              disabled={!isAdmin}
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+            >
+              {!agencyCurrency && <option value="">Choose…</option>}
+              {SUPPORTED_CURRENCIES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              Your company&apos;s own currency: invoices, commissions, the P&amp;L and new quotes
+              start in it. Documents already issued keep their currency.
+            </p>
+          </div>
+
           <div className="mt-3">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Rates currency
@@ -741,7 +908,7 @@ export default function TenantSettingsPage() {
               Company Logo
             </label>
             <p className="text-[10px] text-gray-400 mb-2">
-              Recommended: Square image (500x500px), PNG or SVG. Max 2MB
+              Recommended: Square image (500x500px), PNG or JPEG. Max 2MB
             </p>
 
             {!logoPreview ? (
@@ -749,7 +916,7 @@ export default function TenantSettingsPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={LOGO_ACCEPT}
                   onChange={handleFileSelect}
                   className="hidden"
                 />
@@ -927,6 +1094,12 @@ export default function TenantSettingsPage() {
             />
           </div>
         </div>
+
+        {tenant && (
+          <div className="mt-4">
+            <CompanyDataCard companyName={tenant.company_name} role={tenantMember?.role} />
+          </div>
+        )}
       </div>
     </div>
   )

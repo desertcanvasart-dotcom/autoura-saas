@@ -1,3 +1,4 @@
+import { ratesForTenant } from '@/lib/currency'
 import { NextResponse } from 'next/server'
 import type { Json } from '@/types/database.types'
 import { requireAuth } from '@/lib/supabase-server'
@@ -69,16 +70,18 @@ export async function POST(
       )
     }
 
-    const [{ data: services }, { data: currentRates }] = await Promise.all([
+    const [{ data: services }, { data: allRates }] = await Promise.all([
       supabase
         .from('itinerary_services')
         .select('id, supplier_currency, supplier_cost_original, quantity, unit_cost, total_cost')
         .eq('itinerary_id', id),
       supabase
         .from('exchange_rates')
-        .select('base_currency, target_currency, rate, is_active')
+        .select('tenant_id, base_currency, target_currency, rate, is_active')
         .eq('is_active', true),
     ])
+    // Shared rates plus this company's overrides (its own winning).
+    const currentRates = ratesForTenant(allRates, tenant_id)
 
     if (!currentRates || currentRates.length === 0) {
       return NextResponse.json({ success: false, error: 'No active exchange rates available' }, { status: 409 })

@@ -79,12 +79,18 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
           <h1 className="text-base font-semibold text-gray-900">{booking.trip_name ?? 'Your trip'}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {booking.booking_number}
-            {booking.start_date && ` · ${booking.start_date}`}
-            {booking.end_date && ` → ${booking.end_date}`}
-            {booking.num_travelers ? ` · ${booking.num_travelers} traveller${booking.num_travelers === 1 ? '' : 's'}` : ''}
-          </p>
+          {/* Only once verified. The booking number is one of the answers the
+              gate accepts on a whole-booking link, and it was printed right
+              here above the gate: anyone holding a forwarded link could read
+              it, type it in, and open every traveller's passport scans. */}
+          {verified && (
+            <p className="mt-1 text-sm text-gray-500">
+              {booking.booking_number}
+              {booking.start_date && ` · ${booking.start_date}`}
+              {booking.end_date && ` → ${booking.end_date}`}
+              {booking.num_travelers ? ` · ${booking.num_travelers} traveller${booking.num_travelers === 1 ? '' : 's'}` : ''}
+            </p>
+          )}
         </div>
 
         {verified ? (

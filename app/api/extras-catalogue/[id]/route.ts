@@ -3,6 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
+import { extraInputError } from '@/lib/extras-catalogue-input'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +28,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
@@ -42,6 +46,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       record.name = String(record.name ?? '').trim()
       if (!record.name) return NextResponse.json({ success: false, error: 'Name is required' }, { status: 400 })
     }
+    const inputError = extraInputError(record)
+    if (inputError) return NextResponse.json({ success: false, error: inputError }, { status: 400 })
     record.updated_at = new Date().toISOString()
 
     const { data, error } = await supabase
@@ -71,6 +77,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })

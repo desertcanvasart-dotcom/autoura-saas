@@ -14,6 +14,7 @@ import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
 import { showToast } from '@/app/contexts/ToastContext'
 import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -571,6 +572,8 @@ export default function WhatsAppInboxPage() {
       if (res.ok) {
         const data = await res.json()
         setAgents(data.agents || [])
+        // Who "Mine" and "Claim for myself" mean (the route works it out).
+        setCurrentAgentId(data.current_agent_id ?? null)
       }
     } catch (error) {
       console.error('Error fetching agents:', error)
@@ -579,6 +582,13 @@ export default function WhatsAppInboxPage() {
 
   // Fetch conversations
   const fetchConversations = useCallback(async (showLoader = true) => {
+    // "Mine" with no agent of your own is nobody's conversations — not, as it
+    // was, everyone's.
+    if (filterMode === 'mine' && !currentAgentId) {
+      setConversations([])
+      if (showLoader) setLoading(false)
+      return
+    }
     if (showLoader) setLoading(true)
     try {
       let url = `/api/whatsapp/conversations?search=${searchQuery}`
@@ -663,7 +673,7 @@ export default function WhatsAppInboxPage() {
     if (currentAgentId) {
       assignConversation(currentAgentId, 'claim')
     } else {
-      showToast('warning', 'Please set yourself as an agent first in the Agents settings')
+      showToast('warning', 'You are not a WhatsApp agent yet — add yourself in Manage Agents with your login email')
       setShowAgentsModal(true)
     }
   }
@@ -832,15 +842,13 @@ export default function WhatsAppInboxPage() {
   const parseConversation = () => {
     if (!selectedConversation || messages.length === 0) return
     const conversationText = messages.map(m => `${m.direction === 'inbound' ? 'Client' : 'Agent'}: ${m.message_body}`).join('\n')
-    // URL-safe base64 encoding
-    const encoder = new TextEncoder()
-    const bytes = encoder.encode(conversationText)
-    const base64 = btoa(String.fromCharCode(...bytes))
-    // Make it URL-safe: replace + with -, / with _, remove =
-    const encoded = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-    // The pricing grid is the pricing engine: it decodes the conversation,
-    // parses it into days and prices them, and saves onto the CRM client.
-    const params = new URLSearchParams({ conversation: encoded, encoded: 'base64', source: 'whatsapp', phone: selectedConversation.phone_number })
+    // The pricing grid is the pricing engine: it parses the conversation into
+    // days, prices them, and saves onto the CRM client. The text goes by
+    // sessionStorage, not the URL (lib/grid-handoff.ts).
+    const handoff = stashConversation(conversationText)
+    const params = new URLSearchParams(handoff
+      ? { handoff, source: 'whatsapp', phone: selectedConversation.phone_number }
+      : { conversation: toUrlBase64(conversationText), encoded: 'base64', source: 'whatsapp', phone: selectedConversation.phone_number })
     if (selectedConversation.client_id) params.set('clientId', selectedConversation.client_id)
     const clientName = selectedConversation.clients?.full_name || selectedConversation.client_name
     if (clientName) params.set('clientName', clientName)
@@ -966,7 +974,7 @@ export default function WhatsAppInboxPage() {
           {loading ? (
             <div className="flex items-center justify-center h-32"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#25D366]"></div></div>
           ) : conversations.length === 0 ? (
-            <div className="p-6 text-center text-gray-500"><MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" /><p className="text-sm">No conversations</p></div>
+            <div className="p-6 text-center text-gray-500"><MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" /><p className="text-sm">{filterMode === 'mine' && !currentAgentId ? 'You are not a WhatsApp agent yet — add yourself in Manage Agents with your login email.' : 'No conversations'}</p></div>
           ) : (
             conversations.map((conv) => (
               <div
@@ -1205,7 +1213,7 @@ export default function WhatsAppInboxPage() {
                 <Phone className="w-5 h-5 text-gray-400" />
                 <input type="tel" value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} placeholder="+1234567890" className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#25D366]" />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Include country code (e.g., +20 for Egypt)</p>
+              <p className="text-xs text-gray-500 mt-1">Include the country code (e.g. +44, +1, +20)</p>
             </div>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowNewChat(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>

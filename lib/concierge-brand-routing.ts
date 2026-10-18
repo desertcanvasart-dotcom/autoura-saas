@@ -23,7 +23,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeBrandKey } from '@/lib/concierge-brief-schema'
 
-export type RoutingVia = 'brand_mapping' | 'env' | 'first_tenant'
+export type RoutingVia = 'brand_mapping' | 'env'
 
 export type RoutingResult =
   | { ok: true; tenantId: string; via: RoutingVia; brand: string | null }
@@ -65,15 +65,9 @@ export async function resolveConciergeTenant(
   const configured = env.CONCIERGE_WEBHOOK_TENANT_ID
   if (configured) return { ok: true, tenantId: configured, via: 'env', brand: null }
 
-  const { data } = await supabase
-    .from('tenants')
-    .select('id')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (data?.id) return { ok: true, tenantId: data.id as string, via: 'first_tenant', brand: null }
-
-  return { ok: false, code: 'no_tenant', message: 'No tenant configured to receive briefs.' }
+  // No "oldest company" fallback: with more than one company that put a
+  // traveller's details into whichever signed up first. Unrouted = refused.
+  return { ok: false, code: 'no_tenant', message: 'No tenant configured to receive briefs: send a brand, or set CONCIERGE_WEBHOOK_TENANT_ID.' }
 }
 
 /** Fail closed: no features row (or concierge_enabled != true) => disabled. */

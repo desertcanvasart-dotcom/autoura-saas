@@ -113,9 +113,11 @@ export function sheetColumn(header: string): (typeof SHEET_COLUMNS)[number] | nu
 const text = (v: unknown): string => String(v ?? '').trim()
 const orNull = (v: unknown): string | null => text(v) || null
 
-/** "a; b, c" → ["a", "b", "c"]: either separator, blanks dropped. */
+/** "a; b" → ["a", "b"], blanks dropped. Semicolons only, as the export
+ *  writes them: a comma is part of a name ("Hatshepsut Temple, Deir
+ *  el-Bahari" became two attractions on re-import and priced neither). */
 export function listCell(v: unknown): string[] {
-  return text(v).split(/[;,]/).map(s => s.trim()).filter(Boolean)
+  return text(v).split(';').map(s => s.trim()).filter(Boolean)
 }
 
 function dayType(v: string): BlockDayType | null {

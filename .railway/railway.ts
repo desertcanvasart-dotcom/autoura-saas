@@ -51,6 +51,11 @@ export default defineRailway(() => {
     // Same history as above — this is the live site; the command is now
     // stored on the service (applied 2026-08-24, tomls deleted).
     start: "npm run start",
+    // A new deployment takes traffic only once /api/health answers 200
+    // (database reachable, required env present). A build that cannot start
+    // or cannot reach Supabase never replaces the running one.
+    healthcheck: "/api/health",
+    healthcheckTimeout: 120,
     replicas: { "asia-southeast1-eqsg3a": 1 },
     domains: ["getautoura.net", "www.getautoura.net"],
     networking: { privateNetworkEndpoint: "autoura-saas" },
@@ -84,6 +89,7 @@ export default defineRailway(() => {
       OUTBOUND_REPLY_TO: preserve(),
       RESEND_API_KEY: preserve(),
       RESEND_FROM_EMAIL: preserve(),
+      RESEND_WEBHOOK_SECRET: preserve(),
       SAWA_SYNC_SECRET: preserve(),
       STRIPE_SECRET_KEY: preserve(),
       STRIPE_WEBHOOK_SECRET: preserve(),
@@ -98,6 +104,11 @@ export default defineRailway(() => {
       VAPID_PRIVATE_KEY: preserve(),
       VAPID_SUBJECT: preserve(),
       WHATSAPP_AI_ENABLED: preserve(),
+      // Optional (docs/OPERATIONS.md). Listed so an apply never deletes them
+      // once they are set in the dashboard.
+      ALERT_WEBHOOK_URL: preserve(),
+      PORTAL_VERIFY_SECRET: preserve(),
+      TOKEN_ENCRYPTION_KEY: preserve(),
     },
   });
   const cronexchangeRates = service("cron:exchange-rates", {
@@ -146,7 +157,23 @@ export default defineRailway(() => {
     },
   });
 
+  // Schedule send: sends each scheduled email when its time comes (the inbox
+  // composer's "Schedule send", migration 421). Every 5 minutes — Railway's
+  // shortest — so an email goes out within about five minutes of its time.
+  const cronScheduledSend = service("cron:scheduled-send", {
+    source: autouraSaas,
+    build: "",
+    start: "npm run cron:scheduled-send",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    deploy: { cronSchedule: "*/5 * * * *", restartPolicyType: "NEVER" },
+    networking: { privateNetworkEndpoint: "scheduled-send-cron" },
+    env: {
+      CRON_TARGET_URL: preserve(),
+      CRON_SECRET: preserve(),
+    },
+  });
+
   return project("Autoura multi-tenant", {
-    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts],
+    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend],
   });
 });

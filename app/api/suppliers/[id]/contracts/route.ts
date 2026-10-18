@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { safeKeySegment } from '@/lib/storage-key'
 import {
   SUPPLIER_CONTRACTS_BUCKET,
@@ -62,6 +63,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const auth = await requireAuth()
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(auth.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id, user } = auth
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
 

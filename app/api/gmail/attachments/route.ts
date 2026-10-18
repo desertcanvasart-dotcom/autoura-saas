@@ -1,6 +1,9 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken, openToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { google } from '@/lib/google'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { attachmentNameParams } from '@/lib/email/mime-header'
 
 // GET /api/gmail/attachments?userId=xxx&messageId=xxx&attachmentId=xxx&filename=xxx
 export async function GET(request: NextRequest) {
@@ -14,6 +17,9 @@ export async function GET(request: NextRequest) {
       )
     }
     const user = authResult.user!
+    // The mailbox of the company being worked in (migration 415: one per
+    // person per company).
+    const mailboxTenant = authResult.tenant_id!
     const supabase = createAdminClient()
 
     const { searchParams } = new URL(request.url)
@@ -39,7 +45,8 @@ export async function GET(request: NextRequest) {
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json(
@@ -56,8 +63,8 @@ export async function GET(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: openToken(tokenData.access_token),
+      refresh_token: openToken(tokenData.refresh_token),
     })
 
     // Check if token needs refresh
@@ -67,11 +74,12 @@ export async function GET(request: NextRequest) {
       await (supabase as any)
         .from('gmail_tokens')
         .update({
-          access_token: credentials.access_token,
+          access_token: sealToken(credentials.access_token),
           token_expiry: new Date(credentials.expiry_date!).toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
+        .eq('tenant_id', mailboxTenant)
 
       oauth2Client.setCredentials(credentials)
     }
@@ -106,12 +114,16 @@ export async function GET(request: NextRequest) {
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+        // ASCII fallback plus RFC 6266/2231 filename*: a percent-encoded plain
+        // filename= saved "Reservación.pdf" as "Reservaci%C3%B3n.pdf".
+        'Content-Disposition': `attachment; ${attachmentNameParams(filename).disposition}`,
         'Content-Length': buffer.length.toString(),
       },
     })
 
   } catch (error: any) {
+    const reconnect = gmailReconnectResponse(error)
+    if (reconnect) return reconnect
     console.error('Error downloading attachment:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to download attachment' },

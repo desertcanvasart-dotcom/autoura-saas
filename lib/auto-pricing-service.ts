@@ -45,7 +45,7 @@ import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
 import { presetTierFor, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
-import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant } from '@/lib/vocabulary-server'
+import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant, guideGradesForTenant } from '@/lib/vocabulary-server'
 import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
@@ -60,6 +60,7 @@ import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDay
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
+import { roadPackageCoverage } from '@/lib/pricing/road-package'
 import { guideLanguageKey, pickGuideRateRow, type GuideRateRow } from '@/lib/guides/guide-language'
 import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
 import { dayTripFrom } from '@/lib/pricing/day-trip'
@@ -294,9 +295,9 @@ export interface DayPricingParams {
   travelDate?: string
   marginPercent?: number
   // ---- Guide grades + the throughout guide (B-item 1) ----
-  /** 'egyptologist' (default) or 'senior'. The default ask keeps the
-   *  historical roster fallback; a non-default ask must match a real
-   *  guide_rates row — hole, never a guess. */
+  /** A key from the agency's Guide grades vocabulary. Absent = its first
+   *  active grade, which keeps the historical roster fallback; any other
+   *  grade must match a real guide_rates row — hole, never a guess. */
   guideGrade?: GuideGrade
   /** 'spot' (default, historical: per-city guide on sightseeing days) or
    *  'throughout' (+1: one guide travels day 1 → end — a fee every day, a
@@ -310,8 +311,12 @@ export interface DayPricingParams {
   requestedPax?: number
 }
 
-export type GuideGrade = 'egyptologist' | 'senior'
+// Any key of the agency's Guide grades vocabulary. It was 'egyptologist' |
+// 'senior', so a grade an agency added could be saved on a rate but never
+// quoted, and a non-Egypt agency's first grade was a word it does not use.
+export type GuideGrade = string
 export type GuideMode = 'spot' | 'throughout'
+/** The grade when the agency's vocabulary has none (guideGradesForTenant). */
 export const DEFAULT_GUIDE_GRADE: GuideGrade = 'egyptologist'
 /** The party size at and below which the throughout guide eats at group rates. */
 export const GUIDE_MEALS_MAX_PAX = 3
@@ -1257,7 +1262,7 @@ export async function getCruiseRates(
       // Layer 1: the itinerary's pin. An id is a decision — no tier, city or
       // preference logic; a missing/deactivated id is a re-pick hole (null).
       const { data: rawPinned } = await base().eq('id', opts.rateId).limit(1)
-      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!pinned || pinned.length === 0) return null
       cruise = pinned[0]
     } else {
@@ -1284,7 +1289,7 @@ export async function getCruiseRates(
         }
         rows = data
       }
-      const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rows as Record<string, unknown>[], await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rows as Record<string, unknown>[], await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
       const pick = pickCandidate(cruises as any[], (c: any) => c.ship_name || c.id)
       if (pick.kind === 'ambiguous') {
@@ -1644,7 +1649,7 @@ export async function getHotelRates(
       // Layer 1: the itinerary's pin. An id is a decision — no tier, city or
       // preference logic; a missing/deactivated id is a re-pick hole (null).
       const { data: rawPinned } = await base().eq('id', opts.rateId).limit(1)
-      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!pinned || pinned.length === 0) return null
       return mapRow(pinned[0], 'db')
     }
@@ -1656,7 +1661,7 @@ export async function getHotelRates(
       .eq('tier', tier)
       .ilike('city', `%${city}%`)
       .limit(AMBIGUITY_SCAN_LIMIT)
-    const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!error && hotels && hotels.length > 0) {
       // ilike can match a DIFFERENT city ("Cairo" ~ "New Cairo"). Only an exact
@@ -1687,7 +1692,7 @@ export async function getHotelRates(
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .limit(1)
-    const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (anyHotel && anyHotel.length > 0) {
       return mapRow(anyHotel[0], 'fuzzy')
@@ -1728,7 +1733,7 @@ export async function getEntranceFeeById(
 
     if (!fees || fees.length === 0) return null
 
-    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     const fee = fees[0] as { id: string; attraction_name: string; eur_rate: number | null; non_eur_rate: number | null }
     // NULL = not priced yet (hole); 0 = genuinely free — see getEntranceFee.
     const rate = resolveEntranceRate(fee, isEurPassport)
@@ -1807,7 +1812,7 @@ export async function getEntranceFee(
       return null
     }
 
-    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     const fee = fees[0] as any
 
     // `??`, not `||`. Since migration 278 the schema distinguishes the two
@@ -1863,13 +1868,17 @@ export async function getGuideRate(
   tier: ServiceTier,
   opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet'; city?: string | null; mode?: string }
 ): Promise<{ id: string; name: string; dailyRate: number; source: RateSource; ambiguous?: Ambiguity; cityMatched?: boolean } | null> {
-  const grade = opts?.grade ?? DEFAULT_GUIDE_GRADE
+  // The agency's grades, first = the default ask.
+  const grades = await memoRead(`guide-grades|${scope.tenantId}`, () =>
+    guideGradesForTenant(getSupabaseAdmin() as never, scope.tenantId))
+  const defaultGrade = grades[0] ?? DEFAULT_GUIDE_GRADE
+  const grade = opts?.grade || defaultGrade
   const duration = opts?.duration ?? 'full_day'
   // The quote's guide MODE (sibling #464): a Throughout quote is priced only
   // from Throughout rates, a Spot quote only from Spot rates — a rate says
   // which it is for (guide_rates.guide_mode, migration 380). Never the other.
   const mode = opts?.mode ?? 'spot'
-  const isDefaultAsk = grade === DEFAULT_GUIDE_GRADE && duration === 'full_day'
+  const isDefaultAsk = grade === defaultGrade && duration === 'full_day'
   try {
     // ---- guide_rates: the rate table, matched EXACTLY (lib/guides/guide-language) ----
     // The language is a vocabulary key; a row may store the key or an older
@@ -1886,7 +1895,7 @@ export async function getGuideRate(
         .eq('is_active', true)
         .eq('guide_type', grade)
         .eq('tour_duration', duration)
-      return (await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))) ?? []
+      return (await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)) ?? []
     })
     // A row with no mode is a Spot rate — the column's default (380).
     const forLanguage = (rateRows as Array<GuideRateRow & { guide_mode?: string | null }>)
@@ -1896,7 +1905,7 @@ export async function getGuideRate(
     if (pick.kind === 'one') {
       return {
         id: pick.row.id,
-        name: `${language} ${grade === 'senior' ? 'Senior ' : ''}Guide`,
+        name: `${language} ${grade === defaultGrade ? '' : `${(await tenantVocabularyLabels(scope.tenantId, 'guide_grade')).get(grade) ?? grade} `}Guide`,
         dailyRate: pick.rate,
         source: 'db',
         cityMatched: pick.cityMatched,
@@ -1909,7 +1918,7 @@ export async function getGuideRate(
       }
     }
 
-    // A non-default ask stops here: senior or Meet & Assist without a row
+    // A non-default ask stops here: another grade or Meet & Assist without a row
     // is a HOLE naming what to add — pricing an egyptologist as a senior
     // (or a full day as a meet & greet) would be a silent wrong number.
     if (!isDefaultAsk) return null
@@ -1921,7 +1930,7 @@ export async function getGuideRate(
       .eq('is_active', true)
       .contains('languages', [language])
       .order('is_preferred', { ascending: false })
-    const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!error && guides && guides.length > 0) {
       // Several guides in the requested tier: the preferred one, else a hole
@@ -2013,7 +2022,7 @@ export async function getMealRates(
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('tier', tier)
-    const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     const rows = (mealRows ?? []) as Array<{
       id?: string
@@ -2161,7 +2170,7 @@ export async function getAirportServiceRateDetail(
       // arbitrary one. Deterministic beats incidental.
       .order('rate_eur', { ascending: true })
       .limit(1)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'airport_staff_rates', rawAirportRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'airport_staff_rates', rawAirportRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!rates || rates.length === 0) {
       return null
@@ -2206,7 +2215,7 @@ export async function getHotelServiceRateDetail(
         // second row is added.
         .order('rate_eur', { ascending: true })
         .limit(1)
-      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!rates || rates.length === 0) return null
       return staffRateOf(rates[0])
     }
@@ -2257,7 +2266,7 @@ export async function getTippingRates(
       .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!rates || rates.length === 0) {
       return null
@@ -2312,7 +2321,7 @@ export async function loadTippingRows(scope: CatalogScope): Promise<TippingRow[]
       .select('id, tenant_id, role_type, context, rate_unit, rate_eur, rate_currency, city')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
-    const rows = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     return (rows ?? []) as TippingRow[]
   } catch {
     return []
@@ -2381,7 +2390,7 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
     .select('*')
     .or(catalogOrExpr(scope))
     .eq('is_active', true)
-  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
   const cache = new Map<string, TransportRate>()
 
@@ -2667,8 +2676,27 @@ async function loadCruisePackages(scope: CatalogScope): Promise<Array<PackageVeh
       .or(catalogOrExpr(scope))
       .eq('package_type', 'cruise_sightseeing')
       .eq('is_active', true)
-    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     return (rows ?? []) as unknown as Array<PackageVehicleRates & { id: string; package_name: string; duration_days: number | null }>
+  })
+}
+
+/** The agency's active Day Tour and Multi-Day transport packages (Tours →
+ *  Transport Packages), in the run's currency. Read once per calculation. */
+async function loadRoadPackages(scope: CatalogScope): Promise<Array<PackageVehicleRates & {
+  id: string; package_name: string; package_type: string; origin_city: string | null; destination_city: string | null; duration_days: number | null
+}>> {
+  return memoRead(`road-packages|${scope.tenantId}`, async () => {
+    const { data } = await getSupabaseAdmin()
+      .from('b2b_transport_packages')
+      .select('id, package_name, package_type, origin_city, destination_city, duration_days, vehicles, sedan_rate, sedan_capacity, minivan_rate, minivan_capacity, van_rate, van_capacity, minibus_rate, minibus_capacity, bus_rate, bus_capacity, rate_currency, tenant_id')
+      .or(catalogOrExpr(scope))
+      .in('package_type', ['day_tour', 'multi_day'])
+      .eq('is_active', true)
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
+    return (rows ?? []) as unknown as Array<PackageVehicleRates & {
+      id: string; package_name: string; package_type: string; origin_city: string | null; destination_city: string | null; duration_days: number | null
+    }>
   })
 }
 
@@ -2685,7 +2713,7 @@ async function loadActivitiesByIds(scope: CatalogScope, ids: string[]): Promise<
     .or(catalogOrExpr(scope))
     .in('id', ids)
     .eq('is_active', true)
-  const rows = await normalizeRateRows(getSupabaseAdmin(), 'activity_rates', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+  const rows = await normalizeRateRows(getSupabaseAdmin(), 'activity_rates', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
   for (const r of (rows ?? []) as unknown as ActivityRow[]) map.set(r.id, r)
   return map
 }
@@ -2824,7 +2852,7 @@ export async function calculateDayBasedPricing(
     language = 'English',
     travelDate,
     marginPercent = 25,
-    guideGrade = DEFAULT_GUIDE_GRADE,
+    guideGrade: askedGrade,
     guideMode = 'spot',
     requestedPax
   } = params
@@ -2832,6 +2860,14 @@ export async function calculateDayBasedPricing(
 
   // Resolved once per calculation; every rate lookup below is scoped by it.
   const catalogScope = await getCatalogScope(getSupabaseAdmin(), tenantId)
+  // The grade asked for, else the agency's first; and its word for it.
+  const guideGrades = await memoRead(`guide-grades|${tenantId}`, () =>
+    guideGradesForTenant(getSupabaseAdmin() as never, tenantId))
+  const defaultGuideGrade = guideGrades[0] ?? DEFAULT_GUIDE_GRADE
+  const guideGrade: GuideGrade = askedGrade || defaultGuideGrade
+  const guideGradeWord = guideGrade === defaultGuideGrade
+    ? ''
+    : ((await tenantVocabularyLabels(tenantId, 'guide_grade')).get(guideGrade) ?? guideGrade)
 
   const warnings: string[] = []
   const services: PricedService[] = []
@@ -3328,7 +3364,7 @@ export async function calculateDayBasedPricing(
   const [mealRates, tippingRows, fixedDailyCosts] = await Promise.all([
     getMealRates(catalogScope, tier),
     loadTippingRows(catalogScope),
-    getFixedDailyCosts(),
+    getTenantRunCurrency(getSupabaseAdmin(), catalogScope.tenantId).then(run => getFixedDailyCosts(catalogScope.tenantId, run)),
   ])
   const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
 
@@ -3460,7 +3496,7 @@ export async function calculateDayBasedPricing(
         .select(TICKET_COLUMNS[table])
         .or(catalogOrExpr(catalogScope))
         .eq('is_active', true)
-      return normalizeRateRows(getSupabaseAdmin(), table, (data ?? []) as unknown as Record<string, unknown>[], runCurrencyForTickets)
+      return normalizeRateRows(getSupabaseAdmin(), table, (data ?? []) as unknown as Record<string, unknown>[], runCurrencyForTickets, catalogScope.tenantId)
     }
     const [flightRows, trainRows, sleeperRows] = await Promise.all([
       ticketLegs.some(l => l.mode === 'flight') ? fetchMode('flight_rates') : Promise.resolve([]),
@@ -3749,7 +3785,7 @@ export async function calculateDayBasedPricing(
     // sightseeing days and the cheaper Meet & Assist fee on every other
     // day. A missing meet/assist rate is a hole NAMING the duration to
     // add, never the full-day rate worn as a guess.
-    const gradeLabel = guideGrade === 'senior' ? 'Senior ' : ''
+    const gradeLabel = guideGradeWord ? `${guideGradeWord} ` : ''
     const guideRate = (throughoutGuide || hasSightseeing) ? await guideRateFor(day.city) : null
     // The throughout guide's cheaper fee for meet/goodbye/transit days. Only
     // fetched when asked for — and it must be a REAL row: pricing a meet &
@@ -3758,7 +3794,7 @@ export async function calculateDayBasedPricing(
     if (throughoutGuide) {
       const dayRate = hasSightseeing ? guideRate : guideMeetRate
       const feeLabel = hasSightseeing
-        ? `Throughout Guide (${language}${guideGrade === 'senior' ? ', Senior' : ''})`
+        ? `Throughout Guide (${language}${guideGradeWord ? `, ${guideGradeWord}` : ''})`
         : 'Throughout Guide — Meet & Assist'
       if (dayRate && dayRate.source === 'db') {
         fixedCosts += dayRate.dailyRate
@@ -4370,7 +4406,7 @@ export async function calculateDayBasedPricing(
       rateSource: 'fixed',
       isPerPax: true,
       isOptional: false,
-      notes: `€${waterCostPerPax}/day × ${sightseeingDays} days`
+      notes: `${waterCostPerPax}/day × ${sightseeingDays} days`
     })
   }
 
@@ -4390,6 +4426,8 @@ export async function calculateDayBasedPricing(
   }
 
   const transportInfoByDay: DayTransportInfo[] = []
+  // Days with sightseeing: a Day Tour package is the vehicle for one (8c).
+  const sightseeingDaySet = new Set<number>()
 
   for (let i = 0; i < itinerary.length; i++) {
     const day = itinerary[i]
@@ -4397,6 +4435,7 @@ export async function calculateDayBasedPricing(
     const nextDay = groundedNeighbour(itinerary, i, 1)
 
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
+    if (hasSightseeing) sightseeingDaySet.add(day.day)
     const hasAirportService = day.services.airport_arrival || day.services.airport_departure
     // A day travelling by ticket (B-item 2) is NOT an intercity ROAD day —
     // the ticket is the day's transport (and no station transfers are
@@ -4478,7 +4517,7 @@ export async function calculateDayBasedPricing(
         addHole({
           kind: 'transport', reason: 'missing', tier, dayNumber: sailing.nightDays[0],
           lookupAttempted: `cruise sightseeing package for ${sailing.durationDays} days`,
-          message: `${pick.count} cruise sightseeing packages are ${sailing.durationDays} days long — pricing will not choose between them. Keep one active in Rates → Transport Packages.`,
+          message: `${pick.count} cruise sightseeing packages are ${sailing.durationDays} days long — pricing will not choose between them. Keep one active in Tours → Transport Packages.`,
         })
         continue
       }
@@ -4488,6 +4527,38 @@ export async function calculateDayBasedPricing(
       for (const info of transportInfoByDay) {
         const day = itinerary.find(d => d.day === info.day)
         if (covered.has(info.day) && !day?.transport_lines) info.requiresTransport = false
+      }
+    }
+  }
+
+  // ============================================
+  // STEP 8c: DAY-TOUR AND MULTI-DAY PACKAGES
+  // ============================================
+  // The road counterpart of 8b (lib/pricing/road-package): a stretch of road
+  // days a Day Tour or Multi-Day package fits is priced once from the package
+  // and its days list "Transport — Included"; with no package fitting, the
+  // per-day rates apply as before. These two kinds were stored and never read.
+  const roadPackages = await loadRoadPackages(catalogScope)
+  const roadCovered: Array<{ pkg: (typeof roadPackages)[number]; days: number[] }> = []
+  if (roadPackages.length > 0) {
+    const taken = new Set(sailingPackages.flatMap(({ sailing }) =>
+      [...sailing.nightDays, ...(sailing.disembarkDay != null ? [sailing.disembarkDay] : [])]))
+    const { covered, ambiguous } = roadPackageCoverage(itinerary, roadPackages, { taken, sightseeingDays: sightseeingDaySet })
+    for (const a of ambiguous) {
+      addHole({
+        kind: 'transport', reason: 'missing', tier, dayNumber: a.days[0],
+        lookupAttempted: `transport package for day${a.days.length > 1 ? 's' : ''} ${a.days.join(', ')}`,
+        message: `${a.count} transport packages fit day${a.days.length > 1 ? 's' : ''} ${a.days.join(', ')} — pricing will not choose between them. Keep one active in Tours → Transport Packages.`,
+      })
+    }
+    for (const c of covered) {
+      roadCovered.push(c)
+      const days = new Set(c.days)
+      for (const info of transportInfoByDay) if (days.has(info.day)) info.requiresTransport = false
+      // The package is the road move too: no "included in the overnight
+      // return" line beside it.
+      for (let k = services.length - 1; k >= 0; k--) {
+        if (c.days.some(d => services[k].id === `day${d}-road-return-included`)) services.splice(k, 1)
       }
     }
   }
@@ -4603,7 +4674,7 @@ export async function calculateDayBasedPricing(
       addHole({
         kind: 'transport', reason: 'missing', tier, dayNumber: firstDay,
         lookupAttempted: `${pkg.package_name}: vehicle for ${shownSeats}`,
-        message: `${pkg.package_name} has no vehicle price for a group of ${shownSeats}. Fill it in Rates → Transport Packages.`,
+        message: `${pkg.package_name} has no vehicle price for a group of ${shownSeats}. Fill it in Tours → Transport Packages.`,
       })
     }
     const included = (day: number, what: string) => services.push({
@@ -4614,6 +4685,35 @@ export async function calculateDayBasedPricing(
     })
     for (const d of sailing.nightDays) included(d, 'Sightseeing transport')
     if (sailing.disembarkDay != null) included(sailing.disembarkDay, 'Transfer off the ship')
+  }
+
+  // Each road package (8c): one line on its first day, "Included" on the rest.
+  for (const { pkg, days } of roadCovered) {
+    const vehicle = selectVehicleFromPackage(pkg, shownSeats, vehicleBands)
+    const firstDay = days[0]
+    if (vehicle) {
+      services.push({
+        id: `day${firstDay}-road-package-${pkg.id}`, dayNumber: firstDay, serviceType: 'transportation',
+        serviceName: `${pkg.package_name} (${days.length > 1 ? `${days.length} days, ` : ''}${vehicle.vehicle})`,
+        quantity: 1, quantityMode: 'fixed', unitCost: vehicle.rate, lineTotal: vehicle.rate,
+        rateSource: 'b2b_transport_packages', isPerPax: false, isOptional: false,
+        notes: `${pkg.package_type === 'day_tour' ? 'day tour' : 'multi-day'} transport package`,
+      })
+    } else {
+      addHole({
+        kind: 'transport', reason: 'missing', tier, dayNumber: firstDay,
+        lookupAttempted: `${pkg.package_name}: vehicle for ${shownSeats}`,
+        message: `${pkg.package_name} has no vehicle price for a group of ${shownSeats}. Fill it in Tours → Transport Packages.`,
+      })
+    }
+    for (const d of days.slice(1)) {
+      services.push({
+        id: `day${d}-included-${pkg.id}`, dayNumber: d, serviceType: 'transportation',
+        serviceName: `Transport — Included in ${pkg.package_name}`,
+        quantity: 1, quantityMode: 'fixed', unitCost: 0, lineTotal: 0,
+        rateSource: 'b2b_transport_packages', isPerPax: false, isOptional: false, notes: 'included in the package',
+      })
+    }
   }
 
   // The transfers a day needs BESIDES its sightseeing: dinner out, and the
@@ -4672,7 +4772,7 @@ export async function calculateDayBasedPricing(
     let transportCost = 0
     // Each sailing's package, at this group's size (the hole for a missing
     // vehicle price is recorded once, with the lines above).
-    for (const { pkg } of sailingPackages) {
+    for (const { pkg } of [...sailingPackages, ...roadCovered]) {
       const vehicle = selectVehicleFromPackage(pkg, pax, vehicleBands)
       if (vehicle) transportCost += vehicle.rate
     }
@@ -4759,7 +4859,9 @@ export async function calculateDayBasedPricing(
     // The tour leader pays CUSTOMER fare on tickets (B-item 2).
     tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax + staffPerPax,
     paxFrom: PAX_COUNTS[0],
-    paxTo: PAX_COUNTS[PAX_COUNTS.length - 1],
+    // A group larger than the sheet is priced at its own size: 50 travellers
+    // used to be priced as the 40-pax row and that total split 50 ways.
+    paxTo: Math.max(PAX_COUNTS[PAX_COUNTS.length - 1], Math.floor(Number(requestedPax) || 0)),
   })
 
   // ============================================
@@ -4799,7 +4901,9 @@ export async function calculateDayBasedPricing(
     paxPricing,
     complete: holes.length === 0,
     holes,
-    currency: 'EUR',
+    // Every rate above was normalized into the tenant's run currency; the
+    // result said 'EUR' whatever that was.
+    currency: await getTenantRunCurrency(getSupabaseAdmin(), catalogScope.tenantId),
     marginPercent,
     warnings
   }
@@ -4978,6 +5082,21 @@ export interface PricingResult {
   holes: PricingHole[]
 }
 
+/** One rate-sheet block with the seasonal premium in its price and margin. */
+export function withSeason<B extends { marginAmount: number; sellingPrice: number; pricePerPerson: number }>(
+  block: B, numPax: number, season: Parameters<typeof computeUplift>[0]['season'],
+): B {
+  const amount = Math.round(computeUplift({ sellingPrice: block.sellingPrice, season }).amount * 100) / 100
+  if (amount === 0) return block
+  const sellingPrice = Math.round((block.sellingPrice + amount) * 100) / 100
+  return {
+    ...block,
+    marginAmount: Math.round((block.marginAmount + amount) * 100) / 100,
+    sellingPrice,
+    pricePerPerson: numPax > 0 ? Math.round((sellingPrice / numPax) * 100) / 100 : 0,
+  }
+}
+
 /**
  * BACKWARD COMPATIBLE FUNCTION
  */
@@ -5113,6 +5232,14 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
   const upliftAmount = Math.round(uplift.amount * 100) / 100
   const sellingWithSeason = Math.round((pricing.sellingPrice + upliftAmount) * 100) / 100
   const perPersonWithSeason = numPax > 0 ? Math.round((sellingWithSeason / numPax) * 100) / 100 : 0
+  // The premium is ours, so it is margin; and the rate sheet carries it at
+  // every group size. It used to be in the selling price alone — the margin
+  // and the partner's price table read as if the departure were ordinary.
+  const paxPricingTable = dayResult.paxPricing.map(row => ({
+    ...row,
+    withoutLeader: withSeason(row.withoutLeader, row.numPax, season),
+    withLeader: withSeason(row.withLeader, row.numPax, season),
+  }))
 
   return {
     success: true,
@@ -5137,7 +5264,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     totalCost: pricing.totalCost,
     tourLeaderCost: tourLeaderIncluded ? paxResult.withLeader.tourLeaderCost : 0,
     marginPercent: dayResult.marginPercent,
-    marginAmount: pricing.marginAmount,
+    marginAmount: Math.round((pricing.marginAmount + upliftAmount) * 100) / 100,
     sellingPriceBeforeSeason: pricing.sellingPrice,
     seasonUplift: upliftAmount,
     seasonName: uplift.seasonName,
@@ -5147,7 +5274,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     currency: dayResult.currency,
     ratesUsed,
     warnings: dayResult.warnings,
-    paxPricingTable: dayResult.paxPricing,
+    paxPricingTable,
     singleSupplement: dayResult.singleSupplement,
     tripleReduction: dayResult.tripleReduction,
     complete: dayResult.complete,
@@ -5301,6 +5428,7 @@ export async function loadSeasonWindows(
     .from('pricing_seasons')
     .select('id, name, uplift_percent, is_active')
     .in('id', seasonIds)
+    .eq('tenant_id', tenantId)
     .eq('is_active', true)
 
   const seasons = (rawSeasons ?? []) as unknown as Array<{

@@ -1,3 +1,4 @@
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 import { NextRequest, NextResponse } from 'next/server'
 import { toApprovedGaps } from '@/lib/itineraries/share-approval'
 import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: itinerary, error } = await supabase!
     .from('itineraries')
-    .select('id, status, total_cost, currency, tenant_id')
+    .select('id, status, total_cost, currency, tenant_id, margin_percent')
     .eq('id', id)
     .eq('tenant_id', tenant_id!)
     .maybeSingle()
@@ -60,14 +61,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         success: false,
-        error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or share it anyway with allow_incomplete=true.`,
+        error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or share it anyway.`,
         gaps: itineraryLines.completeness.gaps,
       },
       { status: 422 }
     )
   }
 
-  const priceCheck = checkAmountDeliverable(itinerary.total_cost, { currency: itinerary.currency })
+  // The client total from the services (lib/itinerary-client-total), as the
+  // email and WhatsApp sends use — the header cache can be 0 or stale, and a
+  // priced trip with a 0 cache was refused a link.
+  const clientTotal = effectiveItineraryTotal(itinerary, itineraryLines.services)
+  const priceCheck = checkAmountDeliverable(clientTotal, { currency: itinerary.currency })
   if (!priceCheck.ok) {
     return NextResponse.json(
       { success: false, error: 'Itinerary price is not deliverable', violations: priceCheck.violations },
@@ -166,4 +171,25 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
+}
+
+// GET — the itinerary's live link, if it has one. The page asked only by
+// creating, so on every visit the menu offered "Create share link" (and no
+// Revoke) for a trip whose link the client already had.
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const auth = await requireAuth()
+  if (auth.error !== null) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  }
+  const { data } = await auth.supabase!
+    .from('itinerary_shares')
+    .select('token')
+    .eq('itinerary_id', id)
+    .eq('tenant_id', auth.tenant_id!)
+    .is('revoked_at', null)
+    .maybeSingle()
+  if (!data?.token) return NextResponse.json({ success: true, url: null })
+  const base = appRedirectBase(process.env.NEXT_PUBLIC_APP_URL, request.url)
+  return NextResponse.json({ success: true, token: data.token, url: new URL(`/share/${data.token}`, base).toString() })
 }

@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
@@ -18,9 +19,10 @@ import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 
 // The GRADE axis (B-item 1) and the day type both come from the agency's
 // vocabulary (Settings → Your vocabulary: Guide grades, Guide day types).
-// The engine prices by KEY — 'egyptologist' / 'senior', 'full_day' /
-// 'half_day' / 'meet_greet' — so labels are the agency's to change; the six
-// legacy grades are seeded hidden so old rows still read as words.
+// The engine prices by KEY — any of the agency's grades (its first is the
+// default ask), 'full_day' / 'half_day' / 'meet_greet' — so labels are the
+// agency's to change; the six legacy grades are seeded hidden so old rows
+// still read as words.
 
 interface Guide {
   id: string
@@ -74,6 +76,9 @@ export default function GuideRatesContent() {
   const [selectedLanguage, setSelectedLanguage] = useState('')
   // The agency's words for languages (Settings → Your vocabulary).
   const { labelFor: languageLabel } = useVocabulary('guide_language')
+  // A new rate starts at the agency's first grade, not 'egyptologist'.
+  const { items: gradeItems } = useVocabulary('guide_grade')
+  const firstGrade = gradeItems[0]?.key || 'egyptologist'
   const [selectedGuide, setSelectedGuide] = useState(initialSupplierId)
   const [selectedGuideType, setSelectedGuideType] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -149,7 +154,9 @@ export default function GuideRatesContent() {
   const fetchRates = async () => {
     try {
       const params = new URLSearchParams()
-      if (!showInactive) params.append('active_only', 'true')
+      // Every rate, inactive too: the list filters them (matchesActive). The
+      // fetch ran once, on mount, with active_only — so "Show All" had nothing
+      // to show and a deactivated rate could never be found to switch back on.
 
       const response = await fetch(`/api/rates/guides?${params}`)
       const data = await response.json()
@@ -212,7 +219,7 @@ export default function GuideRatesContent() {
     setFormData({
       service_code: generateServiceCode(),
       guide_language: 'english',
-      guide_type: 'egyptologist',
+      guide_type: firstGrade,
       guide_mode: 'spot',
       city: '',
       tour_duration: 'full_day',
@@ -615,7 +622,7 @@ export default function GuideRatesContent() {
             Add Rate
           </button>
           <Link
-            href="/guides"
+            href="/resources"
             className="flex items-center gap-2 px-3 py-1.5 text-sm border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50"
           >
             <Users className="w-4 h-4" />
@@ -707,7 +714,7 @@ export default function GuideRatesContent() {
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
           >
             <option value="">All Cities</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, selectedCity || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1169,7 +1176,7 @@ export default function GuideRatesContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select City</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>

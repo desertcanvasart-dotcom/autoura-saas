@@ -1,5 +1,7 @@
 'use client'
 
+import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
@@ -19,7 +21,8 @@ import {
   MapPin
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
-import { getCurrencySymbol } from '@/lib/currency'
+import { formatMoney, formatTotals, sumByCurrency } from '@/lib/currency-totals'
+import { withReturnTo } from '@/lib/nav/return-to'
 
 interface UnifiedPayment {
   id: string
@@ -68,7 +71,8 @@ export default function ReceiptsPage() {
         const itineraryData = await itineraryPaymentsRes.json()
         const itineraryPayments = itineraryData.success ? itineraryData.data : (Array.isArray(itineraryData) ? itineraryData : [])
         
-        itineraryPayments.forEach((p: any) => {
+        // Receipts are for money received: not pending, failed or refunded.
+        itineraryPayments.filter((p: any) => p.status === 'completed').forEach((p: any) => {
           allPayments.push({
             id: p.id,
             source: 'itinerary',
@@ -144,7 +148,7 @@ export default function ReceiptsPage() {
     // For itinerary payments, go to the receipt page
     // For invoice payments, go to the invoice page
     if (payment.source === 'itinerary') {
-      router.push(`/documents/receipt/${payment.id}`)
+      router.push(withReturnTo(`/documents/receipt/${payment.id}`, '/receipts'))
     } else {
       router.push(`/invoices/${payment.source_id}`)
     }
@@ -154,12 +158,13 @@ export default function ReceiptsPage() {
     setDownloadingId(payment.id)
     
     try {
-      const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+      const receiptNumber = receiptNumberFor(payment)
 
       const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
       downloadReceiptPDF({
         receiptNumber,
         invoiceNumber: payment.source_reference,
+        referenceLabel: payment.source === 'itinerary' ? 'Itinerary' : 'Invoice',
         clientName: payment.client_name,
         clientEmail: payment.client_email || '',
         paymentDate: payment.payment_date || new Date().toISOString(),
@@ -173,7 +178,7 @@ export default function ReceiptsPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(payment, identityFromTenant(tenant)))
     } catch (error) {
       console.error('Error downloading receipt:', error)
       showToast('error', 'Failed to download receipt')
@@ -191,17 +196,13 @@ export default function ReceiptsPage() {
     setSendingId(payment.id)
     
     try {
-      // For itinerary payments, use the send-receipt API
-      // For invoice payments, use the invoice's send functionality
-      const endpoint = payment.source === 'itinerary' 
-        ? '/api/whatsapp/send-receipt'
-        : '/api/whatsapp/send-invoice'
-      
+      // A receipt for both kinds of payment: invoice payments were sent the
+      // invoice itself (with its balance due) and a draft one marked 'sent'.
       const body = payment.source === 'itinerary'
         ? { paymentId: payment.id }
-        : { invoiceId: payment.source_id }
+        : { invoicePaymentId: payment.id }
 
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/whatsapp/send-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -243,9 +244,7 @@ export default function ReceiptsPage() {
     })
   }
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return `${getCurrencySymbol(currency)} ${amount.toFixed(2)}`
-  }
+  const formatCurrency = (amount: number, currency: string) => formatMoney(amount, currency)
 
   const getMethodLabel = (method: string) => {
     const labels: Record<string, string> = {
@@ -272,8 +271,9 @@ export default function ReceiptsPage() {
     const d = new Date(p.payment_date || p.created_at)
     return d.getFullYear() === nowD.getFullYear() && d.getMonth() === nowD.getMonth()
   }).length
-  const totalAmount = filteredPayments.reduce((sum, p) => sum + p.amount, 0)
-  const mainCurrency = filteredPayments[0]?.currency || 'EUR'
+  // One total per currency: amounts were added across currencies and shown
+  // in the first row's (EUR 1000 + USD 500 read as 1500 of one of them).
+  const totalLabel = formatTotals(sumByCurrency(filteredPayments, p => p.amount, p => p.currency))
 
   if (loading) {
     return (
@@ -321,7 +321,7 @@ export default function ReceiptsPage() {
                 <CreditCard className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalAmount, mainCurrency)}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalLabel}</p>
                 <p className="text-xs text-gray-500">Total Received</p>
               </div>
             </div>
@@ -389,7 +389,7 @@ export default function ReceiptsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredPayments.map((payment) => {
-                    const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+                    const receiptNumber = receiptNumberFor(payment)
                     const isDownloading = downloadingId === payment.id
                     const isSending = sendingId === payment.id
                     const isSent = sentIds.includes(payment.id)
@@ -504,7 +504,7 @@ export default function ReceiptsPage() {
         {filteredPayments.length > 0 && (
           <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
             <span>Showing {filteredPayments.length} receipt{filteredPayments.length !== 1 ? 's' : ''}</span>
-            <span>Total: <strong className="text-gray-900">{formatCurrency(totalAmount, mainCurrency)}</strong></span>
+            <span>Total: <strong className="text-gray-900">{totalLabel}</strong></span>
           </div>
         )}
       </div>

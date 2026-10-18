@@ -46,7 +46,9 @@ export function normalizeHeader(header: string): string {
 export const SUPPLIER_CSV_COLUMNS: readonly SupplierCsvColumn[] = [
   { header: 'Name', field: 'name', aliases: ['company', 'company_name', 'supplier', 'supplier_name'], sample: 'Nile Star Hotel' },
   // The portable cross-install key. Second so it sits beside the name it identifies.
-  { header: 'Code', field: 'supplier_code', aliases: ['supplier_code'], sample: 'SUP-0001' },
+  // The sample's code marks its row as the example: an import skips it, so the
+  // sample uploaded unedited creates nothing.
+  { header: 'Code', field: 'supplier_code', aliases: ['supplier_code'], sample: 'EXAMPLE-SUP-0001' },
   { header: 'Type', field: 'type', aliases: ['supplier_type', 'category'], sample: 'hotel|transport_company' },
   { header: 'Contact', field: 'contact_name', aliases: ['contact_name'], sample: 'Ahmed Hassan' },
   { header: 'Email', field: 'contact_email', aliases: ['contact_email'], sample: 'reservations@nilestar.example' },

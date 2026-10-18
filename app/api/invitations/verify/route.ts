@@ -79,8 +79,9 @@ export async function GET(request: NextRequest) {
     // resets a live password), so the page must not ask them to create one —
     // it did, they typed a new password, and every sign-in with it failed.
     // Same test as the accept route: a profile + a confirmed auth user. An
-    // unconfirmed one is repaired with the password typed here, so it still
-    // gets the form. Token-gated: only the invitee learns this.
+    // unconfirmed one gets the form and, like a new invitee, sets its password
+    // from the link emailed to it. Token-gated: only the link's holder learns
+    // this.
     let hasAccount = false
     const { data: existingProfile } = await db
       .from('user_profiles')

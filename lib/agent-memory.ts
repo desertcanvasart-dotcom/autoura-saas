@@ -6,8 +6,10 @@
 // new memories (from the feedback loop cron job).
 //
 // Used by:
-//   - app/api/ai/generate-itinerary/route.ts (read + inject)
 //   - app/api/cron/process-agent-memory/route.ts (write)
+// Its reader and run log (getMemoriesForPrompt, logAgentRun) were called by
+// the AI itinerary generator, removed 2026-10-11 (nothing called it); they
+// have no caller until an AI feature records runs again.
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js'
@@ -53,7 +55,7 @@ export interface MemoryInjectionResult {
 
 // ============================================================
 // READ: GET MEMORIES FOR PROMPT INJECTION
-// Called at the start of every generate-itinerary invocation.
+// For an AI feature's prompt (the removed itinerary generator read it).
 // ============================================================
 
 export async function getMemoriesForPrompt(params: {
@@ -455,7 +457,7 @@ export async function processRunForMemory(params: {
 
 // ============================================================
 // LOG AGENT RUN (for audit + billing)
-// Call this after every successful generate-itinerary invocation.
+// For an AI feature to call after a run (the removed itinerary generator did).
 // ============================================================
 
 export async function logAgentRun(params: {

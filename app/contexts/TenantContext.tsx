@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { createClient } from '@/app/supabase'
 import type { Json } from '@/types/database.types'
 import { useAuth } from './AuthContext'
@@ -41,6 +42,13 @@ interface Tenant {
   license_number?: string | null
   tax_number?: string | null
   document_footer_text?: string | null
+  // What travel contracts name (Settings → Organization, migration 403).
+  operating_country?: string | null
+  contract_governing_law?: string | null
+  deposit_percent?: number | null
+  /** The company's IANA timezone (Settings → Organization). Server-side
+   *  "today" follows it (lib/tenant-today). NULL / 'UTC' by default. */
+  timezone?: string | null
   created_at: string | null
   updated_at: string | null
 }
@@ -57,6 +65,9 @@ interface TenantMember {
   created_at: string | null
   updated_at: string | null
 }
+
+/** The row as read: role and status are plain strings until narrowed. */
+type TenantMemberRow = Omit<TenantMember, 'role' | 'status'> & { role: string; status: string }
 
 interface TenantFeatures {
   id: string
@@ -145,16 +156,13 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       // tenant/user PAIR), and single() errors on 2+ rows as well as on 0 —
       // so a second membership broke the context outright, and someone with
       // none at all was reported as a fetch failure and retried forever.
-      // Oldest membership wins, which is stable across reloads.
-      const { data: memberData, error: memberError } = await supabase
-        .from('tenant_members')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('joined_at', { ascending: true })
-        .order('tenant_id', { ascending: true })
-        .limit(1)
-        .maybeSingle()
+      // The current company is the database's answer (the chosen one, else
+      // the oldest) — the same one RLS filters by. lib/current-membership.ts
+      const { data: memberData, error: memberError } = await currentMembership<TenantMemberRow>(
+        supabase as unknown as MembershipDb,
+        user.id,
+        '*',
+      )
 
       if (memberError) {
         console.error('Error fetching tenant member:', memberError)

@@ -1,3 +1,5 @@
+import { safeReturnPath } from '@/lib/nav/return-to'
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { createNotification, myNotificationsFilter } from '@/lib/notifications'
@@ -69,6 +71,9 @@ export async function GET(request: NextRequest) {
 
 // POST - Create a notification for a team member in the caller's tenant.
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const auth = await requireAuth()
     if (auth.error !== null) {
@@ -113,7 +118,9 @@ export async function POST(request: NextRequest) {
       type,
       title,
       message,
-      link,
+      // A path inside the app only: a link to any website, in a notification
+      // from a colleague (and its email and push), is a phishing link.
+      link: safeReturnPath(link) ?? undefined,
       related_task_id,
       send_email,
     })

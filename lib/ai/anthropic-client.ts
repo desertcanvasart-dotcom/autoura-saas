@@ -12,12 +12,25 @@ const MISSING_KEY_MESSAGE = 'ANTHROPIC_API_KEY is not configured'
 // Singleton client instance
 let _client: Anthropic | null = null
 
+/**
+ * The key as Anthropic expects it. A key pasted into a hosting dashboard often
+ * carries a trailing newline or space, or the quotes from a .env line
+ * (ANTHROPIC_API_KEY="sk-ant-…"); sent as is, every AI call fails with 401.
+ */
+export function anthropicApiKey(raw: string | undefined = process.env.ANTHROPIC_API_KEY): string {
+  return String(raw ?? '').trim().replace(/^(['"])(.*)\1$/, '$2').trim()
+}
+
 export function getAnthropicClient(): Anthropic {
   if (!_client) {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    const apiKey = anthropicApiKey()
+    if (!apiKey) {
       throw new Error(MISSING_KEY_MESSAGE)
     }
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    // The SDK waits up to 10 minutes per attempt and retries twice on its own;
+    // under createMessageWithRetry's three retries a hung request could hold a
+    // route for over an hour. Three minutes covers the longest generation.
+    _client = new Anthropic({ apiKey, timeout: 180_000, maxRetries: 1 })
   }
   return _client
 }
@@ -247,3 +260,35 @@ function getRetryAfterMs(error: unknown): number | null {
   }
   return null
 }
+
+export type AnthropicKeyCheck =
+  | { status: 'ok' }
+  | { status: 'unconfigured' }
+  | { status: 'rejected'; hint: string }
+  | { status: 'unreachable'; detail: string }
+
+/**
+ * Does Anthropic accept the configured key? Lists one model: no tokens, no
+ * cost. For the deep health check (?ai=1) — so "AI service authentication
+ * failed" can be confirmed and fixed without trying a parse. Never returns
+ * the key; the hint only describes its shape.
+ */
+export async function checkAnthropicKey(): Promise<AnthropicKeyCheck> {
+  const key = anthropicApiKey()
+  if (!key) return { status: 'unconfigured' }
+  try {
+    await getAnthropicClient().models.list({ limit: 1 })
+    return { status: 'ok' }
+  } catch (err) {
+    const status = getStatusCode(err)
+    if (status === 401 || status === 403) {
+      const shape = key.startsWith('sk-ant-') ? 'starts with sk-ant-' : 'does NOT start with sk-ant-'
+      return {
+        status: 'rejected',
+        hint: `Anthropic refused the key (${status}). The configured key ${shape} and is ${key.length} characters long. Create a new key at console.anthropic.com → API keys, and replace ANTHROPIC_API_KEY.`,
+      }
+    }
+    return { status: 'unreachable', detail: err instanceof Error ? err.message : String(err) }
+  }
+}
+

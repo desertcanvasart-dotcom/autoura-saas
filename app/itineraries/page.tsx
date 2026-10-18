@@ -1,4 +1,5 @@
 'use client'
+import LoadError from '@/components/LoadError'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -17,7 +18,9 @@ interface Itinerary {
   total_days: number
   num_adults: number
   num_children: number
-  total_cost: number
+  total_cost: number | null
+  /** The total the itinerary page shows (GET /api/itineraries). */
+  effective_total?: number
   currency: string
   status: string
 }
@@ -31,6 +34,7 @@ export default function ItinerariesPage() {
   const [itineraries, setItineraries] = useState<Itinerary[]>([])
   const [filteredItineraries, setFilteredItineraries] = useState<Itinerary[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   // What needs attention on each open trip — the same list the trip's own
@@ -63,6 +67,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
   }, [itineraries, searchQuery, statusFilter, attentionOnly, attention])
 
   const fetchItineraries = async () => {
+    setLoadError(false)
     try {
       const response = await fetch('/api/itineraries')
       const data = await response.json()
@@ -73,9 +78,12 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
           .then(r => r.json())
           .then(json => { if (json?.success && json.data) setAttention(json.data) })
           .catch(() => undefined)
+      } else {
+        setLoadError(true)
       }
     } catch (error) {
       console.error('Error fetching itineraries:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -403,7 +411,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     <div className="text-sm font-semibold text-gray-900">
-                      {itinerary.currency} {itinerary.total_cost.toFixed(0)}
+                      {itinerary.currency} {Number(itinerary.effective_total ?? itinerary.total_cost ?? 0).toFixed(0)}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-center whitespace-nowrap">
@@ -456,7 +464,9 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
             </tbody>
           </table>
         </div>
-        {filteredItineraries.length === 0 && (
+        {loadError ? (
+          <LoadError what="your itineraries" onRetry={fetchItineraries} />
+        ) : filteredItineraries.length === 0 && (
           <div className="text-center py-12 text-gray-500">
             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-base font-medium text-gray-900">No itineraries found</p>

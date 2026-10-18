@@ -1,9 +1,13 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
@@ -75,10 +79,11 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const message = `⏰ *${businessName} - Tour Reminder* ⏰\n\n` +
+    const message = `⏰ *${businessName ? `${businessName} - ` : ''}Tour Reminder* ⏰\n\n` +
       `Hi ${itinerary.client_name},\n\n` +
-      `Reminder: Your tour is tomorrow! 🌟\n\n` +
-      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
+      // The date is below; this said "tomorrow" whatever the date was.
+      `Reminder: your tour is coming up! 🌟\n\n` +
+      `🎯 *Tour:* ${itinerary.trip_name || 'your trip'}\n` +
       `📅 *Date:* ${formatDate(itinerary.start_date)}\n` +
       `🕐 *Pickup Time:* ${itinerary.pickup_time || 'To be confirmed'}\n` +
       `📍 *Pickup Location:* ${itinerary.pickup_location || 'To be confirmed'}\n\n` +
@@ -87,12 +92,14 @@ export async function POST(request: NextRequest) {
       `✅ Comfortable shoes recommended\n` +
       `✅ Don't forget your camera! 📸\n\n` +
       `Your guide will contact you shortly before pickup.\n\n` +
-      `See you soon! 🐪✨\n\n` +
-      `${businessName} Team`
+      `See you soon! ✨\n\n` +
+      (businessName ? `${businessName} Team` : '')
 
 
 
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: itinerary.client_phone,
       body: message
     })

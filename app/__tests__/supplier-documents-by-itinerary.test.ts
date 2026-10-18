@@ -13,11 +13,12 @@ const API = readFileSync(join(process.cwd(), 'app/api/supplier-documents/route.t
 
 describe('documents for one itinerary', () => {
   it('the itinerary links here with its id', () => {
-    expect(BUTTON).toContain('/documents/supplier?itineraryId=${itineraryId}')
+    expect(BUTTON).toContain('/documents/supplier?itineraryId=${encodeURIComponent(itineraryId)}')
   })
 
   it('the page reads that id and sends it to the API', () => {
-    expect(PAGE).toContain("new URLSearchParams(window.location.search).get('itineraryId')")
+    expect(PAGE).toContain('const params = new URLSearchParams(window.location.search)')
+    expect(PAGE).toContain("setItineraryFilter(params.get('itineraryId'))")
     expect(PAGE).toContain("if (itineraryFilter) params.append('itineraryId', itineraryFilter)")
     expect(PAGE).toMatch(/\[mounted, typeFilter, statusFilter, itineraryFilter\]/)
   })

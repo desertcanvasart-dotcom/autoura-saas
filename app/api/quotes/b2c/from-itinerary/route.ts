@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { quoteSeasonFor } from '@/lib/quotes/quote-season'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server';
+import { priceB2cQuote } from '@/lib/quotes/b2c-quote-price';
+import { recordsInTenant } from '@/lib/quotes/records-in-tenant';
+import { roleDenied } from '@/lib/api-role-gate'
 
 /**
  * POST /api/quotes/b2c/from-itinerary
@@ -17,6 +21,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
     // Admin client with explicit tenant scoping (auth gate above is the security boundary)
     const supabase = createAdminClient()
@@ -33,7 +39,8 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validation
-    if (!itinerary_id || !num_travelers || !tier || !margin_percent) {
+    // A 0% margin (an at-cost trip) is a margin; only a missing one is not.
+    if (!itinerary_id || !num_travelers || !tier || margin_percent === undefined || margin_percent === null || margin_percent === '') {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: itinerary_id, num_travelers, tier, margin_percent' },
         { status: 400 }
@@ -57,6 +64,15 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Itinerary not found' },
         { status: 404 }
       );
+    }
+
+    // A client named in the body must be this tenant's own: the insert below
+    // uses the admin client, its embed would return another tenant's client
+    // name, email and phone, and the quote's sends would go to that client
+    // (documents audit, round 12 — the B2C POST already checks this).
+    const clientCheck = await recordsInTenant(supabase, authResult.tenant_id, { client_id })
+    if (!clientCheck.ok) {
+      return NextResponse.json({ success: false, error: clientCheck.error }, { status: clientCheck.status });
     }
 
     // 2. Calculate costs from services
@@ -107,9 +123,16 @@ export async function POST(request: NextRequest) {
 
     // Calculate totals
     const total_cost = Object.values(costBreakdown).reduce((sum: number, val: any) => sum + val, 0);
-    const margin_amount = total_cost * (margin_percent / 100);
-    const selling_price = total_cost + margin_amount;
-    const price_per_person = selling_price / num_travelers;
+    // In the currency's own units (lib/quotes/b2c-quote-price): whole yen.
+    // The departure's seasonal premium (Settings → Seasonal Premiums), on the
+    // price after margin — it used to apply in the B2B Calculator only.
+    const season = await quoteSeasonFor(authResult.tenant_id, itinerary.start_date);
+    const { selling_price, price_per_person, season_premium } = priceB2cQuote({
+      totalCost: total_cost, marginPercent: margin_percent, travelers: num_travelers, currency,
+      seasonPercent: season.season_percent,
+    });
+    // Margin is margin; the premium is reported as its own line.
+    const margin_amount = selling_price - season_premium - total_cost;
 
     // 3. Generate quote number (requires admin client for RPC)
     const { data: quoteNumber, error: seqError } = await supabase
@@ -139,6 +162,9 @@ export async function POST(request: NextRequest) {
         margin_percent,
         selling_price,
         price_per_person,
+        season_name: season.season_name,
+        season_percent: season.season_percent,
+        season_premium,
         currency: currency || 'EUR',
         cost_breakdown: costBreakdown,
         valid_until: valid_until || null,
@@ -178,6 +204,9 @@ export async function POST(request: NextRequest) {
         total_cost,
         margin_amount,
         margin_percent,
+        season_name: season.season_name,
+        season_percent: season.season_percent,
+        season_premium,
         selling_price,
         price_per_person,
         cost_breakdown: costBreakdown

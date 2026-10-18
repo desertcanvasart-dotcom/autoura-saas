@@ -5,6 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/supabase-server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -88,11 +89,14 @@ export async function GET(request: NextRequest) {
 // POST - Create new category
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // The company the person is signed into: content_categories.tenant_id
+    // is required, and was never set, so creating a category failed.
+    const auth = await requireAuth()
+    if (auth.error !== null) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const { supabase, tenant_id } = auth
+    if (!supabase || !tenant_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -112,6 +116,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('content_categories')
       .insert({
+        tenant_id,
         name,
         slug: finalSlug,
         icon: icon || null,

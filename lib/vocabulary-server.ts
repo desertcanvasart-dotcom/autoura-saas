@@ -8,7 +8,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
-import { activeInOrder, type VocabularyItem, type VocabularyKind } from '@/lib/vocabulary'
+import { activeInOrder, type VehicleTypeUsage, type VocabularyItem, type VocabularyKind } from '@/lib/vocabulary'
 
 type Client = SupabaseClient<Database>
 
@@ -74,9 +74,22 @@ export async function vocabularyLabelsForTenant(admin: Client, tenantId: string,
   return out
 }
 
-/** The tenant's tiers, lowest to highest — the preset when none exist. */
+/** The tenant's guide grades, in its order: the first is the grade a quote
+ *  asks for when it names none. 'egyptologist' when the list is empty. */
+export async function guideGradesForTenant(admin: Client, tenantId: string): Promise<string[]> {
+  const keys = activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'guide_grade')).map(i => i.key)
+  return keys.length ? keys : ['egyptologist']
+}
+
+/** The tenant's tiers, lowest to highest — the preset when none exist.
+ *  HIDDEN TIERS INCLUDED: the engine maps a tier to hotel-staff and airport
+ *  service levels by its position, so hiding Luxury moved Deluxe to the top
+ *  step and priced it as Luxury. Positions stay put, as on the settings page
+ *  (lib/vocabulary-ui tierPosition). */
 export async function tierLadderForTenant(admin: Client, tenantId: string): Promise<string[]> {
-  const keys = activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'tier')).map(i => i.key)
+  const keys = [...await loadVocabularyForTenant(admin, tenantId, 'tier')]
+    .sort((a, b) => a.rank - b.rank)
+    .map(i => i.key)
   return keys.length ? keys : [...PRESET_TIERS]
 }
 
@@ -86,4 +99,57 @@ export async function vehicleBandsForTenant(admin: Client, tenantId: string): Pr
   return activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'vehicle_type'))
     .map(i => ({ key: i.key, min_pax: Number(i.meta?.min_pax ?? 0), max_pax: Number(i.meta?.max_pax ?? 0) }))
     .filter(v => v.max_pax > 0)
+}
+
+/** What a vehicle key is still filed under in one tenant: transport rates
+ *  (one row per route and vehicle) and B2B transport packages (their
+ *  vehicles list). Deleting the key leaves these rows naming a vehicle the
+ *  list no longer holds, so the settings screen warns first. */
+export async function vehicleTypeUsage(supabase: Client, tenantId: string, key: string): Promise<VehicleTypeUsage> {
+  const [rates, packages] = await Promise.all([
+    supabase.from('transportation_rates').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).ilike('vehicle_type', key.replace(/[\\%_]/g, ch => `\\${ch}`)),
+    supabase.from('b2b_transport_packages').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).contains('vehicles', [{ vehicle_type: key }]),
+  ])
+  return { transport_rates: rates.count ?? 0, transport_packages: packages.count ?? 0 }
+}
+
+/** Where a tier or supplier type is still used, as "N itineraries, N hotel
+ *  rates…". Deleting one that is used left those rows with a key the list no
+ *  longer has: a tier'd itinerary could no longer be duplicated (the key
+ *  check refuses it), and suppliers of a deleted type dropped out of every
+ *  supplier picker. Tables a database lacks count as 0. */
+const USAGE_TABLES: Record<string, Array<[table: string, column: string, label: string]>> = {
+  tier: [
+    ['itineraries', 'tier', 'itineraries'],
+    ['b2c_quotes', 'tier', 'quotes'],
+    ['b2b_quotes', 'tier', 'B2B quotes'],
+    ['tour_variations', 'tier', 'tour variations'],
+    ['accommodation_rates', 'tier', 'hotel rates'],
+    ['meal_rates', 'tier', 'meal rates'],
+    ['nile_cruises', 'tier', 'cruises'],
+    ['guides', 'tier', 'guides'],
+    ['vehicles', 'tier', 'vehicles'],
+  ],
+  supplier_type: [
+    ['suppliers', 'type', 'suppliers'],
+  ],
+}
+
+export async function vocabularyKeyUsage(supabase: Client, tenantId: string, kind: string, key: string): Promise<string[]> {
+  const tables = USAGE_TABLES[kind]
+  if (!tables) return []
+  const counts = await Promise.all(tables.map(async ([table, column, label]) => {
+    // Table names from the list above; the client's table union cannot name them by variable.
+    const { count, error } = await (supabase as unknown as { from: (t: string) => ReturnType<Client['from']> })
+      .from(table).select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq(column, key)
+    return { label, count: error ? 0 : count ?? 0 }
+  }))
+  // A supplier holding the type among several roles counts too.
+  if (kind === 'supplier_type') {
+    const { count, error } = await supabase.from('suppliers').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).contains('types', [key]).neq('type', key)
+    if (!error && count) counts.push({ label: 'suppliers (as a second role)', count })
+  }
+  return counts.filter(c => c.count > 0).map(c => `${c.count} ${c.label}`)
 }

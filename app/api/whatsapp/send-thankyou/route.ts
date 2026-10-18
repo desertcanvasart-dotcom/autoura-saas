@@ -1,9 +1,13 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
@@ -65,7 +69,9 @@ export async function POST(request: NextRequest) {
 
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const businessName = senderTenant?.company_name || ''
-    const reviewUrl = process.env.REVIEW_URL || 'https://g.page/r/travel2egypt/review'
+    // No review link: there is no per-tenant review URL, and the fallback was
+    // another operator's (Travel2Egypt's) Google review page — every tenant's
+    // clients were asked to review it. REVIEW_URL is one value for all.
 
     const formatDate = (dateStr: string) => {
       return new Date(dateStr).toLocaleDateString('en-GB', {
@@ -75,21 +81,22 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const message = `🎉 *${businessName}* 🎉\n\n` +
+    const message = (businessName ? `🎉 *${businessName}* 🎉\n\n` : '') +
       `Dear ${itinerary.client_name},\n\n` +
       `Thank you for traveling with us! 🙏\n\n` +
-      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
+      `🎯 *Tour:* ${itinerary.trip_name || 'your trip'}\n` +
       `📅 *Dates:* ${formatDate(itinerary.start_date)} - ${formatDate(itinerary.end_date)}\n\n` +
-      `We hope you had an incredible experience exploring Egypt! 🇪🇬\n\n` +
-      `We'd love to hear your feedback. If you enjoyed your tour, please consider leaving us a review:\n` +
-      `⭐ ${reviewUrl}\n\n` +
-      `Share your photos with us! We love seeing Egypt through your eyes. 📸\n\n` +
+      `We hope you had an incredible trip!\n\n` +
+      `We'd love to hear your feedback — just reply to this message and tell us about your trip. ⭐\n\n` +
+      `Share your photos with us! We'd love to see them. 📸\n\n` +
       `We hope to see you again soon! 🌟\n\n` +
-      `Best regards,\n${businessName} Team`
+      (businessName ? `Best regards,\n${businessName} Team` : 'Best regards,')
 
 
 
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: itinerary.client_phone,
       body: message
     })

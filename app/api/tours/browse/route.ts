@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 // ============================================
 // /api/tours/browse — the LIST of tours. It does not price them.
 // ============================================
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`template_name.ilike.%${search}%,short_description.ilike.%${search}%`)
+      query = query.or(`template_name.ilike.${orIlikeContains(search)},short_description.ilike.${orIlikeContains(search)}`)
     }
 
     // Apply pagination

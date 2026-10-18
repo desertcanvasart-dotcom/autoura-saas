@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('❌ Error fetching bookings:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch bookings', details: error.message },
+        { success: false, error: 'Failed to fetch bookings' },
         { status: 500 }
       )
     }

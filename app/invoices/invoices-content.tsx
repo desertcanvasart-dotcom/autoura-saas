@@ -1,8 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { todayLocal } from '@/lib/today'
-import { sumByCurrency, formatTotals, currencySymbol } from '@/lib/currency-totals'
+import { shiftDateISO, todayLocal } from '@/lib/today'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
+import { fetchItineraryClientTotal } from '@/lib/invoices/fetch-itinerary-client-total'
+import { sumByCurrency, formatTotals, currencySymbol, formatMoney } from '@/lib/currency-totals'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { invoiceMoney } from '@/lib/invoices/invoice-money'
 import { 
   Plus, 
   Eye,
@@ -112,17 +117,54 @@ const initialFormData: FormData = {
   total_amount: 0,
   currency: 'EUR',
   issue_date: todayLocal(),
-  due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  due_date: shiftDateISO(todayLocal(), 14),
   notes: '',
   payment_terms: 'Payment due within 14 days',
   payment_instructions: ''
+}
+
+/**
+ * Subtotal, tax and total for a one-line amount, as the server will store
+ * them (lib/invoices/invoice-money). Picking a trip, switching the type or
+ * changing the deposit percentage reset the line but kept the old tax.
+ */
+function amountsFor(prev: FormData, invoiceType: string, amount: number) {
+  const m = invoiceMoney({
+    invoiceType,
+    total: amount,
+    lineItems: [{ amount }],
+    taxRate: prev.tax_rate,
+    discountAmount: prev.discount_amount,
+    currency: prev.currency,
+  })
+  return { subtotal: m.subtotal, tax_amount: m.tax_amount, total_amount: m.total_amount }
+}
+
+/**
+ * The form's figures after a line, tax rate or discount edit — the same rule
+ * again, so a deposit or final invoice shows no tax or discount (the server
+ * drops them: it showed "Total 342" for a 300 deposit).
+ */
+function totalsOf(f: FormData) {
+  const m = invoiceMoney({
+    invoiceType: f.invoice_type,
+    total: f.line_items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+    lineItems: f.line_items,
+    taxRate: f.tax_rate,
+    discountAmount: f.discount_amount,
+    currency: f.currency,
+  })
+  return { ...f, subtotal: m.subtotal, tax_amount: m.tax_amount, total_amount: m.total_amount }
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100' },
   viewed: { label: 'Viewed', color: 'text-purple-700', bg: 'bg-purple-100' },
-  partial: { label: 'Partial', color: 'text-orange-700', bg: 'bg-orange-100' },
+  // The stored word is partially_paid (lib/invoices/invoice-balance); with no
+  // entry, a part-paid invoice showed as Draft.
+  partially_paid: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100' },
+  partial: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100' },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100' },
   overdue: { label: 'Overdue', color: 'text-red-700', bg: 'bg-red-100' },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bg: 'bg-gray-100' }
@@ -136,6 +178,9 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; ic
 
 export default function InvoicesContent() {
   const dialog = useConfirmDialog()
+  const { tenant } = useTenant()
+  // The agency's deposit rule (Settings → Payment terms), not a fixed 10%.
+  const tenantDepositPercent = resolveDepositRule({ tenant }).depositPercent
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [itineraries, setItineraries] = useState<Itinerary[]>([])
@@ -150,14 +195,27 @@ export default function InvoicesContent() {
   const fetchInvoices = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (statusFilter) params.append('status', statusFilter)
+      // Overdue is worked out here from the due date, never stored, so it is
+      // not sent (the filter found nothing).
+      if (statusFilter && statusFilter !== 'overdue') params.append('status', statusFilter)
       if (typeFilter) params.append('type', typeFilter)
-      
-      const response = await fetch(`/api/invoices?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setInvoices(data)
+
+      // Every invoice, 1000 at a time (the route's cap): the cards were
+      // worked out from the first 1000.
+      const all: Invoice[] = []
+      for (let offset = 0; ; offset += 1000) {
+        params.set('offset', String(offset))
+        const response = await fetch(`/api/invoices?${params}`)
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}))
+          showToast('error', err.error || 'Could not load invoices')
+          break
+        }
+        const page = await response.json()
+        all.push(...page)
+        if (page.length < 1000) break
       }
+      setInvoices(all)
     } catch (error) {
       console.error('Error fetching invoices:', error)
     } finally {
@@ -236,7 +294,7 @@ export default function InvoicesContent() {
     }))
   }
 
-  const handleItineraryChange = (itineraryId: string) => {
+  const handleItineraryChange = async (itineraryId: string) => {
     const itinerary = itineraries.find(i => i.id === itineraryId)
     if (itinerary) {
       const matchingClient = clients.find(c => 
@@ -244,7 +302,9 @@ export default function InvoicesContent() {
         c.email === itinerary.client_email
       )
       
-      const fullCost = itinerary.total_cost
+      // The trip's client total from its services (lib/itinerary-client-total)
+      // — itineraries.total_cost is a cache that can be 0 or stale.
+      const fullCost = await fetchItineraryClientTotal(itinerary)
       const invoiceType = formData.invoice_type
       const depositPercent = formData.deposit_percent
 
@@ -266,6 +326,8 @@ export default function InvoicesContent() {
         client_id: matchingClient?.id || prev.client_id,
         client_name: itinerary.client_name || prev.client_name,
         client_email: itinerary.client_email || prev.client_email,
+        // The trip's own currency — the form stayed on EUR for a JPY trip.
+        currency: itinerary.currency || prev.currency,
         full_trip_cost: fullCost,
         line_items: [{
           description: lineItemDescription,
@@ -273,8 +335,7 @@ export default function InvoicesContent() {
           unit_price: calculatedAmount,
           amount: calculatedAmount
         }],
-        subtotal: calculatedAmount,
-        total_amount: calculatedAmount
+        ...amountsFor({ ...prev, currency: itinerary.currency || prev.currency }, invoiceType, calculatedAmount),
       }))
     } else {
       setFormData(prev => ({
@@ -306,7 +367,7 @@ export default function InvoicesContent() {
     } else if (type === 'final') {
       const depositAmount = (fullCost * depositPercent) / 100
       calculatedAmount = fullCost - depositAmount
-      paymentTerms = 'Balance payable in cash upon arrival or before first day of service.'
+      paymentTerms = 'Balance payable before the first day of service.'
       lineItemDescription = `Final Balance - ${baseDesc}`
     } else {
       lineItemDescription = `Tour Package - ${baseDesc}`
@@ -322,8 +383,7 @@ export default function InvoicesContent() {
         unit_price: calculatedAmount,
         amount: calculatedAmount
       }],
-      subtotal: calculatedAmount,
-      total_amount: calculatedAmount
+      ...amountsFor(prev, type, calculatedAmount),
     }))
   }
 
@@ -357,8 +417,7 @@ export default function InvoicesContent() {
         unit_price: calculatedAmount,
         amount: calculatedAmount
       }],
-      subtotal: calculatedAmount,
-      total_amount: calculatedAmount
+      ...amountsFor(prev, invoiceType, calculatedAmount),
     }))
   }
 
@@ -371,17 +430,7 @@ export default function InvoicesContent() {
         newItems[index].amount = newItems[index].quantity * newItems[index].unit_price
       }
       
-      const subtotal = newItems.reduce((sum, item) => sum + item.amount, 0)
-      const taxAmount = subtotal * (prev.tax_rate / 100)
-      const totalAmount = subtotal + taxAmount - prev.discount_amount
-      
-      return {
-        ...prev,
-        line_items: newItems,
-        subtotal,
-        tax_amount: taxAmount,
-        total_amount: totalAmount
-      }
+      return totalsOf({ ...prev, line_items: newItems })
     })
   }
 
@@ -396,42 +445,32 @@ export default function InvoicesContent() {
     if (formData.line_items.length <= 1) return
     setFormData(prev => {
       const newItems = prev.line_items.filter((_, i) => i !== index)
-      const subtotal = newItems.reduce((sum, item) => sum + item.amount, 0)
-      const taxAmount = subtotal * (prev.tax_rate / 100)
-      const totalAmount = subtotal + taxAmount - prev.discount_amount
-      
-      return {
-        ...prev,
-        line_items: newItems,
-        subtotal,
-        tax_amount: taxAmount,
-        total_amount: totalAmount
-      }
+      return totalsOf({ ...prev, line_items: newItems })
     })
   }
 
   const updateTaxRate = (rate: number) => {
-    setFormData(prev => {
-      const taxAmount = prev.subtotal * (rate / 100)
-      const totalAmount = prev.subtotal + taxAmount - prev.discount_amount
-      return { ...prev, tax_rate: rate, tax_amount: taxAmount, total_amount: totalAmount }
-    })
+    setFormData(prev => totalsOf({ ...prev, tax_rate: rate }))
   }
 
   const updateDiscount = (discount: number) => {
-    setFormData(prev => {
-      const totalAmount = prev.subtotal + prev.tax_amount - discount
-      return { ...prev, discount_amount: discount, total_amount: totalAmount }
-    })
+    setFormData(prev => totalsOf({ ...prev, discount_amount: discount }))
   }
 
   const openAddModal = () => {
-    setFormData(initialFormData)
+    // The agency's currency to start with (it was EUR for every agency).
+    setFormData({ ...initialFormData, deposit_percent: tenantDepositPercent, currency: tenant?.default_currency || 'EUR' })
     setIsModalOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // A deposit or final invoice is a share of the trip's full cost, which the
+    // server works it out from — without a trip it saved 10% of the typed line.
+    if (formData.invoice_type !== 'standard' && !(formData.full_trip_cost > 0)) {
+      showToast('error', 'Pick the trip for a deposit or final invoice')
+      return
+    }
     setSaving(true)
 
     try {
@@ -481,19 +520,21 @@ export default function InvoicesContent() {
       })
       if (response.ok) {
         fetchInvoices()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not mark the invoice sent')
       }
     } catch (error) {
       console.error('Error updating invoice:', error)
+      showToast('error', 'Could not mark the invoice sent')
     }
   }
 
   // Check for overdue invoices
   const processedInvoices = invoices.map(inv => {
-    if (inv.status !== 'paid' && inv.status !== 'cancelled' && inv.due_date) {
-      const dueDate = new Date(inv.due_date)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      if (dueDate < today && inv.balance_due > 0) {
+    // A draft has not been sent, so it cannot be overdue.
+    if (inv.status !== 'paid' && inv.status !== 'cancelled' && inv.status !== 'draft' && inv.due_date) {
+      if (inv.due_date.slice(0, 10) < todayLocal() && inv.balance_due > 0) {
         return { ...inv, status: 'overdue' }
       }
     }
@@ -501,6 +542,7 @@ export default function InvoicesContent() {
   })
 
   const filteredInvoices = processedInvoices.filter(invoice => {
+    if (statusFilter === 'overdue' && invoice.status !== 'overdue') return false
     const matchesSearch = 
       invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       invoice.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -512,9 +554,12 @@ export default function InvoicesContent() {
   const totalInvoices = invoices.length
   // Per currency, never summed across them: a $10,000 and a €5,000 invoice do
   // not make €15,000 of revenue (see lib/currency-totals.ts).
-  const totalRevenue = sumByCurrency(invoices, inv => inv.total_amount, inv => inv.currency)
+  // Billed and outstanding are what was sent: drafts are not billed yet,
+  // and a cancelled invoice is owed by no one.
+  const billable = invoices.filter(inv => inv.status !== 'draft' && inv.status !== 'cancelled')
+  const totalRevenue = sumByCurrency(billable, inv => inv.total_amount, inv => inv.currency)
   const totalPaid = sumByCurrency(invoices, inv => inv.amount_paid, inv => inv.currency)
-  const totalOutstanding = sumByCurrency(invoices, inv => inv.balance_due, inv => inv.currency)
+  const totalOutstanding = sumByCurrency(billable, inv => inv.balance_due, inv => inv.currency)
   const overdueAmount = sumByCurrency(
     processedInvoices.filter(inv => inv.status === 'overdue'),
     inv => inv.balance_due, inv => inv.currency)
@@ -639,7 +684,7 @@ export default function InvoicesContent() {
             <option value="">All Status</option>
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
-            <option value="partial">Partial</option>
+            <option value="partially_paid">Part paid</option>
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
             <option value="cancelled">Cancelled</option>
@@ -650,110 +695,112 @@ export default function InvoicesContent() {
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Invoice #</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Type</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Client</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Issue Date</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Due Date</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Total</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Balance</th>
-              <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredInvoices.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
-                  No invoices found
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Invoice #</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Type</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Client</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Issue Date</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Due Date</th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Total</th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Balance</th>
+                <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
+                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>
               </tr>
-            ) : (
-              filteredInvoices.map((invoice) => {
-                const statusConfig = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.draft
-                const typeConfig = TYPE_CONFIG[invoice.invoice_type] || TYPE_CONFIG.standard
-                const TypeIcon = typeConfig.icon
-                return (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2">
-                      <span className="text-sm font-mono font-medium text-blue-600">{invoice.invoice_number}</span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
-                        <TypeIcon className="h-3 w-3" />
-                        {typeConfig.label}
-                        {invoice.invoice_type !== 'standard' && (
-                          <span className="text-[10px] opacity-75">({invoice.deposit_percent}%)</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{invoice.client_name}</p>
-                        <p className="text-xs text-gray-500">{invoice.client_email}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="text-sm text-gray-600">
-                        {invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={`text-sm ${invoice.status === 'overdue' ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                        {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className="text-sm font-medium text-gray-900">
-                        {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className={`text-sm font-medium ${Number(invoice.balance_due) > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
-                        {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
-                        {statusConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Link
-                          href={`/invoices/${invoice.id}`}
-                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                          title="View"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        {invoice.status === 'draft' && (
-                          <button
-                            onClick={() => handleSendInvoice(invoice.id)}
-                            className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                            title="Mark as Sent"
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
+                    No invoices found
+                  </td>
+                </tr>
+              ) : (
+                filteredInvoices.map((invoice) => {
+                  const statusConfig = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.draft
+                  const typeConfig = TYPE_CONFIG[invoice.invoice_type] || TYPE_CONFIG.standard
+                  const TypeIcon = typeConfig.icon
+                  return (
+                    <tr key={invoice.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2">
+                        <span className="text-sm font-mono font-medium text-blue-600">{invoice.invoice_number}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
+                          <TypeIcon className="h-3 w-3" />
+                          {typeConfig.label}
+                          {invoice.invoice_type !== 'standard' && (
+                            <span className="text-[10px] opacity-75">({invoice.deposit_percent}%)</span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{invoice.client_name}</p>
+                          <p className="text-xs text-gray-500">{invoice.client_email}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="text-sm text-gray-600">
+                          {invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`text-sm ${invoice.status === 'overdue' ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span className="text-sm font-medium text-gray-900">
+                          {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span className={`text-sm font-medium ${Number(invoice.balance_due) > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
+                          {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/invoices/${invoice.id}`}
+                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="View"
                           >
-                            <Send className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          {invoice.status === 'draft' && (
+                            <button
+                              onClick={() => handleSendInvoice(invoice.id)}
+                              className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                              title="Mark as Sent"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(invoice.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(invoice.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Add Invoice Modal */}
@@ -821,7 +868,7 @@ export default function InvoicesContent() {
                       <input
                         type="number"
                         value={formData.deposit_percent}
-                        onChange={(e) => handleDepositPercentChange(parseInt(e.target.value) || 10)}
+                        onChange={(e) => { const n = parseInt(e.target.value); if (n >= 1 && n <= 100) handleDepositPercentChange(n) }}
                         min="1"
                         max="100"
                         className="w-20 px-3 py-2 text-sm text-center border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
@@ -833,15 +880,15 @@ export default function InvoicesContent() {
                     <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="text-amber-600">Full Trip Cost</p>
-                        <p className="font-semibold text-amber-800">{formData.currency} {formData.full_trip_cost.toFixed(2)}</p>
+                        <p className="font-semibold text-amber-800">{formatMoney(formData.full_trip_cost, formData.currency)}</p>
                       </div>
                       <div>
                         <p className="text-amber-600">Deposit ({formData.deposit_percent}%)</p>
-                        <p className="font-semibold text-amber-800">{formData.currency} {((formData.full_trip_cost * formData.deposit_percent) / 100).toFixed(2)}</p>
+                        <p className="font-semibold text-amber-800">{formatMoney(((formData.full_trip_cost * formData.deposit_percent) / 100), formData.currency)}</p>
                       </div>
                       <div>
                         <p className="text-amber-600">Balance</p>
-                        <p className="font-semibold text-amber-800">{formData.currency} {(formData.full_trip_cost - (formData.full_trip_cost * formData.deposit_percent) / 100).toFixed(2)}</p>
+                        <p className="font-semibold text-amber-800">{formatMoney((formData.full_trip_cost - (formData.full_trip_cost * formData.deposit_percent) / 100), formData.currency)}</p>
                       </div>
                     </div>
                   )}
@@ -900,9 +947,8 @@ export default function InvoicesContent() {
                     onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm bg-white"
                   >
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="GBP">GBP (£)</option>
+                    {/* Every supported currency: a JPY trip's invoice showed EUR here. */}
+                    {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c} ({currencySymbol(c)})</option>)}
                   </select>
                 </div>
                 <div>
@@ -940,65 +986,70 @@ export default function InvoicesContent() {
                 </div>
                 
                 <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Description</th>
-                        <th className="text-center text-xs font-semibold text-gray-600 px-4 py-3 w-20">Qty</th>
-                        <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-32">Unit Price</th>
-                        <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-28">Amount</th>
-                        <th className="w-12"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {formData.line_items.map((item, index) => (
-                        <tr key={index} className="bg-white">
-                          <td className="px-4 py-3">
-                            <input
-                              type="text"
-                              value={item.description}
-                              onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                              placeholder="Item description"
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                              min="1"
-                              className="w-full px-3 py-2 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="number"
-                              value={item.unit_price}
-                              onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                              step="0.01"
-                              min="0"
-                              className="w-full px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                            {currencySymbol(formData.currency)}{item.amount.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-3">
-                            {formData.line_items.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeLineItem(index)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            )}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left text-xs font-semibold text-gray-600 px-4 py-3">Description</th>
+                          <th className="text-center text-xs font-semibold text-gray-600 px-4 py-3 w-20">Qty</th>
+                          <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-32">Unit Price</th>
+                          <th className="text-right text-xs font-semibold text-gray-600 px-4 py-3 w-28">Amount</th>
+                          <th className="w-12"></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {formData.line_items.map((item, index) => (
+                          <tr key={index} className="bg-white">
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                                placeholder="Item description"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                                // A deposit/final line is the server's share of the trip; an edit here was not saved.
+                                readOnly={formData.invoice_type !== 'standard'}
+                                min="1"
+                                className="w-full px-3 py-2 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                value={item.unit_price}
+                                onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                readOnly={formData.invoice_type !== 'standard'}
+                                step="0.01"
+                                min="0"
+                                className="w-full px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                              {formatMoney(item.amount, formData.currency)}
+                            </td>
+                            <td className="px-3 py-3">
+                              {formData.line_items.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeLineItem(index)}
+                                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
@@ -1007,8 +1058,10 @@ export default function InvoicesContent() {
                 <div className="w-72 bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium text-gray-900">{currencySymbol(formData.currency)}{formData.subtotal.toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">{formatMoney(formData.subtotal, formData.currency)}</span>
                   </div>
+                  {/* A deposit or final invoice is a share of the trip with no tax or discount of its own (lib/invoices/invoice-money). */}
+                  {formData.invoice_type === 'standard' && (<>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Tax Rate (%)</span>
                     <input
@@ -1022,7 +1075,7 @@ export default function InvoicesContent() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tax Amount</span>
-                    <span className="text-gray-900">{currencySymbol(formData.currency)}{formData.tax_amount.toFixed(2)}</span>
+                    <span className="text-gray-900">{formatMoney(formData.tax_amount, formData.currency)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Discount</span>
@@ -1035,9 +1088,10 @@ export default function InvoicesContent() {
                       className="w-24 px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] shadow-sm"
                     />
                   </div>
+                  </>)}
                   <div className="flex justify-between pt-3 border-t border-gray-200">
                     <span className="font-semibold text-gray-900">Total</span>
-                    <span className="font-bold text-xl text-gray-900">{currencySymbol(formData.currency)}{formData.total_amount.toFixed(2)}</span>
+                    <span className="font-bold text-xl text-gray-900">{formatMoney(formData.total_amount, formData.currency)}</span>
                   </div>
                 </div>
               </div>

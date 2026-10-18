@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import ResendConfirmation from '@/components/auth/ResendConfirmation'
 
 export default function LoginContent() {
   const [email, setEmail] = useState('')
@@ -18,9 +19,24 @@ export default function LoginContent() {
 
   // The middleware sends a deactivated account here after ending its session.
   // Without this the user landed on a blank login form with no reason given.
+  const [notice, setNotice] = useState('')
+  const [unconfirmed, setUnconfirmed] = useState(false)
+
   useEffect(() => {
     if (searchParams.get('error') === 'account_inactive') {
       setError('Your account has been deactivated. Contact your administrator.')
+    }
+    // Back from the confirmation link (signUp's emailRedirectTo).
+    if (searchParams.get('confirmed') === '1') {
+      setNotice('Your email is confirmed. Sign in to get started.')
+    }
+    // An expired or already-used link comes back as an error in the query or
+    // the hash; it used to be dropped on the floor.
+    const hash = typeof window !== 'undefined' ? new URLSearchParams(window.location.hash.slice(1)) : null
+    const linkError = searchParams.get('error_description') || hash?.get('error_description')
+    if (linkError) {
+      setNotice('')
+      setError(`${linkError.replace(/\+/g, ' ')}. If your link expired, sign in below or ask for a new one.`)
     }
   }, [searchParams])
 
@@ -33,7 +49,13 @@ export default function LoginContent() {
       await signIn(email, password)
       // Redirect handled in AuthContext
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in')
+      const message = String(err?.message || '')
+      if (/email not confirmed/i.test(message)) {
+        setUnconfirmed(true)
+        setError('Please confirm your email first — open the link we sent you when you signed up.')
+      } else {
+        setError(message || 'Failed to sign in')
+      }
     } finally {
       setLoading(false)
     }
@@ -56,9 +78,15 @@ export default function LoginContent() {
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {notice && !error && (
+              <div role="status" className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+                {notice}
+              </div>
+            )}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                 {error}
+                {unconfirmed && <ResendConfirmation email={email} className="mt-2" />}
               </div>
             )}
 

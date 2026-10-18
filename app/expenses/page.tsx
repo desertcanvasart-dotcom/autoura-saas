@@ -31,7 +31,9 @@ import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import ExpenseSupplierPicker from '@/components/expenses/ExpenseSupplierPicker'
 import { EXPENSE_CATEGORIES } from '@/lib/expense-categories'
-import { getCurrencySymbol } from '@/lib/currency'
+import { getCurrencySymbol, SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { csvCell } from '@/lib/finance-export'
 
 interface Expense {
   id: string
@@ -104,6 +106,18 @@ const initialFormData: FormData = {
 // One list with the itinerary's Add Expense (lib/expense-categories).
 const CATEGORIES = EXPENSE_CATEGORIES
 
+/** Older rows used other words for some categories; they were left out of the breakdown. */
+const LEGACY_CATEGORY: Record<string, string> = { accommodation: 'hotel', meals: 'meal', entrance_fees: 'entrance', tips: 'tipping' }
+const canonicalCategory = (c: string) => LEGACY_CATEGORY[c] ?? c
+
+/** A YYYY-MM-DD day as written (new Date('2026-03-04') showed the day before west of UTC). */
+function fmtDay(day: string | null | undefined): string {
+  if (!day) return '—'
+  const [y, m, d] = day.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return '—'
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { timeZone: 'UTC' })
+}
+
 const SUPPLIER_TYPES = [
   { value: 'guide', label: 'Tour Guide' },
   { value: 'driver', label: 'Driver' },
@@ -153,6 +167,9 @@ export default function ExpensesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
   const dialog = useConfirmDialog()
+  const { tenant } = useTenant()
+  // A new expense starts in the agency's currency (it was EUR for everyone).
+  const agencyCurrency = tenant?.default_currency || 'EUR'
 
   const fetchExpenses = useCallback(async () => {
     try {
@@ -167,6 +184,9 @@ export default function ExpensesPage() {
       if (response.ok) {
         const data = await response.json()
         setExpenses(data)
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not load expenses')
       }
     } catch (error) {
       console.error('Error fetching expenses:', error)
@@ -193,6 +213,19 @@ export default function ExpensesPage() {
     fetchItineraries()
   }, [fetchExpenses])
 
+  // The expense page's Edit button links to /expenses?edit=<id>; nothing
+  // read it, so the button opened the list and nothing else.
+  const [editHandled, setEditHandled] = useState(false)
+  useEffect(() => {
+    if (editHandled || loading) return
+    const id = new URLSearchParams(window.location.search).get('edit')
+    if (!id) { setEditHandled(true); return }
+    const found = expenses.find(e => e.id === id)
+    setEditHandled(true)
+    if (found) openEditModal(found)
+    else showToast('error', 'That expense is not in this list — clear the filters and try again')
+  }, [loading, expenses, editHandled])
+
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
@@ -200,7 +233,7 @@ export default function ExpensesPage() {
 
   const openAddModal = () => {
     setEditingExpense(null)
-    setFormData(initialFormData)
+    setFormData({ ...initialFormData, currency: agencyCurrency })
     setSupplierCity('')
     setIsModalOpen(true)
   }
@@ -267,7 +300,8 @@ export default function ExpensesPage() {
       if (response.ok) {
         fetchExpenses()
       } else {
-        showToast('error', 'Failed to delete expense')
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Failed to delete expense')
       }
     } catch (error) {
       console.error('Error deleting expense:', error)
@@ -287,9 +321,13 @@ export default function ExpensesPage() {
       })
       if (response.ok) {
         fetchExpenses()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not mark the expense paid')
       }
     } catch (error) {
       console.error('Error updating expense:', error)
+      showToast('error', 'Could not mark the expense paid')
     }
   }
 
@@ -328,10 +366,12 @@ export default function ExpensesPage() {
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      // csvCell: a description beginning with = + - @ ran as a formula in Excel.
+      ...rows.map(row => row.map(csvCell).join(','))
     ].join('\n')
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    // The BOM tells Excel the file is UTF-8 (Arabic text was garbled).
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `expenses_${todayLocal()}.csv`
@@ -388,7 +428,7 @@ export default function ExpensesPage() {
   // Category breakdown for chart
   const categoryBreakdown = CATEGORIES.map(cat => {
     const total = sumByCurrency(
-      expenses.filter(e => e.category === cat.value),
+      expenses.filter(e => canonicalCategory(e.category) === cat.value),
       e => e.amount, e => e.currency)
     return { ...cat, total }
   }).filter(c => mag(c.total) > 0).sort((a, b) => mag(b.total) - mag(a.total))
@@ -706,7 +746,7 @@ export default function ExpensesPage() {
                 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
-                    <p className="text-xs text-gray-500">{new Date(expense.expense_date).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500">{fmtDay(expense.expense_date)}</p>
                     {expense.supplier_name && (
                       <p className="text-xs text-gray-500">{expense.supplier_name}</p>
                     )}
@@ -748,125 +788,127 @@ export default function ExpensesPage() {
       {/* List View (Table) */}
       {viewMode === 'list' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Category</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
-                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
-                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
-                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Receipt</th>
-                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {paginatedExpenses.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
-                    No expenses found
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expense</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Category</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Supplier</th>
+                  <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Amount</th>
+                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
+                  <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Receipt</th>
+                  <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
                 </tr>
-              ) : (
-                paginatedExpenses.map((expense) => {
-                  const statusConfig = STATUS_CONFIG[expense.status] || STATUS_CONFIG.pending
-                  const StatusIcon = statusConfig.icon
-                  return (
-                    <tr key={expense.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div>
-                          <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
-                            {expense.expense_number}
-                          </Link>
-                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{expense.description || '-'}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span>{getCategoryIcon(expense.category)}</span>
-                          <span className="text-sm text-gray-700">{getCategoryLabel(expense.category)}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
-                          {expense.supplier_type && (
-                            <p className="text-xs text-gray-500 capitalize">{expense.supplier_type.replace('_', ' ')}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-600">
-                          {new Date(expense.expense_date).toLocaleDateString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
-                          <StatusIcon className="h-3 w-3" />
-                          {statusConfig.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {expense.receipt_url ? (
-                          <a
-                            href={expense.receipt_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-                          >
-                            <Receipt className="h-3.5 w-3.5" />
-                            View
-                          </a>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/expenses/${expense.id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                          {expense.status === 'approved' && (
-                            <button
-                              onClick={() => handleMarkAsPaid(expense)}
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                              title="Mark as Paid"
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedExpenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
+                      No expenses found
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedExpenses.map((expense) => {
+                    const statusConfig = STATUS_CONFIG[expense.status] || STATUS_CONFIG.pending
+                    const StatusIcon = statusConfig.icon
+                    return (
+                      <tr key={expense.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div>
+                            <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                              {expense.expense_number}
+                            </Link>
+                            <p className="text-xs text-gray-500 truncate max-w-[200px]">{expense.description || '-'}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span>{getCategoryIcon(expense.category)}</span>
+                            <span className="text-sm text-gray-700">{getCategoryLabel(expense.category)}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="text-sm text-gray-900">{expense.supplier_name || '-'}</p>
+                            {expense.supplier_type && (
+                              <p className="text-xs text-gray-500 capitalize">{expense.supplier_type.replace('_', ' ')}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-600">
+                            {fmtDay(expense.expense_date)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {statusConfig.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {expense.receipt_url ? (
+                            <a
+                              href={expense.receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
                             >
-                              <Wallet className="h-4 w-4" />
-                            </button>
+                              <Receipt className="h-3.5 w-3.5" />
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
                           )}
-                          <button
-                            onClick={() => openEditModal(expense)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(expense.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link
+                              href={`/expenses/${expense.id}`}
+                              className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                              title="View"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            {expense.status === 'approved' && (
+                              <button
+                                onClick={() => handleMarkAsPaid(expense)}
+                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Mark as Paid"
+                              >
+                                <Wallet className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openEditModal(expense)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(expense.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -965,10 +1007,7 @@ export default function ExpensesPage() {
                       onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
                       className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
                     >
-                      <option value="EUR">EUR €</option>
-                      <option value="USD">USD $</option>
-                      <option value="GBP">GBP £</option>
-                      <option value="EGP">EGP E£</option>
+                      {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c} {getCurrencySymbol(c)}</option>)}
                     </select>
                     <input
                       type="number"

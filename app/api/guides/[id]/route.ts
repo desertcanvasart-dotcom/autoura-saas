@@ -9,7 +9,7 @@
 // A guide is a SUPPLIER row (supplier_type='guide') — the same source the
 // list at /api/guides reads, and the id every guide picker stores. This
 // route used to read the legacy `guides` table, so a guide picked in the app
-// 404'd here (the resources page's Delete).
+// 404'd here (ResourceSummaryCard, the resources page's Delete).
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -20,6 +20,19 @@ import {
   guideBodyToSupplierUpdate,
   supplierToGuide,
 } from '@/lib/guides/supplier-guide'
+import { gateRole } from '@/lib/api-role-gate'
+import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
+import { supplierTypesOrFilter } from '@/lib/suppliers/type-filter'
+
+/** The suppliers /api/guides lists: any that GUIDES, by the agency's own
+ *  types. Matched on supplier_type 'guide' alone, a guide picked from the
+ *  list whose main type is another (a transport company that also guides)
+ *  404'd here again. Read and edit only — delete stays with a plain guide
+ *  row, so the guide screen never deletes a company that also drives. */
+async function guideFilter(rls: Parameters<typeof supplierTypeKeysForBehaviors>[0] | null): Promise<string> {
+  const keys = rls ? await supplierTypeKeysForBehaviors(rls, ['guide']) : [GUIDE_SUPPLIER_TYPE]
+  return supplierTypesOrFilter(keys) ?? `supplier_type.eq.${GUIDE_SUPPLIER_TYPE}`
+}
 
 export async function GET(
   request: NextRequest,
@@ -42,7 +55,7 @@ export async function GET(
       .from('suppliers')
       .select('*')
       .eq('id', id)
-      .eq('supplier_type', GUIDE_SUPPLIER_TYPE)
+      .or(await guideFilter(authResult.supabase))
       .eq('tenant_id', tenant_id)
       .maybeSingle()
 
@@ -115,6 +128,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -139,7 +154,7 @@ export async function PUT(
       .from('suppliers')
       .update(updateData)
       .eq('id', id)
-      .eq('supplier_type', GUIDE_SUPPLIER_TYPE)
+      .or(await guideFilter(authResult.supabase))
       .eq('tenant_id', authResult.tenant_id)
       .select()
       .maybeSingle()
@@ -155,7 +170,7 @@ export async function PUT(
       }
 
       return NextResponse.json(
-        { success: false, error: 'Failed to update guide', details: error.message },
+        { success: false, error: 'Failed to update guide' },
         { status: 500 }
       )
     }
@@ -187,6 +202,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

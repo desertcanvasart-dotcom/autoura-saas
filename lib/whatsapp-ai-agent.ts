@@ -6,11 +6,18 @@
 // Version: 2.0 - With Tool Calling Support
 // ============================================
 
+import { quoteSentUpdate } from '@/lib/quotes/quote-sent-update'
+import { formatMoney } from '@/lib/currency-totals'
+import { DEFAULT_RUN_CURRENCY, getTenantRunCurrency } from '@/lib/rates/run-currency'
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { whatsappModel } from '@/lib/ai/models'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { loadSenderTenant } from '@/lib/sender-tenant'
+import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
+import { freshQuotePdf } from '@/lib/quotes/fresh-quote-pdf'
+import { createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // TYPES
@@ -94,7 +101,7 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'get_quote_details',
-    description: 'Get detailed information about a specific quote including pricing breakdown. Use this when customer asks about a specific quote.',
+    description: 'Get detailed information about a specific quote (price and status). Use this when customer asks about a specific quote.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -108,18 +115,18 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'create_trip_inquiry',
-    description: 'Create a new trip inquiry/request based on customer requirements. Use this when customer wants to plan a new trip to Egypt.',
+    description: 'Create a new trip inquiry/request based on customer requirements. Use this when customer wants to plan a new trip.',
     input_schema: {
       type: 'object' as const,
       properties: {
         trip_name: {
           type: 'string',
-          description: 'Descriptive name for the trip (e.g., "7-Day Cairo & Luxor Adventure")'
+          description: 'Descriptive name for the trip (e.g., "7-Day Highlights Tour")'
         },
         destinations: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Cities/places they want to visit (e.g., ["Cairo", "Luxor", "Aswan"])'
+          description: 'Cities/places they want to visit, as the customer names them'
         },
         start_date: {
           type: 'string',
@@ -206,7 +213,7 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
         },
         tour_name: {
           type: 'string',
-          description: 'Name of specific tour to check (e.g., "Nile Cruise", "Cairo Pyramids"). Use this when customer asks about a specific tour.'
+          description: 'Name of specific tour to check (e.g., a tour name the customer mentions). Use this when customer asks about a specific tour.'
         },
         check_group_tours: {
           type: 'boolean',
@@ -245,7 +252,8 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
 // TOOL EXECUTOR CLASS
 // ============================================
 
-class ToolExecutor {
+// Exported for its tests; the agent is the only caller.
+export class ToolExecutor {
   private supabase: SupabaseClient
   private clientId: string | null
   private phoneNumber: string
@@ -264,6 +272,20 @@ class ToolExecutor {
     this.phoneNumber = phoneNumber
     this.conversationId = conversationId
     this.tenantId = tenantId
+  }
+
+  /**
+   * The currency the trip is priced in: the tenant's run currency, as
+   * the Quote Builder's save labels its trips. The editor prices lines from the
+   * rate tables in that currency and shows itinerary.currency beside them,
+   * so a default_currency label put EUR rates under a USD sign.
+   *
+   * Read with the admin client: the webhook's client has no session, so RLS
+   * hides the tenant row from it and the answer was always EUR.
+   */
+  private async tenantCurrency(): Promise<string> {
+    if (!this.tenantId) return DEFAULT_RUN_CURRENCY
+    return getTenantRunCurrency(createAdminClient(), this.tenantId)
   }
 
   async execute(toolName: string, toolInput: any): Promise<ToolResult> {
@@ -304,11 +326,17 @@ class ToolExecutor {
 
       const filter = input.status_filter || 'all'
 
-      // Build itinerary query
+      // Build itinerary query — this company's trips only. The client id
+      // alone was the whole filter, and the webhook may hand the agent a
+      // service-role client (documents audit, round 13).
+      if (!this.tenantId) {
+        return { success: true, message: 'No trips found.', data: { itineraries: [], quotes: [] } }
+      }
       let itinQuery = this.supabase
         .from('itineraries')
         .select('id, itinerary_code, trip_name, start_date, end_date, total_days, status, num_adults, num_children')
         .eq('client_id', this.clientId)
+        .eq('tenant_id', this.tenantId)
         .order('start_date', { ascending: false })
         .limit(5)
 
@@ -385,8 +413,10 @@ class ToolExecutor {
         return { success: false, error: `Quote ${input.quote_number} not found` }
       }
 
-      // Verify this quote belongs to the customer (if we have a client_id)
-      if (this.clientId && quote.client_id !== this.clientId) {
+      // The quote must be this customer's. With no client matched to the
+      // sender there is nothing to check against, and quote numbers are
+      // sequential — anyone could read another customer's quote by number.
+      if (!this.clientId || quote.client_id !== this.clientId) {
         return { success: false, error: 'Quote not found for this customer' }
       }
 
@@ -399,11 +429,12 @@ class ToolExecutor {
           duration: quote.itineraries?.total_days,
           travelers: quote.num_travelers,
           tier: quote.tier,
-          total_price: `${quote.currency} ${quote.selling_price}`,
-          price_per_person: `${quote.currency} ${quote.price_per_person}`,
+          total_price: formatMoney(quote.selling_price, quote.currency),
+          price_per_person: formatMoney(quote.price_per_person, quote.currency),
           status: quote.status,
           valid_until: quote.valid_until,
-          cost_breakdown: quote.cost_breakdown
+          // No cost_breakdown: it is the operator's net cost per category, and
+          // the agent may quote the customer anything its tools return.
         }
       }
     } catch (error: any) {
@@ -463,7 +494,8 @@ class ToolExecutor {
           conversation_id: this.conversationId
         }),
         total_cost: 0,
-        currency: 'EUR'
+        // The run currency the rate tables price this trip in.
+        currency: await this.tenantCurrency()
       }
 
       const { data: itinerary, error } = await this.supabase
@@ -517,12 +549,21 @@ class ToolExecutor {
     tier?: string
   }): Promise<ToolResult> {
     try {
-      // Get the itinerary
+      // Only a trip of this company AND of the customer writing: the id
+      // came from the conversation, and it was looked up and updated by id
+      // alone — a customer could have the agent mark any company's trip
+      // "pending quote" and read back its name and code (documents audit,
+      // round 13).
+      if (!this.tenantId || !this.clientId) {
+        return { success: false, error: 'Itinerary not found' }
+      }
       const { data: itinerary, error: itinError } = await this.supabase
         .from('itineraries')
-        .select('*')
+        .select('id, itinerary_code, trip_name')
         .eq('id', input.itinerary_id)
-        .single()
+        .eq('tenant_id', this.tenantId)
+        .eq('client_id', this.clientId)
+        .maybeSingle()
 
       if (itinError || !itinerary) {
         return { success: false, error: 'Itinerary not found' }
@@ -535,7 +576,8 @@ class ToolExecutor {
           status: 'pending_quote',
           updated_at: new Date().toISOString()
         })
-        .eq('id', input.itinerary_id)
+        .eq('id', itinerary.id)
+        .eq('tenant_id', this.tenantId)
 
       // Store notification for team
       await this.supabase.from('whatsapp_messages').insert({
@@ -579,13 +621,25 @@ class ToolExecutor {
         return { success: false, error: 'Quote not found' }
       }
 
+      // The webhook hands the agent the public (anon) client, under which RLS
+      // hides every quote — so this tool always answered "Quote not found".
+      // Reading the quote and storing its PDF need the service client; both
+      // are pinned to the conversation's tenant (and, below, its client).
+      const admin = createAdminClient()
+
       // Get the quote with related data
-      const { data: quote, error: quoteError } = await this.supabase
+      const { data: quote, error: quoteError } = await admin
         .from('b2c_quotes')
         .select(`
           *,
+          clients (
+            full_name,
+            email,
+            phone,
+            nationality
+          ),
           itineraries (
-            id, trip_name, start_date, end_date, total_days
+            id, itinerary_code, trip_name, start_date, end_date, total_days
           )
         `)
         .eq('id', input.quote_id)
@@ -601,48 +655,57 @@ class ToolExecutor {
         return { success: false, error: 'Quote does not belong to this customer' }
       }
 
-      // Check if PDF exists
-      if (!quote.pdf_url) {
-        return {
-          success: false,
-          error: 'Quote PDF not ready yet. Please ask the team to generate the PDF first.'
-        }
+      // The same price gate as the office's own send: never a non-deliverable
+      // price. (B2C quotes keep no per-service snapshot, so there is no
+      // unpriced-service list to check here.)
+      if (!checkQuoteRowDeliverable(quote, 'b2c').ok) {
+        return { success: false, error: 'This quote cannot be sent yet. Please ask the team to re-price it.' }
       }
 
-      // Build message
-      const businessName = process.env.BUSINESS_NAME || ''
-      const message = `🌟 *${businessName}* 🌟\n\n` +
-        `Here's your quote for ${quote.itineraries?.trip_name}!\n\n` +
+      // A fresh PDF (lib/quotes/fresh-quote-pdf), not quote.pdf_url: that link
+      // expired after 7 days, showed old prices after a re-price, or was an
+      // unopenable public URL of the private bucket.
+      const pdf = await freshQuotePdf(admin, { type: 'b2c', quote, tenantId: this.tenantId })
+      if (!pdf.ok) {
+        return { success: false, error: 'Could not prepare the quote PDF. Please ask the team to send it.' }
+      }
+
+      // The tenant's own name (Settings → Organization), not BUSINESS_NAME.
+      const businessName = (await loadSenderTenant(this.tenantId))?.company_name || ''
+      const message = (businessName ? `🌟 *${businessName}* 🌟\n\n` : '') +
+        `Here's your quote for ${quote.itineraries?.trip_name || 'your tour'}!\n\n` +
         `📋 *Quote ${quote.quote_number}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `⏱️ Duration: ${quote.itineraries?.total_days} days\n` +
         `👥 Travelers: ${quote.num_travelers}\n` +
         `🏆 Service: ${quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}\n\n` +
-        `💰 *Total: ${quote.currency} ${quote.selling_price.toLocaleString()}*\n` +
-        `💵 Per Person: ${quote.currency} ${quote.price_per_person.toLocaleString()}\n\n` +
+        `💰 *Total: ${formatMoney(quote.selling_price, quote.currency)}*\n` +
+        `💵 Per Person: ${formatMoney(quote.price_per_person, quote.currency)}\n\n` +
         `📄 Detailed quote attached as PDF.\n\n` +
-        `Reply to this message if you have any questions! 🐪✨`
+        `Reply to this message if you have any questions! ✨`
 
       // Send via WhatsApp
       const result = await sendWhatsAppMessage({
         to: this.phoneNumber,
         body: message,
-        mediaUrl: quote.pdf_url
+        mediaUrl: pdf.url,
+        tenantId: this.tenantId
       })
 
       if (!result.success) {
         return { success: false, error: result.error || 'Failed to send WhatsApp message' }
       }
 
-      // Update quote status
-      await this.supabase
-        .from('b2c_quotes')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          sent_via: 'whatsapp_ai'
-        })
-        .eq('id', input.quote_id)
+      // Record the send; only a draft becomes 'sent' — an accepted quote
+      // sent again must not be demoted (lib/quotes/quote-sent-update).
+      const sentUpdate = quoteSentUpdate('b2c', quote.status, 'whatsapp_ai')
+      if (sentUpdate) {
+        await admin
+          .from('b2c_quotes')
+          .update(sentUpdate)
+          .eq('id', input.quote_id)
+          .eq('tenant_id', this.tenantId)
+      }
 
       // Store the outbound message
       await this.supabase.from('whatsapp_messages').insert({
@@ -650,7 +713,7 @@ class ToolExecutor {
         message_sid: result.messageId,
         direction: 'outbound',
         message_body: message,
-        media_url: quote.pdf_url,
+        media_url: pdf.url,
         status: 'sent',
         sent_at: new Date().toISOString(),
         metadata: {
@@ -768,7 +831,7 @@ class ToolExecutor {
                     available: true,
                     type: 'group_tour',
                     departures: departureInfo,
-                    message: `Great news! We have a ${firstDep.tour_name} departing on ${this.formatDateShort(firstDep.start_date)} with ${spotsText} available.${firstDep.price_per_person ? ` Price: ${firstDep.currency || 'EUR'} ${firstDep.price_per_person} per person.` : ''} Would you like to join this group?`
+                    message: `Great news! We have a ${firstDep.tour_name} departing on ${this.formatDateShort(firstDep.start_date)} with ${spotsText} available.${firstDep.price_per_person ? ` Price: ${formatMoney(firstDep.price_per_person, firstDep.currency || 'EUR')} per person.` : ''} Would you like to join this group?`
                   }
                 }
               } else {
@@ -999,6 +1062,40 @@ function agentErrorMessage(error: unknown): string {
 // AI AGENT CLASS
 // ============================================
 
+interface AgentIdentity {
+  name: string
+  email: string
+  timezone: string | null
+  country: string | null
+}
+
+const EMPTY_AGENT_IDENTITY: AgentIdentity = { name: '', email: '', timezone: null, country: null }
+
+/** An IANA zone the runtime accepts, else null. */
+function validTimeZone(tz: string | null | undefined): string | null {
+  if (!tz) return null
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+    return tz
+  } catch {
+    return null
+  }
+}
+
+/** The tenant the agent answers for: its name, email, clock and destination. */
+async function loadAgentIdentity(supabase: SupabaseClient | undefined, tenantId: string | null | undefined): Promise<AgentIdentity> {
+  if (!tenantId) return EMPTY_AGENT_IDENTITY
+  const sender = await loadSenderTenant(tenantId)
+  let timezone: string | null = null
+  let country: string | null = null
+  if (supabase) {
+    const { data } = await supabase.from('tenants').select('timezone, operating_country').eq('id', tenantId).maybeSingle()
+    timezone = (data as { timezone?: string | null } | null)?.timezone ?? null
+    country = (data as { operating_country?: string | null } | null)?.operating_country ?? null
+  }
+  return { name: sender?.company_name || '', email: sender?.contact_email || '', timezone, country }
+}
+
 export class WhatsAppAIAgent {
   private businessName: string
   private businessEmail: string
@@ -1011,8 +1108,11 @@ export class WhatsAppAIAgent {
       throw new Error('ANTHROPIC_API_KEY not configured')
     }
 
-    this.businessName = process.env.BUSINESS_NAME || ''
-    this.businessEmail = process.env.BUSINESS_EMAIL || ''
+    // Who the agent speaks for is the tenant the conversation belongs to
+    // (loadAgentIdentity, per message) — BUSINESS_NAME / BUSINESS_EMAIL named
+    // one operator for every tenant's customers.
+    this.businessName = ''
+    this.businessEmail = ''
     this.modelId = whatsappModel()
     this.toolsEnabled = process.env.WHATSAPP_AI_TOOLS_ENABLED === 'true'
     this.maxToolIterations = 3 // Prevent infinite loops
@@ -1026,7 +1126,10 @@ export class WhatsAppAIAgent {
     supabase: SupabaseClient,
     conversationId: string,
     clientId: string | null,
-    phoneNumber: string
+    phoneNumber: string,
+    /** The conversation's company: the client, trips and quotes are read
+     *  within it only (documents audit, round 13). None: no client data. */
+    tenantId?: string | null
   ): Promise<ConversationContext> {
     const context: ConversationContext = {
       clientId,
@@ -1055,12 +1158,13 @@ export class WhatsAppAIAgent {
     }
 
     // Get client info if available
-    if (clientId) {
+    if (clientId && tenantId) {
       const { data: client } = await supabase
         .from('clients')
         .select('full_name, email, nationality, preferred_language')
         .eq('id', clientId)
-        .single()
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
 
       if (client) {
         context.clientName = client.full_name
@@ -1077,6 +1181,7 @@ export class WhatsAppAIAgent {
         .from('itineraries')
         .select('id, trip_name, start_date, end_date, status, total_days')
         .eq('client_id', clientId)
+        .eq('tenant_id', tenantId)
         .in('status', ['draft', 'confirmed', 'in_progress'])
         .order('start_date', { ascending: true })
         .limit(3)
@@ -1097,6 +1202,7 @@ export class WhatsAppAIAgent {
         .from('b2c_quotes')
         .select('id, quote_number, selling_price, currency, status, valid_until')
         .eq('client_id', clientId)
+        .eq('tenant_id', tenantId)
         .in('status', ['draft', 'sent', 'pending'])
         .order('created_at', { ascending: false })
         .limit(3)
@@ -1120,21 +1226,26 @@ export class WhatsAppAIAgent {
   // BUILD SYSTEM PROMPT
   // ============================================
 
-  private buildSystemPrompt(context: ConversationContext): string {
+  private buildSystemPrompt(context: ConversationContext, identity: AgentIdentity = EMPTY_AGENT_IDENTITY): string {
+    // The tenant's own clock and destination (Settings → Organization). The
+    // prompt said Egypt and Cairo time for every tenant.
+    const timeZone = validTimeZone(identity.timezone) ?? 'UTC'
     const currentTime = new Date().toLocaleString('en-US', {
-      timeZone: 'Africa/Cairo',
+      timeZone,
       dateStyle: 'full',
       timeStyle: 'short'
     })
+    const where = identity.country ? ` to ${identity.country}` : ''
+    const who = identity.name ? `${identity.name}'s` : 'a travel company\'s'
 
-    let systemPrompt = `You are ${this.businessName}'s friendly WhatsApp assistant for travel inquiries to Egypt.
+    let systemPrompt = `You are ${who} friendly WhatsApp assistant for travel inquiries${where}.
 
-CURRENT TIME: ${currentTime} (Cairo time)
+CURRENT TIME: ${currentTime} (${timeZone})
 
 YOUR ROLE:
-- Help customers with travel inquiries about Egypt tours
+- Help customers with travel inquiries${identity.country ? ` about ${identity.country} tours` : ''}
 - Provide information about their existing bookings and quotes
-- Answer general questions about Egypt travel
+- Answer general questions about ${identity.country ? `${identity.country} travel` : 'their travel'}
 - Be warm, helpful, and professional
 - Keep responses concise (suitable for WhatsApp - max 2-3 short paragraphs)
 - Use appropriate emojis sparingly to be friendly
@@ -1165,10 +1276,7 @@ TOOL USAGE GUIDELINES:
 - Use check_availability to verify dates work
 - Use escalate_to_human for complex issues or explicit human requests
 
-CONTACT FOR URGENT MATTERS:
-Email: ${this.businessEmail}
-
-`
+${identity.email ? `CONTACT FOR URGENT MATTERS:\nEmail: ${identity.email}\n\n` : ''}`
 
     // Add customer context
     if (context.clientInfo) {
@@ -1200,7 +1308,7 @@ Email: ${this.businessEmail}
         const validUntil = q.validUntil
           ? new Date(q.validUntil).toLocaleDateString('en-GB')
           : 'No expiry'
-        systemPrompt += `- ${q.quoteNumber}: ${q.currency} ${q.sellingPrice.toLocaleString()} (Status: ${q.status}, Valid until: ${validUntil})\n`
+        systemPrompt += `- ${q.quoteNumber}: ${formatMoney(q.sellingPrice, q.currency)} (Status: ${q.status}, Valid until: ${validUntil})\n`
       })
     }
 
@@ -1233,7 +1341,10 @@ Email: ${this.businessEmail}
         }
       }
 
-      const systemPrompt = this.buildSystemPrompt(context)
+      const identity = await loadAgentIdentity(supabase, tenantId)
+      this.businessName = identity.name
+      this.businessEmail = identity.email
+      const systemPrompt = this.buildSystemPrompt(context, identity)
 
       // Build messages array with conversation history
       const messages: Anthropic.Messages.MessageParam[] = []
@@ -1560,7 +1671,8 @@ export async function processIncomingMessage(
       supabase,
       conversationId,
       clientId,
-      phoneNumber
+      phoneNumber,
+      tenantId
     )
 
     // Generate response (with tools if enabled)

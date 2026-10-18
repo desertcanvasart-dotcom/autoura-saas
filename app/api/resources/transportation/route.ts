@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { resolveVocabularyKey } from '@/lib/vocabulary'
 
@@ -111,28 +112,35 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
   }
   if (offered.length === 0) return { status: 400, json: { success: false, error: 'At least one vehicle needs a rate' } }
 
-  const routeFields = {
-    ...rateCurrencyWriteField(body),
-    route_name: body.route_name || routeCode(body),
-    service_type: body.service_type,
-    city: body.city,
-    origin_city: body.origin_city || null,
-    destination_city: body.destination_city || null,
-    duration: body.duration || null,
-    area: body.area || null,
-    includes: body.includes || null,
-    is_active: body.is_active !== undefined ? body.is_active : true,
-    // The transport company (migration 355) — one per route, on every row.
-    supplier_id: body.supplier_id || null,
-    updated_at: new Date().toISOString(),
-  }
-
   // The route's current rows, by vehicle key.
   let existing: any[] = []
   if (existingIds.length) {
     const { data } = await admin.from('transportation_rates').select('*').eq('tenant_id', tenantId).in('id', existingIds)
     existing = data ?? []
   }
+  // A field the request does not carry keeps the route's stored value: the
+  // edit form has no origin, duration, area or includes, and saving a price
+  // wrote all four as null — and the engine finds transport by duration and
+  // area, so a CSV-imported half-day route stopped matching.
+  const kept = (field: 'origin_city' | 'duration' | 'area' | 'includes') =>
+    body[field] !== undefined ? (body[field] || null) : (existing[0]?.[field] ?? null)
+
+  const routeFields = {
+    ...rateCurrencyWriteField(body),
+    route_name: body.route_name || routeCode(body),
+    service_type: body.service_type,
+    city: body.city,
+    origin_city: kept('origin_city'),
+    destination_city: body.destination_city || null,
+    duration: kept('duration'),
+    area: kept('area'),
+    includes: kept('includes'),
+    is_active: body.is_active !== undefined ? body.is_active : true,
+    // The transport company (migration 355) — one per route, on every row.
+    supplier_id: body.supplier_id || null,
+    updated_at: new Date().toISOString(),
+  }
+
   const byKey = new Map<string, any>(existing.map(r => [String(r.vehicle_type || '').toLowerCase(), r]))
   const out: any[] = []
 
@@ -174,6 +182,10 @@ export async function POST(request: NextRequest) {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const body = await request.json()
     const existingIds = Array.isArray(body.existing_ids) ? body.existing_ids.map(String) : []
     const { status, json } = await saveRoute(authResult.tenant_id!, body, existingIds)

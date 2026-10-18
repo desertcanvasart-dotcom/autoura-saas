@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, DocScreenshot, Tip } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/itinerary-creation')
 
 export default function ItineraryCreationPage() {
   return (
@@ -14,241 +18,117 @@ export default function ItineraryCreationPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Itinerary Creation</h1>
       <p className="text-gray-600 mb-8">
-        Autoura offers two connected paths for creating itineraries. The <strong>WhatsApp Parser</strong> extracts client details from a conversation, and the <strong>Pricing Grid</strong> is where you build the full day-by-day itinerary with services, rates, and live pricing.
+        Trips are built and priced in one place: the <strong>Quote Builder</strong> (Sell &rarr; Quote Builder). Paste a client&apos;s request, upload a file, or load an itinerary; the AI lays out the days, and every day is priced from your rates as you go.
       </p>
 
-      {/* Two Paths */}
+      {/* Entry points */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Two Entry Points</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">WhatsApp Parser</h3>
-            <p className="text-sm text-gray-600 mb-2">Parses a conversation to extract client metadata &mdash; name, nationality, dates, group size, and budget level. It has no sidebar entry: open it with the <strong>Parse</strong> button inside a WhatsApp conversation (the conversation is pre-loaded), or with the <strong>New Quote</strong> button on the B2C Quotes page.</p>
-            <p className="text-xs text-gray-400">Access: WhatsApp inbox conversation &rarr; Parse, or B2C Quotes &rarr; New Quote</p>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Pricing Grid</h3>
-            <p className="text-sm text-gray-600 mb-2">The full itinerary builder. Accepts text, file uploads, or existing itineraries. AI parses input into a day-by-day grid with 15 service slots, each linked to your rate tables.</p>
-            <p className="text-xs text-gray-400">Sidebar: Sell &rarr; Pricing Grid</p>
-          </div>
-        </div>
-        <p className="text-gray-600 mb-3">
-          From the parser you can generate in two modes &mdash; <strong>Quick Generate</strong> or <strong>Generate &amp; Edit</strong> &mdash; both landing on the itinerary detail and edit pages. A separate button sends the parsed conversation to the pricing grid instead, when you want to price the trip straight away.
-        </p>
-        <Tip>
-          <strong>Quick start:</strong> You can go directly to the <strong>Pricing Grid</strong> without the WhatsApp Parser. Paste text, upload a file, or load an existing itinerary &mdash; the grid handles all three.
-        </Tip>
-      </section>
-
-      {/* Settings Bar */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Trip Settings</h2>
-        <p className="text-gray-600 mb-3">
-          The settings bar at the top of the grid controls all pricing calculations:
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-3 font-semibold text-gray-900 border-b border-gray-200">Setting</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-900 border-b border-gray-200">What It Does</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-gray-100">
-                <td className="px-4 py-2 font-medium text-gray-900">PAX</td>
-                <td className="px-4 py-2 text-gray-600">Number of travelers (up to 50). Affects vehicle selection, per-person costs, and accommodation splits.</td>
-              </tr>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <td className="px-4 py-2 font-medium text-gray-900">Start Date</td>
-                <td className="px-4 py-2 text-gray-600">Trip start date. Determines seasonal pricing (low, high, peak) for hotels and cruises.</td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="px-4 py-2 font-medium text-gray-900">Passport</td>
-                <td className="px-4 py-2 text-gray-600">Two-state toggle (EU or Non-EU). Entrance fees and some services have different rates by passport.</td>
-              </tr>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <td className="px-4 py-2 font-medium text-gray-900">Tier</td>
-                <td className="px-4 py-2 text-gray-600">Budget, Standard, Deluxe, or Luxury. Controls which hotels, restaurants, and service levels are used.</td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="px-4 py-2 font-medium text-gray-900">Guide</td>
-                <td className="px-4 py-2 text-gray-600">Guide / No Guide toggle. Removes or adds guide costs across the whole trip.</td>
-              </tr>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <td className="px-4 py-2 font-medium text-gray-900">Pricing Mode</td>
-                <td className="px-4 py-2 text-gray-600">B2C (direct to client) or B2B (for partner). B2B mode enables partner selection.</td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="px-4 py-2 font-medium text-gray-900">Currency</td>
-                <td className="px-4 py-2 text-gray-600">EUR, USD, GBP, or EGP. All rates are converted and displayed in the selected currency.</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-2 font-medium text-gray-900">Margin %</td>
-                <td className="px-4 py-2 text-gray-600">Your profit margin. Applied to the total cost to calculate the selling price.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="text-sm text-gray-500 mt-3">
-          Changing any setting instantly recalculates the live quote &mdash; cost per person, total cost, margin, sell per person, and sell total. Changing PAX also re-picks the vehicle tier to match the new group size.
-        </p>
-        <Tip>
-          <strong>Reset protection:</strong> When an itinerary is loaded in the grid, a <strong>New Quote</strong> amber banner appears at the top. Starting a fresh quote asks for confirmation first, so you can&apos;t wipe loaded work by accident.
-        </Tip>
-      </section>
-
-      {/* Input Methods */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Three Input Methods</h2>
-        <p className="text-gray-600 mb-4">
-          At the bottom of the grid, three input methods are available side by side:
-        </p>
-
-        <div className="space-y-4">
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">1. Paste Text</h3>
-            <p className="text-sm text-gray-600">
-              Paste a WhatsApp conversation, email, or tour operator shorthand. The AI reads the text, identifies cities, activities, and services, and builds a day-by-day grid with each service slot mapped to actual rates from your database.
-            </p>
-          </div>
-
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">2. Upload File</h3>
-            <p className="text-sm text-gray-600">
-              Drag and drop a PDF, image (PNG, JPG, WebP), or DOCX file up to 32&nbsp;MB. The AI extracts text using vision and then parses it into the same grid format. Useful for scanned tour requests or emailed itineraries.
-            </p>
-          </div>
-
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">3. Load / Build</h3>
-            <p className="text-sm text-gray-600">
-              Enter an itinerary ID to load an existing itinerary for editing or repricing. Or click <strong>+</strong> to add days manually and build from scratch without AI.
-            </p>
-          </div>
-        </div>
-
-        <Tip>
-          <strong>Load by link:</strong> The grid also opens with an itinerary pre-loaded via <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/pricing-grid?itinerary=&lt;id&gt;</code> &mdash; this is exactly what the <strong>Price in Grid</strong> button on the itinerary editor does.
-        </Tip>
-
-        <DocScreenshot src="/docs/itinerary-creation/parser-review.jpg" alt="Pricing Grid showing trip settings bar, live quote strip, and the three input methods" />
-      </section>
-
-      {/* Service Slots */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Day-by-Day Service Slots</h2>
-        <p className="text-gray-600 mb-3">
-          After AI parses the input, each day is displayed as an expandable card with 15 service slots, split into group services (charged once and divided by pax) and per-person services (multiplied by pax):
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Group services</h3>
-            <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-              <li><strong>Transport</strong> &mdash; Vehicles and transfers between cities</li>
-              <li><strong>Guide</strong> &mdash; Tour guide for the day</li>
-              <li><strong>Airport Services</strong> &mdash; Meet and greet, VIP lounge</li>
-              <li><strong>Hotel Services</strong> &mdash; Hotel staff services</li>
-              <li><strong>Tipping</strong> &mdash; Tips for guide, driver, and staff</li>
-              <li><strong>Boat Rides</strong> &mdash; Felucca, motorboat, and similar</li>
-              <li><strong>Other (Group)</strong> &mdash; Custom group-level costs</li>
-            </ul>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Per-person services</h3>
-            <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-              <li><strong>Accommodation</strong> &mdash; Hotel for the overnight</li>
-              <li><strong>Entrance Fees</strong> &mdash; Attraction tickets (EU/Non-EU rates)</li>
-              <li><strong>Flights</strong> &mdash; Domestic flights between cities</li>
-              <li><strong>Experiences</strong> &mdash; Optional excursions and add-ons</li>
-              <li><strong>Meals</strong> &mdash; Lunch and dinner by tier</li>
-              <li><strong>Water</strong> &mdash; Daily water allowance</li>
-              <li><strong>Nile Cruise</strong> &mdash; Cruise rates by cabin type and season</li>
-              <li><strong>Other (PP)</strong> &mdash; Custom per-person costs</li>
-            </ul>
-          </div>
-        </div>
-        <p className="text-gray-600 mb-3">
-          Each slot shows the selected rate from your database. Click any slot to expand it, change the selection, or override the price manually. <strong>Expand All / Collapse All</strong> buttons open or close every day card at once.
-        </p>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Day types</h3>
-        <p className="text-gray-600 mb-3">
-          Every day has a <strong>Day Type</strong> preset &mdash; Arrival, Tour, Transfer, Cruise, Free day, or Departure. The day type determines which slots are expected for that day, and drives the completeness check that must pass before you can save.
-        </p>
-        <Tip>
-          <strong>Auto-pricing:</strong> The AI maps each service to the best matching rate in your database, and meals adjust automatically to the hotel&apos;s board basis &mdash; a half-board (HB) hotel drops the dinner slot, full board (FB) and all-inclusive (AI) drop more. You only need to edit slots where the AI guessed wrong or where you want a different option.
-        </Tip>
-      </section>
-
-      {/* Live Pricing */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Live Pricing</h2>
-        <p className="text-gray-600 mb-3">
-          The live quote strip updates in real time as you edit. It shows:
-        </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Cost/PP</strong> &mdash; Total supplier cost per person</li>
-          <li><strong>Total Cost</strong> &mdash; Cost for all travelers</li>
-          <li><strong>Margin</strong> &mdash; Your profit based on the margin percentage</li>
-          <li><strong>Sell/PP</strong> &mdash; Selling price per person</li>
-          <li><strong>Sell Total</strong> &mdash; Total selling price for the group</li>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Ways In</h2>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Parse</strong> on a WhatsApp conversation, or the purple sparkles icon on an email in the Inbox &mdash; the Quote Builder opens and reads the conversation</li>
+          <li><strong>New Quote</strong> on the B2C or B2B Quotes page &mdash; opens it in that mode</li>
+          <li>From a client&apos;s page &mdash; opens it for that client</li>
+          <li><strong>Price in Grid</strong> in the itinerary editor &mdash; opens that itinerary</li>
+          <li><strong>Quote Builder</strong> in the sidebar</li>
         </ul>
-        <p className="text-sm text-gray-500 mt-3">
-          Change PAX, tier, dates, or currency and the entire quote recalculates instantly. Below the day cards, a <strong>Grand Summary</strong> card totals the whole trip by category.
+        <Tip>
+          Your work in the Quote Builder is kept in this browser until you save, so a closed tab does not lose it.
+        </Tip>
+      </section>
+
+      {/* Settings */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The Trip Settings</h2>
+        <p className="text-gray-600 mb-3">The header holds the settings the whole trip is priced with:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Pax</strong> &mdash; The number of travellers</li>
+          <li><strong>Start</strong> &mdash; The start date: hotels are priced from the rate period that covers it</li>
+          <li><strong>EU</strong> / <strong>Non-EU</strong> &mdash; Passport, for entrance fees (Non-EU to start)</li>
+          <li><strong>Tier</strong> &mdash; Your tiers (Budget, Standard, Deluxe, Luxury, or your own names); it picks the hotels and cruises offered</li>
+          <li><strong>Guide</strong> / <strong>No Guide</strong> &mdash; No Guide removes the guide and the guide&apos;s tips. <strong>Spot</strong> or <strong>Throughout +1</strong> (one guide for the whole trip, with his bed, meals and flight seats), and the <strong>Guide language</strong>, which every day&apos;s guide follows.</li>
+          <li><strong>B2C</strong> / <strong>B2B</strong> (Pricing) &mdash; Switching resets the markup to 25% or 10%; in B2B, <strong>Select Partner&hellip;</strong> takes the partner&apos;s default margin</li>
+          <li><strong>Currency</strong> &mdash; Shows the prices in any of 12 currencies; the trip is saved in your rates&apos; currency</li>
+          <li><strong>Markup %</strong> &mdash; Your margin on cost</li>
+        </ul>
+        <p className="text-gray-600 mt-3">
+          Below it, <strong>Client &amp; Trip Details</strong> hold the tour name and the client&apos;s name, email, phone and nationality, with a <strong>CRM client</strong> tag when the trip is linked to a client.
+        </p>
+      </section>
+
+      {/* Input */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Starting the Days</h2>
+        <p className="text-gray-600 mb-3">
+          First choose the <strong>Package Type</strong> &mdash; Day Trips, Tours Only, Land Package, Full Package, Cruise + Land, or Shore Excursions &mdash; so the AI knows what the client is buying. Then:
+        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Paste Text</strong> &mdash; Paste the request and click <strong>Parse &amp; Generate Quote</strong>. A vague request gets an AI-suggested trip, marked so, for you to review.</li>
+          <li><strong>Upload</strong> &mdash; A PDF, an image (PNG, JPG, WebP) or a Word file (.docx), up to 32 MB; click <strong>Extract &amp; Generate Quote</strong></li>
+          <li><strong>Load / Build</strong> &mdash; Load a saved itinerary by its ID, add a day, or start a <strong>Day from block</strong> &mdash; one of your saved day blocks</li>
+        </ul>
+        <p className="text-gray-600 mt-3">
+          The AI fills in the days and their cities, the travellers, start date, nationality, tour name and client name. It reads WhatsApp messages, emails, day-by-day plans, PDFs and photos, and the common travel shorthand.
+        </p>
+        <DocScreenshot src="/docs/itinerary-creation/parser-review.jpg" alt="The Quote Builder with its settings header and the Paste Text, Upload and Load / Build inputs" />
+      </section>
+
+      {/* Slots */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The Days and Their Services</h2>
+        <p className="text-gray-600 mb-3">Each day has fifteen services:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>For the group</strong> &mdash; Transport, Guide, Airport services, Hotel services, Tipping, Boat rides, Other (Group)</li>
+          <li><strong>Per person</strong> &mdash; Accommodation, Entrance fees, Flights, Experiences, Meals, Water, Nile cruise, Other (PP)</li>
+        </ul>
+        <p className="text-gray-600 mt-3 mb-3">
+          Empty services are hidden: <strong>Add service</strong> brings one in, <strong>Show all services</strong> shows them all. Pick a rate from the list (filtered to the day&apos;s city), or remove it; <strong>Other (Group)</strong> and <strong>Other (PP)</strong> take a typed amount. Picking a hotel adds its meals by its board basis.
+        </p>
+        <p className="text-gray-600">
+          Each day has a type &mdash; arrival, sightseeing, travel, cruise, free or departure &mdash; and can be saved as a day block to reuse. <strong>Expand All</strong> / <strong>Collapse All</strong> and the day bar move you around the trip.
+        </p>
+      </section>
+
+      {/* Writing */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Writing the Days</h2>
+        <p className="text-gray-600 mb-3">
+          Each day&apos;s title and description are what the client reads in the itinerary, the share page and the PDF. <strong>Write descriptions</strong> (above the days) writes them from what each day includes and your <Link href="/docs/content-library" className="text-primary-600 hover:underline">Content Library</Link>, in your Writing Rules:
+        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li>It writes only the days with no description, so your own words stay. A title you chose is kept; &ldquo;Day 3&rdquo; or just the city is replaced.</li>
+          <li><strong>Rewrite from library</strong> under a day&apos;s description writes that day again, after asking.</li>
+          <li>After <strong>Parse</strong>, the days carry the parser&apos;s brief descriptions, and you are offered to write them all from your library instead.</li>
+          <li>Under each written day, <em>From your library</em> names the entries it used. Anything picked that your library has no entry for is listed above the days, to add to the Content Library.</li>
+          <li>The text never mentions prices, and only describes what the day includes. Edit it freely; <strong>Save</strong> stores it. Each run counts as one AI generation.</li>
+        </ul>
+      </section>
+
+      {/* Pricing */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The Price</h2>
+        <p className="text-gray-600">
+          Once something is priced, the <strong>Live Quote</strong> strip shows Cost/PP, Total Cost, the Margin, Sell/PP and Sell Total, and the bar at the bottom repeats them beside the save button. How the price is built: <Link href="/docs/b2c-pricing" className="text-primary-600 hover:underline">B2C Pricing</Link>.
         </p>
       </section>
 
       {/* Saving */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Saving the Itinerary</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Saving</h2>
         <p className="text-gray-600 mb-3">
-          When you&apos;re satisfied with the itinerary and pricing, use <strong>Save as Itinerary</strong> (B2C mode) or <strong>Save as B2B Quote</strong> (B2B mode). Saving creates:
+          <strong>Save as Itinerary</strong> (B2C) or <strong>Save as B2B Quote</strong> saves the trip as an itinerary (code <strong>ITN-S-2026-&hellip;</strong>) with its days and services. When you save:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li>An <strong>itinerary record</strong> with a unique code (e.g., ITN-S-2026-024)</li>
-          <li>All <strong>days and services</strong> stored in the database for future editing</li>
-          <li>A <strong>client record</strong> created or linked automatically</li>
+          <li>Every service is priced from your rates as they are now. If a rate changed since you picked it, the trip is saved at today&apos;s rate and you are told which; a line whose rate is gone keeps its price, and you are told that too.</li>
+          <li>In B2C, the client is linked or added to your clients as a Lead, and a <strong>B2C quote</strong> is made &mdash; or the itinerary&apos;s open quote is repriced</li>
+          <li>In B2B, the B2B quote and a tour template are made and the B2B Calculator opens (see <Link href="/docs/b2b-import" className="text-primary-600 hover:underline">Converting Itineraries to B2B</Link>)</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          After a successful save, a <strong>View</strong> link takes you straight to the saved itinerary or quote.
-        </p>
-
-        <h3 className="font-semibold text-gray-900 mt-4 mb-2">B2B Output</h3>
-        <p className="text-gray-600">
-          When pricing mode is set to B2B with a partner selected, saving creates a <strong>B2B quote</strong> and redirects to the <strong>B2B Calculator</strong> (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/b2b/calculator/[variation_id]</code>), where the rate sheet is generated.
+          Afterwards the button reads <strong>Update itinerary &amp; quote</strong> (with the price change) or <strong>Update B2B Quote</strong>, and links such as <strong>View Itinerary</strong> and <strong>View quote</strong> take you there.
         </p>
       </section>
 
-      {/* Supported Formats */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">What the AI Understands</h2>
-        <p className="text-gray-600 mb-3">
-          The parser handles a wide range of input formats:
-        </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>WhatsApp conversations</strong> &mdash; Copy-paste directly, including multi-message threads</li>
-          <li><strong>Emails</strong> &mdash; Full email text including headers</li>
-          <li><strong>Tour operator shorthand</strong> &mdash; &ldquo;3NTS CAI + 4NTS CRZ + 2NTS HRG&rdquo;</li>
-          <li><strong>Structured day plans</strong> &mdash; &ldquo;D1 CAI/ALX/CAI&rdquo;, &ldquo;D2 CAI - Pyramids&rdquo;</li>
-          <li><strong>PDF itineraries</strong> &mdash; Scanned or digital PDFs via file upload</li>
-          <li><strong>Photos of handwritten requests</strong> &mdash; Images parsed via AI vision</li>
-        </ul>
-        <Tip>
-          <strong>200+ abbreviations:</strong> The system automatically decodes travel abbreviations &mdash; CAI (Cairo), ALX (Alexandria), ASW (Aswan), LXR (Luxor), HRG (Hurghada), CRZ (Cruise), VoK (Valley of the Kings), BB (Bed &amp; Breakfast), and many more.
-        </Tip>
-      </section>
-
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link href="/docs/clients" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Clients (CRM)
-        </Link>
-        <Link href="/docs/itineraries" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          Next: Itineraries
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/itinerary-creation" />
     </div>
   )
 }

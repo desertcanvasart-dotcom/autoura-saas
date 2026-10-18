@@ -41,9 +41,11 @@ describe('tour creation safety', () => {
     ).toBe(true)
   })
 
-  it('the add-activities prompt is an explicit non-destructive question', () => {
+  it('no "add activities" prompt after create: it opened a Day Builder that rendered nothing', () => {
+    // The days are entered on the form's Details tab, so there is nothing more
+    // to open once the tour is created.
     const src = read('app/tours/manage/TourManagerContent.tsx')
-    const call = src.slice(src.indexOf('add activities and set up'))
-    expect(call.slice(0, 300)).toContain("variant: 'info'")
+    expect(src).not.toContain('add activities and set up')
+    expect(src).not.toContain('DayBuilder')
   })
 })

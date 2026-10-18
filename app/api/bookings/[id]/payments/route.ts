@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
@@ -52,6 +53,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const { id } = await params
     const authResult = await requireAuth()
@@ -91,6 +95,13 @@ export async function POST(
         { success: false, error: 'Valid payment amount is required' },
         { status: 400 }
       )
+    }
+
+    // The ledger's types (migration 100 CHECK): an unknown one failed inside
+    // the RPC as a 500.
+    const PAYMENT_TYPES = ['deposit', 'installment', 'balance', 'full_payment', 'refund', 'penalty']
+    if (!PAYMENT_TYPES.includes(String(payment_type))) {
+      return NextResponse.json({ success: false, error: 'Unknown payment type' }, { status: 400 })
     }
 
     // Generate payment number. The prior code generated it before the INSERT
@@ -137,6 +148,10 @@ export async function POST(
     if (rpcError) {
       // The RPC raises if the booking is not found for this tenant.
       const msg = rpcError.message || ''
+      // Over the balance, or a refund over what was paid (migration 436).
+      if ((rpcError as { code?: string }).code === '23514') {
+        return NextResponse.json({ success: false, error: msg }, { status: 409 })
+      }
       const status = msg.includes('not found') ? 404 : 500
       console.error('Error recording payment:', rpcError)
       return NextResponse.json(

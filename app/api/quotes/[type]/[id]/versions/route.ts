@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
 import { attachChangerEmails } from '@/lib/quotes/attach-changer-emails';
+import { gateRole } from '@/lib/api-role-gate'
 
 /**
  * GET /api/quotes/[type]/[id]/versions
@@ -12,6 +13,9 @@ export async function GET(
 ) {
   try {
     const { type, id } = await params;
+    // B2B quotes are managers' and admins'.
+    const gate = type === 'b2b' ? await gateRole('manage') : null;
+    if (gate) return gate;
 
     // Validate quote type
     if (type !== 'b2c' && type !== 'b2b') {

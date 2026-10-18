@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
-import { isSuperAdmin } from '@/lib/super-admin-shared'
+import { isConfirmedSuperAdmin } from '@/lib/super-admin-shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +23,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       authenticated: true,
-      isSuperAdmin: isSuperAdmin(user.email),
+      isSuperAdmin: isConfirmedSuperAdmin(user),
     })
   } catch {
     return NextResponse.json({ success: true, authenticated: false, isSuperAdmin: false })

@@ -277,6 +277,19 @@ export async function GET(request: NextRequest) {
         error = trainsResult.error
         break
 
+      case 'flights': {
+        // Flights had no tab: their rates were on Rates → Flights only.
+        const flightsResult = await supabase
+          .from('flight_rates')
+          .select('id, service_code, route_from, route_to, airline, flight_number, flight_type, cabin_class, base_rate_eur, tax_eur, rate_currency, is_active')
+          .eq('is_active', true)
+          .order('route_from')
+          .order('route_to')
+        data = flightsResult.data || []
+        error = flightsResult.error
+        break
+      }
+
       case 'tipping':
         // ✅ Pull from tipping_rates table
         const tippingQuery = supabase
@@ -300,12 +313,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Supabase error:', error)
-      // Return empty array instead of error for missing tables
-      return NextResponse.json({
-        success: true,
-        data: [],
-        count: 0
-      })
+      // An error, said as one. Answering success with no rows showed "0 rates"
+      // over a failed query — indistinguishable from an empty table.
+      return NextResponse.json(
+        { success: false, error: (error as { message?: string }).message || 'Could not load these rates' },
+        { status: 500 }
+      )
     }
 
     // A train rate names WHICH train it prices; the hub showed only the

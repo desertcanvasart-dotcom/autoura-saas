@@ -68,9 +68,11 @@ export function leadName(candidate: LeadCandidate): { first_name: string; last_n
   return { first_name: first || fallback, ...(rest.length ? { last_name: rest.join(' ') } : {}) }
 }
 
-const PROMPT = `You read the first message of an email conversation that reached a tour operator in Egypt.
+// No country: whether a message asks about travel does not depend on where
+// the operator works, and naming Egypt mis-framed every other company's mail.
+const PROMPT = `You read the first message of an email conversation that reached a tour operator.
 
-Answer ONLY whether this person is asking about travel — a trip, a quote, a tour, dates, availability, a booking they want to make. That includes a short or vague enquiry ("do you do Nile cruises in March?").
+Answer ONLY whether this person is asking about travel — a trip, a quote, a tour, dates, availability, a booking they want to make. That includes a short or vague enquiry ("do you do river cruises in March?").
 
 It is NOT a travel request when the message is:
 - a supplier, hotel or airline writing to the operator

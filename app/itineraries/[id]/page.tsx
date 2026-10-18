@@ -1,7 +1,10 @@
 'use client'
 
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
+import { formatDateOnly } from '@/lib/date-utils'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
-import { todayLocal } from '@/lib/today'
+import { shiftDateISO, todayLocal } from '@/lib/today'
+import { withReturnTo } from '@/lib/nav/return-to'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useAuth } from '@/app/contexts/AuthContext'
 import ComposeEmailModal from '@/components/unified/ComposeEmailModal'
@@ -11,7 +14,7 @@ import Link from 'next/link'
 import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList, Copy, XCircle, RotateCcw } from 'lucide-react'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
-import { generateWhatsAppMessage, generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
+import { generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import AssigneeSelect from '@/components/AssigneeSelect'
 import ItineraryPL from '@/app/components/ItineraryPL'
@@ -29,7 +32,8 @@ import CancelTripDialog from '@/components/itineraries/CancelTripDialog'
 import TripCommissions from '@/components/itineraries/TripCommissions'
 import PickupDetailsDialog from '@/components/itineraries/PickupDetailsDialog'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
-import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
+import { effectiveItineraryTotal, itineraryClientTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
+import { roundToCurrency } from '@/lib/currency-totals'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
 import { buildTripAttention } from '@/lib/itineraries/attention'
@@ -123,6 +127,8 @@ export default function ViewItineraryPage() {
   const [showEmail, setShowEmail] = useState(false)
   const [showPickup, setShowPickup] = useState(false)
   const params = useParams()
+  // Pages this trip opens (booking, invoice, contract) go back to it (lib/nav/return-to).
+  const fromThisTrip = (href: string) => withReturnTo(href, `/itineraries/${params.id}`)
   const router = useRouter()
   const supabase = createClient()
   
@@ -192,6 +198,30 @@ export default function ViewItineraryPage() {
     window.history.replaceState(window.history.state, '', url.toString())
   }
   const { confirm: confirmDialog } = useConfirmDialog()
+
+  // A send the API refuses because some services have no price (422 with
+  // `gaps`) asks whether to go ahead, and if so sends again with
+  // allow_incomplete. The refusal used to end in a toast that said "send it
+  // anyway with allow_incomplete=true" and gave no way to do so.
+  const postAllowingIncomplete = async (url: string, payload: Record<string, unknown>, verb: string): Promise<Response> => {
+    const post = (extra: Record<string, unknown>) => fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, ...extra }),
+    })
+    const first = await post({})
+    if (first.status !== 422) return first
+    const data = await first.clone().json().catch(() => null) as { error?: string; gaps?: unknown[] } | null
+    if (!data?.gaps?.length) return first
+    const ok = await confirmDialog({
+      title: 'Some services have no price',
+      message: `${data.error ?? ''} ${verb} it anyway?`,
+      confirmText: `${verb} anyway`,
+      cancelText: 'Cancel',
+      variant: 'warning',
+    })
+    return ok ? post({ allow_incomplete: true }) : first
+  }
   const [sendingEmail, setSendingEmail] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendSuccess, setSendSuccess] = useState<string | null>(null)
@@ -364,18 +394,14 @@ export default function ViewItineraryPage() {
         return day
       }))
 
-      // Sum the (supplier) service costs, then store the CLIENT/selling total in
-      // total_cost — consistent with the grid save and how the header/invoice/PDF
-      // consume the field (previously this persisted the raw supplier sum).
-      let supplierSum = 0
-      days.forEach(day => {
-        day.services.forEach(s => {
-          supplierSum += s.id === serviceId ? newCost : s.total_cost
-        })
-      })
-      // Same source as the display, so the header and the stored cache can
-      // never disagree about the margin.
-      const newTotalCost = Math.round(supplierSum * (1 + marginPercent / 100) * 100) / 100
+      // Store the CLIENT total — the same figure the header shows: each
+      // service's own client price where it has one, else cost × margin.
+      // Re-deriving it as (all supplier costs) × margin threw away every
+      // per-line client price the grid had set (documents audit, round 12).
+      const services = days.flatMap(day => day.services.map(s =>
+        s.id === serviceId ? { ...s, total_cost: newCost } : s
+      )) as PricedService[]
+      const newTotalCost = roundToCurrency(itineraryClientTotal(services, marginPercent), itinerary?.currency)
 
       await supabase
         .from('itineraries')
@@ -426,7 +452,7 @@ export default function ViewItineraryPage() {
     if (!itinerary) return
 
     if (existingInvoice) {
-      router.push(`/invoices/${existingInvoice.id}`)
+      router.push(fromThisTrip(`/invoices/${existingInvoice.id}`))
       return
     }
 
@@ -435,10 +461,14 @@ export default function ViewItineraryPage() {
       let clientId = itinerary.client_id || null
       
       if (!clientId) {
-        const clientsResponse = await fetch('/api/clients')
+        // Searched by the trip's email, else its name: the unfiltered list
+        // stopped at 50 and was read under the wrong key, so the client was
+        // never found and a duplicate was created for every invoice.
+        const lookFor = itinerary.client_email || itinerary.client_name || ''
+        const clientsResponse = await fetch(`/api/clients?search=${encodeURIComponent(lookFor)}`)
         if (clientsResponse.ok) {
           const clientsData = await clientsResponse.json()
-          const clients = clientsData.success ? clientsData.data : (Array.isArray(clientsData) ? clientsData : [])
+          const clients = clientsData.clients ?? clientsData.data ?? (Array.isArray(clientsData) ? clientsData : [])
           
           const matchingClient = clients.find((c: any) => {
             const clientEmail = c.email?.toLowerCase()
@@ -509,15 +539,17 @@ export default function ViewItineraryPage() {
           total_amount: effectiveTotalCost,
           currency: itinerary.currency || 'EUR',
           issue_date: todayLocal(),
-          due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          due_date: shiftDateISO(todayLocal(), 14),
           payment_terms: 'Payment due within 14 days',
-          notes: `Trip dates: ${new Date(itinerary.start_date).toLocaleDateString()} - ${new Date(itinerary.end_date).toLocaleDateString()}`
+          // Calendar days (a UTC parse printed the day before, west of UTC) in a
+          // format every reader reads the same way — never "10/9/2026".
+          notes: `Trip dates: ${formatDateOnly(itinerary.start_date, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} - ${formatDateOnly(itinerary.end_date, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`
         })
       })
   
       if (response.ok) {
         const invoice = await response.json()
-        router.push(`/invoices/${invoice.id}`)
+        router.push(fromThisTrip(`/invoices/${invoice.id}`))
       } else {
         const error = await response.json()
         showToast('error', error.error || 'Failed to create invoice')
@@ -532,6 +564,14 @@ export default function ViewItineraryPage() {
 
   const [sharing, setSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
+  // The link the trip already has, so the menu offers Copy and Revoke for it.
+  useEffect(() => {
+    if (!itinerary?.id) return
+    fetch(`/api/itineraries/${itinerary.id}/share`)
+      .then(r => r.json())
+      .then(d => { if (d?.success) setShareUrl(d.url ?? null) })
+      .catch(() => undefined)
+  }, [itinerary?.id])
 
   // A share link IS a send path: the API refuses drafts and non-deliverable
   // prices with the same gate as email/WhatsApp. Idempotent — clicking again
@@ -540,7 +580,7 @@ export default function ViewItineraryPage() {
     if (!itinerary) return
     setSharing(true)
     try {
-      const res = await fetch(`/api/itineraries/${itinerary.id}/share`, { method: 'POST' })
+      const res = await postAllowingIncomplete(`/api/itineraries/${itinerary.id}/share`, {}, 'Share')
       const data = await res.json()
       if (!data.success) {
         showToast('error', data.error || 'Could not create the share link')
@@ -582,7 +622,7 @@ export default function ViewItineraryPage() {
       // Open a preview first; the modal exposes Download / Print / Email and a
       // breakdown toggle. The current breakdown choice is preserved.
       const { generateItineraryPDF } = await import('@/lib/pdf-generator')
-      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown, font: await browserPdfFontFor(itinerary, days, identityFromTenant(tenant)) }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
       setShowPdfPreview(true)
     } catch (error) {
@@ -599,7 +639,7 @@ export default function ViewItineraryPage() {
     if (!itinerary || days.length === 0) return
     try {
       const { generateItineraryPDF } = await import('@/lib/pdf-generator')
-      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show, font: await browserPdfFontFor(itinerary, days, identityFromTenant(tenant)) }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
     } catch (error) {
       console.error('Error regenerating PDF preview:', error)
@@ -610,7 +650,7 @@ export default function ViewItineraryPage() {
     if (!itinerary) return
   
     if (!itinerary.client_phone) {
-      showToast('error', 'Client phone number is required for WhatsApp. Please add it in edit mode.')
+      showToast('error', 'Client phone number is required for WhatsApp. Add it in the Quote Builder (Client & Trip Details) and save.')
       return
     }
   
@@ -618,15 +658,11 @@ export default function ViewItineraryPage() {
     setSendingEmail(true) // Reuse loading state for UI feedback
   
     try {
-      const response = await fetch('/api/whatsapp/send-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itineraryId: itinerary.id,
-          clientPhone: itinerary.client_phone,
-          clientName: itinerary.client_name
-        })
-      })
+      const response = await postAllowingIncomplete('/api/whatsapp/send-quote', {
+        itineraryId: itinerary.id,
+        clientPhone: itinerary.client_phone,
+        clientName: itinerary.client_name,
+      }, 'Send')
   
       const data = await response.json()
   
@@ -646,10 +682,15 @@ export default function ViewItineraryPage() {
   }
 
   const handleSendEmail = async () => {
-    if (!itinerary || days.length === 0) return
+    if (!itinerary) return
+    // It returned silently with no days: the click did nothing at all.
+    if (days.length === 0) {
+      showToast('error', 'This trip has no days yet — add them before sending it.')
+      return
+    }
 
     if (!itinerary.client_email) {
-      showToast('error', 'Client email is required. Please add it in edit mode.')
+      showToast('error', 'Client email is required. Add it in the Quote Builder (Client & Trip Details) and save.')
       return
     }
 
@@ -661,25 +702,23 @@ export default function ViewItineraryPage() {
       // omitted them, so the ONE PDF a client actually receives was the only
       // unbranded one: blank header name, no logo, empty footer.
       const { generateItineraryPDF } = await import('@/lib/pdf-generator')
-      const pdf = generateItineraryPDF(itinerary, days, undefined, {
+      // The breakdown choice the operator made for Download and Preview —
+      // this always sent the breakdown, whatever they had chosen.
+      const pdf = generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown, font: await browserPdfFontFor(itinerary, days, identityFromTenant(tenant)) }, {
         ...identityFromTenant(tenant),
         logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url),
       })
       const pdfBlob = pdf.output('blob')
       const pdfBase64 = await blobToBase64(pdfBlob)
 
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itineraryId: itinerary.id,
-          clientName: itinerary.client_name,
-          clientEmail: itinerary.client_email,
-          itineraryCode: itinerary.itinerary_code,
-          tripName: itinerary.trip_name,
-          pdfBase64: pdfBase64.split(',')[1]
-        })
-      })
+      const response = await postAllowingIncomplete('/api/send-email', {
+        itineraryId: itinerary.id,
+        clientName: itinerary.client_name,
+        clientEmail: itinerary.client_email,
+        itineraryCode: itinerary.itinerary_code,
+        tripName: itinerary.trip_name,
+        pdfBase64: pdfBase64.split(',')[1],
+      }, 'Send')
 
       const data = await response.json()
 
@@ -700,7 +739,7 @@ export default function ViewItineraryPage() {
 
   const markAsSent = async (method: string) => {
     try {
-      await fetch(`/api/itineraries/${params.id}/mark-sent`, {
+      const res = await fetch(`/api/itineraries/${params.id}/mark-sent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -708,8 +747,11 @@ export default function ViewItineraryPage() {
           recipientEmail: itinerary?.client_email
         })
       })
-      
-      if (itinerary) {
+      const result = await res.json().catch(() => null)
+
+      // Only a trip still at the quote stage moves to 'sent' — a confirmed
+      // one keeps its status (the route changes nothing then).
+      if (itinerary && result?.statusChanged) {
         setItinerary({ ...itinerary, status: 'sent' })
       }
     } catch (error) {
@@ -973,12 +1015,12 @@ export default function ViewItineraryPage() {
                   )}
                   {/* Linked records are links, not actions. */}
                   {booking && (
-                    <Link href={`/bookings/${booking.id}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
+                    <Link href={fromThisTrip(`/bookings/${booking.id}`)} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
                       <BookOpen className="w-3 h-3" /> {booking.booking_number}
                     </Link>
                   )}
                   {existingInvoice && (
-                    <Link href={`/invoices/${existingInvoice.id}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
+                    <Link href={fromThisTrip(`/invoices/${existingInvoice.id}`)} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
                       <Receipt className="w-3 h-3" /> {existingInvoice.invoice_number}
                     </Link>
                   )}
@@ -1007,7 +1049,7 @@ export default function ViewItineraryPage() {
                     disabled: generatingPDF || days.length === 0,
                     title: days.length === 0 ? 'Add days to the itinerary first — an empty itinerary has nothing to print' : 'Preview and download the client itinerary PDF',
                   },
-                  { label: 'Contract', icon: <FileText className="w-4 h-4" />, href: `/documents/contract/${itinerary.id}` },
+                  { label: 'Contract', icon: <FileText className="w-4 h-4" />, href: fromThisTrip(`/documents/contract/${itinerary.id}`) },
                   {
                     label: existingInvoice ? `Invoice ${existingInvoice.invoice_number}` : generatingInvoice ? 'Creating invoice…' : 'Create invoice',
                     icon: <Receipt className="w-4 h-4" />,
@@ -1256,7 +1298,7 @@ export default function ViewItineraryPage() {
                     </button>
                   )}
                   {itinerary.client_phone && <a
-                    href={`https://wa.me/${formatPhoneForWhatsApp(itinerary.client_phone)}`}
+                    href={`https://wa.me/${formatPhoneForWhatsApp(itinerary.client_phone, tenant?.operating_country)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-2 py-1 text-xs font-medium rounded-md border border-green-300 text-green-700 hover:bg-green-50"

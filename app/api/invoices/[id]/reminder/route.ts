@@ -1,22 +1,28 @@
+import { sendGuard } from '@/lib/send-guard'
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
-import { getCurrencySymbol } from '@/lib/currency'
+import { daysOverdueOrNull, reminderBlocker } from '@/lib/invoice-dates'
+import { escapeHtml } from '@/lib/html-escape'
+import { gateRole } from '@/lib/api-role-gate'
 
 // Reuse the email generation from the main route
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
   // The agency the invoice belongs to (joined as `tenant`), never a fixed brand.
   const company = emailIdentity(invoice.tenant)
-  const currencySymbol = getCurrencySymbol(invoice.currency)
-  const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
-  const totalAmount = `${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`
+  // The currency's own decimals and separators: "JPY120000.00" was how a
+  // yen balance read (JPY has no symbol of its own here).
+  const balanceDue = formatMoney(invoice.balance_due, invoice.currency)
+  const totalAmount = formatMoney(invoice.total_amount, invoice.currency)
   const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB', { 
     day: 'numeric', month: 'long', year: 'numeric' 
   })
   
-  const daysOverdue = Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
+  // Callers check reminderBlocker first; never NaN or 1970 if one does not.
+  const daysOverdue = daysOverdueOrNull(invoice.due_date) ?? 0
   
   let subject = `Payment Reminder: Invoice ${invoice.invoice_number}`
   let urgencyMessage = `This is a reminder about your outstanding invoice.`
@@ -54,7 +60,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
           <tr>
             <td style="padding: 40px;">
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px;">
-                Dear ${invoice.client_name},
+                Dear ${escapeHtml(invoice.client_name)},
               </p>
               
               <p style="margin: 0 0 30px; color: #374151; font-size: 16px;">
@@ -67,7 +73,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="padding: 8px 0;"><span style="color: #6b7280; font-size: 14px;">Invoice Number:</span></td>
-                        <td style="padding: 8px 0; text-align: right;"><span style="color: #111827; font-size: 14px; font-weight: 600;">${invoice.invoice_number}</span></td>
+                        <td style="padding: 8px 0; text-align: right;"><span style="color: #111827; font-size: 14px; font-weight: 600;">${escapeHtml(invoice.invoice_number)}</span></td>
                       </tr>
                       <tr>
                         <td style="padding: 8px 0;"><span style="color: #6b7280; font-size: 14px;">Due Date:</span></td>
@@ -99,7 +105,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
               ${invoice.payment_instructions ? `
               <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px 20px; margin-bottom: 30px;">
                 <p style="margin: 0 0 5px; color: #166534; font-size: 14px; font-weight: 600;">Payment Instructions</p>
-                <p style="margin: 0; color: #15803d; font-size: 14px;">${invoice.payment_instructions}</p>
+                <p style="margin: 0; color: #15803d; font-size: 14px; white-space: pre-line;">${escapeHtml(invoice.payment_instructions)}</p>
               </div>
               ` : ''}
               
@@ -127,7 +133,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
@@ -175,6 +186,13 @@ export async function POST(
         { success: false, error: 'Invoice has no balance due' },
         { status: 400 }
       )
+    }
+
+    // A draft was never sent to the client; an invoice with no due date
+    // would say "~20,700 days overdue, due 1 January 1970".
+    const blocked = reminderBlocker(invoice)
+    if (blocked) {
+      return NextResponse.json({ success: false, error: blocked }, { status: 400 })
     }
 
     const { subject, html } = generateReminderEmail(invoice, 'manual')

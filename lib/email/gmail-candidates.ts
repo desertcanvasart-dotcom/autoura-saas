@@ -92,13 +92,42 @@ async function fromHistory(gmail: Gmail, startHistoryId: string): Promise<{ refs
   return { refs: [...byId.values()].slice(0, MAX_HISTORY_MESSAGES), truncated, noiseIds }
 }
 
-async function fromListing(gmail: Gmail, mainQuery: string, rescueQueries: string[], maxResults: number): Promise<CandidateRef[]> {
+/**
+ * Most ids a fallback listing pages through. Listing is cheap (ids only, 500 a
+ * page); the stored-check then drops what is already saved before anything is
+ * downloaded.
+ */
+export const MAX_FALLBACK_LISTING = 2000
+
+async function fromListing(
+  gmail: Gmail,
+  mainQuery: string,
+  rescueQueries: string[],
+  maxResults: number,
+  opts: { pageAll?: boolean } = {},
+): Promise<{ refs: CandidateRef[]; truncated: boolean }> {
   const byId = new Map<string, CandidateRef>()
   const add = (ms: gmail_v1.Schema$Message[] | undefined) => {
     for (const m of ms ?? []) if (m.id && !byId.has(m.id)) byId.set(m.id, { id: m.id, threadId: m.threadId ?? null })
   }
   // The main listing failing IS the run failing — never swallowed.
-  add((await gmail.users.messages.list({ userId: 'me', maxResults, q: mainQuery })).data.messages)
+  let truncated = false
+  if (opts.pageAll) {
+    // Standing in for history that is too old: everything in the window, not
+    // the newest page. One page (the cron's 50) after a few days' outage kept
+    // the newest 50 and, with the history id then advanced, lost the rest.
+    let pageToken: string | undefined
+    do {
+      const { data } = await gmail.users.messages.list({
+        userId: 'me', maxResults: 500, q: mainQuery, ...(pageToken ? { pageToken } : {}),
+      })
+      add(data.messages)
+      pageToken = data.nextPageToken ?? undefined
+      if (pageToken && byId.size >= MAX_FALLBACK_LISTING) { truncated = true; break }
+    } while (pageToken)
+  } else {
+    add((await gmail.users.messages.list({ userId: 'me', maxResults, q: mainQuery })).data.messages)
+  }
   for (const q of rescueQueries) {
     try {
       add((await gmail.users.messages.list({ userId: 'me', maxResults: 50, q })).data.messages)
@@ -106,7 +135,7 @@ async function fromListing(gmail: Gmail, mainQuery: string, rescueQueries: strin
       console.error('[Email Sync] rescue query failed:', e instanceof Error ? e.message : e)
     }
   }
-  return [...byId.values()]
+  return { refs: [...byId.values()], truncated }
 }
 
 /**
@@ -146,12 +175,22 @@ export async function collectCandidates(
     } catch (e) {
       const status = errStatus(e)
       if (status !== 404 && status !== 400) throw e
-      const refs = await fromListing(gmail, opts.mainQuery, opts.rescueQueries, opts.maxResults)
-      return { mode: 'listing', fellBackBecause: `history id ${status === 404 ? 'too old' : 'not accepted'}`, refs, historyId, truncated: false }
+      const { refs, truncated: capped } = await fromListing(gmail, opts.mainQuery, opts.rescueQueries, opts.maxResults, { pageAll: true })
+      // Past the cap the id still advances: holding it would replay the same
+      // newest MAX_FALLBACK_LISTING every run and never move on. The run log
+      // says so instead.
+      const why = `history id ${status === 404 ? 'too old' : 'not accepted'}`
+      return {
+        mode: 'listing',
+        fellBackBecause: capped ? `${why}; window listing stopped at ${MAX_FALLBACK_LISTING} messages` : why,
+        refs,
+        historyId,
+        truncated: false,
+      }
     }
   }
 
-  const refs = await fromListing(gmail, opts.mainQuery, opts.rescueQueries, opts.maxResults)
+  const { refs } = await fromListing(gmail, opts.mainQuery, opts.rescueQueries, opts.maxResults)
   return { mode: 'listing', refs, historyId, truncated: false }
 }
 

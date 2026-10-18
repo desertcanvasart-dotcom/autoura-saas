@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { todayLocal } from '@/lib/today'
+import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
 import {
   Calendar,
@@ -78,6 +79,9 @@ const STATUS_CONFIG = {
 
 export default function DeparturesPage() {
   const dialog = useConfirmDialog()
+  // New departures are priced in the company's currency, not EUR.
+  const { tenant } = useTenant()
+  const companyCurrency = tenant?.default_currency || 'EUR'
   const [loading, setLoading] = useState(true)
   const [departures, setDepartures] = useState<TourDeparture[]>([])
   const [templates, setTemplates] = useState<TourTemplate[]>([])
@@ -99,8 +103,13 @@ export default function DeparturesPage() {
     max_pax: 20,
     min_pax: 2,
     price_per_person: '',
+    currency: companyCurrency,
     status: 'open'
   })
+  // The company's currency arrives after the first render.
+  useEffect(() => {
+    setNewDeparture(prev => (prev.price_per_person === '' ? { ...prev, currency: companyCurrency } : prev))
+  }, [companyCurrency])
 
   // "Same tour, new date": open the create modal prefilled from an existing
   // departure with the DATE blank — recurring departures repeat everything
@@ -114,6 +123,10 @@ export default function DeparturesPage() {
       max_pax: d.max_pax,
       min_pax: d.min_pax,
       price_per_person: d.price_per_person != null ? String(d.price_per_person) : '',
+      // The clone carries the source's currency; it used to fall back to the
+      // API default, so a USD departure came back priced in EUR (documents
+      // audit, round 12).
+      currency: d.currency || 'EUR',
       status: 'open'
     })
     setShowCreateModal(true)
@@ -211,6 +224,7 @@ export default function DeparturesPage() {
         max_pax: 20,
         min_pax: 2,
         price_per_person: '',
+        currency: companyCurrency,
         status: 'open'
       })
       loadData()
@@ -571,7 +585,7 @@ export default function DeparturesPage() {
                     type="text"
                     value={newDeparture.tour_name}
                     onChange={(e) => setNewDeparture(prev => ({ ...prev, tour_name: e.target.value }))}
-                    placeholder="e.g., 7-Day Cairo & Nile Cruise"
+                    placeholder="e.g., 7-Day Highlights Tour"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
                   />
                 </div>
@@ -641,7 +655,7 @@ export default function DeparturesPage() {
               {/* Price */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price per Person (EUR)
+                  Price per Person ({newDeparture.currency})
                 </label>
                 <input
                   type="number"

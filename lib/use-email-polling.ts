@@ -38,6 +38,19 @@ interface UseEmailPollingOptions {
   onNeedRefresh?: () => void
 }
 
+/** Longest pause between polls after repeated failures. */
+export const MAX_POLL_BACKOFF_MS = 30 * 60_000
+
+/**
+ * How long to pause polling after `errors` failures in a row. The first two
+ * failures keep the normal cadence; from the third, each failure doubles the
+ * pause, capped at MAX_POLL_BACKOFF_MS. Polling always resumes.
+ */
+export function pollBackoffMs(errors: number, interval: number): number {
+  if (errors < 3) return 0
+  return Math.min(interval * 2 ** (errors - 2), MAX_POLL_BACKOFF_MS)
+}
+
 export function useEmailPolling({
   userId,
   enabled = true,
@@ -56,17 +69,16 @@ export function useEmailPolling({
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const isPollingRef = useRef(false)
   const consecutiveErrorsRef = useRef(0)
-  const maxConsecutiveErrors = 3
+  const pausedUntilRef = useRef(0)
 
   // Poll for new emails
   const poll = useCallback(async () => {
     if (!userId || isPollingRef.current) return
 
-    // Skip polling if we've had too many consecutive errors
-    if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
-
-      return
-    }
+    // Back off after repeated failures, but never stop: polling used to give
+    // up for good after three errors (a brief Gmail 429 was enough), and no
+    // new mail appeared until the page was reloaded.
+    if (Date.now() < pausedUntilRef.current) return
 
     isPollingRef.current = true
     setIsPolling(true)
@@ -85,11 +97,13 @@ export function useEmailPolling({
         const errorData = await response.json().catch(() => ({}))
         console.warn('Poll request failed:', response.status, errorData.error || 'Unknown error')
         consecutiveErrorsRef.current++
+        pausedUntilRef.current = Date.now() + pollBackoffMs(consecutiveErrorsRef.current, interval)
         return
       }
 
       // Reset error count on success
       consecutiveErrorsRef.current = 0
+      pausedUntilRef.current = 0
 
       const result: PollResult = await response.json()
 
@@ -126,12 +140,13 @@ export function useEmailPolling({
       // Fail silently - polling is not critical functionality
       console.warn('Polling error (non-critical):', err.message)
       consecutiveErrorsRef.current++
+      pausedUntilRef.current = Date.now() + pollBackoffMs(consecutiveErrorsRef.current, interval)
       setError(err.message)
     } finally {
       isPollingRef.current = false
       setIsPolling(false)
     }
-  }, [userId, historyId, onNewEmails, onDeletedEmails, onLabelChanges, onNeedRefresh])
+  }, [userId, historyId, interval, onNewEmails, onDeletedEmails, onLabelChanges, onNeedRefresh])
 
   // Clear new email notification count
   const clearNewEmailCount = useCallback(() => {
@@ -141,6 +156,7 @@ export function useEmailPolling({
   // Manual refresh - resets error count
   const refresh = useCallback(async () => {
     consecutiveErrorsRef.current = 0 // Reset errors on manual refresh
+    pausedUntilRef.current = 0
     await poll()
   }, [poll])
 
@@ -186,6 +202,10 @@ export function useEmailPolling({
 
 /**
  * Hook for managing email cache with polling
+ */
+/**
+ * `userId` is the cache OWNER: pass cacheOwnerKey(user, company) so each
+ * company's mailbox is cached apart (lib/email-cache.ts).
  */
 export function useEmailCache(userId: string | null) {
   const [isCacheReady, setIsCacheReady] = useState(false)

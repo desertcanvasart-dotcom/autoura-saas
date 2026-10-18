@@ -1,27 +1,42 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import Link from 'next/link'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
 import { SLOT_DEFINITIONS } from './types'
-import { calculateGrandTotals, calculateDay, convertAmount, buildTransportTierIndex } from './lib/calculator'
-import { gridSheetCosts } from './lib/b2b-rate-sheet'
+import { calculateGrandTotals, calculateDay, convertAmount } from './lib/calculator'
 import { getCurrencySymbol } from '@/lib/currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
+import { repickVehicles } from './lib/option-filters'
+import { optionItems, cruiseForTier, hotelForTier } from './lib/option-item'
+import { linkParsedTransport, transportTypeWarnings } from './lib/parsed-transport'
+import { applyPackageToDays, describeRemoved } from './lib/package-apply'
+import { PACKAGE_TYPE_CONFIGS, type PackageType } from '@/lib/package-types'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import type { DayMatch } from '@/lib/day-blocks/match'
+import SaveAsBlockDialog from '@/components/day-blocks/SaveAsBlockDialog'
 import { preParseRawItinerary } from '@/lib/ai/parsing-utils'
 import type { BlockNote } from './components/DayRow'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
+import { alignGuideLanguage, guideLanguages, majorityGuideLanguage } from './lib/guide-language'
 import InputPanel from './components/InputPanel'
 import DayRow from './components/DayRow'
 import GridSummary from './components/GridSummary'
 import { showToast } from '@/app/contexts/ToastContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import type { ExchangeRate } from '@/lib/currency'
+import { displayRate } from './lib/display-rate'
+import { takeConversation } from '@/lib/grid-handoff'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { readbackDays, readbackText } from './lib/readback'
+import { isStructuredItinerary, parseStructuredItinerary, readStructuredHeader, itineraryTemplate, namesList } from './lib/structured-itinerary'
+import type { LibraryGap, WrittenSource } from './components/DayRow'
 
 // ============================================
 // LOCAL STORAGE PERSISTENCE
@@ -119,8 +134,12 @@ function PricingGridContent() {
     loadFromStorage(STORAGE_KEY_DAYS, [])
   )
   const [rates, setRates] = useState<AllRates | null>(null)
+  const guideLanguageList = useMemo(() => guideLanguages(rates?.guide ?? []), [rates])
   // The agency's day blocks (Settings → Day blocks); empty until imported.
   const [blocks, setBlocks] = useState<GridBlock[]>([])
+  // May this user add to the catalog ("Save as a block")?
+  const [canWriteBlocks, setCanWriteBlocks] = useState(false)
+  const [savingBlockDayId, setSavingBlockDayId] = useState<string | null>(null)
   // Per day: what the last block laid on it left for the operator to pick.
   const [blockNotes, setBlockNotes] = useState<Record<string, BlockNote>>({})
   const [loading, setLoading] = useState(true)
@@ -182,75 +201,77 @@ function PricingGridContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Fetch rates
-  const fetchRates = useCallback(async (tier: string) => {
+  // Fetch rates. A tier or date change starts a new request while an older
+  // one may still be in flight; only the latest may land — a late answer for
+  // the old tier put that tier's hotels in the list (operator, 2026-10-10:
+  // the budget hotel missing on one device). The tier the rates were fetched
+  // for travels with them, so the hotel swap below never reads another tier's.
+  const ratesRequestRef = useRef(0)
+  const [ratesTier, setRatesTier] = useState<string | null>(null)
+  const fetchRates = useCallback(async (tier: string, startDate: string, mode: 'missing' | 'all' = 'missing') => {
+    const requestId = ++ratesRequestRef.current
     try {
       setLoading(true)
-      const res = await fetch(`/api/pricing-grid/rates?tier=${tier}`)
+      const params = new URLSearchParams({ tier })
+      if (startDate) params.set('date', startDate)
+      const res = await fetch(`/api/pricing-grid/rates?${params}`)
       const data = await res.json()
+      if (requestId !== ratesRequestRef.current) return
       if (data.success) {
         setRates(data.data)
+        setRatesTier(tier)
         // A draft restored from this browser may hold items with no price, or
         // water as a hidden amount (hydrate-rates.ts) — fill them from the rates.
-        setDays(prev => hydrateDayRates(prev, data.data, 'missing').days)
+        // After a save that repriced ('all'), every item takes today's rate.
+        setDays(prev => hydrateDayRates(prev, data.data, mode).days)
       }
     } catch (err) {
       console.error('Failed to fetch rates:', err)
     } finally {
-      setLoading(false)
+      if (requestId === ratesRequestRef.current) setLoading(false)
     }
   }, [])
 
+  // A new start date can fall in another rate period: the hotels and cruises
+  // already picked take that period's rates ('all'), as the save would. They
+  // kept the old period's price on screen until the save repriced them.
+  const prevStartRef = useRef(config.startDate)
   useEffect(() => {
-    fetchRates(config.tier)
-  }, [config.tier, fetchRates])
+    const dateChanged = prevStartRef.current !== config.startDate
+    prevStartRef.current = config.startDate
+    fetchRates(config.tier, config.startDate, dateChanged ? 'all' : undefined)
+  }, [config.tier, config.startDate, fetchRates])
 
   // Auto-swap accommodation and cruise when tier changes
+  // Runs on the rates OF the new tier (ratesTier), never on a list still
+  // held from the old one. A tier set by opening a saved itinerary is not a
+  // change: that itinerary's hotels are its own (loadItinerary sets the ref).
   const prevTierRef = useRef(config.tier)
   useEffect(() => {
-    if (!rates || days.length === 0) return
+    if (!rates || !ratesTier || ratesTier !== config.tier) return
     // Only run when tier actually changed (not on initial load)
-    if (prevTierRef.current === config.tier) return
-    prevTierRef.current = config.tier
+    if (prevTierRef.current === ratesTier) return
+    prevTierRef.current = ratesTier
+    if (days.length === 0) return
 
     setDays(prevDays => prevDays.map(day => ({
       ...day,
       slots: day.slots.map(slot => {
         // Swap accommodation: match by city
         if (slot.slotId === 'accommodation' && slot.selectedItems.length > 0) {
-          const dayCity = day.city?.toLowerCase()?.trim()
-          const newHotel = (rates as AllRates).accommodation.find(
-            (r: any) => r.city?.toLowerCase()?.trim() === dayCity
-          )
-          if (newHotel) {
-            return {
-              ...slot,
-              selectedItems: [{
-                rateId: newHotel.id,
-                name: newHotel.name,
-                rateEur: newHotel.rateEur,
-                rateNonEur: newHotel.rateNonEur,
-              }],
-            }
-          }
+          // The same hotel in the new tier when it has it (option-item.ts).
+          const newHotel = hotelForTier(slot.selectedItems[0], day.city, (rates as AllRates).accommodation)
+          // With its single supplement, as a pick in the row makes it.
+          if (newHotel) return { ...slot, selectedItems: optionItems('accommodation', newHotel) }
           // No hotel in new tier for this city — clear selection
           return { ...slot, selectedItems: [] }
         }
 
-        // Swap cruise: pick the first cruise in the new tier
+        // Swap cruise: the same ship in the new tier, else one from the
+        // day's city, else the tier's first (option-item.ts).
         if (slot.slotId === 'cruise' && slot.selectedItems.length > 0) {
-          const newCruise = (rates as AllRates).cruise[0]
-          if (newCruise) {
-            return {
-              ...slot,
-              selectedItems: [{
-                rateId: newCruise.id,
-                name: newCruise.name,
-                rateEur: newCruise.rateEur,
-                rateNonEur: newCruise.rateNonEur,
-              }],
-            }
-          }
+          const newCruise = cruiseForTier(slot.selectedItems[0], day.city, (rates as AllRates).cruise)
+          if (newCruise) return { ...slot, selectedItems: optionItems('cruise', newCruise) }
           return { ...slot, selectedItems: [] }
         }
 
@@ -258,45 +279,38 @@ function PricingGridContent() {
       }),
     })))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rates])
+  }, [rates, ratesTier])
 
-  // Pre-fetch all exchange rates once on mount, then currency switching is instant
-  const exchangeRatesCache = useRef<Record<string, number> | null>(null)
+  // The vehicle follows the group: a change of travellers moves every picked
+  // route to the vehicle that seats them (option-filters.ts), as the list and
+  // the B2B rate sheet already do. Nothing moves when nothing needs to.
   useEffect(() => {
-    const prefetch = async () => {
-      try {
-        const res = await fetch('/api/exchange-rates?base=EUR')
-        const data = await res.json()
-        if (data.success && data.data?.rates) {
-          exchangeRatesCache.current = data.data.rates
-          // Apply if currency is already non-EUR
-          if (config.currency !== 'EUR' && data.data.rates[config.currency]) {
-            setConfig(prev => ({ ...prev, exchangeRate: data.data.rates[prev.currency] }))
-          }
-        }
-      } catch (err) {
-        console.error('Failed to prefetch exchange rates:', err)
-      }
-    }
-    prefetch()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const routes = rates?.route
+    if (!routes?.length) return
+    setDays(prev => repickVehicles(prev, routes, config.pax))
+  }, [config.pax, rates])
+
+  // The rates, once; the display currency converts from the run currency
+  // (display-rate.ts). A currency with no rate goes back to the run currency
+  // rather than show its symbol on unconverted amounts.
+  const { tenant } = useTenant()
+  const runCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
+  const [fxRates, setFxRates] = useState<ExchangeRate[] | null>(null)
+  useEffect(() => {
+    fetch('/api/exchange-rates')
+      .then(r => r.json())
+      .then(d => setFxRates(d?.success && Array.isArray(d.data) ? d.data : []))
+      .catch(() => setFxRates([]))
   }, [])
-
-  // Apply exchange rate instantly from cache when currency changes
   useEffect(() => {
-    if (config.currency === 'EUR') {
-      if (config.exchangeRate !== null) {
-        setConfig(prev => ({ ...prev, exchangeRate: null }))
-      }
-      return
+    const shown = displayRate(runCurrency, config.currency, fxRates)
+    if (shown.ok) {
+      if (config.exchangeRate !== shown.rate) setConfig(prev => ({ ...prev, exchangeRate: shown.rate }))
+    } else if (shown.reason !== 'loading') {
+      showToast('error', shown.reason)
+      setConfig(prev => ({ ...prev, currency: runCurrency, exchangeRate: null }))
     }
-    // Use cached rates (instant) — no API call needed
-    const cached = exchangeRatesCache.current
-    if (cached && cached[config.currency]) {
-      setConfig(prev => ({ ...prev, exchangeRate: cached[prev.currency] }))
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.currency])
+  }, [config.currency, config.exchangeRate, runCurrency, fxRates])
 
   // --- URL Params: Auto-load conversation from inbox redirect ---
   const searchParams = useSearchParams()
@@ -306,7 +320,11 @@ function PricingGridContent() {
   // Effect 1: Decode URL params and store text for parsing
   useEffect(() => {
     if (hasProcessedParams.current) return
-    const conversationParam = searchParams?.get('conversation')
+    // ?handoff=<id>: the conversation waits in sessionStorage (grid-handoff.ts);
+    // ?conversation= (base64) is the older way, still read.
+    const handoffParam = searchParams?.get('handoff')
+    const handedOff = handoffParam ? takeConversation(handoffParam) : null
+    const conversationParam = handedOff ?? searchParams?.get('conversation')
     if (!conversationParam) {
       // No conversation: "New booking" from a client's page (?clientId=) or
       // "New quote" from the quotes lists (?type=b2b|b2c) — a fresh grid for
@@ -349,7 +367,7 @@ function PricingGridContent() {
     hasProcessedParams.current = true
 
     // Decode conversation (handle both standard and URL-safe base64)
-    const isBase64 = searchParams?.get('encoded') === 'base64'
+    const isBase64 = !handedOff && searchParams?.get('encoded') === 'base64'
     let decodedText = conversationParam
 
     if (isBase64) {
@@ -425,7 +443,9 @@ function PricingGridContent() {
     fetch('/api/day-blocks')
       .then(res => res.json())
       .then(json => {
-        if (live && json?.success) setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+        if (!live || !json?.success) return
+        setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+        setCanWriteBlocks(json.data.canWrite === true)
       })
       // No library (or no table yet): the Grid simply offers no blocks.
       .catch(() => {})
@@ -438,7 +458,7 @@ function PricingGridContent() {
   const addDayFromBlock = (block: GridBlock) => {
     if (!rates) return
     const fresh = createEmptyDay(days.length + 1)
-    const { day, filled, toPick } = applyBlockToGridDay(fresh, block, rates, config.pax)
+    const { day, filled, toPick } = applyBlockToGridDay(fresh, block, rates, config.pax, { guideLanguage: tripGuideLanguage() })
     setDays(prev => [...prev, { ...day, dayNumber: prev.length + 1, isExpanded: true }])
     setBlockNotes(prev => ({ ...prev, [day.id]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${days.length + 1} from ${blockSummary(block.code, filled, toPick)}`)
@@ -447,10 +467,37 @@ function PricingGridContent() {
   const applyBlockToDay = (dayId: string, block: GridBlock) => {
     const target = days.find(d => d.id === dayId)
     if (!rates || !target) return
-    const { day, filled, toPick } = applyBlockToGridDay(target, block, rates, config.pax)
+    const { day, filled, toPick } = applyBlockToGridDay(target, block, rates, config.pax, { guideLanguage: tripGuideLanguage() })
     setDays(prev => prev.map(d => (d.id === dayId ? day : d)))
     setBlockNotes(prev => ({ ...prev, [dayId]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${target.dayNumber} ← ${blockSummary(block.code, filled, toPick)}`)
+  }
+
+  // A day kept as a new block: it joins the catalog, and the day is now from it.
+  const blockSaved = (dayId: string, block: GridBlock) => {
+    setBlocks(prev => [...prev.filter(b => b.code !== block.code), block].sort((a, b) => a.code.localeCompare(b.code)))
+    setDays(prev => prev.map(d => (d.id === dayId ? { ...d, blockCode: block.code } : d)))
+    setBlockNotes(prev => { const next = { ...prev }; delete next[dayId]; return next })
+    setSavingBlockDayId(null)
+    showToast('success', `Saved to your catalog as day block ${block.code}`)
+  }
+
+  // The trip's guide language: the header's choice, else the one most days' guides speak.
+  const tripGuideLanguage = () =>
+    config.guideLanguage || (rates ? majorityGuideLanguage(days, rates.guide) : null)
+
+  // The header's guide language changed: every day's guide moves to it.
+  const changeConfig = (next: GridConfig) => {
+    if (rates && next.guideLanguage && next.guideLanguage !== config.guideLanguage) {
+      const { days: aligned, changed, unmatched } = alignGuideLanguage(days, rates.guide, next.guideLanguage)
+      if (changed.length) setDays(aligned)
+      if (unmatched.length) {
+        showToast('warning', `No ${next.guideLanguage} guide in the city of day ${unmatched.join(', ')} — those days keep their guide.`)
+      } else if (changed.length) {
+        showToast('success', `${next.guideLanguage} guide on day ${changed.join(', ')}`)
+      }
+    }
+    setConfig(next)
   }
 
   const removeDay = (dayId: string) => {
@@ -485,6 +532,68 @@ function PricingGridContent() {
 
   const updateDay = (dayId: string, partial: Partial<GridDay>) => {
     setDays(prev => prev.map(d => d.id === dayId ? { ...d, ...partial } : d))
+  }
+
+  // --- Write descriptions (lib/ai/day-writer.ts) ---
+  // From what each day sells and the agency's Content Library, in its
+  // Writing Rules. 'fill' writes only days with no description; 'rewrite'
+  // replaces the days named. The text lands on the days; the save stores it.
+  const dialog = useConfirmDialog()
+  const [writing, setWriting] = useState<'all' | number | null>(null)
+  const [writtenFrom, setWrittenFrom] = useState<Record<number, WrittenSource[]>>({})
+  const [libraryMissing, setLibraryMissing] = useState<LibraryGap[]>([])
+  // What the parser wants the operator to know (a named hotel saved under
+  // another tier, a transport rate whose type contradicts its route …).
+  const [parseNotes, setParseNotes] = useState<string[]>([])
+  // After a parse: the grid read back as lines, to check the reading at a glance.
+  const [showReadback, setShowReadback] = useState(false)
+  const readback = useMemo(() => (showReadback ? readbackDays(days) : []), [showReadback, days])
+  const [offerWrite, setOfferWrite] = useState(false)
+  const writeDescriptions = async (mode: 'fill' | 'rewrite', dayNumbers?: number[]) => {
+    if (writing !== null || days.length === 0) return
+    setWriting(dayNumbers?.length === 1 ? dayNumbers[0] : 'all')
+    setOfferWrite(false)
+    try {
+      const res = await fetch('/api/pricing-grid/write-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days, tier: config.tier, tourName: config.tourName, pax: config.pax, mode, dayNumbers }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        showToast('error', data.error || 'Could not write the descriptions')
+        return
+      }
+      const written = (data.data?.written ?? []) as Array<{ dayNumber: number; title: string; description: string; sources: WrittenSource[] }>
+      if (written.length === 0) {
+        showToast('info', data.data?.note || 'Nothing to write')
+        return
+      }
+      const byDay = new Map(written.map(w => [w.dayNumber, w]))
+      setDays(prev => prev.map(d => {
+        const w = byDay.get(d.dayNumber)
+        return w ? { ...d, title: w.title, description: w.description } : d
+      }))
+      setWrittenFrom(prev => ({ ...prev, ...Object.fromEntries(written.map(w => [w.dayNumber, w.sources])) }))
+      const writtenDays = new Set(written.map(w => w.dayNumber))
+      setLibraryMissing(prev => [
+        ...prev.filter(m => !writtenDays.has(m.dayNumber)),
+        ...((data.data?.missing ?? []) as LibraryGap[]),
+      ])
+      showToast('success', `Wrote ${written.length} day${written.length === 1 ? '' : 's'} from your Content Library`)
+    } catch {
+      showToast('error', 'Could not write the descriptions')
+    } finally {
+      setWriting(null)
+    }
+  }
+  const rewriteDay = async (day: GridDay) => {
+    if (day.description.trim() && !(await dialog.confirm({
+      title: `Rewrite day ${day.dayNumber}?`,
+      message: 'Its title and description are replaced with new text from your Content Library.',
+      confirmText: 'Rewrite',
+    }))) return
+    await writeDescriptions('rewrite', [day.dayNumber])
   }
 
   const updateSlot = (dayId: string, slotId: string, value: SlotValue) => {
@@ -542,7 +651,7 @@ function PricingGridContent() {
   }
 
   // --- Day blocks for a parsed itinerary ---
-  const matchParsedDaysToBlocks = async (text: string, parsed: GridDay[], pax: number) => {
+  const matchParsedDaysToBlocks = async (text: string, parsed: GridDay[], pax: number, guideLanguage: string | null) => {
     if (!rates) return
     try {
       // The day's own words, when the text is split into D1 / Day 1 parts.
@@ -567,7 +676,7 @@ function PricingGridContent() {
         if (!day) continue
         const block = m.code ? byCode.get(m.code) : undefined
         if (block && m.confidence === 'high') {
-          const result = applyBlockToGridDay(day, block, rates, pax)
+          const result = applyBlockToGridDay(day, block, rates, pax, { guideLanguage })
           applied.set(day.id, result.day)
           notes[day.id] = { kind: 'applied', code: block.code, by: m.by === 'shorthand' ? 'shorthand' : 'ai', toPick: result.toPick, reason: m.reason }
         } else if (block) {
@@ -592,6 +701,67 @@ function PricingGridContent() {
   }
 
   // --- Parse Text via AI ---
+  // A package change applies to the days already built: what the new
+  // package does not sell is removed, after the operator agrees to it
+  // (package-apply.ts). It only used to steer the next parse.
+  const changePackageType = async (p: PackageType) => {
+    const pkg = PACKAGE_TYPE_CONFIGS.find(c => c.slug === p)
+    if (pkg && days.length > 0) {
+      const result = applyPackageToDays(days, pkg)
+      const what = describeRemoved(result.removed)
+      if (what) {
+        const ok = await dialog.confirm({
+          title: `Switch to ${pkg.name}?`,
+          message: `${pkg.name} does not include them, so ${what} will be removed from this trip.`,
+          confirmText: 'Switch and remove',
+          cancelText: 'Keep the current package',
+          variant: 'warning',
+        })
+        if (!ok) return
+        setDays(result.days)
+      }
+    }
+    setConfig(prev => ({ ...prev, packageType: p }))
+  }
+
+  // The format's text names this tier's rates: when it asks for another
+  // tier, that tier's list is fetched first, and the tier switch is not
+  // treated as a change (its hotels are already the ones written).
+  const readStructuredText = async (text: string) => {
+    const header = readStructuredHeader(text)
+    let list = rates as AllRates
+    const tier = header.tier && header.tier !== config.tier ? header.tier : null
+    if (tier) {
+      const params = new URLSearchParams({ tier })
+      const startDate = header.startDate ?? config.startDate
+      if (startDate) params.set('date', startDate)
+      const data = await fetch(`/api/pricing-grid/rates?${params}`).then(r => r.json()).catch(() => null)
+      if (!data?.success) { showToast('error', `Could not load your ${tier} rates`); return }
+      list = data.data
+      prevTierRef.current = tier
+    }
+    const { days: read, unmatched } = parseStructuredItinerary(text, list, header.pax ?? config.pax, () => crypto.randomUUID())
+    setDays(read)
+    setShowReadback(read.length > 0)
+    setParseNotes([...unmatched, ...transportTypeWarnings(read, list.route)])
+    setWrittenFrom({})
+    setLibraryMissing([])
+    setOfferWrite(read.length > 0)
+    setConfig(prev => ({
+      ...prev,
+      ...(header.packageType && { packageType: header.packageType }),
+      ...(tier && { tier }),
+      ...(header.pax && { pax: header.pax }),
+      ...(header.startDate && { startDate: header.startDate }),
+    }))
+    setSaveMessage(`Read from your itinerary format — ${read.length} day${read.length === 1 ? '' : 's'}, matched by name, no AI used`)
+  }
+
+  const formatTemplate = () => {
+    const pkg = PACKAGE_TYPE_CONFIGS.find(c => c.slug === config.packageType)
+    return itineraryTemplate(rates, { packageName: pkg?.name, tier: config.tier, pax: config.pax, startDate: config.startDate })
+  }
+
   const handleParseDays = async (text: string) => {
     try {
       setIsParsing(true)
@@ -600,24 +770,53 @@ function PricingGridContent() {
       // and the user knows a fresh parse is starting
       setDays([])
       setBlockNotes({})
+      setParseNotes([])
+      setShowReadback(false)
       setConfig(prev => ({ ...prev, itineraryId: null, itineraryCode: null }))
+      // Written in the agency's format: read here, by name, without the AI
+      // (structured-itinerary.ts) — exact, instant, and free.
+      if (rates && isStructuredItinerary(text)) {
+        await readStructuredText(text)
+        return
+      }
       const res = await fetch('/api/pricing-grid/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, tier: config.tier, pax: config.pax, package_type: config.packageType })
+        body: JSON.stringify({ text, tier: config.tier, pax: config.pax, package_type: config.packageType, start_date: config.startDate || null })
       })
       const data = await res.json()
       if (data.success && data.days) {
-        const parsedDays: GridDay[] = parsedDaysToGrid(data.days, () => crypto.randomUUID())
+        const parsedPax = Number(data.metadata?.pax) > 0 ? Number(data.metadata.pax) : config.pax
+        // The parser picks transport ROWS; the grid lists routes by vehicle —
+        // linked here, at the vehicle for the party (parsed-transport.ts).
+        const parsedDays: GridDay[] = rates
+          ? linkParsedTransport(parsedDaysToGrid(data.days, () => crypto.randomUUID()), rates.route, parsedPax)
+          : parsedDaysToGrid(data.days, () => crypto.randomUUID())
         // The parser's prices are its own derivation (a seasonal hotel came in
         // at 0); the grid's rate list is the authority (hydrate-rates.ts).
-        const hydrated = rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays
+        let hydrated = rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays
+        // One guide language for the trip: the one set in the header, else
+        // the one most days came back with (guide-language.ts).
+        const guideLanguage = rates ? (config.guideLanguage || majorityGuideLanguage(hydrated, rates.guide)) : null
+        if (rates && guideLanguage) {
+          hydrated = alignGuideLanguage(hydrated, rates.guide, guideLanguage).days
+          if (!config.guideLanguage) setConfig(prev => ({ ...prev, guideLanguage }))
+        }
         setDays(hydrated)
+        setShowReadback(hydrated.length > 0)
+        setParseNotes([
+          ...(Array.isArray(data.notes) ? data.notes.map(String) : []),
+          ...(rates ? transportTypeWarnings(hydrated, rates.route) : []),
+        ])
+        // The parse wrote its own brief descriptions: offer the library's.
+        setWrittenFrom({})
+        setLibraryMissing([])
+        setOfferWrite(hydrated.length > 0)
         // Which of the agency's day blocks is each day? The blocks then supply
         // the services (lib/day-blocks/match.ts); the AI's reading stays only
         // where no block fits, and is flagged.
         if (rates && blocks.length > 0) {
-          void matchParsedDaysToBlocks(text, hydrated, data.metadata?.pax ?? config.pax)
+          void matchParsedDaysToBlocks(text, hydrated, data.metadata?.pax ?? config.pax, guideLanguage)
         }
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
@@ -637,6 +836,10 @@ function PricingGridContent() {
           ...(meta?.nationality && { nationality: meta.nationality }),
           // Client name: URL param takes precedence, then AI-extracted
           ...(meta?.clientName && !prev.clientName && { clientName: meta.clientName }),
+          // The email and phone the AI found (asked for, then dropped here).
+          // The office's own address is filtered at the save (own-address).
+          ...(meta?.clientEmail && !prev.clientEmail && { clientEmail: String(meta.clientEmail).trim() }),
+          ...(meta?.clientPhone && !prev.clientPhone && { clientPhone: String(meta.clientPhone).trim() }),
         }))
       } else {
         showToast('error', data.error || 'Failed to parse text')
@@ -662,6 +865,10 @@ function PricingGridContent() {
       }
 
       const itn = headerData.data
+      // The itinerary's tier comes with its own hotels: not a change to swap for.
+      prevTierRef.current = itn.tier || 'standard'
+      // Nor is its date a change: its lines keep the prices they were saved at.
+      if (itn.start_date) prevStartRef.current = itn.start_date
 
       // Update config from itinerary
       setConfig(prev => ({
@@ -684,8 +891,17 @@ function PricingGridContent() {
         // still the best information available, and new saves are honest.
         packageType: (itn.package_type as GridConfig['packageType']) || 'full-package',
         partnerId: itn.partner_id || null,
+        // The trip's own pricing settings, so a re-save prices it as it was
+        // priced — reopening reset the margin, passport and nationality to
+        // whatever the last trip had.
+        ...(itn.margin_percent != null ? { marginPercent: Number(itn.margin_percent) } : {}),
+        ...(itn.is_euro_passport != null ? { passport: itn.is_euro_passport ? 'eu' as const : 'non_eu' as const } : {}),
+        ...(itn.nationality ? { nationality: itn.nationality } : {}),
         itineraryId: itn.id,
         itineraryCode: itn.itinerary_code,
+        // A saved trip's guides are its own; the language follows them
+        // (guide-language.ts), not the last trip's choice.
+        guideLanguage: '',
       }))
       setSavedSellingTotal(typeof itn.total_cost === 'number' ? itn.total_cost : Number(itn.total_cost) || null)
 
@@ -714,6 +930,7 @@ function PricingGridContent() {
             // Columns may be undefined for pre-migration rows — that's fine,
             // resolveComponents() falls back to DAY_TYPE_DEFAULTS[DEFAULT_DAY_TYPE].
             dayType: dayData.day_type ?? undefined,
+            blockCode: dayData.block_code ?? null,
             overnight: dayData.overnight ?? undefined,
             hasSightseeing: dayData.has_sightseeing ?? undefined,
             airportArrival: dayData.airport_arrival ?? undefined,
@@ -723,6 +940,15 @@ function PricingGridContent() {
             intercity: dayData.intercity ?? undefined,
           }
         })
+        // The guide as it was saved: a priced trip with no guide line was
+        // saved with No Guide, and the throughout guide leaves its tagged
+        // bed / meal / seat lines. Reopening reset both to the defaults.
+        const allServices = (daysData.data as Array<{ services?: Array<{ description?: string | null }> }>).flatMap(d => d.services || [])
+        if (allServices.length > 0) {
+          const hasGuide = loadedDays.some(d => d.slots.some(sl => sl.slotId === 'guide' && (sl.selectedItems.length > 0 || sl.customAmount > 0)))
+          const throughout = allServices.some(sv => String(sv.description ?? '').includes('[pricing-grid:throughout_guide]'))
+          setConfig(prev => ({ ...prev, withGuide: hasGuide || throughout, guideMode: throughout ? 'throughout' : 'spot' }))
+        }
         // A saved line with no price (rate_eur defaults to 0) takes the rate
         // list's; priced lines keep the price they were saved at.
         setDays(rates ? hydrateDayRates(loadedDays, rates, 'missing').days : loadedDays)
@@ -763,29 +989,28 @@ function PricingGridContent() {
       const res = await fetch('/api/pricing-grid/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          config,
-          days,
-          totals,
-          // Synthetic group rows carrying the throughout guide's money onto
-          // the saved itinerary (B-item 3); the reload parser skips them.
-          throughout_extras: config.guideMode === 'throughout' ? throughoutGuide.extras : [],
-        })
+        // The picks only: the save prices them from the rates as they are now
+        // and works out the totals and the throughout guide itself.
+        body: JSON.stringify({ config, days })
       })
 
       const data = await res.json()
 
       if (data.success) {
-        // An office address offered as the client's was dropped by the save.
-        const warned = Array.isArray(data.warnings) && data.warnings.length > 0
-        if (warned) for (const w of data.warnings as string[]) showToast('error', w)
+        // What the save changed: an office address offered as the client's
+        // was dropped; a rate changed since it was picked was saved at
+        // today's figure; a line with no current rate kept its price.
+        if (Array.isArray(data.warnings)) for (const w of data.warnings as string[]) showToast('error', w)
         setConfig(prev => ({
           ...prev,
           itineraryId: data.itineraryId,
           itineraryCode: data.itineraryCode,
           clientId: data.clientId ?? prev.clientId,
-          ...(warned ? { clientEmail: '' } : {}),
+          ...(data.clientEmailDropped ? { clientEmail: '' } : {}),
         }))
+        // The trip was saved at today's rates: show them, so the grid's total
+        // is the one stored.
+        if (data.repricedLines > 0) fetchRates(config.tier, config.startDate, 'all')
         if (typeof data.sellingTotal === 'number') setSavedSellingTotal(data.sellingTotal)
 
         // For B2B: create quote + template, then redirect to /tours/manage
@@ -803,12 +1028,9 @@ function PricingGridContent() {
                 language: 'English',
                 // Stored via B1's columns, non-default only.
                 guide_mode: config.guideMode === 'throughout' ? 'throughout' : undefined,
-                // The partner price list: the grid's cost at each group size
-                // (b2b-rate-sheet.ts); the route applies the quote's margin.
-                rate_sheet_costs: gridSheetCosts(
-                  days, config, buildTransportTierIndex(rates?.route ?? []),
-                  { groupExtraEur: throughoutGuide.totalEur },
-                ),
+                // The partner price list (b2b-rate-sheet.ts) is worked out by
+                // the route from these picks, priced from today's rates.
+                grid: { days, config },
               })
             })
             const quoteData = await quoteRes.json()
@@ -843,10 +1065,12 @@ function PricingGridContent() {
             const templateData = await templateRes.json()
 
             if (templateData.success && templateData.data?.variation_id) {
-              setSaveMessage(`Saved as ${data.itineraryCode} + B2B Quote ${quoteNum || ''} — Redirecting to B2B Calculator...`)
+              const verb = quoteData.data?.action === 'updated' ? 'B2B Quote updated' : 'B2B Quote'
+              setSaveMessage(`Saved as ${data.itineraryCode} + ${verb} ${quoteNum || ''} — Redirecting to B2B Calculator...`)
               // Redirect to B2B calculator which has full Plus 0/Plus 1 pricing table
               setTimeout(() => {
-                router.push(`/b2b/calculator/${templateData.data.variation_id}`)
+                // On the quote just saved: the calculator's Save reprices it.
+                router.push(`/b2b/calculator/${templateData.data.variation_id}${quoteId ? `?quote=${quoteId}` : ''}`)
               }, 1000)
             } else {
               setSaveMessage(`Saved as ${data.itineraryCode} + B2B Quote ${quoteNum || ''} (template creation: ${templateData.error || 'failed'})`)
@@ -908,7 +1132,7 @@ function PricingGridContent() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-8 bg-gray-50 min-h-screen">
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-3 pb-2 bg-gray-50">
-        <GridHeader config={config} onChange={setConfig} totals={totals} />
+        <GridHeader config={config} onChange={changeConfig} totals={totals} guideLanguages={guideLanguageList} />
       </div>
 
       {/* Client Info */}
@@ -917,12 +1141,14 @@ function PricingGridContent() {
       {/* Input Panel */}
       <InputPanel
         onParseDays={handleParseDays}
+        formatTemplate={rates ? formatTemplate : undefined}
+        namesList={rates ? () => namesList(rates) : undefined}
         onAddDay={addDay}
         blocks={rates ? blocks : []}
         onAddDayFromBlock={addDayFromBlock}
         onLoadItinerary={handleLoadItinerary}
         packageType={config.packageType ?? 'full-package'}
-        onPackageTypeChange={(p) => setConfig(prev => ({ ...prev, packageType: p }))}
+        onPackageTypeChange={changePackageType}
         onClearAll={handleClearAll}
         isParsing={isParsing}
         hasDays={days.length > 0}
@@ -983,6 +1209,15 @@ function PricingGridContent() {
               )}
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => writeDescriptions('fill')}
+                disabled={writing !== null}
+                title="Write the days that have no description, from your Content Library and Writing Rules"
+                className="px-2.5 py-1 text-[11px] font-medium text-[#556B2F] hover:bg-[#556B2F]/10 rounded-md transition-colors disabled:opacity-50"
+              >
+                {writing === 'all' ? 'Writing…' : 'Write descriptions'}
+              </button>
+              <span className="text-gray-300">|</span>
               <button onClick={expandAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
                 Expand All
               </button>
@@ -992,6 +1227,73 @@ function PricingGridContent() {
               </button>
             </div>
           </div>
+
+          {offerWrite && (
+            <div className="mb-2 flex items-center justify-between gap-3 px-3 py-2 text-xs bg-[#556B2F]/5 border border-[#556B2F]/20 rounded-lg">
+              <span className="text-gray-700">
+                The days have the parser&apos;s brief descriptions. Write them from your Content Library, in your house style?
+              </span>
+              <span className="flex items-center gap-2 shrink-0">
+                <button type="button" onClick={() => writeDescriptions('rewrite', days.map(d => d.dayNumber))}
+                  className="px-2.5 py-1 font-medium text-white bg-[#556B2F] rounded-md hover:bg-[#465a26]">
+                  Write descriptions
+                </button>
+                <button type="button" onClick={() => setOfferWrite(false)} className="text-gray-500 hover:underline">Not now</button>
+              </span>
+            </div>
+          )}
+          {parseNotes.length > 0 && (
+            <div role="status" className="mb-2 px-3 py-2 text-xs bg-amber-50 border border-amber-200 rounded-lg text-amber-900">
+              <p className="font-medium mb-1">Check before pricing</p>
+              <ul className="space-y-0.5 list-disc pl-4">
+                {parseNotes.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
+            </div>
+          )}
+          {showReadback && readback.length > 0 && (
+            <details open className="mb-2 px-3 py-2 text-xs bg-white border border-gray-200 rounded-lg text-gray-800">
+              <summary className="cursor-pointer font-medium select-none">
+                What I understood — check each day before pricing
+              </summary>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {readback.map(d => (
+                  <div key={d.title}>
+                    <p className="font-semibold text-gray-900">{d.title}</p>
+                    <ul className="text-gray-700">
+                      {d.lines.map((l, i) => <li key={i}>{l}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-3">
+                <button
+                  type="button"
+                  className="font-medium text-[#556B2F] hover:underline"
+                  onClick={() => {
+                    const pkg = PACKAGE_TYPE_CONFIGS.find(c => c.slug === config.packageType)
+                    void navigator.clipboard?.writeText(readbackText(days, { packageName: pkg?.name, tier: config.tier, pax: config.pax, startDate: config.startDate }))
+                      .then(() => showToast('success', 'Copied'), () => showToast('error', 'Could not copy'))
+                  }}
+                >
+                  Copy as text
+                </button>
+                <button type="button" onClick={() => setShowReadback(false)} className="text-gray-500 hover:underline">Hide</button>
+              </div>
+            </details>
+          )}
+          {libraryMissing.length > 0 && (
+            <details className="mb-2 px-3 py-2 text-xs bg-amber-50 border border-amber-200 rounded-lg">
+              <summary className="cursor-pointer text-amber-900 font-medium">
+                {libraryMissing.length} item{libraryMissing.length === 1 ? '' : 's'} not in your Content Library — the text for {libraryMissing.length === 1 ? 'it' : 'them'} is general
+              </summary>
+              <ul className="mt-1.5 space-y-0.5 text-amber-800">
+                {libraryMissing.map((m, i) => (
+                  <li key={`${m.dayNumber}-${m.kind}-${i}`}>Day {m.dayNumber}: {m.name} <span className="text-amber-600">({m.kind})</span></li>
+                ))}
+              </ul>
+              <Link href="/content-library" className="inline-block mt-1.5 text-amber-900 underline">Add them in the Content Library</Link>
+            </details>
+          )}
 
           {/* Day bar: every day at a glance, one click to jump to it */}
           <div className="sticky top-0 z-20 -mx-1 mb-2 px-1 py-1.5 bg-gray-50/95 backdrop-blur border-b border-gray-200">
@@ -1039,9 +1341,30 @@ function PricingGridContent() {
                 onApplyBlock={(block) => applyBlockToDay(day.id, block)}
                 blockNote={blockNotes[day.id]}
                 onDismissBlockNote={() => setBlockNotes(prev => { const next = { ...prev }; delete next[day.id]; return next })}
+                onSaveAsBlock={canWriteBlocks ? () => setSavingBlockDayId(day.id) : undefined}
+                onRewriteDescription={() => rewriteDay(day)}
+                rewriting={writing === day.dayNumber || writing === 'all'}
+                writtenFrom={writtenFrom[day.dayNumber]}
               />
             ))}
           </div>
+
+          {/* Save a day to the catalog as a new block */}
+          {(() => {
+            const idx = savingBlockDayId ? days.findIndex(d => d.id === savingBlockDayId) : -1
+            if (idx < 0) return null
+            const target = days[idx]
+            return (
+              <SaveAsBlockDialog
+                key={target.id}
+                day={target}
+                nextDay={days[idx + 1] ?? null}
+                takenCodes={blocks.map(b => b.code)}
+                onClose={() => setSavingBlockDayId(null)}
+                onSaved={(block) => blockSaved(target.id, block)}
+              />
+            )
+          })()}
 
           {/* Grand Summary + Save */}
           <GridSummary

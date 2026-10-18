@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { extrasAdmin } from '@/lib/booking-extras-db'
 import { extrasTotal, isPriced, lineAmount, type BookingExtraLine } from '@/lib/booking-extras'
+import { roleDenied } from '@/lib/api-role-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,8 @@ const KINDS = new Set(['addon', 'upgrade'])
 export async function POST(request: NextRequest, { params }: Ctx) {
   const auth = await requireAuth()
   if (auth.error !== null) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const denied = roleDenied(auth.role, 'staff')
+  if (denied) return denied
   const tenantId = auth.tenant_id
   const { id } = await params
   const admin = extrasAdmin()

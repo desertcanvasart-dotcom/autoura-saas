@@ -1,10 +1,22 @@
+import { sendGuard } from '@/lib/send-guard'
+import { gateRole } from '@/lib/api-role-gate'
+import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
-import { getCurrencySymbol } from '@/lib/currency'
+import { formatDateOnly } from '@/lib/date-utils'
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
@@ -23,41 +35,112 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { paymentId } = await request.json()
+    const { paymentId, invoicePaymentId } = await request.json()
 
-    if (!paymentId) {
+    if (!paymentId && !invoicePaymentId) {
       return NextResponse.json({ success: false, error: 'Payment ID required' }, { status: 400 })
     }
 
-    // Get payment details with itinerary
-    const { data: payment, error: paymentError } = await supabase
-      .from('payments')
-      .select(`
-        *,
-        itineraries (
-          id,
-          itinerary_code,
-          client_name,
-          client_phone,
-          client_email
-        )
-      `)
-      .eq('id', paymentId)
-      .single()
-
-    if (paymentError || !payment) {
-      return NextResponse.json({ success: false, error: 'Payment not found' }, { status: 404 })
+    // What the receipt says, from either kind of payment. A payment recorded
+    // against an invoice is a receipt too: the receipts page sent those the
+    // INVOICE ("Balance Due …"), and flipped a draft invoice to 'sent'.
+    let receipt: {
+      clientName: string | null
+      clientPhone: string | null
+      receiptNumber: string
+      amount: unknown
+      currency: unknown
+      paymentDate: string
+      paymentMethod: string | null
+      referenceLabel: string
+      reference: string
     }
 
-    const clientPhone = payment.itineraries?.client_phone
+    if (invoicePaymentId) {
+      const { data: ip, error: ipError } = await supabase
+        .from('invoice_payments')
+        .select('id, amount, currency, payment_method, payment_date, transaction_reference, invoices (invoice_number, client_name, client_id, itinerary_id)')
+        .eq('id', invoicePaymentId)
+        .single()
+
+      if (ipError || !ip) {
+        return NextResponse.json({ success: false, error: 'Payment not found' }, { status: 404 })
+      }
+      const inv = (ip as unknown as { invoices: { invoice_number: string; client_name: string; client_id: string | null; itinerary_id: string | null } | null }).invoices
+
+      // The same phone the invoice send uses: the client's, else the trip's.
+      let phone: string | null = null
+      if (inv?.client_id) {
+        const { data: client } = await supabase.from('clients').select('phone').eq('id', inv.client_id).single()
+        phone = client?.phone ?? null
+      }
+      if (!phone && inv?.itinerary_id) {
+        const { data: itin } = await supabase.from('itineraries').select('client_phone').eq('id', inv.itinerary_id).single()
+        phone = itin?.client_phone ?? null
+      }
+
+      receipt = {
+        clientName: inv?.client_name ?? null,
+        clientPhone: phone,
+        receiptNumber: receiptNumberFor(ip),
+        amount: ip.amount,
+        currency: ip.currency,
+        paymentDate: ip.payment_date,
+        paymentMethod: ip.payment_method,
+        referenceLabel: 'Invoice',
+        reference: inv?.invoice_number || 'N/A',
+      }
+    } else {
+      // Get payment details with itinerary
+      const { data: payment, error: paymentError } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          itineraries (
+            id,
+            itinerary_code,
+            client_name,
+            client_phone,
+            client_email
+          )
+        `)
+        .eq('id', paymentId)
+        .single()
+
+      if (paymentError || !payment) {
+        return NextResponse.json({ success: false, error: 'Payment not found' }, { status: 404 })
+      }
+
+      // A receipt says the money arrived; never send one for a pending,
+      // failed or refunded payment.
+      if (payment.status !== 'completed') {
+        return NextResponse.json(
+          { success: false, error: `This payment is ${payment.status ?? 'not completed'}; a receipt is only sent once it is completed.` },
+          { status: 409 }
+        )
+      }
+
+      receipt = {
+        clientName: payment.itineraries?.client_name ?? null,
+        clientPhone: payment.itineraries?.client_phone ?? null,
+        receiptNumber: receiptNumberFor(payment),
+        amount: payment.amount,
+        currency: payment.currency,
+        paymentDate: payment.payment_date,
+        paymentMethod: payment.payment_method,
+        referenceLabel: 'Itinerary',
+        reference: payment.itineraries?.itinerary_code || 'N/A',
+      }
+    }
+
+    const clientPhone = receipt.clientPhone
     if (!clientPhone) {
       return NextResponse.json({ success: false, error: 'Client phone not found' }, { status: 400 })
     }
 
-    const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
-    const currencySymbol = getCurrencySymbol(payment.currency)
-    const amount = `${currencySymbol}${Number(payment.amount).toFixed(2)}`
-    const paymentDate = new Date(payment.payment_date).toLocaleDateString('en-GB', {
+    const receiptNumber = receipt.receiptNumber
+    const amount = formatMoney(receipt.amount, receipt.currency)
+    const paymentDate = formatDateOnly(receipt.paymentDate, 'en-GB', {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
@@ -70,23 +153,28 @@ export async function POST(request: NextRequest) {
 
     // Build message
     const message = `🧾 *PAYMENT RECEIPT*\n\n` +
-      `Dear ${payment.itineraries?.client_name || 'Valued Customer'},\n\n` +
+      `Dear ${receipt.clientName || 'Valued Customer'},\n\n` +
       `Thank you for your payment! Here are the details:\n\n` +
       `📋 *Receipt Number:* ${receiptNumber}\n` +
       `📅 *Date:* ${paymentDate}\n` +
-      `💳 *Payment Method:* ${payment.payment_method?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}\n` +
+      (receipt.paymentMethod
+        ? `💳 *Payment Method:* ${String(receipt.paymentMethod).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}\n`
+        : '') +
       `💰 *Amount:* ${amount}\n` +
-      `🎫 *Itinerary:* ${payment.itineraries?.itinerary_code || 'N/A'}\n\n` +
+      `🎫 *${receipt.referenceLabel}:* ${receipt.reference}\n\n` +
       `This receipt confirms your payment has been received and processed.\n\n` +
-      `For any questions, please contact us:\n` +
-      `📧 ${businessEmail}\n` +
-      (businessWebsite ? `🌐 ${businessWebsite}\n\n` : '') +
-      `Best regards,\n*${businessName} Team*`
+      (businessEmail || businessWebsite ? `For any questions, please contact us:\n` : '') +
+      (businessEmail ? `📧 ${businessEmail}\n` : '') +
+      (businessWebsite ? `🌐 ${businessWebsite}\n` : '') +
+      (businessEmail || businessWebsite ? '\n' : '') +
+      (businessName ? `Best regards,\n*${businessName} Team*` : 'Best regards')
 
 
 
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: clientPhone,
       body: message
     })

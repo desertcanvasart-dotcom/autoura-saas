@@ -31,10 +31,10 @@ describe('the confirmation message', () => {
       { label: 'Trip', value: 'Cairo, Alexandria & Siwa Oasis Desert Adventure' },
       { label: 'Dates', value: '1 November 2026 – 11 November 2026' },
       { label: 'Travellers', value: '4' },
-      { label: 'Total', value: 'USD 579.44' },
-      { label: 'Paid', value: 'USD 0.00' },
-      { label: 'Balance due', value: 'USD 579.44' },
-      { label: 'Deposit due now', value: 'USD 173.83' },
+      { label: 'Total', value: '$579.44' },
+      { label: 'Paid', value: '$0.00' },
+      { label: 'Balance due', value: '$579.44' },
+      { label: 'Deposit due now', value: '$173.83' },
       { label: 'Payment due by', value: '1 October 2026' },
     ])
   })

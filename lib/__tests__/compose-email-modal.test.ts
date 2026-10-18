@@ -10,7 +10,7 @@ describe('the compose dialog speaks the send route\'s language', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/gmail/send/route.ts'), 'utf8')
 
   it('the route reads userId, to, subject and body', () => {
-    expect(route).toMatch(/userId, to, subject, body/)
+    expect(route).toMatch(/userId, to, cc, bcc, subject, body/)
     expect(route).toContain('if (!userId || !to || !subject || !body)')
   })
 

@@ -2,6 +2,8 @@ import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 import { formatSailingDaysCell, parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
+import { dateShapeIsReal } from '@/lib/rates/calendar-date'
+import { formatTiersCell, parseTiersCell } from '@/lib/rates/activity-tiers'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -16,6 +18,10 @@ export interface RateTableConfig {
   displayName: string
   columns: ColumnDef[]
   uniqueKey: string[]       // columns used for upsert matching
+  /** What identifies a rate whose row has no code: a row with a blank
+   *  uniqueKey is matched on these instead of always being added — a
+   *  hand-filled sheet imported twice doubled every rate. */
+  identityKey?: string[]
 }
 
 export interface ColumnDef {
@@ -100,6 +106,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'accommodation_rates',
     displayName: 'Hotels / Accommodation',
     uniqueKey: ['service_code'],
+    identityKey: ['property_name', 'city', 'tier', 'board_basis'],
     columns: [
       id(), serviceCode(),
       col('property_name', 'Property Name', 'text', true),
@@ -207,6 +214,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'guide_rates',
     displayName: 'Guide Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['guide_language', 'guide_type', 'guide_mode', 'city', 'tour_duration'],
     columns: [
       id(), serviceCode(),
       col('guide_language', 'Language', 'text', true),
@@ -227,6 +235,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'meal_rates',
     displayName: 'Meal Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['restaurant_name', 'meal_type', 'city', 'tier'],
     columns: [
       id(), serviceCode(),
       col('restaurant_name', 'Restaurant Name', 'text', true),
@@ -240,6 +249,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('meal_category', 'Meal Category', 'text', false),
       col('per_person_rate', 'Per Person', 'boolean', false),
       col('minimum_pax', 'Min Pax', 'number', false),
+      // The dietary options the restaurant caters for, semicolon-separated.
+      col('dietary_options', 'Dietary Options', 'text', false),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(),
       col('supplier_name', 'Supplier Name', 'text', false),
@@ -254,6 +265,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'entrance_fees',
     displayName: 'Attractions / Entrance Fees',
     uniqueKey: ['service_code'],
+    identityKey: ['attraction_name', 'city'],
     columns: [
       id(), serviceCode(),
       col('attraction_name', 'Attraction Name', 'text', true),
@@ -266,6 +278,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('category', 'Category', 'text', false),
       col('is_addon', 'Is Add-on', 'boolean', false),
       col('addon_note', 'Add-on Note', 'text', false),
+      // Travellers may add it after booking (the page's "Sell as extra").
+      col('is_sellable_extra', 'Sell as Extra', 'boolean', false),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(), notes(), isActive(), createdAt(), updatedAt(),
       rateCurrency(),
@@ -276,6 +290,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'flight_rates',
     displayName: 'Flight Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['route_from', 'route_to', 'airline', 'cabin_class', 'flight_number'],
     columns: [
       id(), serviceCode(),
       col('route_from', 'From', 'text', true),
@@ -311,6 +326,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'activity_rates',
     displayName: 'Activity Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['activity_name', 'city'],
     columns: [
       id(), serviceCode(),
       col('activity_name', 'Activity Name', 'text', true),
@@ -324,6 +340,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('unit_label', 'Unit Label', 'text', false),
       col('min_capacity', 'Min Capacity', 'number', false),
       col('max_capacity', 'Max Capacity', 'number', false),
+      // Group-size bands for a tiered activity: "1-4:25; 5-8:40".
+      col('tiers', 'Tiers', 'text', false),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(),
       col('supplier_name', 'Supplier Name', 'text', false),
@@ -336,6 +354,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'tipping_rates',
     displayName: 'Tipping Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['role_type', 'context', 'city', 'rate_unit'],
     columns: [
       id(), serviceCode(),
       col('role_type', 'Role Type', 'text', true),
@@ -353,6 +372,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'airport_staff_rates',
     displayName: 'Airport Service Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['airport_code', 'service_type', 'direction'],
     columns: [
       id(), serviceCode(),
       col('airport_code', 'Airport Code', 'text', true),
@@ -376,6 +396,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'hotel_staff_rates',
     displayName: 'Hotel Service Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['service_type', 'hotel_category'],
     columns: [
       id(), serviceCode(),
       col('service_type', 'Service Type', 'text', true),
@@ -395,6 +416,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'nile_cruises',
     displayName: 'Nile Cruises',
     uniqueKey: ['cruise_code'],
+    identityKey: ['ship_name', 'cabin_type', 'duration_nights'],
     columns: [
       id(),
       col('cruise_code', 'Cruise Code', 'text', true),
@@ -471,6 +493,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'train_rates',
     displayName: 'Train Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['origin_city', 'destination_city', 'class_type'],
     columns: [
       id(), serviceCode(),
       col('origin_city', 'Origin City', 'text', true),
@@ -493,6 +516,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     tableName: 'sleeping_train_rates',
     displayName: 'Sleeping Train Rates',
     uniqueKey: ['service_code'],
+    identityKey: ['origin_city', 'destination_city', 'cabin_type'],
     columns: [
       id(), serviceCode(),
       col('origin_city', 'Origin City', 'text', true),
@@ -623,6 +647,21 @@ for (const [table, link] of Object.entries(RATE_PROPERTY_LINK)) {
 // VALIDATION
 // ============================================
 
+/** A yes/no cell, as the validator AND the writer read it — one rule, so a
+ *  "Y" the preview accepted is not then stored as false. null = not yes/no. */
+export function parseCsvBoolean(raw: string): boolean | null {
+  const lower = raw.trim().toLowerCase()
+  if (['true', '1', 'yes', 'y'].includes(lower)) return true
+  if (['false', '0', 'no', 'n'].includes(lower)) return false
+  return null
+}
+
+/** A cell that means "nothing": blank, or the word null in any case. */
+export function isBlankCsvCell(raw: string): boolean {
+  const v = raw.trim()
+  return v === '' || v.toLowerCase() === 'null'
+}
+
 /**
  * Parse a cell value based on the column type.
  */
@@ -630,7 +669,7 @@ function parseCell(value: string | undefined | null, colDef: ColumnDef): { parse
   const raw = (value ?? '').trim()
 
   // Empty value
-  if (raw === '' || raw === 'null' || raw === 'NULL') {
+  if (isBlankCsvCell(raw)) {
     if (colDef.required) {
       return { parsed: null, error: `${colDef.label} is required` }
     }
@@ -641,20 +680,21 @@ function parseCell(value: string | undefined | null, colDef: ColumnDef): { parse
     case 'number': {
       const num = Number(raw)
       if (isNaN(num)) {
-        return { parsed: null, error: `${colDef.label} must be a number` }
+        return { parsed: null, error: `${colDef.label} "${raw}" must be a number` }
       }
       return { parsed: num, error: null }
     }
     case 'boolean': {
-      const lower = raw.toLowerCase()
-      if (['true', '1', 'yes', 'y'].includes(lower)) return { parsed: true, error: null }
-      if (['false', '0', 'no', 'n'].includes(lower)) return { parsed: false, error: null }
-      return { parsed: null, error: `${colDef.label} must be true/false` }
+      const parsed = parseCsvBoolean(raw)
+      if (parsed !== null) return { parsed, error: null }
+      return { parsed: null, error: `${colDef.label} "${raw}" must be true or false` }
     }
     case 'date': {
-      // Accept ISO dates or common formats
-      if (/^\d{4}-\d{2}-\d{2}/.test(raw) || /^\d{2}\/\d{2}\/\d{4}/.test(raw)) {
-        return { parsed: raw, error: null }
+      // Accept ISO dates or common formats — but only real days: the shape
+      // check let 30 February through, to fail the insert batch or roll over
+      // to 2 March (documents audit, round 12).
+      if (!dateShapeIsReal(raw)) {
+        return { parsed: null, error: `${colDef.label} "${raw}" is not a real date (use YYYY-MM-DD)` }
       }
       return { parsed: raw, error: null } // Be lenient with date formats
     }
@@ -701,6 +741,17 @@ export function validateImportData(
         errors.push({ row: rowNum, column: colDef.name, message: error })
         rowValid = false
       } else if (parsed !== null) {
+        // Activity bands: "1-4:25; 5-8:40".
+        if (colDef.name === 'tiers' && config.tableName === 'activity_rates') {
+          const res = parseTiersCell(String(parsed))
+          if ('error' in res) {
+            errors.push({ row: rowNum, column: colDef.name, message: res.error })
+            rowValid = false
+          } else {
+            parsedRow[colDef.name] = res.tiers
+          }
+          continue
+        }
         // Sailing days: weekday words only ("mon;fri", "any").
         if (colDef.name === 'sailing_days') {
           const { days, bad } = parseSailingDaysCell(parsed)
@@ -880,6 +931,8 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 /** Export cell: the named column, else its alias partner. */
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
   if (column === 'sailing_days') return formatSailingDaysCell(row.sailing_days)
+  if (column === 'tiers' && table === 'activity_rates') return formatTiersCell(row.tiers)
+  if (column === 'dietary_options') return Array.isArray(row.dietary_options) ? row.dietary_options.join('; ') : (row.dietary_options ?? '')
   const direct = row[column]
   if (direct !== null && direct !== undefined && direct !== 0) return direct
   if (table === 'nile_cruises') {
@@ -1034,6 +1087,8 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'board_basis') return 'bb'
   if (name === 'tier') return 'standard'
   if (name === 'sailing_days') return 'mon;fri'
+  if (name === 'tiers') return ''
+  if (name === 'dietary_options') return 'vegetarian; vegan'
   if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'
@@ -1111,6 +1166,15 @@ export function importRowKey(
   }
   // NUL separator: a space would let ('a b','c') collide with ('a','b c').
   return parts.join('\u0000')
+}
+
+/** A keyless row's identity (config.identityKey) as a comparable string, or
+ *  null when its first column — the rate's name — is blank. Other blank parts
+ *  compare as empty: a hotel with no board basis is still that hotel. */
+export function importIdentityKey(record: Record<string, unknown>, identityKey: string[]): string | null {
+  const first = String(record[identityKey[0]] ?? '').trim()
+  if (!first) return null
+  return identityKey.map(c => String(record[c] ?? '').trim().toLowerCase()).join('\u0000')
 }
 
 export interface ImportRowPartition<T> {

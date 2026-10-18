@@ -3,6 +3,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/supabase-server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -73,11 +74,15 @@ export async function GET() {
 // POST - Create new writing rule
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // The company the person is signed into (requireAuth). The row needs it:
+    // it came from user_profiles.tenant_id, which is not the company a
+    // person in several companies is working in.
+    const auth = await requireAuth()
+    if (auth.error !== null) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const { supabase, tenant_id, user } = auth
+    if (!supabase || !tenant_id || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -101,17 +106,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get tenant_id from user's profile
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
     const { data, error } = await supabase
       .from('writing_rules')
       .insert({
-        tenant_id: profile?.tenant_id,
+        tenant_id,
         name,
         category: category || 'general',
         rule_type: rule_type || 'enforce',

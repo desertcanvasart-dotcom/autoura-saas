@@ -17,6 +17,7 @@
 // sheet without a city and tier would be an unpriceable ghost, so an
 // unknown code/name is a refusal naming the fix.
 
+import { isRealIsoDate } from '@/lib/rates/calendar-date'
 import { MAX_RATE_PERIODS, sanitizeSeasons, legacyColumnMirror, type RateSeason, type RateSeasonEntity } from '@/lib/rates/rate-seasons'
 
 const RATE_FIELD_HEADERS: Record<string, string> = {
@@ -82,7 +83,8 @@ export interface PeriodsCsvParse {
   totalRows: number
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+// Shape AND calendar: the regex alone passed 2026-02-30 (documents audit,
+// round 12) — isRealIsoDate checks the day exists.
 
 export function parsePeriodsCsv(rows: Array<Record<string, string>>): PeriodsCsvParse {
   const errors: PeriodsCsvParse['errors'] = []
@@ -110,7 +112,7 @@ export function parsePeriodsCsv(rows: Array<Record<string, string>>): PeriodsCsv
     const saysNothing = !from && !to && !rec.name && !rec.season &&
       Object.keys(RATE_FIELD_HEADERS).every(h => !rec[RATE_FIELD_HEADERS[h]])
     if (saysNothing) return
-    if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) {
+    if (!isRealIsoDate(from) || !isRealIsoDate(to)) {
       errors.push({ row: rowNum, column: 'from', message: `"${name || code}": From/To must be real dates (YYYY-MM-DD) — got "${from}" → "${to}"` })
       return
     }

@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // GET /api/partners?type=hotel|guide|restaurant|airport_staff&search=xxx
+interface SupplierGuideRow {
+  id: string
+  name: string | null
+  contact_name: string | null
+  phone: string | null
+  contact_phone: string | null
+  whatsapp: string | null
+  email: string | null
+  contact_email: string | null
+  city: string | null
+  languages: string[] | null
+  address: string | null
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
@@ -55,34 +69,63 @@ export async function GET(request: NextRequest) {
           }))
           break
 
-        case 'guide':
-          const { data: guides } = await (adminClient as any)
-            .from('guides')
-            .select('id, name, phone, email, languages, specialties, daily_rate, hourly_rate')
-            .eq('tenant_id', tenant_id)
-            .eq('is_active', true)
-            .order('name', { ascending: true })
-            .limit(limit)
-          
-          data = (guides || []).map((g: any) => ({
-            id: g.id,
-            type: 'guide',
-            name: g.name,
-            subtype: 'Tour Guide',
-            city: null,
-            contact_person: g.name,
-            phone: g.phone,
-            email: g.email,
-            whatsapp: g.phone,
-            address: null,
-            extra: { 
-              languages: g.languages, 
-              specialties: g.specialties,
-              daily_rate: g.daily_rate,
-              hourly_rate: g.hourly_rate
-            }
-          }))
+        case 'guide': {
+          // Guides are suppliers (supplier_type 'guide'), as /api/guides lists
+          // them; the standalone guides table is legacy and empty for most
+          // agencies, so this offered no guides at all. Both, suppliers first.
+          const guideDb = adminClient as any
+          const [{ data: supplierGuides }, { data: legacyGuides }] = await Promise.all([
+            guideDb
+              .from('suppliers')
+              .select('id, name, contact_name, phone, contact_phone, whatsapp, email, contact_email, city, languages, address')
+              .eq('tenant_id', tenant_id)
+              .eq('supplier_type', 'guide')
+              .eq('status', 'active')
+              .order('name', { ascending: true })
+              .limit(limit),
+            guideDb
+              .from('guides')
+              .select('id, name, phone, email, languages, specialties, daily_rate, hourly_rate')
+              .eq('tenant_id', tenant_id)
+              .eq('is_active', true)
+              .order('name', { ascending: true })
+              .limit(limit),
+          ])
+          data = [
+            ...((supplierGuides || []) as SupplierGuideRow[]).map(g => ({
+              id: g.id,
+              type: 'guide',
+              name: g.name,
+              subtype: 'Tour Guide',
+              city: g.city ?? null,
+              contact_person: g.contact_name || g.name,
+              phone: g.phone || g.contact_phone,
+              email: g.email || g.contact_email,
+              whatsapp: g.whatsapp || g.phone || g.contact_phone,
+              address: g.address ?? null,
+              extra: { languages: g.languages },
+            })),
+            ...(legacyGuides || []).map((g: any) => ({
+              id: g.id,
+              type: 'guide',
+              name: g.name,
+              subtype: 'Tour Guide',
+              city: null,
+              contact_person: g.name,
+              phone: g.phone,
+              email: g.email,
+              whatsapp: g.phone,
+              address: null,
+              extra: {
+                languages: g.languages,
+                specialties: g.specialties,
+                daily_rate: g.daily_rate,
+                hourly_rate: g.hourly_rate
+              }
+            })),
+          ].slice(0, limit)
           break
+        }
 
         case 'restaurant':
           const { data: restaurants } = await (adminClient as any)

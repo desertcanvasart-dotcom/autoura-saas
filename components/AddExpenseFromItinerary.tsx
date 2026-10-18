@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { Plus, X, Receipt } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import ExpenseSupplierPicker from '@/components/expenses/ExpenseSupplierPicker'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { todayLocal } from '@/lib/today'
 import { TRIP_EXPENSE_CATEGORIES } from '@/lib/expense-categories'
 
 interface AddExpenseFromItineraryProps {
@@ -53,12 +56,15 @@ export default function AddExpenseFromItinerary({
   }, [openSignal])
   const [saving, setSaving] = useState(false)
   const [city, setCity] = useState('')
+  // The agency's currency and today's local date (it was EUR, and the UTC day).
+  const { tenant } = useTenant()
+  const agencyCurrency = tenant?.default_currency || 'EUR'
   const [formData, setFormData] = useState<FormData>({
     category: '',
     description: '',
     amount: 0,
-    currency: 'EUR',
-    expense_date: new Date().toISOString().split('T')[0],
+    currency: agencyCurrency,
+    expense_date: todayLocal(),
     supplier_id: null,
     supplier_name: '',
     supplier_type: '',
@@ -73,8 +79,8 @@ export default function AddExpenseFromItinerary({
       category: '',
       description: '',
       amount: 0,
-      currency: 'EUR',
-      expense_date: new Date().toISOString().split('T')[0],
+      currency: agencyCurrency,
+      expense_date: todayLocal(),
       supplier_id: null,
       supplier_name: '',
       supplier_type: '',
@@ -175,9 +181,7 @@ export default function AddExpenseFromItinerary({
                       onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
                       className="w-20 px-2 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
                     >
-                      <option value="EUR">€</option>
-                      <option value="USD">$</option>
-                      <option value="EGP">E£</option>
+                      {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <input
                       type="number"

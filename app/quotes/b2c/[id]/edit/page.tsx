@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { priceB2cQuote } from '@/lib/quotes/b2c-quote-price'
+import { VocabSelect } from '@/components/vocabulary'
 import {
   ArrowLeft, Save, Loader2, AlertCircle
 } from 'lucide-react'
@@ -30,7 +32,10 @@ interface B2CQuote {
   } | null
 }
 
-export default function EditB2CQuotePage({ params }: { params: { id: string } }) {
+// params is a Promise in a client page (Next 15+): reading params.id
+// directly gave undefined, and the page asked for quote "undefined".
+export default function EditB2CQuotePage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise)
   const supabase = createClient()
   const router = useRouter()
 
@@ -53,17 +58,24 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
   // Calculated values
   const [sellingPrice, setSellingPrice] = useState(0)
   const [pricePerPerson, setPricePerPerson] = useState(0)
+  // The departure's seasonal premium as saved; the server reprices it from
+  // the trip's start date on save.
+  const [seasonPercent, setSeasonPercent] = useState(0)
+  const [seasonName, setSeasonName] = useState<string | null>(null)
+  const [seasonPremium, setSeasonPremium] = useState(0)
 
   useEffect(() => {
     fetchQuote()
   }, [params.id])
 
   useEffect(() => {
-    // Recalculate selling price and price per person when relevant fields change
-    const calculated = totalCost * (1 + marginPercent / 100)
-    setSellingPrice(calculated)
-    setPricePerPerson(calculated / numTravelers)
-  }, [totalCost, marginPercent, numTravelers])
+    // The server's own calculation (lib/quotes/b2c-quote-price): the preview
+    // shows the price that is saved, in the currency's units.
+    const price = priceB2cQuote({ totalCost, marginPercent, travelers: numTravelers, currency, seasonPercent })
+    setSellingPrice(price.selling_price)
+    setPricePerPerson(price.price_per_person)
+    setSeasonPremium(price.season_premium)
+  }, [totalCost, marginPercent, numTravelers, currency, seasonPercent])
 
   const fetchQuote = async () => {
     try {
@@ -92,6 +104,8 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
       setCurrency(data.currency)
       setTotalCost(data.total_cost)
       setMarginPercent(data.margin_percent)
+      setSeasonPercent(Number(data.season_percent ?? 0))
+      setSeasonName(data.season_name ?? null)
       setStatus(data.status)
       setValidUntil(data.valid_until || '')
       setInternalNotes(data.internal_notes || '')
@@ -238,34 +252,19 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Service Tier
                 </label>
-                <select
-                  value={tier}
-                  onChange={(e) => setTier(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="budget">Budget</option>
-                  <option value="standard">Standard</option>
-                  <option value="deluxe">Deluxe</option>
-                  <option value="luxury">Luxury</option>
-                </select>
+                {/* The agency's own tiers (Settings → Vocabulary), not four fixed names. */}
+                <VocabSelect kind="tier" value={tier} onChange={setTier} placeholder={null}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Currency
                 </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="EUR">EUR (€)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="EGP">EGP (E£)</option>
-                </select>
+                {/* Read-only: changing it relabelled the amounts without converting them
+                    (EUR 2,500 became "USD 2,500"). A quote in another currency is priced again. */}
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">{currency}</div>
+                <p className="mt-1 text-xs text-gray-500">The amounts are in this currency. To quote in another, price the trip again.</p>
               </div>
             </div>
           </div>
@@ -324,6 +323,12 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
                     {currency} {pricePerPerson.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
+                {seasonPremium > 0 && (
+                  <div className="col-span-2 text-xs text-amber-800">
+                    Includes a seasonal premium{seasonName ? ` (${seasonName})` : ''} of {seasonPercent}%:{' '}
+                    {currency} {seasonPremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                )}
               </div>
               <p className="text-xs text-blue-600 mt-3">
                 These values are calculated automatically based on cost and margin

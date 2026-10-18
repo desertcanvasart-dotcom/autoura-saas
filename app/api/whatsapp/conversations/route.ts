@@ -1,6 +1,9 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { markTeamNotificationsRead } from '@/lib/notifications'
+import { conversationPhoneNumber } from '@/lib/whatsapp'
+import { conversationPhoneKeys } from '@/lib/whatsapp-phone'
 
 // GET /api/whatsapp/conversations - List all conversations
 
@@ -91,7 +94,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`phone_number.ilike.%${search}%,client_name.ilike.%${search}%`)
+      query = query.or(`phone_number.ilike.${orIlikeContains(search)},client_name.ilike.${orIlikeContains(search)}`)
     }
 
     const { data, error } = await query.limit(50)
@@ -133,15 +136,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 })
     }
 
-    // Clean phone number
-    const cleanPhone = phone_number.replace(/[^\d+]/g, '')
+    // E.164 with "+", the key the webhook looks the reply up by. Stored
+    // without the "+", the customer's reply opened a second conversation
+    // (documents audit, round 12). The lookup also finds a row stored the
+    // old way, so that one is reused rather than duplicated.
+    const cleanPhone = await conversationPhoneNumber(phone_number, tenant_id)
 
     // Check if conversation exists (including hidden ones - we'll unhide it)
     const { data: existing } = await supabase
       .from('whatsapp_conversations')
       .select('*')
-      .eq('phone_number', cleanPhone)
-      .single()
+      .in('phone_number', conversationPhoneKeys(cleanPhone))
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (existing) {
       const updates: any = {
@@ -261,13 +269,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { conversation_id, action, agent_id, ...updates } = body
+    const { conversation_id, action, agent_id } = body
 
     if (!conversation_id) {
       return NextResponse.json({ error: 'Conversation ID required' }, { status: 400 })
     }
 
-    let updateData: any = { updated_at: new Date().toISOString() }
+    const updateData: any = { updated_at: new Date().toISOString() }
 
     if (action === 'mark_read') {
       updateData.unread_count = 0
@@ -280,7 +288,10 @@ export async function PATCH(request: NextRequest) {
       updateData.hidden_at = null
       updateData.hidden_by = null
     } else {
-      updateData = { ...updateData, ...updates }
+      // Only the actions above. Any other body was written to the row as-is,
+      // so a request could re-point a conversation's phone number, client or
+      // assignee (documents audit, round 12); assigning has its own route.
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     }
 
     const { data, error } = await supabase
@@ -304,7 +315,7 @@ export async function PATCH(request: NextRequest) {
           agent_id,
           team_member_id: agent_id,
           action_type: 'status_changed',
-          action_details: { action, updates }
+          action_details: { action }
         })
     }
 

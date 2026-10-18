@@ -3,6 +3,7 @@ import { getAuthUrl } from '@/lib/gmail'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { signState } from '@/lib/oauth-state'
 import { checkGoogleRedirect } from '@/lib/oauth-config'
+import { currentTenantId, type MembershipDb } from '@/lib/current-membership'
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,11 +53,32 @@ export async function POST(request: NextRequest) {
     // plaintext state — an attacker could initiate their own Google OAuth
     // flow with `state=<victim_user_id>` and have the callback bind their
     // Google tokens to the victim's gmail_tokens row.
-    const authUrl = getAuthUrl(signState(userId))
+    //
+    // The company is signed in too: the mailbox is filed under the company
+    // the person is working in now (migration 415: one per person per
+    // company), not whichever the callback would guess.
+    const { tenantId } = await currentTenantId(authClient as unknown as MembershipDb)
+    if (!tenantId) {
+      return NextResponse.json({ error: 'No active company' }, { status: 403 })
+    }
+    const authUrl = getAuthUrl(signState(`${userId}:${tenantId}`))
 
     return NextResponse.json({ authUrl, redirect_uri: redirectCheck.redirectUri })
   } catch (err: any) {
     console.error('Gmail connect error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
+}
+// DELETE — disconnect this person's mailbox in the current company: the grant
+// is revoked at Google, then the stored tokens are deleted (lib/gmail-revoke).
+// The page used to delete the row from the browser, leaving the grant live.
+export async function DELETE() {
+  const { requireAuth } = await import('@/lib/supabase-server')
+  const auth = await requireAuth()
+  if (auth.error !== null) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (!auth.tenant_id) return NextResponse.json({ error: 'No active company' }, { status: 403 })
+  const { revokeAndForgetMailbox } = await import('@/lib/gmail-revoke')
+  const result = await revokeAndForgetMailbox(auth.user!.id, auth.tenant_id)
+  if (result.error) return NextResponse.json({ error: 'Could not disconnect Gmail' }, { status: 500 })
+  return NextResponse.json({ success: true, revoked: result.revoked })
 }

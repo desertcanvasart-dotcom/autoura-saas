@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Shield, Building2, Users, BarChart3, Waypoints, MessageCircle, LogOut } from 'lucide-react'
+import { Shield, Building2, Users, BarChart3, Waypoints, MessageCircle, LogOut, Newspaper } from 'lucide-react'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/super-admin', icon: BarChart3 },
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { label: 'Support', href: '/super-admin/support', icon: MessageCircle },
   { label: 'Concierge Brands', href: '/super-admin/concierge-brands', icon: Waypoints },
   { label: 'Analytics', href: '/super-admin/analytics', icon: BarChart3 },
+  { label: 'Blog', href: '/super-admin/blog', icon: Newspaper },
 ]
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {

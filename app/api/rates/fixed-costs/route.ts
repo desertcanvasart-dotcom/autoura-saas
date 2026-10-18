@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { clearFixedCostsCache } from '@/lib/fixed-costs'
 
 // GET - List fixed daily costs
@@ -32,6 +33,10 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -63,7 +68,11 @@ export async function PUT(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
-    const { supabase } = authResult
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
+    const { supabase, tenant_id } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json()
@@ -81,10 +90,14 @@ export async function PUT(request: NextRequest) {
       .from('fixed_daily_costs')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', tenant_id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    // The shared default (tenant_id null) matches nothing here: say so, rather
+    // than the 500 .single() gave on zero rows.
+    if (!data) return NextResponse.json({ success: false, error: 'That cost is the shared default — add your own cost of the same type instead.' }, { status: 404 })
     clearFixedCostsCache()
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
@@ -99,18 +112,26 @@ export async function DELETE(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
-    const { supabase } = authResult
+    // Rates and suppliers are the managers' area (the sidebar's Suppliers &
+    // Rates group); RLS checks only the tenant, so the role is checked here.
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
+    const { supabase, tenant_id } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json().catch(() => ({}))
     const id = body?.id
     if (!id || typeof id !== 'string') return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 })
 
-    const { error } = await supabase
+    const { data: removed, error } = await supabase
       .from('fixed_daily_costs')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', tenant_id)
+      .select('id')
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    // Nothing removed (the shared default, or another agency's row) is not a success.
+    if (!removed || removed.length === 0) return NextResponse.json({ success: false, error: 'That cost is not yours to delete.' }, { status: 404 })
     clearFixedCostsCache()
     return NextResponse.json({ success: true })
   } catch (error) {

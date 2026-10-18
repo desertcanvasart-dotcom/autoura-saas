@@ -48,12 +48,18 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    const preferences = data || {
-      default_cost_mode: 'auto',
-      default_tier: 'standard',
-      default_margin_percent: 25,
-      default_currency: 'EUR'
-    }
+    // The company's currency is the default for anyone who has not chosen
+    // their own — EUR was, so a USD or EGP company's first quotes came out in
+    // euros unless every person changed it.
+    const companyCurrency = await companyCurrencyFor(supabase)
+    const preferences = data
+      ? { ...data, default_currency: data.default_currency || companyCurrency }
+      : {
+          default_cost_mode: 'auto',
+          default_tier: 'standard',
+          default_margin_percent: 25,
+          default_currency: companyCurrency,
+        }
 
     return NextResponse.json({
       success: true,
@@ -89,7 +95,7 @@ export async function PUT(request: NextRequest) {
       // `??`, not `|| 25`: a user who chooses a 0% (at-cost) margin had 25
       // written to their profile instead. See lib/pricing/resolve-margin.ts.
       default_margin_percent: body.default_margin_percent ?? DEFAULT_MARGIN_PERCENT,
-      default_currency: body.default_currency || 'EUR',
+      default_currency: body.default_currency || await companyCurrencyFor(supabase),
       updated_at: new Date().toISOString()
     }
 
@@ -117,5 +123,16 @@ export async function PUT(request: NextRequest) {
       { success: false, error: error.message },
       { status: 500 }
     )
+  }
+}
+/** The current company's currency (tenants.default_currency), else EUR. */
+async function companyCurrencyFor(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string> {
+  try {
+    const { data: tenantId } = await supabase.rpc('get_user_tenant_id')
+    if (!tenantId) return 'EUR'
+    const { data } = await supabase.from('tenants').select('default_currency').eq('id', tenantId as string).maybeSingle()
+    return (data as { default_currency?: string | null } | null)?.default_currency || 'EUR'
+  } catch {
+    return 'EUR'
   }
 }

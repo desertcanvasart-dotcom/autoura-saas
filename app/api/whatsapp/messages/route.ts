@@ -1,7 +1,9 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { indexWhatsAppReply } from '@/lib/copilot-indexer'
-import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, conversationPhoneNumber } from '@/lib/whatsapp'
+import { conversationPhoneKeys } from '@/lib/whatsapp-phone'
 
 // GET /api/whatsapp/messages - Get messages for a conversation
 export async function GET(request: NextRequest) {
@@ -52,6 +54,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/whatsapp/messages - Send a new message
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   try {
     // ✅ SECURITY: Require authentication - prevents SMS spam abuse
     const authResult = await requireAuth()
@@ -89,13 +94,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (!conversation_id && phone_number) {
-      // Create conversation if needed
-      const cleanPhone = phone_number.replace(/[^\d+]/g, '')
+      // Create conversation if needed. E.164 with "+", the key the webhook
+      // looks the reply up by — without it the customer's reply opened a
+      // second conversation (documents audit, round 12).
+      const cleanPhone = await conversationPhoneNumber(phone_number, tenant_id)
       const { data: existing } = await supabase
         .from('whatsapp_conversations')
         .select('id')
-        .eq('phone_number', cleanPhone)
-        .single()
+        .in('phone_number', conversationPhoneKeys(cleanPhone))
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (existing) {
         convId = existing.id
@@ -118,6 +127,8 @@ export async function POST(request: NextRequest) {
     const sendResult = await sendWhatsAppMessage({
       to: formattedPhone,
       body: message,
+      // From the company's own number when it has one (lib/whatsapp-tenant).
+      tenantId: tenant_id ?? null,
       statusCallback: `${process.env.NEXT_PUBLIC_APP_URL || "https://autoura.net"}/api/whatsapp/status-callback`
     })
 

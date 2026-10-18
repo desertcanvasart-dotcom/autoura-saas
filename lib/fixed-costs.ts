@@ -5,7 +5,8 @@ import { ttlMemo } from '@/lib/ttl-memo'
 // Lazy-initialized service-role client — the pricing engine reads fixed costs
 // server-side. Lazy init mirrors auto-pricing-service's getSupabaseAdmin()
 // pattern and avoids build-time/import errors when env vars are absent.
-// (reads is_active rows, not tenant-scoped here — same as getTippingRate.)
+// (it reads every tenant's active rows, then keeps the caller's own and the
+// shared ones — see loadFixedDailyCosts.)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
 function getSupabaseAdmin() {
   if (!_supabaseAdmin) {
@@ -51,9 +52,9 @@ const costsMemo = ttlMemo<FixedDailyCosts>(CACHE_TTL)
  * NOTE: Tipping is handled separately via the tipping_rates table —
  * use getTippingRate() from lib/auto-pricing-service.ts for tips.
  */
-export async function getFixedDailyCosts(): Promise<FixedDailyCosts> {
+export async function getFixedDailyCosts(tenantId?: string | null, runCurrency?: string): Promise<FixedDailyCosts> {
   try {
-    return await costsMemo('all', loadFixedDailyCosts)
+    return await costsMemo(`${tenantId ?? '-'}|${runCurrency ?? '-'}`, () => loadFixedDailyCosts(tenantId ?? null, runCurrency))
   } catch (err: any) {
     // The fallback is NOT remembered: a database that was briefly unreachable
     // must not pin every quote to the built-in default for the next five
@@ -63,28 +64,26 @@ export async function getFixedDailyCosts(): Promise<FixedDailyCosts> {
   }
 }
 
-/** Throws rather than falling back, so a failure is never cached. */
-async function loadFixedDailyCosts(): Promise<FixedDailyCosts> {
-  {
-    const { data: rawData, error } = await getSupabaseAdmin()
-      .from('fixed_daily_costs')
-      .select('*')
-      .eq('is_active', true)
-    const data = await normalizeRateRows(getSupabaseAdmin(), 'fixed_daily_costs', rawData)
+/** Throws rather than falling back, so a failure is never cached.
+ *
+ *  THIS company's water row, else the shared one (tenant_id null) — the same
+ *  rule the pricing grid uses (lib/pricing/grid-rates.ts). It read every
+ *  tenant's rows under the service key and took the first "Water Bottle" it
+ *  met, so one agency's price set another's, and the Quote Builder and the
+ *  rate sheet disagreed about water. Converted into the run currency. */
+async function loadFixedDailyCosts(tenantId: string | null, runCurrency?: string): Promise<FixedDailyCosts> {
+  const { data: rawData, error } = await getSupabaseAdmin()
+    .from('fixed_daily_costs')
+    .select('*')
+    .eq('is_active', true)
+  if (error) throw new Error(`fixed_daily_costs query failed: ${error.message}`)
 
-    if (error) throw new Error(`fixed_daily_costs query failed: ${error.message}`)
-
-    const findRate = (type: string) => {
-      const record = ((data as any[]) || []).find((r: any) => r.cost_type === type)
-      return record?.cost_per_person_per_day ?? DEFAULTS[type as keyof typeof DEFAULTS] ?? 0
-    }
-
-    const costs: FixedDailyCosts = {
-      waterPerPersonPerDay: findRate('Water Bottle'),
-    }
-
-    return costs
-  }
+  type CostRow = { tenant_id?: string | null; cost_type?: unknown; cost_per_person_per_day?: number | null } & Record<string, unknown>
+  const visible = ((rawData ?? []) as CostRow[]).filter(r => r.tenant_id == null || (tenantId != null && r.tenant_id === tenantId))
+  const data = await normalizeRateRows(getSupabaseAdmin(), 'fixed_daily_costs', visible, runCurrency, tenantId)
+  const water = data.filter(r => isWaterCostType(r.cost_type))
+  const record = water.find(r => tenantId != null && r.tenant_id === tenantId) ?? water[0]
+  return { waterPerPersonPerDay: record?.cost_per_person_per_day ?? DEFAULTS['Water Bottle'] }
 }
 
 /** Clear the cache (e.g. after updating rates via the admin API) */

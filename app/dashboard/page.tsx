@@ -1,4 +1,5 @@
 'use client'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -7,6 +8,8 @@ import {
   ArrowRight, Layers, Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
+import { useRole } from '@/hooks/useRole'
+import { getCurrencySymbol } from '@/lib/currency'
 import TodayOnTheGround from '@/app/components/TodayOnTheGround'
 import NeedsAttention from './NeedsAttention'
 import ExpiringContracts from './ExpiringContracts'
@@ -30,17 +33,21 @@ import ExpiringContracts from './ExpiringContracts'
 
 interface DashboardData {
   windowDays: number
+  /** The company's today (its timezone), YYYY-MM-DD. */
+  today: string
   departures: {
     count: number
-    items: { id: string; reference: string; tripName: string; startDate: string; status: string; balanceDue: number }[]
+    items: { id: string; reference: string; tripName: string; startDate: string; status: string; balanceDue: number; currency: string }[]
   }
+  /** Null for a viewer: what clients owe is for staff. */
   outstanding: {
-    total: number
     count: number
     overdueCount: number
-    overdueTotal: number
-    items: { id: string; reference: string; clientName: string; balanceDue: number; dueDate: string | null }[]
-  }
+    /** One total per currency — amounts in different currencies never add. */
+    totals: Record<string, number>
+    overdueTotals: Record<string, number>
+    items: { id: string; reference: string; clientName: string; balanceDue: number; currency: string; dueDate: string | null }[]
+  } | null
   inbox: {
     count: number
     items: { id: string; threadId: string | null; sender: string; snippet: string; channel: string; receivedAt: string }[]
@@ -50,13 +57,19 @@ interface DashboardData {
     items: { id: string; itineraryId: string; tripName: string; clientName: string | null; viewCount: number; lastViewedAt: string | null }[]
   }
   quotes: { staleCount: number; expiredCount: number; awaitingCount: number }
-  clients: { total: number }
+  clients: { total: number | null }
   degraded: { card: string; reason: string }[]
 }
 
 const supabase = createClient()
 
 export default function DashboardPage() {
+  const { tenant } = useTenant()
+  const { role } = useRole()
+  // Links only where the role can go: a viewer clicking "Outstanding" was
+  // bounced back here by the middleware, so the card looked dead.
+  const staff = role !== 'viewer'
+  const manage = role === 'admin' || role === 'manager'
   const [data, setData] = useState<DashboardData | null>(null)
   const [userName, setUserName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -132,8 +145,15 @@ export default function DashboardPage() {
 
   const { departures, outstanding, inbox, proposals, quotes, clients, degraded } = data
   const failed = (card: string) => degraded.some((d) => d.card === card)
-  const money = (n: number) =>
-    `€${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const money = (n: number, currency: string) =>
+    `${getCurrencySymbol(currency)}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const moneyTotals = (totals: Record<string, number>) => {
+    const parts = Object.entries(totals).filter(([, v]) => v > 0).map(([c, v]) => money(v, c))
+    // Nothing owed yet: show 0 in the company's own currency (it read €0.00
+    // to every new non-EUR company).
+    return parts.length ? parts.join(' + ') : money(0, Object.keys(totals)[0] || tenant?.default_currency || 'EUR')
+  }
+  const daysAway = (d: string | null) => daysFromToday(d, data.today)
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -160,7 +180,7 @@ export default function DashboardPage() {
           title={`Departing in ${data.windowDays} days`}
           value={failed('departures') ? '—' : departures.count}
           icon={Plane}
-          href="/bookings"
+          href={staff ? '/bookings' : null}
           color="primary"
           subtitle={
             failed('departures') ? 'Unavailable'
@@ -168,26 +188,28 @@ export default function DashboardPage() {
               : 'Nothing scheduled'
           }
         />
-        <StatCard
-          title="Outstanding"
-          value={failed('outstanding') ? '—' : money(outstanding.total)}
-          icon={Wallet}
-          href="/invoices"
-          color={outstanding.overdueCount > 0 ? 'orange' : 'primary'}
-          subtitle={
-            failed('outstanding') ? 'Unavailable'
-              : outstanding.overdueCount > 0
-                ? `${outstanding.overdueCount} overdue · ${money(outstanding.overdueTotal)}`
-                : outstanding.count > 0
-                  ? `${outstanding.count} open invoice${outstanding.count === 1 ? '' : 's'}`
-                  : 'All settled'
-          }
-        />
+        {outstanding && (
+          <StatCard
+            title="Outstanding"
+            value={failed('outstanding') ? '—' : moneyTotals(outstanding.totals)}
+            icon={Wallet}
+            href="/invoices"
+            color={outstanding.overdueCount > 0 ? 'orange' : 'primary'}
+            subtitle={
+              failed('outstanding') ? 'Unavailable'
+                : outstanding.overdueCount > 0
+                  ? `${outstanding.overdueCount} overdue · ${moneyTotals(outstanding.overdueTotals)}`
+                  : outstanding.count > 0
+                    ? `${outstanding.count} open invoice${outstanding.count === 1 ? '' : 's'}`
+                    : 'All settled'
+            }
+          />
+        )}
         <StatCard
           title="Needs a reply"
           value={failed('inbox') ? '—' : inbox.count}
           icon={Inbox}
-          href="/inbox"
+          href={staff ? '/inbox' : null}
           color="purple"
           subtitle={failed('inbox') ? 'Unavailable' : inbox.count === 0 ? 'Inbox clear' : 'Unanswered messages'}
         />
@@ -195,7 +217,7 @@ export default function DashboardPage() {
           title="Quotes awaiting client"
           value={failed('quotes') ? '—' : quotes.awaitingCount}
           icon={FileText}
-          href="/quotes/b2c"
+          href={staff ? '/quotes/b2c' : null}
           color="warning"
           subtitle={
             failed('quotes') ? 'Unavailable'
@@ -221,16 +243,16 @@ export default function DashboardPage() {
         <Panel
           title="Departing soon"
           icon={Plane}
-          href="/bookings"
+          href={staff ? '/bookings' : null}
           empty={departures.items.length === 0}
           emptyIcon={Plane}
           emptyTitle={`No trips in the next ${data.windowDays} days`}
           emptyHint="Confirmed bookings appear here as their departure approaches."
         >
           {departures.items.map((d) => {
-            const days = daysFromToday(d.startDate)
+            const days = daysAway(d.startDate)
             return (
-              <Link key={d.id} href={`/bookings/${d.id}`} className="flex items-center justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+              <Row key={d.id} href={staff ? `/bookings/${d.id}` : null}>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{d.tripName}</p>
                   <p className="text-xs text-gray-500">
@@ -240,10 +262,10 @@ export default function DashboardPage() {
                 </div>
                 {d.balanceDue > 0 && (
                   <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded shrink-0 ml-3">
-                    {money(d.balanceDue)} due
+                    {money(d.balanceDue, d.currency)} due
                   </span>
                 )}
-              </Link>
+              </Row>
             )
           })}
         </Panel>
@@ -255,14 +277,14 @@ export default function DashboardPage() {
         <Panel
           title="Clients reading their proposal"
           icon={Eye}
-          href="/itineraries"
+          href={staff ? '/itineraries' : null}
           empty={proposals.items.length === 0}
           emptyIcon={Eye}
           emptyTitle="No proposals opened yet"
           emptyHint="Share an itinerary link and you’ll see here when the client opens it."
         >
           {proposals.items.map((p) => (
-            <Link key={p.id} href={`/itineraries/${p.itineraryId}`} className="flex items-center justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+            <Row key={p.id} href={staff ? `/itineraries/${p.itineraryId}` : null}>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{p.tripName}</p>
                 <p className="text-xs text-gray-500 truncate">
@@ -271,10 +293,11 @@ export default function DashboardPage() {
                 </p>
               </div>
               <ArrowRight className="w-4 h-4 text-gray-300 shrink-0 ml-3" />
-            </Link>
+            </Row>
           ))}
         </Panel>
 
+        {outstanding && (
         <Panel
           title="Largest balances owed"
           icon={Wallet}
@@ -285,7 +308,7 @@ export default function DashboardPage() {
           emptyHint="You’re all paid up — unpaid invoices will appear here."
         >
           {outstanding.items.map((i) => {
-            const d = i.dueDate ? daysFromToday(i.dueDate) : null
+            const d = i.dueDate ? daysAway(i.dueDate) : null
             const overdue = d !== null && d < 0
             return (
               <Link key={i.id} href={`/invoices/${i.id}`} className="flex items-center justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
@@ -294,24 +317,25 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-500">{i.dueDate ? `Due ${fmtDate(i.dueDate)}` : 'No due date'}</p>
                 </div>
                 <span className={`text-xs font-medium px-2 py-1 rounded shrink-0 ml-3 ${overdue ? 'text-red-700 bg-red-50' : 'text-gray-700 bg-gray-100'}`}>
-                  {money(i.balanceDue)}
+                  {money(i.balanceDue, i.currency)}
                 </span>
               </Link>
             )
           })}
         </Panel>
+        )}
 
         <Panel
           title="Waiting on your reply"
           icon={Inbox}
-          href="/inbox"
+          href={staff ? '/inbox' : null}
           empty={inbox.items.length === 0}
           emptyIcon={Inbox}
           emptyTitle="Inbox clear"
           emptyHint="New client messages land here across email and WhatsApp."
         >
           {inbox.items.map((m) => (
-            <Link key={m.id} href="/inbox" className="flex items-start justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+            <Row key={m.id} href={staff ? '/inbox' : null} align="start">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{m.sender || 'Unknown sender'}</p>
                 <p className="text-xs text-gray-500 truncate">{m.snippet}</p>
@@ -319,20 +343,23 @@ export default function DashboardPage() {
               <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0 ml-3 mt-0.5">
                 {m.channel}
               </span>
-            </Link>
+            </Row>
           ))}
         </Panel>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <QuickAction href="/itineraries/new" icon={Sparkles} title="New Quote" hint="Create an itinerary" />
-          <QuickAction href="/rates" icon={Layers} title="Rates Hub" hint="Hotels, guides & services" />
-          <QuickAction href="/tours/manage" icon={FileText} title="B2B Packages" hint="Ready-made tours" />
-          <QuickAction href="/clients" icon={Users} title="Clients" hint={`${clients.total} total`} />
+      {/* Only the shortcuts this role can open (a viewer has none). */}
+      {staff && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <QuickAction href="/itineraries/new" icon={Sparkles} title="New Quote" hint="Create an itinerary" />
+            {manage && <QuickAction href="/rates" icon={Layers} title="Rates Hub" hint="Hotels, guides & services" />}
+            {manage && <QuickAction href="/tours/manage" icon={FileText} title="B2B Packages" hint="Ready-made tours" />}
+            <QuickAction href="/clients" icon={Users} title="Clients" hint={clients.total === null ? '—' : `${clients.total} total`} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -341,19 +368,22 @@ export default function DashboardPage() {
 // Presentation helpers
 // ============================================
 
+/** A DATE column as written: read and shown in UTC, so it never moves a day
+ *  in a browser west of Greenwich. */
 function fmtDate(d: string | null): string {
   if (!d) return '—'
-  const t = new Date(d).getTime()
+  const t = new Date(String(d).slice(0, 10) + 'T00:00:00Z').getTime()
   if (!Number.isFinite(t)) return '—'
-  return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
-/** Mirrors lib/dashboard-metrics.daysUntil: UTC-anchored, null-safe, no NaN. */
-function daysFromToday(d: string | null): number | null {
+/** Mirrors lib/dashboard-metrics.daysUntil, counted from the company's today
+ *  (the server's answer), not the browser's UTC date. */
+function daysFromToday(d: string | null, companyToday: string): number | null {
   if (!d) return null
   const t = new Date(d).getTime()
   if (!Number.isFinite(t)) return null
-  const today = new Date(); today.setUTCHours(0, 0, 0, 0)
+  const today = new Date(Date.parse(`${companyToday}T00:00:00Z`) || Date.now()); today.setUTCHours(0, 0, 0, 0)
   const target = new Date(t); target.setUTCHours(0, 0, 0, 0)
   return Math.round((target.getTime() - today.getTime()) / 86_400_000)
 }
@@ -375,7 +405,8 @@ function StatCard({
   title: string
   value: string | number
   icon: React.ComponentType<{ className?: string }>
-  href: string
+  /** Null when the role cannot open the page: the card is not a link. */
+  href: string | null
   color?: 'primary' | 'warning' | 'purple' | 'orange'
   subtitle?: string
 }) {
@@ -385,9 +416,8 @@ function StatCard({
     purple: 'bg-purple-600',
     orange: 'bg-orange-600',
   }
-  return (
-    <Link href={href} className="block group">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow h-full min-h-[120px] flex flex-col">
+  const card = (
+      <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 ${href ? 'hover:shadow-md' : ''} transition-shadow h-full min-h-[120px] flex flex-col`}>
         <div className="flex items-start justify-between flex-1">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -400,8 +430,16 @@ function StatCard({
           <Icon className="w-5 h-5 text-gray-300 group-hover:text-gray-400 transition-colors shrink-0 ml-2" />
         </div>
       </div>
-    </Link>
   )
+  return href ? <Link href={href} className="block group">{card}</Link> : <div className="group">{card}</div>
+}
+
+/** One panel line: a link when the role can open it, plain text when not. */
+function Row({ href, align = 'center', children }: { href: string | null; align?: 'center' | 'start'; children: React.ReactNode }) {
+  const cls = `flex ${align === 'start' ? 'items-start' : 'items-center'} justify-between py-2.5 px-1 rounded`
+  return href
+    ? <Link href={href} className={`${cls} hover:bg-gray-50 transition-colors`}>{children}</Link>
+    : <div className={cls}>{children}</div>
 }
 
 function Panel({
@@ -409,7 +447,7 @@ function Panel({
 }: {
   title: string
   icon: React.ComponentType<{ className?: string }>
-  href: string
+  href: string | null
   children: React.ReactNode
   empty: boolean
   emptyIcon: React.ComponentType<{ className?: string }>
@@ -423,9 +461,11 @@ function Panel({
           <Icon className="w-4 h-4 text-gray-400" />
           <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
         </div>
-        <Link href={href} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
-          View all <ArrowRight className="w-3 h-3" />
-        </Link>
+        {href && (
+          <Link href={href} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+            View all <ArrowRight className="w-3 h-3" />
+          </Link>
+        )}
       </div>
 
       {/* An empty state names what to do next. A tenant with no data yet should

@@ -4,7 +4,7 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCurrency } from '@/hooks/useCurrency'
 import { BedDouble, Plus, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
@@ -14,14 +14,7 @@ import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurre
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 import Link from 'next/link'
-
-// Sleeping train routes (Cairo-Luxor-Aswan corridor)
-const SLEEPER_CITIES = [
-  'Cairo',
-  'Giza',
-  'Luxor',
-  'Aswan'
-]
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 interface SleepingTrainRate {
   // The currency this row's amounts are in; blank means the tenant's.
@@ -57,6 +50,16 @@ export default function SleepingTrainRatesContent() {
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<SleepingTrainRate[]>([])
+
+  // The agency's destination cities (Settings → Destinations), plus any city
+  // its rates already name — a fixed Egypt list was required here, so a
+  // non-Egypt agency could not add a rate and an imported route could not be
+  // saved until a listed city was picked.
+  const { cities: destinationCities } = useDestinationCities()
+  const SLEEPER_CITIES = useMemo(() => {
+    const stored = rates.flatMap(r => [r.origin_city, r.destination_city]).filter((c): c is string => Boolean(c))
+    return [...new Set([...destinationCities, ...stored])].sort((a, b) => a.localeCompare(b))
+  }, [destinationCities, rates])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
@@ -138,7 +141,9 @@ export default function SleepingTrainRatesContent() {
   const fetchRates = async () => {
     try {
       const params = new URLSearchParams()
-      if (!showInactive) params.append('active_only', 'true')
+      // Every rate, inactive too: the list filters them (matchesActive). The
+      // fetch ran once, on mount, with active_only — so "Show All" had nothing
+      // to show and a deactivated rate could never be found to switch back on.
 
       const response = await fetch(`/api/rates/sleeping-trains?${params}`)
       const data = await response.json()

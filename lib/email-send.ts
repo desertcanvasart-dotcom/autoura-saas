@@ -26,6 +26,8 @@
  */
 
 import { Resend } from 'resend'
+import { suppressedAmong, normaliseAddress } from '@/lib/email-suppression'
+import { displayName } from '@/lib/tenant-email-domain'
 
 export interface MailAttachment {
   filename: string
@@ -72,6 +74,8 @@ export interface SendMailResult {
    * failed" call for different responses.
    */
   authError?: boolean
+  /** Not sent: every recipient bounced or complained before (migration 437). */
+  suppressed?: boolean
 }
 
 /** `Name <addr@example.com>` or a bare address; returns the bare address. */
@@ -101,18 +105,36 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   // A caller-resolved From wins: it already encodes whether the tenant's own
   // domain is verified. Otherwise fromName may change only the DISPLAY name —
   // the address must stay one Resend has verified, or the send is rejected.
+  //
+  // The name is quoted and stripped as resolveSender() does: a raw company
+  // name with a comma, quote or '<' ("Smith, Jones & Co") made an invalid
+  // From that Resend rejected, so the mail silently never went.
+  const label = input.fromName ? displayName(input.fromName) : ''
   const from = input.from
     ? input.from
-    : input.fromName
-      ? `${input.fromName} <${bareAddress(configuredFrom)}>`
+    : label
+      ? `${label} <${bareAddress(configuredFrom)}>`
       : configuredFrom
+
+  // Addresses that bounced or complained are not mailed again: repeated
+  // sends to them are what gets a sending domain suspended for everyone.
+  const recipients = (Array.isArray(input.to) ? input.to : [input.to]).map(String)
+  const blocked = await suppressedAmong(recipients)
+  const deliverable = recipients.filter(r => !blocked.has(normaliseAddress(bareAddress(r))))
+  if (deliverable.length === 0) {
+    return {
+      success: false,
+      suppressed: true,
+      error: `Not sent: ${recipients.join(', ')} bounced or reported spam before. Check the address with the client.`,
+    }
+  }
 
   try {
     const resend = new Resend(apiKey)
 
     const { data, error } = await resend.emails.send({
       from,
-      to: input.to,
+      to: Array.isArray(input.to) ? deliverable : deliverable[0],
       subject: input.subject,
       html: input.html,
       ...(input.bcc ? { bcc: input.bcc } : {}),

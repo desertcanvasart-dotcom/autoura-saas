@@ -1,3 +1,4 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
@@ -82,6 +83,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
   const auth = await requireAuth()
   if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   const { supabase } = auth
@@ -107,7 +111,7 @@ export async function POST(request: NextRequest) {
   if (!message?.trim()) return NextResponse.json({ success: false, error: 'The message is empty' }, { status: 400 })
   if (!itinerary.client_phone) return NextResponse.json({ success: false, error: 'This itinerary has no client phone number' }, { status: 400 })
 
-  const result = await sendWhatsAppMessage({ to: itinerary.client_phone, body: message.trim() })
+  const result = await sendWhatsAppMessage({ to: itinerary.client_phone, body: message.trim(), tenantId: auth.tenant_id })
   if (!result.success) return NextResponse.json({ success: false, error: result.error || 'Could not send the WhatsApp message' }, { status: 502 })
   return NextResponse.json({ success: true, sent: true, messageId: result.messageId })
 }

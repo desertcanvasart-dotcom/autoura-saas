@@ -1,3 +1,5 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { fetchEmails, refreshAccessToken } from '@/lib/gmail'
@@ -28,6 +30,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase, user } = authResult
+    // The mailbox of the company being worked in (migration 415: one per
+    // person per company).
+    const mailboxTenant = authResult.tenant_id!
     if (!supabase || !user) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -37,7 +42,13 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get('query') || ''
     const pageToken = searchParams.get('pageToken') || undefined
-    const maxResults = parseInt(searchParams.get('maxResults') || '20')
+    // Each result is one Gmail call, made in parallel: bounded, and a bad value
+    // falls back rather than reaching Gmail as NaN.
+    const askedMax = parseInt(searchParams.get('maxResults') || '20', 10)
+    const maxResults = Number.isFinite(askedMax) ? Math.min(Math.max(askedMax, 1), 100) : 20
+    // A folder (Gmail label) by id: its emails wherever they are, archived
+    // ones included — a search by name inside the Inbox hid those.
+    const labelId = searchParams.get('labelId') || undefined
 
     // ✅ SECURITY: Use authenticated user's ID only - prevents user impersonation
     // Remove ability to specify userId in query params
@@ -54,7 +65,8 @@ export async function GET(request: NextRequest) {
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
@@ -76,22 +88,25 @@ export async function GET(request: NextRequest) {
       await (getSupabaseAdmin() as any)
         .from('gmail_tokens')
         .update({
-          access_token: newTokens.access_token,
+          access_token: sealToken(newTokens.access_token),
           token_expiry: new Date(newTokens.expiry_date || Date.now() + 3600000).toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
+        .eq('tenant_id', mailboxTenant)
     }
 
     // Fetch emails
     const { messages, nextPageToken } = await fetchEmails(
       access_token,
       refresh_token,
-      { maxResults, query, pageToken }
+      { maxResults, query, pageToken, labelIds: labelId ? [labelId] : undefined }
     )
 
     return NextResponse.json({ messages, nextPageToken })
   } catch (err: any) {
+    const reconnect = gmailReconnectResponse(err)
+    if (reconnect) return reconnect
     console.error('Fetch emails error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

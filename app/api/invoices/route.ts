@@ -7,7 +7,11 @@
 // Security: Requires authentication for all operations
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
+import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import { NextRequest, NextResponse } from 'next/server'
+import { formatMoney, roundToCurrency } from '@/lib/currency-totals'
+import { invoiceMoney } from '@/lib/invoices/invoice-money'
 import { includeAdditions, partitionAdditions, toLineItems, type Addition } from '@/lib/invoice-additions'
 import { extrasAdmin } from '@/lib/booking-extras-db'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
@@ -20,6 +24,11 @@ import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-number
  * RLS policies automatically filter by tenant_id
  */
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Use authenticated client - RLS automatically filters by tenant
     const supabase = await createAuthenticatedClient()
@@ -38,6 +47,7 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId')
     const itineraryId = searchParams.get('itineraryId')
     const invoiceType = searchParams.get('type')
+    const parentInvoiceId = searchParams.get('parentInvoiceId')
 
     // Pagination. Callers may opt in with ?limit / ?offset. When neither is
     // supplied we still apply a safety cap so a tenant with a very large
@@ -56,6 +66,9 @@ export async function GET(request: NextRequest) {
         *,
         itineraries (
           client_phone
+        ),
+        clients (
+          phone
         )
       `)
       .order('created_at', { ascending: false })
@@ -64,6 +77,7 @@ export async function GET(request: NextRequest) {
     if (status) {
       query = query.eq('status', status)
     }
+    if (parentInvoiceId) query = query.eq('parent_invoice_id', parentInvoiceId)
 
     if (clientId) {
       query = query.eq('client_id', clientId)
@@ -87,8 +101,12 @@ export async function GET(request: NextRequest) {
     // Flatten the response to include client_phone at the top level
     const formattedData = (data || []).map((invoice: any) => ({
       ...invoice,
-      client_phone: invoice.itineraries?.client_phone || null,
-      itineraries: undefined // Remove nested object
+      // The number a WhatsApp send actually uses: the client's, else the trip's
+      // (send-invoice / send-receipt). Showing only the trip's meant the screen
+      // named one number while the message went to another.
+      client_phone: invoice.clients?.phone || invoice.itineraries?.client_phone || null,
+      itineraries: undefined, // Remove nested objects
+      clients: undefined
     }))
 
     return NextResponse.json(formattedData)
@@ -104,6 +122,11 @@ export async function GET(request: NextRequest) {
  * Requires authentication and validates tenant ownership
  */
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
@@ -176,8 +199,26 @@ export async function POST(request: NextRequest) {
     // Calculate amounts based on invoice type
     let totalAmount = body.total_amount || 0
     let lineItems = body.line_items || []
-    const depositPercent = body.deposit_percent || 10
-    const fullTripCost = body.full_trip_cost || totalAmount // Store original trip cost
+    // The agency's own deposit rule (Settings → Payment terms) when the form
+    // sends none — it was a fixed 10% for every tenant.
+    let depositPercent = Number(body.deposit_percent)
+    if (!(depositPercent > 0 && depositPercent <= 100)) {
+      const { data: depositTenant } = await supabase
+        .from('tenants')
+        .select('deposit_percent, deposit_due_days')
+        .eq('id', tenant_id)
+        .maybeSingle()
+      depositPercent = resolveDepositRule({ tenant: depositTenant }).depositPercent
+    }
+    // A deposit or final invoice is a share of the trip's full cost. Without it
+    // the typed total stood in for the trip, and a 300 deposit saved as 30.
+    if ((invoiceType === 'deposit' || invoiceType === 'final') && !(Number(body.full_trip_cost) > 0)) {
+      return NextResponse.json(
+        { success: false, error: 'A deposit or final invoice needs the trip and its full cost' },
+        { status: 400 }
+      )
+    }
+    const fullTripCost = Number(body.full_trip_cost) || totalAmount // Store original trip cost
     const currency = body.currency || 'EUR'
 
     // Extras and upgrades sold after the trip was priced (migration 321) are
@@ -214,8 +255,10 @@ export async function POST(request: NextRequest) {
     billedExtraIds = parts.billable.filter(a => a.source === 'extra' && a.id).map(a => a.id as string)
 
     if (invoiceType === 'deposit') {
-      // Deposit invoice: calculate deposit amount
-      totalAmount = (fullTripCost * depositPercent) / 100
+      // Deposit invoice: calculate deposit amount, in the currency's own
+      // smallest unit — 20% of ¥1,854,367 is ¥370,873, not ¥370,873.40,
+      // which left a 0.40 balance the client could never pay off.
+      totalAmount = roundToCurrency((fullTripCost * depositPercent) / 100, currency)
       lineItems = [{
         description: `Booking Deposit (${depositPercent}%) - ${body.line_items?.[0]?.description || 'Tour Package'}`,
         quantity: 1,
@@ -223,9 +266,24 @@ export async function POST(request: NextRequest) {
         amount: totalAmount
       }]
     } else if (invoiceType === 'final') {
-      // Final invoice: remaining balance after deposit
-      const depositAmount = (fullTripCost * depositPercent) / 100
-      totalAmount = fullTripCost - depositAmount
+      // Final invoice: the trip less the deposit ACTUALLY invoiced. Worked
+      // out again from the percentage, it ignored a deposit edited after it
+      // was raised, and rounding twice could leave the two a unit short
+      // (¥1,854,367 at 20%: ¥370,873 + ¥1,483,492 = ¥1,854,365).
+      let depositAmount = roundToCurrency((fullTripCost * depositPercent) / 100, currency)
+      if (body.parent_invoice_id) {
+        const { data: parent } = await supabase
+          .from('invoices')
+          .select('total_amount, invoice_type, status, currency')
+          .eq('id', String(body.parent_invoice_id))
+          .eq('tenant_id', tenant_id)
+          .maybeSingle()
+        if (parent && parent.invoice_type === 'deposit' && parent.status !== 'cancelled'
+            && String(parent.currency || currency).toUpperCase() === String(currency).toUpperCase()) {
+          depositAmount = roundToCurrency(Number(parent.total_amount) || 0, currency)
+        }
+      }
+      totalAmount = roundToCurrency(fullTripCost - depositAmount, currency)
       lineItems = [{
         description: `Balance Payment - ${body.line_items?.[0]?.description || 'Tour Package'}`,
         quantity: 1,
@@ -239,7 +297,7 @@ export async function POST(request: NextRequest) {
       }]
       // Adjust total to just show the balance
       lineItems = [{
-        description: `Final Balance - ${body.line_items?.[0]?.description || 'Tour Package'} (Total: ${body.currency || 'EUR'} ${fullTripCost.toFixed(2)} minus ${depositPercent}% deposit)`,
+        description: `Final Balance - ${body.line_items?.[0]?.description || 'Tour Package'} (Total: ${formatMoney(fullTripCost, currency)} minus ${depositPercent}% deposit)`,
         quantity: 1,
         unit_price: totalAmount,
         amount: totalAmount
@@ -250,8 +308,25 @@ export async function POST(request: NextRequest) {
     // deposit (a percentage on account against the tour), and appended LAST
     // because the type branches above rebuild lineItems from scratch.
     if (additionsTotal && includeAdditions(invoiceType)) {
-      totalAmount = Math.round((totalAmount + additionsTotal) * 100) / 100
+      totalAmount = totalAmount + additionsTotal
       lineItems = [...lineItems, ...additionLines]
+    }
+    // Every invoice total in its currency's smallest unit (no ¥0.25), and
+    // subtotal + tax − discount = total — a standard invoice worked out from
+    // its own lines and tax rate (lib/invoices/invoice-money).
+    const money = invoiceMoney({
+      invoiceType,
+      total: totalAmount,
+      lineItems,
+      taxRate: body.tax_rate,
+      discountAmount: body.discount_amount,
+      currency,
+    })
+    totalAmount = money.total_amount
+    // An invoice for nothing, or for less than nothing (a discount above the
+    // subtotal), is refused — as an edit already was.
+    if (!(totalAmount > 0)) {
+      return NextResponse.json({ success: false, error: 'The invoice total must be above 0' }, { status: 400 })
     }
 
     const baseInvoice = {
@@ -264,11 +339,7 @@ export async function POST(request: NextRequest) {
       client_name: body.client_name,
       client_email: body.client_email || null,
       line_items: lineItems,
-      subtotal: totalAmount,
-      tax_rate: body.tax_rate || 0,
-      tax_amount: body.tax_amount || 0,
-      discount_amount: body.discount_amount || 0,
-      total_amount: totalAmount,
+      ...money,
       currency: body.currency || 'EUR',
       amount_paid: 0,
       balance_due: totalAmount,
@@ -298,12 +369,27 @@ export async function POST(request: NextRequest) {
     // (which filters on invoiced_at IS NULL) cannot bill them again. Loud on
     // failure, because the failure mode is silent double-billing later.
     if (data?.id && billedExtraIds.length && includeAdditions(invoiceType)) {
-      const { error: stampError } = await extrasAdmin()
+      // Claim only extras still unbilled: two invoices raised for the trip at
+      // the same moment both read them as unbilled. Whichever stamps second
+      // claims fewer than it billed — that invoice is withdrawn rather than
+      // charging the client twice.
+      const { data: claimed, error: stampError } = await extrasAdmin()
         .from('booking_extras')
         .update({ invoiced_at: new Date().toISOString(), invoice_id: data.id })
         .in('id', billedExtraIds)
         .eq('tenant_id', tenant_id)
+        .is('invoiced_at', null)
+        .select('id')
       if (stampError) console.error('invoices: could not stamp extras as invoiced', stampError)
+      else if ((claimed ?? []).length < billedExtraIds.length) {
+        await extrasAdmin().from('booking_extras').update({ invoiced_at: null, invoice_id: null }).eq('invoice_id', data.id)
+        const { error: undoError } = await supabase.from('invoices').delete().eq('id', data.id)
+        if (undoError) console.error('invoices: could not withdraw the double-billing invoice', data.id, undoError)
+        return NextResponse.json(
+          { error: 'Another invoice for this trip was created at the same moment and already includes its extras. Refresh and check before creating another.' },
+          { status: 409 }
+        )
+      }
     }
 
     return NextResponse.json(
@@ -323,7 +409,7 @@ function getDefaultPaymentTerms(invoiceType: string): string {
     case 'deposit':
       return 'Deposit required to confirm booking. Non-refundable once services are confirmed.'
     case 'final':
-      return 'Balance payable in cash upon arrival or before first day of service.'
+      return 'Balance payable before the first day of service.'
     default:
       return 'Payment due within 14 days'
   }

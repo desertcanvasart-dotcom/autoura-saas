@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 
@@ -86,8 +87,8 @@ interface FormData {
 
 const initialFormData: FormData = {
   service_code: '',
-  route_from: 'Cairo',
-  route_to: 'Aswan',
+  route_from: '',
+  route_to: '',
   airline: 'egyptair',
   flight_number: '',
   flight_type: 'domestic',
@@ -131,7 +132,7 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function FlightsContent() {
   // City vocabulary from the destination catalog (Egypt fallback pre-migration).
-  const { cities: cityOptions } = useDestinationCities()
+  const { cities: cityOptions, catalog: destinationCatalog } = useDestinationCities()
   const dialog = useConfirmDialog()
   const { loading: currencyLoading } = useCurrency()
 
@@ -154,7 +155,7 @@ export default function FlightsContent() {
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
   // Labels must name the currency the amounts are actually in (C3.4b).
-  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
+  const { symbol: rateSymbol, code: rateCode } = useRateCurrency(rateCurrency)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -239,11 +240,14 @@ export default function FlightsContent() {
         prev.airline,
         prev.cabin_class
       )
-      // Auto-detect flight type
-      const domesticCities = ['Cairo', 'Luxor', 'Aswan', 'Hurghada', 'Sharm El Sheikh', 'Alexandria', 'Abu Simbel', 'Marsa Alam']
-      const fromDomestic = domesticCities.includes(field === 'route_from' ? value : prev.route_from)
-      const toDomestic = domesticCities.includes(field === 'route_to' ? value : prev.route_to)
-      updated.flight_type = (fromDomestic && toDomestic) ? 'domestic' : 'international'
+      // Auto-detect flight type: domestic when both cities are in the same
+      // country of the destination catalogue. A fixed list of Egyptian cities
+      // made Rome → Milan "international". Unknown cities leave it as it was.
+      const countryOf = (city: string) => destinationCatalog.find(d =>
+        [...(d.all_cities ?? []), ...(d.cities ?? [])].some(c => c.name.toLowerCase() === city.trim().toLowerCase()))?.country_code
+      const fromCountry = countryOf(field === 'route_from' ? value : prev.route_from)
+      const toCountry = countryOf(field === 'route_to' ? value : prev.route_to)
+      if (fromCountry && toCountry) updated.flight_type = fromCountry === toCountry ? 'domestic' : 'international'
       return updated
     })
   }
@@ -370,7 +374,7 @@ export default function FlightsContent() {
     }
 
     if (!formData.base_rate_eur || formData.base_rate_eur <= 0) {
-      setError('Please enter a valid EUR rate')
+      setError('Please enter a valid base rate')
       setSaving(false)
       return
     }
@@ -680,7 +684,7 @@ export default function FlightsContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">From Any</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, routeFromFilter || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -694,7 +698,7 @@ export default function FlightsContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">To Any</option>
-            {cityOptions.map(city => (
+            {cityOptionsFor(cityOptions, routeToFilter || '').map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1099,7 +1103,7 @@ export default function FlightsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     >
                       <option value="">Select departure city</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.route_from || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
@@ -1239,7 +1243,7 @@ export default function FlightsContent() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Base Rate (EUR) <span className="text-red-500">*</span>
+                      Base Rate ({rateCode}) <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <input
@@ -1257,7 +1261,7 @@ export default function FlightsContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Tax (EUR)
+                      Tax ({rateCode})
                     </label>
                     <div className="relative">
                       {/* tax_eur is EUR by definition — hard-coded symbol is correct here (euro-literal ratchet) */}

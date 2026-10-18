@@ -4,6 +4,9 @@ import { verifyWebhookSignature } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
+import { reportServerError } from '@/lib/monitoring/error-alerts'
+import { isRetrySafeEvent } from '@/lib/billing/webhook-retry'
+import { shouldApplySubscription } from '@/lib/billing/subscription-sync'
 import {
   decideOnboardingFee,
   chargedMetadata,
@@ -39,6 +42,7 @@ function getSupabaseAdmin() {
 export async function POST(request: NextRequest) {
   // Declared outside the try so the catch can close out a claimed event.
   let eventId: string | null = null
+  let eventType: string | null = null
   try {
     const body = await request.text()
     const headersList = await headers()
@@ -76,6 +80,7 @@ export async function POST(request: NextRequest) {
 
 
     eventId = event.id
+    eventType = event.type
 
     // Claim the event before doing anything with money. The INSERT is the
     // claim: the PK makes a concurrent duplicate lose with 23505 rather than
@@ -133,15 +138,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (error: any) {
     console.error('Webhook error:', error)
-    // Record why, then let Stripe retry. The claim row stays, so the retry is
-    // skipped as a duplicate — deliberate: a handler that failed halfway must
-    // be inspected (processed_at IS NULL finds it), not silently re-run over
-    // money. The message is preserved for exactly that triage.
-    await markEventProcessed(eventId, error?.message ?? String(error))
+    // Someone must hear about it either way: this route answers the error
+    // itself, so instrumentation.ts never sees it.
+    await reportServerError(error, { method: 'POST', routePath: `/api/billing/webhook (${eventType ?? 'unknown event'})` })
+    if (eventId && eventType && isRetrySafeEvent(eventType)) {
+      // State syncs only (lib/billing/webhook-retry): release the claim so
+      // Stripe's retry runs it again. Kept, a passing database blip left the
+      // subscription out of step with Stripe for good.
+      await releaseClaim(eventId)
+    } else {
+      // Money moves here (an invoice item raised or withdrawn): the claim
+      // stays, so the retry is skipped as a duplicate — a handler that failed
+      // halfway must be inspected (processed_at with an error finds it), not
+      // silently re-run. The message is preserved for exactly that triage.
+      await markEventProcessed(eventId, error?.message ?? String(error))
+    }
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
     )
+  }
+}
+
+/** Let a retry of this event run again. Best-effort, like the close-out. */
+async function releaseClaim(eventId: string) {
+  try {
+    const { error } = await (getSupabaseAdmin() as any)
+      .from('stripe_webhook_events')
+      .delete()
+      .eq('event_id', eventId)
+    if (error) console.error('billing webhook: could not release claim', eventId, error)
+  } catch (err) {
+    console.error('billing webhook: could not release claim', eventId, err)
   }
 }
 
@@ -188,7 +216,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 /**
  * Handle subscription created or updated
  */
-async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdate(eventSubscription: Stripe.Subscription) {
+  // The subscription as Stripe has it NOW: events arrive out of order, and a
+  // late or retried one must not roll the company's row back.
+  const subscription = await stripe.subscriptions.retrieve(eventSubscription.id)
   const sub = subscription as any
   const tenantId = subscription.metadata?.tenant_id
   const customerId = subscription.customer as string
@@ -210,8 +241,9 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     .single()
 
   if (!plan) {
-    console.error(`No plan found for price ID: ${priceId}`)
-    return
+    // Throw, so Stripe retries and an alert goes out: returning recorded the
+    // event as handled and the company kept its old plan for good.
+    throw new Error(`No plan found for price ID: ${priceId} (subscription ${subscription.id})`)
   }
 
   const billingCycle = subscription.items.data[0]?.price.recurring?.interval === 'year' ? 'yearly' : 'monthly'
@@ -230,8 +262,22 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     throw new Error(`Unresolvable billing period for subscription ${subscription.id}`)
   }
 
+  // Never let an old subscription that is ending overwrite a different,
+  // live one (lib/billing/subscription-sync.ts).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped admin client, as throughout this file
+  const db = getSupabaseAdmin() as any
+  const { data: existingRow } = await db
+    .from('tenant_subscriptions')
+    .select('stripe_subscription_id, status')
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+  if (!shouldApplySubscription(existingRow ?? null, { id: subscription.id, status: subscription.status })) {
+    console.warn(`billing webhook: ignoring ${subscription.status} subscription ${subscription.id} — tenant ${tenantId} is on live subscription ${existingRow?.stripe_subscription_id}`)
+    return
+  }
+
   // Upsert subscription
-  const { error } = await (getSupabaseAdmin() as any)
+  const { error } = await db
     .from('tenant_subscriptions')
     .upsert({
       tenant_id: tenantId,
@@ -251,8 +297,9 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     })
 
   if (error) {
-    console.error('Error upserting subscription:', error)
-    return
+    // Throw: this event is retry-safe (lib/billing/webhook-retry), and
+    // returning marked it handled while the row stayed out of step.
+    throw new Error(`Could not save subscription ${subscription.id}: ${error.message ?? error}`)
   }
 
   // Create or update usage tracking record for new period
@@ -277,7 +324,11 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
         api_calls: 0,
         storage_used: 0
       }, {
-        onConflict: 'tenant_id,period_start'
+        // Create the period's counters once. Overwriting them zeroed the
+        // month's usage on EVERY subscription update (a coupon, a cancel and
+        // un-cancel, a dunning flip), so limits never triggered.
+        onConflict: 'tenant_id,period_start',
+        ignoreDuplicates: true,
       })
   }
 
@@ -418,14 +469,17 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
 
 
-  // Update subscription status to past_due
-  await (getSupabaseAdmin() as any)
+  // The subscription's real status, not a blanket past_due: a late or retried
+  // payment_failed after the card was fixed left a paying company stuck.
+  const current = await stripe.subscriptions.retrieve(subscriptionId)
+  const { error: statusError } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
     .update({
-      status: 'past_due',
+      status: current.status,
       updated_at: new Date().toISOString()
     })
     .eq('id', subscription.id)
+  if (statusError) throw new Error(`Could not update subscription status: ${statusError.message ?? statusError}`)
 
   // Log activity
   await (getSupabaseAdmin() as any).rpc('log_activity', {

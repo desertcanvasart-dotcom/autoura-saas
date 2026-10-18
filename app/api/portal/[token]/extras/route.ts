@@ -27,6 +27,8 @@ export interface PortalLink {
   booking_id: string
   tenant_id: string
   passenger_id: string | null
+  /** The office has locked the details: no new requests from the portal. */
+  form_locked: boolean
 }
 
 /** Everything the two portal extras routes check before touching anything. */
@@ -44,12 +46,12 @@ export async function resolvePortalExtrasLink(
 
   const { data: link } = await extrasAdmin()
     .from('booking_portal_links')
-    .select('booking_id, tenant_id, passenger_id, revoked_at, expires_at')
+    .select('booking_id, tenant_id, passenger_id, revoked_at, expires_at, form_locked')
     .eq('token', token)
     .maybeSingle()
   if (!link || !portalLinkState(link).usable) return { error: notFound() }
 
-  return { link: link as PortalLink }
+  return { link: { ...link, form_locked: !!link.form_locked } as PortalLink }
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -78,7 +80,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return NextResponse.json({
     currency: booking?.currency || 'EUR',
-    canRequest: true,
+    // Once the office locks the details it takes no new requests; an offer
+    // it has already made can still be answered (extras/[eid]).
+    canRequest: !link.form_locked,
     // portalExtraView, not the row: no unit price, no supplier, no cost.
     extras: (data ?? []).map(portalExtraView),
   })
@@ -89,6 +93,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const resolved = await resolvePortalExtrasLink(request, token)
   if ('error' in resolved) return resolved.error
   const { link } = resolved
+  if (link.form_locked) {
+    return NextResponse.json({ error: 'Details are confirmed and locked — contact your agency for anything more.' }, { status: 409 })
+  }
   const admin = extrasAdmin()
 
   const body = await request.json().catch(() => null)
@@ -96,15 +103,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!title) return NextResponse.json({ error: 'Please tell us what you would like.' }, { status: 400 })
   const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 1000) : null
 
-  // The same title twice is a double-tap rather than a second request.
-  const { data: existing } = await admin
+  // The same title twice FROM THE SAME LINK is a double-tap rather than a
+  // second request. maybeSingle() errored once two matched (and then let a
+  // third through), and two travellers asking for the same thing are two
+  // requests, not one.
+  let dupQuery = admin
     .from('booking_extras')
     .select('id')
     .eq('booking_id', link.booking_id)
     .eq('status', 'requested')
     .eq('title', title)
-    .maybeSingle()
-  if (existing) return NextResponse.json({ success: true, duplicate: true })
+  dupQuery = link.passenger_id ? dupQuery.eq('passenger_id', link.passenger_id) : dupQuery.is('passenger_id', null)
+  const { data: existing } = await dupQuery.limit(1)
+  if (existing && existing.length > 0) return NextResponse.json({ success: true, duplicate: true })
 
   const { error } = await admin.from('booking_extras').insert({
     tenant_id: link.tenant_id,

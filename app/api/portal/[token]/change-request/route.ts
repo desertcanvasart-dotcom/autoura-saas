@@ -2,8 +2,9 @@
 //
 // Adding people changes the price, so the portal cannot create passengers
 // beyond the booked count. The lead files a request; the office re-prices
-// and approves. Booking-level (family) link only, behind the gate
-// (isValidPortalToken + verified cookie + portalLinkState).
+// and approves — until the office locks the details (form_locked).
+// Booking-level (family) link only, behind the gate (isValidPortalToken +
+// verified cookie + portalLinkState).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
@@ -32,10 +33,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const db = createAdminClient()
     const { data: link } = await db
       .from('booking_portal_links')
-      .select('tenant_id, booking_id, passenger_id, revoked_at, expires_at')
+      .select('tenant_id, booking_id, passenger_id, revoked_at, expires_at, form_locked')
       .eq('token', token)
       .maybeSingle()
     if (!link || !portalLinkState(link).usable) return NOT_FOUND()
+    // Once the office locks the details the page hides this form; a direct
+    // POST must not still file a request and notify the office.
+    if (link.form_locked) {
+      return NextResponse.json({ success: false, error: 'Details are confirmed and locked — contact your agency for changes.' }, { status: 409 })
+    }
     // Party size is the lead's call: booking-level link only.
     if (link.passenger_id) return NOT_FOUND()
 

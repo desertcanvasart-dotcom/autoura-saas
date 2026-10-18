@@ -18,10 +18,12 @@ describe('what goes on which document', () => {
 
 describe('where a service belongs', () => {
   const dayTrip = { city: 'Alexandria', overnight_city: 'Cairo' }
-  it('a night, the vehicle and the guide: where the party is based — a day trip goes with its stay', () => {
+  it('a night and the vehicle: where the party is based — a day trip goes with its stay', () => {
     expect(serviceCity({ docType: 'hotel_voucher' }, dayTrip)).toBe('Cairo')
     expect(serviceCity({ docType: 'transport_voucher' }, dayTrip)).toBe('Cairo')
-    expect(serviceCity({ docType: 'guide_assignment' }, dayTrip)).toBe('Cairo')
+  })
+  it('a guide nobody is assigned to: where the guiding is — a local guide', () => {
+    expect(serviceCity({ docType: 'guide_assignment' }, dayTrip)).toBe('Alexandria')
   })
   it('meals and sites: where they are', () => {
     expect(serviceCity({ docType: 'service_order', category: 'entrance' }, dayTrip)).toBe('Alexandria')

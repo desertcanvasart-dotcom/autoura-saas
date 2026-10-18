@@ -10,7 +10,6 @@ import { z } from 'zod'
 const ProfileUpdateSchema = z.object({
   full_name: z.string().min(1).max(255).trim().optional(),
   phone: z.string().max(50).trim().optional().nullable(),
-  timezone: z.string().max(100).optional(),
   company_name: z.string().max(255).trim().optional().nullable(),
 })
 

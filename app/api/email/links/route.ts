@@ -1,3 +1,4 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { autoLinkEmails } from '@/lib/email-auto-link'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -104,6 +105,9 @@ export async function GET(request: NextRequest) {
 // POST /api/email/links
 // Link an email to a client
 export async function POST(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -123,6 +127,21 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: userId, messageId, clientId' },
         { status: 400 }
       )
+    }
+
+    // The client must belong to the caller's company. The admin client bypasses
+    // RLS and email_client_links has no tenant_id, so without this a user could
+    // link mail to another company's client — reading back that client's name,
+    // email and phone in the response, and planting an entry on its timeline.
+    const { data: owned, error: ownErr } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('id', clientId)
+      .eq('tenant_id', authResult.tenant_id)
+      .maybeSingle()
+    if (ownErr) throw ownErr
+    if (!owned) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 })
     }
 
     // Check if link already exists (scoped to the session user)
@@ -194,6 +213,9 @@ export async function POST(request: NextRequest) {
 // DELETE /api/email/links
 // Remove an email-client link
 export async function DELETE(request: NextRequest) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {

@@ -1,7 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { NextResponse, type NextRequest } from 'next/server'
-import { isSuperAdmin } from '@/lib/super-admin-shared'
+import { isConfirmedSuperAdmin } from '@/lib/super-admin-shared'
 import { toPermissionRole } from '@/lib/roles'
+import { INACTIVE_MEMBER_STATUSES } from '@/lib/member-status'
 
 // ============================================
 // API ROUTES THAT SELF-AUTHENTICATE
@@ -44,7 +46,22 @@ export const SELF_AUTH_API_PREFIXES = [
   // Public marketing contact form: the sender is a prospect with no session.
   // Self-protects with a per-IP rate limit + honeypot inside the handler.
   '/api/contact',
+  // Browsers POST Content-Security-Policy violations here from any page,
+  // signed in or not. Rate limited per IP; it only logs.
+  '/api/csp-report',
 ]
+
+/**
+ * The ROUTE_PERMISSIONS entry that governs a path: the MOST specific one
+ * that matches — '/settings/seasons' before '/settings'. The first match in
+ * the list used to win, so every page under /settings was admin-only
+ * whatever its own entry said.
+ */
+export function permissionRouteFor(pathname: string): string | undefined {
+  return Object.keys(ROUTE_PERMISSIONS)
+    .filter(route => pathname === route || pathname.startsWith(route + '/'))
+    .sort((a, b) => b.length - a.length)[0]
+}
 
 // Define route permissions - which roles can access which routes
 // Exported so lib/__tests__/roles.test.ts can assert the invariant that makes
@@ -52,6 +69,20 @@ export const SELF_AUTH_API_PREFIXES = [
 export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Admin only
   '/settings': ['admin'],
+  // Pages under /settings the sidebar gives to more than admins — each
+  // sent its manager or member to "unauthorized", because the /settings
+  // rule above caught them first. The longest matching route wins (below).
+  '/settings/email-signatures': ['admin', 'manager', 'member'],
+  '/settings/copilot-analytics': ['admin', 'manager'],
+  '/settings/seasons': ['admin', 'manager'],
+  // Your own profile, password and notifications, and your own Gmail
+  // (connected per person): everyone with a login. The Inbox sends members
+  // here to connect Gmail; they were turned away. Office addresses and
+  // templates on the email page stay admin-only inside the page.
+  '/settings/profile': ['admin', 'manager', 'member', 'viewer'],
+  '/settings/email': ['admin', 'manager', 'member'],
+  // Team Members (managers) links here to manage departments.
+  '/settings/departments': ['admin', 'manager'],
   '/users': ['admin'],
   
   // Admin and Manager
@@ -60,10 +91,20 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/profit-loss': ['admin', 'manager'],
   '/accounts-receivable': ['admin', 'manager'],
   '/accounts-payable': ['admin', 'manager'],
+  // Finance pages with no entry were open to any role by URL, viewers too.
+  '/commissions': ['admin', 'manager'],
+  '/supplier-invoices': ['admin', 'manager'],
   '/rates': ['admin', 'manager'],
   '/pricing-grid': ['admin', 'manager', 'member'],
   '/hotels': ['admin', 'manager'],
   '/restaurants': ['admin', 'manager'],
+  // Operate and the supplier directory, as the sidebar shows them: with no
+  // entry, any signed-in role (viewers too) opened them by URL — and the
+  // Resources page could delete suppliers.
+  '/departures': ['admin', 'manager'],
+  '/suppliers': ['admin', 'manager'],
+  '/resources': ['admin', 'manager'],
+  '/airport-staff': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],
   '/transportation': ['admin', 'manager'],
   '/attractions': ['admin', 'manager'],
@@ -73,13 +114,33 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/itineraries': ['admin', 'manager', 'member'],
   '/invoices': ['admin', 'manager', 'member'],
   '/payments': ['admin', 'manager', 'member'],
+  '/receipts': ['admin', 'manager', 'member'],
   '/tasks': ['admin', 'manager', 'member'],
   '/inbox': ['admin', 'manager', 'member'],
   '/whatsapp-inbox': ['admin', 'manager', 'member'],
+  // The rest of the Communicate group, and Documents: the sidebar hides them
+  // from viewers, but a viewer with the link got in (no entry here = open).
+  '/conversations': ['admin', 'manager', 'member'],
+  '/concierge-briefs': ['admin', 'manager', 'member'],
+  '/copilot': ['admin', 'manager', 'member'],
+  '/copilot-knowledge': ['admin', 'manager', 'member'],
+  '/templates': ['admin', 'manager', 'member'],
+  '/content-library': ['admin', 'manager'],
+  // Receipts, invoices and contracts open from Payments and Itineraries.
+  '/documents': ['admin', 'manager', 'member'],
   '/whatsapp-parser': ['admin', 'manager', 'member'],
   '/communications': ['admin', 'manager', 'member'],
   '/followups': ['admin', 'manager', 'member'],
   '/tours': ['admin', 'manager', 'member'],
+  // The Tour Manager edits the catalogue: managers and admins, as the sidebar.
+  '/tours/manage': ['admin', 'manager'],
+  // Sell: quotes and bookings for the sales team; B2B (quotes, partners, the
+  // calculator, transport packages) for managers and admins — as the sidebar
+  // shows them. With no entry, a viewer or member with the link got in.
+  '/quotes': ['admin', 'manager', 'member'],
+  '/quotes/b2b': ['admin', 'manager'],
+  '/b2b': ['admin', 'manager'],
+  '/bookings': ['admin', 'manager', 'member'],
   '/expenses': ['admin', 'manager', 'member'],
   '/reminders': ['admin', 'manager', 'member'],
   
@@ -153,10 +214,15 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = [
     '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
     '/about', '/contact', '/demo', '/docs', '/integrations', '/pricing', '/privacy', '/terms',
+    // The product blog (/blog, /blog/<slug>): published posts only, read
+    // server-side; writing is /super-admin/blog, behind login.
+    '/blog',
     // Crawler surfaces (Next metadata routes; .txt/.xml are NOT excluded by
     // the matcher the way images are). These redirected to /login, which
     // made organic discovery impossible.
     '/robots.txt', '/sitemap.xml',
+    // The site summary for AI assistants (app/llms.txt, lib/seo/llms.ts).
+    '/llms.txt', '/llms-full.txt',
     // PWA manifest (app/manifest.ts): a manifest behind a login redirect is
     // no manifest at all — install would silently break for logged-out users.
     '/manifest.webmanifest',
@@ -212,7 +278,7 @@ export async function middleware(request: NextRequest) {
   // If user is logged in and trying to access login/signup (but not homepage).
   // Platform owners live in /super-admin, not the agency app.
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-    const home = user.email && isSuperAdmin(user.email) ? '/super-admin' : '/dashboard'
+    const home = isConfirmedSuperAdmin(user) ? '/super-admin' : '/dashboard'
     return NextResponse.redirect(new URL(home, request.url))
   }
 
@@ -238,14 +304,12 @@ export async function middleware(request: NextRequest) {
     // super admin is impersonating a tenant they already get an admin role
     // server-side (lib/supabase-server.ts); this simply stops the tenant gate
     // from overriding their platform access.
-    if (user.email && isSuperAdmin(user.email)) {
+    if (isConfirmedSuperAdmin(user)) {
       return response
     }
 
     // Check if this route has permission restrictions
-    const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find(route => {
-      return pathname === route || pathname.startsWith(route + '/')
-    })
+    const matchedRoute = permissionRouteFor(pathname)
 
     if (matchedRoute) {
       // is_active still comes from the profile; the ROLE comes from the
@@ -258,19 +322,31 @@ export async function middleware(request: NextRequest) {
           .select('is_active')
           .eq('id', user.id)
           .single(),
-        supabase
-          .from('tenant_members')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: true })
-          .order('tenant_id', { ascending: true })
-          .limit(1)
-          .maybeSingle(),
+        // The current company's membership — the database's answer, the one
+        // RLS uses (lib/current-membership.ts).
+        currentMembership<{ role: string }>(supabase as unknown as MembershipDb, user.id, 'role'),
       ])
 
+      // Deactivation is per company: the Team page switches off this
+      // company's membership row, not the account-wide profile flag, so a
+      // person deactivated in one company keeps every other one (documents
+      // audit, round 12). The lookup above already skips such rows and lands
+      // on the user's next active company; only when NO active membership
+      // remains and one was deactivated is the user inactive here.
+      // user_profiles.is_active stays the platform-level (super-admin) switch.
+      let deactivatedHere = false
+      if (!membership) {
+        const { data: inactive } = await supabase
+          .from('tenant_members')
+          .select('status')
+          .eq('user_id', user.id)
+          .in('status', [...INACTIVE_MEMBER_STATUSES])
+          .limit(1)
+        deactivatedHere = (inactive?.length ?? 0) > 0
+      }
+
       // Check if user is active
-      if (profile && !profile.is_active) {
+      if ((profile && !profile.is_active) || deactivatedHere) {
         // End the session BEFORE redirecting. The comment here used to claim
         // "sign them out" but nothing did — so a still-authenticated
         // deactivated user hit /login, the /login guard bounced them straight

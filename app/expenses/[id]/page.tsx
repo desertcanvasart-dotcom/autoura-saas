@@ -67,7 +67,7 @@ const CATEGORIES: Record<string, { label: string; icon: string }> = {
   airport_staff: { label: 'Airport Staff', icon: '✈️' },
   hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
   ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  cruise: { label: 'Nile Cruise', icon: '🚢' },
+  cruise: { label: 'Cruise', icon: '🚢' },
   flights: { label: 'Flights', icon: '🛫' },
   activity: { label: 'Activities & Tours', icon: '🎈' },
   tipping: { label: 'Tipping', icon: '💵' },
@@ -108,6 +108,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   approved: { label: 'Approved', color: 'text-blue-700', bg: 'bg-blue-100', icon: CheckCircle },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100', icon: AlertCircle }
+}
+
+/** A YYYY-MM-DD day as written (new Date('2026-03-04') showed the day before west of UTC). */
+function dayText(day: string | null | undefined): string {
+  if (!day) return '—'
+  return new Date(`${day.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })
 }
 
 export default function ExpenseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -308,7 +314,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
               <div className="text-right">
                 <p className="text-sm text-gray-500 mb-1">Expense Date</p>
                 <p className="text-lg font-medium text-gray-900">
-                  {new Date(expense.expense_date).toLocaleDateString('en-US', { 
+                  {new Date(`${expense.expense_date.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', 
                     weekday: 'short',
                     year: 'numeric', 
                     month: 'short', 
@@ -393,7 +399,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
                   <p className="text-sm text-gray-500">{itinerary.client_name}</p>
                   {itinerary.start_date && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {new Date(itinerary.start_date).toLocaleDateString()} - {new Date(itinerary.end_date).toLocaleDateString()}
+                      {dayText(itinerary.start_date)} - {dayText(itinerary.end_date)}
                     </p>
                   )}
                 </div>
@@ -455,7 +461,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-400" />
                   <span className="text-sm text-gray-900">
-                    {expense.payment_date ? new Date(expense.payment_date).toLocaleDateString() : 'Not paid yet'}
+                    {expense.payment_date ? dayText(expense.payment_date) : 'Not paid yet'}
                   </span>
                 </div>
               </div>

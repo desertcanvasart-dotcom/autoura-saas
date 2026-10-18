@@ -1,10 +1,15 @@
+import { sendGuard } from '@/lib/send-guard'
+import { formatMoney } from '@/lib/currency-totals'
 import { NextRequest, NextResponse } from 'next/server'
-import { daysOverdueOrNull } from '@/lib/invoice-dates'
-import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { daysOverdueOn, daysOverdueOrNull, isFirstReminderDue, REMINDABLE_INVOICE_STATUSES } from '@/lib/invoice-dates'
+import { escapeHtml } from '@/lib/html-escape'
+import { requireAuth } from '@/lib/supabase-server'
+import { tenantToday } from '@/lib/tenant-today'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
-import { getCurrencySymbol } from '@/lib/currency'
 import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
+import { gateRole } from '@/lib/api-role-gate'
+import { recentReminderSentAt, nextReminderAfter } from '@/lib/invoice-reminder-guard'
 
 // Sends a reminder email directly via the shared mail helper.
 async function sendReminderEmail(params: {
@@ -29,9 +34,10 @@ async function sendReminderEmail(params: {
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
   // The agency the invoice belongs to (joined as `tenant`), never a fixed brand.
   const company = emailIdentity(invoice.tenant)
-  const currencySymbol = getCurrencySymbol(invoice.currency)
-  const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
-  const totalAmount = `${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`
+  // The currency's own decimals and separators: "JPY120000.00" was how a
+  // yen balance read (JPY has no symbol of its own here).
+  const balanceDue = formatMoney(invoice.balance_due, invoice.currency)
+  const totalAmount = formatMoney(invoice.total_amount, invoice.currency)
   // Callers skip invoices with no due date, but this renderer must not be the
   // thing that trusts it: "Invalid Date" and "NaN days overdue" in a payment
   // demand is worse than any missing line.
@@ -89,7 +95,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
@@ -112,7 +118,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
           <tr>
             <td style="padding: 40px;">
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                Dear ${invoice.client_name},
+                Dear ${escapeHtml(invoice.client_name)},
               </p>
               
               <p style="margin: 0 0 30px; color: #374151; font-size: 16px; line-height: 1.6;">
@@ -129,7 +135,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
                           <span style="color: #6b7280; font-size: 14px;">Invoice Number:</span>
                         </td>
                         <td style="padding: 8px 0; text-align: right;">
-                          <span style="color: #111827; font-size: 14px; font-weight: 600;">${invoice.invoice_number}</span>
+                          <span style="color: #111827; font-size: 14px; font-weight: 600;">${escapeHtml(invoice.invoice_number)}</span>
                         </td>
                       </tr>
                       <tr>
@@ -183,7 +189,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
               ${invoice.payment_instructions ? `
               <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px 20px; margin-bottom: 30px; border-radius: 0 8px 8px 0;">
                 <p style="margin: 0 0 5px; color: #166534; font-size: 14px; font-weight: 600;">Payment Instructions</p>
-                <p style="margin: 0; color: #15803d; font-size: 14px; line-height: 1.5;">${invoice.payment_instructions}</p>
+                <p style="margin: 0; color: #15803d; font-size: 14px; line-height: 1.5; white-space: pre-line;">${escapeHtml(invoice.payment_instructions)}</p>
               </div>
               ` : ''}
               
@@ -214,31 +220,34 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 export async function GET(request: NextRequest) {
   try {
     // Authenticate user
-    const supabase = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const authResult = await requireAuth()
+    if (authResult.error !== null || !authResult.supabase) {
       return NextResponse.json({
         success: false,
-        error: 'Not authenticated'
-      }, { status: 401 })
+        error: authResult.error || 'Not authenticated'
+      }, { status: authResult.status || 401 })
     }
+    const { supabase, tenant_id } = authResult
 
     const { searchParams } = new URL(request.url)
     const preview = searchParams.get('preview') === 'true'
 
-    // Get invoices that need reminders - RLS automatically filters by tenant
-    const today = new Date().toISOString().split('T')[0]
+    // Get invoices that need reminders - RLS automatically filters by tenant.
+    // "Today" in the company's timezone (lib/tenant-today), not the server's.
+    const today = await tenantToday(supabase, tenant_id)
 
     const { data: invoices, error } = await supabase
       .from('invoices')
       // Tenant joined so the reminder is sent as the operator with replies
       // routed to them, rather than to the platform's verified domain.
       .select('*, tenant:tenants(company_name, contact_email, company_phone, company_website, logo_url, primary_color, tagline, company_address, license_number, tax_number, document_footer_text, email_domain, email_from_local, email_domain_status)')
-      .not('status', 'in', '("paid","cancelled")')
+      .in('status', [...REMINDABLE_INVOICE_STATUSES])
+      .not('due_date', 'is', null)
       .gt('balance_due', 0)
-      .eq('reminder_paused', false)
-      .or(`next_reminder_date.lte.${today},next_reminder_date.is.null`)
+      // Paused invoices are listed too, marked: this list is the only place a
+      // paused reminder can be resumed, and it used to leave them out. Sending
+      // (POST, the daily job) still skips them.
+      .or(`next_reminder_date.lte.${today},next_reminder_date.is.null,reminder_paused.eq.true`)
       .not('client_email', 'is', null)
       .order('due_date', { ascending: true })
 
@@ -268,7 +277,8 @@ export async function GET(request: NextRequest) {
         days_until_due: daysUntilDue,
         reminder_type: reminderType,
         reminder_count: invoice.reminder_count || 0,
-        last_reminder_sent: invoice.last_reminder_sent
+        last_reminder_sent: invoice.last_reminder_sent,
+        reminder_paused: invoice.reminder_paused === true
       }
     })
 
@@ -290,7 +300,12 @@ export async function GET(request: NextRequest) {
 
 // POST: Process and send reminders
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
@@ -317,7 +332,8 @@ export async function POST(request: NextRequest) {
       // Tenant joined so the reminder is sent as the operator with replies
       // routed to them, rather than to the platform's verified domain.
       .select('*, tenant:tenants(company_name, contact_email, company_phone, company_website, logo_url, primary_color, tagline, company_address, license_number, tax_number, document_footer_text, email_domain, email_from_local, email_domain_status)')
-      .not('status', 'in', '("paid","cancelled")')
+      .in('status', [...REMINDABLE_INVOICE_STATUSES])
+      .not('due_date', 'is', null)
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
       .not('client_email', 'is', null)
@@ -325,7 +341,7 @@ export async function POST(request: NextRequest) {
     if (invoiceIds && invoiceIds.length > 0) {
       query = query.in('id', invoiceIds)
     } else if (sendAll) {
-      const today = new Date().toISOString().split('T')[0]
+      const today = await tenantToday(supabase, tenant_id)
       query = query.or(`next_reminder_date.lte.${today},next_reminder_date.is.null`)
     } else {
       return NextResponse.json(
@@ -353,6 +369,9 @@ export async function POST(request: NextRequest) {
       skipped: 0,
       details: [] as any[]
     }
+    // The company's calendar day, not the server's UTC one: at 10:00 UTC an
+    // invoice due tomorrow in Tokyo read "Payment Due Today".
+    const companyToday = await tenantToday(supabase, tenant_id)
 
     for (const invoice of invoices) {
       // The query filters client_email IS NOT NULL, but keep a row-level
@@ -365,8 +384,15 @@ export async function POST(request: NextRequest) {
 
       // No due date => NaN => every branch below false => 'overdue_30',
       // i.e. a Final Notice for an invoice that was never even due.
-      const overdue = daysOverdueOrNull(invoice.due_date)
+      const overdue = daysOverdueOn(invoice.due_date, companyToday)
       if (overdue === null) {
+        results.skipped++
+        continue
+      }
+      // "Send all due" follows the automatic rule, as the cron does: the first
+      // reminder goes a week before the due date, not the moment an invoice
+      // is raised (one due in 60 days was told "due in 7 days", then weekly).
+      if (sendAll && !(invoiceIds && invoiceIds.length > 0) && !isFirstReminderDue(invoice.next_reminder_date, overdue)) {
         results.skipped++
         continue
       }
@@ -379,6 +405,18 @@ export async function POST(request: NextRequest) {
       else if (daysUntilDue >= -7) reminderType = 'overdue_7'
       else if (daysUntilDue >= -14) reminderType = 'overdue_14'
       else reminderType = 'overdue_30'
+
+      // "Send all due" is the automatic rule run by hand: an invoice already
+      // reminded this week (its next date failed to save) is not sent a second
+      // demand. Invoices picked one by one are sent as asked.
+      if (sendAll && !(invoiceIds && invoiceIds.length > 0)) {
+        const recent = await recentReminderSentAt(supabase, invoice.id)
+        if (recent) {
+          await supabase.from('invoices').update({ next_reminder_date: nextReminderAfter(recent) }).eq('id', invoice.id)
+          results.skipped++
+          continue
+        }
+      }
 
       const { subject, html } = generateReminderEmail(invoice, reminderType)
 
@@ -397,7 +435,7 @@ export async function POST(request: NextRequest) {
         const nextReminderDate = new Date()
         nextReminderDate.setDate(nextReminderDate.getDate() + 7) // Next reminder in 7 days
 
-        await supabase
+        const { error: dateError } = await supabase
           .from('invoices')
           .update({
             last_reminder_sent: new Date().toISOString(),
@@ -405,6 +443,7 @@ export async function POST(request: NextRequest) {
             next_reminder_date: nextReminderDate.toISOString().split('T')[0]
           })
           .eq('id', invoice.id)
+        if (dateError) console.error('reminder sent but next date not saved:', invoice.id, dateError.message)
 
         // Log reminder
         await supabase

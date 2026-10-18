@@ -6,6 +6,8 @@
 
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
+import { tenantToday } from '@/lib/tenant-today'
 import {
   CONTRACT_EXPIRING_DAYS,
   contractStatus,
@@ -22,8 +24,11 @@ export async function GET() {
     const auth = await requireAuth()
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const supabase = auth.supabase!
+    // Supplier contracts belong to Suppliers, which is managers' and admins'.
+    const denied = roleDenied(auth.role, 'manage')
+    if (denied) return denied
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = await tenantToday(supabase, auth.tenant_id)
     const { from, to } = contractsExpiryWindow(today)
 
     const { data, error } = await supabase

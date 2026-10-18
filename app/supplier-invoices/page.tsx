@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Receipt, Plus, Upload, Loader2, X, Sparkles } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
+import { formatTotals, type CurrencyTotals } from '@/lib/currency-totals'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 const money = (n: number, c = 'EUR') => `${getCurrencySymbol(c)}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -22,7 +24,7 @@ interface Invoice {
   id: string; internal_reference: string | null; supplier_invoice_number: string; supplier_name: string
   invoice_date: string; amount: number; currency: string; status: string; match_status: string
 }
-interface Summary { total: number; total_amount: number; unmatched: number; approved: number; paid: number; disputed: number }
+interface Summary { total: number; total_amount: CurrencyTotals; unmatched: number; approved: number; paid: number; disputed: number }
 
 const BLANK = { supplier_invoice_number: '', supplier_name: '', invoice_date: '', due_date: '', amount: '', currency: 'EUR', tax_amount: '', description: '' }
 
@@ -39,6 +41,11 @@ export default function SupplierInvoicesPage() {
   const [parsing, setParsing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [parseNote, setParseNote] = useState<string | null>(null)
+  // The document the form was read from: attached to the new invoice on save
+  // (it was thrown away, and had to be uploaded again on the detail page).
+  const [parsedFile, setParsedFile] = useState<File | null>(null)
+  const { tenant } = useTenant()
+  const blank = () => ({ ...BLANK, currency: tenant?.default_currency || 'EUR' })
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -49,6 +56,7 @@ export default function SupplierInvoicesPage() {
       const res = await fetch(`/api/supplier-invoices?${p}`)
       const data = await res.json()
       if (data.success) { setInvoices(data.data); setSummary(data.summary) }
+      else showToast('error', data.error || 'Could not load supplier invoices')
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }, [statusFilter, matchFilter, search])
 
@@ -68,8 +76,9 @@ export default function SupplierInvoicesPage() {
         setForm({
           supplier_invoice_number: d.supplier_invoice_number || '', supplier_name: d.supplier_name || '',
           invoice_date: d.invoice_date || '', due_date: d.due_date || '', amount: String(d.total_amount || ''),
-          currency: d.currency || 'EUR', tax_amount: String(d.tax_amount || ''), description: d.description || '',
+          currency: d.currency || form.currency, tax_amount: String(d.tax_amount || ''), description: d.description || '',
         })
+        setParsedFile(file)
         setParseNote(d.notes || 'Extracted — please review the fields below.')
       } else { setParseNote(data.error || 'Could not parse the document.') }
     } catch (e: any) { setParseNote(e?.message || 'Parse failed') } finally { setParsing(false) }
@@ -80,10 +89,19 @@ export default function SupplierInvoicesPage() {
     try {
       const res = await fetch('/api/supplier-invoices', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, amount: parseFloat(form.amount) || 0, tax_amount: parseFloat(form.tax_amount) || 0 }),
+        // Sent as typed: the server refuses an amount that is not a number
+        // above 0 (it was turned into 0 here and saved).
+        body: JSON.stringify({ ...form, amount: form.amount, tax_amount: form.tax_amount || 0 }),
       })
       const data = await res.json()
-      if (data.success) { setShowModal(false); setForm({ ...BLANK }); setParseNote(null); router.push(`/supplier-invoices/${data.data.id}`) }
+      if (data.success) {
+        if (parsedFile) {
+          const fd = new FormData(); fd.append('file', parsedFile)
+          const up = await fetch(`/api/supplier-invoices/${data.data.id}/upload`, { method: 'POST', body: fd }).catch(() => null)
+          if (!up || !up.ok) showToast('error', 'Invoice created, but the document could not be attached — upload it on the invoice page')
+        }
+        setShowModal(false); setForm(blank()); setParseNote(null); setParsedFile(null); router.push(`/supplier-invoices/${data.data.id}`)
+      }
       else showToast('error', data.error || 'Failed to create')
     } catch (e) { console.error(e) } finally { setSaving(false) }
   }
@@ -98,7 +116,7 @@ export default function SupplierInvoicesPage() {
             <p className="text-sm text-gray-500">Accounts payable — match, approve, and pay supplier bills</p>
           </div>
         </div>
-        <button onClick={() => { setForm({ ...BLANK }); setParseNote(null); setShowModal(true) }}
+        <button onClick={() => { setForm(blank()); setParseNote(null); setParsedFile(null); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238]">
           <Plus className="h-4 w-4" /> New Invoice
         </button>
@@ -107,7 +125,7 @@ export default function SupplierInvoicesPage() {
       {/* Summary */}
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-          <Stat label="Total" value={String(summary.total)} sub={money(summary.total_amount)} />
+          <Stat label="Total" value={String(summary.total)} sub={formatTotals(summary.total_amount)} />
           <Stat label="Unmatched" value={String(summary.unmatched)} accent="text-amber-600" />
           <Stat label="Approved" value={String(summary.approved)} accent="text-indigo-600" />
           <Stat label="Paid" value={String(summary.paid)} accent="text-green-600" />
@@ -170,7 +188,7 @@ export default function SupplierInvoicesPage() {
                 {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-[#647C47]" />}
                 {parsing ? 'Reading invoice…' : 'Upload a PDF/image to auto-extract'}
                 <input type="file" accept="application/pdf,image/*" className="hidden" disabled={parsing}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) onParse(f) }} />
+                  onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onParse(f) }} />
               </label>
               {parseNote && <p className="text-xs text-gray-500 bg-gray-50 rounded p-2">{parseNote}</p>}
 

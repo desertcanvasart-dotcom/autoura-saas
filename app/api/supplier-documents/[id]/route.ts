@@ -1,5 +1,7 @@
 import { requireAuth } from '@/lib/supabase-server'
+import { editableSupplierDocumentFields } from '@/lib/documents/supplier-document-fields'
 import { NextRequest, NextResponse } from 'next/server'
+import { gateRole } from '@/lib/api-role-gate'
 
 export async function GET(
   request: NextRequest,
@@ -68,11 +70,14 @@ export async function PUT(
   const { id } = await params
 
   try {
+    const roleGate = await gateRole('staff')
+    if (roleGate) return roleGate
     const body = await request.json()
 
 
-    // Remove fields that shouldn't be updated directly
-    const { itinerary, supplier, created_at, tenant_id, ...updateData } = body
+    // Only real, editable columns (lib/documents/supplier-document-fields):
+    // an unknown field used to fail the whole update.
+    const updateData = editableSupplierDocumentFields(body)
 
     // Auto-set timestamps based on status changes
     if (updateData.status === 'sent' && !updateData.sent_at) {
@@ -131,6 +136,8 @@ export async function DELETE(
   const { id } = await params
 
   try {
+    const roleGate = await gateRole('manage')
+    if (roleGate) return roleGate
     const { error } = await supabase
       .from('supplier_documents')
       .delete()

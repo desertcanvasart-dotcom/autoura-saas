@@ -1,3 +1,4 @@
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { logActivity } from '@/lib/billing-middleware'
@@ -133,6 +134,33 @@ export async function PATCH(request: NextRequest) {
         success: false,
         error: 'Invalid secondary_color format. Must be hex color code (e.g., #10B981)'
       }, { status: 400 })
+    }
+
+    // The agency currency drives invoices, commissions and P&L (migration 281
+    // mirrors it into default_currency): only a supported code.
+    if ('currency' in updates) {
+      const c = String(updates.currency ?? '').trim().toUpperCase()
+      if (!(SUPPORTED_CURRENCIES as readonly string[]).includes(c)) {
+        return NextResponse.json({ success: false, error: `Currency must be one of ${SUPPORTED_CURRENCIES.join(', ')}` }, { status: 400 })
+      }
+      updates.currency = c
+    }
+    // `settings` is merged into what is stored, not written over it: a
+    // partial object wiped every other setting.
+    if ('settings' in updates) {
+      if (!updates.settings || typeof updates.settings !== 'object' || Array.isArray(updates.settings)) {
+        return NextResponse.json({ success: false, error: 'settings must be an object' }, { status: 400 })
+      }
+      const { data: current } = await supabase.from('tenants').select('settings').eq('id', tenant_id).maybeSingle()
+      const stored = (current as { settings?: Record<string, unknown> | null } | null)?.settings
+      updates.settings = { ...(stored && typeof stored === 'object' ? stored : {}), ...updates.settings }
+    }
+    if ('office_email_addresses' in updates) {
+      if (!Array.isArray(updates.office_email_addresses)) {
+        return NextResponse.json({ success: false, error: 'office_email_addresses must be a list' }, { status: 400 })
+      }
+      updates.office_email_addresses = (updates.office_email_addresses as unknown[])
+        .map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean)
     }
 
     if (Object.keys(updates).length === 0) {

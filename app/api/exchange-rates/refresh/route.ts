@@ -1,31 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { refreshExchangeRates } from '@/lib/exchange-rate-refresh'
+import { secretMatches } from '@/lib/support/probe-auth'
+import { isSuperAdmin } from '@/lib/super-admin-shared'
+import { roleDenied } from '@/lib/api-role-gate'
+import { checkSharedRateLimit } from '@/lib/rate-limit-shared'
+import { rateLimitResponse } from '@/lib/rate-limit'
 
 function getSupabaseAdmin() {
   return createAdminClient()
 }
 
 /**
- * Authorize either a logged-in user session OR a cron caller presenting
- * the x-cron-secret header. Fails closed if CRON_SECRET is unset.
- * Returns null when authorized, or an error response otherwise.
+ * Who may refresh the SHARED system rates: the cron (x-cron-secret, compared
+ * in constant time), a platform admin, or a company owner/admin. Only the
+ * first two may force a refresh: a forced refresh spends the paid
+ * ExchangeRate-API quota every call, and one script looping on it would
+ * leave every company on stale rates. Everyone else gets the normal
+ * "only when stale" refresh, which is a no-op while the rates are fresh.
  */
-async function authorizeSessionOrCron(request: NextRequest): Promise<NextResponse | null> {
-  const cronSecret = process.env.CRON_SECRET
-  const headerSecret = request.headers.get('x-cron-secret')
-  if (cronSecret && headerSecret === cronSecret) {
-    return null
+async function authorize(request: NextRequest): Promise<{ denied: NextResponse | null; mayForce: boolean }> {
+  if (secretMatches(request.headers.get('x-cron-secret'), process.env.CRON_SECRET)) {
+    return { denied: null, mayForce: true }
   }
-
   const authResult = await requireAuth()
   if (authResult.error !== null) {
-    return NextResponse.json(
-      { success: false, error: authResult.error },
-      { status: authResult.status }
-    )
+    return { denied: NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status }), mayForce: false }
   }
-  return null
+  if (isSuperAdmin(authResult.user.email ?? '')) return { denied: null, mayForce: true }
+  const denied = roleDenied(authResult.role, 'admin')
+  if (denied) return { denied, mayForce: false }
+  const limited = await checkSharedRateLimit(authResult.tenant_id, 'heavy')
+  if (!limited.success) return { denied: rateLimitResponse(limited), mayForce: false }
+  return { denied: null, mayForce: false }
 }
 
 /**
@@ -42,13 +49,11 @@ async function authorizeSessionOrCron(request: NextRequest): Promise<NextRespons
  */
 export async function POST(request: NextRequest) {
   try {
-    const authError = await authorizeSessionOrCron(request)
-    if (authError) {
-      return authError
-    }
+    const { denied, mayForce } = await authorize(request)
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
-    const force = searchParams.get('force') === 'true'
+    const force = mayForce && searchParams.get('force') === 'true'
 
     // Shared job body — see lib/exchange-rate-refresh.ts. The scheduled
     // counterpart is POST /api/cron/refresh-exchange-rates, which runs the
@@ -90,9 +95,12 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const authError = await authorizeSessionOrCron(request)
-    if (authError) {
-      return authError
+    // Reading the shared rates' status: the cron or anyone signed in.
+    if (!secretMatches(request.headers.get('x-cron-secret'), process.env.CRON_SECRET)) {
+      const authResult = await requireAuth()
+      if (authResult.error !== null) {
+        return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+      }
     }
 
     const { data: rates, error } = await (getSupabaseAdmin() as any)

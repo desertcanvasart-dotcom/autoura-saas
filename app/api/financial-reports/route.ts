@@ -1,3 +1,4 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 // app/api/financial-reports/route.ts
 // ============================================
 // AUTOURA - FINANCIAL REPORTS API
@@ -7,6 +8,7 @@
 // Security: Requires authentication, ALL data filtered by tenant
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import {
@@ -33,7 +35,9 @@ import { mergeFxSummary, emptyFxSummary, type FxHole } from '@/lib/fx-conversion
 // Both previously inflated the figures they appeared in.
 
 /** Invoices in this state are not revenue. */
-const EXCLUDED_INVOICE_STATUSES = new Set(['cancelled'])
+// Drafts too: an invoice nobody has sent is not revenue or a receivable (a
+// 5,000 draft counted in both).
+const EXCLUDED_INVOICE_STATUSES = new Set(['cancelled', 'draft'])
 /** A rejected expense is not a cost. */
 const EXCLUDED_EXPENSE_STATUSES = new Set(['rejected'])
 
@@ -109,6 +113,11 @@ interface CommissionData {
  * RLS policies automatically filter ALL data by tenant_id
  */
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     // Use authenticated client - RLS automatically filters ALL queries by tenant
     const supabase = await createAuthenticatedClient()
@@ -145,48 +154,60 @@ export async function GET(request: NextRequest) {
       availableYearsResult
     ] = await Promise.all([
       // Current year invoices - only needed columns
-      supabase
+      fetchAllPages((from, to) => supabase
         .from('invoices')
         .select('id, invoice_number, issue_date, paid_at, total_amount, amount_paid, balance_due, tax_amount, currency, status')
         .gte('issue_date', yearStart)
         .lte('issue_date', yearEnd)
-        .order('issue_date', { ascending: true }),
+        .order('issue_date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)),
 
       // Current year expenses - only needed columns
-      supabase
+      fetchAllPages((from, to) => supabase
         .from('expenses')
         .select('id, expense_number, expense_date, payment_date, amount, currency, status, category, supplier_name')
         .gte('expense_date', yearStart)
         .lte('expense_date', yearEnd)
-        .order('expense_date', { ascending: true }),
+        .order('expense_date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)),
 
       // Current year itineraries - only needed columns
-      supabase
+      fetchAllPages((from, to) => supabase
         .from('itineraries')
         .select('id, start_date, status')
         .gte('start_date', yearStart)
-        .lte('start_date', yearEnd),
+        .lte('start_date', yearEnd)
+        .order('id', { ascending: true })
+        .range(from, to)),
 
       // Previous year invoices for YoY comparison
-      supabase
+      fetchAllPages((from, to) => supabase
         .from('invoices')
         .select('id, invoice_number, total_amount, amount_paid, balance_due, currency, status, issue_date, paid_at')
         .gte('issue_date', prevYearStart)
-        .lte('issue_date', prevYearEnd),
+        .lte('issue_date', prevYearEnd)
+        .order('id', { ascending: true })
+        .range(from, to)),
 
       // Previous year expenses for YoY comparison
-      supabase
+      fetchAllPages((from, to) => supabase
         .from('expenses')
         .select('id, expense_number, amount, currency, status, expense_date, payment_date')
         .gte('expense_date', prevYearStart)
-        .lte('expense_date', prevYearEnd),
+        .lte('expense_date', prevYearEnd)
+        .order('id', { ascending: true })
+        .range(from, to)),
 
-      // Get available years (distinct years from invoices/expenses)
+      // The earliest invoice: every year from it to now is selectable. (The
+      // newest 1000 invoices' years dropped a busy company's early years.)
       supabase
         .from('invoices')
         .select('issue_date')
-        .order('issue_date', { ascending: false })
-        .limit(1000)
+        .not('issue_date', 'is', null)
+        .order('issue_date', { ascending: true })
+        .limit(1)
     ])
 
     const rawYearInvoices = ((yearInvoicesResult.data || []) as ReportInvoice[])
@@ -388,13 +409,17 @@ export async function GET(request: NextRequest) {
     // wearing a report. vat_paid is NULL because expenses carry no tax
     // field at all: input VAT is genuinely untracked, and an honest hole
     // beats a fabricated 14%-of-expenses.
+    // Revenue for tax is net of the VAT collected on it: total_amount includes
+    // tax, so a 1,140 invoice at 14% counted 1,140 of income AND 140 of VAT.
+    const vatCollected = yearInvoices.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0)
+    const netRevenue = totalRevenue - vatCollected
     const taxSummary = {
-      gross_revenue: totalRevenue,
+      gross_revenue: netRevenue,
       total_expenses: totalExpensesAmount,
       deductible_expenses: deductibleTotal,
-      taxable_income: totalRevenue - deductibleTotal,
+      taxable_income: netRevenue - deductibleTotal,
       expense_breakdown: categoryBreakdown,
-      vat_collected: yearInvoices.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
+      vat_collected: vatCollected,
       vat_paid: null as number | null,
       net_vat: null as number | null,
     }
@@ -498,7 +523,7 @@ export async function GET(request: NextRequest) {
       commissionSummary,
       yearOverYear,
       availableYears: [...new Set([
-        ...(availableYearsResult.data || []).map((inv: any) => new Date(inv.issue_date).getFullYear()),
+        ...yearsFrom((availableYearsResult.data || [])[0]?.issue_date, year),
         year, // Always include current year
         prevYear // Always include previous year
       ])].filter(y => y > 2020).sort((a, b) => b - a)
@@ -507,4 +532,13 @@ export async function GET(request: NextRequest) {
     console.error('❌ Error in Financial Reports GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+/** Every year from the earliest invoice's year to `current`. */
+function yearsFrom(earliest: string | null | undefined, current: number): number[] {
+  const first = earliest ? Number(String(earliest).slice(0, 4)) : current
+  if (!Number.isFinite(first) || first > current) return []
+  const out: number[] = []
+  for (let y = first; y <= current; y++) out.push(y)
+  return out
 }

@@ -9,10 +9,10 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 // tenant_destinations is read-only to authenticated — so every write comes
 // through here: owner/admin gate, then the admin client with the caller's
 // tenant stamped explicitly. Self-serve model: a tenant can add countries
-// and cities to the shared catalog (additive, benign — every tenant picks
-// which countries it actually operates), but nothing here can update or
-// delete a GLOBAL city another tenant may be using; that stays operator-side
-// until there is super-admin tooling.
+// and cities, and they are its OWN (added_by_tenant, migration 435): adding
+// to the shared catalogue put them in every agency's dropdowns and AI
+// vocabulary. Nothing here can update or delete a shared row; that stays
+// operator-side until there is super-admin tooling.
 //
 // Actions:
 //   select_destination   { catalog_id }
@@ -44,11 +44,19 @@ export async function POST(request: NextRequest) {
     const action = body?.action as string
 
     const admin = createAdminClient()
+    // What this company may see and use (migration 435): the shared catalogue
+    // plus its own additions — never another company's.
+    const visible = `added_by_tenant.is.null,added_by_tenant.eq.${tenant_id}`
+    const destinationVisible = async (catalogId: string) => {
+      const { data } = await admin.from('destination_catalog').select('id').eq('id', catalogId).or(visible).maybeSingle()
+      return Boolean(data)
+    }
 
     switch (action) {
       case 'select_destination': {
         const catalogId = body.catalog_id as string
         if (!catalogId) return badRequest('catalog_id is required')
+        if (!(await destinationVisible(catalogId))) return badRequest('Unknown destination')
 
         // First selection becomes the default automatically.
         const { count } = await admin
@@ -143,9 +151,18 @@ export async function POST(request: NextRequest) {
         if (!/^[A-Z]{2}$/.test(countryCode)) return badRequest('country_code must be a 2-letter ISO code')
         if (!name) return badRequest('name is required')
 
+        const { data: existing } = await admin
+          .from('destination_catalog')
+          .select('id')
+          .eq('country_code', countryCode)
+          .or(visible)
+          .limit(1)
+        if (existing && existing.length) return badRequest(`${countryCode} already exists in the catalog — select it instead`)
+
+        // The company's own addition, seen only by it (migration 435).
         const { data: created, error } = await admin
           .from('destination_catalog')
-          .insert({ country_code: countryCode, name, name_ja: body.name_ja || null })
+          .insert({ country_code: countryCode, name, name_ja: body.name_ja || null, added_by_tenant: tenant_id })
           .select('id')
           .single()
         if (error) {
@@ -172,7 +189,8 @@ export async function POST(request: NextRequest) {
         if (raw !== null && raw !== undefined) {
           if (!Array.isArray(raw)) return badRequest('city_ids must be an array of ids, or null for every city')
           // Only ids that belong to THIS destination survive.
-          const { data: known } = await admin.from('destination_cities').select('id').eq('catalog_id', catalogId)
+          if (!(await destinationVisible(catalogId))) return badRequest('Unknown destination')
+          const { data: known } = await admin.from('destination_cities').select('id').eq('catalog_id', catalogId).or(visible)
           const ok = new Set((known ?? []).map(c => c.id))
           cityIds = raw.map(String).filter(id => ok.has(id))
           if (cityIds.length === 0) return badRequest('Keep at least one city, or choose every city')
@@ -189,6 +207,19 @@ export async function POST(request: NextRequest) {
         const name = String(body.name || '').trim()
         if (!catalogId) return badRequest('catalog_id is required')
         if (!name) return badRequest('name is required')
+        if (!(await destinationVisible(catalogId))) return badRequest('Unknown destination')
+
+        // The same city in the SAME country, whatever its case: the unique
+        // rule is case-sensitive, so "luxor" sat beside "Luxor" in every
+        // agency's dropdowns. The catalog is shared; there is no delete.
+        const { data: same } = await admin
+          .from('destination_cities')
+          .select('id, name')
+          .eq('catalog_id', catalogId)
+          .ilike('name', name.replace(/[\\%_]/g, ch => `\\${ch}`))
+          .or(visible)
+          .limit(1)
+        if (same && same.length) return badRequest(`"${(same[0] as { name: string }).name}" is already in this country`)
 
         // Same-name city in ANOTHER country: allowed (Alexandria exists twice
         // on Earth) but flagged, so vocabulary collisions in the AI parser
@@ -198,6 +229,7 @@ export async function POST(request: NextRequest) {
           .select('id, catalog_id, destination_catalog(name)')
           .ilike('name', name)
           .neq('catalog_id', catalogId)
+          .or(visible)
 
         const { data: maxRow } = await admin
           .from('destination_cities')
@@ -220,6 +252,7 @@ export async function POST(request: NextRequest) {
             aliases: Array.isArray(body.aliases) ? body.aliases : [],
             airport_codes: Array.isArray(body.airport_codes) ? body.airport_codes : [],
             sort_order: (maxRow?.sort_order ?? 0) + 1,
+            added_by_tenant: tenant_id,
           })
           .select('id')
           .single()

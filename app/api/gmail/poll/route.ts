@@ -1,8 +1,18 @@
+import { gmailReconnectResponse } from '@/lib/gmail-reconnect'
+import { sealToken, openToken } from '@/lib/token-crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { google } from '@/lib/google'
 import { createClient } from '@supabase/supabase-js'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { notifyNewEmails } from '@/lib/email/new-mail-alerts'
+import { currentTenantId, type MembershipDb } from '@/lib/current-membership'
+import {
+  collectHistoryChanges,
+  isInboxArrival,
+  MAX_HISTORY_PAGES,
+  MAX_NEW_FETCH,
+  type HistoryRecord,
+} from '@/lib/email/poll-history'
 
 // Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
 let _supabase: ReturnType<typeof createClient> | null = null
@@ -42,12 +52,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
+    // The mailbox of the company being worked in (migration 415).
+    const { tenantId: mailboxTenant } = await currentTenantId(authClient as unknown as MembershipDb)
+    if (!mailboxTenant) {
+      return NextResponse.json({ error: 'No active company' }, { status: 403 })
+    }
+
     // Get user's Gmail tokens
     const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
@@ -61,8 +78,8 @@ export async function GET(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: openToken(tokenData.access_token),
+      refresh_token: openToken(tokenData.refresh_token),
     })
 
     // Check if token needs refresh
@@ -72,11 +89,12 @@ export async function GET(request: NextRequest) {
       await (getSupabase() as any)
         .from('gmail_tokens')
         .update({
-          access_token: credentials.access_token,
+          access_token: sealToken(credentials.access_token),
           token_expiry: new Date(credentials.expiry_date!).toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
+        .eq('tenant_id', mailboxTenant)
 
       oauth2Client.setCredentials(credentials)
     }
@@ -95,69 +113,59 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get history since last check
+    // Get history since last check — every page of it. Advancing historyId
+    // past an unread page loses those changes for good (lib/email/poll-history).
     try {
-      const history = await gmail.users.history.list({
-        userId: 'me',
-        startHistoryId: historyId,
-        historyTypes: ['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'],
-      })
+      const records: HistoryRecord[] = []
+      let latestHistoryId: string | null | undefined
+      let pageToken: string | undefined
+      let pages = 0
+      do {
+        const history = await gmail.users.history.list({
+          userId: 'me',
+          startHistoryId: historyId,
+          historyTypes: ['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'],
+          ...(pageToken ? { pageToken } : {}),
+        })
+        records.push(...(history.data.history ?? []))
+        latestHistoryId = history.data.historyId || latestHistoryId
+        pageToken = history.data.nextPageToken || undefined
+        pages++
+      } while (pageToken && pages < MAX_HISTORY_PAGES)
 
-      if (!history.data.history) {
+      // More change than one poll should replay: reload the list instead.
+      if (pageToken) {
+        const profile = await gmail.users.getProfile({ userId: 'me' })
         return NextResponse.json({
-          historyId: history.data.historyId || historyId,
-          hasChanges: false,
+          historyId: profile.data.historyId,
+          hasChanges: true,
           newMessages: [],
           deletedMessages: [],
           labelChanges: [],
+          needsFullRefresh: true,
         })
       }
 
-      const newMessageIds: string[] = []
-      const deletedMessageIds: string[] = []
-      const labelChanges: Array<{
-        messageId: string
-        labelsAdded?: string[]
-        labelsRemoved?: string[]
-      }> = []
+      const { newMessageIds, deletedMessageIds, labelChanges } = collectHistoryChanges(records)
+      const nextHistoryId = latestHistoryId || historyId
 
-      for (const item of history.data.history) {
-        // New messages
-        if (item.messagesAdded) {
-          for (const msg of item.messagesAdded) {
-            if (msg.message?.id) {
-              newMessageIds.push(msg.message.id)
-            }
-          }
-        }
-
-        // Deleted messages
-        if (item.messagesDeleted) {
-          for (const msg of item.messagesDeleted) {
-            if (msg.message?.id) {
-              deletedMessageIds.push(msg.message.id)
-            }
-          }
-        }
-
-        // Label changes
-        if (item.labelsAdded || item.labelsRemoved) {
-          const messageId = item.labelsAdded?.[0]?.message?.id || 
-                           item.labelsRemoved?.[0]?.message?.id
-
-          if (messageId) {
-            labelChanges.push({
-              messageId,
-              labelsAdded: item.labelsAdded?.map(l => l.labelIds || []).flat(),
-              labelsRemoved: item.labelsRemoved?.map(l => l.labelIds || []).flat(),
-            })
-          }
-        }
+      // More arrivals than are worth fetching one by one: the inbox reloads,
+      // which shows them all, rather than showing ten and dropping the rest.
+      if (newMessageIds.length > MAX_NEW_FETCH) {
+        return NextResponse.json({
+          historyId: nextHistoryId,
+          hasChanges: true,
+          newMessages: [],
+          deletedMessages: deletedMessageIds,
+          labelChanges,
+          needsFullRefresh: true,
+          totalNew: newMessageIds.length,
+        })
       }
 
       // Fetch details for new messages
       const newMessages = []
-      for (const messageId of newMessageIds.slice(0, 10)) { // Limit to 10
+      for (const messageId of newMessageIds) {
         try {
           const message = await gmail.users.messages.get({
             userId: 'me',
@@ -166,8 +174,12 @@ export async function GET(request: NextRequest) {
             metadataHeaders: ['From', 'To', 'Subject', 'Date'],
           })
 
+          // History may not carry labels; the message itself always does.
+          // A sent reply or a draft is not new mail in the Inbox.
+          if (!isInboxArrival(message.data.labelIds ?? [])) continue
+
           const headers = message.data.payload?.headers || []
-          const getHeader = (name: string) => 
+          const getHeader = (name: string) =>
             headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || ''
 
           newMessages.push({
@@ -188,12 +200,12 @@ export async function GET(request: NextRequest) {
       }
 
       return NextResponse.json({
-        historyId: history.data.historyId,
+        historyId: nextHistoryId,
         hasChanges: newMessages.length > 0 || deletedMessageIds.length > 0 || labelChanges.length > 0,
         newMessages,
         deletedMessages: deletedMessageIds,
         labelChanges,
-        totalNew: newMessageIds.length,
+        totalNew: newMessages.length,
       })
 
     } catch (error: any) {
@@ -214,6 +226,8 @@ export async function GET(request: NextRequest) {
     }
 
   } catch (error: any) {
+    const reconnect = gmailReconnectResponse(error)
+    if (reconnect) return reconnect
     console.error('Error polling emails:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
@@ -243,12 +257,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
+    // The mailbox of the company being worked in (migration 415).
+    const { tenantId: mailboxTenant } = await currentTenantId(authClient as unknown as MembershipDb)
+    if (!mailboxTenant) {
+      return NextResponse.json({ error: 'No active company' }, { status: 403 })
+    }
+
     // Get user's Gmail tokens
     const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .eq('tenant_id', mailboxTenant)
+      .maybeSingle()
 
     if (tokenError || !tokenData) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
@@ -262,8 +283,8 @@ export async function POST(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: openToken(tokenData.access_token),
+      refresh_token: openToken(tokenData.refresh_token),
     })
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
@@ -294,6 +315,8 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
+    const reconnect = gmailReconnectResponse(error)
+    if (reconnect) return reconnect
     console.error('Error getting email counts:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

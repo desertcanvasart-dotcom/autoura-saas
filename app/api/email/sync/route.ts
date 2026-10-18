@@ -1,9 +1,10 @@
-import { tenantForUser, type MembershipRow } from '@/lib/email/scheduled-sync'
+import { inboundAiAllowed } from '@/lib/ai-guard'
+import { secretMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
 import { createLeadsFromNewConversations, type NewConversation } from '@/lib/email/create-leads'
-import { contactNameFromThread, fillMissingContactNames } from '@/lib/email/contact-name'
+import { contactNameFromThread, fillMissingContactNames, headerAddresses } from '@/lib/email/contact-name'
 
 /** Either client writes the same rows; the sweep's is the service role. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,11 +16,22 @@ import { syncQueries } from '@/lib/inbox-business-filter'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { collectCandidates, storedIds, downloadMessages } from '@/lib/email/gmail-candidates'
+import { tenantClientEmails } from '@/lib/email/tenant-client-emails'
+import { applyRulesToNewMail } from '@/lib/email/apply-rules'
+import type { MailRule } from '@/lib/email/mail-rules'
 
+/** The first real address in a header, or '' (lib/email/contact-name headerAddresses). */
 function extractEmailAddress(from: string | null | undefined): string {
-  if (!from) return ''
-  const match = from.match(/<([^>]+)>/)
-  return match ? match[1].toLowerCase() : from.toLowerCase().trim()
+  return headerAddresses(from)[0] ?? ''
+}
+
+/**
+ * The customer's address when the office wrote first: the first recipient that
+ * is not the office. A To line naming a colleague first, or a bare list
+ * ("a@x.com, b@y.com"), used to become the conversation's "customer" whole.
+ */
+function firstCustomerAddress(header: string | null | undefined, office: OfficeRule): string {
+  return headerAddresses(header).find(a => !isOfficeAddress(office, a)) ?? ''
 }
 
 function extractDisplayName(from: string | null | undefined): string | null {
@@ -49,17 +61,19 @@ function getDirection(from: string | null | undefined, office: OfficeRule): 'inb
 }
 
 // GET - Sync status
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
 
-    const userId = request.nextUrl.searchParams.get('user_id') || authResult.user?.id
+    // Your own mailbox's progress only: ?user_id= let one member read another's.
+    const userId = authResult.user?.id
     if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
-    const { data } = await supabase.from('email_sync_state').select('*').eq('user_id', userId).single()
+    // Sync progress is per mailbox: this person in this company (migration 415).
+    const { data } = await supabase.from('email_sync_state').select('*').eq('user_id', userId).eq('tenant_id', authResult.tenant_id!).maybeSingle()
     return NextResponse.json({ sync_state: data || { user_id: userId, sync_status: 'idle', emails_synced: 0 }, success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message, success: false }, { status: 500 })
@@ -69,16 +83,18 @@ export async function GET(request: NextRequest) {
 // POST - Trigger email sync
 export async function POST(request: NextRequest) {
   let userId: string | undefined
+  // The mailbox's company, kept for recording a failure.
+  let failedTenant: string | null = null
   try {
     const body = await request.json()
-    const { user_id, full_sync = false, max_results = 100, days_back = 30, use_history = false } = body
+    const { user_id, tenant_id: requestedTenant, full_sync = false, max_results = 100, days_back = 30, use_history = false } = body
 
     // Two ways in. A person, with a session — or the scheduled sweep, with the
     // server-to-server secret, because mail must arrive whether or not anybody
     // has the page open. Fails closed: with CRON_SECRET unset the header path
     // is always rejected, exactly as in /api/gmail/send.
     const cronSecret = process.env.CRON_SECRET
-    const isTrustedServerCall = Boolean(cronSecret && request.headers.get('x-cron-secret') === cronSecret)
+    const isTrustedServerCall = secretMatches(request.headers.get('x-cron-secret'), cronSecret)
 
     let db: SupabaseLike
     let tenant_id: string | null = null
@@ -86,21 +102,17 @@ export async function POST(request: NextRequest) {
     if (isTrustedServerCall) {
       userId = user_id
       if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
-      // The tenant comes from the mailbox's own row, never from the request.
+      // A mailbox is (person, company) since migration 415, so the sweep
+      // names the company with the person — and it must be a mailbox that
+      // exists, never just what the request says.
       const { data: owner } = await createAdminClient()
         .from('gmail_tokens')
         .select('tenant_id')
         .eq('user_id', userId)
+        .eq('tenant_id', typeof requestedTenant === 'string' ? requestedTenant : '00000000-0000-0000-0000-000000000000')
         .maybeSingle()
-      // …or, when that row carries none (the sign-in never wrote one: all four
-      // production mailboxes had NULL on 2026-09-20), from the owner's own
-      // membership — still never from the request.
-      const { data: memberships } = await createAdminClient()
-        .from('tenant_members')
-        .select('user_id, tenant_id, joined_at')
-        .eq('user_id', userId)
-        .eq('status', 'active') // the one company rule (migration 390)
-      tenant_id = tenantForUser(userId, owner?.tenant_id ?? null, (memberships ?? []) as MembershipRow[])
+      tenant_id = owner?.tenant_id ?? null
+      failedTenant = tenant_id
       if (!tenant_id) return NextResponse.json({ error: 'Mailbox is not linked to a company', success: false }, { status: 404 })
       // No session, so no RLS client: the sweep spans every tenant and writes
       // with the service role, scoped by the tenant_id resolved above.
@@ -111,6 +123,7 @@ export async function POST(request: NextRequest) {
       if (!authResult.supabase || !authResult.tenant_id) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
       db = authResult.supabase as unknown as SupabaseLike
       tenant_id = authResult.tenant_id
+      failedTenant = tenant_id
       userId = user_id || authResult.user?.id
       if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
@@ -129,7 +142,7 @@ export async function POST(request: NextRequest) {
     // refresh_token can be revoked from `authenticated` (migration 273) — RLS
     // is row-level, not column-level, so an own-row SELECT policy necessarily
     // hands the refresh token to the user's own browser.
-    const { data: tokenRecord } = await createAdminClient().from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).single()
+    const { data: tokenRecord } = await createAdminClient().from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).eq('tenant_id', tenant_id).maybeSingle()
     if (!tokenRecord || !tokenRecord.access_token || !tokenRecord.refresh_token) return NextResponse.json({ error: 'Gmail not connected', success: false }, { status: 401 })
     const refreshToken = tokenRecord.refresh_token
 
@@ -162,7 +175,7 @@ export async function POST(request: NextRequest) {
     const repaired = await repairOfficeDirections(db as never, tenant_id, office)
 
     // Update sync state
-    await db.from('email_sync_state').upsert({ user_id: userId, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    await db.from('email_sync_state').upsert({ user_id: userId, tenant_id, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id,tenant_id' })
 
     // Build query
     let query = ''
@@ -175,14 +188,15 @@ export async function POST(request: NextRequest) {
     // (Updates does — hotel and airline confirmations live there). A sender
     // already on record is rescued from those categories by a second pass,
     // so a client Gmail misfiled is never lost. See lib/inbox-business-filter.
-    const { data: knownRows } = await createAdminClient().from('clients').select('email').eq('tenant_id', tenant_id).not('email', 'is', null)
-    const { main: mainQuery, rescues } = syncQueries(query, (knownRows ?? []).map((r: { email: string | null }) => r.email || ''))
+    // Every client, paged — a plain select stops at 1000 rows without saying so.
+    const knownRows = await tenantClientEmails(createAdminClient() as unknown as Parameters<typeof tenantClientEmails>[0], tenant_id)
+    const { main: mainQuery, rescues } = syncQueries(query, knownRows.map(r => r.email))
 
     // Which messages to download (lib/email/gmail-candidates.ts): what Gmail
     // added since the stored history id on a scheduled run, else the date
     // window — then only the ones not already stored.
-    const { data: syncState } = await db.from('email_sync_state').select('last_history_id').eq('user_id', userId).maybeSingle()
-    const knownSenders = new Set((knownRows ?? []).map((r: { email: string | null }) => (r.email || '').trim().toLowerCase()).filter(Boolean))
+    const { data: syncState } = await db.from('email_sync_state').select('last_history_id').eq('user_id', userId).eq('tenant_id', tenant_id).maybeSingle()
+    const knownSenders = new Set(knownRows.map(r => r.email.trim().toLowerCase()).filter(Boolean))
     const candidates = await collectCandidates(gmail, {
       useHistory: Boolean(use_history) && !full_sync,
       startHistoryId: (syncState as { last_history_id?: string | null } | null)?.last_history_id ?? null,
@@ -209,6 +223,32 @@ export async function POST(request: NextRequest) {
       download_failed: downloaded.failed,
       download_gone: downloaded.gone,
       insert_failed: 0,
+      rules_applied: 0,
+      rules_error: undefined as string | undefined,
+    }
+
+    // Mail rules (migration 422): the company's rules run on what just
+    // arrived — filed, starred, read, out of the Inbox, to Spam or to Trash.
+    // Mail a rule sends to Spam or Trash is not filed into conversations. A
+    // rule that cannot be applied is reported, never a reason to fail the sync.
+    let ruleRemoved = new Set<string>()
+    try {
+      const { data: ruleRows, error: rulesErr } = await createAdminClient()
+        .from('email_rules')
+        .select('id, name, enabled, conditions, actions')
+        .eq('tenant_id', tenant_id)
+        .eq('enabled', true)
+        .order('created_at', { ascending: true })
+      if (rulesErr) throw new Error(rulesErr.message)
+      if (ruleRows && ruleRows.length > 0 && downloaded.messages.length > 0) {
+        const applied = await applyRulesToNewMail(gmail, ruleRows as unknown as MailRule[], downloaded.messages)
+        result.rules_applied = applied.applied
+        ruleRemoved = applied.removedIds
+      }
+    } catch (ruleErr) {
+      const msg = ruleErr instanceof Error ? ruleErr.message : String(ruleErr)
+      console.error('[Email Sync] mail rules failed:', msg)
+      result.rules_error = msg
     }
 
     // Track conversation ids that received at least one new inbound message
@@ -222,6 +262,7 @@ export async function POST(request: NextRequest) {
     // Group by thread (only the newly downloaded messages)
     const threadMessages = new Map<string, any[]>()
     for (const detail of downloaded.messages) {
+      if (detail.id && ruleRemoved.has(detail.id)) continue
       const threadId = detail.threadId!
       if (!threadMessages.has(threadId)) threadMessages.set(threadId, [])
       threadMessages.get(threadId)!.push(detail)
@@ -247,7 +288,9 @@ export async function POST(request: NextRequest) {
         const firstTo = getH(firstHeaders, 'To')
         const firstDir = getDirection(firstFrom, office)
         const customerHeader = firstDir === 'inbound' ? firstFrom : firstTo
-        const contactEmail = extractEmailAddress(customerHeader)
+        const contactEmail = firstDir === 'inbound'
+          ? extractEmailAddress(firstFrom)
+          : firstCustomerAddress(firstTo, office)
         // Any header in the thread that names the customer — not only the
         // first one, which is a bare address when the office wrote first
         // (lib/email/contact-name.ts).
@@ -306,18 +349,39 @@ export async function POST(request: NextRequest) {
             })
             .select('id')
             .single()
-          if (unifiedErr || !newUnified) continue
-          unifiedId = newUnified.id
-          // Judged for a travel request after the loop: a conversation is
-          // judged ONCE, when it first appears.
-          newConversations.push({
-            unifiedId,
-            fromEmail: contactEmail,
-            fromName: contactName,
-            subject: getH(firstHeaders, 'Subject'),
-            body: sorted[0]?.snippet || '',
-          })
-          result.conversations_created++
+          if (unifiedErr || !newUnified) {
+            // Another sync (the scheduled sweep, a Sync click) created this
+            // contact's conversation a moment ago: file the mail there.
+            const { data: raced } = unifiedErr?.code === '23505'
+              ? await db
+                  .from('unified_conversations')
+                  .select('id')
+                  .eq('tenant_id', tenant_id)
+                  .eq('contact_email', contactEmail)
+                  .maybeSingle()
+              : { data: null }
+            if (!raced) {
+              // Counted, so the history id is not advanced past mail that was
+              // never stored (it was dropped silently before).
+              console.error('[Email Sync] conversation insert failed:', unifiedErr?.message)
+              insertFailed += messages.length
+              continue
+            }
+            unifiedId = raced.id
+            result.conversations_updated++
+          } else {
+            unifiedId = newUnified.id
+            // Judged for a travel request after the loop: a conversation is
+            // judged ONCE, when it first appears.
+            newConversations.push({
+              unifiedId,
+              fromEmail: contactEmail,
+              fromName: contactName,
+              subject: getH(firstHeaders, 'Subject'),
+              body: sorted[0]?.snippet || '',
+            })
+            result.conversations_created++
+          }
         }
 
         // Store each message in email_messages (skip duplicates by gmail_message_id)
@@ -361,7 +425,9 @@ export async function POST(request: NextRequest) {
           const toEmail = extractEmailAddress(toRaw)
           const toName = extractDisplayName(toRaw)
           const cc = getMH('Cc')
-          const ccEmails = cc ? cc.split(',').map((e: string) => extractEmailAddress(e)).filter(Boolean) : null
+          // Quote-aware: `"Smith, John" <j@x.com>` is one address, not two.
+          const ccList = headerAddresses(cc)
+          const ccEmails = ccList.length ? ccList : null
 
           const { error: insErr } = await db.from('email_messages').insert({
             tenant_id,
@@ -422,6 +488,9 @@ export async function POST(request: NextRequest) {
           .eq('id', unifiedId)
       } catch (threadErr: any) {
         console.error('[Email Sync] Thread error:', threadErr?.message || threadErr)
+        // Counted like a failed insert: the run is not clean, so its history
+        // id is not stored and the thread is retried rather than lost.
+        insertFailed++
       }
     }
 
@@ -476,6 +545,9 @@ export async function POST(request: NextRequest) {
             // Serialize to avoid hammering Claude; cap at 10 per sync to stay sensible.
             const capped = convIds.slice(0, 10)
             for (const cid of capped) {
+              // The company's AI ceiling and a per-thread cap (lib/ai-guard):
+              // a flood of inbound mail must not run up the bill.
+              if (!(await inboundAiAllowed(tenant_id, `mail:${cid}`))) continue
               try {
                 await generateDraftReplies({
                   supabase: db as any,
@@ -508,6 +580,7 @@ export async function POST(request: NextRequest) {
     const problem = clean ? null : `${downloaded.failed} message(s) could not be downloaded and ${insertFailed} could not be saved — they are retried on the next run${why}`
     await db.from('email_sync_state').upsert({
       user_id: userId,
+      tenant_id,
       sync_status: clean ? 'idle' : 'partial',
       last_full_sync_at: full_sync ? new Date().toISOString() : undefined,
       ...(clean ? { last_incremental_sync_at: new Date().toISOString() } : {}),
@@ -515,13 +588,13 @@ export async function POST(request: NextRequest) {
       emails_synced: result.messages_created,
       error_message: problem,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+    }, { onConflict: 'user_id,tenant_id' })
     if (!clean) (result as Record<string, unknown>).warning = problem
 
     return NextResponse.json(result)
   } catch (error: any) {
     console.error('[Email Sync] Error:', error.message)
-    if (userId) {
+    if (userId && failedTenant) {
       // The failure is recorded with the service role: the scheduled sweep has
       // no session to write it with, and a failed sync that records nothing is
       // the silence this whole job exists to end.
@@ -529,8 +602,8 @@ export async function POST(request: NextRequest) {
         await createAdminClient()
           .from('email_sync_state')
           .upsert(
-            { user_id: userId, sync_status: 'failed', error_message: error.message, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id' }
+            { user_id: userId, tenant_id: failedTenant, sync_status: 'failed', error_message: error.message, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id,tenant_id' }
           )
       } catch {}
     }

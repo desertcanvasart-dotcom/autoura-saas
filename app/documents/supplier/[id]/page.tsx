@@ -1,5 +1,6 @@
 'use client'
 
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter, brandColor } from '@/components/documents/Letterhead'
 import { formatDateOnly, daysBetween } from '@/lib/date-utils'
@@ -8,8 +9,12 @@ import { useVocabulary } from '@/components/vocabulary'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Download, Send, Mail, MessageSquare, Printer, CheckCircle } from 'lucide-react'
+import { Download, Send, Mail, MessageSquare, Printer, CheckCircle, Pencil } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
+import { withReturnTo, safeReturnPath, FROM_PARAM } from '@/lib/nav/return-to'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VOUCHER_VEHICLE_TYPES } from '@/lib/documents/vehicle-types'
 
 interface SupplierDocument {
   id: string
@@ -31,6 +36,8 @@ interface SupplierDocument {
   pickup_time?: string
   pickup_location?: string
   dropoff_location?: string
+  vehicle_type?: string
+  driver_name?: string
   services: any[]
   currency: string
   total_cost: number
@@ -38,6 +45,8 @@ interface SupplierDocument {
   special_requests?: string
   internal_notes?: string
   status: string
+  sent_at?: string | null
+  confirmed_at?: string | null
   created_at: string
   itinerary?: {
     id: string
@@ -87,6 +96,12 @@ export default function SupplierDocumentViewPage() {
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+  const dialog = useConfirmDialog()
+  // ?from= (the list or trip this was opened from), passed on to Edit.
+  const [returnTo, setReturnTo] = useState<string | null>(null)
+  useEffect(() => {
+    setReturnTo(safeReturnPath(new URLSearchParams(window.location.search).get(FROM_PARAM)))
+  }, [])
 
   useEffect(() => {
     if (params.id) {
@@ -115,7 +130,8 @@ export default function SupplierDocumentViewPage() {
   const buildPdf = async (doc: SupplierDocument) => {
     const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
     const company = { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }
-    return generateSupplierDocumentPDF({ ...withLanguageLabels(doc), company })
+    const labelled = { ...withLanguageLabels(doc), company }
+    return generateSupplierDocumentPDF(labelled, await browserPdfFontFor(labelled))
   }
 
   const handleDownload = async () => {
@@ -141,6 +157,24 @@ export default function SupplierDocumentViewPage() {
     }
   }
 
+  // Marks the voucher sent (the route stamps sent_at). It used to send a
+  // sent_via column the table does not have, so the update always failed and
+  // nothing checked: no voucher ever reached "sent".
+  const markSent = async (documentId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/supplier-documents/${documentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'sent' })
+      })
+      if (!res.ok) showToast('error', 'Sent, but the voucher could not be marked as sent')
+      return res.ok
+    } catch {
+      showToast('error', 'Sent, but the voucher could not be marked as sent')
+      return false
+    }
+  }
+
   const handleSendEmail = async () => {
     if (!document || !document.supplier_contact_email) {
       showToast('error', 'Supplier email not available')
@@ -155,30 +189,24 @@ export default function SupplierDocumentViewPage() {
       const response = await fetch('/api/send-supplier-document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // The route reads the recipient, number and names from the voucher,
+        // and marks it sent once the email has gone.
         body: JSON.stringify({
           documentId: document.id,
-          supplierEmail: document.supplier_contact_email,
-          supplierName: document.supplier_name,
-          documentNumber: document.document_number,
           documentType: DOCUMENT_TITLES[document.document_type],
-          clientName: document.client_name,
           pdfBase64
         })
       })
       
       if (response.ok) {
-        // Update status to sent
-        await fetch(`/api/supplier-documents/${document.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'sent', sent_via: 'email' })
-        })
-        
         setActionSuccess('Email sent successfully!')
         fetchDocument()
         setTimeout(() => setActionSuccess(null), 5000)
       } else {
-        showToast('error', 'Failed to send email')
+        // The route says why ("Gmail not connected…", no supplier email);
+        // this replaced it with a bare "Failed to send email".
+        const body = await response.json().catch(() => null)
+        showToast('error', body?.error || 'Failed to send email')
       }
     } catch (error) {
       console.error('Error sending email:', error)
@@ -188,7 +216,10 @@ export default function SupplierDocumentViewPage() {
     }
   }
 
-  const handleSendWhatsApp = () => {
+  // wa.me opens a chat with the text filled in; nothing is attached and this
+  // page cannot see whether it was sent. It used to mark the voucher sent the
+  // moment the chat opened. Now it asks.
+  const handleSendWhatsApp = async () => {
     if (!document || !document.supplier_contact_phone) {
       showToast('error', 'Supplier phone not available')
       return
@@ -197,7 +228,7 @@ export default function SupplierDocumentViewPage() {
     const phone = document.supplier_contact_phone.replace(/\D/g, '')
     const message = encodeURIComponent(
       `Dear ${document.supplier_contact_name || document.supplier_name},\n\n` +
-      `Please find attached ${DOCUMENT_TITLES[document.document_type]} #${document.document_number}\n\n` +
+      `${DOCUMENT_TITLES[document.document_type]} #${document.document_number}\n\n` +
       `Guest: ${document.client_name}\n` +
       `Date: ${document.check_in || document.service_date || 'As specified'}\n\n` +
       `Please confirm receipt.\n\n` +
@@ -205,13 +236,14 @@ export default function SupplierDocumentViewPage() {
     )
     
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank')
-    
-    // Update status
-    fetch(`/api/supplier-documents/${document.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'sent', sent_via: 'whatsapp' })
-    }).then(() => fetchDocument())
+
+    const sent = await dialog.confirm({
+      title: 'WhatsApp',
+      message: 'Did you send the voucher on WhatsApp? It will be marked as sent.',
+      confirmText: 'Yes, mark sent',
+      cancelText: 'Not yet',
+    })
+    if (sent && (await markSent(document.id))) fetchDocument()
   }
 
   const handleMarkConfirmed = async () => {
@@ -219,12 +251,16 @@ export default function SupplierDocumentViewPage() {
     
     setActionLoading('confirm')
     try {
-      await fetch(`/api/supplier-documents/${document.id}`, {
+      const res = await fetch(`/api/supplier-documents/${document.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'confirmed' })
       })
-      
+      if (!res.ok) {
+        showToast('error', 'Failed to update status')
+        return
+      }
+
       setActionSuccess('Marked as confirmed!')
       fetchDocument()
       setTimeout(() => setActionSuccess(null), 5000)
@@ -276,31 +312,50 @@ export default function SupplierDocumentViewPage() {
         ...(document.pickup_time ? [{ label: 'Pickup time', value: document.pickup_time }] : []),
         ...(document.pickup_location ? [{ label: 'From', value: document.pickup_location }] : []),
         ...(document.dropoff_location ? [{ label: 'To', value: document.dropoff_location }] : []),
+        ...(document.vehicle_type ? [{ label: 'Vehicle', value: VOUCHER_VEHICLE_TYPES[document.vehicle_type] || document.vehicle_type }] : []),
+        ...(document.driver_name ? [{ label: 'Driver', value: document.driver_name }] : []),
       ]
   const paymentTerms = document.payment_terms
     ? (PAYMENT_TERMS[document.payment_terms] || document.payment_terms.replace(/_/g, ' '))
     : 'As agreed'
+
+  const tripRef = document.itinerary
+    ? { id: document.itinerary.id, code: document.itinerary.itinerary_code, name: document.itinerary.trip_name }
+    : null
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
+          <TripBreadcrumb itineraryId={document.itinerary?.id} trip={tripRef} current={document.document_number} />
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Link
-                href="/documents/supplier"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
-              </Link>
+              <BackLink fallbackHref="/documents/supplier" fallbackLabel="Documents" trip={tripRef} />
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">{document.document_number}</h1>
                 <p className="text-sm text-gray-500">{DOCUMENT_TITLES[document.document_type]} • {document.supplier_name}</p>
+                {(document.sent_at || document.confirmed_at) && (
+                  <p className="text-xs text-gray-500">
+                    {document.sent_at && `Sent ${new Date(document.sent_at).toLocaleDateString()}`}
+                    {document.sent_at && document.confirmed_at && ' · '}
+                    {document.confirmed_at && `Confirmed ${new Date(document.confirmed_at).toLocaleDateString()}`}
+                  </p>
+                )}
               </div>
             </div>
             
             <div className="flex items-center gap-2 flex-wrap">
+              {document.status !== 'cancelled' && (
+                <Link
+                  // Edit returns here, keeping where this page was opened from.
+                  href={withReturnTo(`/documents/supplier/${document.id}/edit`, returnTo)}
+                  className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium flex items-center gap-1.5"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </Link>
+              )}
               <button
                 onClick={handleDownload}
                 className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1.5"

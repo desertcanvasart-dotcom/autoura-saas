@@ -1,3 +1,5 @@
+import { effectiveItineraryTotal, totalWithBookingExtras } from '@/lib/itinerary-client-total'
+import { formatMoney } from '@/lib/currency-totals'
 import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import {
@@ -16,7 +18,6 @@ import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
 import { sharePriceDecision } from '@/lib/itineraries/share-approval'
 import ReportProblem from './ReportProblem'
 import TripChat from './TripChat'
-import { getCurrencySymbol } from '@/lib/currency'
 
 // ============================================
 // THE SHAREABLE ITINERARY PAGE — public, token-gated
@@ -50,6 +51,8 @@ interface Operator {
   email: string | null
   phone: string | null
   website: string | null
+  /** IANA zone the trip's times are shown in. */
+  timeZone: string
 }
 
 async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator; team: ClientTeamMember[]; events: ClientTripEvent[]; messages: ClientTripMessage[] } | null> {
@@ -72,14 +75,21 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     // The night's hotel or ship. EXPLICIT columns: these rows also carry
     // costs and supplier ids, which must never reach this page's process.
     // Only the resolved NAME is put on the day below.
-    supabase
-      .from('itinerary_services')
-      .select('itinerary_day_id, service_type, service_name, supplier_name, description')
-      .eq('itinerary_id', share.itinerary_id)
-      .in('service_type', ['accommodation', 'hotel', 'cruise']),
+    // By the trip's DAYS: itinerary_services.itinerary_id is not set by the
+    // AI generator or the editor, so hotel and ship names went missing.
+    (async () => {
+      const { data: dayRows } = await supabase.from('itinerary_days').select('id').eq('itinerary_id', share.itinerary_id)
+      const dayIds = (dayRows ?? []).map((d: { id: string }) => d.id)
+      if (dayIds.length === 0) return { data: [] as Array<{ itinerary_day_id: string; service_type: string; service_name: string; supplier_name: string | null; description: string | null }> }
+      return supabase
+        .from('itinerary_services')
+        .select('itinerary_day_id, service_type, service_name, supplier_name, description')
+        .in('itinerary_day_id', dayIds)
+        .in('service_type', ['accommodation', 'hotel', 'cruise'])
+    })(),
     supabase
       .from('tenants')
-      .select('company_name, logo_url, primary_color, contact_email, company_phone, company_website')
+      .select('company_name, logo_url, primary_color, contact_email, company_phone, company_website, timezone')
       .eq('id', share.tenant_id)
       .maybeSingle(),
     // CONFIRMED only — a pending assignment is an internal plan, not a promise.
@@ -118,7 +128,9 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
   const fetchContacts = async (table: string, cols: string, ids: string[]): Promise<Array<Record<string, unknown>>> =>
     ids.length === 0
       ? []
-      : (((await supabase.from(table).select(cols).in('id', ids)).data ?? []) as unknown as Array<Record<string, unknown>>)
+      // This share's tenant only: an assignment's resource_id is whatever was
+      // saved on it, and another tenant's guide would bring their phone.
+      : (((await supabase.from(table).select(cols).in('id', ids).eq('tenant_id', share.tenant_id)).data ?? []) as unknown as Array<Record<string, unknown>>)
   // Guides live in SUPPLIERS (supplier_type='guide') — the guides table is
   // legacy. Assignment ids may reference either, so fetch both and let the
   // sanitizer's id-match pick whichever exists; supplier rows are mapped to
@@ -151,9 +163,22 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
   // again. The itinerary itself still shows. Fails closed: if the services
   // cannot be read, the price is withheld.
   const lines = await loadItineraryCompleteness(supabase, share.itinerary_id, share.tenant_id)
+  // The client total from the services — the same figure the email and
+  // WhatsApp sends quote. itineraries.total_cost is a cache that can be 0 or
+  // stale, so a traveller could see two different prices.
+  const tripTotal = lines.ok
+    ? effectiveItineraryTotal(itinerary as { total_cost: number | string | null; margin_percent: unknown }, lines.services)
+    : (itinerary as { total_cost?: unknown }).total_cost
+  // Plus the confirmed extras on the trip's booking (bookings.extras_total).
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('status, currency, extras_total')
+    .eq('itinerary_id', share.itinerary_id)
+    .eq('tenant_id', share.tenant_id)
+  const clientTotal = totalWithBookingExtras(tripTotal, (itinerary as { currency?: string | null }).currency, bookings)
   const priceDecision = sharePriceDecision({
     status: (itinerary as { status?: string | null }).status,
-    totalCost: (itinerary as { total_cost?: unknown }).total_cost,
+    totalCost: clientTotal,
     currency: (itinerary as { currency?: string | null }).currency,
     completeness: lines.ok ? lines.completeness : null,
     approvedGaps: (share as { incomplete_approved_gaps?: unknown }).incomplete_approved_gaps,
@@ -167,7 +192,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     itinerary: toClientItinerary(
       // A withheld price does not reach the projection at all, so it cannot
       // be rendered by accident.
-      priceDecision.show ? itinerary : { ...itinerary, total_cost: null },
+      priceDecision.show ? { ...itinerary, total_cost: clientTotal } : { ...itinerary, total_cost: null },
       (days ?? []).map(d => ({
         ...d,
         overnight_property:
@@ -192,8 +217,16 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
       email: tenant?.contact_email || null,
       phone: tenant?.company_phone || null,
       website: tenant?.company_website || null,
+      // The agency's own clock (Settings). This page renders on a UTC server:
+      // a 09:00 Cairo check-in showed as "07:00", and "today" was UTC's.
+      timeZone: validTimeZone((tenant as { timezone?: string | null } | null)?.timezone) ?? 'UTC',
     },
   }
+}
+
+function validTimeZone(tz: string | null | undefined): string | null {
+  if (!tz) return null
+  try { new Intl.DateTimeFormat('en-GB', { timeZone: tz }); return tz } catch { return null }
 }
 
 function fmtDate(d: string | null): string {
@@ -218,16 +251,19 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
     checked_in: 'Checked in', checked_out: 'Checked out',
     completed: 'Completed', delayed: 'Running late',
   }
+  const timeZone = op.timeZone
+  // YYYY-MM-DD on the agency's calendar.
+  const dayIn = (d: Date) => d.toLocaleDateString('en-CA', { timeZone })
   const fmtTime = (iso: string) => {
     try {
       const d = new Date(iso)
-      const sameDay = d.toISOString().slice(0, 10) === todayStr
+      const sameDay = dayIn(d) === todayStr
       return sameDay
-        ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-        : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+        ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone })
+        : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone })
     } catch { return iso }
   }
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = dayIn(new Date())
   const withYouToday = (m: ClientTeamMember) =>
     !!m.startDate && m.startDate <= todayStr && (!m.endDate || todayStr <= m.endDate)
   const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, '')}`
@@ -238,9 +274,8 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
     hotel_staff: { emoji: '🛎', label: 'Hotel assistance' },
     hotel: { emoji: '🏨', label: 'Hotel' },
     restaurant: { emoji: '🍽', label: 'Restaurant' },
-    cruise: { emoji: '🚢', label: 'Nile cruise' },
+    cruise: { emoji: '🚢', label: 'Cruise' },
   }
-  const sym = it.currency ? getCurrencySymbol(it.currency) : ''
   const travellers = it.numAdults + it.numChildren
 
   return (
@@ -321,7 +356,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
                   {(day.flightFrom || day.flightTo) && (
                     <span>🛫 {[day.flightFrom, day.flightTo].filter(Boolean).join(' → ')}</span>
                   )}
-                  {day.isCruiseDay && <span>🚢 Nile cruise</span>}
+                  {day.isCruiseDay && <span>🚢 Cruise</span>}
                   {day.isFreeDay && <span>🌴 Free day</span>}
                   {day.lunchIncluded && <span>🍽 Lunch included</span>}
                   {day.dinnerIncluded && <span>🌙 Dinner included</span>}
@@ -422,7 +457,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             <div>
               <p className="text-sm text-gray-500">Total for {travellers || 'your'} traveller{travellers === 1 ? '' : 's'}</p>
               <p className="text-2xl font-bold text-gray-900">
-                {sym}{it.totalPrice.toLocaleString()}
+                {it.currency ? formatMoney(it.totalPrice, it.currency) : it.totalPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}
               </p>
             </div>
             {it.code && <span className="text-xs text-gray-400">Ref: {it.code}</span>}

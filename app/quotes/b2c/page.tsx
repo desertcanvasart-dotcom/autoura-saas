@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { csvCell } from '@/lib/finance-export'
 
 interface B2CQuote {
   id: string
@@ -236,12 +237,15 @@ export default function B2CQuotesPage() {
   }
 
   // Selection handlers
+  // The header box selects the quotes on THIS page — the ones you can see.
+  // It selected every filtered quote, so a bulk delete took quotes on other
+  // pages nobody was looking at.
+  const pageAllSelected = paginatedQuotes.length > 0 && paginatedQuotes.every(q => selectedQuotes.has(q.id))
   const handleSelectAll = () => {
-    if (selectedQuotes.size === filteredQuotes.length) {
-      setSelectedQuotes(new Set())
-    } else {
-      setSelectedQuotes(new Set(filteredQuotes.map(q => q.id)))
-    }
+    const next = new Set(selectedQuotes)
+    if (pageAllSelected) paginatedQuotes.forEach(q => next.delete(q.id))
+    else paginatedQuotes.forEach(q => next.add(q.id))
+    setSelectedQuotes(next)
   }
 
   const handleSelectQuote = (quoteId: string) => {
@@ -379,7 +383,8 @@ export default function B2CQuotesPage() {
 
     const csvContent = [
       csvHeaders.join(','),
-      ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
+      // Quotes and formula characters escaped (a name like Smith "Jr" broke the row).
+      ...csvRows.map(row => row.map(csvCell).join(','))
     ].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv' })
@@ -410,7 +415,7 @@ export default function B2CQuotesPage() {
 
             <Link
               href="/pricing-grid?type=b2c"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
+              className="h-10 px-4 bg-blue-600 text-white rounded-lg text-sm font-medium whitespace-nowrap hover:bg-blue-700 inline-flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />
               New Quote
@@ -448,7 +453,7 @@ export default function B2CQuotesPage() {
               <div className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={selectedQuotes.size === filteredQuotes.length && filteredQuotes.length > 0}
+                  checked={pageAllSelected}
                   onChange={handleSelectAll}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                   aria-label="Select all quotes"
@@ -463,7 +468,7 @@ export default function B2CQuotesPage() {
                 placeholder="Search by quote #, client name, or trip..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full h-10 px-4 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
 
@@ -473,7 +478,7 @@ export default function B2CQuotesPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="h-10 w-48 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 aria-label="Filter by status"
               >
                 <option value="all">All Status ({statusCounts.all})</option>
@@ -490,7 +495,7 @@ export default function B2CQuotesPage() {
             <button
               type="button"
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 ${
+              className={`h-10 px-4 border rounded-lg text-sm font-medium whitespace-nowrap shrink-0 inline-flex items-center gap-2 ${
                 activeFiltersCount > 0
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
@@ -727,7 +732,7 @@ export default function B2CQuotesPage() {
         {/* Bulk Actions Bar */}
         {selectedQuotes.size > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Check className="w-5 h-5 text-blue-600" />
@@ -744,7 +749,7 @@ export default function B2CQuotesPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Change Status Dropdown */}
                 <select
                   onChange={(e) => {
@@ -754,7 +759,7 @@ export default function B2CQuotesPage() {
                     }
                   }}
                   disabled={bulkActionLoading}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                  className="h-10 w-44 px-3 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
                   aria-label="Change status for selected quotes"
                 >
                   <option value="">Change Status...</option>
@@ -771,7 +776,7 @@ export default function B2CQuotesPage() {
                   type="button"
                   onClick={handleExportCSV}
                   disabled={bulkActionLoading}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+                  className="h-10 w-36 px-4 bg-white border border-gray-300 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-gray-50 inline-flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
                   Export CSV
@@ -782,7 +787,7 @@ export default function B2CQuotesPage() {
                   type="button"
                   onClick={handleBulkDelete}
                   disabled={bulkActionLoading}
-                  className="px-4 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 flex items-center gap-2 disabled:opacity-50"
+                  className="h-10 w-36 px-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-red-100 inline-flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -815,7 +820,7 @@ export default function B2CQuotesPage() {
               {searchQuery ? 'No quotes found' : 'No B2C quotes yet'}
             </h3>
             <p className="text-xs text-gray-400">
-              {searchQuery ? 'Try adjusting your search filters' : 'Create your first quote from the WhatsApp parser'}
+              {searchQuery ? 'Try adjusting your search filters' : 'Create your first quote with New Quote, or Parse a WhatsApp or email into the Quote Builder'}
             </p>
           </div>
         ) : (
@@ -907,10 +912,10 @@ export default function B2CQuotesPage() {
                       <div className="text-right">
                         <div className="text-xs text-gray-500 mb-1">Total Price</div>
                         <div className="text-2xl font-bold text-gray-900">
-                          {quote.currency} {quote.selling_price.toLocaleString()}
+                          {quote.currency} {Number(quote.selling_price ?? 0).toLocaleString()}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {quote.currency} {quote.price_per_person.toLocaleString()} / person × {quote.num_travelers}
+                          {quote.currency} {Number(quote.price_per_person ?? 0).toLocaleString()} / person × {quote.num_travelers}
                         </div>
                       </div>
 

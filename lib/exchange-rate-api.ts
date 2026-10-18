@@ -59,7 +59,8 @@ export async function fetchExchangeRates(
       : `https://open.er-api.com/v6/latest/${baseCurrency}`
 
     const response = await fetch(url, {
-      next: { revalidate: 3600 } // Cache for 1 hour in Next.js
+      next: { revalidate: 3600 }, // Cache for 1 hour in Next.js
+      signal: AbortSignal.timeout(10_000),
     })
 
     if (!response.ok) {

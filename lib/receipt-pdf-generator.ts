@@ -1,12 +1,15 @@
+import { formatMoney } from '@/lib/currency-totals'
+import { applyDocumentFont, type JsPdfFont } from '@/lib/pdf/jspdf-font'
 import { brandColorRgb, type CompanyIdentity } from './company-identity'
 import { drawLetterhead, drawFooters } from './pdf-letterhead'
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
-import { getCurrencySymbol } from '@/lib/currency'
 
 interface ReceiptData {
   receiptNumber: string
   invoiceNumber: string
+  /** What invoiceNumber is: 'Invoice' (default) or 'Itinerary' for a trip payment. */
+  referenceLabel?: string
   clientName: string
   clientEmail: string
   paymentDate: string
@@ -24,12 +27,14 @@ interface Invoice {
   currency: string
 }
 
-export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }): jsPDF {
+export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }, font?: JsPdfFont | null): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
   })
+  // Noto Sans JP when the document has text Helvetica cannot draw (lib/pdf/jspdf-font).
+  applyDocumentFont(doc, font)
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
@@ -74,7 +79,8 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
 
   y += 10
   doc.setFont('helvetica', 'normal')
-  doc.text(`Invoice: ${receipt.invoiceNumber}`, margin + 10, y)
+  // A trip payment's reference is the itinerary code — it was labelled "Invoice".
+  doc.text(`${receipt.referenceLabel || 'Invoice'}: ${receipt.invoiceNumber}`, margin + 10, y)
   
   y += 7
   const methodLabel = receipt.paymentMethod.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -88,7 +94,6 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   y += 25
 
   // Amount
-  const currencySymbol = getCurrencySymbol(receipt.currency)
   
   doc.setFillColor(br, bg, bb)
   doc.roundedRect(margin, y, pageWidth - 2 * margin, 25, 3, 3, 'F')
@@ -99,7 +104,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   doc.text('AMOUNT RECEIVED', margin + 10, y + 10)
   
   doc.setFontSize(18)
-  doc.text(`${currencySymbol}${Number(receipt.amount).toFixed(2)}`, pageWidth - margin - 10, y + 15, { align: 'right' })
+  doc.text(formatMoney(receipt.amount, receipt.currency), pageWidth - margin - 10, y + 15, { align: 'right' })
 
   y += 40
 
@@ -128,7 +133,17 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   return doc
 }
 
-export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }) {
-  const doc = generateReceiptPDF(receipt, invoice, company)
+export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }, font?: JsPdfFont | null) {
+  const doc = generateReceiptPDF(receipt, invoice, company, font)
   doc.save(`Receipt-${receipt.receiptNumber}.pdf`)
+}
+/**
+ * A payment's receipt number — ONE rule wherever a receipt is made (the
+ * invoice page, the receipts page, the receipt page, WhatsApp): its
+ * transaction reference, else RCP- and the payment id. The invoice page
+ * numbered receipts by position in a newest-first list, so each new payment
+ * renumbered the older receipts, and WhatsApp sent yet another number.
+ */
+export function receiptNumberFor(payment: { id: string; transaction_reference?: string | null }): string {
+  return payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
 }

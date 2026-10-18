@@ -66,9 +66,14 @@ interface InputPanelProps {
    *  product does not sell, and the value is saved onto the itinerary. */
   packageType: PackageType
   onPackageTypeChange: (p: PackageType) => void
+  /** The agency's itinerary format, written with its own rate names: text
+   *  in it is read by name, without the AI (structured-itinerary.ts). */
+  formatTemplate?: () => string
+  /** Every name the format accepts, by line. */
+  namesList?: () => string
 }
 
-export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFromBlock, onLoadItinerary, onClearAll, isParsing, hasDays, packageType, onPackageTypeChange }: InputPanelProps) {
+export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFromBlock, onLoadItinerary, onClearAll, isParsing, hasDays, packageType, onPackageTypeChange, formatTemplate, namesList }: InputPanelProps) {
   const [text, setText] = useState('')
   const [showPaste, setShowPaste] = useState(false)
   const [itineraryId, setItineraryId] = useState('')
@@ -389,9 +394,37 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
             onChange={(e) => setText(e.target.value)}
             rows={6}
             className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg resize-y focus:ring-2 focus:ring-blue-300 bg-white"
-            placeholder={'Paste WhatsApp conversation, email text, or itinerary description here...\n\nThe AI will parse it into days with services.'}
+            placeholder={'Paste WhatsApp conversation, email text, or itinerary description here...\n\nThe AI will parse it into days with services. Text in your itinerary format (Template) is read by name, without the AI.'}
             autoFocus
           />
+          {formatTemplate && (
+            <p className="mt-1 text-xs text-gray-600">
+              Writing it yourself? Use your format — each line names your own rates, so it is read exactly, without the AI.{' '}
+              <button type="button" onClick={() => setText(formatTemplate())} className="font-medium text-blue-700 hover:underline">
+                Insert template
+              </button>
+              {namesList && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const blob = new Blob([namesList()], { type: 'text/plain' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = 'itinerary-format-names.txt'
+                      a.click()
+                      URL.revokeObjectURL(url)
+                    }}
+                    className="font-medium text-blue-700 hover:underline"
+                  >
+                    Download the names list
+                  </button>
+                </>
+              )}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-2">
             <button
               type="button"

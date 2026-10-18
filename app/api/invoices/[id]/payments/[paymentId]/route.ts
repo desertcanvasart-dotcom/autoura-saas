@@ -7,6 +7,7 @@
 // Security: Requires manager role (via RLS policy)
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
@@ -14,6 +15,11 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; paymentId: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id, paymentId } = await params
     // Use authenticated client - RLS enforces tenant + manager role
@@ -32,10 +38,11 @@ export async function DELETE(
     }
 
     // Delete the payment (RLS requires manager role)
-    const { error } = await supabase
+    const { data: removed, error } = await supabase
       .from('invoice_payments')
       .delete()
       .eq('id', paymentId)
+      .select('id')
 
     if (error) {
       console.error('❌ Error deleting payment:', error)
@@ -48,43 +55,14 @@ export async function DELETE(
       }
       return NextResponse.json({ error: 'Failed to delete payment' }, { status: 500 })
     }
-
-    // Recalculate invoice balance after deletion
-    // RLS filters to tenant's payments only
-    const { data: payments } = await supabase
-      .from('invoice_payments')
-      .select('amount')
-      .eq('invoice_id', id)
-
-    const totalPaid = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0)
-
-    // Get invoice (RLS filters to tenant's invoices only)
-    const { data: invoice } = await supabase
-      .from('invoices')
-      .select('total_amount')
-      .eq('id', id)
-      .single()
-
-    if (invoice) {
-      const balanceDue = Number(invoice.total_amount) - totalPaid
-      let status = 'sent'
-      if (totalPaid >= Number(invoice.total_amount)) {
-        status = 'paid'
-      } else if (totalPaid > 0) {
-        status = 'partially_paid'
-      }
-
-      await supabase
-        .from('invoices')
-        .update({
-          amount_paid: totalPaid,
-          balance_due: balanceDue,
-          status: status,
-          paid_at: status === 'paid' ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
+    if (!removed || removed.length === 0) {
+      return NextResponse.json({ error: 'Payment not found or you do not have permission to delete it' }, { status: 404 })
     }
+
+    // The invoice's paid amount, balance and status are recomputed by the
+    // database as the row is deleted, under a lock (migration 436) — not
+    // re-read and written here, where a payment recorded at the same moment
+    // could be lost from the totals.
 
     return NextResponse.json({ success: true })
   } catch (error) {

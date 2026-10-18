@@ -8,6 +8,7 @@
 // (lib/day-blocks/match.ts). Read-only: the Grid decides what to do with the
 // answer. An agency with no blocks gets no matches, and no AI call.
 
+import { roleDenied } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createMessageWithRetry, replyText } from '@/lib/ai/anthropic-client'
@@ -15,6 +16,7 @@ import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { MATCH_SYSTEM, matchDaysToBlocks, matchPrompt, matchSchema, type AiMatchReply, type RawDay } from '@/lib/day-blocks/match'
 import { BLOCK_COLS } from '@/lib/day-blocks/access'
 import type { DayBlock } from '@/lib/day-blocks/blocks'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +29,11 @@ export async function POST(request: NextRequest) {
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const { supabase, tenant_id } = auth
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
+    // It calls the AI: staff only (viewers could trigger it).
+    const denied = roleDenied(auth.role, 'staff')
+    if (denied) return denied
+    const overBudget = await aiBudgetDenied(auth.user!.id, tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({})) as { days?: unknown }
     const days: RawDay[] = (Array.isArray(body.days) ? body.days : [])

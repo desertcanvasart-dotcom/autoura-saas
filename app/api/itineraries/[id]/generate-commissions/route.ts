@@ -12,6 +12,7 @@
 // services yields zero rows, and that must be distinguishable from a broken
 // run.
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import {
@@ -25,6 +26,11 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -43,6 +49,10 @@ export async function POST(
       .single()
     if (itinError || !itinerary) {
       return NextResponse.json({ success: false, error: 'Itinerary not found' }, { status: 404 })
+    }
+    // A cancelled trip earns and owes no commission (documents audit, round 12).
+    if (itinerary.status === 'cancelled') {
+      return NextResponse.json({ success: false, error: 'The trip is cancelled — no commissions to generate' }, { status: 409 })
     }
 
     // select('*') everywhere: sold_by_supplier_id (migration 303) must ride
@@ -113,10 +123,32 @@ export async function POST(
       })
     }
 
+    // Claim the services FIRST, and only those still unclaimed: two clicks
+    // (or a failed mark after the insert, which was ignored) generated every
+    // commission twice. Only the pairs of services this call claimed are
+    // inserted; if the insert fails, the claim is released.
+    const wantedIds = [...new Set(pairs.map(p => p.serviceId))]
+    const { data: claimedRows, error: claimError } = await supabase
+      .from('itinerary_services')
+      .update({ commission_status: 'generated' })
+      .in('id', wantedIds)
+      .or('commission_status.is.null,commission_status.eq.pending')
+      .select('id')
+    if (claimError) {
+      console.error('Error claiming services for commissions:', claimError)
+      return NextResponse.json({ success: false, error: 'Failed to create commissions' }, { status: 500 })
+    }
+    const claimed = new Set((claimedRows ?? []).map(r => r.id as string))
+    const claimedPairs = pairs.filter(p => claimed.has(p.serviceId))
+    if (claimedPairs.length === 0) {
+      return NextResponse.json({ success: true, message: 'These commissions were already generated', generated: 0, skipped, skip_summary: summariseSkips(skipped) })
+    }
+    const release = () => supabase.from('itinerary_services').update({ commission_status: 'pending' }).in('id', [...claimed])
+
     // Insert. cost_amount is migration 303; on a database without it,
     // PostgREST rejects the column by name — strip it and retry so deploy
     // and migration can land in either order.
-    let toInsert = pairs.map(p => ({ ...p.commission })) as Array<Record<string, unknown>>
+    let toInsert = claimedPairs.map(p => ({ ...p.commission })) as Array<Record<string, unknown>>
     let { data: created, error: createError } = await supabase
       .from('commissions')
       .insert(toInsert as never)
@@ -130,21 +162,14 @@ export async function POST(
     }
     if (createError) {
       console.error('Error creating commissions:', createError)
+      await release()
       return NextResponse.json({ success: false, error: 'Failed to create commissions' }, { status: 500 })
     }
 
-    // Claim exactly the services that produced a row — BY ID from the pairs,
-    // never by re-running a filter that could drift from the engine's.
-    const claimedIds = [...new Set(pairs.map(p => p.serviceId))]
-    await supabase
-      .from('itinerary_services')
-      .update({ commission_status: 'generated' })
-      .in('id', claimedIds)
-
     return NextResponse.json({
       success: true,
-      message: `Generated ${created?.length ?? pairs.length} commission record(s)`,
-      generated: created?.length ?? pairs.length,
+      message: `Generated ${created?.length ?? claimedPairs.length} commission record(s)`,
+      generated: created?.length ?? claimedPairs.length,
       skipped,
       skip_summary: summariseSkips(skipped),
     })

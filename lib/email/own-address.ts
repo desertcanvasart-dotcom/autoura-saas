@@ -38,7 +38,7 @@ export async function loadOwnAddresses(
   const [members, tenant, tokens] = await Promise.all([
     supabase.from('team_members').select('email').eq('tenant_id', tenantId),
     supabase.from('tenants').select('office_email_addresses').eq('id', tenantId).maybeSingle(),
-    user?.id ? supabase.from('gmail_tokens').select('email').eq('user_id', user.id) : Promise.resolve({ data: [] as { email: string | null }[] }),
+    user?.id ? supabase.from('gmail_tokens').select('email').eq('user_id', user.id).eq('tenant_id', tenantId) : Promise.resolve({ data: [] as { email: string | null }[] }),
   ])
   const people = [
     ...((members.data ?? []) as { email: string | null }[]).map(m => m.email ?? ''),

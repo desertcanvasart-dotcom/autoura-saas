@@ -1,11 +1,14 @@
+import { ratesForTenant } from '@/lib/currency'
 import { NextResponse } from 'next/server'
+import { roleAllows } from '@/lib/api-role-gate'
 import { evaluateDeleteGuard } from '@/lib/delete-guard'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
 import { buildFrozenFx } from '@/lib/itinerary-fx'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { createBookingOnConfirm } from '@/lib/bookings/create-booking-on-confirm'
 import { cruiseSailingNotes, type CruiseShip, type ItineraryCruiseDay } from '@/lib/rates/cruise-sailing'
+import { shiftDateISO } from '@/lib/today'
 
 /**
  * GET /api/itineraries/[id]
@@ -175,10 +178,12 @@ export async function PUT(
         .maybeSingle()
       const row = current as (Record<string, unknown> & { status?: string }) | null
       if (row && 'fx_frozen' in row && row.fx_frozen == null && row.status !== 'confirmed') {
-        const { data: fxRates } = await supabase
+        const { data: fxAll } = await supabase
           .from('exchange_rates')
-          .select('base_currency, target_currency, rate, is_active')
+          .select('tenant_id, base_currency, target_currency, rate, is_active')
           .eq('is_active', true)
+        // Shared rates plus this company's overrides (its own winning).
+        const fxRates = ratesForTenant(fxAll, typeof row.tenant_id === 'string' ? row.tenant_id : null)
         if (fxRates && fxRates.length > 0) {
           const { data: { user: fxUser } } = await supabase.auth.getUser()
           const fxBase = typeof row.tenant_id === 'string'
@@ -210,6 +215,40 @@ export async function PUT(
 
     if (error) throw error
 
+    // New dates move what hangs off them: each day's date, and the bookings
+    // made from this trip. Dragging a trip on the Booking Calendar moved the
+    // itinerary alone — its booking kept the old dates.
+    if (data && body.start_date !== undefined && typeof data.start_date === 'string' && data.start_date) {
+      const start = data.start_date as string
+      const { data: dayRows } = await supabase
+        .from('itinerary_days').select('id, day_number').eq('itinerary_id', id)
+      for (const d of dayRows ?? []) {
+        const { error: dayError } = await supabase
+          .from('itinerary_days').update({ date: shiftDateISO(start, (d.day_number ?? 1) - 1) }).eq('id', d.id)
+        if (dayError) console.warn('[itinerary] moving a day date failed:', dayError.message)
+      }
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .update({ start_date: start, ...(data.end_date ? { end_date: data.end_date } : {}), updated_at: new Date().toISOString() })
+        .eq('itinerary_id', id)
+        .neq('status', 'cancelled')
+      if (bookingError) console.warn('[itinerary] moving the booking dates failed:', bookingError.message)
+    }
+
+    // A cancelled trip's DRAFT supplier vouchers are cancelled with it (no
+    // supplier has seen them), so they stop showing as work to send. Vouchers
+    // already sent stay as they are: the supplier holds them, and marking them
+    // cancelled here would hide that someone still has to tell the supplier.
+    // The caller's client is RLS-scoped to the tenant.
+    if (body.status === 'cancelled' && data) {
+      const { error: voucherError } = await supabase
+        .from('supplier_documents')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('itinerary_id', id)
+        .eq('status', 'draft')
+      if (voucherError) console.warn('[itinerary] cancelling draft vouchers failed:', voucherError.message)
+    }
+
     if (newAssignee && newAssignee !== previousAssignee) {
       const row = data as { itinerary_code?: string | null; trip_name?: string | null }
       await notifyTripAssignment({
@@ -226,10 +265,15 @@ export async function PUT(
     // surfaced as booking_note, never allowed to block the confirm itself.
     let booking: Record<string, unknown> | null = null
     let bookingNote: string | null = null
+    let capacityFull = false
     if (body.status === 'confirmed') {
-      const result = await createBookingOnConfirm(id, data as Record<string, unknown>)
+      const result = await createBookingOnConfirm(id, data as Record<string, unknown>, {
+        // Over the Capacity Calendar only on a manager's or admin's say-so.
+        overrideCapacity: body.override_capacity === true && roleAllows((await requireAuth()).role, 'manage'),
+      })
       booking = result.booking
       bookingNote = result.note
+      capacityFull = result.capacityFull === true
     }
 
     return NextResponse.json({
@@ -237,6 +281,7 @@ export async function PUT(
       data,
       ...(booking ? { booking } : {}),
       ...(bookingNote ? { booking_note: bookingNote } : {}),
+      ...(capacityFull ? { capacity_full: true } : {}),
     })
   } catch (error) {
     console.error('Error updating itinerary:', error)
@@ -288,7 +333,7 @@ export async function DELETE(
     // single atomic statement. Nothing is destroyed unless everything can be.
     // ────────────────────────────────────────────────────────────────────
 
-    const [bookings, invoices, payments, commissions, quotes] = await Promise.all([
+    const [bookings, invoices, payments, commissions, quotes, expenses, supplierInvoices] = await Promise.all([
       supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
       supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
       supabase.from('payments').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
@@ -297,6 +342,9 @@ export async function DELETE(
       // vanish silently.
       supabase.from('b2c_quotes').select('id', { count: 'exact', head: true })
         .eq('itinerary_id', id).neq('status', 'draft'),
+      // Costs too: they were set to null and dropped out of the trip's P&L.
+      supabase.from('expenses').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
+      supabase.from('supplier_invoices').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
     ])
 
     const guard = evaluateDeleteGuard('itinerary', [
@@ -305,6 +353,8 @@ export async function DELETE(
       { label: `${payments.count} payment(s)`, count: payments.count, error: payments.error },
       { label: `${commissions.count} commission(s)`, count: commissions.count, error: commissions.error },
       { label: `${quotes.count} sent quote(s)`, count: quotes.count, error: quotes.error },
+      { label: `${expenses.count} expense(s)`, count: expenses.count, error: expenses.error },
+      { label: `${supplierInvoices.count} supplier invoice(s)`, count: supplierInvoices.count, error: supplierInvoices.error },
     ])
     if (!guard.ok) {
       if (guard.kind === 'error') console.error('❌ Itinerary delete pre-check failed:', guard.label)

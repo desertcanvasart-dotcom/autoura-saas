@@ -1,3 +1,8 @@
+import { sendGuard } from '@/lib/send-guard'
+import { gateRole } from '@/lib/api-role-gate'
+import { tripServices } from '@/lib/itineraries/trip-services'
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { serverPdfFontFor } from '@/lib/pdf/jspdf-font-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
@@ -7,8 +12,15 @@ import { contractNumber, contractDestinations } from '@/lib/contract-facts'
 import { generateContractPDF } from '@/lib/contract-pdf-generator'
 import { identityFromTenant } from '@/lib/company-identity'
 import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
+import { contractPrice, contractSettingsFromTenant, sanitizeContractEdits } from '@/lib/contract-terms'
 
 export async function POST(request: NextRequest) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('messaging')
+  if (sendGate) return sendGate
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
@@ -29,6 +41,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { itineraryId } = body
+    // What the operator set on the contract page (bounded, strings only).
+    // The parties and the recipient still come from the database.
+    const edits = sanitizeContractEdits(body.contract)
 
     if (!itineraryId) {
       return NextResponse.json(
@@ -72,13 +87,29 @@ export async function POST(request: NextRequest) {
 
     const numAdults = itinerary.num_adults || 1
     const numChildren = itinerary.num_children || 0
-    const totalCost = itinerary.total_cost || 0
+    // No price yet = "To be confirmed", never 0.00.
+    // The client total from the services (lib/itinerary-client-total), the
+    // figure the quote sends use; the header cache can be 0 or stale.
+    const { rows: priceLines } = await tripServices<{ total_cost: number | null; client_price: number | null }>(supabase, itineraryId, 'total_cost, client_price')
+    const clientTotal = effectiveItineraryTotal(itinerary, priceLines)
+    const totalCost: number | null = edits.totalCost !== undefined
+      ? edits.totalCost
+      : clientTotal > 0 ? clientTotal : null
+    const tourName = edits.tourName?.trim() || itinerary.trip_name || 'Your tour'
 
     // Generate contract PDF
 
     // The contract names the operator as the legal Service Provider party —
     // it must be the tenant, never a hardcoded company.
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
+    // Country, governing law and deposit (Settings → Organization). Read on
+    // their own: before migration 403 the columns are missing, and the
+    // contract then says nothing about a country rather than failing.
+    const { data: contractTenant } = await createAdminClient()
+      .from('tenants')
+      .select('operating_country, contract_governing_law, deposit_percent')
+      .eq('id', authResult.tenant_id)
+      .maybeSingle()
     const contractData = {
       company: {
         // The letterhead: Settings → Organization, as on every document.
@@ -101,16 +132,18 @@ export async function POST(request: NextRequest) {
       clientName: itinerary.client_name || 'Valued Guest',
       clientEmail: itinerary.client_email || undefined,
       numTravelers: numAdults + numChildren,
-      tourName: itinerary.trip_name || 'Egypt Tour',
+      tourName,
       startDate: itinerary.start_date,
       endDate: itinerary.end_date,
       // The trip's own cities — never an invented default.
-      destinations: contractDestinations(contractDays ?? []),
-      totalCost: totalCost,
-      currency: itinerary.currency || 'EUR'
+      destinations: edits.destinations?.trim() || contractDestinations(contractDays ?? []),
+      totalCost,
+      currency: itinerary.currency || 'EUR',
+      settings: contractSettingsFromTenant(contractTenant),
+      terms: edits,
     }
 
-    const pdfBytes = await generateContractPDF(contractData)
+    const pdfBytes = await generateContractPDF({ ...contractData, font: await serverPdfFontFor(contractData) })
 
     // Upload to Supabase Storage
 
@@ -137,11 +170,11 @@ export async function POST(request: NextRequest) {
       `Your tour contract is ready! 🎉\n\n` +
       `📋 *Contract Details:*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
+      `🎯 *Tour:* ${tourName}\n` +
       `📅 *Dates:* ${new Date(itinerary.start_date).toLocaleDateString()} - ${new Date(itinerary.end_date).toLocaleDateString()}\n` +
       `👥 *Travelers:* ${numAdults} adult${numAdults > 1 ? 's' : ''}` +
       `${numChildren > 0 ? `, ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}\n` +
-      `💰 *Total:* ${itinerary.currency} ${totalCost.toFixed(2)}\n\n` +
+      `💰 *Total:* ${contractPrice(totalCost, itinerary.currency)}\n\n` +
       `📄 Please review the attached contract carefully.\n\n` +
       `✍️ *Next Steps:*\n` +
       `1. Review all terms and conditions\n` +
@@ -151,11 +184,13 @@ export async function POST(request: NextRequest) {
       `If you have any questions, please don't hesitate to reach out!\n\n` +
       (senderTenant?.contact_email ? `📧 ${senderTenant.contact_email}\n` : '') +
       (senderTenant?.company_website ? `🌐 ${senderTenant.company_website}\n` : '') + '\n' +
-      `Looking forward to your adventure! 🐪✨\n\n` +
+      `Looking forward to your adventure! ✨\n\n` +
       `Best regards,\n${businessName ? businessName + ' Team' : 'Your travel team'}`
 
     // Send via WhatsApp WITH PDF attachment
     const result = await sendWhatsAppMessage({
+      // A local number takes this tenant's country code (lib/whatsapp).
+      tenantId: authResult.tenant_id,
       to: itinerary.client_phone,
       body: message,
       mediaUrl: pdfUrl

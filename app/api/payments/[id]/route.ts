@@ -7,14 +7,23 @@
 // Security: Requires authentication
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { parsePaymentInput } from '@/lib/payment-input'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { paymentCurrencyFor } from '@/lib/payment-currency'
+import { tripServices } from '@/lib/itineraries/trip-services'
+import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS automatically filters by tenant
@@ -36,7 +45,10 @@ export async function GET(
         itineraries (
           itinerary_code,
           client_name,
-          total_cost
+          client_phone,
+          client_email,
+          total_cost,
+          margin_percent
         )
       `)
       .eq('id', id)
@@ -44,11 +56,27 @@ export async function GET(
 
     if (error) throw error
 
+    // The trip's client total from its services, as every other document
+    // shows it — the stored total_cost can be 0 or stale, and the payment
+    // invoice prints "Full trip cost / Balance" from it.
+    let tripTotal = payment.itineraries?.total_cost ?? null
+    if (payment.itinerary_id && payment.itineraries) {
+      const services = await tripServices<PricedService>(supabase, payment.itinerary_id, 'total_cost, client_price')
+      if (services.ok) tripTotal = effectiveItineraryTotal(payment.itineraries, services.rows)
+    }
+
     const formattedPayment = {
       ...payment,
+      // The column is `status`; the payment, invoice and receipt pages and
+      // the edit form all read `payment_status` (parsePaymentInput accepts
+      // either on the way in). Without it they crashed on .replace().
+      payment_status: payment.status,
       itinerary_code: payment.itineraries?.itinerary_code,
       client_name: payment.itineraries?.client_name,
-      total_cost: payment.itineraries?.total_cost
+      // The receipt's WhatsApp button and the email on both PDFs need these.
+      client_phone: payment.itineraries?.client_phone,
+      client_email: payment.itineraries?.client_email,
+      total_cost: tripTotal
     }
 
     return NextResponse.json({
@@ -68,6 +96,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS enforces tenant boundaries
@@ -88,9 +121,36 @@ export async function PUT(
       )
     }
 
+    // The edit form does not send the trip or the client: unsent, they keep
+    // their stored values (they were written as null, detaching the payment
+    // from its trip and skipping the currency check below).
+    const update: Record<string, unknown> = { ...parsed.value }
+    if (body.itinerary_id === undefined) delete update.itinerary_id
+    if (body.client_id === undefined) delete update.client_id
+    if (update.itinerary_id === undefined) {
+      const { data: stored } = await supabase.from('payments').select('itinerary_id').eq('id', id).maybeSingle()
+      if (!stored) return NextResponse.json({ success: false, error: 'Payment not found' }, { status: 404 })
+      parsed.value.itinerary_id = stored.itinerary_id
+    }
+
+    // As POST: the trip must be this tenant's, and the payment in its currency.
+    if (parsed.value.itinerary_id) {
+      const { data: itinerary } = await supabase
+        .from('itineraries')
+        .select('id, currency')
+        .eq('id', parsed.value.itinerary_id) // RLS: this tenant's trips only
+        .maybeSingle()
+      if (!itinerary) {
+        return NextResponse.json({ success: false, error: 'Itinerary not found or access denied' }, { status: 404 })
+      }
+      const paid = paymentCurrencyFor(body.currency, itinerary.currency)
+      if (!paid.ok) return NextResponse.json({ success: false, error: paid.error }, { status: 400 })
+      update.currency = paid.currency
+    }
+
     const { data, error } = await supabase
       .from('payments')
-      .update({ ...parsed.value, updated_at: new Date().toISOString() })
+      .update({ ...update, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single()
@@ -117,15 +177,21 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('manage')
+  if (roleGate) return roleGate
+
   try {
     const { id } = await params
     // Use authenticated client - RLS policies enforce tenant isolation + manager role
     const supabase = await createAuthenticatedClient()
 
-    const { error } = await supabase
+    const { data: removed, error } = await supabase
       .from('payments')
       .delete()
       .eq('id', id)
+      .select('id')
 
     if (error) {
       console.error('❌ Delete error:', error)
@@ -137,6 +203,9 @@ export async function DELETE(
         )
       }
       throw error
+    }
+    if (!removed || removed.length === 0) {
+      return NextResponse.json({ success: false, error: 'Payment not found or you do not have permission to delete it' }, { status: 404 })
     }
 
     return NextResponse.json({

@@ -5,6 +5,11 @@ import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import type { Tables, TablesInsert } from '@/types/database.types'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
+import { roundToCurrency } from '@/lib/currency-totals'
+import { shiftDateISO } from '@/lib/today'
+import { tenantToday } from '@/lib/tenant-today'
+import { roleDenied, roleAllows } from '@/lib/api-role-gate'
+import { bookingCapacityProblems, describeCapacityProblems } from '@/lib/capacity/booking-capacity'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +22,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
 
     const { tenant_id, user } = authResult
 
@@ -58,6 +65,11 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'quote_type must be b2c or b2b' },
         { status: 400 }
       )
+    }
+    // B2B quotes are managers' and admins' (Sell → B2B Quotes).
+    if (quote_type === 'b2b') {
+      const deniedB2b = roleDenied(authResult.role, 'manage')
+      if (deniedB2b) return deniedB2b
     }
 
     // Fetch the quote (separate typed queries — the two tables share almost
@@ -263,7 +275,8 @@ export async function POST(request: NextRequest) {
       total_amount = total.value
     }
 
-    const deposit_amount = (total_amount * deposit_percent) / 100
+    // In the currency's own units: 20% of ¥1,854,367 is not ¥370,873.4.
+    const deposit_amount = roundToCurrency((total_amount * deposit_percent) / 100, quote.currency || 'EUR')
     const balance_due = total_amount
 
     // Trip facts: from the itinerary when there is one, else (calculator
@@ -319,6 +332,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create booking
+    const today = await tenantToday(adminClient, tenant_id)
     const bookingData: TablesInsert<'bookings'> = {
       tenant_id,
       itinerary_id: itinerary_id ?? null,
@@ -330,7 +344,7 @@ export async function POST(request: NextRequest) {
       client_id: b2cQuote?.client_id ?? itinerary?.client_id ?? null,
       partner_id: b2bQuote?.partner_id ?? null,
       booking_number,
-      booking_date: new Date().toISOString().split('T')[0],
+      booking_date: today,
       trip_name: tripFacts.trip_name,
       start_date: tripFacts.start_date,
       end_date: tripFacts.end_date,
@@ -346,12 +360,27 @@ export async function POST(request: NextRequest) {
       total_paid: 0,
       balance_due,
       status: 'pending_deposit',
-      payment_deadline: (() => {
-        const d = new Date()
-        d.setDate(d.getDate() + depositRule.depositDueDays)
-        return d.toISOString().split('T')[0]
-      })(),
+      // In the company's timezone (lib/tenant-today), not the UTC server's.
+      payment_deadline: shiftDateISO(today, depositRule.depositDueDays),
       created_by: user?.id
+    }
+
+    // The Capacity Calendar (lib/capacity/booking-capacity): a full or closed
+    // day takes no booking unless a manager or admin books it anyway.
+    const capacityOverride = body?.override_capacity === true && roleAllows(authResult.role, 'manage')
+    if (!capacityOverride) {
+      const problems = await bookingCapacityProblems(adminClient, authResult.tenant_id!, tripFacts.start_date, tripFacts.end_date)
+      if (problems.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `The Capacity Calendar is ${describeCapacityProblems(problems)}.`,
+            capacity: problems,
+            can_override: roleAllows(authResult.role, 'manage'),
+          },
+          { status: 409 }
+        )
+      }
     }
 
     const { data: booking, error: bookingError } = await adminClient

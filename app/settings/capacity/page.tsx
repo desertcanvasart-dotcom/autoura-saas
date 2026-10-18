@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { DEFAULT_MAX_GROUPS } from '@/lib/capacity/capacity-write'
 import { useRouter } from 'next/navigation'
+import { toLocalDateString } from '@/lib/today'
 import {
   Calendar,
   ChevronLeft,
@@ -155,7 +157,12 @@ export default function CapacityPage() {
   const [editingEntry, setEditingEntry] = useState<CapacityEntry | null>(null)
 
   // Default settings
-  const [defaultMaxGroups, setDefaultMaxGroups] = useState(3)
+  // The company's default (null = no limit), saved on the company
+  // (/api/capacity/default, migration 417). New entries start from it.
+  const [defaultMaxGroups, setDefaultMaxGroups] = useState<number | null>(null)
+  const [defaultDraft, setDefaultDraft] = useState('')
+  const [defaultSaving, setDefaultSaving] = useState(false)
+  const [defaultMessage, setDefaultMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
   // Tour filtering state
   const [tourTemplates, setTourTemplates] = useState<TourTemplate[]>([])
@@ -178,7 +185,37 @@ export default function CapacityPage() {
   useEffect(() => {
     loadTourTemplates()
     loadItineraries()
+    fetch('/api/capacity/default')
+      .then(r => r.json())
+      .then(j => {
+        if (j?.success) {
+          const v = j.data.default_max_groups
+          setDefaultMaxGroups(v ?? null)
+          setDefaultDraft(v == null ? '' : String(v))
+        }
+      })
+      .catch(() => {})
   }, [])
+
+  const saveDefault = async () => {
+    setDefaultSaving(true)
+    setDefaultMessage(null)
+    try {
+      const res = await fetch('/api/capacity/default', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_max_groups: defaultDraft.trim() === '' ? null : Number(defaultDraft) }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.success) throw new Error(j.error || 'Could not save the default')
+      setDefaultMaxGroups(j.data.default_max_groups)
+      setDefaultMessage({ ok: true, text: 'Default saved' })
+    } catch (e) {
+      setDefaultMessage({ ok: false, text: e instanceof Error ? e.message : 'Could not save the default' })
+    } finally {
+      setDefaultSaving(false)
+    }
+  }
 
   // Load tour departures when tour is selected or month changes
   useEffect(() => {
@@ -340,7 +377,7 @@ export default function CapacityPage() {
     const existing = pendingChanges.get(date) || capacityData.get(date) || {
       date,
       status: 'available' as const,
-      max_groups: defaultMaxGroups,
+      max_groups: defaultMaxGroups ?? DEFAULT_MAX_GROUPS,
       booked_groups: 0
     }
 
@@ -356,9 +393,11 @@ export default function CapacityPage() {
   // CALENDAR HELPERS
   // ============================================
 
-  const formatDate = (date: Date): string => {
-    return date.toISOString().split('T')[0]
-  }
+  // The calendar's days are local midnights: their date is the LOCAL one.
+  // toISOString() gave the UTC date — the day before, east of UTC — so in
+  // Cairo, blacking out the 15th saved the 14th, and the WhatsApp AI turned
+  // clients away on the wrong day.
+  const formatDate = (date: Date): string => toLocalDateString(date)
 
   const getDaysInMonth = (date: Date): Date[] => {
     const year = date.getFullYear()
@@ -722,7 +761,7 @@ export default function CapacityPage() {
                             setEditingEntry(entry || {
                               date: dateStr,
                               status: 'available',
-                              max_groups: defaultMaxGroups,
+                              max_groups: defaultMaxGroups ?? DEFAULT_MAX_GROUPS,
                               booked_groups: 0
                             })
                           }
@@ -1016,7 +1055,7 @@ export default function CapacityPage() {
                 <div>
                   <label htmlFor="bookedGroups" className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-1">
                     <Clock className="w-3.5 h-3.5" />
-                    Booked Groups
+                    Booked outside Autoura
                   </label>
                   <input
                     id="bookedGroups"
@@ -1120,17 +1159,32 @@ export default function CapacityPage() {
                 <label htmlFor="defaultMaxGroups" className="text-xs font-medium text-gray-700 mb-1 block">
                   Default Max Groups per Day
                 </label>
-                <input
-                  id="defaultMaxGroups"
-                  type="number"
-                  value={defaultMaxGroups}
-                  onChange={(e) => setDefaultMaxGroups(parseInt(e.target.value) || 3)}
-                  min="1"
-                  max="20"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-                />
+                <div className="flex gap-2">
+                  <input
+                    id="defaultMaxGroups"
+                    type="number"
+                    value={defaultDraft}
+                    onChange={(e) => setDefaultDraft(e.target.value)}
+                    min="0"
+                    max="1000"
+                    placeholder="No limit"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveDefault()}
+                    disabled={defaultSaving}
+                    className="px-3 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                  >
+                    {defaultSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+                {defaultMessage && (
+                  <p className={`text-xs mt-1 ${defaultMessage.ok ? 'text-green-700' : 'text-red-600'}`}>{defaultMessage.text}</p>
+                )}
                 <p className="text-xs text-gray-500 mt-1">
-                  Applied to new dates without explicit capacity set
+                  The limit for any day without its own entry. Blank = no limit. Bookings count against it automatically;
+                  a full or closed day refuses a new booking unless a manager or admin books it anyway.
                 </p>
               </div>
             </div>

@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { use, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/app/supabase'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PricingTable from '@/components/quotes/PricingTable'
 import StatusManager from '@/components/quotes/StatusManager'
 import {
   FileText, Building2, Mail, Phone, Calendar, DollarSign,
   ArrowLeft, Edit, Download, Send, Clock, AlertCircle, Loader2,
-  MapPin, Users, CheckCircle, XCircle, Eye, Globe, MessageCircle, BookOpen
+  MapPin, Users, CheckCircle, XCircle, Eye, Globe, MessageCircle
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { quoteCompleteness } from '@/lib/pricing/quote-completeness'
@@ -27,6 +26,9 @@ type SavedQuoteLine = {
   issue?: string
 }
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabLabel } from '@/components/vocabulary'
+import ConvertToBookingButton from '@/components/quotes/ConvertToBookingButton'
+import { postQuoteSend } from '@/lib/quotes/send-quote-client'
 
 interface B2BQuote {
   id: string
@@ -53,6 +55,12 @@ interface B2BQuote {
   valid_until: string | null
   season: string | null
   internal_notes: string | null
+  // Entered when the quote is saved from the B2B Calculator.
+  notes?: string | null
+  client_name?: string | null
+  client_email?: string | null
+  client_phone?: string | null
+  client_nationality?: string | null
   terms_and_conditions: string | null
   pdf_url: string | null
   services_snapshot?: unknown
@@ -84,9 +92,11 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
   expired: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: AlertCircle }
 }
 
-export default function B2BQuoteDetailPage({ params }: { params: { id: string } }) {
+// params is a Promise in a client page (Next 15+): reading params.id
+// directly gave undefined, and the page asked for quote "undefined".
+export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise)
   const supabase = createClient()
-  const router = useRouter()
   const dialog = useConfirmDialog()
   const [quote, setQuote] = useState<B2BQuote | null>(null)
 
@@ -107,34 +117,6 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
   const [error, setError] = useState<string | null>(null)
   const [pdfGenerating, setPdfGenerating] = useState(false)
   const [sending, setSending] = useState(false)
-  const [converting, setConverting] = useState(false)
-
-  const handleConvertToBooking = async () => {
-    if (!quote) return
-    if (!(await dialog.confirm({
-      message: `Create a booking from quote ${quote.quote_number}? A quote can only be converted once.`,
-      confirmText: 'Create booking',
-    }))) return
-    setConverting(true)
-    try {
-      const res = await fetch('/api/bookings/from-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quote_id: quote.id, quote_type: 'b2b' }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        showToast('error', data.error || 'Failed to create booking')
-        setConverting(false)
-        return
-      }
-      showToast('success', 'Booking created')
-      router.push(`/bookings/${data.data.id}`)
-    } catch {
-      showToast('error', 'Failed to create booking')
-      setConverting(false)
-    }
-  }
 
   useEffect(() => {
     fetchQuote()
@@ -251,14 +233,10 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2b/${quote.id}/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2b/${quote.id}/send`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send rate sheet')
@@ -290,14 +268,10 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
       try {
         setSending(true)
 
-        const response = await fetch(`/api/quotes/b2b/${quote.id}/send-whatsapp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        const data = await response.json()
+        // Unpriced services: ask, then send anyway only if confirmed.
+        const sent = await postQuoteSend(`/api/quotes/b2b/${quote.id}/send-whatsapp`, (message) => dialog.confirm({ message }))
+        if (sent.cancelled) return
+        const { response, data } = sent
 
         if (!response.ok) {
           throw new Error(data.error || 'Failed to send rate sheet')
@@ -361,12 +335,12 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
               <span className="text-sm font-medium">Back to B2B Quotes</span>
             </Link>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={handleDownloadPDF}
                 disabled={pdfGenerating}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {pdfGenerating ? (
                   <>
@@ -382,7 +356,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
               </button>
               <Link
                 href={`/quotes/b2b/${quote.id}/edit`}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
+                className="h-10 px-4 whitespace-nowrap shrink-0 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 inline-flex items-center justify-center gap-2"
               >
                 <Edit className="w-4 h-4" />
                 Edit
@@ -391,7 +365,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 type="button"
                 onClick={() => handleSendQuote('email')}
                 disabled={sending || !quote.b2b_partners?.email}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <>
@@ -409,7 +383,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 type="button"
                 onClick={() => handleSendQuote('whatsapp')}
                 disabled={sending || !quote.b2b_partners?.phone}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!quote.b2b_partners?.phone ? 'No phone number available' : 'Send via WhatsApp'}
               >
                 {sending ? (
@@ -424,25 +398,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                   </>
                 )}
               </button>
-              <button
-                type="button"
-                onClick={handleConvertToBooking}
-                disabled={converting || quote.status !== 'accepted'}
-                title={quote.status !== 'accepted' ? 'Only accepted quotes can be converted — set the status to Accepted first' : 'Create a booking from this quote'}
-                className="px-4 py-2 bg-[#647C47] text-white rounded-lg text-sm font-medium hover:bg-[#566b3c] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {converting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <BookOpen className="w-4 h-4" />
-                    Convert to Booking
-                  </>
-                )}
-              </button>
+              <ConvertToBookingButton quoteId={quote.id} quoteType="b2b" quoteNumber={quote.quote_number} status={quote.status} />
             </div>
           </div>
 
@@ -463,7 +419,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 )}
                 {quote.guide_mode === 'throughout' && (
                   <span className="px-3 py-1 rounded-full text-sm font-medium bg-[#e8ede3] text-[#4a5c35]">
-                    +1 Guide{quote.guide_grade === 'senior' ? ' \u00b7 Senior' : ''}
+                    +1 Guide{quote.guide_grade ? <>{' \u00b7 '}<VocabLabel kind="guide_grade" value={quote.guide_grade} /></> : null}
                   </span>
                 )}
               </div>
@@ -793,6 +749,23 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
               )}
             </div>
           </div>
+
+          {/* The client and notes entered on the calculator's Save Quote —
+              stored, but never shown anywhere until now. */}
+          {(quote.client_name || quote.client_email || quote.client_phone || quote.client_nationality || quote.notes) && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Client &amp; Notes</h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                {quote.client_name && (<><dt className="text-gray-500">Client</dt><dd className="text-gray-900">{quote.client_name}</dd></>)}
+                {quote.client_email && (<><dt className="text-gray-500">Email</dt><dd className="text-gray-900 break-all">{quote.client_email}</dd></>)}
+                {quote.client_phone && (<><dt className="text-gray-500">Phone</dt><dd className="text-gray-900">{quote.client_phone}</dd></>)}
+                {quote.client_nationality && (<><dt className="text-gray-500">Nationality</dt><dd className="text-gray-900">{quote.client_nationality}</dd></>)}
+              </dl>
+              {quote.notes && (
+                <div className="mt-3 text-sm text-gray-700 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{quote.notes}</div>
+              )}
+            </div>
+          )}
 
           {/* Internal Notes */}
           {quote.internal_notes && (

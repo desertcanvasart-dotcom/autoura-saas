@@ -11,6 +11,7 @@
 // ============================================
 
 import twilio from 'twilio'
+import { whatsAppSenderFor } from './whatsapp-tenant'
 
 // Types
 export interface WhatsAppMessage {
@@ -18,6 +19,11 @@ export interface WhatsAppMessage {
   body: string
   mediaUrl?: string // Optional: PDF or image URL
   statusCallback?: string // Optional: override the delivery-receipt URL (Twilio only)
+  /** The sending tenant — REQUIRED, so no send forgets it: the message goes
+   *  out from ITS WhatsApp number (lib/whatsapp-tenant), and a local number
+   *  (leading 0) takes its country's code. null = the shared number (a
+   *  platform send with no company behind it). */
+  tenantId: string | null
 }
 
 export interface QuoteMessage {
@@ -48,6 +54,16 @@ export interface StatusUpdate {
 
 let twilioClient: twilio.Twilio | null = null
 
+/** The service client, for the sender lookup; null when it cannot be made. */
+async function adminForSender(): Promise<Parameters<typeof whatsAppSenderFor>[0]> {
+  try {
+    const { createAdminClient } = await import('@/lib/supabase-server')
+    return createAdminClient() as unknown as Parameters<typeof whatsAppSenderFor>[0]
+  } catch {
+    return null
+  }
+}
+
 function getTwilioClient() {
   if (twilioClient) return twilioClient
 
@@ -62,6 +78,16 @@ function getTwilioClient() {
   // Create client with API Key (more secure than Auth Token)
   twilioClient = twilio(apiKey, apiSecret, { accountSid })
   return twilioClient
+}
+
+/**
+ * The WhatsApp senders registered in the platform's Twilio account (Senders
+ * API): "whatsapp:+…" and their status (ONLINE, PENDING_VERIFICATION …).
+ * Super Admin checks a company's number against it before saving.
+ */
+export async function listWhatsAppSenders(): Promise<Array<{ senderId: string; status: string }>> {
+  const senders = await getTwilioClient().messaging.v2.channelsSenders.list({ channel: 'whatsapp' })
+  return senders.map(s => ({ senderId: s.senderId, status: String(s.status) }))
 }
 
 // ============================================
@@ -119,11 +145,13 @@ export async function sendWhatsAppMessage({
   to,
   body,
   mediaUrl,
-  statusCallback
+  statusCallback,
+  tenantId
 }: WhatsAppMessage): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
   try {
     const client = getTwilioClient()
-    const from = process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_WHATSAPP_NUMBER
+    // The company's own number, else the shared one (lib/whatsapp-tenant).
+    const from = await whatsAppSenderFor(await adminForSender(), tenantId)
 
     if (!from) {
       throw new Error('TWILIO_WHATSAPP_FROM not configured')
@@ -193,7 +221,8 @@ export async function testWhatsAppConnection(
   try {
     const result = await sendWhatsAppMessage({
       to: testPhone,
-      body: '✅ Success! Your WhatsApp integration is working correctly. This is a test message from Autoura.'
+      body: '✅ Success! Your WhatsApp integration is working correctly. This is a test message from Autoura.',
+      tenantId: null
     })
 
     if (result.success) {

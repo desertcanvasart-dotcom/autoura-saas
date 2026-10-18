@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { DocScreenshot, Tip } from '../layout'
+import { ScreenshotPlaceholder, Tip } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/content-library')
 
 export default function ContentLibraryPage() {
   return (
@@ -14,24 +18,32 @@ export default function ContentLibraryPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Content Library &amp; Documents</h1>
       <p className="text-gray-600 mb-8">
-        The Content Library, AI Prompts and Writing Rules entries in the sidebar&rsquo;s Communicate group (admins and managers) holds the building blocks the AI uses to write your itineraries &mdash; reusable content, prompt templates, and house-style rules &mdash; plus the Documents hub for customer and supplier paperwork.
+        <strong>Content Library</strong>, <strong>AI Prompts</strong> and <strong>Writing Rules</strong> sit in the sidebar&rsquo;s Communicate group, for admins and managers. The Content Library and Writing Rules are what the Quote Builder&apos;s <strong>Write descriptions</strong> writes your days from. The <strong>Documents</strong> hub, for customer and supplier paperwork, is in the Operate group.
       </p>
 
       {/* Content Library */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Content Library</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Content Library</strong> stores reusable destination, attraction, and hotel content that feeds AI-generated itineraries:
+          <strong>Content Library</strong> stores your own descriptions of sites, hotels, experiences, restaurants, cruises, transfers, day structures and phrases &mdash; written once, at every comfort level:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Category Pills</strong> &mdash; Entries are grouped by category, each pill showing a count</li>
+          <li><strong>Category pills</strong> &mdash; <strong>All</strong> and one pill per category, each with its count</li>
           <li><strong>Search</strong> &mdash; Find entries by name, description, or location</li>
-          <li><strong>Cards</strong> &mdash; Each shows the category, name, location or duration, tags, the number of variations, and which tiers are still missing (tiers: Budget, Standard, Deluxe, Luxury)</li>
-          <li><strong>Add Content</strong> &mdash; Create a new entry; existing entries can be viewed, edited, or deleted</li>
+          <li><strong>Cards</strong> &mdash; The category, name, location, short description and tags, with <strong>All tiers</strong> or <strong>2/4 tiers</strong> and a badge per tier (grey when that tier is still missing)</li>
+          <li><strong>Add Content</strong> &mdash; Opens the editor; click an entry&apos;s name or the pencil to edit it, or the bin to delete it with all its tiers</li>
+          <li><strong>Add categories</strong> &mdash; Creates the standard categories you don&apos;t have yet, each with its own fields in the editor. A new library starts here: content needs a category.</li>
         </ul>
-        <DocScreenshot src="/docs/content-library/library.jpg" alt="Content Library page with category pills showing counts, the search bar, and content cards showing name, location/duration, tags, and variation count" />
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Editor</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Basic information</strong> &mdash; Category, Name, Short Description, Location and Tags</li>
+          <li><strong>Category details</strong> &mdash; Fields that suit the category, such as a hotel&apos;s star rating and room types or a restaurant&apos;s cuisine and dress code</li>
+          <li><strong>One tab per tier</strong> (your tier names, from Your Vocabulary) &mdash; Title, Description, Highlights, Inclusions (for some categories) and Internal Notes, which never appear in itineraries. Only tiers with a description are saved.</li>
+        </ul>
+        <ScreenshotPlaceholder caption="Content Library with category pills and counts, the search bar, and content cards with their tier badges" />
         <Tip>
-          <strong>Tiers matter:</strong> An entry with variations for every tier (Budget, Standard, Deluxe, Luxury) lets the AI describe the same attraction or hotel appropriately at any comfort level. The cards flag missing tiers so you know what to fill in.
+          <strong>Tiers matter:</strong> <strong>Write descriptions</strong> uses the entries that match what each day includes &mdash; its sites, hotel, cruise and experiences &mdash; in the version for the trip&apos;s tier. When that tier is missing it uses another tier&apos;s text and says so; the cards show which tiers are missing. A cruise&apos;s day-by-day is used for each sailing day, a Day Structure for its city shows how such a day reads, and Phrases marked for Itineraries are used where they fit.
         </Tip>
       </section>
 
@@ -39,57 +51,60 @@ export default function ContentLibraryPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">AI Prompts</h2>
         <p className="text-gray-600 mb-3">
-          <strong>AI Prompts</strong> holds the prompt templates behind each kind of AI generation, grouped by purpose: full itinerary, day description, site description, email, WhatsApp, summary, and transfer. Each template stores:
+          <strong>AI Prompts</strong> (<strong>AI Prompt Templates</strong>) keeps your own prompts for AI writing, grouped by purpose: Full Itinerary, Day Description, Site Description, Email, WhatsApp, Summary, and Transfer. <strong>New Template</strong> asks for:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li>A system prompt and a user prompt template with <code>{'{{variables}}'}</code></li>
-          <li>The model and temperature to use</li>
-          <li>An active flag and a version number</li>
+          <li>A <strong>Name</strong>, <strong>Purpose</strong> and <strong>Description</strong></li>
+          <li>A <strong>System Prompt</strong> and a <strong>User Prompt Template</strong>, with <code>{'{{variable}}'}</code> placeholders</li>
+          <li>The <strong>Model</strong>, <strong>Temperature</strong> (0&ndash;2) and <strong>Max Tokens</strong></li>
+          <li><strong>Set as default for this purpose</strong> &mdash; the default is marked with a star; there is one per purpose, and it cannot be deleted</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          A star marks the default template for each purpose. Templates can be viewed, edited, copied, or deleted.
+          Each template can be viewed (the eye icon), edited, or deleted, and the copy icon copies its prompt text. These templates are a reference for your team: the AI features do not read them yet.
         </p>
-        <DocScreenshot src="/docs/content-library/prompts.jpg" alt="AI Prompts page with templates grouped by purpose, showing each template's model, temperature, active flag, and version" />
+        <ScreenshotPlaceholder caption="AI Prompt Templates grouped by purpose, with the default marked by a star" />
       </section>
 
       {/* Writing Rules */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Writing Rules</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Writing Rules</strong> define the house style the AI follows when generating content. Each rule has:
+          <strong>Writing Rules</strong> are your house style. <strong>Add Rule</strong> asks for:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Category</strong> &mdash; Tone, vocabulary, structure, formatting, or brand</li>
-          <li><strong>Rule Type</strong> &mdash; Must Follow, Preferred, or Avoid, each with good and bad examples</li>
-          <li><strong>Priority and Scope</strong> &mdash; Rules can apply everywhere or only to itineraries, email, or WhatsApp</li>
-          <li><strong>Active Flag</strong> &mdash; Turn rules on and off without deleting them</li>
+          <li><strong>Rule Name</strong> and <strong>Description</strong> &mdash; what the AI reads (rules for <strong>All</strong> or <strong>Itineraries</strong> are used by <strong>Write descriptions</strong>; Email and WhatsApp rules are not read yet)</li>
+          <li><strong>Category</strong> &mdash; Tone, Vocabulary, Structure, Formatting, or Brand (also the filter pills at the top)</li>
+          <li><strong>Rule Type</strong> &mdash; Must Follow, Preferred, or Avoid</li>
+          <li><strong>Priority</strong> from 1 (low) to 10 (high), and <strong>Applies To</strong>: All, Itineraries, Emails, WhatsApp</li>
+          <li><strong>Bad Examples</strong> and <strong>Good Examples</strong> &mdash; shown as &ldquo;Avoid&rdquo; and &ldquo;Better&rdquo; when you expand a rule</li>
         </ul>
-        <DocScreenshot src="/docs/content-library/rules.jpg" alt="Writing Rules page showing rules with their category, Must Follow / Preferred / Avoid type, good/bad examples, priority, scope, and active toggles" />
+        <p className="text-gray-600 mt-3">
+          Rules are listed by type and priority. A rule you no longer want is deleted; there is no on/off switch.
+        </p>
+        <Tip>
+          The AI follows your rules when it writes an itinerary &mdash; your highest-priority ones: up to 5 Must Follow, 3 Preferred and 5 Avoid. It reads each rule&apos;s name and description; the examples and <strong>Applies To</strong> are for your team and are not used by the AI yet.
+        </Tip>
+        <ScreenshotPlaceholder caption="Writing Rules with the category pills, rules grouped by Must Follow / Preferred / Avoid, and one rule expanded with its Avoid / Better examples" />
       </section>
 
       {/* Documents */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Documents</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Documents</strong> is a hub page that points you to where each kind of paperwork is generated &mdash; it is not a document list:
+          <strong>Documents</strong> (Operate group) is a hub that points you to where each kind of paperwork is made:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Customer Documents</strong> &mdash; Contracts and invoices, generated from an itinerary via <Link href="/docs/itineraries" className="text-primary-600 hover:underline">Itineraries</Link></li>
-          <li><strong>Supplier Documents</strong> &mdash; Six types: hotel voucher, transport voucher, cruise voucher, activity voucher, guide assignment, and service order</li>
+          <li><strong>Customer Contracts</strong> &mdash; Made from an itinerary: its <strong>Documents</strong> menu has the itinerary PDF, the contract and the invoice (see <Link href="/docs/itineraries" className="text-primary-600 hover:underline">Itineraries</Link>)</li>
+          <li><strong>Supplier documents</strong> &mdash; Five kinds: Hotel Vouchers, Transport Vouchers, Cruise Vouchers, Guide Assignments, and Service Orders (meals and entrance tickets)</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          To generate supplier documents, open any itinerary and use its <strong>Documents</strong> button &mdash; services are automatically grouped by supplier. Vouchers can be sent by Email or WhatsApp, and you can track each one&rsquo;s confirmation status.
+          To make supplier documents, open an itinerary and click <strong>Supplier docs</strong> &mdash; its services are grouped by supplier for you. <strong>All Supplier Documents</strong> lists them by status (Draft, Sent, Confirmed, Completed, Cancelled); from a document, send it by <strong>Email</strong> or <strong>WhatsApp</strong> and <strong>Mark Confirmed</strong> when the supplier confirms.
         </p>
-        <DocScreenshot src="/docs/content-library/documents-hub.jpg" alt="Documents hub page showing the Customer Documents section (contracts, invoices) and the Supplier Documents section listing the document types" />
+        <ScreenshotPlaceholder caption="Documents hub with Customer Contracts and the five supplier document types" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200">
-        <Link href="/docs" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          All Docs
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/content-library" />
     </div>
   )
 }

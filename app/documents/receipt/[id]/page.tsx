@@ -1,13 +1,16 @@
 'use client'
 
+import { formatMoney } from '@/lib/currency-totals'
+import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
+import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { BackLink } from '@/components/nav/TripNav'
 import { 
-  ArrowLeft, 
   Download, 
   Loader2, 
   Check, 
@@ -21,11 +24,10 @@ import {
   Phone
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
-import { getCurrencySymbol } from '@/lib/currency'
 
 interface Payment {
   id: string
-  itinerary_id: string
+  itinerary_id: string | null
   itinerary_code: string
   client_name: string
   client_email?: string
@@ -43,7 +45,6 @@ interface Payment {
 export default function ReceiptPage() {
   const { tenant } = useTenant()
   const params = useParams()
-  const router = useRouter()
   const [payment, setPayment] = useState<Payment | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
@@ -79,8 +80,9 @@ export default function ReceiptPage() {
     try {
       const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
       downloadReceiptPDF({
-        receiptNumber: payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`,
+        receiptNumber: receiptNumberFor(payment),
         invoiceNumber: payment.itinerary_code,
+        referenceLabel: 'Itinerary',
         clientName: payment.client_name,
         clientEmail: payment.client_email || '',
         paymentDate: payment.payment_date || new Date().toISOString(),
@@ -94,7 +96,7 @@ export default function ReceiptPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
+      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) }, await browserPdfFontFor(payment, identityFromTenant(tenant)))
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download receipt')
@@ -135,7 +137,7 @@ export default function ReceiptPage() {
   }
 
   const formatCurrency = (amount: number, currency: string) => {
-    return `${getCurrencySymbol(currency)} ${amount.toFixed(2)}`
+    return formatMoney(amount, currency)
   }
 
   if (loading) {
@@ -164,24 +166,23 @@ export default function ReceiptPage() {
     )
   }
 
-  const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+  const receiptNumber = receiptNumberFor(payment)
+  // Every payment links here, pending, failed and refunded ones included. Only
+  // a completed payment has been received; the rest get no receipt to send.
+  const received = payment.payment_status === 'completed'
 
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
+          {/* Browser-history "back" left the app from a shared link or a new tab:
+              back goes to where it was opened from (?from=), else Receipts. */}
+          <BackLink fallbackHref="/receipts" fallbackLabel="Receipts" />
           
           <div className="flex items-center gap-2">
             {/* WhatsApp Button */}
-            {payment.client_phone && (
+            {received && payment.client_phone && (
               <button
                 onClick={handleSendWhatsApp}
                 disabled={sending}
@@ -203,18 +204,20 @@ export default function ReceiptPage() {
             )}
             
             {/* Download Button */}
-            <button
-              onClick={handleDownloadPDF}
-              disabled={downloading}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50"
-            >
-              {downloading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              {downloading ? 'Generating...' : 'Download PDF'}
-            </button>
+            {received && (
+              <button
+                onClick={handleDownloadPDF}
+                disabled={downloading}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50"
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {downloading ? 'Generating...' : 'Download PDF'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -224,10 +227,19 @@ export default function ReceiptPage() {
           <DocumentLetterhead company={identityFromTenant(tenant)} title="Payment Receipt" number={receiptNumber} />
 
           {/* Status Badge */}
-          <div className="px-6 py-3 bg-green-50 border-b border-green-100 flex items-center justify-center gap-2">
-            <Check className="w-4 h-4 text-green-600" />
-            <span className="text-sm font-medium text-green-700">Payment Completed Successfully</span>
-          </div>
+          {received ? (
+            <div className="px-6 py-3 bg-green-50 border-b border-green-100 flex items-center justify-center gap-2">
+              <Check className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-700">Payment Completed Successfully</span>
+            </div>
+          ) : (
+            <div className="px-6 py-3 bg-amber-50 border-b border-amber-100 text-center">
+              <span className="text-sm font-medium text-amber-800 capitalize">
+                Payment {(payment.payment_status || 'not completed').replace('_', ' ')}
+              </span>
+              <span className="text-sm text-amber-800"> — not received, so there is no receipt to issue.</span>
+            </div>
+          )}
 
           {/* Receipt Body */}
           <div className="p-6">
@@ -265,12 +277,17 @@ export default function ReceiptPage() {
                     year: 'numeric'
                   })}
                 </p>
-                <Link 
-                  href={`/itineraries/${payment.itinerary_id}`}
-                  className="text-sm text-primary-600 hover:text-primary-700 font-mono"
-                >
-                  {payment.itinerary_code}
-                </Link>
+                {/* A payment need not have a trip: never link /itineraries/null. */}
+                {payment.itinerary_id ? (
+                  <Link
+                    href={`/itineraries/${payment.itinerary_id}`}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-mono"
+                  >
+                    {payment.itinerary_code}
+                  </Link>
+                ) : payment.itinerary_code ? (
+                  <p className="text-sm text-gray-600 font-mono">{payment.itinerary_code}</p>
+                ) : null}
               </div>
             </div>
 
@@ -318,7 +335,7 @@ export default function ReceiptPage() {
 
             {/* Amount */}
             <div className="bg-primary-600 text-white rounded-lg p-6 text-center mb-6">
-              <p className="text-primary-200 text-xs uppercase tracking-wider mb-2">Amount Received</p>
+              <p className="text-primary-200 text-xs uppercase tracking-wider mb-2">{received ? 'Amount Received' : 'Amount'}</p>
               <p className="text-4xl font-bold">
                 {formatCurrency(payment.amount, payment.currency)}
               </p>
@@ -333,14 +350,16 @@ export default function ReceiptPage() {
             )}
 
             {/* Footer */}
-            <div className="border-t border-gray-200 pt-6 text-center">
-              <p className="text-lg font-semibold text-gray-900 mb-1">
-                Thank you for your payment!
-              </p>
-              <p className="text-sm text-gray-600">
-                This receipt confirms your payment has been received and processed.
-              </p>
-            </div>
+            {received && (
+              <div className="border-t border-gray-200 pt-6 text-center">
+                <p className="text-lg font-semibold text-gray-900 mb-1">
+                  Thank you for your payment!
+                </p>
+                <p className="text-sm text-gray-600">
+                  This receipt confirms your payment has been received and processed.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Footer: Settings → Organization */}

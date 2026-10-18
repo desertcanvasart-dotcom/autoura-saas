@@ -18,11 +18,13 @@
 //
 // WHERE a service belongs:
 //   - a night (hotel, cruise) — where the bed is: the day's overnight city;
-//   - transport and the guide — where the party is based that day: the
-//     overnight city as well, so a day trip's vehicle and guide go with the
-//     stay they leave from (the agency's Cairo driver drives to Alexandria);
-//   - meals and entrance fees — where they are consumed: the day's own city
-//     (the Alexandria restaurant, the Alexandria sites).
+//   - transport — where the party is based that day: the overnight city as
+//     well, so a day trip's vehicle goes with the stay it leaves from (the
+//     agency's Cairo driver drives to Alexandria);
+//   - meals, entrance fees and a guide nobody is assigned to yet — where they
+//     happen: the day's own city (the Alexandria restaurant, the Alexandria
+//     sites, a local Alexandria guide). An assigned guide gets their own
+//     assignment wherever they go (lib/documents/plan-supplier-documents).
 // Cities a short drive apart (Giza and Cairo, ~10 km) are one place: the
 // first named on the trip names the group (lib/pricing/day-trip).
 //
@@ -35,7 +37,7 @@
 import { citiesFarApart } from '@/lib/pricing/day-trip'
 import { resolveCityCoordinates } from '@/lib/constants/egypt-city-coordinates'
 
-export type DocCategory = 'meals' | 'entrance'
+export type DocCategory = 'meals' | 'entrance' | 'assistance'
 
 export interface ServiceMapping {
   docType: string | null
@@ -62,6 +64,10 @@ export const SERVICE_TO_DOC_TYPE: Record<string, ServiceMapping> = {
   accommodation: { docType: 'hotel_voucher' },
   hotel: { docType: 'hotel_voucher' },
   cruise: { docType: 'cruise_voucher' },
+  // Meet & assist at the airport and the hotel: the representative's own
+  // order, not the driver's voucher (what the AI builder writes).
+  airport_service: { docType: 'service_order', category: 'assistance' },
+  hotel_service: { docType: 'service_order', category: 'assistance' },
   // No document: tips, water, supplies, a flight (ticketed by the airline).
   tips: { docType: null },
   tip: { docType: null },
@@ -72,11 +78,20 @@ export const SERVICE_TO_DOC_TYPE: Record<string, ServiceMapping> = {
   service_fee: { docType: null },
 }
 
+const GRID_ASSISTANCE = /^\[pricing-grid:(airport_services|hotel_services)\]/
+
 /** What a service line goes on; undefined / docType null = no document. */
 export function docMappingFor(service: { service_type?: string | null; description?: string | null }): ServiceMapping | undefined {
   // The grid saves a cruise as 'accommodation' (its slot tag says cruise) —
   // that is a cruise voucher, not a hotel voucher.
-  if (String(service.description ?? '').startsWith('[pricing-grid:cruise]')) return SERVICE_TO_DOC_TYPE.cruise
+  const description = String(service.description ?? '')
+  if (description.startsWith('[pricing-grid:cruise]')) return SERVICE_TO_DOC_TYPE.cruise
+  // The grid saves its airport services as 'transfer' and its hotel services
+  // (check-in / check-out assist, porters) as 'other'. Typed by the type alone,
+  // the airport meet & assist went on the driver's transport voucher and the
+  // hotel assist on no document (live ITN-S-2026-8987). Both are the meet &
+  // assist representative's.
+  if (GRID_ASSISTANCE.test(description)) return SERVICE_TO_DOC_TYPE.airport_service
   return service.service_type ? SERVICE_TO_DOC_TYPE[service.service_type] : undefined
 }
 
@@ -84,9 +99,9 @@ const clean = (s: unknown): string => String(s ?? '').trim()
 const ON_BOARD = /^on board\b/i
 
 /**
- * The city a service belongs to, by what it is: a night, transport and the
- * guide go where the party is based (the overnight city); meals and sites
- * where they are.
+ * The city a service belongs to, by what it is: a night and transport go
+ * where the party is based (the overnight city); meals, sites and guiding
+ * where they happen.
  */
 export function serviceCity(
   mapping: ServiceMapping,
@@ -96,7 +111,7 @@ export function serviceCity(
   const city = clean(day.city)
   const night = clean(day.overnight_city)
   const based = night && !ON_BOARD.test(night) ? night : ''
-  if (mapping.category) return city || based || fallback
+  if (mapping.category || mapping.docType === 'guide_assignment') return city || based || fallback
   return based || city || fallback
 }
 

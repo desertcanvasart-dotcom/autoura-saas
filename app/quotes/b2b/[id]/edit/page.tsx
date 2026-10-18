@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { VocabSelect } from '@/components/vocabulary'
 import {
-  ArrowLeft, Save, Loader2, AlertCircle, RefreshCw
+  ArrowLeft, Save, Loader2, AlertCircle
 } from 'lucide-react'
-import { showToast } from '@/app/contexts/ToastContext'
 
 interface B2BQuote {
   id: string
@@ -41,7 +41,10 @@ interface B2BQuote {
   } | null
 }
 
-export default function EditB2BQuotePage({ params }: { params: { id: string } }) {
+// params is a Promise in a client page (Next 15+): reading params.id
+// directly gave undefined, and the page asked for quote "undefined".
+export default function EditB2BQuotePage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise)
   const supabase = createClient()
   const router = useRouter()
 
@@ -142,7 +145,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent, recalculate: boolean = false) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!quote) return
@@ -177,7 +180,6 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
           season: season || null,
           internal_notes: internalNotes,
           terms_and_conditions: termsAndConditions,
-          recalculate,
         }),
       })
 
@@ -187,14 +189,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
         throw new Error(data.error || 'Failed to update quote')
       }
 
-      // If recalculate, refresh the page to show new pricing table
-      if (recalculate) {
-        await fetchQuote()
-        showToast('success', 'Pricing table recalculated successfully!')
-      } else {
-        // Redirect to detail page
-        router.push(`/quotes/b2b/${quote.id}`)
-      }
+      router.push(`/quotes/b2b/${quote.id}`)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -278,7 +273,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
           </div>
         )}
 
-        <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-6">
+        <form onSubmit={(e) => handleSubmit(e)} className="space-y-6">
           {/* Basic Configuration */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Configuration</h2>
@@ -288,34 +283,19 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Service Tier
                 </label>
-                <select
-                  value={tier}
-                  onChange={(e) => setTier(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                >
-                  <option value="budget">Budget</option>
-                  <option value="standard">Standard</option>
-                  <option value="deluxe">Deluxe</option>
-                  <option value="luxury">Luxury</option>
-                </select>
+                {/* The agency's own tiers (Settings → Vocabulary), not four fixed names. */}
+                <VocabSelect kind="tier" value={tier} onChange={setTier} placeholder={null}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Currency
                 </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                >
-                  <option value="EUR">EUR (€)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="EGP">EGP (E£)</option>
-                </select>
+                {/* Read-only: changing it relabelled the amounts without converting them
+                    (EUR 2,500 became "USD 2,500"). A quote in another currency is priced again. */}
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">{currency}</div>
+                <p className="mt-1 text-xs text-gray-500">The amounts are in this currency. To quote in another, price the trip again.</p>
               </div>
 
               <div>
@@ -569,23 +549,14 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-purple-200">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleSubmit(e as any, true)
-                }}
-                disabled={saving}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Recalculate Full Pricing Table (2-30 pax)
-              </button>
-              <p className="text-xs text-purple-600 mt-2">
-                This will regenerate the pricing table for all passenger counts based on current values
-              </p>
-            </div>
+            {/* The "Recalculate" button sent recalculate:true, which the API never
+                read, and still said "recalculated successfully" — the partner
+                kept getting the old prices. Engine-priced quotes keep these
+                fields at 0, so rebuilding the table from them would zero it. */}
+            <p className="mt-4 pt-4 border-t border-purple-200 text-xs text-purple-700">
+              Saving these values does not change the multi-pax pricing table the partner receives.
+              To change partner prices, create a new quote from the itinerary or the B2B calculator.
+            </p>
           </div>
 
           {/* Status & Validity */}

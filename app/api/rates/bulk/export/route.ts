@@ -4,13 +4,14 @@ import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplate
 import type { Database } from '@/types/database.types'
 import { usesOneSheet, oneSheetHeaders, oneSheetTemplateRows, buildOneSheetRows } from '@/lib/rates/rate-sheet'
 import { loadVocabulary } from '@/lib/vocabulary-server'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import Papa from 'papaparse'
 
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const table = request.nextUrl.searchParams.get('table')
@@ -51,21 +52,34 @@ export async function GET(request: NextRequest) {
     // fixed_daily_costs table.
     const tableName = config.tableName as keyof Database['public']['Tables']
 
-    // RLS automatically filters by tenant.
+    // This tenant's OWN rows. RLS also shows the shared catalogue (entrance
+    // fees, flights, trains, tipping …), and exporting those then importing
+    // the sheet made a tenant copy of every shared row — the import matches
+    // only the tenant's own rates.
     // select('*') + header mapping, never select(headers.join(',')): naming a
     // column the database does not have yet (e.g. rate_currency before
     // migration 295) would 500 the whole export.
-    interface DynamicQuery {
-      select(columns: string): {
-        order(column: string, opts: { ascending: boolean }): PromiseLike<{
-          data: Record<string, unknown>[] | null
-          error: { message: string } | null
-        }>
-      }
+    interface DynamicOrdered {
+      order(column: string, opts: { ascending: boolean }): DynamicOrdered
+      range(from: number, to: number): PromiseLike<{
+        data: Record<string, unknown>[] | null
+        error: { message: string } | null
+      }>
     }
-    const { data, error } = await (supabase.from(tableName) as unknown as DynamicQuery)
-      .select('*')
-      .order('created_at', { ascending: false })
+    interface DynamicQuery {
+      select(columns: string): { eq(column: string, value: string): DynamicOrdered }
+    }
+    // Paged: a plain select stops at PostgREST's 1000-row cap, so a table of
+    // 1,400 rates exported 1,000 with no warning (documents audit, round 12).
+    // id breaks created_at ties so no row falls between two pages.
+    const { data, error } = await fetchAllPages((from, to) =>
+      (supabase.from(tableName) as unknown as DynamicQuery)
+        .select('*')
+        .eq('tenant_id', tenant_id)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })

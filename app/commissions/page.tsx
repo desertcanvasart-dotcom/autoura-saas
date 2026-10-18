@@ -34,7 +34,9 @@ import {
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { getCurrencySymbol } from '@/lib/currency'
+import { formatMoney, formatTotals, type CurrencyTotals } from '@/lib/currency-totals'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 interface Commission {
   id: string
@@ -63,15 +65,16 @@ interface Commission {
   client?: { id: string; first_name: string; last_name: string; email: string } | null
 }
 
+/** Per currency (lib/currency-totals): never added across currencies. */
 interface Summary {
-  total_receivable: number
-  total_payable: number
-  pending_receivable: number
-  pending_payable: number
-  received: number
-  paid: number
-  net_commission: number
-  by_category: Record<string, { receivable: number; payable: number; count: number }>
+  total_receivable: CurrencyTotals
+  total_payable: CurrencyTotals
+  pending_receivable: CurrencyTotals
+  pending_payable: CurrencyTotals
+  received: CurrencyTotals
+  paid: CurrencyTotals
+  net_commission: CurrencyTotals
+  by_category: Record<string, { receivable: CurrencyTotals; payable: CurrencyTotals; count: number }>
 }
 
 interface Supplier {
@@ -162,6 +165,9 @@ export default function CommissionsPage() {
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
   const dialog = useConfirmDialog()
+  const { tenant } = useTenant()
+  // A new commission starts in the agency's currency (it was always EUR).
+  const agencyCurrency = tenant?.default_currency || 'EUR'
 
   const fetchCommissions = useCallback(async () => {
     try {
@@ -175,6 +181,9 @@ export default function CommissionsPage() {
         const result = await response.json()
         setCommissions(result.data || [])
         setSummary(result.summary || null)
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Could not load commissions')
       }
     } catch (error) {
       console.error('Error fetching commissions:', error)
@@ -281,9 +290,13 @@ export default function CommissionsPage() {
       const response = await fetch(`/api/commissions/${id}`, { method: 'DELETE' })
       if (response.ok) {
         fetchCommissions()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Failed to delete commission')
       }
     } catch (error) {
       console.error('Error deleting commission:', error)
+      showToast('error', 'Failed to delete commission')
     }
   }
 
@@ -296,20 +309,27 @@ export default function CommissionsPage() {
       })
       if (response.ok) {
         fetchCommissions()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast('error', err.error || 'Failed to update commission')
       }
     } catch (error) {
       console.error('Error updating commission:', error)
+      showToast('error', 'Failed to update commission')
     }
   }
 
   const openAddModal = () => {
-    setFormData(initialFormData)
+    setFormData({ ...initialFormData, currency: agencyCurrency })
     setEditingId(null)
     setIsModalOpen(true)
   }
 
   const filteredCommissions = commissions.filter(c => {
-    const search = searchTerm.toLowerCase()
+    const search = searchTerm.trim().toLowerCase()
+    // No search: every row. A commission with no source, description,
+    // supplier or trip matched nothing and was hidden for good.
+    if (!search) return true
     return (
       c.source_name?.toLowerCase().includes(search) ||
       c.description?.toLowerCase().includes(search) ||
@@ -319,9 +339,7 @@ export default function CommissionsPage() {
     )
   })
 
-  const formatCurrency = (amount: number, currency: string = 'EUR') => {
-    return `${getCurrencySymbol(currency)}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
+  const formatCurrency = (amount: number, currency: string = 'EUR') => formatMoney(amount, currency)
 
   if (loading) {
     return (
@@ -361,50 +379,50 @@ export default function CommissionsPage() {
               <TrendingUp className="h-4 w-4 text-green-500" />
               <span className="text-xs text-gray-500">Receivable</span>
             </div>
-            <p className="text-xl font-bold text-green-600">{formatCurrency(summary.total_receivable)}</p>
+            <p className="text-xl font-bold text-green-600">{formatTotals(summary.total_receivable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="h-4 w-4 text-red-500" />
               <span className="text-xs text-gray-500">Payable</span>
             </div>
-            <p className="text-xl font-bold text-red-600">{formatCurrency(summary.total_payable)}</p>
+            <p className="text-xl font-bold text-red-600">{formatTotals(summary.total_payable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="h-4 w-4 text-amber-500" />
               <span className="text-xs text-gray-500">Pending In</span>
             </div>
-            <p className="text-xl font-bold text-amber-600">{formatCurrency(summary.pending_receivable)}</p>
+            <p className="text-xl font-bold text-amber-600">{formatTotals(summary.pending_receivable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="h-4 w-4 text-orange-500" />
               <span className="text-xs text-gray-500">Pending Out</span>
             </div>
-            <p className="text-xl font-bold text-orange-600">{formatCurrency(summary.pending_payable)}</p>
+            <p className="text-xl font-bold text-orange-600">{formatTotals(summary.pending_payable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Check className="h-4 w-4 text-emerald-500" />
               <span className="text-xs text-gray-500">Received</span>
             </div>
-            <p className="text-xl font-bold text-emerald-600">{formatCurrency(summary.received)}</p>
+            <p className="text-xl font-bold text-emerald-600">{formatTotals(summary.received)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <Check className="h-4 w-4 text-blue-500" />
               <span className="text-xs text-gray-500">Paid Out</span>
             </div>
-            <p className="text-xl font-bold text-blue-600">{formatCurrency(summary.paid)}</p>
+            <p className="text-xl font-bold text-blue-600">{formatTotals(summary.paid)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <DollarSign className="h-4 w-4 text-purple-500" />
               <span className="text-xs text-gray-500">Net</span>
             </div>
-            <p className={`text-xl font-bold ${summary.net_commission >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(summary.net_commission)}
+            <p className={`text-xl font-bold ${Object.values(summary.net_commission).every(v => v >= 0) ? 'text-green-600' : 'text-red-600'}`}>
+              {formatTotals(summary.net_commission)}
             </p>
           </div>
         </div>
@@ -468,143 +486,145 @@ export default function CommissionsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Type</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Category</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Source / Supplier</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Itinerary</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Base Amount</th>
-              <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Rate</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Commission</th>
-              <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Status</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Date</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredCommissions.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="px-4 py-12 text-center">
-                  <Handshake className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">No commissions found</p>
-                  <button
-                    onClick={openAddModal}
-                    className="mt-3 text-sm text-[#647C47] hover:underline font-medium"
-                  >
-                    Add your first commission
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Type</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Category</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Source / Supplier</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Itinerary</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Base Amount</th>
+                <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Rate</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Commission</th>
+                <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Status</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Date</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Actions</th>
               </tr>
-            ) : (
-              filteredCommissions.map((commission) => {
-                const categoryConfig = CATEGORY_CONFIG[commission.category] || CATEGORY_CONFIG.other
-                const statusConfig = STATUS_CONFIG[commission.status] || STATUS_CONFIG.pending
-                const CategoryIcon = categoryConfig.icon
-                const StatusIcon = statusConfig.icon
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredCommissions.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-12 text-center">
+                    <Handshake className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm text-gray-500">No commissions found</p>
+                    <button
+                      onClick={openAddModal}
+                      className="mt-3 text-sm text-[#647C47] hover:underline font-medium"
+                    >
+                      Add your first commission
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                filteredCommissions.map((commission) => {
+                  const categoryConfig = CATEGORY_CONFIG[commission.category] || CATEGORY_CONFIG.other
+                  const statusConfig = STATUS_CONFIG[commission.status] || STATUS_CONFIG.pending
+                  const CategoryIcon = categoryConfig.icon
+                  const StatusIcon = statusConfig.icon
 
-                return (
-                  <tr key={commission.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
-                        commission.commission_type === 'receivable' 
-                          ? 'bg-green-50 text-green-700' 
-                          : 'bg-red-50 text-red-700'
-                      }`}>
-                        {commission.commission_type === 'receivable' ? (
-                          <TrendingUp className="h-3 w-3" />
+                  return (
+                    <tr key={commission.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                          commission.commission_type === 'receivable' 
+                            ? 'bg-green-50 text-green-700' 
+                            : 'bg-red-50 text-red-700'
+                        }`}>
+                          {commission.commission_type === 'receivable' ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {commission.commission_type === 'receivable' ? 'In' : 'Out'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${categoryConfig.color}`}>
+                          <CategoryIcon className="h-3 w-3" />
+                          {categoryConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900">
+                          {commission.supplier?.name || commission.source_name || '-'}
+                        </p>
+                        {commission.source_contact && (
+                          <p className="text-xs text-gray-500">{commission.source_contact}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {commission.itinerary ? (
+                          <Link href={`/itineraries/${commission.itinerary.id}`} className="text-sm text-blue-600 hover:underline">
+                            {commission.itinerary.itinerary_code}
+                          </Link>
                         ) : (
-                          <TrendingDown className="h-3 w-3" />
+                          <span className="text-sm text-gray-400">-</span>
                         )}
-                        {commission.commission_type === 'receivable' ? 'In' : 'Out'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${categoryConfig.color}`}>
-                        <CategoryIcon className="h-3 w-3" />
-                        {categoryConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">
-                        {commission.supplier?.name || commission.source_name || '-'}
-                      </p>
-                      {commission.source_contact && (
-                        <p className="text-xs text-gray-500">{commission.source_contact}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {commission.itinerary ? (
-                        <Link href={`/itineraries/${commission.itinerary.id}`} className="text-sm text-blue-600 hover:underline">
-                          {commission.itinerary.itinerary_code}
-                        </Link>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-600">
-                        {commission.base_amount > 0 ? formatCurrency(commission.base_amount, commission.currency) : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-sm text-gray-600">
-                        {commission.commission_rate ? `${commission.commission_rate}%` : '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`text-sm font-semibold ${
-                        commission.commission_type === 'receivable' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {commission.commission_type === 'payable' ? '-' : ''}
-                        {formatCurrency(commission.commission_amount, commission.currency)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-                        <StatusIcon className="h-3 w-3" />
-                        {statusConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">
-                        {new Date(commission.transaction_date).toLocaleDateString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {commission.status === 'pending' && (
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm text-gray-600">
+                          {commission.base_amount > 0 ? formatCurrency(commission.base_amount, commission.currency) : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm text-gray-600">
+                          {commission.commission_rate ? `${commission.commission_rate}%` : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`text-sm font-semibold ${
+                          commission.commission_type === 'receivable' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {commission.commission_type === 'payable' ? '-' : ''}
+                          {formatCurrency(commission.commission_amount, commission.currency)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                          <StatusIcon className="h-3 w-3" />
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-gray-600">
+                          {commission.transaction_date ? new Date(`${commission.transaction_date.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {['pending', 'invoiced', 'disputed'].includes(commission.status) && (
+                            <button
+                              onClick={() => handleMarkAs(commission.id, commission.commission_type === 'receivable' ? 'received' : 'paid')}
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title={commission.commission_type === 'receivable' ? 'Mark as Received' : 'Mark as Paid'}
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleMarkAs(commission.id, commission.commission_type === 'receivable' ? 'received' : 'paid')}
-                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title={commission.commission_type === 'receivable' ? 'Mark as Received' : 'Mark as Paid'}
+                            onClick={() => handleEdit(commission)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit"
                           >
-                            <Check className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleEdit(commission)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(commission.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+                          <button
+                            onClick={() => handleDelete(commission.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Add/Edit Modal */}
@@ -761,6 +781,16 @@ export default function CommissionsPage() {
                     max="100"
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  >
+                    {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Commission Amount <span className="text-red-500">*</span></label>

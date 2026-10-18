@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/profit-loss')
 
 export default function ProfitLossPage() {
   return (
@@ -14,109 +18,104 @@ export default function ProfitLossPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Profit &amp; Loss</h1>
       <p className="text-gray-600 mb-8">
-        Track the financial health of your business with per-trip and aggregate profit &amp; loss reports. Compare expenses against client revenue and monitor your margins across all trips.
+        What each trip actually made: what it earns, less what it cost, plus or minus its commissions &mdash; trip by
+        trip and across all of them. <strong>Profit &amp; Loss</strong> is in Finance, for managers and admins.
       </p>
 
-      {/* Overview */}
+      {/* What a trip earns */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Overview</h2>
-        <p className="text-gray-600 mb-3">
-          Navigate to <strong>Profit &amp; Loss</strong> in the sidebar. Eight summary cards sit at the top:
-        </p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">What a trip earns</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Total Trips</strong></li>
-          <li><strong>Total Revenue</strong></li>
-          <li><strong>Total Expenses</strong></li>
-          <li><strong>Net Commission</strong> &mdash; with a sub-line splitting commission in vs. out (disputed receivable commissions are excluded)</li>
-          <li><strong>Gross Profit</strong></li>
-          <li><strong>Avg Margin</strong></li>
-          <li><strong>Profitable</strong> &mdash; count of trips in the black</li>
-          <li><strong>Loss-Making</strong> &mdash; count of trips in the red</li>
+          <li><strong>Its invoices</strong>, net of tax, once a standard or final invoice exists. VAT is collected for the state, not earned.</li>
+          <li><strong>Its quote</strong> (plus the extras sold on the booking) while nothing is invoiced, or only deposits &mdash; a 20% deposit is not the trip&rsquo;s revenue. If the deposits come to more than the quote, the deposits. Shown with a <strong>quoted</strong> mark.</li>
+          <li><strong>A cancelled trip</strong> earns only what was invoiced. With nothing invoiced it earns nothing, and any costs on it are a loss.</li>
+        </ul>
+        <p className="text-gray-600 mt-3">
+          Cancelled invoices are left out. Drafts count &mdash; issue or cancel them to keep the figure right.
+        </p>
+      </section>
+
+      {/* What it cost */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">What it cost, and its commissions</h2>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Expenses</strong> linked to the trip, paid or not. Rejected expenses are left out.</li>
+          <li><strong>Extras sold</strong> on the trip&rsquo;s booking: what they cost from the supplier counts as a cost.</li>
+          <li><strong>Commissions</strong> on the trip: receivable ones add to profit, payable ones take from it. A disputed receivable is left out (money you may never see); a disputed payable is still counted (you will probably pay it). Cancelled commissions are left out.</li>
+        </ul>
+        <p className="text-gray-600 mt-3">
+          Supplier invoices are not read: their cost is in the expenses they are matched to.
+        </p>
+      </section>
+
+      {/* The list */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The P&amp;L page</h2>
+        <p className="text-gray-600 mb-3">Eight cards at the top:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Total Trips</strong>, <strong>Total Revenue</strong>, <strong>Total Expenses</strong> (extras&rsquo; supplier cost included)</li>
+          <li><strong>Net Commission</strong> &mdash; with the commission in and out beneath it</li>
+          <li><strong>Gross Profit</strong> and <strong>Avg Margin</strong> &mdash; profit over revenue across the trips shown</li>
+          <li><strong>Profitable</strong> and <strong>Loss-Making</strong> &mdash; how many trips are in the black and the red</li>
         </ul>
         <p className="mt-3 text-gray-600 mb-3">
-          Below the cards, every trip is listed with its revenue, expenses, and profit/loss. A collapsible filter panel lets you set a custom <strong>start and end date</strong> and filter by trip status (Draft, Sent, Confirmed, Completed, Cancelled). You can sort by date, profit, or margin, and the list is paginated.
+          Below, every trip with its revenue, costs, commission, profit and margin, 15 to a page. Search; filter by trip
+          status and dates &mdash; a trip is in the range when any of its days are; sort by date, profit or margin.
+          Profit sorts in your agency&rsquo;s currency, so trips in different currencies compare.
         </p>
         <DocScreenshot src="/docs/profit-loss/pl-overview.jpg" alt="Profit & Loss overview with eight summary cards, filters, and trip list" />
       </section>
 
-      {/* Per-Trip P&L */}
+      {/* Per-trip */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Per-Trip Breakdown</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">One trip&rsquo;s P&amp;L</h2>
         <p className="text-gray-600 mb-3">
-          Click on any trip to see its detailed P&amp;L. The page is built around a single equation &mdash; <strong>Revenue &minus; Expenses &plusmn; Commission = Profit/Loss</strong> &mdash; with one margin badge for the trip.
+          Click a trip. The page is one equation &mdash; <strong>Revenue &minus; Expenses &plusmn; Commission = Profit</strong>{' '}
+          &mdash; and its margin.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Revenue</strong> &mdash; What has been invoiced for the trip, with a separate figure for what has actually been paid. If nothing has been invoiced yet, the quoted amount is used instead and flagged with a <strong>Quoted amount</strong> badge.</li>
-          <li><strong>Expenses</strong> &mdash; Expenses linked to the trip, with a sub-figure for pending (not yet paid) expenses.</li>
-          <li><strong>Commission</strong> &mdash; Net effect of receivable and payable commissions on the trip.</li>
+          <li><strong>Revenue</strong> &mdash; as above, marked when it is the quote; what has been paid beneath it.</li>
+          <li><strong>Expenses</strong> &mdash; with what is still pending, and the extras&rsquo; supplier cost when there is one.</li>
+          <li><strong>Commission</strong> &mdash; the net, with in and out beneath it.</li>
         </ul>
-        <p className="mt-3 text-gray-600 mb-3">
-          Below the equation, panels show the <strong>Expense Breakdown</strong> by category, the full <strong>Expenses</strong> list, the <strong>Invoices</strong> list, and <strong>Trip Details</strong>.
+        <p className="mt-3 text-gray-600">
+          Below it: spend by category, the trip&rsquo;s expenses and invoices (each in its own currency), and the trip&rsquo;s details.
         </p>
         <DocScreenshot src="/docs/profit-loss/trip-pl.jpg" alt="Per-trip P&L page with the Revenue − Expenses ± Commission equation, margin badge, and breakdown panels" />
       </section>
 
-      {/* Multi-currency */}
+      {/* Currency */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Multi-Currency &amp; Data Provenance</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Currencies</h2>
         <p className="text-gray-600 mb-3">
-          All totals are shown in a single reporting currency. When your trips involve multiple currencies, a provenance banner explains exactly how the numbers were produced and warns you about:
+          Each trip is worked out in its own currency: an expense, invoice or commission in another currency is converted
+          at the rate on its date (the payment date when paid). The cards convert every trip into{' '}
+          <strong>your agency&rsquo;s currency</strong>, at the rate on the trip&rsquo;s start date. A banner says when the figures are
+          not exact:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Amounts converted at today&apos;s rate</strong> &mdash; historic transactions converted with the current exchange rate, not the rate on the transaction date</li>
-          <li><strong>Amounts excluded entirely</strong> &mdash; when no exchange rate exists for a currency, those amounts are left out, which means the margin shown is better than reality</li>
-          <li><strong>Untranslated trips</strong> &mdash; trips that could not be brought into the reporting currency</li>
-          <li><strong>Unavailable commissions</strong> &mdash; commissions that could not be included</li>
+          <li><strong>Converted at today&rsquo;s rate</strong> &mdash; no rate was on file for the date</li>
+          <li><strong>Left out</strong> &mdash; no rate at all for that currency, so the margin shown is better than reality; the trip is marked</li>
+          <li><strong>Trips not converted</strong> &mdash; left out of the cards</li>
+          <li><strong>Commissions unavailable</strong> &mdash; they could not be read</li>
         </ul>
         <Tip>
-          Disputed receivable commissions are deliberately excluded from margin calculations &mdash; money you may never receive should not inflate your profit.
-        </Tip>
-      </section>
-
-      {/* Data Sources */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Where the Numbers Come From</h2>
-        <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Revenue</strong> &mdash; From invoices created for the trip (falling back to the quoted amount when nothing is invoiced)</li>
-          <li><strong>Payments Received</strong> &mdash; From the payments module (actual cash received)</li>
-          <li><strong>Expenses</strong> &mdash; From expenses linked to the itinerary</li>
-          <li><strong>Commissions</strong> &mdash; From the commissions module (receivable and payable)</li>
-        </ul>
-        <Tip>
-          <strong>Accuracy Tip:</strong> For the most accurate P&amp;L, record all expenses against the correct itinerary and keep invoice amounts up to date.
+          If invoices or expenses cannot be read, the report says so and shows nothing, rather than figures without them.
         </Tip>
       </section>
 
       {/* Reports */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Reports</h2>
-        <p className="text-gray-600 mb-3">
-          In addition to the P&amp;L page, the <strong>Reports</strong> page (admin/manager only) provides aggregate views across five tabs:
+        <p className="text-gray-600">
+          The yearly financial dashboard &mdash; Overview, Revenue, Cash Flow, Tax Summary and Commissions, each with CSV
+          export &mdash; is <strong>Reports</strong>, described in{' '}
+          <Link href="/docs/expenses-commissions" className="text-primary-600 hover:underline">Expenses &amp; Commissions</Link>.
         </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Overview</strong> &mdash; including an expense breakdown by category</li>
-          <li><strong>Revenue</strong> &mdash; quarterly and monthly views</li>
-          <li><strong>Cash Flow</strong> &mdash; including receivable and payable figures</li>
-          <li><strong>Tax Summary</strong></li>
-          <li><strong>Commissions</strong></li>
-        </ul>
-        <p className="mt-3 text-gray-600">
-          Every table offers a CSV export.
-        </p>
-        <DocScreenshot src="/docs/profit-loss/financial-reports.jpg" alt="Reports page with Overview, Revenue, Cash Flow, Tax Summary, and Commissions tabs" />
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between">
-        <Link href="/docs/expenses-commissions" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Expenses &amp; Commissions
-        </Link>
-        <Link href="/docs/followups-reminders" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
-          Next: Follow-ups &amp; Reminders
-          <ChevronRight className="w-4 h-4" />
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/profit-loss" />
     </div>
   )
 }

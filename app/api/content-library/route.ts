@@ -1,3 +1,4 @@
+import { orIlikeContains } from '@/lib/postgrest-search'
 // =====================================================
 // CONTENT LIBRARY API - FIXED VERSION
 // =====================================================
@@ -5,6 +6,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/supabase-server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,short_description.ilike.%${search}%,location.ilike.%${search}%`)
+      query = query.or(`name.ilike.${orIlikeContains(search)},short_description.ilike.${orIlikeContains(search)},location.ilike.${orIlikeContains(search)}`)
     }
 
     const { data: contentItems, error: contentError } = await query
@@ -147,11 +149,14 @@ export async function GET(request: NextRequest) {
 // POST - Create new content item
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // The company the person is signed into (requireAuth). The row needs it:
+    // content_library.tenant_id is NOT NULL with no default, so every create failed.
+    const auth = await requireAuth()
+    if (auth.error !== null) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const { supabase, tenant_id, user } = auth
+    if (!supabase || !tenant_id || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -183,6 +188,7 @@ export async function POST(request: NextRequest) {
     const { data: content, error: contentError } = await supabase
       .from('content_library')
       .insert({
+        tenant_id,
         category_id,
         name,
         slug: finalSlug,

@@ -1,3 +1,4 @@
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 // app/api/payments/route.ts
 // ============================================
 // AUTOURA - PAYMENTS API
@@ -7,9 +8,11 @@
 // Security: Requires authentication for all operations
 // ============================================
 
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server'
 import { parsePaymentInput } from '@/lib/payment-input'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { paymentCurrencyFor } from '@/lib/payment-currency'
 
 /**
  * GET /api/payments
@@ -17,6 +20,11 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
  * RLS policies automatically filter by tenant_id
  */
 export async function GET(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Use authenticated client - RLS automatically filters by tenant
     const supabase = await createAuthenticatedClient()
@@ -30,7 +38,9 @@ export async function GET(request: NextRequest) {
       }, { status: 401 })
     }
 
-    const { data: payments, error } = await supabase
+    // Every payment: the pages total them ("total received"), and a plain
+    // select stopped at 1000 rows.
+    const { data: payments, error } = await fetchAllPages((from, to) => supabase
       .from('payments')
       .select(`
         *,
@@ -43,6 +53,8 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to))
 
     if (error) {
       console.error('❌ Database error:', error)
@@ -77,6 +89,11 @@ export async function GET(request: NextRequest) {
  * Requires authentication and validates tenant ownership
  */
 export async function POST(request: NextRequest) {
+  // Viewers read nothing here and change nothing; deletes and the
+  // finance-only areas are for managers and admins (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
+
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
@@ -113,7 +130,7 @@ export async function POST(request: NextRequest) {
     if (parsed.value.itinerary_id) {
       const { data: itinerary, error: itineraryError } = await supabase
         .from('itineraries')
-        .select('id, tenant_id')
+        .select('id, tenant_id, currency')
         .eq('id', parsed.value.itinerary_id)
         .single()
 
@@ -130,6 +147,11 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         )
       }
+
+      // In the trip's currency (lib/payment-currency) — the receipt says so.
+      const paid = paymentCurrencyFor(body.currency, itinerary.currency)
+      if (!paid.ok) return NextResponse.json({ success: false, error: paid.error }, { status: 400 })
+      parsed.value.currency = paid.currency
     }
 
     // tenant_id last is deliberate: it cannot be overridden by the payload,

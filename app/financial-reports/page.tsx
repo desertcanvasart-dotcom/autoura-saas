@@ -209,8 +209,17 @@ export default function FinancialReportsPage() {
   }, [fetchData])
 
   const exportToCSV = (data: any[], filename: string) => {
-    const headers = Object.keys(data[0] || {}).join(',')
-    const rows = data.map(row => Object.values(row).join(','))
+    // Quoted cells: a name with a comma shifted every money column after it,
+    // and text starting with = + - @ runs as a formula in a spreadsheet.
+    // Numbers stay bare, so a negative amount is still a number.
+    const cell = (v: unknown) => {
+      // Two places at most: summed floats printed 1234.5600000001.
+      if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v * 100) / 100) : ''
+      const s = String(v ?? '')
+      return `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`
+    }
+    const headers = Object.keys(data[0] || {}).map(cell).join(',')
+    const rows = data.map(row => Object.values(row).map(cell).join(','))
     const csv = [headers, ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -498,55 +507,57 @@ export default function FinancialReportsPage() {
                 Export CSV
               </button>
             </div>
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Month</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Invoiced</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Collected</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Expenses</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Net Profit</th>
-                  <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Trips</th>
-                  <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Invoices</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {monthly.map(m => (
-                  <tr key={m.month} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month} {m.year}</td>
-                    <td className="px-4 py-3 text-sm text-right text-blue-600">{formatAmount(m.invoiced)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-emerald-600">{formatAmount(m.collected)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.expenses)}</td>
-                    <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatAmount(m.net_profit)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-center text-gray-600">{m.trip_count}</td>
-                    <td className="px-4 py-3 text-sm text-center text-gray-600">{m.invoice_count}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Month</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Invoiced</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Collected</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Expenses</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Net Profit</th>
+                    <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Trips</th>
+                    <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Invoices</th>
                   </tr>
-                ))}
-                <tr className="bg-gray-50 font-semibold">
-                  <td className="px-4 py-3 text-sm text-gray-900">Total</td>
-                  <td className="px-4 py-3 text-sm text-right text-blue-600">
-                    {formatAmount(monthly.reduce((sum, m) => sum + m.invoiced, 0))}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-emerald-600">
-                    {formatAmount(monthly.reduce((sum, m) => sum + m.collected, 0))}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-red-600">
-                    {formatAmount(monthly.reduce((sum, m) => sum + m.expenses, 0))}
-                  </td>
-                  <td className={`px-4 py-3 text-sm text-right ${summary && summary.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatAmount(monthly.reduce((sum, m) => sum + m.net_profit, 0))}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-center text-gray-600">
-                    {monthly.reduce((sum, m) => sum + m.trip_count, 0)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-center text-gray-600">
-                    {monthly.reduce((sum, m) => sum + m.invoice_count, 0)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {monthly.map(m => (
+                    <tr key={m.month} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month} {m.year}</td>
+                      <td className="px-4 py-3 text-sm text-right text-blue-600">{formatAmount(m.invoiced)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-emerald-600">{formatAmount(m.collected)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.expenses)}</td>
+                      <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatAmount(m.net_profit)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-600">{m.trip_count}</td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-600">{m.invoice_count}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-gray-50 font-semibold">
+                    <td className="px-4 py-3 text-sm text-gray-900">Total</td>
+                    <td className="px-4 py-3 text-sm text-right text-blue-600">
+                      {formatAmount(monthly.reduce((sum, m) => sum + m.invoiced, 0))}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-emerald-600">
+                      {formatAmount(monthly.reduce((sum, m) => sum + m.collected, 0))}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-red-600">
+                      {formatAmount(monthly.reduce((sum, m) => sum + m.expenses, 0))}
+                    </td>
+                    <td className={`px-4 py-3 text-sm text-right ${summary && summary.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatAmount(monthly.reduce((sum, m) => sum + m.net_profit, 0))}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-center text-gray-600">
+                      {monthly.reduce((sum, m) => sum + m.trip_count, 0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-center text-gray-600">
+                      {monthly.reduce((sum, m) => sum + m.invoice_count, 0)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -598,28 +609,30 @@ export default function FinancialReportsPage() {
                 Export
               </button>
             </div>
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Month</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Inflow</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Outflow</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Net</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {cashFlow.monthly_cash_flow.map(m => (
-                  <tr key={m.month} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month}</td>
-                    <td className="px-4 py-3 text-sm text-right text-green-600">{formatAmount(m.inflow)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.outflow)}</td>
-                    <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatAmount(m.net)}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Month</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Inflow</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Outflow</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Net</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {cashFlow.monthly_cash_flow.map(m => (
+                    <tr key={m.month} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month}</td>
+                      <td className="px-4 py-3 text-sm text-right text-green-600">{formatAmount(m.inflow)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.outflow)}</td>
+                      <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatAmount(m.net)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -780,52 +793,54 @@ export default function FinancialReportsPage() {
                 Export
               </button>
             </div>
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Name</th>
-                  <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Type</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Total Earned</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Paid</th>
-                  <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Pending</th>
-                  <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Trips</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {commissionSummary.recipients.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
-                      No commission data
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Name</th>
+                    <th className="text-left text-xs font-semibold text-gray-600 uppercase px-4 py-3">Type</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Total Earned</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Paid</th>
+                    <th className="text-right text-xs font-semibold text-gray-600 uppercase px-4 py-3">Pending</th>
+                    <th className="text-center text-xs font-semibold text-gray-600 uppercase px-4 py-3">Trips</th>
                   </tr>
-                ) : (
-                  commissionSummary.recipients.map((recipient, idx) => {
-                    const config = CATEGORY_LABELS[recipient.type] || CATEGORY_LABELS.other
-                    return (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span>{config.icon}</span>
-                            <span className="text-sm font-medium text-gray-900">{recipient.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{config.label}</td>
-                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
-                          {formatAmount(recipient.total_earned)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-green-600">
-                          {formatAmount(recipient.total_paid)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-orange-600">
-                          {formatAmount(recipient.total_pending)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-center text-gray-600">{recipient.trip_count}</td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {commissionSummary.recipients.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                        No commission data
+                      </td>
+                    </tr>
+                  ) : (
+                    commissionSummary.recipients.map((recipient, idx) => {
+                      const config = CATEGORY_LABELS[recipient.type] || CATEGORY_LABELS.other
+                      return (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span>{config.icon}</span>
+                              <span className="text-sm font-medium text-gray-900">{recipient.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{config.label}</td>
+                          <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                            {formatAmount(recipient.total_earned)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-green-600">
+                            {formatAmount(recipient.total_paid)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-orange-600">
+                            {formatAmount(recipient.total_pending)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-center text-gray-600">{recipient.trip_count}</td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

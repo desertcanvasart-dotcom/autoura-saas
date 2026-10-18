@@ -5,6 +5,11 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Link from 'next/link'
+import BrandMark from '@/components/BrandMark'
+import ResendConfirmation from '@/components/auth/ResendConfirmation'
+
+const INPUT =
+  'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#263A29] focus:border-transparent'
 
 export default function SignupContent() {
   const [email, setEmail] = useState('')
@@ -12,6 +17,7 @@ export default function SignupContent() {
   const [fullName, setFullName] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -20,25 +26,28 @@ export default function SignupContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
 
     if (password !== confirmPassword) {
       setError('Passwords do not match')
-      setLoading(false)
       return
     }
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters')
-      setLoading(false)
       return
     }
 
+    if (!acceptedTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy to continue')
+      return
+    }
+
+    setLoading(true)
     try {
-      await signUp(email, password, fullName, companyName)
+      await signUp(email, password, fullName, companyName, new Date().toISOString())
       setSuccess(true)
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account')
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to create account')
     } finally {
       setLoading(false)
     }
@@ -46,22 +55,23 @@ export default function SignupContent() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[#F7F7F4] flex items-center justify-center px-4">
         <div className="max-w-md w-full">
-          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+          <div className="bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
+            <div className="w-16 h-16 bg-[#647C47]/10 text-[#647C47] rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
               ✓
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email!</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
             <p className="text-gray-600 mb-6">
-              We've sent you a confirmation link to <strong>{email}</strong>. 
-              Please check your inbox and click the link to verify your account.
+              We&apos;ve sent a confirmation link to <strong>{email}</strong>. Open it to verify your
+              account, then sign in.
             </p>
+            <ResendConfirmation email={email} className="mb-6" />
             <Link
               href="/login"
-              className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+              className="inline-block bg-[#263A29] text-white px-6 py-3 rounded-lg hover:bg-[#1D2B20] font-medium transition-colors"
             >
-              Go to Login
+              Go to sign in
             </Link>
           </div>
         </div>
@@ -70,109 +80,142 @@ export default function SignupContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-[#F7F7F4] flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 text-white rounded-full text-2xl font-bold mb-4">
-            T2E
+          <div className="mb-4">
+            <BrandMark />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-          <p className="text-gray-600">Join the Autoura operations platform</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create your account</h1>
+          <p className="text-gray-600">Start running your tours on Autoura</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
+              <label htmlFor="signup-full-name" className="block text-sm font-medium text-gray-700 mb-2">
+                Full name
               </label>
               <input
+                id="signup-full-name"
                 type="text"
                 required
+                autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="John Doe"
+                className={INPUT}
+                placeholder="Jane Smith"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Company Name
+              <label htmlFor="signup-company" className="block text-sm font-medium text-gray-700 mb-2">
+                Company name
               </label>
               <input
+                id="signup-company"
                 type="text"
                 required
+                autoComplete="organization"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={INPUT}
                 placeholder="Your Company Ltd"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+              <label htmlFor="signup-email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email address
               </label>
               <input
+                id="signup-email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={INPUT}
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="signup-password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
               <input
+                id="signup-password"
                 type="password"
                 required
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={INPUT}
                 placeholder="••••••••"
                 minLength={8}
+                aria-describedby="signup-password-hint"
               />
-              <p className="text-xs text-gray-500 mt-1">At least 8 characters</p>
+              <p id="signup-password-hint" className="text-xs text-gray-500 mt-1">At least 8 characters</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password
+              <label htmlFor="signup-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm password
               </label>
               <input
+                id="signup-confirm-password"
                 type="password"
                 required
+                autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={INPUT}
                 placeholder="••••••••"
               />
+            </div>
+
+            <div className="flex items-start gap-3">
+              <input
+                id="signup-terms"
+                type="checkbox"
+                required
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-[#263A29] border-gray-300 rounded focus:ring-[#263A29]"
+              />
+              <label htmlFor="signup-terms" className="text-sm text-gray-600">
+                I agree to the{' '}
+                <Link href="/terms" target="_blank" className="text-[#263A29] font-medium hover:underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" target="_blank" className="text-[#263A29] font-medium hover:underline">
+                  Privacy Policy
+                </Link>
+                .
+              </label>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+              className="w-full bg-[#263A29] text-white py-3 rounded-lg hover:bg-[#1D2B20] disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? 'Creating account...' : 'Create account'}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
-              <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link href="/login" className="text-[#263A29] hover:text-[#1D2B20] font-medium">
                 Sign in
               </Link>
             </p>

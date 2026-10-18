@@ -81,7 +81,14 @@ export async function GET(request: NextRequest) {
       subjectTeamMemberId = tm?.id ?? null
     }
 
-    const startIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+    // Whole days, today included: "Today" is since midnight, 7 days is today
+    // and the six before. It was now minus N×24h, so "Today" took in
+    // yesterday afternoon and yesterday's whole rollup, and 7d summed 8 days.
+    // Days are UTC, as the rollup is kept.
+    const startOfToday = new Date()
+    startOfToday.setUTCHours(0, 0, 0, 0)
+    const start = new Date(startOfToday.getTime() - (days - 1) * 24 * 60 * 60 * 1000)
+    const startIso = start.toISOString()
     const startDay = startIso.slice(0, 10)
 
     // Presence (login-linked subjects only)

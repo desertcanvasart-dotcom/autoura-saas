@@ -1,5 +1,9 @@
+import { gateRole } from '@/lib/api-role-gate'
 import { NextRequest, NextResponse } from 'next/server';
+import { quoteSeasonFor } from '@/lib/quotes/quote-season'
+import { priceB2cQuote, b2cPriceInputError } from '@/lib/quotes/b2c-quote-price';
 import { createAuthenticatedClient, createAdminClient, requireAuth } from '@/lib/supabase-server';
+import { isQuoteStatus, quoteStatusError } from '@/lib/quotes/quote-status'
 
 /**
  * GET /api/quotes/b2c/[id]
@@ -90,6 +94,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     // Require authentication to get user info for versioning
     const authResult = await requireAuth();
@@ -117,8 +124,6 @@ export async function PUT(
       currency,
       total_cost,
       margin_percent,
-      selling_price,
-      price_per_person,
       cost_breakdown,
       status,
       valid_until,
@@ -137,47 +142,55 @@ export async function PUT(
     if (tier !== undefined) updateData.tier = tier;
     if (currency !== undefined) updateData.currency = currency;
 
-    // If we have total_cost and margin_percent, recalculate selling_price and price_per_person
-    let finalTotalCost = total_cost;
-    let finalMarginPercent = margin_percent;
-    let finalSellingPrice = selling_price;
-    let finalPricePerPerson = price_per_person;
-    let finalNumTravelers = num_travelers;
-
-    // If total_cost or margin_percent is provided, recalculate
-    if (total_cost !== undefined || margin_percent !== undefined) {
-      // Fetch current values if not provided (using authenticated client)
-      if (finalTotalCost === undefined || finalMarginPercent === undefined || finalNumTravelers === undefined) {
-        const { data: currentQuote } = await supabase
-          .from('b2c_quotes')
-          .select('total_cost, margin_percent, num_travelers')
-          .eq('id', id)
-          .single();
-
-        if (currentQuote) {
-          finalTotalCost = total_cost !== undefined ? total_cost : currentQuote.total_cost;
-          finalMarginPercent = margin_percent !== undefined ? margin_percent : currentQuote.margin_percent;
-          finalNumTravelers = num_travelers !== undefined ? num_travelers : currentQuote.num_travelers;
-        }
+    // The selling price and price per person are worked out here from the
+    // base cost, margin, travellers and currency — never taken from the body
+    // (lib/quotes/b2c-quote-price). Any of the four changing reprices.
+    if (total_cost !== undefined || margin_percent !== undefined || num_travelers !== undefined || currency !== undefined) {
+      const { data: currentQuote } = await supabase
+        .from('b2c_quotes')
+        .select('total_cost, margin_percent, num_travelers, currency, itinerary_id')
+        .eq('id', id)
+        .eq('tenant_id', authResult.tenant_id)
+        .maybeSingle();
+      if (!currentQuote) {
+        return NextResponse.json({ success: false, error: 'Quote not found' }, { status: 404 });
       }
-
-      // Recalculate selling price: cost + (cost * margin / 100)
-      finalSellingPrice = finalTotalCost * (1 + finalMarginPercent / 100);
-      finalPricePerPerson = finalSellingPrice / finalNumTravelers;
-
-      updateData.selling_price = finalSellingPrice;
-      updateData.price_per_person = finalPricePerPerson;
-    } else {
-      // Use provided values if no recalculation needed
-      if (selling_price !== undefined) updateData.selling_price = selling_price;
-      if (price_per_person !== undefined) updateData.price_per_person = price_per_person;
+      const cost = total_cost !== undefined ? total_cost : currentQuote.total_cost;
+      const margin = margin_percent !== undefined ? margin_percent : currentQuote.margin_percent;
+      const inputError = b2cPriceInputError(cost, margin);
+      if (inputError) {
+        return NextResponse.json({ success: false, error: inputError }, { status: 400 });
+      }
+      // The departure's seasonal premium, from the trip's start date now —
+      // an edit reprices it like the rest of the price.
+      let departure: string | null = null;
+      if (currentQuote.itinerary_id) {
+        const { data: trip } = await supabase
+          .from('itineraries')
+          .select('start_date')
+          .eq('id', currentQuote.itinerary_id)
+          .eq('tenant_id', authResult.tenant_id)
+          .maybeSingle();
+        departure = trip?.start_date ?? null;
+      }
+      const season = await quoteSeasonFor(authResult.tenant_id, departure);
+      Object.assign(updateData, priceB2cQuote({
+        totalCost: cost,
+        marginPercent: margin,
+        travelers: num_travelers !== undefined ? num_travelers : currentQuote.num_travelers,
+        currency: currency !== undefined ? currency : currentQuote.currency,
+        seasonPercent: season.season_percent,
+      }), { season_name: season.season_name, season_percent: season.season_percent });
+      if (total_cost !== undefined) updateData.total_cost = Number(total_cost);
+      if (margin_percent !== undefined) updateData.margin_percent = Number(margin_percent);
     }
 
-    if (total_cost !== undefined) updateData.total_cost = total_cost;
-    if (margin_percent !== undefined) updateData.margin_percent = margin_percent;
     if (cost_breakdown !== undefined) updateData.cost_breakdown = cost_breakdown;
 
     // Metadata fields
+    if (status !== undefined && !isQuoteStatus('b2c', status)) {
+      return NextResponse.json({ success: false, error: quoteStatusError('b2c') }, { status: 400 });
+    }
     if (status !== undefined) updateData.status = status;
     if (valid_until !== undefined) updateData.valid_until = valid_until;
     if (internal_notes !== undefined) updateData.internal_notes = internal_notes;
@@ -194,6 +207,7 @@ export async function PUT(
       .from('b2c_quotes')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select(`
         *,
         clients (
@@ -254,6 +268,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Viewers read; they do not change anything (lib/api-role-gate).
+  const roleGate = await gateRole('staff')
+  if (roleGate) return roleGate
   try {
     const { id } = await params;
 

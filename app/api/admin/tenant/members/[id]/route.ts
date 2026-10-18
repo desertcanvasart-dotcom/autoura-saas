@@ -1,3 +1,4 @@
+import { checkRoleChange, checkActiveChange } from '@/lib/member-role'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { logActivity } from '@/lib/billing-middleware'
@@ -74,20 +75,19 @@ export async function PATCH(
       }, { status: 404 })
     }
 
-    // Prevent non-owners from creating/modifying owners
-    if (role === 'owner' && currentMember.role !== 'owner') {
-      return NextResponse.json({
-        success: false,
-        error: 'Only owners can assign the owner role'
-      }, { status: 403 })
-    }
-
-    // Prevent users from modifying their own role
-    if ((targetMember as any).user_id === user.id) {
-      return NextResponse.json({
-        success: false,
-        error: 'You cannot change your own role'
-      }, { status: 400 })
+    // The same rules as User Management (lib/member-role): only an owner
+    // assigns or changes the owner role — an admin could demote the owner
+    // here, since only ASSIGNING the owner role was checked — and nobody
+    // changes their own.
+    const check = checkRoleChange({
+      callerId: user.id,
+      callerRole: currentMember.role,
+      targetId: (targetMember as { user_id: string }).user_id,
+      targetRole: (targetMember as { role?: string | null }).role,
+      newRole: role,
+    })
+    if (!check.ok) {
+      return NextResponse.json({ success: false, error: check.error }, { status: check.status })
     }
 
     const old_role = (targetMember as any).role
@@ -194,6 +194,17 @@ export async function DELETE(
       }, { status: 404 })
     }
 
+    // Only an owner removes an owner, and nobody removes themselves here.
+    const removal = checkActiveChange({
+      callerId: user.id,
+      callerRole: currentMember.role,
+      targetId: (targetMember as { user_id: string }).user_id,
+      targetRole: (targetMember as { role?: string | null }).role,
+    })
+    if (!removal.ok) {
+      return NextResponse.json({ success: false, error: removal.error }, { status: removal.status })
+    }
+
     // Prevent removing the last owner
     if ((targetMember as any).role === 'owner') {
       const { count } = await supabase
@@ -225,6 +236,20 @@ export async function DELETE(
       .eq('id', id)
 
     if (deleteError) throw deleteError
+
+    // Their mailbox in this company goes with them: revoked at Google and
+    // forgotten. Left behind, a removed person's live Gmail grant stayed in
+    // the database. Best-effort — the removal itself already happened.
+    try {
+      const { revokeAndForgetMailbox } = await import('@/lib/gmail-revoke')
+      const removedUser = (targetMember as { user_id?: string }).user_id
+      if (removedUser) {
+        const r = await revokeAndForgetMailbox(removedUser, tenant_id)
+        if (r.error) console.error('Member removed, but their Gmail connection was not cleared:', r.error)
+      }
+    } catch (err) {
+      console.error('Member removed, but their Gmail connection was not cleared:', err)
+    }
 
     // Log activity
     await logActivity(

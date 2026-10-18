@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
+import { aiBudgetDenied } from '@/lib/ai-guard'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,6 +14,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const { supabase, tenant_id, user } = auth
     const { id } = await params
+    const overBudget = await aiBudgetDenied(user.id, tenant_id)
+    if (overBudget) return overBudget
 
     const body = await request.json().catch(() => ({}))
     const instruction: string | null = typeof body.instruction === 'string' && body.instruction.trim() ? body.instruction.trim() : null

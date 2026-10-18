@@ -59,15 +59,50 @@ export const RATE_LIMITS = {
     limit: 10,         // uploads
     windowMs: 3600000, // per hour
   },
-  // Email sending
+  // Email sending (lib/send-guard.ts) — a person, and a whole company.
   email: {
-    limit: 20,         // emails
+    limit: 60,         // emails
     windowMs: 3600000, // per hour
+  },
+  emailCompany: {
+    limit: 1000,       // emails
+    windowMs: 86400000, // per day
   },
   // Expensive operations (reports, exports)
   heavy: {
     limit: 5,          // requests
     windowMs: 60000,   // per minute
+  },
+  // AI calls (lib/ai-guard.ts) — a person: generous for real work, a
+  // ceiling for a stuck loop or a script.
+  ai: {
+    limit: 20,         // AI requests
+    windowMs: 60000,   // per minute
+  },
+  // AI work triggered by inbound messages, per conversation (lib/ai-guard).
+  aiPerConversation: {
+    limit: 10,         // AI runs
+    windowMs: 3600000, // per hour
+  },
+  // AI calls — a whole company, across all its people.
+  aiCompany: {
+    limit: 300,        // AI requests
+    windowMs: 3600000, // per hour
+  },
+  // SMS / WhatsApp sent from a template (lib/rate-limit-shared.ts) — a
+  // person, and a whole company.
+  messaging: {
+    limit: 30,         // messages
+    windowMs: 3600000, // per hour
+  },
+  messagingCompany: {
+    limit: 300,        // messages
+    windowMs: 86400000, // per day
+  },
+  // Data exports (app/api/account/export): each one reads every table.
+  dataExport: {
+    limit: 5,          // exports
+    windowMs: 3600000, // per hour
   },
   // Invitations
   invitation: {

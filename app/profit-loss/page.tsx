@@ -51,6 +51,9 @@ interface TripPnL {
   quoted_amount: number
   total_revenue: number
   total_paid: number
+  revenue_basis: 'invoiced' | 'quoted' | 'none'
+  revenue_for_margin: number
+  extras_supplier_cost: number
   total_expenses: number
   expenses_paid: number
   expenses_pending: number
@@ -84,6 +87,7 @@ interface Summary {
   loss_trips: number
   incomplete_trips: number
   untranslated_trips: number
+  trip_profit_reporting: Record<string, number | null>
   fx: FxSummary
 }
 
@@ -122,6 +126,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const ITEMS_PER_PAGE = 15
 
+/** A YYYY-MM-DD day as written — new Date('2026-03-04') is UTC midnight,
+ *  which showed the day before west of Greenwich. */
+function fmtDay(day: string | null | undefined, opts: Intl.DateTimeFormatOptions): string {
+  if (!day) return ''
+  const [y, m, d] = day.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return ''
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' })
+}
+
 export default function ProfitLossPage() {
   const [data, setData] = useState<TripPnL[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -135,6 +148,7 @@ export default function ProfitLossPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<'profit_margin' | 'gross_profit' | 'start_date'>('start_date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -145,16 +159,20 @@ export default function ProfitLossPage() {
       if (endDate) params.append('endDate', endDate)
 
       const response = await fetch(`/api/profit-loss?${params}`)
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success) {
-          setData(result.data)
-          setSummary(result.summary)
-          setMeta(result.meta || null)
-        }
+      const result = await response.json().catch(() => ({}))
+      if (response.ok && result.success) {
+        setData(result.data)
+        setSummary(result.summary)
+        setMeta(result.meta || null)
+        setLoadError(null)
+      } else {
+        // Shown, and the previous figures cleared — they belonged to another filter.
+        setData([]); setSummary(null); setMeta(null)
+        setLoadError(result.error || 'Could not load the report')
       }
     } catch (error) {
       console.error('Error fetching P&L data:', error)
+      setLoadError('Could not load the report')
     } finally {
       setLoading(false)
     }
@@ -184,13 +202,14 @@ export default function ProfitLossPage() {
           bVal = b.profit_margin
           break
         case 'gross_profit':
-          aVal = a.gross_profit
-          bVal = b.gross_profit
+          // In the reporting currency: 50,000 EGP is not more than 5,000 EUR.
+          aVal = summary?.trip_profit_reporting?.[a.itinerary_id] ?? -Infinity
+          bVal = summary?.trip_profit_reporting?.[b.itinerary_id] ?? -Infinity
           break
         case 'start_date':
         default:
-          aVal = new Date(a.start_date).getTime()
-          bVal = new Date(b.start_date).getTime()
+          aVal = a.start_date ? Date.parse(a.start_date) : 0
+          bVal = b.start_date ? Date.parse(b.start_date) : 0
       }
       return sortOrder === 'asc' ? aVal - bVal : bVal - aVal
     })
@@ -266,6 +285,10 @@ export default function ProfitLossPage() {
           </div>
         </div>
       </div>
+
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{loadError}</div>
+      )}
 
       {/* Summary Cards */}
       {summary && (
@@ -504,151 +527,156 @@ export default function ProfitLossPage() {
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Trip</th>
-              <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Revenue</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expenses</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Commission</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Profit</th>
-              <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Margin</th>
-              <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
-              <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {paginatedData.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
-                  No trips found
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Trip</th>
+                <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Revenue</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expenses</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Commission</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Profit</th>
+                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Margin</th>
+                <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
+                <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Actions</th>
               </tr>
-            ) : (
-              paginatedData.map((trip) => {
-                const statusConfig = STATUS_CONFIG[trip.status] || STATUS_CONFIG.draft
-                const revenue = trip.total_revenue > 0 ? trip.total_revenue : trip.quoted_amount
-                return (
-                  <tr key={trip.itinerary_id} className={`hover:bg-gray-50 ${getProfitBg(trip.gross_profit)}`}>
-                    <td className="px-4 py-3">
-                      <div>
-                        <Link 
-                          href={`/profit-loss/${trip.itinerary_id}`}
-                          className="text-sm font-medium text-gray-900 hover:text-[#647C47]"
-                        >
-                          {trip.itinerary_code}
-                        </Link>
-                        <p className="text-xs text-gray-500 truncate max-w-[200px]">{trip.client_name}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm text-gray-600">
-                        {new Date(trip.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {trip.end_date && `to ${new Date(trip.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="text-sm font-medium text-gray-900">
-                        {getCurrencySymbol(trip.currency)}{revenue.toLocaleString()}
-                      </div>
-                      {trip.invoice_count > 0 && (
-                        <div className="text-xs text-gray-500">
-                          {trip.invoice_count} invoice{trip.invoice_count > 1 ? 's' : ''}
-                        </div>
-                      )}
-                      {trip.total_revenue === 0 && (
-                        <div className="text-xs text-gray-400 italic">quoted</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="text-sm font-medium text-gray-900">
-                        {getCurrencySymbol(trip.currency)}{trip.total_expenses.toLocaleString()}
-                      </div>
-                      {trip.expense_count > 0 && (
-                        <div className="text-xs text-gray-500">
-                          {trip.expense_count} expense{trip.expense_count > 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {trip.commission_count === 0 ? (
-                        <span className="text-sm text-gray-300">—</span>
-                      ) : (
-                        <>
-                          <div
-                            className={`text-sm font-medium ${
-                              trip.net_commission >= 0 ? 'text-green-600' : 'text-red-600'
-                            }`}
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
+                    No trips found
+                  </td>
+                </tr>
+              ) : (
+                paginatedData.map((trip) => {
+                  const statusConfig = STATUS_CONFIG[trip.status] || STATUS_CONFIG.draft
+                  const revenue = trip.revenue_for_margin
+                  return (
+                    <tr key={trip.itinerary_id} className={`hover:bg-gray-50 ${getProfitBg(trip.gross_profit)}`}>
+                      <td className="px-4 py-3">
+                        <div>
+                          <Link 
+                            href={`/profit-loss/${trip.itinerary_id}`}
+                            className="text-sm font-medium text-gray-900 hover:text-[#647C47]"
                           >
-                            {trip.net_commission >= 0 ? '+' : '−'}
-                            {getCurrencySymbol(trip.currency)}
-                            {Math.abs(trip.net_commission).toLocaleString()}
-                          </div>
+                            {trip.itinerary_code}
+                          </Link>
+                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{trip.client_name}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-600">
+                          {fmtDay(trip.start_date, { month: 'short', day: 'numeric' })}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {trip.end_date && `to ${fmtDay(trip.end_date, { month: 'short', day: 'numeric' })}`}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="text-sm font-medium text-gray-900">
+                          {getCurrencySymbol(trip.currency)}{revenue.toLocaleString()}
+                        </div>
+                        {trip.invoice_count > 0 && (
                           <div className="text-xs text-gray-500">
-                            {trip.commission_count} record{trip.commission_count > 1 ? 's' : ''}
+                            {trip.invoice_count} invoice{trip.invoice_count > 1 ? 's' : ''}
                           </div>
-                        </>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className={`text-sm font-semibold ${getProfitColor(trip.gross_profit)}`}>
-                        {trip.gross_profit >= 0 ? '+' : ''}{getCurrencySymbol(trip.currency)}{trip.gross_profit.toLocaleString()}
-                      </div>
-                      {!trip.complete && (
-                        <div
-                          className="inline-flex items-center gap-1 text-xs text-amber-700 mt-0.5"
-                          title={trip.holes.map(h => h.message).join('\n')}
-                        >
-                          <AlertTriangle className="h-3 w-3" />
-                          {trip.holes.length} cost{trip.holes.length > 1 ? 's' : ''} not converted
+                        )}
+                        {trip.revenue_basis === 'quoted' && (
+                          <div className="text-xs text-gray-400 italic">quoted</div>
+                        )}
+                        {trip.revenue_basis === 'none' && (
+                          <div className="text-xs text-gray-400 italic">cancelled · nothing invoiced</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="text-sm font-medium text-gray-900">
+                          {getCurrencySymbol(trip.currency)}{(trip.total_expenses + (trip.extras_supplier_cost || 0)).toLocaleString()}
                         </div>
-                      )}
-                      {trip.complete && trip.fx.live > 0 && (
-                        <div
-                          className="text-xs text-gray-400 mt-0.5"
-                          title="No exchange rate was on file for the transaction date, so today's rate was used."
-                        >
-                          today&apos;s FX rate
+                        {trip.expense_count > 0 && (
+                          <div className="text-xs text-gray-500">
+                            {trip.expense_count} expense{trip.expense_count > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {trip.commission_count === 0 ? (
+                          <span className="text-sm text-gray-300">—</span>
+                        ) : (
+                          <>
+                            <div
+                              className={`text-sm font-medium ${
+                                trip.net_commission >= 0 ? 'text-green-600' : 'text-red-600'
+                              }`}
+                            >
+                              {trip.net_commission >= 0 ? '+' : '−'}
+                              {getCurrencySymbol(trip.currency)}
+                              {Math.abs(trip.net_commission).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {trip.commission_count} record{trip.commission_count > 1 ? 's' : ''}
+                            </div>
+                          </>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className={`text-sm font-semibold ${getProfitColor(trip.gross_profit)}`}>
+                          {trip.gross_profit >= 0 ? '+' : ''}{getCurrencySymbol(trip.currency)}{trip.gross_profit.toLocaleString()}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getMarginColor(trip.profit_margin)}`}>
-                        {trip.profit_margin >= 0 ? '+' : ''}{trip.profit_margin.toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
-                        {statusConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Link
-                          href={`/profit-loss/${trip.itinerary_id}`}
-                          className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          href={`/itineraries/${trip.itinerary_id}`}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="View Itinerary"
-                        >
-                          <Calendar className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+                        {!trip.complete && (
+                          <div
+                            className="inline-flex items-center gap-1 text-xs text-amber-700 mt-0.5"
+                            title={trip.holes.map(h => h.message).join('\n')}
+                          >
+                            <AlertTriangle className="h-3 w-3" />
+                            {trip.holes.length} cost{trip.holes.length > 1 ? 's' : ''} not converted
+                          </div>
+                        )}
+                        {trip.complete && trip.fx.live > 0 && (
+                          <div
+                            className="text-xs text-gray-400 mt-0.5"
+                            title="No exchange rate was on file for the transaction date, so today's rate was used."
+                          >
+                            today&apos;s FX rate
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getMarginColor(trip.profit_margin)}`}>
+                          {trip.profit_margin >= 0 ? '+' : ''}{trip.profit_margin.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/profit-loss/${trip.itinerary_id}`}
+                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          <Link
+                            href={`/itineraries/${trip.itinerary_id}`}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="View Itinerary"
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Pagination */}

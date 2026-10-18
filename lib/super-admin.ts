@@ -7,13 +7,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { isSuperAdmin } from '@/lib/super-admin-shared'
+import { isSuperAdmin, isConfirmedSuperAdmin } from '@/lib/super-admin-shared'
 
 const isBuildTime = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 // Re-exported so existing imports keep working; the implementation lives in
 // lib/super-admin-shared.ts (dependency-free, safe for middleware).
-export { isSuperAdmin }
+export { isSuperAdmin, isConfirmedSuperAdmin }
 
 export async function requireSuperAdmin() {
   if (isBuildTime) {
@@ -41,7 +41,7 @@ export async function requireSuperAdmin() {
     return { error: 'Unauthorized', status: 401, user: null, adminClient: null }
   }
 
-  if (!isSuperAdmin(user.email)) {
+  if (!isConfirmedSuperAdmin(user)) {
     return { error: 'Forbidden: not a super admin', status: 403, user: null, adminClient: null }
   }
 

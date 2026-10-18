@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { buildCapacityWrite, DEFAULT_MAX_GROUPS } from '@/lib/capacity/capacity-write'
+import { gateRole } from '@/lib/api-role-gate'
 
 // ============================================
 // SINGLE DATE CAPACITY API
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         data: {
           date,
           status: 'available',
-          max_groups: 3,
+          max_groups: DEFAULT_MAX_GROUPS,
           booked_groups: 0,
           is_default: true
         }
@@ -94,11 +96,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * - status: 'available' | 'limited' | 'busy' | 'blackout'
  * - max_groups?: number
  * - booked_groups?: number
- * - notes?: string
+ * - max_guides? / booked_guides? / max_vehicles? / booked_vehicles?: number
+ * - notes? / internal_notes?: string
  * - reason?: string
+ * Fields left out keep their stored value (new rows get the table defaults).
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('admin')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(
@@ -126,29 +132,20 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Validate status if provided
-    const validStatuses = ['available', 'limited', 'busy', 'blackout']
-    if (body.status && !validStatuses.includes(body.status)) {
+    // Prepare update data: only the fields the body carries. Defaulting the
+    // rest (booked counts to 0, max to 3, status to available, notes to blank)
+    // wiped them on every edit (documents audit, round 12).
+    const write = buildCapacityWrite(body && typeof body === 'object' ? body : {})
+    if (!write.ok) {
       return NextResponse.json(
-        { success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+        { success: false, error: write.error },
         { status: 400 }
       )
     }
-
-    // Prepare update data
     const updateData = {
+      ...write.fields,
       tenant_id,
       date,
-      status: body.status || 'available',
-      max_groups: body.max_groups ?? 3,
-      booked_groups: body.booked_groups ?? 0,
-      max_guides: body.max_guides,
-      booked_guides: body.booked_guides ?? 0,
-      max_vehicles: body.max_vehicles,
-      booked_vehicles: body.booked_vehicles ?? 0,
-      notes: body.notes,
-      internal_notes: body.internal_notes,
-      reason: body.reason,
       created_by: user?.id
     }
 
@@ -190,6 +187,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const roleGate = await gateRole('admin')
+    if (roleGate) return roleGate
     const authResult = await requireAuth()
     if (authResult.error !== null) {
       return NextResponse.json(

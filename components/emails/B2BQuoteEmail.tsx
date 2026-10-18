@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency-totals'
 import React from 'react'
 import {
   Html,
@@ -12,13 +13,15 @@ import {
   Column,
   Button,
 } from '@react-email/components'
+import { contactLine, emailDate, type QuoteEmailCompany } from './quote-email-company'
 
 interface B2BQuoteEmailProps {
   partnerName: string
   contactName?: string
   quoteNumber: string
   tripName: string
-  startDate: string
+  /** Null when the trip has no dates yet: the row is left out. */
+  startDate: string | null
   duration: number
   tier: string
   tourLeaderIncluded: boolean
@@ -27,7 +30,11 @@ interface B2BQuoteEmailProps {
   validFrom?: string
   validUntil?: string
   season?: string
-  viewQuoteUrl: string
+  /** A page the recipient can open without an account. None exists yet:
+   *  the quote is the attached PDF, and the button is left out. */
+  viewQuoteUrl?: string
+  /** The tenant sending it (Settings → Organization). */
+  company?: QuoteEmailCompany
 }
 
 export default function B2BQuoteEmail({
@@ -45,7 +52,10 @@ export default function B2BQuoteEmail({
   validUntil,
   season,
   viewQuoteUrl,
+  company,
 }: B2BQuoteEmailProps) {
+  const start = emailDate(startDate, { year: 'numeric', month: 'long', day: 'numeric' })
+  const contact = contactLine(company)
   // Get pax range
   const paxCounts = Object.keys(pricingTable).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b)
   const minPax = paxCounts[0]
@@ -59,7 +69,7 @@ export default function B2BQuoteEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Heading style={companyName}>AUTOURA</Heading>
+            {company?.name && <Heading style={companyName}>{company.name}</Heading>}
             <Text style={tagline}>B2B Rate Sheet</Text>
           </Section>
 
@@ -96,18 +106,19 @@ export default function B2BQuoteEmail({
             </Row>
 
             <Row>
-              <Column>
-                <Text style={label}>Start Date</Text>
-                <Text style={value}>{new Date(startDate).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}</Text>
-              </Column>
-              <Column>
-                <Text style={label}>Duration</Text>
-                <Text style={value}>{duration} days</Text>
-              </Column>
+              {start && (
+                <Column>
+                  <Text style={label}>Start Date</Text>
+                  <Text style={value}>{start}</Text>
+                </Column>
+              )}
+              {/* No duration known (a calculator quote has no trip): no row, never "0 days". */}
+              {duration > 0 && (
+                <Column>
+                  <Text style={label}>Duration</Text>
+                  <Text style={value}>{duration} days</Text>
+                </Column>
+              )}
             </Row>
 
             <Row>
@@ -144,7 +155,7 @@ export default function B2BQuoteEmail({
               </Column>
               <Column align="right">
                 <Text style={highlightLabel}>Best Rate (Per Person)</Text>
-                <Text style={highlightValueLarge}>{currency} {lowestPP.toLocaleString()}</Text>
+                <Text style={highlightValueLarge}>{formatMoney(lowestPP, currency)}</Text>
                 <Text style={highlightSubtext}>at {maxPax} pax</Text>
               </Column>
             </Row>
@@ -166,10 +177,10 @@ export default function B2BQuoteEmail({
                     <Text style={tableCellText}>{pax} pax</Text>
                   </Column>
                   <Column style={tableCell} align="right">
-                    <Text style={tableCellText}>{currency} {pricing.pp.toLocaleString()} pp</Text>
+                    <Text style={tableCellText}>{formatMoney(pricing.pp, currency)} pp</Text>
                   </Column>
                   <Column style={tableCell} align="right">
-                    <Text style={tableCellTextBold}>{currency} {pricing.total.toLocaleString()}</Text>
+                    <Text style={tableCellTextBold}>{formatMoney(pricing.total, currency)}</Text>
                   </Column>
                 </Row>
               )
@@ -189,10 +200,10 @@ export default function B2BQuoteEmail({
                   <Text style={tableCellTextBold}>{maxPax} pax</Text>
                 </Column>
                 <Column style={tableCell} align="right">
-                  <Text style={tableCellTextBold}>{currency} {pricingTable[maxPax].pp.toLocaleString()} pp</Text>
+                  <Text style={tableCellTextBold}>{formatMoney(pricingTable[maxPax].pp, currency)} pp</Text>
                 </Column>
                 <Column style={tableCell} align="right">
-                  <Text style={tableCellTextBold}>{currency} {pricingTable[maxPax].total.toLocaleString()}</Text>
+                  <Text style={tableCellTextBold}>{formatMoney(pricingTable[maxPax].total, currency)}</Text>
                 </Column>
               </Row>
             )}
@@ -210,12 +221,15 @@ export default function B2BQuoteEmail({
             </Section>
           )}
 
-          {/* CTA Button */}
-          <Section style={buttonSection}>
-            <Button style={button} href={viewQuoteUrl}>
-              View Complete Rate Sheet & Cost Breakdown
-            </Button>
-          </Section>
+          {/* CTA Button — only to a page the recipient can open. It linked the
+              staff quote page, which sent every client and partner to /login. */}
+          {viewQuoteUrl && (
+            <Section style={buttonSection}>
+              <Button style={button} href={viewQuoteUrl}>
+                View Complete Rate Sheet
+              </Button>
+            </Section>
+          )}
 
           {/* Footer */}
           <Section style={footer}>
@@ -223,12 +237,12 @@ export default function B2BQuoteEmail({
             <Text style={footerText}>
               Questions about this rate sheet? Contact your account manager or reply to this email.
             </Text>
-            <Text style={footerText}>
-              📧 hello@getautoura.net | 📱 +20 10 8091 6066
-            </Text>
-            <Text style={footerTextSmall}>
-              © {new Date().getFullYear()} Autoura by Online Era. All rights reserved.
-            </Text>
+            {contact && <Text style={footerText}>{contact}</Text>}
+            {company?.name && (
+              <Text style={footerTextSmall}>
+                © {new Date().getFullYear()} {company.name}
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>

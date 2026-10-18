@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency-totals'
 import React from 'react'
 import {
   Html,
@@ -12,12 +13,14 @@ import {
   Column,
   Button,
 } from '@react-email/components'
+import { contactLine, emailDate, type QuoteEmailCompany } from './quote-email-company'
 
 interface B2CQuoteEmailProps {
   clientName: string
   quoteNumber: string
   tripName: string
-  startDate: string
+  /** Null when the trip has no dates yet: the row is left out. */
+  startDate: string | null
   duration: number
   numTravelers: number
   pricePerPerson: number
@@ -25,7 +28,11 @@ interface B2CQuoteEmailProps {
   currency: string
   validUntil?: string
   clientNotes?: string
-  viewQuoteUrl: string
+  /** A page the recipient can open without an account. None exists yet:
+   *  the quote is the attached PDF, and the button is left out. */
+  viewQuoteUrl?: string
+  /** The tenant sending it (Settings → Organization). */
+  company?: QuoteEmailCompany
 }
 
 export default function B2CQuoteEmail({
@@ -41,7 +48,10 @@ export default function B2CQuoteEmail({
   validUntil,
   clientNotes,
   viewQuoteUrl,
+  company,
 }: B2CQuoteEmailProps) {
+  const start = emailDate(startDate, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const contact = contactLine(company)
   return (
     <Html>
       <Head />
@@ -49,16 +59,16 @@ export default function B2CQuoteEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Heading style={companyName}>AUTOURA</Heading>
-            <Text style={tagline}>Your Journey, Perfectly Planned</Text>
+            {company?.name && <Heading style={companyName}>{company.name}</Heading>}
+            {company?.tagline && <Text style={tagline}>{company.tagline}</Text>}
           </Section>
 
           {/* Greeting */}
           <Section style={content}>
-            <Heading style={h1}>Your Egypt Travel Quote is Ready!</Heading>
+            <Heading style={h1}>Your Travel Quote is Ready!</Heading>
             <Text style={text}>Dear {clientName},</Text>
             <Text style={text}>
-              Thank you for your interest in exploring Egypt with us. We're excited to present your personalized travel quote.
+              Thank you for your interest in travelling with us. We&apos;re excited to present your personalized travel quote.
             </Text>
           </Section>
 
@@ -80,19 +90,19 @@ export default function B2CQuoteEmail({
             </Row>
 
             <Row>
-              <Column>
-                <Text style={label}>Start Date</Text>
-                <Text style={value}>{new Date(startDate).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}</Text>
-              </Column>
-              <Column>
-                <Text style={label}>Duration</Text>
-                <Text style={value}>{duration} days</Text>
-              </Column>
+              {start && (
+                <Column>
+                  <Text style={label}>Start Date</Text>
+                  <Text style={value}>{start}</Text>
+                </Column>
+              )}
+              {/* No duration known (a calculator quote has no trip): no row, never "0 days". */}
+              {duration > 0 && (
+                <Column>
+                  <Text style={label}>Duration</Text>
+                  <Text style={value}>{duration} days</Text>
+                </Column>
+              )}
             </Row>
 
             <Row>
@@ -108,14 +118,14 @@ export default function B2CQuoteEmail({
             <Row>
               <Column>
                 <Text style={label}>Price Per Person</Text>
-                <Text style={priceText}>{currency} {pricePerPerson.toLocaleString()}</Text>
+                <Text style={priceText}>{formatMoney(pricePerPerson, currency)}</Text>
               </Column>
             </Row>
 
             <Row>
               <Column>
                 <Text style={label}>Total Price</Text>
-                <Text style={totalPriceText}>{currency} {totalPrice.toLocaleString()}</Text>
+                <Text style={totalPriceText}>{formatMoney(totalPrice, currency)}</Text>
               </Column>
             </Row>
 
@@ -141,18 +151,21 @@ export default function B2CQuoteEmail({
             </Section>
           )}
 
-          {/* CTA Button */}
-          <Section style={buttonSection}>
-            <Button style={button} href={viewQuoteUrl}>
-              View Full Quote Details
-            </Button>
-          </Section>
+          {/* CTA Button — only to a page the recipient can open. It linked the
+              staff quote page, which sent every client and partner to /login. */}
+          {viewQuoteUrl && (
+            <Section style={buttonSection}>
+              <Button style={button} href={viewQuoteUrl}>
+                View Full Quote Details
+              </Button>
+            </Section>
+          )}
 
           {/* Next Steps */}
           <Section style={content}>
             <Heading style={h2}>What's Next?</Heading>
             <Text style={text}>
-              • Review your detailed itinerary and pricing breakdown
+              • Review your detailed itinerary and what is included
             </Text>
             <Text style={text}>
               • Ask us any questions - we're here to help!
@@ -166,14 +179,14 @@ export default function B2CQuoteEmail({
           <Section style={footer}>
             <Hr style={divider} />
             <Text style={footerText}>
-              Need assistance? Reply to this email or contact us at:
+              {contact ? 'Need assistance? Reply to this email or contact us at:' : 'Need assistance? Reply to this email.'}
             </Text>
-            <Text style={footerText}>
-              📧 hello@getautoura.net | 📱 +20 10 8091 6066
-            </Text>
-            <Text style={footerTextSmall}>
-              © {new Date().getFullYear()} Autoura by Online Era. All rights reserved.
-            </Text>
+            {contact && <Text style={footerText}>{contact}</Text>}
+            {company?.name && (
+              <Text style={footerTextSmall}>
+                © {new Date().getFullYear()} {company.name}
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { capacityDateRange } from '@/lib/capacity/capacity-write'
+import { loadDayLoads } from '@/lib/capacity/booking-capacity'
 
 // ============================================
 // CAPACITY CHECK API (Public for AI Agent)
@@ -62,76 +64,42 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveEndDate = end_date || start_date
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveEndDate)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid end_date format. Use YYYY-MM-DD' },
+        { status: 400 }
+      )
+    }
 
     // Admin client (bypasses RLS); all queries are scoped to the session tenant below
     const supabase = createAdminClient()
 
-    // Get capacity entries for the date range
-    const { data: capacityData, error } = await supabase
-      .from('operator_capacity')
-      .select('date, status, max_groups, booked_groups, notes, reason')
-      .eq('tenant_id', tenant_id)
-      .gte('date', start_date)
-      .lte('date', effectiveEndDate)
-      .order('date', { ascending: true })
-
-    if (error) {
-      console.error('Error checking capacity:', error)
+    // Each day's load the way bookings are checked (lib/capacity/booking-capacity):
+    // live bookings on the ground + groups booked outside Autoura, against the
+    // day's own limit or the company's default (none = no limit).
+    if (!capacityDateRange(start_date, effectiveEndDate)) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
+        { success: false, error: 'Date range is too long (max 366 days)' },
+        { status: 400 }
       )
     }
-
-    // Create a map of dates to capacity
-    const capacityMap = new Map<string, {
-      status: string
-      max_groups: number
-      booked_groups: number
-      notes?: string | null
-      reason?: string | null
-    }>()
-
-    capacityData?.forEach(entry => {
-      capacityMap.set(entry.date, {
-        status: entry.status,
-        max_groups: entry.max_groups,
-        booked_groups: entry.booked_groups,
-        notes: entry.notes,
-        reason: entry.reason
-      })
-    })
-
-    // Generate all dates in range
-    const dates: string[] = []
-    const current = new Date(start_date)
-    const end = new Date(effectiveEndDate)
-
-    while (current <= end) {
-      dates.push(current.toISOString().split('T')[0])
-      current.setDate(current.getDate() + 1)
+    const { loads, error } = await loadDayLoads(supabase, tenant_id!, start_date, effectiveEndDate)
+    if (error) {
+      console.error('Error checking capacity:', error)
+      return NextResponse.json({ success: false, error }, { status: 500 })
     }
 
-    // Check availability for each date
-    const details = dates.map(date => {
-      const capacity = capacityMap.get(date)
-
-      if (!capacity) {
-        // No entry = default available
-        return {
-          date,
-          status: 'available' as const,
-          available_slots: 3 - group_size // Default 3 max groups
-        }
-      }
-
-      const availableSlots = capacity.max_groups - capacity.booked_groups
-
+    const details = loads.map(d => {
+      const free = d.max == null ? Number.MAX_SAFE_INTEGER : Math.max(0, d.max - d.booked)
+      // A day at its limit reads as busy whatever its label says.
+      const status = d.status === 'blackout' ? 'blackout' as const
+        : d.max != null && free === 0 ? 'busy' as const
+        : (d.status as 'available' | 'limited' | 'busy')
       return {
-        date,
-        status: capacity.status as 'available' | 'limited' | 'busy' | 'blackout',
-        available_slots: availableSlots,
-        reason: capacity.reason
+        date: d.date,
+        status,
+        available_slots: d.max == null ? 99 : free,
+        reason: d.reason,
       }
     })
 

@@ -100,16 +100,6 @@ const TABS = [
   { id: 'preferences', label: 'Preferences', icon: Settings },
 ]
 
-const TIMEZONES = [
-  { value: 'Africa/Cairo', label: 'Cairo (EET, UTC+2)' },
-  { value: 'Europe/London', label: 'London (GMT/BST)' },
-  { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
-  { value: 'America/New_York', label: 'New York (EST/EDT)' },
-  { value: 'America/Los_Angeles', label: 'Los Angeles (PST/PDT)' },
-  { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
-  { value: 'Asia/Dubai', label: 'Dubai (GST)' },
-  { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' },
-]
 
 const COST_MODE_OPTIONS = [
   { 
@@ -167,6 +157,9 @@ function SettingsContent() {
     default_currency: 'EUR'
   })
   const { items: tierItems, all: allTiers } = useVocabulary('tier')
+  // Only the rates you change become your own: saving sent every rate shown,
+  // pinning the automatic ones as manual so they stopped updating.
+  const [editedRates, setEditedRates] = useState<Set<string>>(new Set())
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([
     { base_currency: 'EUR', target_currency: 'USD', rate: 1.08 },
     { base_currency: 'EUR', target_currency: 'GBP', rate: 0.86 },
@@ -331,15 +324,26 @@ function SettingsContent() {
     setError(null)
 
     try {
+      const changed = exchangeRates.filter(r => editedRates.has(r.target_currency))
+      if (changed.length === 0) {
+        setSavingRates(false)
+        return
+      }
+      if (changed.some(r => !(Number(r.rate) > 0))) {
+        setError('An exchange rate must be a number above 0')
+        setSavingRates(false)
+        return
+      }
       const response = await fetch('/api/exchange-rates', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rates: exchangeRates })
+        body: JSON.stringify({ rates: changed })
       })
 
       const data = await response.json()
 
       if (data.success) {
+        setEditedRates(new Set())
         setSaveSuccess(true)
         setTimeout(() => setSaveSuccess(false), 2000)
       } else {
@@ -353,6 +357,7 @@ function SettingsContent() {
   }
 
   const updateExchangeRate = (targetCurrency: string, newRate: number) => {
+    setEditedRates(prev => new Set(prev).add(targetCurrency))
     setExchangeRates(prev =>
       prev.map(r =>
         r.target_currency === targetCurrency ? { ...r, rate: newRate } : r
@@ -613,29 +618,9 @@ function SettingsContent() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-          <select
-            value={profile?.timezone || 'Africa/Cairo'}
-            onChange={(e) => setProfile(prev => prev ? { ...prev, timezone: e.target.value } : null)}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
-          >
-            {TIMEZONES.map(tz => (
-              <option key={tz.value} value={tz.value}>{tz.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-          <input
-            type="text"
-            value={profile?.company_name || ''}
-            onChange={(e) => setProfile(prev => prev ? { ...prev, company_name: e.target.value } : null)}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-            placeholder="Your company name"
-          />
-        </div>
+        {/* No personal timezone or company name: user_profiles has no
+            timezone (saving one failed the whole profile), and the company
+            name documents use is the Organization's. */}
       </div>
 
       {/* Save Button */}

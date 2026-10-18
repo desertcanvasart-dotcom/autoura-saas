@@ -13,6 +13,8 @@
 // name on your invoice is not. There is no non-tenant default identity, and
 // there must never be one.
 
+import { contractSettingsFromTenant, contractDepositPercent, paymentTermsText } from '@/lib/contract-terms'
+
 export interface CompanyIdentity {
   name: string
   email?: string
@@ -33,6 +35,9 @@ export interface CompanyIdentity {
   taxNumber?: string
   /** The agency's own line — bank details, a legal note. May span lines. */
   footerText?: string
+  /** The payment sentence the agency's documents print, from its deposit and
+   *  country (lib/contract-terms paymentTermsText). Absent = no such section. */
+  paymentTerms?: string
 }
 
 /** The tenant fields documents render. All optional so partial rows degrade. */
@@ -48,6 +53,8 @@ export interface TenantIdentityFields {
   license_number?: string | null
   tax_number?: string | null
   document_footer_text?: string | null
+  deposit_percent?: number | string | null
+  operating_country?: string | null
 }
 
 export function identityFromTenant(
@@ -66,7 +73,15 @@ export function identityFromTenant(
     licenseNumber: tenant?.license_number?.trim() || undefined,
     taxNumber: tenant?.tax_number?.trim() || undefined,
     footerText: tenant?.document_footer_text?.trim() || undefined,
+    // The itinerary PDF said "30% deposit… balance due 14 days before
+    // arrival" for every agency, whatever its settings said.
+    paymentTerms: tenant ? tenantPaymentTerms(tenant) : undefined,
   }
+}
+
+function tenantPaymentTerms(tenant: TenantIdentityFields): string {
+  const settings = contractSettingsFromTenant(tenant)
+  return paymentTermsText(contractDepositPercent(settings), settings)
 }
 
 /**
@@ -130,7 +145,10 @@ export async function fetchLogoDataUrl(
   // browser for client-side jsPDF/pdf-lib generation, where a fetch is the
   // user's own and node:dns cannot be bundled — so the guard cannot live here.
   try {
-    const res = await fetch(logoUrl)
+    // Best-effort, so bounded: 10s, and no redirects — the server routes
+    // vet the URL (lib/ssrf-guard.ts), and a redirect would take the fetch
+    // somewhere that was never vetted.
+    const res = await fetch(logoUrl, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
     if (!res.ok) return undefined
     const type = res.headers.get('content-type') || 'image/png'
     if (!/^image\/(png|jpe?g)/.test(type)) return undefined // jsPDF supports PNG/JPEG
@@ -155,7 +173,10 @@ export async function fetchLogoBytes(
 ): Promise<{ bytes: Uint8Array; format: 'png' | 'jpeg' } | undefined> {
   if (!logoUrl) return undefined
   try {
-    const res = await fetch(logoUrl)
+    // Best-effort, so bounded: 10s, and no redirects — the server routes
+    // vet the URL (lib/ssrf-guard.ts), and a redirect would take the fetch
+    // somewhere that was never vetted.
+    const res = await fetch(logoUrl, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
     if (!res.ok) return undefined
     const m = (res.headers.get('content-type') || '').match(/^image\/(png|jpe?g)/)
     if (!m) return undefined

@@ -20,7 +20,8 @@ describe('VAT report honesty', () => {
   })
 
   it('vat_collected sums the invoices own tax lines', () => {
-    expect(SRC).toMatch(/vat_collected:.*tax_amount/)
+    expect(SRC).toMatch(/const vatCollected = yearInvoices\.reduce\(.*tax_amount/)
+    expect(SRC).toMatch(/vat_collected: vatCollected/)
   })
 
   it('the invoice query fetches tax_amount and the FX spec converts it', () => {

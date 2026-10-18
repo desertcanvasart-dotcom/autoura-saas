@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
+import { DocPager } from '../pager'
+import { docMetadata } from '../seo'
+
+export const metadata = docMetadata('/docs/workflows')
 
 export default function WorkflowsPage() {
   return (
@@ -22,17 +26,15 @@ export default function WorkflowsPage() {
         </p>
         <ol className="list-decimal list-inside space-y-3 text-gray-700">
           <li><strong>Receive inquiry</strong> &mdash; The client messages on WhatsApp. The conversation appears in your WhatsApp inbox.</li>
-          <li><strong>Parse with AI</strong> &mdash; Open the conversation and click <strong>Parse</strong>. The parser opens with the chat already loaded &mdash; no copying and pasting. Click <strong>Analyze with AI</strong> to extract the trip details.</li>
-          <li><strong>Configure and confirm</strong> &mdash; Review the extracted details, choose the output (B2C quote, B2B quote, or itinerary only), and confirm the client (or click <strong>Create Client &amp; Generate</strong> for a new one).</li>
-          <li><strong>Generate</strong> &mdash; Click <strong>Quick Generate</strong> for a one-shot itinerary, or <strong>Generate &amp; Edit</strong> to open it straight in the editor.</li>
-          <li><strong>Review and edit</strong> &mdash; Adjust days, services, hotels, and pricing as needed.</li>
-          <li><strong>Send to client</strong> &mdash; Share the itinerary link or download the PDF and send it via WhatsApp or email.</li>
-          <li><strong>Client accepts</strong> &mdash; Open the quote&apos;s detail page (under <strong>B2C Quotes</strong>, or B2B Quotes for partners) and click <strong>Convert to Booking</strong>. Each quote can be converted once.</li>
+          <li><strong>Parse</strong> &mdash; Open the conversation and click <strong>Parse</strong>. The <strong>Quote Builder</strong> opens with the chat loaded, reads the trip from it and prices every day from your rates.</li>
+          <li><strong>Review and adjust</strong> &mdash; Check the days, services, hotels and margin in the grid.</li>
+          <li><strong>Save</strong> &mdash; <strong>Save as Itinerary</strong> creates the itinerary and its B2C quote; for a partner, <strong>Save as B2B Quote</strong>.</li>
+          <li><strong>Send to client</strong> &mdash; Share the itinerary link, or send the quote PDF by WhatsApp or email.</li>
+          <li><strong>Client accepts</strong> &mdash; Either set the itinerary&rsquo;s status to <strong>Confirmed</strong>, which creates its booking, or open the quote under <strong>B2C Quotes</strong> (B2B Quotes for partners), set its status to <strong>Accepted</strong> and click <strong>Convert to Booking</strong>. Each quote converts once.</li>
           <li><strong>Confirm suppliers</strong> &mdash; In the booking, track each supplier&apos;s confirmation status.</li>
           <li><strong>Invoice and get paid</strong> &mdash; Create the invoice, send it, and record payments as they arrive.</li>
-          <li><strong>Complete trip</strong> &mdash; After the trip, mark the booking as completed and review the P&amp;L.</li>
+          <li><strong>Complete trip</strong> &mdash; After the trip, mark the booking as completed; managers and admins review its P&amp;L.</li>
         </ol>
-        <ScreenshotPlaceholder caption="Flow diagram showing the complete journey from WhatsApp message to completed booking" />
       </section>
 
       {/* Quote pipeline */}
@@ -41,10 +43,10 @@ export default function WorkflowsPage() {
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Go to <strong>B2C Quotes</strong> to see every quote and its status</li>
           <li>Chase the ones the client hasn&apos;t answered &mdash; the dashboard&apos;s <strong>Quotes awaiting client</strong> card takes you to the same list</li>
-          <li>When a client says yes, open the quote and click <strong>Convert to Booking</strong></li>
+          <li>When a client says yes, open the quote, set it to <strong>Accepted</strong> and click <strong>Convert to Booking</strong></li>
         </ol>
         <Tip>
-          Bookings are always created from a quote&apos;s detail page &mdash; convert the quote rather than looking for a booking button elsewhere.
+          Confirming an itinerary also creates its booking. Use one way or the other for a trip, not both.
         </Tip>
       </section>
 
@@ -67,7 +69,7 @@ export default function WorkflowsPage() {
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Go to <strong>Concierge Leads</strong> (Communicate group) to see inbound briefs from your intake form</li>
           <li>Open a brief to review the trip request</li>
-          <li>Follow up by WhatsApp or email, and create a client record for promising leads</li>
+          <li>Follow up by WhatsApp or email &mdash; each brief already has its client in <strong>Clients</strong>, created when it arrived</li>
         </ol>
       </section>
 
@@ -76,9 +78,9 @@ export default function WorkflowsPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Replying Faster with Copilot</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Open <strong>Copilot</strong> in the sidebar to see AI-drafted replies to incoming messages</li>
-          <li>Review each draft, edit if needed, then send &mdash; nothing is ever sent without your approval</li>
+          <li>Review each draft, edit if needed, then send &mdash; nothing is sent without your approval, unless an admin has switched on WhatsApp AI auto-reply</li>
           <li>In the WhatsApp inbox, Copilot suggestions also appear right in the composer</li>
-          <li>Improve future drafts by adding facts to <strong>Copilot Knowledge</strong> and tuning <strong>Copilot Settings</strong></li>
+          <li>Improve future drafts by adding facts to <strong>Copilot Knowledge</strong>; admins tune <strong>Copilot Settings</strong></li>
         </ol>
       </section>
 
@@ -88,11 +90,11 @@ export default function WorkflowsPage() {
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>On the Dashboard, click <strong>New Quote</strong> &mdash; this opens a simple new-itinerary form</li>
           <li>Enter the client, dates, and number of travelers, then create the itinerary</li>
-          <li>On the itinerary&apos;s detail page, add days and services, and use the <strong>Auto</strong>/<strong>Manual</strong> cost toggle &mdash; Auto prices everything from your rates database</li>
-          <li>Click <strong>Download PDF</strong> and send it to the client</li>
+          <li>Open <strong>&#8943;</strong> &rarr; <strong>Edit itinerary</strong> to add days and services, then <strong>Price in Grid</strong> to price them from your rates</li>
+          <li>Open <strong>Documents</strong> &rarr; <strong>Itinerary PDF</strong> to download it, or <strong>Send</strong> &rarr; <strong>Send quote</strong> to send it to the client</li>
         </ol>
         <Tip>
-          <strong>New Quote</strong> &mdash; on the Dashboard and in the sidebar (Sell group) &mdash; always opens the new-itinerary form: most sales start in an email or a WhatsApp and land in an itinerary. The spreadsheet-style quoting surface is its own entry, <strong>Pricing Grid</strong>, right below it.
+          <strong>New Quote</strong> on the Dashboard opens the new-itinerary form. Most quotes start in the <strong>Quote Builder</strong> (Sell group): <strong>Parse</strong> a WhatsApp or email straight into it and it prices every day from your rates.
         </Tip>
       </section>
 
@@ -101,7 +103,7 @@ export default function WorkflowsPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Recording an Expense Against a Trip</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Open the itinerary</li>
-          <li>Click <strong>Add Expense</strong></li>
+          <li>Open <strong>&#8943;</strong> &rarr; <strong>Add expense</strong></li>
           <li>Enter the category, amount, and supplier</li>
           <li>The expense automatically appears in the itinerary&apos;s P&amp;L</li>
         </ol>
@@ -111,9 +113,9 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Chasing Payments</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Receivables</strong> (Finance group) to see everything clients still owe</li>
-          <li>Click the <strong>Send Reminder</strong> mail action on an overdue item &mdash; the reminder goes out by email</li>
-          <li>To review past and scheduled reminders for an invoice, open the invoice and follow its <strong>Reminder History</strong> to the Payment Reminders page</li>
+          <li>Go to <strong>Receivables</strong> (Finance group; managers and admins) to see everything clients still owe</li>
+          <li>Click the <strong>Send Reminder</strong> mail action on an overdue item &mdash; it opens a reminder email in your own mail program, to send yourself</li>
+          <li>The app also emails reminders by itself, weekly from a week before the due date: open the invoice and click <strong>View All</strong> on its <strong>Reminder History</strong> for the Payment Reminders page</li>
         </ol>
         <p className="text-gray-600 mt-3">
           The invoice detail page itself gives you <strong>Send via WhatsApp</strong>, <strong>Download PDF</strong>, <strong>Mark as Sent</strong>, and <strong>Record Payment</strong>.
@@ -124,12 +126,13 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Working with B2B Partners</h2>
         <p className="text-gray-600 mb-3">
-          Manage business-to-business relationships with other travel companies:
+          Selling to tour operators and agencies:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Partners</strong> &mdash; Go to <strong>B2B &gt; Partners</strong> to add partner companies, set pricing rules, and track performance</li>
-          <li><strong>B2B Quotes</strong> &mdash; Create quotes with net pricing, apply partner-specific rules, and generate B2B PDFs</li>
-          <li><strong>Pricing Rules</strong> &mdash; Set up partner-specific discounts, commission structures, and markup rules</li>
+          <li><strong>Partners</strong> &mdash; under <strong>People &rarr; Partners</strong>: each partner&rsquo;s contact, currency and default margin. See <Link href="/docs/partners" className="text-primary-600 hover:underline">Partners</Link>.</li>
+          <li><strong>B2B Calculator</strong> &mdash; a rate sheet for a tour programme, at the partner&rsquo;s margin. See <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Pricing</Link>.</li>
+          <li><strong>B2B Quotes</strong> &mdash; quotes for partners from the Quote Builder in B2B mode, with their PDFs. See <Link href="/docs/b2b-quotes" className="text-primary-600 hover:underline">B2B Quotes</Link>.</li>
+          <li><strong>Transport Packages</strong> &mdash; one price per vehicle for a cruise, a day tour or a road journey, which the calculator and Quote Builder apply. See <Link href="/docs/b2b-pricing-rules" className="text-primary-600 hover:underline">Transport Packages</Link>.</li>
         </ul>
       </section>
 
@@ -137,10 +140,10 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Managing Tasks</h2>
         <p className="text-gray-600 mb-3">
-          Switch between three views using the buttons at the top of the Tasks page:
+          Switch between three views with the icons at the top of the Tasks page (managers and admins; members open tasks from their notifications):
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
-          <li><strong>Kanban Board</strong> &mdash; Drag tasks between columns (To Do, In Progress, Done)</li>
+          <li><strong>Kanban Board</strong> &mdash; columns To Do, In Progress and Done; move a card with its <strong>Start</strong> and <strong>Complete</strong> buttons</li>
           <li><strong>Table View</strong> &mdash; Spreadsheet-style list with sorting</li>
           <li><strong>List View</strong> &mdash; Simple list with filters</li>
         </ul>
@@ -153,11 +156,11 @@ export default function WorkflowsPage() {
         <ul className="space-y-3">
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>Status cards are clickable</strong> &mdash; On any list page, click the status cards at the top to quickly filter</span>
+            <span><strong>Status cards filter</strong> &mdash; On list pages such as Invoices and Bookings, click a status card at the top to filter</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>Auto-pricing saves time</strong> &mdash; Keep your rates database updated and use Auto cost mode on the itinerary page for instant pricing</span>
+            <span><strong>Auto-pricing saves time</strong> &mdash; Keep your rates up to date and price in the Quote Builder (or <strong>Price in Grid</strong> from an itinerary): every day is priced from them</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
@@ -165,15 +168,11 @@ export default function WorkflowsPage() {
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>PDF downloads are instant</strong> &mdash; PDFs are generated in your browser, no waiting for server processing</span>
-          </li>
-          <li className="flex items-start gap-3 text-gray-700">
-            <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
             <span><strong>WhatsApp is two-way</strong> &mdash; Clients can reply to your WhatsApp messages and those replies appear in your inbox</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>The search bar works everywhere</strong> &mdash; Every list page has a search bar that searches across multiple fields</span>
+            <span><strong>Search</strong> &mdash; List pages have a search bar that looks across several fields</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
@@ -199,16 +198,8 @@ export default function WorkflowsPage() {
         </ul>
       </section>
 
-      {/* Navigation */}
-      <div className="mt-12 pt-6 border-t border-gray-200">
-        <Link
-          href="/docs/team-settings"
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ChevronRight className="w-4 h-4 rotate-180" />
-          Team &amp; Settings
-        </Link>
-      </div>
+      {/* Previous / next — from the docs order (pager.tsx) */}
+      <DocPager href="/docs/workflows" />
     </div>
   )
 }

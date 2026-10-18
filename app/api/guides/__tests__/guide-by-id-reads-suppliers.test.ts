@@ -20,11 +20,14 @@ const updated: Array<{ table: string; patch: Row }> = []
 // rows, so a missing tenant/type filter shows up as a wrong result.
 function query(table: string) {
   const filters: Record<string, unknown> = {}
+  // .or() as the routes write it: "types.ov.{a,b},supplier_type.in.(a,b)"
+  // or "supplier_type.eq.guide" — any one clause matching keeps the row.
+  const ors: Array<(r: Row) => boolean> = []
   let op: 'select' | 'update' | 'delete' = 'select'
   let patch: Row = {}
   let head = false
   const rows = () => (db[table] ?? []).filter(r =>
-    Object.entries(filters).every(([k, v]) => r[k] === v))
+    Object.entries(filters).every(([k, v]) => r[k] === v) && ors.every(f => f(r)))
   const run = () => {
     if (op === 'delete') {
       deleted.push({ table, filters: { ...filters } })
@@ -46,6 +49,16 @@ function query(table: string) {
     update: (p: Row) => { op = 'update'; patch = p; return q },
     delete: () => { op = 'delete'; return q },
     eq: (k: string, v: unknown) => { filters[k] = v; return q },
+    or: (expr: string) => {
+      const clauses = [...expr.matchAll(/(\w+)\.(ov|in|eq)\.(\{[^}]*\}|\([^)]*\)|[^,]+)/g)].map(([, col, opr, val]) => {
+        const list = val.replace(/^[{(]|[})]$/g, '').split(',')
+        return (r: Row) => opr === 'ov'
+          ? Array.isArray(r[col]) && (r[col] as unknown[]).some(x => list.includes(String(x)))
+          : opr === 'in' ? list.includes(String(r[col])) : String(r[col]) === val
+      })
+      ors.push(r => clauses.some(c => c(r)))
+      return q
+    },
     order: () => q,
     maybeSingle: async () => {
       const r = run() as { data: Row[] | null; error: null }
@@ -61,6 +74,8 @@ vi.mock('@/lib/supabase-server', () => ({
   requireAuth: async () => ({ error: null, tenant_id: 'tenant-A', user: { id: 'u1' } }),
   createAdminClient: () => ({ from: (t: string) => query(t) }),
 }))
+
+vi.mock('@/lib/api-role-gate', () => ({ gateRole: async () => null }))
 
 import { GET, PUT, DELETE } from '@/app/api/guides/[id]/route'
 import { GET as LIST } from '@/app/api/guides/route'
@@ -91,6 +106,7 @@ beforeEach(() => {
       { id: 'other-tenant-guide', tenant_id: 'tenant-B', supplier_type: 'guide', name: 'Not yours', status: 'active' },
       // a hotel supplier is not a guide
       { id: 'hotel-1', tenant_id: 'tenant-A', supplier_type: 'hotel', name: 'Some Hotel', status: 'active' },
+      { id: 'drives-and-guides', tenant_id: 'tenant-A', supplier_type: 'transport', types: ['transport', 'guide'], name: 'Nile Wheels', status: 'active' },
     ],
     guides: [
       { id: 'legacy-guide', tenant_id: 'tenant-A', name: 'Old Guide', phone: '+20 1', languages: ['French'] },
@@ -176,5 +192,14 @@ describe('DELETE /api/guides/[id]', () => {
     expect((await DELETE(req('DELETE'), ctx('other-tenant-guide'))).status).toBe(404)
     expect((await DELETE(req('DELETE'), ctx('hotel-1'))).status).toBe(404)
     expect(deleted).toHaveLength(0)
+  })
+
+  it('a supplier that also guides (main type transport) opens and edits as listed, but the guide screen never deletes it', async () => {
+    const listed = (await (await LIST({ nextUrl: new URL('https://app.test/api/guides') } as never)).json()).data as Array<{ id: string }>
+    expect(listed.map(g => g.id)).toContain('drives-and-guides')
+    expect((await GET(req(), ctx('drives-and-guides'))).status).toBe(200)
+    expect((await PUT(req('PUT', { name: 'Nile Wheels & Guides' }), ctx('drives-and-guides'))).status).toBe(200)
+    expect((await DELETE(req('DELETE'), ctx('drives-and-guides'))).status).toBe(404)
+    expect(db.suppliers.some(r => r.id === 'drives-and-guides')).toBe(true)
   })
 })

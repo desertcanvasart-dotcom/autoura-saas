@@ -35,7 +35,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const patch: { alias?: string; canonical?: string; is_active?: boolean; updated_at: string } = { updated_at: new Date().toISOString() }
     let note: string | undefined
 
-    if ('alias' in body || 'canonical' in body) {
+    // Switching one back ON is checked like a save: an alias whose fee was
+    // renamed or removed was re-enabled unchecked and priced nothing again.
+    const switchingOn = body.is_active === true && !current.is_active
+    if ('alias' in body || 'canonical' in body || switchingOn) {
       const { data: fees } = await supabase.from('entrance_fees').select('attraction_name, city').eq('tenant_id', tenant_id).eq('is_active', true)
       const verdict = validateAlias(
         { alias: 'alias' in body ? body.alias : current.alias, canonical: 'canonical' in body ? body.canonical : current.canonical },

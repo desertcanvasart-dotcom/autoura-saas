@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
+/** The statuses a send moves to 'sent'; any later one is kept. */
+const PROMOTABLE_TO_SENT = ['draft', 'quoted']
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -25,7 +28,10 @@ export async function POST(
     const { id } = await params
     const { sentVia, recipientEmail } = await request.json()
 
-    // Update itinerary status to 'sent' - RLS ensures tenant isolation
+    // Only a trip still at the quote stage becomes 'sent' (RLS keeps it to
+    // the tenant). The page calls this after every email and WhatsApp send,
+    // so re-sending a confirmed, operating or cancelled trip set it back to
+    // 'sent' — undoing the status the send routes themselves leave alone.
     const { data, error } = await supabase
       .from('itineraries')
       .update({
@@ -33,8 +39,9 @@ export async function POST(
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .or(`status.is.null,status.in.(${PROMOTABLE_TO_SENT.join(',')})`)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
 
@@ -44,6 +51,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       data,
+      statusChanged: Boolean(data),
       message: `Quote sent via ${sentVia}`
     })
 

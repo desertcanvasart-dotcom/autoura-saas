@@ -1,4 +1,5 @@
 'use client'
+import LoadError from '@/components/LoadError'
 
 import { useEffect, useState } from 'react'
 import { sumByCurrency, addToTotals, formatTotals, type CurrencyTotals } from '@/lib/currency-totals'
@@ -17,6 +18,8 @@ import Link from 'next/link'
 import { getCurrencySymbol } from '@/lib/currency'
 
 interface UnifiedPayment {
+  /** Trip payments only: pending, completed, failed or refunded. */
+  status?: string
   id: string
   source: 'invoice' | 'itinerary'
   source_id: string
@@ -44,6 +47,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<UnifiedPayment[]>([])
   const [filteredPayments, setFilteredPayments] = useState<UnifiedPayment[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [stats, setStats] = useState<PaymentStats>({
     totalReceived: {},
     pendingPayments: {},
@@ -65,6 +69,7 @@ export default function PaymentsPage() {
 
   const fetchAllPayments = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       // Fetch from both sources in parallel
       const [itineraryPaymentsRes, invoicesRes] = await Promise.all([
@@ -96,9 +101,14 @@ export default function PaymentsPage() {
             payment_date: p.payment_date,
             transaction_reference: p.transaction_reference,
             notes: p.notes,
-            created_at: p.created_at
+            created_at: p.created_at,
+            status: p.status || p.payment_status || 'completed',
           })
-          addToTotals(totalReceived, p.amount, p.currency || 'EUR')
+          // Received means received: a pending, failed or refunded trip
+          // payment was counted (Receipts leaves them out, so the two disagreed).
+          if ((p.status || p.payment_status || 'completed') === 'completed') {
+            addToTotals(totalReceived, p.amount, p.currency || 'EUR')
+          }
         })
       }
 
@@ -117,7 +127,7 @@ export default function PaymentsPage() {
             addToTotals(pendingPayments, invoice.balance_due, invoice.currency || 'EUR')
           }
           
-          if (invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.due_date) {
+          if (invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.status !== 'draft' && invoice.due_date) {
             const dueDate = new Date(invoice.due_date)
             if (dueDate < now && Number(invoice.balance_due) > 0) {
               addToTotals(overduePayments, invoice.balance_due, invoice.currency || 'EUR')
@@ -170,7 +180,7 @@ export default function PaymentsPage() {
       startOfMonth.setHours(0, 0, 0, 0)
       
       const thisMonthRevenue = sumByCurrency(
-        allPayments.filter(p => p.payment_date && new Date(p.payment_date) >= startOfMonth),
+        allPayments.filter(p => p.payment_date && new Date(p.payment_date) >= startOfMonth && (p.status ?? 'completed') === 'completed'),
         p => p.amount,
         p => p.currency
       )
@@ -185,6 +195,7 @@ export default function PaymentsPage() {
 
     } catch (error) {
       console.error('Error fetching payments:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -445,7 +456,9 @@ export default function PaymentsPage() {
           </table>
         </div>
 
-        {filteredPayments.length === 0 && (
+        {loadError ? (
+          <LoadError what="your payments" onRetry={fetchAllPayments} />
+        ) : filteredPayments.length === 0 && (
           <div className="text-center py-8 text-gray-500">
             <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-base font-medium text-gray-900">No payments found</p>

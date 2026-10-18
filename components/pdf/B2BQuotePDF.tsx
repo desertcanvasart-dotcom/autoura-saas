@@ -1,7 +1,11 @@
 import React from 'react'
 import type { CompanyIdentity } from '@/lib/company-identity'
-import { QuoteHeader, QuoteFooter, quotePalette, QuoteTopBar, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
+import { QuoteHeader, QuoteFooter, quotePalette, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
+import { QUOTE_PDF_FONT } from '@/lib/pdf/quote-fonts'
+import { formatMoney } from '@/lib/currency-totals'
+import { formatDateOnly } from '@/lib/date-utils'
+import { partnerSingleSupplement } from '@/lib/quotes/partner-rate-sheet'
 
 // Styles take the agency's brand colour (Settings → Organization); they were
 // a fixed blue (B2C) / purple (B2B) whatever the agency's colours.
@@ -11,7 +15,7 @@ const makeStyles = ({ main, light }: { main: string; light: string }) => StyleSh
     // Room for the letterhead footer on every page (QuoteLetterhead).
     paddingBottom: QUOTE_FOOTER_SPACE,
     fontSize: 10,
-    fontFamily: 'Helvetica',
+    fontFamily: QUOTE_PDF_FONT,
     backgroundColor: '#ffffff',
   },
   header: {
@@ -101,23 +105,6 @@ const makeStyles = ({ main, light }: { main: string; light: string }) => StyleSh
   col33: {
     width: '33.33%',
   },
-  costBreakdownRow: {
-    flexDirection: 'row',
-    paddingVertical: 5,
-    borderBottom: '1 solid #f3f4f6',
-  },
-  costLabel: {
-    width: '70%',
-    fontSize: 9,
-    color: '#6b7280',
-  },
-  costValue: {
-    width: '30%',
-    fontSize: 9,
-    color: '#1f2937',
-    fontWeight: 'bold',
-    textAlign: 'right',
-  },
   highlight: {
     backgroundColor: '#fef3c7',
     padding: 8,
@@ -171,6 +158,8 @@ interface B2BQuotePDFProps {
     ppd_accommodation: number
     ppd_cruise: number
     single_supplement: number
+    /** The quote's margin; the stored supplement is net when it is set. */
+    margin_percent?: number | null
     fixed_transport: number
     fixed_guide: number
     fixed_other: number
@@ -192,6 +181,9 @@ interface B2BQuotePDFProps {
       email: string
       country: string
     } | null
+    /** A calculator quote's own trip (no itinerary). */
+    trip_name?: string | null
+    travel_date?: string | null
     itineraries: {
       itinerary_code: string
       trip_name: string
@@ -203,6 +195,11 @@ interface B2BQuotePDFProps {
 
 const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' } }) => {
   const styles = makeStyles(quotePalette(company))
+  // A partner document: selling prices only. A second page listed the
+  // operator's net costs (per-night rates, transport, guide, tour leader)
+  // and the single supplement at cost.
+  const supplement = partnerSingleSupplement(quote)
+  const day = (d: string | null | undefined) => formatDateOnly(d, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   // Sort pax counts
   const sortedPax = Object.keys(quote.pricing_table)
     .map(Number)
@@ -255,6 +252,27 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
           </View>
         )}
 
+        {/* A calculator quote has no itinerary: its own tour name and date. */}
+        {!quote.itineraries && quote.trip_name && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Trip Details</Text>
+            <View style={styles.row}>
+              <Text style={styles.label}>Trip Name:</Text>
+              <Text style={styles.value}>{quote.trip_name}</Text>
+            </View>
+            {quote.travel_date && (
+              <View style={styles.row}>
+                <Text style={styles.label}>Travel Date:</Text>
+                <Text style={styles.value}>{day(quote.travel_date)}</Text>
+              </View>
+            )}
+            <View style={styles.row}>
+              <Text style={styles.label}>Service Tier:</Text>
+              <Text style={styles.value}>{quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Trip Information */}
         {quote.itineraries && (
           <View style={styles.section}>
@@ -267,10 +285,13 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
               <Text style={styles.label}>Duration:</Text>
               <Text style={styles.value}>{quote.itineraries.total_days} days</Text>
             </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Start Date:</Text>
-              <Text style={styles.value}>{new Date(quote.itineraries.start_date).toLocaleDateString()}</Text>
-            </View>
+            {/* A trip with no dates yet: no row, never 1/1/1970. */}
+            {quote.itineraries.start_date && (
+              <View style={styles.row}>
+                <Text style={styles.label}>Start Date:</Text>
+                <Text style={styles.value}>{day(quote.itineraries.start_date)}</Text>
+              </View>
+            )}
             <View style={styles.row}>
               <Text style={styles.label}>Service Tier:</Text>
               <Text style={styles.value}>{quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}</Text>
@@ -308,10 +329,10 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
                       {pax} {quote.tour_leader_included ? `(+1 = ${pax + 1})` : ''}
                     </Text>
                     <Text style={[styles.pricingTableCell, styles.col33]}>
-                      {quote.currency} {pricing.pp.toLocaleString()}
+                      {formatMoney(pricing.pp, quote.currency)}
                     </Text>
                     <Text style={[styles.pricingTableCell, styles.col33]}>
-                      {quote.currency} {pricing.total.toLocaleString()}
+                      {formatMoney(pricing.total, quote.currency)}
                     </Text>
                   </View>
                 )
@@ -322,103 +343,15 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
           {quote.tour_leader_included && (
             <View style={styles.highlight}>
               <Text style={styles.highlightText}>
-                ⚠ Tour Leader +1 included: All prices include one complimentary tour leader. Cost distributed across paying passengers.
+                ⚠ Tour Leader +1 included: All prices include one complimentary tour leader.
               </Text>
             </View>
           )}
-        </View>
-      </Page>
 
-      {/* Page 2: Cost Breakdown */}
-      <Page size="A4" style={styles.page}>
-        {/* Footer on every page — declared first, so it repeats from the first */}
-        <QuoteFooter company={company} />
-        <QuoteTopBar company={company} />
-        {/* Cost Breakdown Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cost Breakdown</Text>
-
-          {/* PPD Costs */}
-          <View style={{ marginBottom: 15 }}>
-            <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 5 }}>Per Person Double (PPD)</Text>
-            {quote.ppd_accommodation > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Accommodation (per night)</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.ppd_accommodation.toLocaleString()}</Text>
-              </View>
-            )}
-            {quote.ppd_cruise > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Cruise (per night)</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.ppd_cruise.toLocaleString()}</Text>
-              </View>
-            )}
-            {quote.single_supplement > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Single Supplement (total)</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.single_supplement.toLocaleString()}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Fixed Costs */}
-          <View style={{ marginBottom: 15 }}>
-            <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 5 }}>Fixed Costs (Per Trip)</Text>
-            {quote.fixed_transport > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Transportation</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.fixed_transport.toLocaleString()}</Text>
-              </View>
-            )}
-            {quote.fixed_guide > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Guide</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.fixed_guide.toLocaleString()}</Text>
-              </View>
-            )}
-            {quote.fixed_other > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Other Fixed Costs</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.fixed_other.toLocaleString()}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Per Person Costs */}
-          <View style={{ marginBottom: 15 }}>
-            <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 5 }}>Per Person Costs</Text>
-            {quote.pp_entrance_fees > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Entrance Fees</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.pp_entrance_fees.toLocaleString()}</Text>
-              </View>
-            )}
-            {quote.pp_meals > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Meals</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.pp_meals.toLocaleString()}</Text>
-              </View>
-            )}
-            {quote.pp_tips > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Tips</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.pp_tips.toLocaleString()}</Text>
-              </View>
-            )}
-            {quote.pp_domestic_flights > 0 && (
-              <View style={styles.costBreakdownRow}>
-                <Text style={styles.costLabel}>Domestic Flights</Text>
-                <Text style={styles.costValue}>{quote.currency} {quote.pp_domestic_flights.toLocaleString()}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Tour Leader Cost */}
-          {quote.tour_leader_included && quote.tour_leader_cost > 0 && (
-            <View style={styles.highlight}>
-              <Text style={styles.highlightText}>
-                Tour Leader Total Cost: {quote.currency} {quote.tour_leader_cost.toLocaleString()}
-              </Text>
+          {supplement > 0 && (
+            <View style={styles.row}>
+              <Text style={styles.label}>Single Supplement:</Text>
+              <Text style={styles.value}>{formatMoney(supplement, quote.currency)} per single traveller, whole trip</Text>
             </View>
           )}
         </View>
@@ -428,18 +361,18 @@ const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' }
           <Text style={styles.sectionTitle}>Validity</Text>
           <View style={styles.row}>
             <Text style={styles.label}>Quote Date:</Text>
-            <Text style={styles.value}>{new Date(quote.created_at).toLocaleDateString()}</Text>
+            <Text style={styles.value}>{day(quote.created_at)}</Text>
           </View>
           {quote.valid_from && (
             <View style={styles.row}>
               <Text style={styles.label}>Valid From:</Text>
-              <Text style={styles.value}>{new Date(quote.valid_from).toLocaleDateString()}</Text>
+              <Text style={styles.value}>{day(quote.valid_from)}</Text>
             </View>
           )}
           {quote.valid_until && (
             <View style={styles.row}>
               <Text style={styles.label}>Valid Until:</Text>
-              <Text style={styles.value}>{new Date(quote.valid_until).toLocaleDateString()}</Text>
+              <Text style={styles.value}>{day(quote.valid_until)}</Text>
             </View>
           )}
         </View>

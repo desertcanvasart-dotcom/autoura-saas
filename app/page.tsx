@@ -1,6 +1,8 @@
 'use client'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
@@ -405,22 +407,18 @@ export default function AutouraHomepage() {
     const checkAuthAndRedirect = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        const { data: memberData } = await supabase
-          .from('tenant_members')
-          .select('tenant_id')
-          .eq('user_id', session.user.id)
-          .eq('status', 'active')
-          .order('joined_at', { ascending: true })
-          .order('tenant_id', { ascending: true })
-          .limit(1)
-          .maybeSingle()
+        const { data: memberData } = await currentMembership<{ tenant_id: string; role: string }>(
+          supabase as unknown as MembershipDb,
+          session.user.id,
+          'tenant_id, role',
+        )
         if (memberData?.tenant_id) {
           const { data: featuresData } = await supabase
             .from('tenant_features')
             .select('onboarding_completed')
             .eq('tenant_id', memberData.tenant_id)
             .single()
-          if (featuresData && !featuresData.onboarding_completed) {
+          if (featuresData && !featuresData.onboarding_completed && ['owner', 'admin'].includes(String(memberData.role))) {
             router.push('/onboarding')
           } else {
             router.push('/dashboard')
@@ -469,6 +467,7 @@ export default function AutouraHomepage() {
             <Link href="/pricing" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Pricing</Link>
             <Link href="/integrations" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Integrations</Link>
             <Link href="/docs" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Docs</Link>
+            <Link href="/blog" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Blog</Link>
             <Link href="/about" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">About</Link>
             <Link href="/login" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Login</Link>
             <a
@@ -496,6 +495,7 @@ export default function AutouraHomepage() {
             <Link href="/pricing" className="block text-sm text-[#555] hover:text-[#111710] py-2">Pricing</Link>
             <Link href="/integrations" className="block text-sm text-[#555] hover:text-[#111710] py-2">Integrations</Link>
             <Link href="/docs" className="block text-sm text-[#555] hover:text-[#111710] py-2">Docs</Link>
+            <Link href="/blog" className="block text-sm text-[#555] hover:text-[#111710] py-2">Blog</Link>
             <Link href="/about" className="block text-sm text-[#555] hover:text-[#111710] py-2">About</Link>
             <Link href="/login" className="block text-sm text-[#555] hover:text-[#111710] py-2">Login</Link>
             <a
@@ -991,8 +991,10 @@ export default function AutouraHomepage() {
               <Link href="/pricing" className="hover:text-stone-700 transition-colors">Pricing</Link>
               <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
               <Link href="/docs" className="hover:text-stone-700 transition-colors">Docs</Link>
+              <Link href="/blog" className="hover:text-stone-700 transition-colors">Blog</Link>
               <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>
               <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
+              <CookieSettingsLink className="hover:text-stone-700 transition-colors" />
               <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
               <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
             </div>

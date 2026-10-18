@@ -7,6 +7,8 @@ import {
   collectCurrencies,
 } from '@/lib/fx-report'
 import { mergeFxSummary, emptyFxSummary, type FxHole } from '@/lib/fx-conversion'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { effectiveItineraryTotal, type PricedService } from '@/lib/itinerary-client-total'
 
 // ============================================
 // GET /api/analytics
@@ -29,6 +31,12 @@ import { mergeFxSummary, emptyFxSummary, type FxHole } from '@/lib/fx-conversion
 
 /** Trip statuses that count as booked revenue. */
 const REVENUE_STATUSES = ['confirmed', 'completed']
+
+/** Quoted and waiting on the client. A sent quote is saved as 'sent'; the
+ *  older 'pending' / 'quoted' are kept so existing rows still count. */
+const PENDING_STATUSES = ['sent', 'pending', 'quoted']
+
+type DbError = { message?: string } | null
 
 interface AnalyticsItinerary {
   id?: string
@@ -90,56 +98,59 @@ export async function GET(request: NextRequest) {
     // Previous equal-length window, for the growth comparison.
     const previousStartDate = new Date(startDate.getTime() - (now.getTime() - startDate.getTime()))
 
-    // Fetch all data in parallel
+    const ITINERARY_COLS = 'id, itinerary_code, status, total_cost, currency, start_date, destinations, created_at'
+
+    // Every read is paged: past 1,000 rows ("Last Year" for a busy agency)
+    // PostgREST cut them short and revenue, bookings and growth read low.
     const [
       itinerariesResult,
       clientsResult,
       leadsResult,
       followUpsResult,
-      revenueByWeekResult,
       previousItinerariesResult
     ] = await Promise.all([
       // Itineraries (bookings) in date range.
-      // Columns verified against the live schema — `total_cost`, not
-      // `total_price`; `destinations` (TEXT[]), not `cities`.
-      supabase
-        .from('itineraries')
-        .select('id, itinerary_code, status, total_cost, currency, start_date, destinations, created_at')
-        .gte('created_at', startDateStr),
-      
-      // All clients with status
+      fetchAllPages<AnalyticsItinerary, DbError>((from, to) =>
+        supabase
+          .from('itineraries')
+          .select(ITINERARY_COLS)
+          .gte('created_at', startDateStr)
+          .order('created_at', { ascending: true })
+          .order('id')
+          .range(from, to)),
+
+      // Clients added in the range
+      fetchAllPages<{ id: string; status: string | null; created_at: string | null }, DbError>((from, to) =>
+        supabase
+          .from('clients')
+          .select('id, status, created_at')
+          .gte('created_at', startDateStr)
+          .order('id')
+          .range(from, to)),
+
+      // Leads count (clients with status = 'lead'), all time
       supabase
         .from('clients')
-        .select('id, status, created_at')
-        .gte('created_at', startDateStr),
-      
-      // Leads count (clients with status = 'lead')
-      supabase
-        .from('clients')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: true })
         .eq('status', 'lead'),
-      
-      // Follow-ups count
+
+      // Open follow-ups — the table the Follow-ups page uses (this read
+      // 'follow_ups', which the page never writes).
       supabase
-        .from('follow_ups')
-        .select('id', { count: 'exact' })
-        .eq('status', 'pending'),
-      
-      // Revenue by week for trend chart
-      supabase
-        .from('itineraries')
-        .select('itinerary_code, total_cost, currency, created_at')
-        .in('status', REVENUE_STATUSES)
-        .gte('created_at', startDateStr)
-        .order('created_at', { ascending: true }),
+        .from('client_followups')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'overdue']),
 
       // Previous period, for growth
-      supabase
-        .from('itineraries')
-        .select('itinerary_code, total_cost, currency, status, created_at')
-        .gte('created_at', previousStartDate.toISOString())
-        .lt('created_at', startDateStr)
-        .in('status', REVENUE_STATUSES)
+      fetchAllPages<AnalyticsItinerary, DbError>((from, to) =>
+        supabase
+          .from('itineraries')
+          .select(ITINERARY_COLS)
+          .gte('created_at', previousStartDate.toISOString())
+          .lt('created_at', startDateStr)
+          .in('status', REVENUE_STATUSES)
+          .order('id')
+          .range(from, to)),
     ])
 
     // A failed itinerary query used to be indistinguishable from "no trips".
@@ -151,13 +162,49 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+    // The other figures: say which could not be read rather than show 0.
+    const degraded: string[] = []
+    if (clientsResult.error) degraded.push('clients')
+    if (leadsResult.error) degraded.push('leads')
+    if (followUpsResult.error) degraded.push('follow-ups')
+    if (previousItinerariesResult.error) degraded.push('growth')
 
-    const rawItineraries = (itinerariesResult.data || []) as AnalyticsItinerary[]
-    const clients = clientsResult.data || []
-    const leadsCount = leadsResult.count || 0
-    const followUpsCount = followUpsResult.count || 0
-    const rawRevenueData = (revenueByWeekResult.data || []) as AnalyticsItinerary[]
-    const rawPreviousItineraries = (previousItinerariesResult.data || []) as AnalyticsItinerary[]
+    // A trip's amount is what its page shows: the services' client total when
+    // it has priced services, else the stored total_cost — a cache that can be
+    // 0 or stale, which made priced trips add nothing to revenue.
+    const withEffectiveTotals = async (rows: AnalyticsItinerary[]): Promise<AnalyticsItinerary[]> => {
+      const ids = rows.map(r => r.id).filter((id): id is string => !!id)
+      const servicesBy = new Map<string, PricedService[]>()
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data: svc, error } = await fetchAllPages<PricedService & { itinerary_id: string | null }, DbError>((from, to) =>
+          supabase
+            .from('itinerary_services')
+            .select('id, itinerary_id, total_cost, client_price')
+            .in('itinerary_id', ids.slice(i, i + 200))
+            .order('id')
+            .range(from, to))
+        if (error) {
+          if (!degraded.includes('trip totals')) degraded.push('trip totals')
+          continue
+        }
+        for (const row of svc) {
+          if (!row.itinerary_id) continue
+          const bucket = servicesBy.get(row.itinerary_id) ?? []
+          bucket.push(row)
+          servicesBy.set(row.itinerary_id, bucket)
+        }
+      }
+      return rows.map(r => ({ ...r, total_cost: effectiveItineraryTotal(r as Parameters<typeof effectiveItineraryTotal>[0], servicesBy.get(r.id ?? '') ?? []) }))
+    }
+
+    const rawItineraries = await withEffectiveTotals(itinerariesResult.data)
+    const clients = clientsResult.data
+    // A failed count is 0 here and named in `degraded`, which the page shows.
+    const leadsCount = leadsResult.count ?? 0
+    const followUpsCount = followUpsResult.count ?? 0
+    // Booked trips of the range, for the weekly trend.
+    const rawRevenueData = rawItineraries.filter(i => REVENUE_STATUSES.includes(i.status || ''))
+    const rawPreviousItineraries = await withEffectiveTotals(previousItinerariesResult.data)
 
     // ---------- Restate every amount into one currency ----------
     // Trips are converted at their own creation date, which is the date the
@@ -210,7 +257,7 @@ export async function GET(request: NextRequest) {
     // breakdown.
     const bookingCounts = {
       confirmed: itineraries.filter(i => i.status === 'confirmed').length,
-      pending: itineraries.filter(i => i.status === 'pending' || i.status === 'quoted').length,
+      pending: itineraries.filter(i => PENDING_STATUSES.includes(i.status || '')).length,
       cancelled: itineraries.filter(i => i.status === 'cancelled').length,
       completed: itineraries.filter(i => i.status === 'completed').length
     }
@@ -225,16 +272,16 @@ export async function GET(request: NextRequest) {
     )
     const totalRevenue = confirmedItineraries.reduce((sum, i) => sum + amountOf(i), 0)
 
-    // Calculate client stats
+    // Client stats — clients ADDED in the range, split by their status.
     const totalClients = clients.length
     const newClients = clients.filter(c => c.status === 'lead').length
     const returningClients = clients.filter(c => c.status === 'customer').length
 
-    // Calculate conversion rate (confirmed / total inquiries). Denominator
-    // stays every trip started, drafts included — excluding drafts from the
-    // bookings CARD must not quietly inflate conversion.
+    // Conversion: trips that became bookings (confirmed, or since run and
+    // completed — leaving those out made conversion fall as trips finished)
+    // over every trip started, drafts included.
     const conversionRate = itineraries.length > 0
-      ? (bookingStats.confirmed / itineraries.length) * 100
+      ? ((bookingStats.confirmed + bookingStats.completed) / itineraries.length) * 100
       : 0
 
     // Calculate average deal size
@@ -243,7 +290,7 @@ export async function GET(request: NextRequest) {
       : 0
 
     // Group revenue by week for trend chart
-    const weeklyRevenue = groupByWeek(convertedRevenue.rows, range)
+    const weeklyRevenue = groupByWeek(convertedRevenue.rows, startDate, now)
 
     // Calculate destination stats from itineraries.
     // `destinations` is TEXT[] on itineraries; revenue per destination uses
@@ -312,6 +359,8 @@ export async function GET(request: NextRequest) {
         confirmed: bookingStats.confirmed,
         completed: bookingStats.completed
       },
+      // Figures that could not be read (shown as unavailable, not 0).
+      degraded,
       // What currency the money above is in, and how exact it is.
       currency: {
         reporting_currency: reportingCurrency,
@@ -333,58 +382,41 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper to group revenue by week.
-// Receives rows already restated into the reporting currency, so `total_cost`
-// here is a converted number — never a raw foreign amount.
+// Revenue per week across the WHOLE range: every Monday-to-Sunday week from
+// the range's start to today, a week with no bookings included as 0. It kept
+// only the last 5 weeks that had revenue and renumbered them, so on 90 days
+// or a year the trend and the forecast covered about five weeks, and empty
+// weeks vanished instead of pulling the line down. Weeks are UTC.
+// Receives rows already restated into the reporting currency.
 function groupByWeek(
   data: Array<{ total_cost?: number | string | null; created_at?: string | null }>,
-  range: string
+  start: Date,
+  end: Date
 ): { month: string; revenue: number }[] {
-  if (data.length === 0) {
-    // Return empty weeks based on range
-    const weeks = range === '7d' ? 1 : range === '30d' ? 4 : range === '90d' ? 12 : 52
-    return Array.from({ length: Math.min(weeks, 5) }, (_, i) => ({
-      month: `Week ${i + 1}`,
-      revenue: 0
-    }))
-  }
-
   const weekMap = new Map<string, number>()
-  
-  data.forEach(item => {
-    if (!item.created_at) return
-    const date = new Date(item.created_at)
-    const weekStart = getWeekStart(date)
-    const weekKey = weekStart.toISOString().split('T')[0]
-
-    const amount = Number(item.total_cost ?? 0)
-    const existing = weekMap.get(weekKey) || 0
-    weekMap.set(weekKey, existing + (Number.isFinite(amount) ? amount : 0))
-  })
-
-  // Convert to array and sort
-  const weeks = Array.from(weekMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-5) // Last 5 weeks
-    .map((entry, index) => ({
-      month: `Week ${index + 1}`,
-      revenue: entry[1]
-    }))
-
-  // Ensure at least some data points
-  if (weeks.length === 0) {
-    return [{ month: 'Week 1', revenue: 0 }]
+  for (let w = getWeekStart(start); w.getTime() <= end.getTime(); w = new Date(w.getTime() + 7 * 864e5)) {
+    weekMap.set(w.toISOString().slice(0, 10), 0)
   }
-
-  return weeks
+  for (const item of data) {
+    if (!item.created_at) continue
+    const key = getWeekStart(new Date(item.created_at)).toISOString().slice(0, 10)
+    if (!weekMap.has(key)) continue
+    const amount = Number(item.total_cost ?? 0)
+    weekMap.set(key, (weekMap.get(key) ?? 0) + (Number.isFinite(amount) ? amount : 0))
+  }
+  return Array.from(weekMap.entries())
+    .sort((x, y) => x[0].localeCompare(y[0]))
+    .map(([key, revenue]) => ({
+      month: new Date(`${key}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
+      revenue: Math.round(revenue * 100) / 100,
+    }))
 }
 
+/** Monday 00:00 UTC of the date's week. */
 function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
-  d.setHours(0, 0, 0, 0)
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  const day = d.getUTCDay()
+  d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1))
   return d
 }
 

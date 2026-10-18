@@ -1,5 +1,6 @@
 'use client'
 // @bulk-import
+import { cityOptionsFor } from '@/components/CitySelect'
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
@@ -445,10 +446,17 @@ export default function AttractionsContent() {
         const method = editingAttraction ? 'PUT' : 'POST'
       
         // Clean up empty supplier_id
-        // Single-rate entry: non_eur_rate mirrors eur_rate so both DB columns stay filled
+        // Single-rate entry: non_eur_rate mirrors eur_rate so both DB columns stay
+        // filled — except an older row that kept a separate non-EU price, which
+        // the engine still charges: an edit that leaves the price alone (a note,
+        // a toggle) keeps it rather than cutting it to the EU figure.
+        const keptNonEu = editingAttraction
+          && editingAttraction.non_eur_rate != null
+          && editingAttraction.non_eur_rate !== editingAttraction.eur_rate
+          && Number(formData.eur_rate) === Number(editingAttraction.eur_rate)
         const submitData = {
           ...formData,
-          non_eur_rate: formData.eur_rate,
+          non_eur_rate: keptNonEu ? editingAttraction.non_eur_rate : formData.eur_rate,
           supplier_id: formData.supplier_id || null,
           ...rateCurrencyPatch(rateCurrency, (editingAttraction as { rate_currency?: string | null } | null)?.rate_currency),
         }
@@ -1097,7 +1105,7 @@ export default function AttractionsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
                     >
                       <option value="">Select city...</option>
-                      {cityOptions.map(city => (
+                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>

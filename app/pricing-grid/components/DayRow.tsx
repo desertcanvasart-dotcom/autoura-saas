@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
+import { BookmarkPlus, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import type { GridDay, GridConfig, AllRates, SlotValue, DayCalc, SelectedItem, DayType, Intercity, SlotDefinition } from '../types'
 import { GROUP_SLOTS, PP_SLOTS, DAY_TYPES, DAY_TYPE_LABELS, DEFAULT_DAY_TYPE, DAY_TYPE_DEFAULTS } from '../types'
 import { calculateDay, convertAmount } from '../lib/calculator'
@@ -9,6 +9,7 @@ import SlotRow from './SlotRow'
 import CitySelect from '@/components/CitySelect'
 import BlockPicker from '@/components/day-blocks/BlockPicker'
 import type { GridBlock } from '@/lib/day-blocks/grid-apply'
+import { getCurrencySymbol } from '@/lib/currency'
 
 /** A day block on a day: laid on it, suggested for it, or none fitting. */
 export interface BlockNote {
@@ -38,15 +39,29 @@ interface DayRowProps {
   /** What a day block did (or would do) for this day. */
   blockNote?: BlockNote
   onDismissBlockNote?: () => void
+  /** Keep this day as a new block in the catalog; offered only on a day not
+   *  already from it, and only to those who may change the catalog. */
+  onSaveAsBlock?: () => void
+  /** Write this day again from the Content Library (Write descriptions). */
+  onRewriteDescription?: () => void
+  rewriting?: boolean
+  /** The library entries the day's text was written from. */
+  writtenFrom?: WrittenSource[]
 }
+
+/** A Content Library entry a day's text was written from. */
+export interface WrittenSource { name: string; kind: string; tier: string | null; otherTier: boolean }
+/** A pick the Content Library has no entry for. */
+export interface LibraryGap { dayNumber: number; kind: string; name: string }
 
 /** Services offered "Apply to all days" — a daily item, not a one-off. */
 const APPLY_TO_ALL_SLOTS = new Set(['water'])
 
-export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote }: DayRowProps) {
+export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote, onSaveAsBlock, onRewriteDescription, rewriting, writtenFrom }: DayRowProps) {
   const calc: DayCalc = calculateDay(day, config)
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
-  const sym = config.currency === 'EUR' ? '€' : config.currency === 'USD' ? '$' : config.currency === 'GBP' ? '£' : config.currency
+  // The app's own symbols for all 12 currencies (it knew three).
+  const sym = getCurrencySymbol(config.currency)
 
   // Day-type + component override panel — collapsed by default to keep the
   // day editor tight; operators who care about the rich completeness gate
@@ -203,6 +218,13 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
         if (selectedIds.has(o.id)) return true
         // Always show cruise transport packages on cruise-related days
         if ((o as any).service_type === 'cruise_transport_package') return isCruiseDay
+        // Day Tour / Multi-Day packages: road days starting in their origin
+        const pkgOpt = o as { service_type?: string; origin_city?: string | null }
+        if (pkgOpt.service_type === 'road_transport_package') {
+          if (isCruiseDay) return false
+          const from = pkgOpt.origin_city?.toLowerCase().trim() || ''
+          return from !== '' && relevantCities.has(from)
+        }
         // On pure cruise sailing days (not flight/transfer), hide individual transport
         if (isCruiseDay && !isFlightDay && !isTransferDay) return false
         if (relevantCities.size === 0) return false
@@ -220,7 +242,12 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
     if (slotId === 'hotel_services') {
       if (isCruiseDay) return []
+      // A room supplement belongs to one hotel: offered only on a night that
+      // hotel is the one picked.
+      const nightHotel = getSlotItems('accommodation')[0]?.rateId
       return allOptions.filter(o => {
+        const hotelId = (o as { hotel_id?: string }).hotel_id
+        if (hotelId) return hotelId === nightHotel
         const tierOk = (o as any).category === config.tier || (o as any).category === 'all'
         if (!tierOk) return false
         const dest = o.city?.toLowerCase().trim()
@@ -262,6 +289,16 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
       return matched.length > 0 ? matched : allOptions
     }
 
+    // Guides: the day's cities (and guides with no city), the chosen one
+    // kept; every guide when none is local. The dropdown's own city filter
+    // reaches the rest.
+    if (slotId === 'guide') {
+      const selectedIds = new Set(getSlotItems('guide').map(i => i.rateId))
+      const here = new Set([city, overnightCity].filter(Boolean))
+      const local = allOptions.filter(o => selectedIds.has(o.id) || !o.city || here.has(o.city.toLowerCase().trim()))
+      return local.length > 0 ? local : allOptions
+    }
+
     if (slotId === 'cruise') return allOptions
 
     return allOptions
@@ -277,6 +314,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
       options={getFilteredOptions(def.slotId)}
       allOptions={getAllOptions(def.slotId)}
       passport={config.passport}
+      pax={config.pax}
       onChange={(val) => onUpdateSlot(def.slotId, val)}
       onApplyToAllDays={onApplyToAllDays && APPLY_TO_ALL_SLOTS.has(def.slotId) && allDays.length > 1
         ? () => onApplyToAllDays(def.slotId, getSlotValue(def.slotId))
@@ -357,9 +395,37 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
-          {blocks && onApplyBlock && (
-            <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
-          )}
+          {blocks && onApplyBlock && (() => {
+            // A day built from a block in the catalog says which one — it is
+            // already a catalog day, so no "use a block" offer (operator,
+            // 2026-10-10). A code the catalog no longer holds (block renamed
+            // or deleted since) reads as a new day again.
+            const fromBlock = day.blockCode ? blocks.find(b => b.code === day.blockCode) : undefined
+            return fromBlock ? (
+              <BlockPicker
+                blocks={blocks}
+                onPick={onApplyBlock}
+                label="Use a block"
+                current={fromBlock.code}
+                title={`Built from your day block ${fromBlock.code} — ${fromBlock.name}. Click to switch to another block.`}
+                compact
+              />
+            ) : (
+              <>
+                <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
+                {onSaveAsBlock && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onSaveAsBlock() }}
+                    className="p-1.5 text-gray-400 hover:text-green-700 rounded-md hover:bg-green-50 transition-colors"
+                    title="New day: save it to your catalog as a day block"
+                  >
+                    <BookmarkPlus className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
+            )
+          })()}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemoveDay() }}
@@ -427,6 +493,20 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 className="w-full text-xs leading-5 text-gray-600 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 resize-none"
                 placeholder="Day description / activities..."
               />
+              <div className="flex items-center justify-between gap-2 mt-0.5 px-1">
+                <span className="text-[10px] text-gray-400 truncate">
+                  {writtenFrom && (writtenFrom.length > 0
+                    ? <>From your library: {writtenFrom.map(s => `${s.name}${s.otherTier ? ` (${s.tier} text)` : ''}`).join(' · ')}</>
+                    : 'Nothing for this day in your library — written from the day’s services')}
+                </span>
+                {onRewriteDescription && (
+                  <button type="button" onClick={onRewriteDescription} disabled={rewriting}
+                    title="Write this day from your Content Library and Writing Rules"
+                    className="shrink-0 text-[10px] text-[#556B2F] hover:underline disabled:opacity-50">
+                    {rewriting ? 'Writing…' : day.description.trim() ? 'Rewrite from library' : 'Write from library'}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -451,7 +531,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 {showDayTypeOverrides ? 'hide overrides' : 'override components'}
               </button>
               <span className="text-[10px] text-indigo-500/80 ml-auto">
-                The completeness gate uses these to decide what each day requires.
+                What happens on this day — saved with the itinerary.
               </span>
             </div>
 

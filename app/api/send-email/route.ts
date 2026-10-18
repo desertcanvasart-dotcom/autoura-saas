@@ -1,6 +1,11 @@
+import { sendGuard } from '@/lib/send-guard'
 import { NextResponse } from 'next/server'
 import { generateEmailTemplate } from '@/lib/communication-utils'
+import { formatCurrency } from '@/lib/currency'
+import { currencyDecimals } from '@/lib/currency-totals'
+import { contractDepositPercent, contractSettingsFromTenant } from '@/lib/contract-terms'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
@@ -9,6 +14,9 @@ import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
 import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 export async function POST(request: Request) {
+  // Staff only, and a per-person and per-company ceiling (lib/send-guard).
+  const sendGate = await sendGuard('email')
+  if (sendGate) return sendGate
   try {
     // Authenticated users only — this route sends mail through the company
     // mailbox, so it must never be callable anonymously.
@@ -16,6 +24,10 @@ export async function POST(request: Request) {
     if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
+    // Staff only, like the quote and supplier-document sends: this emails a
+    // client under the company's name and domain, which a viewer must not do.
+    const denied = roleDenied(auth.role, 'staff')
+    if (denied) return denied
 
     // Who the client should see, and where their reply should land. This route
     // hardcoded one operator's name and BCC'd a single Gmail mailbox, which is
@@ -24,7 +36,7 @@ export async function POST(request: Request) {
     // actually routes a client's reply back to the operator.
     const { data: tenant } = await auth.supabase!
       .from('tenants')
-      .select('company_name, contact_email, company_phone, company_website, email_domain, email_from_local, email_domain_status')
+      .select('company_name, contact_email, company_phone, company_website, email_domain, email_from_local, email_domain_status, deposit_percent')
       .eq('id', auth.tenant_id!)
       .maybeSingle()
 
@@ -102,7 +114,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway with allow_incomplete=true.`,
+          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway.`,
           gaps: itineraryLines.completeness.gaps,
         },
         { status: 422 }
@@ -124,14 +136,16 @@ export async function POST(request: Request) {
       recipientName,
       itineraryCode,
       tripName,
-      totalCost.toFixed(2),
-      currency,
+      // ¥450,000, not "JPY 450000.00".
+      formatCurrency(totalCost, currency, { decimals: currencyDecimals(currency) }),
       {
         company: tenant?.company_name || '',
         email: tenant?.contact_email || '',
         phone: tenant?.company_phone || '',
         website: tenant?.company_website || '',
-      }
+      },
+      // The deposit the operator asks for (Settings → Organization).
+      contractDepositPercent(contractSettingsFromTenant(tenant))
     )
 
     const result = await sendMail({
@@ -140,7 +154,7 @@ export async function POST(request: Request) {
         ? { bcc: tenant.contact_email, replyTo: tenant.contact_email }
         : {}),
       from: resolveSender(tenant, process.env.RESEND_FROM_EMAIL || '').from,
-      subject: `Your Egypt Tour Itinerary - ${tripName} (${itineraryCode})`,
+      subject: `Your Tour Itinerary - ${tripName} (${itineraryCode})`,
       html: emailHtml,
       attachments: pdfBase64 ? [{
         filename: `${itineraryCode}_${recipientName.replace(/\s+/g, '_')}.pdf`,

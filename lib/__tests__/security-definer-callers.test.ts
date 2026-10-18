@@ -17,7 +17,7 @@ const ALLOWED_CALLERS: Record<string, string[]> = {
   log_activity: ['lib/billing-middleware.ts', 'app/api/billing/webhook/route.ts'],
   increment_usage: ['lib/usage-enforcement.ts'],
   get_tenant_agent_memories: ['lib/agent-memory.ts'],
-  create_b2b_quote_version: ['app/api/quotes/b2b/[id]/route.ts'],
+  create_b2b_quote_version: ['app/api/quotes/b2b/[id]/route.ts', 'app/api/b2b/quote-from-itinerary/route.ts', 'app/api/b2b/quotes/route.ts'],
   create_b2c_quote_version: ['app/api/quotes/b2c/[id]/route.ts', 'app/api/pricing-grid/save/route.ts'],
   revert_b2b_quote_to_version: ['app/api/quotes/[type]/[id]/versions/revert/route.ts'],
   revert_b2c_quote_to_version: ['app/api/quotes/[type]/[id]/versions/revert/route.ts'],

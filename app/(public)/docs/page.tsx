@@ -1,5 +1,9 @@
 import Link from 'next/link'
 import { CATEGORIES } from './toc'
+import { DOCS_INDEX_DESCRIPTION } from './seo'
+import { buildPageMetadata } from '@/lib/seo/site'
+
+export const metadata = buildPageMetadata({ title: 'Documentation', description: DOCS_INDEX_DESCRIPTION, path: '/docs' })
 
 export default function DocsHub() {
   return (

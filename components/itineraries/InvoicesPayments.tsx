@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Loader2, Plus, Receipt } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { PAYMENT_METHODS } from '@/lib/payment-input'
+import { withReturnTo } from '@/lib/nav/return-to'
 
 interface Invoice {
   id: string
@@ -184,7 +185,7 @@ export default function InvoicesPayments({ itineraryId, today, onCreateInvoice, 
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link href={`/invoices/${inv.id}`} className="text-sm font-medium text-primary-700 hover:underline">{inv.invoice_number}</Link>
+                        <Link href={withReturnTo(`/invoices/${inv.id}`, `/itineraries/${itineraryId}`)} className="text-sm font-medium text-primary-700 hover:underline">{inv.invoice_number}</Link>
                         {typeLabel(inv.invoice_type) && <span className="text-xs text-gray-500">{typeLabel(inv.invoice_type)}</span>}
                         <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS[status] ?? 'bg-gray-100 text-gray-700'}`}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
                       </div>

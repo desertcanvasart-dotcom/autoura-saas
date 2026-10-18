@@ -1,5 +1,7 @@
 // lib/template-placeholders.ts
+import { DEFAULT_DEPOSIT_DUE_DAYS } from '@/lib/bookings/deposit-rule'
 import { getCurrencySymbol } from '@/lib/currency'
+import { escapeHtml } from '@/lib/html-escape'
 // Utility functions for template placeholder replacement
 
 /**
@@ -20,15 +22,33 @@ export function getPlaceholders(text: string): string[] {
 }
 
 /**
- * Replace all {{placeholder}} with actual values
+ * Replace all {{placeholder}} with actual values.
+ *
+ * `escape: true` HTML-escapes each value — for an HTML body. Values are
+ * client, partner and typed-in text; pasted raw into the email body, a name
+ * like "Smith & <b>Sons</b>" became markup (documents audit, round 12).
+ * Plain-text uses (the subject) stay unescaped, or they would show "&amp;".
  */
 export function replacePlaceholders(
   text: string,
-  data: Record<string, string | undefined>
+  data: Record<string, string | undefined>,
+  options: { escape?: boolean } = {}
 ): string {
   return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key) => {
-    return data[key] !== undefined ? data[key]! : match
+    const value = data[key]
+    if (value === undefined) return match
+    return options.escape ? escapeHtml(value) : value
   })
+}
+
+/** Today plus the agency's deposit days (the bookings' default when unset). */
+export function depositDueDate(depositDueDays: number | null | undefined, today: Date = new Date()): Date {
+  const days = typeof depositDueDays === 'number' && Number.isFinite(depositDueDays) && depositDueDays >= 0
+    ? depositDueDays
+    : DEFAULT_DEPOSIT_DUE_DAYS
+  const d = new Date(today)
+  d.setDate(d.getDate() + days)
+  return d
 }
 
 /**
@@ -115,6 +135,8 @@ export function buildPlaceholderData(
     agentName?: string
     email?: string
     phone?: string
+    /** Settings → Organization → deposit due days. */
+    depositDueDays?: number | null
   }
 ): Record<string, string> {
   const data: Record<string, string> = {}
@@ -164,18 +186,12 @@ export function buildPlaceholderData(
   // Dynamic dates
   data.today = formatDate(new Date())
   
-  // Calculate due dates
-  const today = new Date()
-  const depositDue = new Date(today)
-  depositDue.setDate(depositDue.getDate() + 7)
-  data.deposit_due_date = formatDate(depositDue)
-  
-  if (trip?.startDate) {
-    const startDate = new Date(trip.startDate)
-    const finalPaymentDue = new Date(startDate)
-    finalPaymentDue.setDate(finalPaymentDue.getDate() - 14)
-    data.final_payment_due = formatDate(finalPaymentDue)
-  }
+  // Due dates on the agency's own terms. These were invented: the deposit
+  // always "today + 7" and the balance always 14 days before departure,
+  // contradicting the deposit days in Settings and the payment terms the
+  // agency's documents print (lib/contract-terms: balance before the tour).
+  data.deposit_due_date = formatDate(depositDueDate(company?.depositDueDays))
+  if (trip?.startDate) data.final_payment_due = formatDate(trip.startDate)
 
   return data
 }

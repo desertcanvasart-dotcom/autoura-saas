@@ -50,6 +50,11 @@ export async function PATCH(request: NextRequest) {
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ success: false, error: 'Nothing to update' }, { status: 400 })
   }
+  // The same platform checks as WhatsApp settings: switched on here without
+  // them, the switch showed On while the webhook ignored it.
+  if (patch.whatsapp_ai_enabled === true && (!process.env.ANTHROPIC_API_KEY || process.env.WHATSAPP_AI_ENABLED !== 'true')) {
+    return NextResponse.json({ success: false, error: 'WhatsApp auto-reply is not available on this platform yet — contact Autoura support' }, { status: 400 })
+  }
 
   const { data, error } = await supabase
     .from('tenant_features')

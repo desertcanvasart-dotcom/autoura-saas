@@ -1,6 +1,11 @@
 // app/api/translate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { requireAuth } from '@/lib/supabase-server'
+import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
+
+/** A message to translate, not a document. */
+const MAX_TRANSLATE_CHARS = 5_000
 
 // Lazy-initialized OpenAI client (avoids build-time errors when env vars unavailable)
 let _openai: OpenAI | null = null
@@ -11,13 +16,23 @@ function getOpenAI(): OpenAI {
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY is not defined in environment variables')
     }
-    _openai = new OpenAI({ apiKey })
+    _openai = new OpenAI({ apiKey, timeout: 30_000, maxRetries: 1 })
   }
   return _openai
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Signed in, and within the AI ceiling. The middleware already demanded a
+    // session, but this route checked nothing itself and paid OpenAI for any
+    // amount of text, as often as it was called.
+    const auth = await requireAuth()
+    if (auth.error !== null) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+    const overBudget = await aiBudgetDenied(auth.user!.id, auth.tenant_id)
+    if (overBudget) return overBudget
+
     // Check API key first
     if (!process.env.OPENAI_API_KEY) {
       console.error('Missing OPENAI_API_KEY')
@@ -30,11 +45,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { text, targetLanguage, action } = body
 
-    if (!text) {
+    if (!text || typeof text !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Text is required' },
         { status: 400 }
       )
+    }
+    const tooLong = aiInputTooLong(text, MAX_TRANSLATE_CHARS)
+    if (tooLong) return tooLong
+    // The language name goes into the prompt: a name, not instructions.
+    if (targetLanguage !== undefined && (typeof targetLanguage !== 'string' || targetLanguage.length > 40)) {
+      return NextResponse.json({ success: false, error: 'Unknown target language' }, { status: 400 })
     }
 
     let prompt: string
@@ -120,6 +141,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const auth = await requireAuth()
+  if (auth.error !== null) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  }
   return NextResponse.json({
     success: true,
     message: 'Translation API is running',
