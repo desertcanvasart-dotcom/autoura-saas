@@ -8346,6 +8346,8 @@ export interface Database {
           special_requests: string | null
           internal_notes: string | null
           status: string
+          sync_key: string | null
+          synced_hash: string | null
           sent_at: string | null
           confirmed_at: string | null
           completed_at: string | null
@@ -8384,6 +8386,8 @@ export interface Database {
           special_requests?: string | null
           internal_notes?: string | null
           status?: string
+          sync_key?: string | null
+          synced_hash?: string | null
           sent_at?: string | null
           confirmed_at?: string | null
           completed_at?: string | null
@@ -8422,6 +8426,8 @@ export interface Database {
           special_requests?: string | null
           internal_notes?: string | null
           status?: string
+          sync_key?: string | null
+          synced_hash?: string | null
           sent_at?: string | null
           confirmed_at?: string | null
           completed_at?: string | null

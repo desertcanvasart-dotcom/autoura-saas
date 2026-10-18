@@ -88,6 +88,15 @@ export default function SupplierDocumentsPage() {
   // Documents holding lines the trip no longer has (removed, renamed or moved
   // to another day since Generate). They were left as they were, silently.
   const [stale, setStale] = useState<Array<{ id: string; document_number: string | null; supplier_name: string | null; gone: number }>>([])
+  // Drafts Generate made, untouched since, that Sync would bring in step or
+  // retire (no longer needed). Theirs to change, so one button does it.
+  type DocRef = { id: string; document_number: string | null; supplier_name: string | null }
+  const [outdated, setOutdated] = useState<DocRef[]>([])
+  const [retire, setRetire] = useState<DocRef[]>([])
+  // What no document can show: nights with no hotel, sightseeing with no
+  // vehicle — and the lines that go on no document on purpose, and why.
+  const [coverage, setCoverage] = useState<Array<{ kind: string; dayNumber?: number; message: string }>>([])
+  const [excluded, setExcluded] = useState<Array<{ day_number: number; service_name: string; reason: string }>>([])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -106,15 +115,21 @@ export default function SupplierDocumentsPage() {
   }, [mounted, typeFilter, statusFilter, itineraryFilter])
 
   const fetchMissing = async (id: string | null) => {
-    if (!id) { setMissing([]); setStale([]); return }
+    const list = (v: unknown) => (Array.isArray(v) ? v : [])
+    const apply = (result: Record<string, unknown> | null) => {
+      setMissing(list(result?.missing))
+      setStale(list(result?.stale))
+      setOutdated(list(result?.outdated))
+      setRetire(list(result?.retire))
+      setCoverage(list(result?.coverage))
+      setExcluded(list(result?.excluded))
+    }
+    if (!id) { apply(null); return }
     try {
       const response = await fetch(`/api/itineraries/${encodeURIComponent(id)}/generate-documents`)
-      const result = response.ok ? await response.json() : null
-      setMissing(Array.isArray(result?.missing) ? result.missing : [])
-      setStale(Array.isArray(result?.stale) ? result.stale : [])
+      apply(response.ok ? await response.json() : null)
     } catch {
-      setMissing([])
-      setStale([])
+      apply(null)
     }
   }
 
@@ -133,7 +148,7 @@ export default function SupplierDocumentsPage() {
       })
       const result = await response.json().catch(() => null)
       if (!response.ok || !result?.success) {
-        await dialog.alert('Documents not generated', result?.error || 'Could not generate the missing documents.', 'warning')
+        await dialog.alert('Documents not synced', result?.error || 'Could not bring the documents in step with the trip.', 'warning')
       }
     } finally {
       setGeneratingMissing(false)
@@ -321,20 +336,32 @@ export default function SupplierDocumentsPage() {
           </div>
         )}
 
-        {/* Services on the trip that no document carries yet. */}
-        {itineraryFilter && missing.length > 0 && (
+        {/* What Sync would change: services no document carries yet, and
+            Generate's own untouched drafts that are out of step or no
+            longer needed. */}
+        {itineraryFilter && (missing.length + outdated.length + retire.length) > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-900">
-                  {missing.length === 1 ? 'One document is' : `${missing.length} documents are`} not generated yet
-                </p>
-                <p className="text-sm text-amber-800">
-                  {missing.map(m => m.supplier_name).join(' · ')}
-                </p>
-                <p className="text-xs text-amber-700 mt-1">
-                  The trip has services no document carries, usually because it changed after documents were generated.
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-amber-900">The documents are not in step with the trip</p>
+                {missing.length > 0 && (
+                  <p className="text-sm text-amber-800">
+                    <span className="font-medium">To create:</span> {missing.map(m => m.supplier_name).join(' · ')}
+                  </p>
+                )}
+                {outdated.length > 0 && (
+                  <p className="text-sm text-amber-800">
+                    <span className="font-medium">To update:</span> {outdated.map(d => d.document_number || d.supplier_name).join(' · ')}
+                  </p>
+                )}
+                {retire.length > 0 && (
+                  <p className="text-sm text-amber-800">
+                    <span className="font-medium">No longer needed (kept as Cancelled):</span> {retire.map(d => d.document_number || d.supplier_name).join(' · ')}
+                  </p>
+                )}
+                <p className="text-xs text-amber-700">
+                  Sync only changes drafts it made that nobody has edited. Documents edited or sent are never changed.
                 </p>
               </div>
             </div>
@@ -344,9 +371,39 @@ export default function SupplierDocumentsPage() {
               disabled={generatingMissing}
               className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 whitespace-nowrap"
             >
-              {generatingMissing ? 'Generating…' : 'Generate missing'}
+              {generatingMissing ? 'Syncing…' : 'Sync documents'}
             </button>
           </div>
+        )}
+
+        {/* Nights and days that look unplanned: no line, no voucher. */}
+        {itineraryFilter && coverage.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                {coverage.length === 1 ? 'One gap in the trip' : `${coverage.length} gaps in the trip`} no document can cover
+              </p>
+              <ul className="text-sm text-amber-800 mt-1 space-y-0.5 list-disc pl-5">
+                {coverage.map((w, i) => <li key={`${w.kind}-${w.dayNumber ?? i}`}>{w.message}</li>)}
+              </ul>
+              <p className="text-xs text-amber-700 mt-1">Add the missing service to the trip, then sync the documents.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Lines that go on no document, on purpose. */}
+        {itineraryFilter && excluded.length > 0 && (
+          <details className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700">
+            <summary className="cursor-pointer font-medium">
+              {excluded.length === 1 ? 'One line goes' : `${excluded.length} lines go`} on no document
+            </summary>
+            <ul className="mt-2 space-y-0.5">
+              {excluded.map((l, i) => (
+                <li key={`${l.day_number}-${i}`}>Day {l.day_number} · {l.service_name} — {l.reason}</li>
+              ))}
+            </ul>
+          </details>
         )}
 
         {/* Documents the trip has changed under. */}
@@ -368,7 +425,7 @@ export default function SupplierDocumentsPage() {
                 ))}
               </ul>
               <p className="text-xs text-amber-700 mt-1">
-                The trip changed after these were generated. Edit them, or cancel them and generate again; tell the supplier if one was already sent.
+                The trip changed after these were edited or sent, so Sync leaves them alone. Edit them, or cancel them and sync again; tell the supplier if one was already sent.
               </p>
             </div>
           </div>

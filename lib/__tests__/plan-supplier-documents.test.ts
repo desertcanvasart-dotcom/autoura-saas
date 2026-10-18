@@ -63,6 +63,8 @@ describe('the documents ITN-S-2026-8987 needs', () => {
       'Alexandria Entrance Fees',
       'Alexandria Guide Services',
       'Alexandria Restaurant & Meals',
+      // The grid's Camel Ride ('other', slot experiences) — on no document before.
+      'Cairo Activities & Experiences',
       'Cairo Entrance Fees',
       'Cairo Guide Services',
       'Cairo Meet & Assist',
@@ -94,7 +96,7 @@ describe('the documents ITN-S-2026-8987 needs', () => {
       { supplier_id: null, document_type: 'service_order', supplier_name: 'Alexandria Restaurant & Meals' },
     ])
     expect(missing.map(r => r.supplier_name).sort()).toEqual([
-      'Alexandria Guide Services', 'Cairo Entrance Fees', 'Cairo Guide Services', 'Cairo Meet & Assist', 'Cairo Restaurant & Meals',
+      'Alexandria Guide Services', 'Cairo Activities & Experiences', 'Cairo Entrance Fees', 'Cairo Guide Services', 'Cairo Meet & Assist', 'Cairo Restaurant & Meals',
     ])
   })
 })

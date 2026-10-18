@@ -109,7 +109,7 @@ describe('Generate Documents handles every service type the grid saves', () => {
 
     // The table lives in lib/documents/group-services, which the route's
     // planner (lib/documents/plan-supplier-documents) uses.
-    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain('planSupplierDocuments(')
+    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain('syncSupplierDocuments(')
     expect(read('lib/documents/plan-supplier-documents.ts')).toContain('docMappingFor(')
     for (const t of gridTypes) expect(Object.keys(SERVICE_TO_DOC_TYPE), `grid type '${t}' unmapped — skipped silently`).toContain(t)
   })

@@ -32,6 +32,16 @@
 // silently left as it was. A document with no such lines (made by hand) is
 // matched as before: by its kind and title, or for a night, by its dates.
 //
+// Sync (live ITN-S-2026-8987 again): Generate only ever ADDED documents, so a
+// draft it had made kept its old lines when the trip changed, and a document
+// the trip no longer needed stayed as it was. A draft Generate made and nobody
+// has touched since — still a draft, its lines and dates still hashing to
+// what Generate wrote (sync_key / synced_hash, migration 438) — is now
+// Generate's to keep in step: updated to the trip's lines, or retired (kept
+// as Cancelled) when the trip no longer needs it. A document a person edited
+// or sent, or one made before Sync, is never changed: it holds its lines and
+// is listed as out of date, as before.
+//
 // Guides: one assignment per GUIDE assigned to the trip (itinerary_resources,
 // type guide), under the guide's name, with their languages. Guiding nobody
 // is assigned to yet is grouped by the city it happens in: the Cairo guide
@@ -40,7 +50,7 @@
 
 import type { Database, Json } from '@/types/database.types'
 import { transportCrew } from './transport-crew'
-import { docMappingFor, serviceCity, PlaceNames, entranceLineName, unassignedDocKey, type ServiceMapping } from './group-services'
+import { docMappingFor, noDocumentReason, serviceCity, PlaceNames, entranceLineName, unassignedDocKey, type ServiceMapping } from './group-services'
 import { propertyFromService, propertyKey } from '@/lib/itineraries/overnight-property'
 
 /** Supplier type → the document its services go on. */
@@ -68,6 +78,8 @@ const DEFAULT_SUPPLIER_NAMES: Record<string, Record<string, string>> = {
     meals: 'Restaurant & Meals',
     entrance: 'Entrance Fees',
     assistance: 'Meet & Assist',
+    activities: 'Activities & Experiences',
+    other: 'Other Services',
     default: 'Ground Services',
   },
 }
@@ -99,6 +111,10 @@ export interface PlanInput {
     check_in?: string | null
     check_out?: string | null
     services?: unknown
+    status?: string | null
+    sync_key?: string | null
+    synced_hash?: string | null
+    service_date?: string | null
   }>
   /** The guides assigned to the trip (itinerary_resources, type guide). */
   guides?: PlanGuide[]
@@ -248,7 +264,7 @@ function tripLines(days: PlanDay[]): Array<{ day: PlanDay; service: any; mapping
     for (const raw of day.services ?? []) {
       // Tips, water, supplies, a flight… go on no document.
       const mapping = docMappingFor(raw)
-      if (!mapping?.docType) continue
+      if (!mapping.docType) continue
       // An entrance line names its sites, even when it was saved as the one
       // generic "Entrance Fees" line of the day.
       const service = mapping.category === 'entrance'
@@ -381,9 +397,162 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
       total_cost: group.services.reduce((sum, s) => sum + (parseFloat(String(s.total_cost)) || 0), 0),
       payment_terms: supplier ? (supplier.payment_terms || 'commission') : 'pay_direct',
       status: 'draft',
+      sync_key: key,
       // The vehicle and driver the trip's transport lines name (migration 402).
       ...(group.docType === 'transport_voucher' ? transportCrew(group.services as Parameters<typeof transportCrew>[0]) : {}),
     })
   }
+  for (const row of rows) row.synced_hash = documentHash(row)
   return rows
+}
+
+// ── Sync ────────────────────────────────────────────────────────────────────
+
+/** JSON with keys sorted and empty values dropped: jsonb reorders keys and
+ *  drops nothing, the planner leaves some keys undefined — both must hash
+ *  the same. */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`
+  if (v && typeof v === 'object') {
+    const entries = Object.entries(v as Record<string, unknown>)
+      .filter(([, x]) => x !== null && x !== undefined && x !== '')
+      .sort(([a], [b]) => a.localeCompare(b))
+    return `{${entries.map(([k, x]) => `${JSON.stringify(k)}:${canonical(x)}`).join(',')}}`
+  }
+  if (typeof v === 'string' && /^\d+(\.\d+)?$/.test(v)) return String(Number(v))
+  return JSON.stringify(v ?? null)
+}
+
+/** cyrb53 — enough to notice a hand edit; not security. */
+function hash53(str: string): string {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)
+}
+
+/** What Generate wrote that a person might change by hand: the lines and
+ *  the dates. Contact details, notes and requests are not in it — a person
+ *  filling those in keeps the draft Generate's, and Sync leaves them be. */
+export function documentHash(doc: { services?: unknown; check_in?: string | null; check_out?: string | null; service_date?: string | null }): string {
+  const day = (d: string | null | undefined) => (d ? String(d).slice(0, 10) : null)
+  return hash53(canonical({ services: doc.services ?? [], check_in: day(doc.check_in), check_out: day(doc.check_out), service_date: day(doc.service_date) }))
+}
+
+/** A draft Generate made that nobody has touched since: Sync's to change. */
+export function isUntouchedDraft(doc: PlanInput['existing'][number]): boolean {
+  return doc.status === 'draft' && !!doc.sync_key && !!doc.synced_hash && documentHash(doc) === doc.synced_hash
+}
+
+/** The fields Sync rewrites on a draft it keeps: what the trip decides.
+ *  Contacts, notes and requests stay as a person left them. */
+const SYNCED_FIELDS = [
+  'services', 'total_cost', 'check_in', 'check_out', 'service_date', 'city', 'supplier_name',
+  'client_name', 'client_nationality', 'num_adults', 'num_children', 'currency',
+  'vehicle_type', 'driver_name', 'synced_hash',
+] as const
+
+export interface SyncPlan {
+  /** New documents, ready to insert. */
+  create: SupplierDocumentInsert[]
+  /** Untouched drafts brought in step with the trip. */
+  update: Array<{ id: string; document_number: string | null; supplier_name: string | null; fields: Partial<SupplierDocumentInsert> }>
+  /** Untouched drafts the trip no longer needs: kept, as Cancelled. */
+  retire: Array<{ id: string; document_number: string | null; supplier_name: string | null }>
+  /** Documents a person edited or sent (or made before Sync) that hold
+   *  lines the trip no longer has: never changed, listed. */
+  stale: ReturnType<typeof staleSupplierDocuments>
+}
+
+export function syncSupplierDocuments(input: PlanInput): SyncPlan {
+  const ours = input.existing.filter(isUntouchedDraft)
+  const kept = input.existing.filter(d => !isUntouchedDraft(d))
+  // Generate's own drafts hold no lines: planned afresh as if they were not
+  // there, then matched back to the draft that already has the key.
+  const planned = planSupplierDocuments({ ...input, existing: kept })
+  const create: SyncPlan['create'] = []
+  const update: SyncPlan['update'] = []
+  const matched = new Set<string>()
+  for (const row of planned) {
+    const draft = ours.find(d => d.id && !matched.has(d.id) && d.sync_key === row.sync_key && d.document_type === row.document_type)
+    if (!draft?.id) { create.push(row); continue }
+    matched.add(draft.id)
+    if (draft.synced_hash === row.synced_hash) continue
+    const fields: Partial<SupplierDocumentInsert> = {}
+    for (const f of SYNCED_FIELDS) if (f in row) (fields as Record<string, unknown>)[f] = (row as Record<string, unknown>)[f]
+    update.push({ id: draft.id, document_number: draft.document_number ?? null, supplier_name: draft.supplier_name, fields })
+  }
+  const retire = ours
+    .filter(d => d.id && !matched.has(d.id) && (!input.documentTypes || input.documentTypes.includes(d.document_type)))
+    .map(d => ({ id: d.id!, document_number: d.document_number ?? null, supplier_name: d.supplier_name }))
+  return { create, update, retire, stale: staleSupplierDocuments(input.days, kept) }
+}
+
+// ── Coverage: what the documents would otherwise hide ──────────────────────
+
+export interface CoverageWarning {
+  kind: 'night_without_hotel' | 'trip_without_transport' | 'day_without_transport'
+  dayNumber?: number
+  message: string
+}
+
+const ON_BOARD_NIGHT = /^on board\b/i
+const clean = (v: unknown): string => String(v ?? '').trim()
+
+/**
+ * Nights and days that look unplanned — a trip problem, not a document one,
+ * but one the documents hide: no line means no voucher, and nothing said so.
+ *   - a night with no hotel or cruise line, when other nights have one (a
+ *     trip that books no beds at all is a day-tour programme, not a gap);
+ *   - a day with sightseeing (a guide, entrance fees, activities) and no
+ *     transport line. A day on a cruise, or the morning after a night on
+ *     board, is exempt: the cruise's excursions carry it.
+ * The last day has no night.
+ */
+export function coverageWarnings(days: readonly PlanDay[]): CoverageWarning[] {
+  const sorted = [...days].sort((a, b) => a.day_number - b.day_number)
+  const goesOn = (d: PlanDay, test: (m: ServiceMapping) => boolean) => (d.services ?? []).some(s => {
+    const m = docMappingFor(s)
+    return !!m.docType && test(m)
+  })
+  const hasNight = (d: PlanDay) => goesOn(d, m => m.docType === 'hotel_voucher' || m.docType === 'cruise_voucher')
+  const hasCruise = (d: PlanDay) => goesOn(d, m => m.docType === 'cruise_voucher')
+  const hasTransport = (d: PlanDay) => goesOn(d, m => m.docType === 'transport_voucher')
+  const sightseeing = (d: PlanDay) => goesOn(d, m => m.docType === 'guide_assignment' || m.category === 'entrance' || m.category === 'activities')
+  const warnings: CoverageWarning[] = []
+
+  const nights = sorted.slice(0, -1)
+  if (nights.some(hasNight)) {
+    for (const d of nights) {
+      if (hasNight(d)) continue
+      const where = clean(d.overnight_city) || clean(d.city)
+      warnings.push({ kind: 'night_without_hotel', dayNumber: d.day_number, message: `Night ${d.day_number}${where ? ` (${where})` : ''} has no hotel or cruise line, so no voucher books it.` })
+    }
+  }
+
+  if (!sorted.some(hasTransport)) {
+    if (sorted.some(sightseeing)) warnings.push({ kind: 'trip_without_transport', message: 'This trip has sightseeing but no transport line, so there is no transport voucher.' })
+  } else {
+    const onCruise = (d: PlanDay, i: number) =>
+      hasCruise(d) || ON_BOARD_NIGHT.test(clean(d.overnight_city)) || (i > 0 && (hasCruise(sorted[i - 1]) || ON_BOARD_NIGHT.test(clean(sorted[i - 1].overnight_city))))
+    for (const [i, d] of sorted.entries()) {
+      if (sightseeing(d) && !hasTransport(d) && !onCruise(d, i)) {
+        warnings.push({ kind: 'day_without_transport', dayNumber: d.day_number, message: `Day ${d.day_number}${clean(d.city) ? ` (${clean(d.city)})` : ''} has sightseeing but no transport line.` })
+      }
+    }
+  }
+  return warnings
+}
+
+/** The trip's lines that go on no document, on purpose, and why. */
+export function excludedLines(days: readonly PlanDay[]): Array<{ day_number: number; service_name: string; reason: string }> {
+  return days.flatMap(d => (d.services ?? []).flatMap(s => {
+    const reason = noDocumentReason(s)
+    return reason ? [{ day_number: d.day_number, service_name: clean(s.service_name) || clean(s.service_type), reason }] : []
+  }))
 }
