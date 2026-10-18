@@ -7,12 +7,19 @@ import { describe, it, expect } from 'vitest'
 import { docMappingFor, serviceCity, PlaceNames, entranceLineName, unassignedDocKey, requestedDocTypes } from '@/lib/documents/group-services'
 
 describe('what goes on which document', () => {
-  it('by service type; a grid cruise is a cruise voucher; tips, water and flights on none', () => {
+  it('by service type; a grid cruise is a cruise voucher; tips, water and flights on none; anything else on Other Services', () => {
     expect(docMappingFor({ service_type: 'transportation' })?.docType).toBe('transport_voucher')
     expect(docMappingFor({ service_type: 'entrance_fee' })).toEqual({ docType: 'service_order', category: 'entrance' })
     expect(docMappingFor({ service_type: 'accommodation', description: '[pricing-grid:cruise] MS Nile' })?.docType).toBe('cruise_voucher')
     for (const t of ['tip', 'water', 'flight']) expect(docMappingFor({ service_type: t })?.docType).toBeNull()
-    expect(docMappingFor({ service_type: 'unknown' })).toBeUndefined()
+    // Unknown is never "nowhere": it goes where it is seen.
+    expect(docMappingFor({ service_type: 'unknown' })).toEqual({ docType: 'service_order', category: 'other' })
+    expect(docMappingFor({ service_type: null })).toEqual({ docType: 'service_order', category: 'other' })
+    // The grid saves experiences, boat rides, extras AND water as 'other': the slot decides.
+    expect(docMappingFor({ service_type: 'other', description: '[pricing-grid:experiences] Camel Ride' })).toEqual({ docType: 'service_order', category: 'activities' })
+    expect(docMappingFor({ service_type: 'other', description: '[pricing-grid:boat_rides] Felucca' })).toEqual({ docType: 'service_order', category: 'activities' })
+    expect(docMappingFor({ service_type: 'other', description: '[pricing-grid:other_group] custom' })).toEqual({ docType: 'service_order', category: 'other' })
+    expect(docMappingFor({ service_type: 'other', description: '[pricing-grid:water] Water Bottles' }).docType).toBeNull()
   })
 })
 

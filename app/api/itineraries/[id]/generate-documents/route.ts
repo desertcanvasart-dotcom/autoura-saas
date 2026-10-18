@@ -1,5 +1,10 @@
-// POST  create the trip's supplier documents it has not got yet
-// GET   list them without creating anything (the trip's documents page)
+// POST  sync the trip's supplier documents: create what is missing, bring the
+//       drafts Generate made (untouched since) in step, retire the ones the
+//       trip no longer needs (kept as Cancelled)
+// GET   say what POST would do, without changing anything, plus what the
+//       documents cannot show: documents a person edited or sent that no
+//       longer match, nights and days that look unplanned, and the lines
+//       that go on no document and why (the trip's documents page)
 //
 // What a trip needs, and how it is grouped: lib/documents/plan-supplier-documents.
 
@@ -9,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { requestedDocTypes } from '@/lib/documents/group-services'
 import { parseManualAssignee } from '@/lib/notify/assignment-message'
-import { planSupplierDocuments, staleSupplierDocuments, type PlanDay, type PlanGuide } from '@/lib/documents/plan-supplier-documents'
+import { syncSupplierDocuments, coverageWarnings, excludedLines, type PlanDay, type PlanGuide } from '@/lib/documents/plan-supplier-documents'
 import { gateRole } from '@/lib/api-role-gate'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -37,7 +42,7 @@ async function planForItinerary(
 
   const { data: existing } = await supabase
     .from('supplier_documents')
-    .select('id, document_number, supplier_id, document_type, supplier_name, check_in, check_out, services')
+    .select('id, document_number, supplier_id, document_type, supplier_name, check_in, check_out, service_date, services, status, sync_key, synced_hash')
     .eq('itinerary_id', itinerary.id)
     .neq('status', 'cancelled')
 
@@ -92,10 +97,7 @@ async function planForItinerary(
     }] : []
   })
 
-  return {
-    rows: planSupplierDocuments({ tenantId, itinerary, days, suppliers, existing: existing ?? [], guides, documentTypes }),
-    stale: staleSupplierDocuments(days, existing ?? []),
-  }
+  return syncSupplierDocuments({ tenantId, itinerary, days, suppliers, existing: existing ?? [], guides, documentTypes })
 }
 
 /** The trip and its days with their services, for the caller's tenant. */
@@ -135,16 +137,21 @@ export async function GET(
   try {
     const trip = await loadTrip(supabase, itineraryId, authResult.tenant_id)
     if (trip.error) return trip.error
-    const { rows: missing, stale } = await planForItinerary(supabase, trip.itinerary, trip.days, authResult.tenant_id, null)
+    const plan = await planForItinerary(supabase, trip.itinerary, trip.days, authResult.tenant_id, null)
     return NextResponse.json({
       success: true,
-      // Documents made before the trip changed and holding lines it no longer has.
-      stale,
-      missing: missing.map(d => ({
+      missing: plan.create.map(d => ({
         document_type: d.document_type,
         supplier_name: d.supplier_name,
         lines: Array.isArray(d.services) ? d.services.length : 0,
       })),
+      // Generate's own drafts that Sync would bring in step, or retire.
+      outdated: plan.update.map(({ id, document_number, supplier_name }) => ({ id, document_number, supplier_name })),
+      retire: plan.retire,
+      // Documents a person edited or sent that hold lines the trip no longer has.
+      stale: plan.stale,
+      coverage: coverageWarnings(trip.days),
+      excluded: excludedLines(trip.days),
     })
   } catch (error) {
     console.error('❌ Error listing missing documents:', error)
@@ -190,43 +197,74 @@ export async function POST(
       )
     }
 
-    const { rows: documentsToCreate } = await planForItinerary(supabase, itinerary, days, authResult.tenant_id, document_types)
+    const plan = await planForItinerary(supabase, itinerary, days, authResult.tenant_id, document_types)
 
-    // Insert all documents
-    if (documentsToCreate.length > 0) {
-
-
+    let created: unknown[] = []
+    if (plan.create.length > 0) {
       // Numbered as one batch, across every tenant's numbers; a number taken
       // by an overlapping request in between is renumbered and retried.
       const { data: createdDocs, error: createError } = await insertNumbered(
-        documentsToCreate,
+        plan.create,
         supabase,
         rows => supabase.from('supplier_documents').insert(rows).select()
       )
-
       if (createError) {
         console.error('❌ Error creating documents:', createError)
         return NextResponse.json({ error: createError.message }, { status: 500 })
       }
-
-
-
-      const created = createdDocs ?? []
-      return NextResponse.json({
-        success: true,
-        message: `Generated ${created.length} document(s)`,
-        count: created.length,
-        documents: created
-      })
+      created = createdDocs ?? []
     }
 
+    // Each change is held to a draft: a document sent between the plan and
+    // now is left be.
+    let updated = 0
+    for (const u of plan.update) {
+      const { data, error } = await supabase
+        .from('supplier_documents')
+        .update({ ...u.fields, updated_at: new Date().toISOString() })
+        .eq('id', u.id)
+        .eq('tenant_id', authResult.tenant_id)
+        .eq('status', 'draft')
+        .select('id')
+      if (error) {
+        console.error('❌ Error updating document:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      updated += data?.length ?? 0
+    }
 
+    let retired = 0
+    if (plan.retire.length > 0) {
+      const { data, error } = await supabase
+        .from('supplier_documents')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .in('id', plan.retire.map(r => r.id))
+        .eq('tenant_id', authResult.tenant_id)
+        .eq('status', 'draft')
+        .select('id')
+      if (error) {
+        console.error('❌ Error retiring documents:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      retired = data?.length ?? 0
+    }
 
+    const parts = [
+      created.length ? `created ${created.length}` : '',
+      updated ? `updated ${updated}` : '',
+      retired ? `cancelled ${retired} no longer needed` : '',
+    ].filter(Boolean)
     return NextResponse.json({
       success: true,
-      message: 'No new documents to generate. Documents may already exist or no services found.',
-      count: 0,
-      documents: []
+      message: parts.length
+        ? `Documents synced: ${parts.join(', ')}.`
+        : 'The documents already match the trip. Nothing to change.',
+      count: created.length,
+      updated,
+      retired,
+      documents: created,
+      // Edited or sent documents that no longer match: a person decides.
+      stale: plan.stale,
     })
 
   } catch (error) {
