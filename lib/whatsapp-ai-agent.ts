@@ -18,6 +18,40 @@ import { loadSenderTenant } from '@/lib/sender-tenant'
 import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
 import { freshQuotePdf } from '@/lib/quotes/fresh-quote-pdf'
 import { createAdminClient } from '@/lib/supabase-server'
+import { notifyTeam } from '@/lib/notifications'
+
+/**
+ * Tell the team what the AI did, or that a person is needed.
+ *
+ * These notes used to be saved as whatsapp_messages with direction 'system'.
+ * The table only allows 'inbound' and 'outbound' (migration 019), and nobody
+ * checked the insert's error, so every one was rejected and lost. A note
+ * isn't something the customer said or was sent, so it doesn't belong in the
+ * chat anyway: the AI would read it back as its own reply, and the inbox
+ * would draw it as a customer bubble. It goes to the team's bell instead, on
+ * the chat's own item (wa:<conversation>), so opening the chat clears it.
+ * Best-effort: a note that fails never fails the reply.
+ */
+export async function noteForTeam(
+  tenantId: string | null | undefined,
+  conversationId: string,
+  title: string,
+  message: string
+): Promise<void> {
+  if (!tenantId) return
+  try {
+    await notifyTeam({
+      tenant_id: tenantId,
+      dedupe_key: `wa:${conversationId}`,
+      type: 'whatsapp_new_message',
+      title,
+      message,
+      link: '/whatsapp-inbox',
+    })
+  } catch (e) {
+    console.error('WhatsApp AI team note failed:', (e as Error).message)
+  }
+}
 
 // ============================================
 // TYPES
@@ -509,19 +543,12 @@ export class ToolExecutor {
         return { success: false, error: 'Failed to create trip inquiry' }
       }
 
-      // Store a notification for the team
-      await this.supabase.from('whatsapp_messages').insert({
-        conversation_id: this.conversationId,
-        direction: 'system',
-        message_body: `🤖 AI created trip inquiry: ${input.trip_name} (${itineraryCode})`,
-        status: 'delivered',
-        sent_at: new Date().toISOString(),
-        metadata: {
-          type: 'ai_action',
-          action: 'create_trip_inquiry',
-          itinerary_id: itinerary.id
-        }
-      })
+      await noteForTeam(
+        this.tenantId,
+        this.conversationId,
+        'WhatsApp AI created a trip inquiry',
+        `🤖 ${input.trip_name} (${itineraryCode})`
+      )
 
       return {
         success: true,
@@ -579,20 +606,12 @@ export class ToolExecutor {
         .eq('id', itinerary.id)
         .eq('tenant_id', this.tenantId)
 
-      // Store notification for team
-      await this.supabase.from('whatsapp_messages').insert({
-        conversation_id: this.conversationId,
-        direction: 'system',
-        message_body: `🤖 AI requested quote for: ${itinerary.trip_name} (${itinerary.itinerary_code})`,
-        status: 'delivered',
-        sent_at: new Date().toISOString(),
-        metadata: {
-          type: 'ai_action',
-          action: 'request_quote',
-          itinerary_id: input.itinerary_id,
-          tier: input.tier || 'standard'
-        }
-      })
+      await noteForTeam(
+        this.tenantId,
+        this.conversationId,
+        'WhatsApp AI asked for a quote',
+        `🤖 ${itinerary.trip_name} (${itinerary.itinerary_code}), ${input.tier || 'standard'}`
+      )
 
       return {
         success: true,
@@ -1021,20 +1040,12 @@ export class ToolExecutor {
         })
         .eq('id', this.conversationId)
 
-      // Store escalation note
-      await this.supabase.from('whatsapp_messages').insert({
-        conversation_id: this.conversationId,
-        direction: 'system',
-        message_body: `⚠️ ESCALATION: ${input.reason} (Urgency: ${input.urgency || 'medium'})`,
-        status: 'delivered',
-        sent_at: new Date().toISOString(),
-        metadata: {
-          type: 'escalation',
-          reason: input.reason,
-          urgency: input.urgency || 'medium',
-          escalated_by: 'ai_agent'
-        }
-      })
+      await noteForTeam(
+        this.tenantId,
+        this.conversationId,
+        'WhatsApp chat needs a person',
+        `⚠️ ${input.reason} (urgency: ${input.urgency || 'medium'})`
+      )
 
       return {
         success: true,
@@ -1641,15 +1652,12 @@ export async function processIncomingMessage(
       // Even if we shouldn't auto-respond, check if we should escalate
       const shouldEscalate = /speak.*human|real.*person|talk.*agent/i.test(incomingMessage)
       if (shouldEscalate && tenantId) {
-        // Create escalation note
-        await supabase.from('whatsapp_messages').insert({
-          conversation_id: conversationId,
-          direction: 'system',
-          message_body: `⚠️ Customer requested human agent. Auto-reply skipped.`,
-          status: 'delivered',
-          sent_at: new Date().toISOString(),
-          metadata: { type: 'escalation_request', reason: reason }
-        })
+        await noteForTeam(
+          tenantId,
+          conversationId,
+          'WhatsApp chat needs a person',
+          '⚠️ The customer asked for a person, so the AI did not reply.'
+        )
 
         // Update conversation status
         await supabase
