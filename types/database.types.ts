@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 155
+ * Tables: 167
  */
 
 export type Json =
@@ -7704,7 +7704,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_domains_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_drafts: {
         Row: {
@@ -7734,8 +7742,8 @@ export interface Database {
           page_id: string
           language: string
           kind: string
-          content?: Json
-          sources?: Json
+          content: Json
+          sources: Json
           check_result?: Json | null
           status?: string
           origin?: string
@@ -7770,7 +7778,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_drafts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_enquiries: {
         Row: {
@@ -7802,7 +7818,7 @@ export interface Database {
           source: string
           landing_url?: string | null
           campaign?: string | null
-          utm?: Json
+          utm: Json
           language?: string | null
           tour_template_id?: string | null
           dates?: Json | null
@@ -7833,7 +7849,57 @@ export interface Database {
           ref_token?: string | null
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_enquiries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_enquiries_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "publish_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_enquiries_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "publish_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_enquiries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_enquiries_tour_template_id_fkey"
+            columns: ["tour_template_id"]
+            isOneToOne: false
+            referencedRelation: "tour_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_enquiries_concierge_brief_id_fkey"
+            columns: ["concierge_brief_id"]
+            isOneToOne: false
+            referencedRelation: "concierge_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_enquiries_whatsapp_conversation_id_fkey"
+            columns: ["whatsapp_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_glossary: {
         Row: {
@@ -7866,7 +7932,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_glossary_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_media: {
         Row: {
@@ -7890,7 +7964,7 @@ export interface Database {
           storage_path: string
           width?: number | null
           height?: number | null
-          alt?: Json
+          alt: Json
           is_placeholder?: boolean
           checksum?: string | null
           created_by?: string | null
@@ -7911,7 +7985,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_media_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_page_locales: {
         Row: {
@@ -7953,7 +8035,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_page_locales_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_pages: {
         Row: {
@@ -7972,7 +8062,7 @@ export interface Database {
           site_id: string
           kind: string
           tour_template_id?: string | null
-          blocks?: Json
+          blocks: Json
           created_at?: string
           updated_at?: string
         }
@@ -7986,7 +8076,22 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_pages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_pages_tour_template_id_fkey"
+            columns: ["tour_template_id"]
+            isOneToOne: false
+            referencedRelation: "tour_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_redirects: {
         Row: {
@@ -8016,7 +8121,15 @@ export interface Database {
           status_code?: number
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_redirects_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_rules: {
         Row: {
@@ -8043,7 +8156,15 @@ export interface Database {
           enabled?: boolean
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_sites: {
         Row: {
@@ -8051,7 +8172,7 @@ export interface Database {
           tenant_id: string
           archetype: string
           status: string
-          languages: string
+          languages: string[]
           brand: Json
           settings: Json
           created_at: string
@@ -8062,9 +8183,9 @@ export interface Database {
           tenant_id: string
           archetype: string
           status?: string
-          languages?: string
-          brand?: Json
-          settings?: Json
+          languages: string[]
+          brand: Json
+          settings: Json
           created_at?: string
           updated_at?: string
         }
@@ -8073,13 +8194,21 @@ export interface Database {
           tenant_id?: string
           archetype?: string
           status?: string
-          languages?: string
+          languages?: string[]
           brand?: Json
           settings?: Json
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_sites_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_sync_health: {
         Row: {
@@ -8177,7 +8306,22 @@ export interface Database {
           approver_name?: string | null
           approved_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_versions_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "publish_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publish_wa_refs: {
         Row: {
@@ -8213,7 +8357,29 @@ export interface Database {
           created_at?: string
           matched_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "publish_wa_refs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_wa_refs_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "publish_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_wa_refs_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "publish_pages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_subscriptions: {
         Row: {
@@ -12784,8 +12950,11 @@ export interface Database {
         Returns: any
       }
       publish_can_manage: {
-        Args: { p_tenant: string }
-        Returns: boolean
+        Args: {
+          p_tenant?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
       }
       publish_changed_keys: {
         Args: {
@@ -12796,8 +12965,11 @@ export interface Database {
         Returns: any
       }
       publish_hostname_available: {
-        Args: { p_hostname: string }
-        Returns: boolean
+        Args: {
+          p_hostname?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
       }
       publish_is_watched: {
         Args: {
