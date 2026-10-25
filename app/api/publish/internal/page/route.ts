@@ -3,6 +3,7 @@ import { bearerMatches } from '@/lib/support/probe-auth'
 import { CONTRACT_VERSION } from '@/lib/publish/contract'
 import { createAdminClient } from '@/lib/supabase-server'
 import { loadPagePayload } from '@/lib/publish/site-data'
+import { loadTourFacts } from '@/lib/publish/tour-facts'
 import { notifyTeam } from '@/lib/notifications'
 
 // ============================================
@@ -32,6 +33,12 @@ async function tellOnce(dedupeKey: string, send: () => Promise<unknown>): Promis
   }
 }
 
+/** The company switched the fact-only rule off (D12: on by default). */
+async function factOnlyRuleOff(db: ReturnType<typeof createAdminClient>, tenantId: string): Promise<boolean> {
+  const { data } = await db.from('publish_rules').select('enabled').eq('tenant_id', tenantId).eq('rule_type', 'auto_publish_fact_only').maybeSingle()
+  return data ? data.enabled === false : false
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function GET(request: NextRequest) {
@@ -53,8 +60,39 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'site (uuid) and lang are required' }, { status: 400 })
   }
   try {
-    const page = await loadPagePayload(createAdminClient(), {
+    const db = createAdminClient()
+    const page = await loadPagePayload(db, {
       siteId, language, path: q.get('path') ?? '', preview: q.get('preview') === '1',
+    }, {
+      tourFacts: loadTourFacts,
+      // §10: approved text withheld because the tour changed under it — the
+      // page shows its facts meanwhile, and the company is told once a week.
+      // With the fact-only rule switched OFF, a change of facts alone is
+      // announced too (with it on — the default — that republishes silently).
+      onNarrative: info => {
+        if (!info.published) return
+        if (info.stale.length) {
+          void tellOnce(`publish-narrative-stale:${info.pageId}:${info.language}`, () => notifyTeam({
+            tenant_id: info.tenantId,
+            dedupe_key: `publish-narrative-stale:${info.pageId}:${info.language}`,
+            type: 'publish_narrative_stale',
+            title: `Website: new text needed for ${info.tourName}`,
+            message: `The tour changed, so its approved text (${info.stale.join(', ')}) is hidden in ${info.language.toUpperCase()} until a new draft is approved. The page shows the tour's facts meanwhile.`,
+            link: `/publish/pages/${info.pageId}?lang=${info.language}`,
+            roles: ['owner', 'admin', 'manager'],
+          }))
+        } else if (info.factsChanged) {
+          void factOnlyRuleOff(db, info.tenantId).then(off => { if (off) return tellOnce(`publish-facts-changed:${info.pageId}:${info.language}`, () => notifyTeam({
+            tenant_id: info.tenantId,
+            dedupe_key: `publish-facts-changed:${info.pageId}:${info.language}`,
+            type: 'publish_facts_changed',
+            title: `Website: ${info.tourName} shows new facts`,
+            message: 'A price, inclusion, departure or term changed and the page now shows it. Its approved text did not need to change.',
+            link: `/publish/pages/${info.pageId}?lang=${info.language}`,
+            roles: ['owner', 'admin', 'manager'],
+          })) })
+        }
+      },
     })
     if (!page) return NextResponse.json({ error: 'No such page' }, { status: 404 })
     // D7: a published tour that can no longer be published as it stands

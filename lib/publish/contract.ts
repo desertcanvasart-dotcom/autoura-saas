@@ -24,7 +24,7 @@ import { z } from 'zod'
  * deploy (it sits under a different cache key) — and the app can refuse a
  * renderer that is a version behind.
  */
-export const CONTRACT_VERSION = 3
+export const CONTRACT_VERSION = 4
 
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
@@ -138,6 +138,24 @@ export const tourFactsSchema = z.object({
 })
 export type TourFacts = z.infer<typeof tourFactsSchema>
 
+const segmentSchema = z.union([
+  z.object({ type: z.literal('text'), text: z.string().min(1), sources: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('slot'), slot: z.enum(['price_from', 'duration', 'group_size', 'departure_days', 'next_departure', 'cancellation']) }),
+])
+
+/**
+ * The approved narrative a page may show (step 7): only parts still true to
+ * today's facts — a part whose tour or day changed under it, or whose fact
+ * slot can no longer be filled, is withheld and the page shows its facts.
+ */
+export const narrativeSchema = z.object({
+  overview: z.array(segmentSchema).nullable(),
+  highlights: z.array(z.array(segmentSchema)).nullable(),
+  days: z.array(z.object({ day: z.number().int().positive(), segments: z.array(segmentSchema) })),
+  seo: z.object({ title: z.string(), description: z.string() }).nullable(),
+})
+export type PageNarrative = z.infer<typeof narrativeSchema>
+
 export const pagePayloadSchema = z.object({
   kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal']),
   language: languageCode,
@@ -157,7 +175,12 @@ export const pagePayloadSchema = z.object({
   /** The same page in the site's other languages, for hreflang (step 10). */
   alternates: z.array(z.object({ language: languageCode, path: z.string() })),
   /** A tour page's product, and its facts from the records. */
-  tour: z.object({ templateId: z.string().uuid(), name: z.string(), facts: tourFactsSchema.nullable() }).nullable(),
+  tour: z.object({
+    templateId: z.string().uuid(),
+    name: z.string(),
+    facts: tourFactsSchema.nullable(),
+    narrative: narrativeSchema.nullable(),
+  }).nullable(),
   /** Home and listing: the tours the site shows. */
   tours: z.array(pageLink),
   /** Not yet published — shown only on a test hostname. */

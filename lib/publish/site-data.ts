@@ -8,8 +8,9 @@
 //
 // Step 3: identity and page structure. Facts join the page in step 5.
 
-import type { SiteResolution, PagePayload, TourFacts } from './contract'
+import type { SiteResolution, PagePayload, PageNarrative, TourFacts } from './contract'
 import { loadTourFacts } from './tour-facts'
+import { factsHash, renderableNarrative, type NarrativeBundle } from './narrative'
 
 type Db = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,6 +124,7 @@ interface LocaleRow {
   language: string
   slug: string
   is_published: boolean
+  current_version_id?: string | null
   publish_pages: {
     id: string
     kind: PagePayload['kind']
@@ -131,7 +133,7 @@ interface LocaleRow {
   } | null
 }
 
-const LOCALE_SELECT = 'page_id, language, slug, is_published, publish_pages(id, kind, tour_template_id, tour_templates(template_name, is_active))'
+const LOCALE_SELECT = 'page_id, language, slug, is_published, current_version_id, publish_pages(id, kind, tour_template_id, tour_templates(template_name, is_active))'
 
 /** A locale that may be shown: published (or previewing), and for a tour
  *  page, a tour that still exists and is switched on. */
@@ -152,8 +154,23 @@ function pathOf(row: LocaleRow): string {
   return row.slug
 }
 
+export interface NarrativeInfo {
+  tenantId: string
+  pageId: string
+  templateId: string
+  tourName: string
+  language: string
+  published: boolean
+  /** Parts withheld because the records changed under them. */
+  stale: string[]
+  /** The facts differ from those shown when the narrative was last approved. */
+  factsChanged: boolean
+}
+
 export interface PageDeps {
   tourFacts: (db: Db, input: { tenantId: string; templateId: string; language: string; indicativeCurrencies: string[] }) => Promise<TourFacts>
+  /** Told what the page's narrative looks like against today's facts. */
+  onNarrative?: (info: NarrativeInfo) => void
 }
 
 /** The currencies a site shows indicative prices in (publish_sites.settings). */
@@ -210,16 +227,29 @@ export async function loadPagePayload(db: Db, input: {
 
   const kind: PagePayload['kind'] = row?.publish_pages?.kind ?? (target.kind === 'home' ? 'home' : 'listing')
   const templateId = kind === 'tour' ? row?.publish_pages?.tour_template_id ?? null : null
-  const tour = templateId
-    ? {
-        templateId,
-        name: row!.publish_pages!.tour_templates!.template_name,
-        facts: await deps.tourFacts(db, {
-          tenantId: siteInfo.tenantId, templateId, language: input.language,
-          indicativeCurrencies: indicativeCurrenciesOf(site.settings),
-        }),
-      }
-    : null
+  let tour: PagePayload['tour'] = null
+  if (templateId) {
+    const name = row!.publish_pages!.tour_templates!.template_name
+    const facts = await deps.tourFacts(db, {
+      tenantId: siteInfo.tenantId, templateId, language: input.language,
+      indicativeCurrencies: indicativeCurrenciesOf(site.settings),
+    })
+    let narrative: PageNarrative | null = null
+    if (row!.current_version_id) {
+      const { data: version, error: vErr } = await db.from('publish_versions').select('content, facts_snapshot')
+        .eq('id', row!.current_version_id).eq('tenant_id', siteInfo.tenantId).maybeSingle()
+      if (vErr) throw new Error(`reading the published text: ${vErr.message}`)
+      const r = renderableNarrative((version?.content as NarrativeBundle) ?? null, facts, name)
+      // renderableNarrative keeps only slots the tour can fill — all of them known keys.
+      narrative = { overview: r.overview, highlights: r.highlights, days: r.days, seo: r.seo } as PageNarrative
+      deps.onNarrative?.({
+        tenantId: siteInfo.tenantId, pageId: row!.page_id, templateId, tourName: name, language: input.language,
+        published: row!.is_published, stale: r.stale,
+        factsChanged: Boolean(version?.facts_snapshot?.hash && version.facts_snapshot.hash !== factsHash(facts)),
+      })
+    }
+    tour = { templateId, name, facts, narrative }
+  }
 
   let alternates: PagePayload['alternates'] = []
   if (row) {

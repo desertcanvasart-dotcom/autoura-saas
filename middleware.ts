@@ -123,6 +123,9 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // from viewers, but a viewer with the link got in (no entry here = open).
   '/conversations': ['admin', 'manager', 'member'],
   '/concierge-briefs': ['admin', 'manager', 'member'],
+  // Publish: everyone who works reads and drafts; the API lets only managers
+  // approve and publish (lib/publish/admin-route.ts).
+  '/publish': ['admin', 'manager', 'member'],
   '/copilot': ['admin', 'manager', 'member'],
   '/copilot-knowledge': ['admin', 'manager', 'member'],
   '/templates': ['admin', 'manager', 'member'],

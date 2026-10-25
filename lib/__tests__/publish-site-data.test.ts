@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload } from '@/lib/publish/site-data'
-import { siteResolutionSchema, pagePayloadSchema, type TourFacts } from '@/lib/publish/contract'
+import { siteResolutionSchema, pagePayloadSchema, CONTRACT_VERSION, type TourFacts } from '@/lib/publish/contract'
 import { indicativeCurrenciesOf } from '@/lib/publish/site-data'
 
 const FACTS: TourFacts = {
@@ -107,6 +107,28 @@ describe('resolveSiteByHost', () => {
   })
 })
 
+describe('approved narrative on the page (step 7)', () => {
+  it('only the parts still true to today\'s facts are sent; the rest is reported as stale', async () => {
+    const { toStoredPart, withPart, factsHash } = await import('@/lib/publish/narrative')
+    const bundle = withPart(withPart(null,
+      toStoredPart({ kind: 'overview', segments: [{ type: 'text', text: 'The plateau at dawn.' }] }, FACTS, 'Nile classic')),
+      toStoredPart({ kind: 'days', days: [{ day: 1, segments: [{ type: 'text', text: 'Giza first.' }] }] }, { ...FACTS, days: [{ ...FACTS.days[0], sights: ['Sphinx'] }] }, 'Nile classic'))
+    const tables: Record<string, Array<Record<string, unknown>>> = {
+      publish_versions: [{ id: 'v1', tenant_id: TENANT, content: bundle, facts_snapshot: { hash: factsHash(FACTS) } }],
+    }
+    const seen: unknown[] = []
+    const base = fakeDb({
+      publish_sites: [{ ...site }],
+      publish_page_locales: [{ ...tourPage('nile-classic', 'en', true), current_version_id: 'v1' }],
+      publish_versions: tables.publish_versions,
+    })
+    const page = await loadPagePayload(base as never, { siteId: SITE, language: 'en', path: 'tours/nile-classic', preview: false },
+      { tourFacts: async () => FACTS, onNarrative: info => seen.push(info) })
+    expect(page!.tour!.narrative).toEqual({ overview: [{ type: 'text', text: 'The plateau at dawn.' }], highlights: null, days: [], seo: null })
+    expect(seen).toEqual([expect.objectContaining({ pageId: PAGE, language: 'en', published: true, stale: ['day 1'], factsChanged: false })])
+  })
+})
+
 describe('indicative currencies from the site settings', () => {
   it('three-letter codes only, at most three', () => {
     expect(indicativeCurrenciesOf({ indicativeCurrencies: ['USD', 'eur', 'GBP', 'JPY', 'CHF'] })).toEqual(['USD', 'GBP', 'JPY'])
@@ -194,7 +216,7 @@ describe('the internal endpoints', () => {
   it('a renderer on another contract version is refused plainly', async () => {
     const r = await siteGET(req('/api/publish/internal/site?host=sillage.example&v=1', 'Bearer internal-secret'))
     expect(r.status).toBe(409)
-    expect((await siteGET(req('/api/publish/internal/site?host=sillage.example&v=3', 'Bearer internal-secret'))).status).toBe(200)
+    expect((await siteGET(req(`/api/publish/internal/site?host=sillage.example&v=${CONTRACT_VERSION}`, 'Bearer internal-secret'))).status).toBe(200)
     expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&v=9`, 'Bearer internal-secret'))).status).toBe(409)
   })
   it('a published tour that can no longer be published tells its company — once a week, not every render', async () => {

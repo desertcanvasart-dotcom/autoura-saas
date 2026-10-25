@@ -33,8 +33,11 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const found = await pageFor(params)
   if (!found) return { robots: { index: false } }
   const { page, preview } = found
+  // An approved SEO title/description (still true to the facts) wins.
+  const seo = page.tour?.narrative?.seo ?? null
   return {
-    title: page.kind === 'home' ? page.site.companyName : `${page.title} · ${page.site.companyName}`,
+    title: seo?.title ?? (page.kind === 'home' ? page.site.companyName : `${page.title} · ${page.site.companyName}`),
+    description: seo?.description,
     // A test hostname, or a page not yet published, is never indexed.
     robots: preview || page.unpublished ? { index: false, follow: false } : undefined,
   }
