@@ -42,6 +42,8 @@
   "lib/__tests__/hotel-rate-columns.test.ts": 2,
   "lib/__tests__/itinerary-margin.test.ts": 1,
   "lib/__tests__/pricing-grid-multipax.test.ts": 9,
+  "lib/__tests__/publish-engine.test.ts": 3,
+  "lib/__tests__/publish-fact-check.test.ts": 2,
   "lib/__tests__/rates-csv-single-path.test.ts": 1,
   "lib/__tests__/trip-pnl.test.ts": 7,
   "lib/ai/__tests__/staff-rate-resolution.test.ts": 1,
