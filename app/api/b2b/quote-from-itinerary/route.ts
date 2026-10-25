@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
       (days || []) as never,
       { tier, numPax, isEurPassport: is_eur_passport, currencySymbol, tourLeaderIncluded: tour_leader_included },
       {
-        hotel: (city, rateId) => getHotelRates(scope, city, tier, travelDateStr, { rateId }),
-        cruise: (city, rateId) => getCruiseRates(scope, tier, city, travelDateStr, { rateId }),
+        hotel: (city, rateId) => getHotelRates(scope, city, tier, travelDateStr, { rateId, isEurPassport: is_eur_passport }),
+        cruise: (city, rateId) => getCruiseRates(scope, tier, city, travelDateStr, { rateId, isEurPassport: is_eur_passport }),
         meals: () => getMealRates(scope, tier),
         guide: () => getGuideRate(scope, language, tier),
         entrance: name => getEntranceFee(scope, name, is_eur_passport),
