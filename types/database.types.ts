@@ -2296,6 +2296,39 @@ export interface Database {
           },
         ]
       }
+      cancellation_policies: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          is_default: boolean
+          tiers: Json
+          wording: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          is_default?: boolean
+          tiers?: Json
+          wording?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          is_default?: boolean
+          tiers?: Json
+          wording?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       client_followups: {
         Row: {
           id: string
@@ -11192,6 +11225,8 @@ export interface Database {
           cached_price_updated_at: string | null
           duration_hours: number | null
           tour_theme: string | null
+          departure_days: string[]
+          cancellation_policy_id: string | null
         }
         Insert: {
           id?: string
@@ -11232,6 +11267,8 @@ export interface Database {
           cached_price_updated_at?: string | null
           duration_hours?: number | null
           tour_theme?: string | null
+          departure_days?: string[]
+          cancellation_policy_id?: string | null
         }
         Update: {
           id?: string
@@ -11272,6 +11309,8 @@ export interface Database {
           cached_price_updated_at?: string | null
           duration_hours?: number | null
           tour_theme?: string | null
+          departure_days?: string[]
+          cancellation_policy_id?: string | null
         }
         Relationships: [
           {
@@ -12770,6 +12809,10 @@ export interface Database {
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
+      }
+      cancellation_tiers_valid: {
+        Args: { t: Json }
+        Returns: boolean
       }
       convert_amount: {
         Args: {

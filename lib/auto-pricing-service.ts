@@ -362,6 +362,9 @@ export interface PricedService {
   included?: boolean
   /** The operator-facing reason for an unpriced or included line. */
   issue?: string
+  /** A hotel or ship the customer stays on, by name — for pages that show
+   *  where a tour sleeps (Publish) without parsing serviceName. */
+  property?: { kind: 'hotel' | 'cruise'; name: string; city?: string }
 }
 
 // Complete pricing result
@@ -4129,6 +4132,7 @@ export async function calculateDayBasedPricing(
         dayNumber: day.day,
         serviceType: 'accommodation',
         serviceName: `Hotel - ${hotelRate.hotelName} (${day.city})`,
+        property: { kind: 'hotel', name: hotelRate.hotelName, city: day.city },
         quantity: 1,
         quantityMode: 'per_pax',
         unitCost: hotelRate.ppdNight,
@@ -4150,6 +4154,7 @@ export async function calculateDayBasedPricing(
       dayNumber: cruiseDays[0]?.day || 1,
       serviceType: 'cruise',
       serviceName: `Nile Cruise - ${cruiseRates.shipName} (${cruiseNights} nights)`,
+      property: { kind: 'cruise', name: cruiseRates.shipName },
       quantity: cruiseNights,
       quantityMode: 'per_pax',
       unitCost: cruiseRates.ppdNight,

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { THEMES } from '../themes'
 import { TOUR_SECTIONS } from '../themes/types'
 import { ARCHETYPES } from '@/lib/publish/brand'
-import type { PagePayload } from '@/lib/publish/contract'
+import type { PagePayload, TourFacts } from '@/lib/publish/contract'
 
 // ============================================================================
 // The archetype themes (docs/publish/PLAN.md §7, step 4). Each is a package —
@@ -33,7 +33,7 @@ function render(archetype: PagePayload['site']['archetype'], page: PagePayload, 
   const theme = THEMES[archetype]
   return renderToStaticMarkup(<theme.Frame page={page} preview={preview}><theme.Page page={page} preview={preview} /></theme.Frame>)
 }
-const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/g, ' ')
+const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/g, ' ').replace(/\s+/g, ' ').replace(/ ([:,.)])/g, '$1')
 
 describe('the theme packages', () => {
   it('every archetype has a theme, and each tour page places every section exactly once', () => {
@@ -64,7 +64,7 @@ for (const archetype of ARCHETYPES) {
     })
     it('language links go to this page in the other language — real URLs, no script', () => {
       const page = payload({ kind: 'tour', path: 'tours/croisiere', title: 'Nile classic', tours: [],
-        tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic' },
+        tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic', facts: null },
         alternates: [{ language: 'en', path: 'tours/nile-classic' }] }, archetype)
       const html = render(archetype, page)
       expect(html).toContain('href="/en/tours/nile-classic" hrefLang="en" lang="en"')
@@ -86,7 +86,7 @@ for (const archetype of ARCHETYPES) {
     })
     it('a test hostname says it is a preview; an unpublished page says so', () => {
       expect(render(archetype, payload({}, archetype), true)).toContain('Preview — this site is not public')
-      const draft = payload({ kind: 'tour', title: 'Soon', unpublished: true, tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Soon' } }, archetype)
+      const draft = payload({ kind: 'tour', title: 'Soon', unpublished: true, tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Soon', facts: null } }, archetype)
       expect(render(archetype, draft)).toContain('Not yet published')
     })
     it('an empty site says so instead of showing an empty grid', () => {
@@ -102,3 +102,80 @@ describe('the brand layer is configuration, not markup', () => {
     expect(render('private_journeys', a)).toBe(render('private_journeys', b))
   })
 })
+
+// ---------- step 5: the facts on a tour page ----------
+
+const FACTS: TourFacts = {
+  durationDays: 3, durationNights: 2, images: ['https://cdn.test/hero.jpg'],
+  days: [
+    { day: 1, title: 'Cairo', city: 'Cairo', overnight: true, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Giza Pyramids'] },
+    { day: 2, title: null, city: 'Luxor', overnight: true, meals: { breakfast: true, lunch: false, dinner: true }, sights: [] },
+    { day: 3, title: 'Home', city: 'Luxor', overnight: false, meals: { breakfast: true, lunch: false, dinner: false }, sights: [] },
+  ],
+  mainAttractions: ['Karnak'], highlights: [], inclusions: ['Guide'], exclusions: ['Flights'],
+  accommodation: [{ kind: 'hotel', name: 'Nile View', city: 'Cairo' }],
+  groupSize: { min: 2, max: 8 }, departureDays: ['mon', 'fri'],
+  departures: [{ date: '2026-11-16', endDate: null, status: 'open', seatsLeft: 5 }],
+  cancellation: { tiers: [{ daysBefore: 30, chargePercent: 25 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
+  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' },
+    from: { perPerson: 840.2, tier: 'deluxe', tierLabel: 'Deluxe' }, byNationality: { eu: 910, other: 840.2 },
+    table: [{ pax: 2, perPerson: null, eu: 910, other: 840.2 }, { pax: 4, perPerson: null, eu: 802.5, other: 735 }],
+    indicative: [{ currency: 'USD', perPerson: 905, rateDate: '2026-10-25' }] },
+  publishable: { ok: true, reasons: [] },
+}
+const tourPage = (archetype: PagePayload['site']['archetype'], facts: TourFacts | null) => payload({
+  kind: 'tour', language: 'en', path: 'tours/nile', title: 'Nile classic', tours: [],
+  tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic', facts },
+  site: { ...payload({}, archetype).site, identity: blank },
+}, archetype)
+
+for (const archetype of ARCHETYPES) {
+  describe(`${archetype}: tour facts`, () => {
+    const html = render(archetype, tourPage(archetype, FACTS))
+    const words = text(html)
+    it('prices as given, rounded UP to whole units, both nationalities labelled, the basis stated', () => {
+      expect(words).toContain('EU passport holders')
+      expect(words).toContain('Other nationalities')
+      expect(words).toContain('€910')
+      expect(words).toContain('€841') // 840.20 is never shown as €840
+      expect(words).not.toContain('€840')
+      expect(words).toContain('€803') // 802.50 → 803
+      expect(words).toContain('per person, based on 2 travellers sharing. Prices vary by travel date.')
+      expect(words).toMatch(/Indicative only: ≈ \$905 \(you pay in EUR/)
+    })
+    it('every number on the page comes from the facts', () => {
+      const allowed = new Set(['910', '841', '803', '735', '905', '25', '2026', '16', '30', '100', '5', '2', '8', '3', '4', '1'])
+      for (const n of words.match(/\d+/g) ?? []) expect(allowed, n).toContain(n)
+    })
+    it('days, inclusions, where it sleeps, group size, departure days and terms — no "daily", no "free"', () => {
+      expect(words).toContain('Day 1')
+      expect(words).toContain('Visits: Giza Pyramids')
+      expect(words).toContain('Nile View, Cairo')
+      expect(words).toContain('2–8 travellers')
+      expect(words).toContain('Departs: Monday and Friday')
+      expect(words).toContain('30 days or fewer before departure: 25% charged when cancelled')
+      expect(words).toContain('On the day of departure: 100% charged when cancelled')
+      expect(words.toLowerCase()).not.toMatch(/\bdaily\b|\bfree\b|refund/)
+      expect(html).toContain('src="https://cdn.test/hero.jpg"')
+    })
+    it('the archetype decides the order', () => {
+      const order = [...html.matchAll(/data-section="([a-zA-Z]+)"/g)].map(m => m[1])
+      expect(order).toEqual(THEMES[archetype].tourSections.filter(sct => order.includes(sct)))
+      if (archetype === 'transparent_value') expect(order.indexOf('price')).toBeLessThan(order.indexOf('itinerary'))
+      else expect(order.indexOf('itinerary')).toBeLessThan(order.indexOf('price'))
+    })
+    it('a price on request shows no amount and no currency anywhere', () => {
+      const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, from: null, byNationality: null, table: [], indicative: [] } }
+      const w = text(render(archetype, tourPage(archetype, onRequest)))
+      expect(w).toContain('Price on request')
+      expect(w).not.toMatch(/[€$£]|\bEUR\b|\bUSD\b/)
+    })
+    it('an absent fact is an absent section', () => {
+      const bare = { ...FACTS, cancellation: null, departureDays: [], departures: [], groupSize: null, accommodation: [], images: [] }
+      const h = render(archetype, tourPage(archetype, bare))
+      for (const sct of ['terms', 'departures', 'groupSize', 'accommodation']) expect(h, sct).not.toMatch(new RegExp(`data-section="${sct}"[^>]*>\\s*<section`))
+      expect(text(h)).not.toContain('Cancellation')
+      expect(text(h)).not.toContain('Departs')
+    })
+  })
+}

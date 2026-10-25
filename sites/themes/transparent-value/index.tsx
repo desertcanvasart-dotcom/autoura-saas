@@ -10,6 +10,7 @@ import type { Theme, ThemePageProps } from '../types'
 import { BrandMark } from '../blocks/BrandMark'
 import { LanguageLinks } from '../blocks/LanguageLinks'
 import { TourSections } from '../blocks/TourSections'
+import { AccommodationSection, CancellationSection, DeparturesSection, GroupSizeSection, HighlightsSection, InclusionsSection, ItinerarySection, PriceSection, TourImage } from '../blocks/TourFacts'
 import { emailHref, phoneHref, whatsappHref } from '../blocks/contact'
 import { t } from '../../i18n/strings'
 import s from './theme.module.css'
@@ -96,6 +97,8 @@ function Page(props: ThemePageProps) {
     )
   }
   if (page.kind === 'tour') {
+    const facts = page.tour?.facts ?? null
+    const f = facts ? { facts, lang, variant: 'compact' as const } : null
     return (
       <article className={s.section}>
         {page.unpublished && <p className={s.unpublished}>{t(lang, 'notYetPublished')}</p>}
@@ -106,9 +109,18 @@ function Page(props: ThemePageProps) {
               <header className={s.tourHead}>
                 <a className={s.crumb} href={`/${lang}/tours`}>← {t(lang, 'allTours')}</a>
                 <h1 className={s.tourTitle}>{page.title}</h1>
+                {facts && <TourImage facts={facts} alt={page.title} className={s.tourImage} />}
               </header>
             ),
+            price: () => f && <PriceSection {...f} />,
             enquiry: () => wa ? <a className={s.heroButton} href={wa} rel="noopener">{t(lang, 'askOnWhatsApp')}</a> : null,
+            inclusions: () => f && <InclusionsSection {...f} />,
+            groupSize: () => f && <GroupSizeSection {...f} />,
+            departures: () => f && <DeparturesSection {...f} />,
+            highlights: () => f && <HighlightsSection {...f} />,
+            itinerary: () => f && <ItinerarySection {...f} />,
+            accommodation: () => f && <AccommodationSection {...f} />,
+            terms: () => f && <CancellationSection {...f} />,
           }}
         />
       </article>

@@ -39,6 +39,8 @@
 .card a:hover .cardTitle { color: var(--brand-primary); }
 
 .band { padding: 48px 0 64px; text-align: center; }
+.tour { max-width: 820px; margin: 0 auto; }
+.tourImage { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; margin: 32px 0 0; }
 
 .footer { background: var(--brand-ink); color: var(--brand-surface); margin-top: 48px; }
 .footerInner { max-width: 1120px; margin: 0 auto; padding: 40px 16px; box-sizing: border-box; }

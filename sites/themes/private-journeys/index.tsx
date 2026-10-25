@@ -10,6 +10,7 @@ import type { Theme, ThemePageProps } from '../types'
 import { BrandMark } from '../blocks/BrandMark'
 import { LanguageLinks } from '../blocks/LanguageLinks'
 import { TourSections } from '../blocks/TourSections'
+import { AccommodationSection, CancellationSection, DeparturesSection, GroupSizeSection, HighlightsSection, InclusionsSection, ItinerarySection, PriceSection, TourImage } from '../blocks/TourFacts'
 import { emailHref, phoneHref, whatsappHref } from '../blocks/contact'
 import { t } from '../../i18n/strings'
 import s from './theme.module.css'
@@ -108,8 +109,10 @@ function Page(props: ThemePageProps) {
     )
   }
   if (page.kind === 'tour') {
+    const facts = page.tour?.facts ?? null
+    const f = facts ? { facts, lang, variant: 'editorial' as const } : null
     return (
-      <article>
+      <article className={s.tour}>
         {page.unpublished && <p className={s.unpublished}>{t(lang, 'notYetPublished')}</p>}
         <TourSections
           sections={privateJourneys.tourSections}
@@ -118,8 +121,17 @@ function Page(props: ThemePageProps) {
               <header className={s.tourHero}>
                 <a className={s.eyebrow} href={`/${lang}/tours`}>{t(lang, 'journeysTitle')}</a>
                 <h1 className={s.heroTitle}>{page.title}</h1>
+                {facts && <TourImage facts={facts} alt={page.title} className={s.tourImage} />}
               </header>
             ),
+            highlights: () => f && <HighlightsSection {...f} />,
+            itinerary: () => f && <ItinerarySection {...f} />,
+            accommodation: () => f && <AccommodationSection {...f} />,
+            inclusions: () => f && <InclusionsSection {...f} />,
+            price: () => f && <PriceSection {...f} />,
+            departures: () => f && <DeparturesSection {...f} />,
+            groupSize: () => f && <GroupSizeSection {...f} />,
+            terms: () => f && <CancellationSection {...f} />,
             enquiry: () => <ConsultationBand {...props} />,
           }}
         />

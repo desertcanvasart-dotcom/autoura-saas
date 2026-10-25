@@ -102,6 +102,7 @@ const FIXTURES: Array<{ type: SyncEventType; row: Partial<ChangeRow>; tags: stri
   { type: 'rate.changed', row: { table_name: 'accommodation_rates', template_id: null, changed_fields: ['ppd_eur'] }, tags: [publishTags.tours(A)] },
   { type: 'departure.changed', row: { table_name: 'tour_departures', changed_fields: ['booked_pax'] }, tags: [publishTags.tour(TOUR)] },
   { type: 'policy.changed', row: { table_name: 'tenants', template_id: null, changed_fields: ['license_number'] }, tags: [publishTags.site(A)] },
+  { type: 'policy.changed', row: { table_name: 'cancellation_policies', template_id: null, changed_fields: ['tiers'] }, tags: [publishTags.tours(A)] },
   { type: 'fx.changed', row: { table_name: 'exchange_rates', template_id: null, changed_fields: ['rate'] }, tags: [publishTags.tours(A)] },
 ]
 

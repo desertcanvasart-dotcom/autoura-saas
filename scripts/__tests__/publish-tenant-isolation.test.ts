@@ -235,6 +235,21 @@ describe('leads (enquiries)', () => {
 
 // ---------- the rest of the model ----------
 
+describe('cancellation policies (migration 441)', () => {
+  it('stay inside the company; viewers do not write them; a tour cannot use another company\'s', async () => {
+    expect(await as('aMember', `INSERT INTO cancellation_policies (tenant_id, name, is_default, tiers) VALUES ('${T.A}', 'Standard', true, '[{"days_before":30,"charge_percent":25}]')`)).toBeNull()
+    expect(await seen('bOwner', `SELECT 1 FROM cancellation_policies WHERE tenant_id = '${T.A}'`)).toBe(0)
+    expect(await as('aViewer', `INSERT INTO cancellation_policies (tenant_id, name) VALUES ('${T.A}', 'Viewer terms')`)).toMatch(/row-level security/)
+    expect(await as('bOwner', `INSERT INTO cancellation_policies (tenant_id, name) VALUES ('${T.A}', 'Planted')`)).toMatch(/row-level security/)
+    const policyA = (await one<{ id: string }>(`SELECT id FROM cancellation_policies WHERE tenant_id = '${T.A}'`)).id
+    await expect(db.exec(`UPDATE tour_templates SET cancellation_policy_id = '${policyA}' WHERE id = '${ids.tourB}'`))
+      .rejects.toThrow(/belongs to another company/)
+    await db.exec(`UPDATE tour_templates SET cancellation_policy_id = '${policyA}', departure_days = '{mon,fri}' WHERE id = '${ids.tourA}'`)
+    await expect(db.exec(`INSERT INTO cancellation_policies (tenant_id, name, is_default) VALUES ('${T.A}', 'Second default', true)`))
+      .rejects.toThrow(/cancellation_policies_one_default/)
+  })
+})
+
 describe('sites, domains, glossary, redirects', () => {
   it('creating a site enrolled its company in sync health, with the fact-only rule on', async () => {
     expect(await count(`SELECT count(*) n FROM publish_sync_health WHERE tenant_id IN ('${T.A}', '${T.B}')`)).toBe(2)
