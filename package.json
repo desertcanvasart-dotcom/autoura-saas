@@ -15,6 +15,7 @@
     "cron:mail-alerts": "node scripts/cron-mail-alerts.mjs",
     "cron:reminders": "node scripts/cron-reminders.mjs",
     "cron:scheduled-send": "node scripts/cron-scheduled-send.mjs",
+    "cron:publish-sync": "node scripts/cron-publish-sync.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

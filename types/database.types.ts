@@ -7578,6 +7578,104 @@ export interface Database {
           },
         ]
       }
+      publish_change_log: {
+        Row: {
+          id: number
+          tenant_id: string | null
+          table_name: string
+          record_id: string | null
+          op: string
+          template_id: string | null
+          changed_fields: string[]
+          is_active: boolean | null
+          changed_at: string
+          processed_at: string | null
+          attempts: number
+          error: string | null
+        }
+        Insert: {
+          id?: number
+          tenant_id?: string | null
+          table_name: string
+          record_id?: string | null
+          op: string
+          template_id?: string | null
+          changed_fields?: string[]
+          is_active?: boolean | null
+          changed_at?: string
+          processed_at?: string | null
+          attempts?: number
+          error?: string | null
+        }
+        Update: {
+          id?: number
+          tenant_id?: string | null
+          table_name?: string
+          record_id?: string | null
+          op?: string
+          template_id?: string | null
+          changed_fields?: string[]
+          is_active?: boolean | null
+          changed_at?: string
+          processed_at?: string | null
+          attempts?: number
+          error?: string | null
+        }
+        Relationships: []
+      }
+      publish_sync_health: {
+        Row: {
+          tenant_id: string
+          status: string
+          enrolled_at: string
+          last_event_at: string | null
+          last_success_at: string | null
+          last_failure_at: string | null
+          last_error: string | null
+          consecutive_failures: number
+          lag_seconds: number
+          alerted_status: string | null
+          alerted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          tenant_id: string
+          status?: string
+          enrolled_at?: string
+          last_event_at?: string | null
+          last_success_at?: string | null
+          last_failure_at?: string | null
+          last_error?: string | null
+          consecutive_failures?: number
+          lag_seconds?: number
+          alerted_status?: string | null
+          alerted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          tenant_id?: string
+          status?: string
+          enrolled_at?: string
+          last_event_at?: string | null
+          last_success_at?: string | null
+          last_failure_at?: string | null
+          last_error?: string | null
+          consecutive_failures?: number
+          lag_seconds?: number
+          alerted_status?: string | null
+          alerted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publish_sync_health_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           id: string
@@ -12099,6 +12197,14 @@ export interface Database {
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
+      }
+      publish_changed_keys: {
+        Args: { old_row: Json; new_row: Json }
+        Returns: string[]
+      }
+      publish_is_watched: {
+        Args: { p_tenant: string }
+        Returns: boolean
       }
       purge_tenant: {
         Args: { p_tenant_id: string }
