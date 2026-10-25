@@ -7661,6 +7661,426 @@ export interface Database {
         }
         Relationships: []
       }
+      publish_domains: {
+        Row: {
+          id: string
+          tenant_id: string
+          site_id: string
+          hostname: string
+          kind: string
+          status: string
+          provider_ref: string | null
+          verified_at: string | null
+          last_checked_at: string | null
+          last_error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          site_id: string
+          hostname: string
+          kind?: string
+          status?: string
+          provider_ref?: string | null
+          verified_at?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          site_id?: string
+          hostname?: string
+          kind?: string
+          status?: string
+          provider_ref?: string | null
+          verified_at?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publish_drafts: {
+        Row: {
+          id: string
+          tenant_id: string
+          page_id: string
+          language: string
+          kind: string
+          content: Json
+          sources: Json
+          check_result: Json | null
+          status: string
+          origin: string
+          model: string | null
+          prompt_version: string | null
+          fact_fingerprint: string | null
+          reviewer_note: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          page_id: string
+          language: string
+          kind: string
+          content?: Json
+          sources?: Json
+          check_result?: Json | null
+          status?: string
+          origin?: string
+          model?: string | null
+          prompt_version?: string | null
+          fact_fingerprint?: string | null
+          reviewer_note?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          page_id?: string
+          language?: string
+          kind?: string
+          content?: Json
+          sources?: Json
+          check_result?: Json | null
+          status?: string
+          origin?: string
+          model?: string | null
+          prompt_version?: string | null
+          fact_fingerprint?: string | null
+          reviewer_note?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publish_enquiries: {
+        Row: {
+          id: string
+          tenant_id: string
+          site_id: string | null
+          page_id: string | null
+          client_id: string | null
+          source: string
+          landing_url: string | null
+          campaign: string | null
+          utm: Json
+          language: string | null
+          tour_template_id: string | null
+          dates: Json | null
+          travellers: number | null
+          message: string | null
+          concierge_brief_id: string | null
+          whatsapp_conversation_id: string | null
+          ref_token: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          site_id?: string | null
+          page_id?: string | null
+          client_id?: string | null
+          source: string
+          landing_url?: string | null
+          campaign?: string | null
+          utm?: Json
+          language?: string | null
+          tour_template_id?: string | null
+          dates?: Json | null
+          travellers?: number | null
+          message?: string | null
+          concierge_brief_id?: string | null
+          whatsapp_conversation_id?: string | null
+          ref_token?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          site_id?: string | null
+          page_id?: string | null
+          client_id?: string | null
+          source?: string
+          landing_url?: string | null
+          campaign?: string | null
+          utm?: Json
+          language?: string | null
+          tour_template_id?: string | null
+          dates?: Json | null
+          travellers?: number | null
+          message?: string | null
+          concierge_brief_id?: string | null
+          whatsapp_conversation_id?: string | null
+          ref_token?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      publish_glossary: {
+        Row: {
+          id: string
+          tenant_id: string
+          term_key: string
+          kind: string
+          language: string
+          spelling: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          term_key: string
+          kind: string
+          language: string
+          spelling: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          term_key?: string
+          kind?: string
+          language?: string
+          spelling?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publish_media: {
+        Row: {
+          id: string
+          tenant_id: string
+          site_id: string
+          storage_path: string
+          width: number | null
+          height: number | null
+          alt: Json
+          is_placeholder: boolean
+          checksum: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          site_id: string
+          storage_path: string
+          width?: number | null
+          height?: number | null
+          alt?: Json
+          is_placeholder?: boolean
+          checksum?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          site_id?: string
+          storage_path?: string
+          width?: number | null
+          height?: number | null
+          alt?: Json
+          is_placeholder?: boolean
+          checksum?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publish_page_locales: {
+        Row: {
+          id: string
+          tenant_id: string
+          site_id: string
+          page_id: string
+          language: string
+          slug: string
+          is_published: boolean
+          current_version_id: string | null
+          published_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          site_id: string
+          page_id: string
+          language: string
+          slug: string
+          is_published?: boolean
+          current_version_id?: string | null
+          published_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          site_id?: string
+          page_id?: string
+          language?: string
+          slug?: string
+          is_published?: boolean
+          current_version_id?: string | null
+          published_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publish_pages: {
+        Row: {
+          id: string
+          tenant_id: string
+          site_id: string
+          kind: string
+          tour_template_id: string | null
+          blocks: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          site_id: string
+          kind: string
+          tour_template_id?: string | null
+          blocks?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          site_id?: string
+          kind?: string
+          tour_template_id?: string | null
+          blocks?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publish_redirects: {
+        Row: {
+          id: string
+          tenant_id: string
+          site_id: string
+          from_path: string
+          to_path: string
+          status_code: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          site_id: string
+          from_path: string
+          to_path: string
+          status_code?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          site_id?: string
+          from_path?: string
+          to_path?: string
+          status_code?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      publish_rules: {
+        Row: {
+          id: string
+          tenant_id: string
+          site_id: string
+          rule_type: string
+          enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          site_id: string
+          rule_type: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          site_id?: string
+          rule_type?: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      publish_sites: {
+        Row: {
+          id: string
+          tenant_id: string
+          archetype: string
+          status: string
+          languages: string
+          brand: Json
+          settings: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          archetype: string
+          status?: string
+          languages?: string
+          brand?: Json
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          archetype?: string
+          status?: string
+          languages?: string
+          brand?: Json
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       publish_sync_health: {
         Row: {
           tenant_id: string
@@ -7713,6 +8133,87 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
+      }
+      publish_versions: {
+        Row: {
+          id: string
+          tenant_id: string
+          page_id: string
+          language: string
+          version_no: number
+          content: Json
+          facts_snapshot: Json | null
+          reason: string
+          draft_id: string | null
+          approved_by: string | null
+          approver_name: string | null
+          approved_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          page_id: string
+          language: string
+          version_no: number
+          content: Json
+          facts_snapshot?: Json | null
+          reason: string
+          draft_id?: string | null
+          approved_by?: string | null
+          approver_name?: string | null
+          approved_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          page_id?: string
+          language?: string
+          version_no?: number
+          content?: Json
+          facts_snapshot?: Json | null
+          reason?: string
+          draft_id?: string | null
+          approved_by?: string | null
+          approver_name?: string | null
+          approved_at?: string
+        }
+        Relationships: []
+      }
+      publish_wa_refs: {
+        Row: {
+          token: string
+          tenant_id: string
+          site_id: string | null
+          page_id: string | null
+          landing_url: string | null
+          campaign: string | null
+          language: string | null
+          created_at: string
+          matched_at: string | null
+        }
+        Insert: {
+          token: string
+          tenant_id: string
+          site_id?: string | null
+          page_id?: string | null
+          landing_url?: string | null
+          campaign?: string | null
+          language?: string | null
+          created_at?: string
+          matched_at?: string | null
+        }
+        Update: {
+          token?: string
+          tenant_id?: string
+          site_id?: string | null
+          page_id?: string | null
+          landing_url?: string | null
+          campaign?: string | null
+          language?: string | null
+          created_at?: string
+          matched_at?: string | null
+        }
+        Relationships: []
       }
       push_subscriptions: {
         Row: {
@@ -12282,6 +12783,10 @@ export interface Database {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
       }
+      publish_can_manage: {
+        Args: { p_tenant: string }
+        Returns: boolean
+      }
       publish_changed_keys: {
         Args: {
           new_row?: Json
@@ -12289,6 +12794,10 @@ export interface Database {
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
+      }
+      publish_hostname_available: {
+        Args: { p_hostname: string }
+        Returns: boolean
       }
       publish_is_watched: {
         Args: {

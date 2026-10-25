@@ -90,7 +90,8 @@ describe('the kinds', () => {
   })
 
   it('the kind CHECK constraint in SQL and the TS list agree', () => {
-    const sql = lastMigrationContaining(/tenant_vocabularies_kind_check|kind TEXT NOT NULL CHECK \(kind IN/)
+    // The vocabulary table's CHECK — not any table with a `kind` column (440's Publish tables have one).
+    const sql = lastMigrationContaining(/tenant_vocabularies_kind_check|tenant_vocabularies[\s\S]*kind TEXT NOT NULL CHECK \(kind IN/)
     const check = sql.match(/kind IN \(([\s\S]*?)\)\)/)![1].match(/'([a-z_]+)'/g)!.map(s => s.replace(/'/g, ''))
     expect(check.sort()).toEqual([...VOCABULARY_KINDS].sort())
   })
