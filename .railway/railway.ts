@@ -77,6 +77,12 @@ export default defineRailway(() => {
       GOOGLE_CLIENT_SECRET: preserve(),
       GOOGLE_REDIRECT_URI: preserve(),
       NEXT_PUBLIC_APP_URL: preserve(),
+      // Publish (docs/publish/PLAN.md): the renderer's internal API secret, and
+      // where/how the sync worker reaches the renderer.
+      PUBLISH_INTERNAL_SECRET: preserve(),
+      PUBLISH_INTERNAL_SECRET_PREVIOUS: preserve(),
+      PUBLISH_RENDERER_URL: preserve(),
+      PUBLISH_REVALIDATE_SECRET: preserve(),
       // Added in the dashboard, never written here — an apply without these
       // three would DELETE them from the live site (caught 2026-09-24).
       NEXT_PUBLIC_GROWTH_WIDGET_URL: preserve(),
@@ -190,7 +196,26 @@ export default defineRailway(() => {
     },
   });
 
+  // Publish site renderer (sites/, docs/publish/PLAN.md D1): every company's
+  // website, by hostname. Data only through the web service's internal API —
+  // no database credentials here. Agency domains are added to THIS service
+  // (step 11). No healthcheck path yet: every path is a company site, so a
+  // probe from Railway's own hostname is an unknown host (404) by design.
+  const publishSites = service("publish-sites", {
+    source: autouraSaas,
+    build: "npm run sites:build",
+    start: "npm run sites:start",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    networking: { privateNetworkEndpoint: "publish-sites" },
+    env: {
+      PUBLISH_APP_URL: preserve(),
+      PUBLISH_INTERNAL_SECRET: preserve(),
+      PUBLISH_REVALIDATE_SECRET: preserve(),
+      PUBLISH_REVALIDATE_SECRET_PREVIOUS: preserve(),
+    },
+  });
+
   return project("Autoura multi-tenant", {
-    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend, cronPublishSync],
+    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend, cronPublishSync, publishSites],
   });
 });

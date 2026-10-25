@@ -50,6 +50,8 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // signs with Svix.
   '/api/webhooks/': ['verifyConciergeSignature', 'verifySvix('],
   '/api/integrations/': ['SAWA_SYNC_SECRET'],
+  // The Publish site renderer (sites/) → internal page data; bearer secret.
+  '/api/publish/internal/': ['PUBLISH_INTERNAL_SECRET'],
   '/api/auth/': null, // OAuth callbacks / pre-session by nature (state verified in-handler)
   '/api/cron/': ['CRON_SECRET'],
   '/api/version': null, // sha + uptime only, public by design

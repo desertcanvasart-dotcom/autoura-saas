@@ -1,0 +1,163 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
+import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload } from '@/lib/publish/site-data'
+import { siteResolutionSchema, pagePayloadSchema } from '@/lib/publish/contract'
+
+// ============================================================================
+// The GetAutoura side of the renderer's two internal endpoints (Publish step
+// 3): which site a hostname serves, what is on a page, and that only the
+// renderer may ask.
+// ============================================================================
+
+const TENANT = '00000000-0000-4000-8000-0000000000aa'
+const SITE = '00000000-0000-4000-8000-0000000000bb'
+const TOUR = '00000000-0000-4000-8000-0000000000cc'
+const PAGE = '00000000-0000-4000-8000-0000000000dd'
+const OFF_TOUR_PAGE = '00000000-0000-4000-8000-0000000000ee'
+
+/** A PostgREST-shaped fake: rows per table (joins pre-embedded), eq/neq filters. */
+function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
+  return {
+    from(table: string) {
+      const filters: Array<(r: Record<string, unknown>) => boolean> = []
+      const q = {
+        select: () => q,
+        eq: (col: string, v: unknown) => { filters.push(r => r[col] === v); return q },
+        neq: (col: string, v: unknown) => { filters.push(r => r[col] !== v); return q },
+        rows: () => (tables[table] ?? []).filter(r => filters.every(f => f(r))),
+        maybeSingle: async () => ({ data: q.rows()[0] ?? null, error: null }),
+        then: (resolve: (v: { data: unknown; error: null }) => unknown) => resolve({ data: q.rows(), error: null }),
+      }
+      return q
+    },
+  }
+}
+
+const site = { id: SITE, tenant_id: TENANT, archetype: 'private_journeys', status: 'live', languages: ['en', 'fr'], brand: {}, tenants: { company_name: 'Sillage' } }
+const tourPage = (slug: string, language: string, published: boolean, pageId = PAGE, active = true) => ({
+  page_id: pageId, site_id: SITE, language, slug, is_published: published,
+  publish_pages: { id: pageId, kind: 'tour', tour_template_id: TOUR, tour_templates: { template_name: active ? 'Nile classic' : 'Retired tour', is_active: active } },
+})
+
+function db(over: Partial<{ siteStatus: string; domainKind: string; domainStatus: string }> = {}) {
+  return fakeDb({
+    publish_domains: [
+      { hostname: 'sillage.example', kind: over.domainKind ?? 'primary', status: over.domainStatus ?? 'active', site_id: SITE, publish_sites: { ...site, status: over.siteStatus ?? 'live' } },
+    ],
+    publish_redirects: [{ site_id: SITE, from_path: '/old', to_path: '/en', status_code: 301 }],
+    publish_sites: [{ ...site, status: over.siteStatus ?? 'live' }],
+    publish_page_locales: [
+      tourPage('nile-classic', 'en', true),
+      tourPage('croisiere-nil', 'fr', true),
+      tourPage('retired', 'en', true, OFF_TOUR_PAGE, false),
+      { ...tourPage('draft-tour', 'en', false, '00000000-0000-4000-8000-0000000000ff'), publish_pages: { id: 'x', kind: 'tour', tour_template_id: TOUR, tour_templates: { template_name: 'Coming soon', is_active: true } } },
+      { page_id: 'about', site_id: SITE, language: 'en', slug: 'about-us', is_published: true, publish_pages: { id: 'about', kind: 'about', tour_template_id: null, tour_templates: null } },
+    ],
+  })
+}
+
+describe('rules', () => {
+  it('hostnames are compared as stored', () => {
+    expect(normalizeHost('Sillage.Example:443')).toBe('sillage.example')
+    expect(normalizeHost('sillage.example.')).toBe('sillage.example')
+    expect(normalizeHost('localhost')).toBeNull()
+    expect(normalizeHost('bad host')).toBeNull()
+  })
+  it('a test hostname always serves; a real one once verified and live; a suspended site nowhere', () => {
+    expect(domainServes('test', 'pending_dns', 'draft')).toBe(true)
+    expect(domainServes('primary', 'pending_dns', 'live')).toBe(false)
+    expect(domainServes('primary', 'active', 'draft')).toBe(false)
+    expect(domainServes('primary', 'active', 'live')).toBe(true)
+    expect(domainServes('test', 'active', 'suspended')).toBe(false)
+  })
+  it('paths', () => {
+    expect(targetOf('')).toEqual({ kind: 'home' })
+    expect(targetOf('tours')).toEqual({ kind: 'listing' })
+    expect(targetOf('tours/nile-classic')).toEqual({ kind: 'tour', slug: 'nile-classic' })
+    expect(targetOf('about-us')).toEqual({ kind: 'page', slug: 'about-us' })
+    expect(targetOf('tours/a/b')).toEqual({ kind: 'none' })
+    expect(targetOf('__missing')).toEqual({ kind: 'none' })
+  })
+})
+
+describe('resolveSiteByHost', () => {
+  it('a verified primary of a live site resolves, in the contract\'s shape, with its redirects', async () => {
+    const r = await resolveSiteByHost(db() as never, 'SILLAGE.example:443')
+    expect(siteResolutionSchema.parse(r)).toEqual(r)
+    expect(r).toMatchObject({ site: { id: SITE, tenantId: TENANT, companyName: 'Sillage' }, preview: false,
+      redirects: [{ from: '/old', to: '/en', status: 301 }] })
+  })
+  it('a test hostname previews a draft site', async () => {
+    expect(await resolveSiteByHost(db({ domainKind: 'test', domainStatus: 'pending_dns', siteStatus: 'draft' }) as never, 'sillage.example'))
+      .toMatchObject({ preview: true, domain: { kind: 'test' } })
+  })
+  it('unknown, unverified or suspended: no site', async () => {
+    expect(await resolveSiteByHost(db() as never, 'other.example')).toBeNull()
+    expect(await resolveSiteByHost(db({ domainStatus: 'verifying' }) as never, 'sillage.example')).toBeNull()
+    expect(await resolveSiteByHost(db({ siteStatus: 'suspended' }) as never, 'sillage.example')).toBeNull()
+  })
+})
+
+describe('loadPagePayload', () => {
+  const load = (path: string, opts: { language?: string; preview?: boolean; siteStatus?: string } = {}) =>
+    loadPagePayload(db({ siteStatus: opts.siteStatus }) as never, { siteId: SITE, language: opts.language ?? 'en', path, preview: opts.preview ?? false })
+
+  it('a published tour page, with its other language for hreflang', async () => {
+    const page = await load('tours/nile-classic')
+    expect(pagePayloadSchema.parse(page)).toEqual(page)
+    expect(page).toMatchObject({ kind: 'tour', title: 'Nile classic', path: 'tours/nile-classic', unpublished: false,
+      tour: { templateId: TOUR, name: 'Nile classic' }, alternates: [{ language: 'fr', path: 'tours/croisiere-nil' }] })
+  })
+  it('the home page exists before any home page row, listing the published, switched-on tours', async () => {
+    const home = await load('')
+    expect(home).toMatchObject({ kind: 'home', title: 'Sillage', alternates: [{ language: 'fr', path: '' }] })
+    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic' }])
+  })
+  it('an unpublished page shows only in preview, flagged', async () => {
+    expect(await load('tours/draft-tour')).toBeNull()
+    expect(await load('tours/draft-tour', { preview: true })).toMatchObject({ unpublished: true })
+  })
+  it('a switched-off tour has no page', async () => {
+    expect(await load('tours/retired')).toBeNull()
+  })
+  it('a core page by its slug; nothing for unknown paths or a language the site lacks', async () => {
+    expect(await load('about-us')).toMatchObject({ kind: 'about' })
+    expect(await load('no-such-page')).toBeNull()
+    expect(await load('__missing')).toBeNull()
+    expect(await load('', { language: 'es' })).toBeNull()
+  })
+  it('a suspended site has no pages', async () => {
+    expect(await load('', { siteStatus: 'suspended' })).toBeNull()
+  })
+})
+
+// ---------- only the renderer may ask ----------
+
+vi.mock('@/lib/supabase-server', () => ({ createAdminClient: () => db() }))
+const { GET: siteGET } = await import('@/app/api/publish/internal/site/route')
+const { GET: pageGET } = await import('@/app/api/publish/internal/page/route')
+
+describe('the internal endpoints', () => {
+  beforeEach(() => {
+    process.env.PUBLISH_INTERNAL_SECRET = 'internal-secret'
+    process.env.PUBLISH_INTERNAL_SECRET_PREVIOUS = 'old-secret'
+  })
+  const req = (path: string, auth?: string) =>
+    new NextRequest(`https://app.test${path}`, auth ? { headers: { authorization: auth } } : undefined)
+
+  it('refuse anyone without the secret', async () => {
+    expect((await siteGET(req('/api/publish/internal/site?host=sillage.example'))).status).toBe(401)
+    expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en`, 'Bearer guess'))).status).toBe(401)
+  })
+  it('answer the renderer, with the current or the previous secret', async () => {
+    const r = await siteGET(req('/api/publish/internal/site?host=sillage.example', 'Bearer internal-secret'))
+    expect(r.status).toBe(200)
+    expect((await r.json()).site.id).toBe(SITE)
+    expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&path=tours/nile-classic`, 'Bearer old-secret'))).status).toBe(200)
+  })
+  it('404 for no site or no page; 400 for a malformed ask', async () => {
+    expect((await siteGET(req('/api/publish/internal/site?host=nobody.example', 'Bearer internal-secret'))).status).toBe(404)
+    expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&path=nope`, 'Bearer internal-secret'))).status).toBe(404)
+    expect((await pageGET(req(`/api/publish/internal/page?site=not-a-uuid&lang=en`, 'Bearer internal-secret'))).status).toBe(400)
+  })
+})

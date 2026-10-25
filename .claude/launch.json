@@ -4,15 +4,61 @@
     {
       "name": "dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "autoPort": true
     },
     {
       "name": "sawa-static",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8899", "-d", "/Users/islamhussein/Autoura/Sawa/site"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8899",
+        "-d",
+        "/Users/islamhussein/Autoura/Sawa/site"
+      ],
       "port": 8899
+    },
+    {
+      "name": "publish-dev-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/publish-dev-api.mjs"
+      ],
+      "port": 4010
+    },
+    {
+      "name": "sites",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PUBLISH_APP_URL=http://127.0.0.1:4010",
+        "PUBLISH_INTERNAL_SECRET=dev-internal",
+        "PUBLISH_REVALIDATE_SECRET=dev-revalidate",
+        "npm",
+        "run",
+        "sites:dev"
+      ],
+      "port": 3001
+    },
+    {
+      "name": "sites-prod",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PUBLISH_APP_URL=http://127.0.0.1:4010",
+        "PUBLISH_INTERNAL_SECRET=dev-internal",
+        "PUBLISH_REVALIDATE_SECRET=dev-revalidate",
+        "npx",
+        "next",
+        "start",
+        "sites",
+        "--port",
+        "3002"
+      ],
+      "port": 3002
     }
   ]
 }
