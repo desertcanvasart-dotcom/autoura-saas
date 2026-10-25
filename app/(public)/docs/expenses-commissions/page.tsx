@@ -45,6 +45,12 @@ export default function ExpensesCommissionsPage() {
           <li><strong>Status</strong> &mdash; Pending, Approved, Paid or Rejected. Once Approved or Paid, the payment method (Cash, Bank Transfer, Credit Card, PayPal, Company Card), date and reference appear. A Paid expense with no payment date gets today&rsquo;s.</li>
         </ul>
         <p className="text-gray-600 mt-3">Click <strong>Add Expense</strong> (or <strong>Update Expense</strong> when editing).</p>
+        <p className="text-gray-600 mt-3">
+          Confirming a supplier on a booking&rsquo;s <strong>Suppliers</strong> tab adds its expense for you, in the
+          currency that supplier is paid in &mdash; its own when its itinerary lines were priced in it (EGP for a guide,
+          USD for a Nile cruise), otherwise the trip&rsquo;s. While Pending it follows the supplier&rsquo;s cost, currency
+          and date; once Approved, Paid or Rejected it is left alone.
+        </p>
         <DocScreenshot src="/docs/expenses-commissions/expenses-list.jpg" alt="Expenses page with add expense form, filters, and expense list" />
       </section>
 

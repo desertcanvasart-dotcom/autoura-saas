@@ -6,10 +6,16 @@
 // showed ~100% margin and owed nobody. Now a booking's supplier row
 // (booking_supplier_status) that is CONFIRMED with a cost becomes a pending
 // expense: supplier, category, amount (the confirmed cost, else the quoted
-// one), the service date, the trip and booking.
+// one) in the row's currency, the service date, the trip and booking.
+//
+// The row's currency (cost_currency) is the supplier's OWN when its lines
+// were priced in it (EGP for a guide, USD for a Nile cruise —
+// lib/bookings/booking-suppliers); null means the booking's. The expense is
+// recorded in that currency, as the supplier is paid; reports convert it at
+// the expense date like any other expense.
 //
 // The expense follows its row only while it is still PENDING:
-//   * cost or date changes → the expense is updated;
+//   * cost, currency or date changes → the expense is updated;
 //   * the row leaves 'confirmed' (cancelled, back to contacted…) or loses its
 //     cost → the expense is removed — it was never owed;
 //   * once someone has approved, paid or rejected it, it is theirs: nothing
@@ -18,6 +24,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-numbering'
+import { supplierCostCurrency } from '@/lib/bookings/booking-suppliers'
 
 export interface SupplierRowForExpense {
   id: string
@@ -29,6 +36,8 @@ export interface SupplierRowForExpense {
   service_date: string | null
   quoted_cost: number | string | null
   confirmed_cost: number | string | null
+  /** Currency of quoted/confirmed cost; null = the booking's. */
+  cost_currency?: string | null
   confirmation_number: string | null
   status: string | null
 }
@@ -71,25 +80,30 @@ export function supplierRowCost(row: Pick<SupplierRowForExpense, 'confirmed_cost
 }
 
 export type ExpensePlan =
-  | { action: 'create'; amount: number; expense_date: string }
-  | { action: 'update'; amount: number; expense_date: string }
+  | { action: 'create'; amount: number; currency: string; expense_date: string }
+  | { action: 'update'; amount: number; currency: string; expense_date: string }
   | { action: 'remove' }
   | { action: 'none' }
   | { action: 'kept' }
 
 /** Pure: what to do with the row's expense. */
 export function planSupplierExpense(
-  row: Pick<SupplierRowForExpense, 'status' | 'confirmed_cost' | 'quoted_cost' | 'service_date'>,
-  existing: Pick<LinkedExpense, 'status' | 'amount' | 'expense_date'> | null,
+  row: Pick<SupplierRowForExpense, 'status' | 'confirmed_cost' | 'quoted_cost' | 'service_date' | 'cost_currency'>,
+  existing: Pick<LinkedExpense, 'status' | 'amount' | 'expense_date'> & { currency?: string | null } | null,
   today: string,
+  bookingCurrency?: string | null,
 ): ExpensePlan {
   if (existing && existing.status !== 'pending') return { action: 'kept' }
   const amount = row.status === 'confirmed' ? supplierRowCost(row) : null
   if (amount === null) return existing ? { action: 'remove' } : { action: 'none' }
   const expense_date = (row.service_date ?? '').slice(0, 10) || today
-  if (!existing) return { action: 'create', amount, expense_date }
-  if (Number(existing.amount) === amount && existing.expense_date === expense_date) return { action: 'none' }
-  return { action: 'update', amount, expense_date }
+  const currency = supplierCostCurrency(row, bookingCurrency)
+  if (!existing) return { action: 'create', amount, currency, expense_date }
+  // A pending expense in another currency than its row (the booking's
+  // currency changed, or it predates cost_currency) follows the row too.
+  const sameCurrency = String(existing.currency ?? '').trim().toUpperCase() === currency
+  if (Number(existing.amount) === amount && existing.expense_date === expense_date && sameCurrency) return { action: 'none' }
+  return { action: 'update', amount, currency, expense_date }
 }
 
 export type SupplierExpenseResult =
@@ -109,10 +123,17 @@ export async function syncSupplierExpense(
 ): Promise<SupplierExpenseResult> {
   const { data: row, error: rowErr } = await db
     .from('booking_supplier_status')
-    .select('id, booking_id, supplier_id, supplier_type, supplier_name, service_description, service_date, quoted_cost, confirmed_cost, confirmation_number, status')
+    .select('id, booking_id, supplier_id, supplier_type, supplier_name, service_description, service_date, quoted_cost, confirmed_cost, cost_currency, confirmation_number, status')
     .eq('id', rowId)
     .maybeSingle()
   if (rowErr || !row) return { ok: false, error: rowErr?.message || 'Supplier row not found' }
+
+  const { data: booking } = await db
+    .from('bookings')
+    .select('id, booking_number, itinerary_id, currency')
+    .eq('id', row.booking_id)
+    .maybeSingle()
+  if (!booking) return { ok: false, error: 'Booking not found' }
 
   const { data: existing, error: exErr } = await db
     .from('expenses')
@@ -122,7 +143,7 @@ export async function syncSupplierExpense(
   if (exErr) return { ok: false, error: exErr.message }
 
   const today = new Date().toISOString().slice(0, 10)
-  const plan = planSupplierExpense(row as SupplierRowForExpense, existing as LinkedExpense | null, today)
+  const plan = planSupplierExpense(row as SupplierRowForExpense, existing as LinkedExpense | null, today, booking.currency)
 
   if (plan.action === 'none' || plan.action === 'kept') {
     return { ok: true, action: plan.action, expense: (existing as LinkedExpense | null) ?? null }
@@ -137,7 +158,7 @@ export async function syncSupplierExpense(
   if (plan.action === 'update') {
     const { data, error } = await db
       .from('expenses')
-      .update({ amount: plan.amount, expense_date: plan.expense_date, updated_at: new Date().toISOString() })
+      .update({ amount: plan.amount, currency: plan.currency, expense_date: plan.expense_date, updated_at: new Date().toISOString() })
       .eq('id', existing!.id)
       .eq('status', 'pending')
       .select(EXPENSE_COLUMNS)
@@ -147,13 +168,6 @@ export async function syncSupplierExpense(
   }
 
   // create
-  const { data: booking } = await db
-    .from('bookings')
-    .select('id, booking_number, itinerary_id, currency')
-    .eq('id', row.booking_id)
-    .maybeSingle()
-  if (!booking) return { ok: false, error: 'Booking not found' }
-
   const r = row as SupplierRowForExpense
   const description = [r.supplier_name, r.service_description].filter(Boolean).join(' — ')
   const base = {
@@ -166,7 +180,7 @@ export async function syncSupplierExpense(
     category: expenseCategoryForSupplierType(r.supplier_type),
     description,
     amount: plan.amount,
-    currency: booking.currency || 'EUR',
+    currency: plan.currency,
     expense_date: plan.expense_date,
     status: 'pending',
     payment_reference: r.confirmation_number || null,

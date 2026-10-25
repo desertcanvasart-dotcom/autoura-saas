@@ -12,12 +12,19 @@
 //   * lines nobody confirms (tips, water, supplies, fees) are left out;
 //   * the same supplier on the same day is ONE row (by supplier_id when the
 //     line is linked, else by name), its costs summed;
+//   * the cost is in the supplier's OWN currency (EGP for a guide, USD for a
+//     cruise…) when every line of the row is in that one currency and has
+//     the rate it was converted at (lib/supplier-own-currency) — that is what
+//     the supplier confirms and is paid. Otherwise it is the lines'
+//     total_cost, in the trip's currency. cost_currency says which; null =
+//     the booking's currency (rows from before it, rows added by hand);
 //   * a row marked cancelled = "not needed" and does not count;
 //   * BACKED = at least one row still needed, and every one confirmed — an
 //     empty list is not backing ("all zero suppliers confirmed" is the claim
 //     that made the sibling add this rule).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { supplierOwnMoney, type OwnCurrencyLine } from '@/lib/supplier-own-currency'
 
 export type SupplierRowStatus = 'pending' | 'contacted' | 'confirmed' | 'no_response' | 'cancelled'
 
@@ -52,7 +59,7 @@ export function supplierTypeFor(serviceType: string | null | undefined): string 
   return t in map ? map[t] : null
 }
 
-export interface ServiceForSupplier {
+export interface ServiceForSupplier extends OwnCurrencyLine {
   supplier_id?: string | null
   supplier_name?: string | null
   service_name?: string | null
@@ -71,6 +78,16 @@ export interface SupplierLine {
   service_description: string | null
   service_date: string | null
   quoted_cost: number | null
+  /** Currency of quoted_cost; null = the booking's currency. */
+  cost_currency: string | null
+}
+
+/** The currency a row's quoted and confirmed cost are in: its own, else the booking's. */
+export function supplierCostCurrency(
+  row: { cost_currency?: string | null },
+  bookingCurrency: string | null | undefined,
+): string {
+  return String(row.cost_currency || bookingCurrency || 'EUR').trim().toUpperCase()
 }
 
 export function serviceDate(dayNumber: number, dayDate: string | null | undefined, tripStart: string | null | undefined): string | null {
@@ -89,9 +106,19 @@ export function supplierKey(l: { supplier_id?: string | null; supplier_name?: st
     : `name:${(l.supplier_name ?? '').trim().toLowerCase()}|${l.supplier_type ?? ''}|${date}`
 }
 
-/** The booking's supplier rows implied by its itinerary's services. */
-export function supplierLinesFromServices(services: ServiceForSupplier[], tripStart: string | null | undefined): SupplierLine[] {
-  const byKey = new Map<string, SupplierLine>()
+/**
+ * The booking's supplier rows implied by its itinerary's services.
+ * `tripCurrency` is the currency the services' total_cost is in (the
+ * itinerary's); without it, every row gets cost_currency null (= the
+ * booking's) at the lines' total_cost.
+ */
+export function supplierLinesFromServices(
+  services: ServiceForSupplier[],
+  tripStart: string | null | undefined,
+  tripCurrency?: string | null,
+): SupplierLine[] {
+  const trip = String(tripCurrency ?? '').trim().toUpperCase()
+  const byKey = new Map<string, { line: SupplierLine; group: ServiceForSupplier[] }>()
   for (const s of services) {
     // The grid saves a cruise as 'accommodation'; its slot tag says cruise.
     const isGridCruise = String(s.description ?? '').startsWith('[pricing-grid:cruise]')
@@ -103,17 +130,22 @@ export function supplierLinesFromServices(services: ServiceForSupplier[], tripSt
       supplier_name: (s.supplier_name || s.service_name || 'Unknown').trim(),
       service_description: s.notes || null,
       service_date: serviceDate(s.day_number, s.day_date, tripStart),
-      quoted_cost: Number(s.total_cost) || null,
+      quoted_cost: null,
+      cost_currency: null,
     }
     const key = supplierKey(line)
     const seen = byKey.get(key)
-    if (seen) {
-      seen.quoted_cost = (seen.quoted_cost ?? 0) + (line.quoted_cost ?? 0) || null
-    } else {
-      byKey.set(key, line)
-    }
+    if (seen) seen.group.push(s)
+    else byKey.set(key, { line, group: [s] })
   }
-  return [...byKey.values()].sort((a, b) => (a.service_date ?? '').localeCompare(b.service_date ?? ''))
+  const lines = [...byKey.values()].map(({ line, group }): SupplierLine => {
+    // Only with a known trip currency: "foreign" means foreign to it.
+    const money = trip ? supplierOwnMoney(group, trip) : null
+    if (money?.own) return { ...line, quoted_cost: money.total || null, cost_currency: money.currency }
+    const sum = group.reduce((acc, s) => acc + (Number(s.total_cost) || 0), 0)
+    return { ...line, quoted_cost: Math.round(sum * 100) / 100 || null, cost_currency: trip || null }
+  })
+  return lines.sort((a, b) => (a.service_date ?? '').localeCompare(b.service_date ?? ''))
 }
 
 /**
@@ -135,10 +167,11 @@ export async function syncBookingSuppliers(
   if (!booking) return { ok: false, error: 'Booking not found' }
   if (!booking.itinerary_id) return { ok: true, added: 0 }
 
-  const [{ data: days }, { data: services }, { data: existing }] = await Promise.all([
+  const [{ data: itinerary }, { data: days }, { data: services }, { data: existing }] = await Promise.all([
+    db.from('itineraries').select('currency').eq('id', booking.itinerary_id).maybeSingle(),
     db.from('itinerary_days').select('id, day_number, date').eq('itinerary_id', booking.itinerary_id),
     db.from('itinerary_services')
-      .select('supplier_id, supplier_name, service_name, service_type, description, notes, total_cost, itinerary_day_id, day_id')
+      .select('supplier_id, supplier_name, service_name, service_type, description, notes, quantity, total_cost, supplier_currency, supplier_cost_original, exchange_rate_used, itinerary_day_id, day_id')
       .eq('itinerary_id', booking.itinerary_id),
     db.from('booking_supplier_status').select('supplier_id, supplier_name, supplier_type, service_date').eq('booking_id', bookingId),
   ])
@@ -152,7 +185,7 @@ export async function syncBookingSuppliers(
   }
 
   const have = new Set((existing ?? []).map(supplierKey))
-  const fresh = supplierLinesFromServices(rows, booking.start_date as string | null).filter(l => !have.has(supplierKey(l)))
+  const fresh = supplierLinesFromServices(rows, booking.start_date as string | null, (itinerary?.currency as string | null) ?? null).filter(l => !have.has(supplierKey(l)))
   if (fresh.length === 0) return { ok: true, added: 0 }
 
   const { error } = await db.from('booking_supplier_status').insert(

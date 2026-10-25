@@ -2062,6 +2062,7 @@ export interface Database {
           contact_phone: string | null
           quoted_cost: number | null
           confirmed_cost: number | null
+          cost_currency: string | null
           confirmation_number: string | null
           confirmation_notes: string | null
           status: string | null
@@ -2083,6 +2084,7 @@ export interface Database {
           contact_phone?: string | null
           quoted_cost?: number | null
           confirmed_cost?: number | null
+          cost_currency?: string | null
           confirmation_number?: string | null
           confirmation_notes?: string | null
           status?: string | null
@@ -2104,6 +2106,7 @@ export interface Database {
           contact_phone?: string | null
           quoted_cost?: number | null
           confirmed_cost?: number | null
+          cost_currency?: string | null
           confirmation_number?: string | null
           confirmation_notes?: string | null
           status?: string | null

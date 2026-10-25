@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { syncSupplierExpense } from '@/lib/bookings/supplier-expense'
 import { roleDenied } from '@/lib/api-role-gate'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 const SUPPLIER_STATUSES = ['pending', 'contacted', 'confirmed', 'no_response', 'cancelled']
 
@@ -118,6 +119,20 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'supplier_type and supplier_name are required' }, { status: 400 })
     }
 
+    // The currency the supplier is paid in (EGP for a guide, USD for a
+    // cruise…), which the expense made on confirming is recorded in. The
+    // booking's own currency is stored as null (= the booking's). Only set
+    // here: saving a status or a confirmed cost never changes it.
+    const { data: booking } = await supabase.from('bookings').select('currency').eq('id', id).maybeSingle()
+    if (!booking) return NextResponse.json({ success: false, error: 'Booking not found' }, { status: 404 })
+    const bookingCurrency = String(booking.currency || 'EUR').trim().toUpperCase()
+    const costCurrency = typeof body.cost_currency === 'string' && body.cost_currency.trim()
+      ? body.cost_currency.trim().toUpperCase()
+      : bookingCurrency
+    if (costCurrency !== bookingCurrency && !(SUPPORTED_CURRENCIES as readonly string[]).includes(costCurrency)) {
+      return NextResponse.json({ success: false, error: `cost_currency must be ${bookingCurrency} or one of: ${SUPPORTED_CURRENCIES.join(', ')}` }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from('booking_supplier_status')
       .insert({
@@ -132,6 +147,7 @@ export async function POST(
         contact_email: body.contact_email || null,
         contact_phone: body.contact_phone || null,
         quoted_cost: body.quoted_cost || null,
+        cost_currency: costCurrency === bookingCurrency ? null : costCurrency,
         status: 'pending',
       })
       .select()

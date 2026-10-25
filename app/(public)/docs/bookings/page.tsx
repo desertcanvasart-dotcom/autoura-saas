@@ -80,7 +80,7 @@ export default function BookingsPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Suppliers</h3>
         <p className="text-gray-600">
-          Every supplier on the trip, by date: <strong>Sync from itinerary</strong> fills the list. For each, track the status (Pending, Contacted, Confirmed, No response, Not needed) and the confirmation number. Confirming a supplier adds its cost as a pending expense.
+          Every supplier on the trip, by date: <strong>Sync from itinerary</strong> fills the list. For each, track the status (Pending, Contacted, Confirmed, No response, Not needed) and the confirmation number. Confirming a supplier adds its cost as a pending expense. Each cost is shown with its currency: the supplier&rsquo;s own (EGP for a guide, USD for a Nile cruise) when its itinerary lines were priced in it, otherwise the trip&rsquo;s &mdash; and the expense is recorded in that currency, as the supplier is paid. Changing a status or a confirmed cost never changes a row&rsquo;s currency.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Passengers</h3>

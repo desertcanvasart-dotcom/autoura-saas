@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
-import { supplierBacking } from '@/lib/bookings/booking-suppliers'
+import { supplierBacking, supplierCostCurrency } from '@/lib/bookings/booking-suppliers'
 
 // Who has to confirm what for this booking (booking_supplier_status). The
 // list is filled from the itinerary when the booking is made; "Sync from
 // itinerary" adds anything new. Mark each row as it is chased and confirmed —
 // "Not needed" takes it out of the count (e.g. a ticket bought at the gate).
 // Confirming a row with a cost records it as a pending expense (what the trip
-// owes that supplier); the Expense column links to it.
+// owes that supplier); the Expense column links to it. A row's cost is in
+// its own currency (cost_currency — EGP for a guide, USD for a cruise), else
+// the booking's, and the expense is recorded in that currency.
 
 interface SupplierRow {
   id: string
@@ -20,6 +22,8 @@ interface SupplierRow {
   service_description: string | null
   quoted_cost: number | null
   confirmed_cost: number | null
+  /** Currency of quoted/confirmed cost; null = the booking's. */
+  cost_currency: string | null
   status: string
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
@@ -180,7 +184,7 @@ export default function BookingSuppliersPanel({
                       // The cost the supplier confirmed (defaults to the quote);
                       // it is what the expense records.
                       <span className="inline-flex items-center gap-1">
-                        <span className="text-xs text-gray-400">{currency}</span>
+                        <span className="text-xs text-gray-400">{supplierCostCurrency(r, currency)}</span>
                         <input
                           key={`${r.id}:${r.confirmed_cost ?? ''}`}
                           aria-label={`Confirmed cost for ${r.supplier_name}`}
@@ -199,7 +203,7 @@ export default function BookingSuppliersPanel({
                           className="!w-24 !px-2 !py-1 !text-xs text-right border border-gray-200 rounded-md"
                         />
                       </span>
-                    ) : (r.confirmed_cost ?? r.quoted_cost) != null ? `${currency} ${Number(r.confirmed_cost ?? r.quoted_cost).toFixed(2)}` : '—'}
+                    ) : (r.confirmed_cost ?? r.quoted_cost) != null ? `${supplierCostCurrency(r, currency)} ${Number(r.confirmed_cost ?? r.quoted_cost).toFixed(2)}` : '—'}
                     {r.confirmed_cost != null && r.quoted_cost != null && Number(r.confirmed_cost) !== Number(r.quoted_cost) && (
                       <div className="text-[10px] text-gray-400">quoted {Number(r.quoted_cost).toFixed(2)}</div>
                     )}

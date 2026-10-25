@@ -1,4 +1,3 @@
-import { ratesForTenant } from '@/lib/currency'
 // ============================================
 // /api/bookings/[id]/extras/[eid] — pricing, confirming, withdrawing
 // ============================================
@@ -15,7 +14,6 @@ import { extrasAdmin } from '@/lib/booking-extras-db'
 import { nextStatus, isPriced, lineAmount, type ExtraAction, type BookingExtraLine } from '@/lib/booking-extras'
 import { recomputeBookingExtras } from '../recompute'
 import { manifestCost } from '@/lib/bookings/extra-supplier-cost'
-import type { ExchangeRate } from '@/lib/currency'
 import { roleDenied } from '@/lib/api-role-gate'
 
 export const dynamic = 'force-dynamic'
@@ -226,13 +224,8 @@ async function addToSupplierManifest(tenantId: string, bookingId: string, extra:
     ? await admin.from('suppliers').select('name').eq('id', String(extra.supplier_id)).maybeSingle()
     : { data: null }
 
-  const [{ data: booking }, { data: rates }] = await Promise.all([
-    admin.from('bookings').select('currency').eq('id', bookingId).maybeSingle(),
-    admin.from('exchange_rates').select('tenant_id, base_currency, target_currency, rate, is_active').eq('is_active', true),
-  ])
-  // The service role sees every company's manual rates: keep the shared ones
-  // and this company's own.
-  const { quotedCost, note } = manifestCost(extra, booking?.currency, ratesForTenant((rates ?? []) as ExchangeRate[], tenantId))
+  const { data: booking } = await admin.from('bookings').select('currency').eq('id', bookingId).maybeSingle()
+  const { quotedCost, costCurrency } = manifestCost(extra, booking?.currency)
 
   const { error } = await admin.from('booking_supplier_status').insert({
     tenant_id: tenantId,
@@ -240,8 +233,9 @@ async function addToSupplierManifest(tenantId: string, bookingId: string, extra:
     supplier_id: typeof extra.supplier_id === 'string' ? extra.supplier_id : null,
     supplier_type: 'other',
     supplier_name: supplier?.name || String(extra.title),
-    service_description: `Extra: ${String(extra.title)}${note}`,
+    service_description: `Extra: ${String(extra.title)}`,
     quoted_cost: quotedCost,
+    cost_currency: costCurrency,
     status: 'pending',
   })
   if (error) console.error('extras: could not add to supplier manifest', error)
