@@ -59,6 +59,21 @@ export function targetOf(path: string): PathTarget {
 
 const tourPath = (slug: string) => `tours/${slug}`
 
+const blankToNull = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+
+/** The company's identity fields, as the contract carries them. */
+export function identityOf(t: Record<string, unknown> | null | undefined): PagePayload['site']['identity'] {
+  return {
+    tagline: blankToNull(t?.tagline),
+    logoUrl: blankToNull(t?.logo_url),
+    phone: blankToNull(t?.company_phone),
+    email: blankToNull(t?.contact_email),
+    whatsapp: blankToNull(t?.whatsapp_number),
+    address: blankToNull(t?.company_address),
+    licenseNumber: blankToNull(t?.license_number),
+  }
+}
+
 // ---------- the site behind a hostname ----------
 
 export async function resolveSiteByHost(db: Db, rawHost: string): Promise<SiteResolution | null> {
@@ -143,7 +158,7 @@ export async function loadPagePayload(db: Db, input: {
   preview: boolean
 }): Promise<PagePayload | null> {
   const { data: site, error: sErr } = await db.from('publish_sites')
-    .select('id, tenant_id, archetype, status, languages, tenants(company_name)')
+    .select('id, tenant_id, archetype, status, languages, brand, tenants(company_name, tagline, logo_url, company_phone, contact_email, whatsapp_number, company_address, license_number)')
     .eq('id', input.siteId).maybeSingle()
   if (sErr) throw new Error(`reading the site: ${sErr.message}`)
   if (!site || site.status === 'suspended' || !site.languages.includes(input.language)) return null
@@ -157,6 +172,8 @@ export async function loadPagePayload(db: Db, input: {
     archetype: site.archetype,
     companyName: (site.tenants?.company_name as string | undefined) ?? '',
     languages: site.languages as string[],
+    brand: (site.brand ?? {}) as Record<string, unknown>,
+    identity: identityOf(site.tenants),
   }
 
   // Every locale of the site in this language: few enough per company to

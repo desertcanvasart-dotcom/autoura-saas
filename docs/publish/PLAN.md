@@ -177,11 +177,16 @@ On entering `failing`, `lagging` or `stalled` (de-duplicated, at most one alert 
 
 ## 7. Archetype themes and brand layer
 
-- `sites/themes/private-journeys/` and `sites/themes/transparent-value/`. Each exports a manifest: page types it supports, layout components, block set, default tokens, and how the tour page orders its sections (Private journeys: long-form itinerary, guides, consultation CTA; Transparent value: price-led grid, inclusions/exclusions up front, WhatsApp-first CTA).
-- **Blocks (shared library, theme-styled):** hero, tour grid, itinerary, inclusions/exclusions, price table, departures, gallery, FAQ, team, contact, map, rich text, enquiry.
-- **Brand layer = configuration only:** CSS custom properties from `brand.palette`; fonts from a fixed list of pairs (Latin, with the extended Latin glyphs French, Spanish, German and Italian need), self-hosted via `next/font`; logo from `tenant-logos`; tone feeds the engine (§9). No per-tenant code.
-- **Left-to-right only** (D14). Layouts are not built for RTL.
-- **Performance budget:** no client JS on tour pages except the enquiry form and the concierge embed (lazy, after interaction); images via `next/image` with explicit sizes; Lighthouse mobile run in CI against a fixture tour page (LCP < 2.5 s, CLS < 0.1, INP < 200 ms).
+*Built in step 4 — this section describes what exists.*
+
+- **Theme packages:** `sites/themes/private-journeys/` and `sites/themes/transparent-value/`, registered in `sites/themes/index.ts` (typed so an archetype without a theme does not compile). Each exports its frame (header, footer), its pages by kind, and its **tour section order** — the archetype's sales logic: Private journeys tells the journey first and the price late, ending on the consultation; Transparent value puts price, the way to ask and inclusions above the itinerary. Sections render from records (step 5) or approved narrative (step 7) and render **nothing** without data — no placeholder price, no invented inclusion (a test renders every page kind and fails on any digit or currency it was not given).
+- **Shared blocks:** brand mark (logo from the company record, else its name), language links (this page in the other language — real URLs), contact links from the record (WhatsApp/email/phone, each only when the record has it), tour sections in manifest order. Step 8 swaps the plain WhatsApp link for the tracked `/go/wa`.
+- **Brand layer = configuration only** (`lib/publish/brand.ts`, shared with the future admin screen): palette (primary, accent, ink, surface), typeface pair from a fixed list of five, tone (for the engine). A stored choice is used only if valid **and readable** (body text ≥ 4.5:1, links/buttons ≥ 3:1 against the background); otherwise that field falls back to the archetype default and the reason is kept for the admin — never an error on a live site. Text colour on buttons is computed for contrast. The brand reaches the page only as CSS variables on `<body>` (validated hex only), so two companies on one archetype get identical markup.
+- **Fonts:** `next/font` at build time, self-hosted (no request to Google from a visitor), Latin + Latin Extended; only the chosen pair's variables are applied; `preload` off so no page downloads faces it does not show; `display: swap` with metric-matched fallbacks.
+- **Company identity** (tagline, logo, phone, email, WhatsApp, address, licence) joined the page payload from `tenants`; the sync worker already refreshes the site when those fields change.
+- **Contract version:** `CONTRACT_VERSION` is sent on every internal request — a cached answer in an old shape sits under a different cache key after a deploy, and the app answers 409 to a renderer on another version. *(Found while building: the dev cache served a pre-change payload and the page crashed.)*
+- **Interface words** (`sites/i18n/strings.ts`) are English for now; a French or Spanish page shows English buttons and labels until step 10 adds the reviewed translations.
+- **Performance:** no client JavaScript in the themes; images (none yet in the payload) arrive with step 5 via `next/image`. The Lighthouse run in CI is still to add — with real tour pages in step 5.
 
 ---
 
