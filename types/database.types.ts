@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 167
+ * Tables: 168
  */
 
 export type Json =
@@ -2312,8 +2312,8 @@ export interface Database {
           tenant_id: string
           name: string
           is_default?: boolean
-          tiers?: Json
-          wording?: Json
+          tiers: Json
+          wording: Json
           created_at?: string
           updated_at?: string
         }
@@ -2327,7 +2327,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_policies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_followups: {
         Row: {
@@ -11267,7 +11275,7 @@ export interface Database {
           cached_price_updated_at?: string | null
           duration_hours?: number | null
           tour_theme?: string | null
-          departure_days?: string[]
+          departure_days: string[]
           cancellation_policy_id?: string | null
         }
         Update: {
@@ -11325,6 +11333,13 @@ export interface Database {
             columns: ["destination_id"]
             isOneToOne: false
             referencedRelation: "destinations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_templates_cancellation_policy_id_fkey"
+            columns: ["cancellation_policy_id"]
+            isOneToOne: false
+            referencedRelation: "cancellation_policies"
             referencedColumns: ["id"]
           },
         ]
@@ -12811,8 +12826,11 @@ export interface Database {
         Returns: any
       }
       cancellation_tiers_valid: {
-        Args: { t: Json }
-        Returns: boolean
+        Args: {
+          t?: Json
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
       }
       convert_amount: {
         Args: {
