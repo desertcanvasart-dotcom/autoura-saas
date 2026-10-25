@@ -342,7 +342,9 @@ Test: export a fixture site, unzip, assert every published page/language, every 
 | 11 | Domains | provider adapter with fake + one real test domain | D13, Q6 |
 | 12 | Export | §14 | — |
 
-**Phase 0 gate** = steps 1–4 plus step 5 enough to show our own brands' tour pages on test domains, with sync alerts working. I report after each step: what was built, what was tested, what changed from this plan.
+**Phase 0 gate** = steps 1–4 plus step 5 enough to show tour pages on a test domain, with sync alerts working. *Changed 2026-10-25 (operator): the four own brands keep their existing websites, so the gate runs on a **fictional test brand** instead — the "Autoura Sandbox" company, seeded with invented rates and tours by `scripts/publish-seed-sandbox.mjs` (dry run by default; `--apply`; `--remove`). Seeded 2026-10-25: 72 invented rows, site + test domain `sandbox.localhost`, enrolled; its three tours price completely in all four tiers and pass the thin-page rule.*
+
+**Found while seeding (pricing engine, outside Publish):** the engine prices hotels and Nile cruises from the EU column only (`ppd_eur`, seasonal periods' `ppd_eur`) for every traveller — the other-nationality hotel/cruise rates are entered but never used. So a tour page's EU/other split (Q5) can today only come from entrance fees, flights, trains and activities. Raised with the operator; not changed. I report after each step: what was built, what was tested, what changed from this plan.
 
 ---
 
