@@ -88,6 +88,19 @@ const en = {
   orWhatsApp: 'Or message us on WhatsApp',
   waHello: 'Hello, I would like to plan a trip.',
   waInterestedIn: 'Hello, I am interested in',
+  // ---- discovery (redesign) ----
+  findJourney: 'Find your journey',
+  anyLength: 'Any length',
+  dayTrips: 'Day trips',
+  shortBreaks: 'Up to 4 days',
+  longJourneys: '5 days or more',
+  anywhere: 'Anywhere',
+  noMatch: 'No journey matches — try another filter.',
+  destinationsTitle: 'Destinations',
+  destinationLabel: 'Destination',
+  toursThere: 'Journeys that go there',
+  journeysCount: 'journeys',
+  oneJourney: 'journey',
 } as const
 
 export type StringKey = keyof typeof en

@@ -168,10 +168,28 @@ function page(s, lang, path, preview) {
   const other = second ? 'en' : s.languages[1]
   const slugIn = (t, l) => (l === 'en' ? t.slug : t.other)
   const list = s.tours.filter(t => t.published || preview)
-  const links = list.map(t => ({ title: t.name, path: `tours/${slugIn(t, lang)}` }))
-  const base = { language: lang, site: siteInfo(s), tour: null, tours: [], unpublished: false }
+  // Cards and destinations, as lib/publish/site-data.ts builds them (cardOf, placeSlug).
+  const placeSlug = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const factsOf = t => facts(t.price ?? 'on_request', 'EUR', t.plan)
+  const cardFor = f => ({ days: f.durationDays, nights: f.durationNights, cities: [...new Set(f.days.map(d => d.city).filter(Boolean))],
+    from: f.price.status === 'available' && f.price.from ? { amount: f.price.from.perPerson, currency: f.price.currency } : null, image: f.images[0] ?? null })
+  const links = list.map(t => ({ title: t.name, path: `tours/${slugIn(t, lang)}`, card: cardFor(factsOf(t)) }))
+  const places = new Map()
+  for (const t of list) for (const c of cardFor(factsOf(t)).cities) {
+    const p = places.get(placeSlug(c)) ?? { name: c, tours: new Set() }
+    p.tours.add(`tours/${slugIn(t, lang)}`); places.set(placeSlug(c), p)
+  }
+  const destinations = [...places].map(([slug, p]) => ({ name: p.name, path: `destinations/${slug}`, count: p.tours.size })).sort((a, b) => b.count - a.count)
+  const base = { language: lang, site: siteInfo(s), tour: null, tours: [], unpublished: false, destinations }
   if (path === '') return { ...base, kind: 'home', path: '', title: s.companyName, alternates: [{ language: other, path: '' }], tours: links }
   if (path === 'tours') return { ...base, kind: 'listing', path: 'tours', title: s.companyName, alternates: [{ language: other, path: 'tours' }], tours: links }
+  const dm = path.match(/^destinations\/([a-z0-9-]+)$/)
+  if (dm) {
+    const p = places.get(dm[1])
+    if (!p) return null
+    return { ...base, kind: 'destination', path, title: p.name, destination: { name: p.name, slug: dm[1] },
+      alternates: [{ language: other, path }], tours: links.filter(l => p.tours.has(l.path)) }
+  }
   const m = path.match(/^tours\/([a-z0-9-]+)$/)
   const t = m && list.find(x => slugIn(x, lang) === m[1])
   if (!t) return null

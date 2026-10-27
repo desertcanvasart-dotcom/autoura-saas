@@ -25,6 +25,7 @@ import { colon, countOf, t } from '../../i18n/strings'
 import { photoFor, tourPhotos, type Photo } from '../../lib/photos'
 import { PriceExplorer } from './PriceExplorer'
 import { RouteMap } from './RouteMap'
+import { TourFinder, type FinderTour } from './TourFinder'
 import s from './theme.module.css'
 
 /* eslint-disable @next/next/no-img-element -- remote library and agency storage; sized by CSS */
@@ -39,7 +40,7 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
   const wa = whatsappHref(page)
   const email = emailHref(identity)
   const phone = phoneHref(identity)
-  const onBand = page.kind === 'home' || page.kind === 'tour'
+  const onBand = page.kind === 'home' || page.kind === 'tour' || page.kind === 'destination'
   return (
     <div className={s.page}>
       {preview && <div className={s.preview}>{t(lang, 'previewBanner')}</div>}
@@ -73,27 +74,49 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
   )
 }
 
-function TourCards({ page }: ThemePageProps) {
+/** The page's tours as finder cards: the agency's own photo first, else the library's. */
+function finderTours(page: ThemePageProps['page']): FinderTour[] {
+  return page.tours.map(tour => {
+    const c = tour.card
+    const photo = c?.image ? { src: c.image, alt: tour.title } : tourPhotos({ name: tour.title, cities: c?.cities ?? [] })[0]
+    return {
+      title: tour.title, href: `/${page.language}/${tour.path}`, photo: { src: photo.src, alt: photo.alt },
+      days: c?.days ?? null, nights: c?.nights ?? null, cities: c?.cities ?? [], from: c?.from ?? null,
+    }
+  })
+}
+
+function TourCards({ page, filters = true }: ThemePageProps & { filters?: boolean }) {
+  if (page.tours.length === 0) return <p className={s.empty}>{t(page.language, 'noToursYet')}</p>
+  return <TourFinder tours={finderTours(page)} lang={page.language} filters={filters} />
+}
+
+/** The places the tours go, as photo tiles — each a page of its own. */
+function Destinations({ page }: ThemePageProps) {
   const lang = page.language
-  if (page.tours.length === 0) return <p className={s.empty}>{t(lang, 'noToursYet')}</p>
+  const list = (page.destinations ?? []).filter(d => d.path !== `destinations/${page.destination?.slug}`).slice(0, 8)
+  if (list.length === 0) return null
   return (
-    <ul className={s.cards}>
-      {page.tours.map(tour => {
-        const photo = tourPhotos({ name: tour.title })[0]
-        return (
-          <li key={tour.path}>
-            <a className={s.card} href={`/${lang}/${tour.path}`}>
-              <Img photo={photo} className={s.cardImg} />
-              <span className={s.cardShade} aria-hidden="true" />
-              <span className={s.cardBody}>
-                <span className={s.cardTitle}>{tour.title}</span>
-                <span className={s.cardMore}>{t(lang, 'viewTour')} <span aria-hidden="true">→</span></span>
-              </span>
-            </a>
-          </li>
-        )
-      })}
-    </ul>
+    <section className={`${s.container} ${s.section}`}>
+      <h2 className={s.h2Big}>{t(lang, 'destinationsTitle')}</h2>
+      <ul className={s.places}>
+        {list.map(d => {
+          const photo = photoFor(d.name) ?? tourPhotos({ name: d.name })[0]
+          return (
+            <li key={d.path}>
+              <a className={s.place} href={`/${lang}/${d.path}`}>
+                <Img photo={photo} className={s.placeImg} />
+                <span className={s.cardShade} aria-hidden="true" />
+                <span className={s.placeBody}>
+                  <span className={s.placeName}>{d.name}</span>
+                  <span className={s.cardMore}>{d.count} {t(lang, d.count === 1 ? 'oneJourney' : 'journeysCount')}</span>
+                </span>
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 
@@ -269,18 +292,42 @@ function Page(props: ThemePageProps) {
       <>
         <HomeHero {...props} />
         <section className={`${s.container} ${s.section}`}>
-          <h2 className={s.h2Big}>{t(lang, 'journeysTitle')}</h2>
+          <h2 className={s.h2Big}>{t(lang, 'findJourney')}</h2>
           <TourCards {...props} />
         </section>
+        <Destinations {...props} />
       </>
     )
   }
   if (page.kind === 'listing') {
     return (
-      <section className={`${s.container} ${s.section} ${s.listingTop}`}>
-        <h1 className={s.h2Big}>{t(lang, 'journeysTitle')}</h1>
-        <TourCards {...props} />
-      </section>
+      <>
+        <section className={`${s.container} ${s.section} ${s.listingTop}`}>
+          <h1 className={s.h2Big}>{t(lang, 'journeysTitle')}</h1>
+          <TourCards {...props} />
+        </section>
+        <Destinations {...props} />
+      </>
+    )
+  }
+  if (page.kind === 'destination' && page.destination) {
+    const photo = photoFor(page.destination.name) ?? tourPhotos({ name: page.destination.name })[0]
+    return (
+      <>
+        <section className={s.tourHero} data-section="hero">
+          <Img photo={photo} className={s.tourHeroImg} eager />
+          <div className={s.tourHeroShade} aria-hidden="true" />
+          <div className={`${s.container} ${s.tourHeroText}`}>
+            <p className={s.eyebrow}>{t(lang, 'destinationLabel')}</p>
+            <h1 className={s.tourTitle}>{page.destination.name}</h1>
+          </div>
+        </section>
+        <section className={`${s.container} ${s.section}`}>
+          <h2 className={s.h2Big}>{t(lang, 'toursThere')}</h2>
+          <TourCards {...props} filters={false} />
+        </section>
+        <Destinations {...props} />
+      </>
     )
   }
   if (page.kind === 'tour' && page.tour) return <TourPage {...props} />

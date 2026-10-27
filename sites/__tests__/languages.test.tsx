@@ -25,7 +25,7 @@ describe('the supported languages', () => {
   })
 
   // Words that are the same in the language (or a brand-neutral label).
-  const SAME: Partial<Record<string, StringKey[]>> = { fr: ['contact', 'menu', 'licensed'], es: [] }
+  const SAME: Partial<Record<string, StringKey[]>> = { fr: ['contact', 'menu', 'licensed', 'destinationLabel'], es: [] }
   for (const [lang, dict] of [['fr', fr], ['es', es]] as const) {
     it(`${lang}: every word is there, filled in, and actually translated`, () => {
       for (const key of Object.keys(dict) as StringKey[]) {

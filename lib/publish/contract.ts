@@ -65,7 +65,6 @@ export const siteResolutionSchema = z.object({
 })
 export type SiteResolution = z.infer<typeof siteResolutionSchema>
 
-const pageLink = z.object({ title: z.string(), path: z.string() })
 
 /** The company as its records say — shown in the header and footer. From
  *  `tenants`, read at render time like every other fact. */
@@ -82,6 +81,20 @@ export const companyIdentitySchema = z.object({
 export type CompanyIdentity = z.infer<typeof companyIdentitySchema>
 
 const money = z.number().positive().finite()
+
+/** What a tour card shows (home, listing, destination pages): the tour's
+ *  shape and its "from" price, from the same records as its page. Optional,
+ *  so a renderer or app one deploy behind still agrees. */
+const tourCard = z.object({
+  days: z.number().int().nonnegative(),
+  nights: z.number().int().nonnegative(),
+  cities: z.array(z.string()),
+  /** The tour page's "from" (per person, 2 sharing); null = price on request. */
+  from: z.object({ amount: money, currency: z.string() }).nullable(),
+  /** The agency's own first photo, if it has one. */
+  image: z.string().nullable(),
+})
+const pageLink = z.object({ title: z.string(), path: z.string(), card: tourCard.optional() })
 const weekday = z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
 
 /**
@@ -164,7 +177,7 @@ export const narrativeSchema = z.object({
 export type PageNarrative = z.infer<typeof narrativeSchema>
 
 export const pagePayloadSchema = z.object({
-  kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal']),
+  kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal', 'destination']),
   language: languageCode,
   /** The path inside the language, '' for the home page. */
   path: z.string(),
@@ -192,8 +205,12 @@ export const pagePayloadSchema = z.object({
     facts: tourFactsSchema.nullable(),
     narrative: narrativeSchema.nullable(),
   }).nullable(),
-  /** Home and listing: the tours the site shows. */
+  /** Home, listing and destination pages: the tours the site shows there. */
   tours: z.array(pageLink),
+  /** The places the site's tours go, each a page of its own (redesign). */
+  destinations: z.array(z.object({ name: z.string(), path: z.string(), count: z.number().int().positive() })).optional(),
+  /** A destination page: the place it is about. */
+  destination: z.object({ name: z.string(), slug: z.string() }).nullable().optional(),
   /** Not yet published — shown only on a test hostname. */
   unpublished: z.boolean(),
   /** The page row, for the enquiry form and the tracked WhatsApp link
@@ -257,7 +274,7 @@ export function internalAuthHeader(secret: string): Record<string, string> {
 export const sitemapSchema = z.object({
   languages: z.array(languageCode),
   pages: z.array(z.object({
-    kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal']),
+    kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal', 'destination']),
     /** language → path inside it ('' for the home page). */
     paths: z.record(languageCode, z.string()),
     /** ISO date of the latest publication, when known. */

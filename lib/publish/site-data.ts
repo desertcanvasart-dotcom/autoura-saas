@@ -43,6 +43,7 @@ export type PathTarget =
   | { kind: 'listing' }
   | { kind: 'tour'; slug: string }
   | { kind: 'page'; slug: string }
+  | { kind: 'destination'; slug: string }
   | { kind: 'none' }
 
 /** What a path inside a language asks for. */
@@ -55,8 +56,41 @@ export function targetOf(path: string): PathTarget {
     if (parts.length === 2 && slugOk(parts[1])) return { kind: 'tour', slug: parts[1] }
     return { kind: 'none' }
   }
+  if (parts[0] === 'destinations') {
+    if (parts.length === 2 && slugOk(parts[1])) return { kind: 'destination', slug: parts[1] }
+    return { kind: 'none' }
+  }
   if (parts.length === 1 && slugOk(parts[0])) return { kind: 'page', slug: parts[0] }
   return { kind: 'none' }
+}
+
+/** A place's address segment, from its name in the records ("Kom Ombo" → "kom-ombo"). */
+export function placeSlug(name: string): string {
+  return name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'place'
+}
+
+type Card = NonNullable<PagePayload['tours'][number]['card']>
+
+/** A tour card's facts, from the same facts as the tour's page. */
+export function cardOf(facts: TourFacts, labels: Record<string, string> = {}): Card {
+  const cities = [...new Set(facts.days.map(d => d.city).filter((c): c is string => !!c))]
+  return {
+    days: facts.durationDays,
+    nights: facts.durationNights,
+    cities: cities.map(c => labels[c] ?? c),
+    from: facts.price.status === 'available' && facts.price.from ? { amount: facts.price.from.perPerson, currency: facts.price.currency } : null,
+    image: facts.images[0] ?? null,
+  }
+}
+
+/** Run at most `limit` at once — one company's tours, each through the pricing engine. */
+async function inBatches<T, R>(items: T[], limit: number, f: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await f(items[i]) }
+  }))
+  return out
 }
 
 const tourPath = (slug: string) => `tours/${slug}`
@@ -217,18 +251,57 @@ export async function loadPagePayload(db: Db, input: {
   const locales = ((rows ?? []) as LocaleRow[]).filter(r => showable(r, input.preview))
   const tourLocales = locales.filter(r => r.publish_pages!.kind === 'tour')
   const names = await approvedNames(db, siteInfo.tenantId, tourLocales)
+  // Cards (and the places they add up to) only where tours are listed: a
+  // tour page needs neither, and each card runs the pricing engine.
+  const listed = target.kind === 'home' || target.kind === 'listing' || target.kind === 'destination'
+  const facts = listed
+    ? await inBatches(tourLocales, 6, r => deps.tourFacts(db, {
+      tenantId: siteInfo.tenantId, templateId: r.publish_pages!.tour_template_id!, language: input.language,
+      indicativeCurrencies: indicativeCurrenciesOf(site.settings),
+    }).catch(() => null))
+    : []
+  const places = new Map<string, { name: string; tours: Set<string> }>()
   const tourLinks = tourLocales
-    .map(r => {
+    .map((r, i) => {
       const name = r.publish_pages!.tour_templates!.template_name
-      return { title: names.get(r.current_version_id ?? '')?.[name] ?? name, path: tourPath(r.slug) }
+      const labels = names.get(r.current_version_id ?? '') ?? {}
+      const f = facts[i]
+      if (f) for (const d of f.days) {
+        if (!d.city) continue
+        const slug = placeSlug(d.city)
+        const place = places.get(slug) ?? { name: labels[d.city] ?? d.city, tours: new Set<string>() }
+        place.tours.add(r.slug)
+        places.set(slug, place)
+      }
+      return { title: labels[name] ?? name, path: tourPath(r.slug), ...(f ? { card: cardOf(f, labels) } : {}) }
     })
     .sort((a, b) => a.title.localeCompare(b.title, input.language))
+  const destinations = [...places].map(([slug, p]) => ({ name: p.name, path: `destinations/${slug}`, count: p.tours.size }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, input.language))
 
   let row: LocaleRow | undefined
   if (target.kind === 'home') row = locales.find(r => r.publish_pages!.kind === 'home')
   else if (target.kind === 'tour') row = locales.find(r => r.publish_pages!.kind === 'tour' && r.slug === target.slug)
   else if (target.kind === 'page') row = locales.find(r => !['tour', 'home', 'listing'].includes(r.publish_pages!.kind) && r.slug === target.slug)
   else if (target.kind === 'listing') row = locales.find(r => r.publish_pages!.kind === 'listing')
+
+  // A destination page exists while a listed tour goes there — built from
+  // the records, never a page row of its own.
+  if (target.kind === 'destination') {
+    const place = places.get(target.slug)
+    if (!place) return null
+    return {
+      kind: 'destination', language: input.language, path: `destinations/${target.slug}`, title: place.name,
+      site: siteInfo,
+      alternates: siteInfo.languages.filter(l => l !== input.language).map(l => ({ language: l, path: `destinations/${target.slug}` })),
+      tour: null,
+      tours: tourLinks.filter(l => place.tours.has(l.path.slice('tours/'.length))),
+      destinations,
+      destination: { name: place.name, slug: target.slug },
+      unpublished: false,
+      pageId: null,
+    }
+  }
 
   // The home page and the tour listing exist even before a page row is made
   // for them: a site with only tour pages still has a front door.
@@ -287,6 +360,7 @@ export async function loadPagePayload(db: Db, input: {
     alternates,
     tour,
     tours: kind === 'home' || kind === 'listing' ? tourLinks : [],
+    ...(kind === 'home' || kind === 'listing' ? { destinations } : {}),
     unpublished: row ? !row.is_published : false,
     pageId: row?.page_id ?? null,
   }
@@ -312,8 +386,8 @@ async function approvedNames(db: Db, tenantId: string, rows: LocaleRow[]): Promi
 /** The site's published pages, each with its path per published language.
  *  The home page and the tour listing are always there (they exist without
  *  a page row); nothing unpublished, and no tour that is switched off. */
-export async function loadSitemap(db: Db, siteId: string): Promise<SitemapData | null> {
-  const { data: site, error: sErr } = await db.from('publish_sites').select('id, status, languages').eq('id', siteId).maybeSingle()
+export async function loadSitemap(db: Db, siteId: string, deps: Pick<PageDeps, 'tourFacts'> = { tourFacts: loadTourFacts }): Promise<SitemapData | null> {
+  const { data: site, error: sErr } = await db.from('publish_sites').select('id, tenant_id, status, languages, settings').eq('id', siteId).maybeSingle()
   if (sErr) throw new Error(`reading the site: ${sErr.message}`)
   if (!site || site.status === 'suspended') return null
   const languages = site.languages as string[]
@@ -322,8 +396,11 @@ export async function loadSitemap(db: Db, siteId: string): Promise<SitemapData |
     .select(`${LOCALE_SELECT}, published_at`).eq('site_id', siteId)
   if (error) throw new Error(`reading pages: ${error.message}`)
   const byPage = new Map<string, SitemapData['pages'][number]>()
+  const tourLanguages = new Map<string, Set<string>>() // template → the languages its page is published in
   for (const row of (rows ?? []) as Array<LocaleRow & { published_at: string | null }>) {
     if (!languages.includes(row.language) || !showable(row, false)) continue
+    const template = row.publish_pages!.tour_template_id
+    if (row.publish_pages!.kind === 'tour' && template) tourLanguages.set(template, (tourLanguages.get(template) ?? new Set()).add(row.language))
     const entry = byPage.get(row.page_id) ?? { kind: row.publish_pages!.kind, paths: {}, lastModified: null }
     entry.paths[row.language] = pathOf(row)
     if (row.published_at && (!entry.lastModified || row.published_at > entry.lastModified)) entry.lastModified = row.published_at.slice(0, 10)
@@ -333,5 +410,25 @@ export async function loadSitemap(db: Db, siteId: string): Promise<SitemapData |
   const all = (path: string) => Object.fromEntries(languages.map(l => [l, path]))
   if (!pages.some(p => p.kind === 'home')) pages.unshift({ kind: 'home', paths: all(''), lastModified: null })
   if (!pages.some(p => p.kind === 'listing')) pages.splice(1, 0, { kind: 'listing', paths: all('tours'), lastModified: null })
+
+  // Destination pages: one per place a published tour goes, in the languages
+  // that tour is published in (the same rule as the pages themselves).
+  const templates = [...tourLanguages.keys()]
+  const facts = await inBatches(templates, 6, templateId => deps.tourFacts(db, {
+    tenantId: site.tenant_id as string, templateId, language: languages[0], indicativeCurrencies: indicativeCurrenciesOf(site.settings),
+  }).catch(() => null))
+  const places = new Map<string, Set<string>>()
+  templates.forEach((templateId, i) => {
+    for (const d of facts[i]?.days ?? []) {
+      if (!d.city) continue
+      const slug = placeSlug(d.city)
+      const langs = places.get(slug) ?? new Set<string>()
+      tourLanguages.get(templateId)!.forEach(l => langs.add(l))
+      places.set(slug, langs)
+    }
+  })
+  for (const [slug, langs] of [...places].sort((a, b) => a[0].localeCompare(b[0]))) {
+    pages.push({ kind: 'destination', paths: Object.fromEntries([...langs].map(l => [l, `destinations/${slug}`])), lastModified: null })
+  }
   return { languages, pages }
 }

@@ -136,6 +136,14 @@ function Page(props: ThemePageProps) {
       </article>
     )
   }
+  if (page.kind === 'destination') {
+    return (
+      <section className={s.section}>
+        <h1 className={s.sectionTitle}>{page.title}</h1>
+        <TourGrid {...props} />
+      </section>
+    )
+  }
   return (
     <section className={s.section}>
       <h1 className={s.sectionTitle}>{page.title}</h1>

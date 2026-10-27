@@ -158,7 +158,8 @@ describe('loadPagePayload', () => {
   it('the home page exists before any home page row, listing the published, switched-on tours', async () => {
     const home = await load('')
     expect(home).toMatchObject({ kind: 'home', title: 'Sillage', alternates: [{ language: 'fr', path: '' }] })
-    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic' }])
+    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic', card: { days: 1, nights: 0, cities: ['Giza'], from: { amount: 99, currency: 'EUR' }, image: null } }])
+    expect(home!.destinations).toEqual([{ name: 'Giza', path: 'destinations/giza', count: 1 }])
   })
   it('an unpublished page shows only in preview, flagged', async () => {
     expect(await load('tours/draft-tour')).toBeNull()
@@ -260,6 +261,7 @@ describe('search engines (step 9)', () => {
       { kind: 'listing', paths: { en: 'tours', fr: 'tours' }, lastModified: null },
       { kind: 'tour', paths: { en: 'tours/nile-classic', fr: 'tours/croisiere-nil' }, lastModified: null },
       { kind: 'about', paths: { en: 'about-us' }, lastModified: null },
+      { kind: 'destination', paths: { en: 'destinations/giza', fr: 'destinations/giza' }, lastModified: null },
     ])
   })
   it('a suspended site has no sitemap', async () => {
@@ -286,6 +288,39 @@ describe('the tour\'s wording in the page language (approved translation)', () =
     expect(page!.tour!.facts!.price).toEqual(FACTS.price)
 
     const listing = await loadPagePayload(base as never, { siteId: SITE, language: 'fr', path: 'tours', preview: false }, { tourFacts: async () => FACTS })
-    expect(listing!.tours).toEqual([{ title: 'Le Nil classique', path: 'tours/le-nil-classique' }])
+    expect(listing!.tours).toEqual([{ title: 'Le Nil classique', path: 'tours/le-nil-classique', card: { days: 1, nights: 0, cities: ['Gizeh'], from: { amount: 99, currency: 'EUR' }, image: null } }])
+    expect(listing!.destinations).toEqual([{ name: 'Gizeh', path: 'destinations/giza', count: 1 }])
+  })
+})
+
+describe('tour cards and destination pages (redesign)', () => {
+  const load = (path: string, opts: { language?: string; facts?: () => Promise<TourFacts> } = {}) =>
+    loadPagePayload(db() as never, { siteId: SITE, language: opts.language ?? 'en', path, preview: false }, { tourFacts: opts.facts ?? (async () => FACTS) })
+
+  it('a destination page lists the published tours that go there', async () => {
+    const page = await load('destinations/giza')
+    expect(pagePayloadSchema.parse(page)).toEqual(page)
+    expect(page).toMatchObject({ kind: 'destination', title: 'Giza', path: 'destinations/giza', destination: { name: 'Giza', slug: 'giza' },
+      alternates: [{ language: 'fr', path: 'destinations/giza' }] })
+    expect(page!.tours.map(t => t.path)).toEqual(['tours/nile-classic'])
+  })
+  it('a place no listed tour goes to is not a page', async () => {
+    expect(await load('destinations/aswan')).toBeNull()
+    expect(await load('destinations')).toBeNull()
+  })
+  it('a tour whose facts cannot be read is listed without a card — the page still renders', async () => {
+    const home = await load('', { facts: async () => { throw new Error('engine down') } })
+    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic' }])
+    expect(home!.destinations).toEqual([])
+  })
+  it('a price on request gives a card without an amount', async () => {
+    const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, from: null, byNationality: null, table: [], indicative: [] } }
+    const home = await load('', { facts: async () => onRequest })
+    expect(home!.tours[0].card!.from).toBeNull()
+  })
+  it('a tour page does not price every other tour', async () => {
+    const facts = vi.fn(async () => FACTS)
+    await load('tours/nile-classic', { facts })
+    expect(facts).toHaveBeenCalledTimes(1)
   })
 })

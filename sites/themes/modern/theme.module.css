@@ -69,7 +69,7 @@
 @keyframes rise { from { opacity: 0; transform: skewX(-12deg) translateY(60px); } }
 
 /* ---------- sections and cards ---------- */
-.section { padding: 56px 0; }
+.section { padding-top: 56px; padding-bottom: 56px; }
 .listingTop { padding-top: 32px; }
 .h2Big { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 4vw, 44px); letter-spacing: -0.02em; margin: 0 0 28px; }
 .h2 { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.01em; margin: 0 0 16px; }
@@ -87,6 +87,24 @@
 .cardBody { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px; display: grid; gap: 8px; }
 .cardTitle { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1.1; }
 .cardMore { font-size: 14px; font-weight: 600; opacity: 0.9; }
+
+/* ---------- finder, card details, destination tiles ---------- */
+.finder { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; margin: -8px 0 24px; }
+.finder .toggleGroup { margin-top: 0; }
+.select { font: inherit; font-size: 15px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--brand-ink); }
+.cardMeta { font-size: 13px; font-weight: 500; opacity: 0.9; }
+.cardPrice {
+  position: absolute; top: 14px; right: 14px; padding: 8px 12px; border-radius: 999px; font-size: 13px;
+  background: rgba(255,255,255,0.92); color: var(--brand-ink); box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+.cardPrice strong { font-family: var(--font-display); font-size: 16px; color: var(--brand-primary); }
+.places { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 900px) { .places { grid-template-columns: repeat(4, 1fr); } }
+.place { position: relative; display: block; aspect-ratio: 1; border-radius: var(--radius); overflow: hidden; color: #fff !important; text-decoration: none; isolation: isolate; }
+.placeImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; transition: transform 0.6s ease; }
+.place:hover .placeImg { transform: scale(1.06); }
+.placeBody { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px; display: grid; gap: 4px; }
+.placeName { font-family: var(--font-display); font-weight: 700; font-size: 22px; }
 
 /* ---------- tour hero ---------- */
 .tourHero { position: relative; min-height: 520px; display: flex; align-items: flex-end; color: #fff; overflow: hidden; }
@@ -175,5 +193,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .strip { animation: none; }
-  .cardImg, .pill, .pillDark { transition: none; }
+  .cardImg, .placeImg, .pill, .pillDark { transition: none; }
 }
