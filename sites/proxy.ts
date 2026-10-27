@@ -41,6 +41,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything but Next's own assets and the sync worker's revalidate call.
-  matcher: ['/((?!_next/|api/revalidate).*)'],
+  // Everything but Next's own assets and the app's own routes: the sync
+  // worker's revalidate call, and the enquiry form and WhatsApp button
+  // (sites/app/api/*), which resolve the hostname themselves.
+  matcher: ['/((?!_next/|api/).*)'],
 }

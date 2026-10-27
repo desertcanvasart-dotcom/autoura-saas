@@ -8,9 +8,9 @@
 // Env: PUBLISH_APP_URL (the GetAutoura app), PUBLISH_INTERNAL_SECRET.
 
 import {
-  CONTRACT_VERSION, INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, internalAuthHeader,
-  pagePayloadSchema, siteResolutionSchema,
-  type PagePayload, type SiteResolution,
+  CONTRACT_VERSION, INTERNAL_ENQUIRY_PATH, INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, INTERNAL_WA_REF_PATH, internalAuthHeader,
+  pagePayloadSchema, siteResolutionSchema, waRefResultSchema,
+  type EnquiryInput, type PagePayload, type SiteResolution, type WaRefInput, type WaRefResult,
 } from '@/lib/publish/contract'
 import { publishTags } from '@/lib/publish/sync/events'
 import type { Mode } from './routing'
@@ -90,4 +90,32 @@ export async function loadPage(
     throw new InternalApiError('page payload is for a different site')
   }
   return page
+}
+
+// ---------- lead capture (step 8): never cached ----------
+
+async function post(path: string, body: unknown, fetchImpl: typeof fetch): Promise<Response> {
+  const { base, secret } = config()
+  return fetchImpl(`${base}${path}?v=${CONTRACT_VERSION}`, {
+    method: 'POST',
+    headers: { ...internalAuthHeader(secret), 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  })
+}
+
+/** 'sent', 'slow_down' (rate limited), or 'invalid' (the app refused the fields). */
+export async function sendEnquiry(input: EnquiryInput, fetchImpl: typeof fetch = fetch): Promise<'sent' | 'slow_down' | 'invalid'> {
+  const res = await post(INTERNAL_ENQUIRY_PATH, input, fetchImpl)
+  if (res.status === 201) return 'sent'
+  if (res.status === 429) return 'slow_down'
+  if (res.status === 400) return 'invalid'
+  throw new InternalApiError(`enquiry: HTTP ${res.status}`)
+}
+
+export async function requestWaRef(input: WaRefInput, fetchImpl: typeof fetch = fetch): Promise<WaRefResult> {
+  const res = await post(INTERNAL_WA_REF_PATH, input, fetchImpl)
+  if (!res.ok) throw new InternalApiError(`WhatsApp reference: HTTP ${res.status}`)
+  return waRefResultSchema.parse(await res.json())
 }

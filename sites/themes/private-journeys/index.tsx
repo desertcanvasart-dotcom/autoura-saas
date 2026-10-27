@@ -12,11 +12,12 @@ import { LanguageLinks } from '../blocks/LanguageLinks'
 import { TourSections } from '../blocks/TourSections'
 import { OverviewSection, AccommodationSection, CancellationSection, DeparturesSection, GroupSizeSection, HighlightsSection, InclusionsSection, ItinerarySection, PriceSection, TourImage } from '../blocks/TourFacts'
 import { emailHref, phoneHref, whatsappHref } from '../blocks/contact'
+import { EnquiryForm } from '../blocks/EnquiryForm'
 import { t } from '../../i18n/strings'
 import s from './theme.module.css'
 
 function consultationHref(page: ThemePageProps['page']): string | null {
-  return emailHref(page.site.identity) ?? whatsappHref(page.site.identity)
+  return emailHref(page.site.identity) ?? whatsappHref(page)
 }
 
 function Frame({ page, preview, children }: ThemePageProps & { children: React.ReactNode }) {
@@ -24,7 +25,7 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
   const { identity, companyName } = page.site
   const email = emailHref(identity)
   const phone = phoneHref(identity)
-  const wa = whatsappHref(identity)
+  const wa = whatsappHref(page)
   return (
     <div className={s.page}>
       {preview && <div className={s.preview}>{t(lang, 'previewBanner')}</div>}
@@ -43,7 +44,7 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
           <ul className={s.footerContact}>
             {email && <li><a href={email}>{identity.email}</a></li>}
             {phone && <li><a href={phone}>{identity.phone}</a></li>}
-            {wa && <li><a href={wa} rel="noopener">WhatsApp</a></li>}
+            {wa && <li><a href={wa} rel="nofollow">WhatsApp</a></li>}
             {identity.address && <li>{identity.address}</li>}
           </ul>
           {identity.licenseNumber && <p className={s.licence}>{t(lang, 'licensed')} {identity.licenseNumber}</p>}
@@ -68,16 +69,6 @@ function JourneyCards({ page }: ThemePageProps) {
         </li>
       ))}
     </ul>
-  )
-}
-
-function ConsultationBand({ page }: ThemePageProps) {
-  const href = consultationHref(page)
-  if (!href) return null
-  return (
-    <section className={s.band}>
-      <a className={s.button} href={href}>{t(page.language, 'planYourJourney')}</a>
-    </section>
   )
 }
 
@@ -133,7 +124,7 @@ function Page(props: ThemePageProps) {
             departures: () => f && <DeparturesSection {...f} />,
             groupSize: () => f && <GroupSizeSection {...f} />,
             terms: () => f && <CancellationSection {...f} />,
-            enquiry: () => <ConsultationBand {...props} />,
+            enquiry: () => <EnquiryForm page={page} variant="editorial" />,
           }}
         />
       </article>
@@ -142,6 +133,7 @@ function Page(props: ThemePageProps) {
   return (
     <section className={s.section}>
       <h1 className={s.sectionTitle}>{page.title}</h1>
+      {page.kind === 'contact' && <EnquiryForm page={page} variant="editorial" />}
     </section>
   )
 }

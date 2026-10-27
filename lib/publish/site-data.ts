@@ -275,5 +275,6 @@ export async function loadPagePayload(db: Db, input: {
     tour,
     tours: kind === 'home' || kind === 'listing' ? tourLinks : [],
     unpublished: row ? !row.is_published : false,
+    pageId: row?.page_id ?? null,
   }
 }
