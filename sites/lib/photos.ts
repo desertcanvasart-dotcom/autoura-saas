@@ -6,9 +6,13 @@
 // records, so a tour has pictures without the agency doing anything. The
 // agency's own photos (facts.images) always come first.
 //
-// MOCK-UP ONLY: these are Wikimedia Commons images, used for the local
-// preview of the new design. Before this ships they are replaced by the
-// licensed library (decision pending) and served from our own storage.
+// The library is OFF unless PUBLISH_PHOTO_LIBRARY=commons — set only for the
+// local preview (.claude/launch.json). These are Wikimedia Commons images,
+// whose licences ask for each photographer's credit, so they never reach a
+// live company site (operator, 2026-10-28). With the library off, a tour
+// shows the agency's own photos, and the themes draw a colour panel in the
+// agency's palette where there are none. The licensed library (decision
+// pending) replaces this list and is served from our own storage.
 
 export interface Photo { src: string; alt: string; credit: string }
 
@@ -35,18 +39,24 @@ const LIBRARY: Array<{ keys: string[]; photo: Photo }> = [
 
 const FALLBACK = LIBRARY.find(l => l.keys.includes('felucca'))!.photo
 
+/** Whether library photos may be shown (local preview only, for now). */
+export function libraryEnabled(): boolean {
+  return process.env.PUBLISH_PHOTO_LIBRARY === 'commons'
+}
+
 export function photoFor(name: string | null | undefined): Photo | null {
   const n = (name ?? '').toLowerCase()
-  if (!n) return null
+  if (!n || !libraryEnabled()) return null
   return LIBRARY.find(l => l.keys.some(k => n.includes(k)))?.photo ?? null
 }
 
 /** A tour's photos: its own first, then the library's for its name, sights
- *  and cities — each once. Never empty: a tour always has a picture. */
+ *  and cities — each once. With the library on, never empty; with it off,
+ *  only the agency's own (possibly none — the theme draws a colour panel). */
 export function tourPhotos(input: { name: string; images?: string[]; sights?: string[]; cities?: (string | null)[] }): Photo[] {
   const own = (input.images ?? []).map(src => ({ src, alt: input.name, credit: '' }))
   const matched = [input.name, ...(input.sights ?? []), ...(input.cities ?? [])].map(photoFor).filter((p): p is Photo => p !== null)
   const seen = new Set<string>()
   const out = [...own, ...matched].filter(p => (seen.has(p.src) ? false : (seen.add(p.src), true)))
-  return out.length ? out : [FALLBACK]
+  return out.length || !libraryEnabled() ? out : [FALLBACK]
 }

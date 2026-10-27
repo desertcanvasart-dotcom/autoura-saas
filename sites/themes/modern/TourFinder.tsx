@@ -12,7 +12,8 @@ import s from './theme.module.css'
 export interface FinderTour {
   title: string
   href: string
-  photo: { src: string; alt: string }
+  /** null: no photo of its own and no library — a colour panel instead. */
+  photo: { src: string; alt: string } | null
   days: number | null
   nights: number | null
   cities: string[]
@@ -53,8 +54,10 @@ export function TourFinder({ tours, lang, filters = true }: { tours: FinderTour[
           {shown.map(x => (
             <li key={x.href}>
               <a className={s.card} href={x.href}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- library or agency storage; sized by CSS */}
-                <img src={x.photo.src} alt={x.photo.alt} className={s.cardImg} loading="lazy" decoding="async" />
+                {x.photo
+                  // eslint-disable-next-line @next/next/no-img-element -- library or agency storage; sized by CSS
+                  ? <img src={x.photo.src} alt={x.photo.alt} className={s.cardImg} loading="lazy" decoding="async" />
+                  : <span className={s.panel} aria-hidden="true" />}
                 <span className={s.cardShade} aria-hidden="true" />
                 {x.from && (
                   <span className={s.cardPrice}>{t(lang, 'from')} <strong>{formatPrice(x.from.amount, x.from.currency, lang)}</strong></span>

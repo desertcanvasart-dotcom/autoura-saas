@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { THEMES } from '../themes'
 import { routeStops } from '../themes/modern/RouteMap'
@@ -93,9 +93,24 @@ describe('the route and the photos', () => {
   it('the route is the days\' cities in order, each stop once in a row, unknown places left out', () => {
     expect(routeStops(facts).map(s => s.name)).toEqual(['Luxor', 'Aswan'])
   })
-  it('the agency\'s own photo first, then the library\'s, never none', () => {
+  afterEach(() => { vi.unstubAllEnvs() })
+  it('local preview (library on): the agency\'s own photo first, then the library\'s, never none', () => {
+    vi.stubEnv('PUBLISH_PHOTO_LIBRARY', 'commons')
     expect(tourPhotos({ name: 'Giza day', images: ['https://cdn.example/own.jpg'] })[0].src).toBe('https://cdn.example/own.jpg')
     expect(photoFor('Valley of the Kings')?.alt).toBe('The Valley of the Kings')
     expect(tourPhotos({ name: 'Somewhere unknown' })).toHaveLength(1)
+  })
+  it('a live site (library off): only the agency\'s own photos — no unlicensed picture ever', () => {
+    vi.stubEnv('PUBLISH_PHOTO_LIBRARY', '')
+    expect(photoFor('Valley of the Kings')).toBeNull()
+    expect(tourPhotos({ name: 'Giza day', sights: ['Giza Pyramids'] })).toEqual([])
+    expect(tourPhotos({ name: 'Giza day', images: ['https://cdn.example/own.jpg'] }).map(p => p.src)).toEqual(['https://cdn.example/own.jpg'])
+  })
+  it('a live site draws colour panels where there is no photo, and loads nothing from Wikimedia', () => {
+    vi.stubEnv('PUBLISH_PHOTO_LIBRARY', '')
+    const html = render(home())
+    expect(html).not.toContain('wikimedia')
+    expect(html).not.toContain('<img')
+    expect(html.match(/class="[^"]*panel/g)?.length).toBeGreaterThanOrEqual(tours.length)
   })
 })

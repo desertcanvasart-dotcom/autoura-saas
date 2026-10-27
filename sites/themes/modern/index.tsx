@@ -78,9 +78,9 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
 function finderTours(page: ThemePageProps['page']): FinderTour[] {
   return page.tours.map(tour => {
     const c = tour.card
-    const photo = c?.image ? { src: c.image, alt: tour.title } : tourPhotos({ name: tour.title, cities: c?.cities ?? [] })[0]
+    const photo = c?.image ? { src: c.image, alt: tour.title } : tourPhotos({ name: tour.title, cities: c?.cities ?? [] })[0] ?? null
     return {
-      title: tour.title, href: `/${page.language}/${tour.path}`, photo: { src: photo.src, alt: photo.alt },
+      title: tour.title, href: `/${page.language}/${tour.path}`, photo: photo ? { src: photo.src, alt: photo.alt } : null,
       days: c?.days ?? null, nights: c?.nights ?? null, cities: c?.cities ?? [], from: c?.from ?? null,
     }
   })
@@ -101,11 +101,11 @@ function Destinations({ page }: ThemePageProps) {
       <h2 className={s.h2Big}>{t(lang, 'destinationsTitle')}</h2>
       <ul className={s.places}>
         {list.map(d => {
-          const photo = photoFor(d.name) ?? tourPhotos({ name: d.name })[0]
+          const photo = photoFor(d.name) ?? tourPhotos({ name: d.name })[0] ?? null
           return (
             <li key={d.path}>
               <a className={s.place} href={`/${lang}/${d.path}`}>
-                <Img photo={photo} className={s.placeImg} />
+                {photo ? <Img photo={photo} className={s.placeImg} /> : <span className={s.panel} aria-hidden="true" />}
                 <span className={s.cardShade} aria-hidden="true" />
                 <span className={s.placeBody}>
                   <span className={s.placeName}>{d.name}</span>
@@ -135,7 +135,12 @@ function HomeHero({ page }: ThemePageProps) {
           <a className={s.pill} href={`/${lang}/tours`}>{t(lang, 'journeysTitle')} <span aria-hidden="true">→</span></a>
         </div>
         <div className={s.strips} aria-hidden="true">
-          {pics.map((p, i) => <div key={p.src} className={s.strip} style={{ '--i': i } as React.CSSProperties}><Img photo={p} eager={i === 0} /></div>)}
+          {/* No photos (library off, none of the agency's): the strips are colour. */}
+          {(pics.length ? pics : [null, null, null]).map((p, i) => (
+            <div key={p?.src ?? i} className={s.strip} style={{ '--i': i } as React.CSSProperties}>
+              {p ? <Img photo={p} eager={i === 0} /> : <span className={s.stripPanel} aria-hidden="true" />}
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -214,7 +219,7 @@ function TourPage({ page }: ThemePageProps) {
   return (
     <article>
       <section className={s.tourHero} data-section="hero">
-        <Img photo={photos[0]} className={s.tourHeroImg} eager />
+        {photos[0] && <Img photo={photos[0]} className={s.tourHeroImg} eager />}
         <div className={s.tourHeroShade} aria-hidden="true" />
         <div className={`${s.container} ${s.tourHeroText}`}>
           {page.unpublished && <p className={s.unpublished}>{t(lang, 'notYetPublished')}</p>}
@@ -311,11 +316,11 @@ function Page(props: ThemePageProps) {
     )
   }
   if (page.kind === 'destination' && page.destination) {
-    const photo = photoFor(page.destination.name) ?? tourPhotos({ name: page.destination.name })[0]
+    const photo = photoFor(page.destination.name) ?? tourPhotos({ name: page.destination.name })[0] ?? null
     return (
       <>
         <section className={s.tourHero} data-section="hero">
-          <Img photo={photo} className={s.tourHeroImg} eager />
+          {photo && <Img photo={photo} className={s.tourHeroImg} eager />}
           <div className={s.tourHeroShade} aria-hidden="true" />
           <div className={`${s.container} ${s.tourHeroText}`}>
             <p className={s.eyebrow}>{t(lang, 'destinationLabel')}</p>
