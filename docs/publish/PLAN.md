@@ -236,35 +236,16 @@ On entering `failing`, `lagging` or `stalled` (de-duplicated, at most one alert 
 
 ## 9. Content engine (`lib/publish/engine/`)
 
-**Interface**
+*Built in step 6 — this section describes what exists.*
 
-```ts
-draft(input: {
-  kind: 'overview' | 'highlights' | 'day' | 'seo'
-  language: SiteLanguage      // 'en' | 'fr' | 'es' in Phase 1 — the site's English or its picked second language
-  facts: TourFacts            // the same bundle the page renders
-  brand: BrandProfile         // tone, claim list, words to avoid
-  sources: SourceNote[]       // Content Library entries matched without AI (day-writer approach)
-  glossary: GlossaryEntry[]
-  instruction?: string        // reviewer's note on a rejected draft
-}): Promise<{ segments: Segment[]; sources: SourceRef[]; check: CheckResult }>
-
-type Segment = { type: 'text'; text: string; sourceRefs: string[] }
-             | { type: 'slot'; slot: SlotKey }   // price_from, group_size, departure_days, ...
-```
-
-The model is told which slots exist and may only place slot tokens (`{{slot:price_from}}`); it never sees the values it would be tempted to repeat where a slot is the right answer. A second-language draft is written from the same facts in that language (not machine-translated from the English draft), with the glossary as hard constraints.
-
-**Post-check** (`lib/publish/engine/fact-check.ts`, pure, runs on every draft **and on every human edit before approval**). After masking glossary terms (so "Ramses II" or a cruise ship's name passes), a text segment fails if it contains:
-- any decimal digit (Unicode `\p{Nd}`), Roman numerals not in the glossary, number words and ordinals (one…twelve, hundred, thousand, dozen, first…);
-- currency symbols/codes/words (€ $ £ E£ EGP USD EUR GBP, euro, dollar, pound);
-- dates and schedule words (month and weekday names, "daily", "every", "year-round");
-- policy and promise wording (refund, cancel, deposit, non-refundable, guaranteed, free of charge, included/excluded/inclusive, price, discount).
-
-Word lists are per language (`fact-check/words/{lang}.ts`); a language can't be enabled on a site until its list exists and has tests.
-- superlatives and claims not on the brand's claim list (flagged for review, not rejected).
-
-Rejected engine drafts are retried up to twice with the violations as feedback, then stored as `failed_check` for a human. Every rule has a test case in each enabled language; the acceptance test set includes adversarial drafts (numbers spelled out, non-Latin digits, prices inside parentheses).
+- **`draftNarrative(input, callModel)`** (`engine.ts`) — kinds `overview`, `highlights`, `days`, `seo`; languages en/fr/es (a language without a post-check word list is refused before any call). Output is a draft: segments of text (with the ids of the agency notes used) or a fact **slot** by key.
+- **What the model is given:** the tour's shape from the records (days, cities, sights, meals, nights, main attractions, where it stays), the agency's tone, the claims it may make and the words it avoids (`publish_sites.brand.claims` / `.avoid`), its glossary, its own notes, the reviewer's note on a rejected draft. **Never** prices, durations, group sizes, dates or terms — those exist only as slots. A test asserts the prompt carries none of them.
+- **Slots** (`slots.ts`): `price_from`, `duration`, `group_size`, `departure_days`, `next_departure`, `cancellation` — offered only when the fact exists (no price slot on a price on request); the JSON schema enforces the list; a slot the tour cannot fill is dropped, never rendered blank. Rendering slot values on the page comes with the approved narrative (step 7).
+- **Post-check** (`fact-check.ts` + `words/{en,fr,es}.ts`): refuses any digit (every script), Roman numerals (two letters or more, upper case), number words and ordinals (from "second"; articles that mean "one" are left alone), currency signs/codes/names, months, weekdays and schedule words, policy and promise words (whole words, `*` for prefixes, so "free" does not catch "freedom" nor "tax" "taxi"). Names from the records and the glossary are masked first ("KV62", "Ramses II", "Travel2Egypt"); day titles and highlights are not names and are not masked. Claims are flagged for the reviewer unless on the claim list. The same check will run on every human edit before approval (step 7).
+- **Retries:** a draft that fails is sent back, append-only, naming each offending word; at most three attempts, then kept as `failed_check` for a person — never passed as clean. A refusal, `max_tokens`, invalid JSON or empty reply ends the loop with the reason in `notes`.
+- **Model call** (`generate.ts`): the product's single model constant (`lib/ai/models.ts`), structured output (`output_config.format` JSON schema), effort `medium`, the static system prompt cached. `generateTourDraft()` gathers a page's inputs (site, page, facts, glossary) — reads only; storing and approving drafts is step 7.
+- **Not yet:** matching the Content Library to a tour as source notes (the input exists; step 7 fills it), the cross-tenant similarity check (Phase 2).
+- **Live check: blocked** — the app's `ANTHROPIC_API_KEY` in `.env.local` was rejected (401) on 2026-10-25; to run once the key is updated.
 
 ---
 
