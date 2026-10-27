@@ -199,7 +199,9 @@ const SITE = {
   brand: { tone: 'warm', claims: ['Egyptologist guides'], avoid: [] },
   settings: { indicativeCurrencies: ['USD', 'GBP'] },
 }
-const TEST_HOSTNAME = 'sandbox.localhost' // for a renderer run on this machine; the Railway hostname is added once the service exists
+// sandbox.localhost for a renderer run on this machine; the Railway hostname
+// for the deployed publish-sites service.
+const TEST_HOSTNAMES = ['sandbox.localhost', 'publish-sites-production.up.railway.app']
 
 // ---------- the run ----------
 
@@ -288,9 +290,12 @@ if (siteId) { skipped++; console.log('   = exists') } else {
   console.log('     (creating it enrols the company in Publish sync health and switches on the fact-only rule)')
 }
 console.log('== publish_domains')
-const domainTaken = (await q('select tenant_id from publish_domains where hostname = $1', [TEST_HOSTNAME]))[0]
-if (domainTaken) { skipped++; console.log(`   = exists  ${TEST_HOSTNAME}${domainTaken.tenant_id !== T ? ' (ANOTHER COMPANY — will not touch)' : ''}`) } else {
-  toWrite++; console.log(`   + ${TEST_HOSTNAME} (test hostname: preview, never indexed)`)
+const newHostnames = []
+for (const hostname of TEST_HOSTNAMES) {
+  const taken = (await q('select tenant_id from publish_domains where hostname = $1', [hostname]))[0]
+  if (taken) { skipped++; console.log(`   = exists  ${hostname}${taken.tenant_id !== T ? ' (ANOTHER COMPANY — will not touch)' : ''}`) } else {
+    toWrite++; newHostnames.push(hostname); console.log(`   + ${hostname} (test hostname: preview, never indexed)`)
+  }
 }
 
 console.log(`\n${toWrite} row(s) to write, ${skipped} already there.`)
@@ -318,7 +323,7 @@ try {
     }
   }
   const site = siteId ?? await insert('publish_sites', { archetype: SITE.archetype, status: SITE.status, languages: SITE.languages, brand: JSON.stringify(SITE.brand), settings: JSON.stringify(SITE.settings) })
-  if (!domainTaken) await insert('publish_domains', { site_id: site, hostname: TEST_HOSTNAME, kind: 'test' })
+  for (const hostname of newHostnames) await insert('publish_domains', { site_id: site, hostname, kind: 'test' })
   await db.query('commit')
   console.log(`\nWritten. Policy ${policy}, site ${site}.`)
 } catch (e) {
