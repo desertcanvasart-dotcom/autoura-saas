@@ -91,6 +91,7 @@ export default function PublishOverviewPage() {
               <p className="text-sm text-gray-500">{data.site.status === 'live' ? 'Live' : data.site.status === 'draft' ? 'Not live yet' : 'Suspended'} · {data.site.languages.map(l => l.toUpperCase()).join(' + ')}</p>
               <Link href="/publish/look" className="mt-2 block text-sm text-[#647C47] hover:underline">Look and feel — theme, colours, fonts →</Link>
               <Link href="/publish/embed" className="mt-1 block text-sm text-[#647C47] hover:underline">On your own website — show your tours there →</Link>
+              <Link href="/publish/domains" className="mt-1 block text-sm text-[#647C47] hover:underline">Your website&apos;s address — domain, going public →</Link>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs uppercase tracking-wide text-gray-400">Sync with your records</p>

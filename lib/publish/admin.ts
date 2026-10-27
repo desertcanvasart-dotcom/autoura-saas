@@ -29,6 +29,9 @@ import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerp
 import { publishTags } from './sync/events'
 import { ARCHETYPES, ARCHETYPE_DEFAULTS, FONT_PAIRS, PALETTE_PRESETS, resolveBrand, type Archetype } from './brand'
 import { MAX_ORIGINS, embedOf, newEmbedKey, normalizeOrigin } from './embed'
+import type { DnsRecord, DomainProvider, DomainState } from './domains/provider'
+import { railwayConfigFromEnv, railwayProvider } from './domains/railway'
+import { normalizeHost } from './site-data'
 import { createRevalidator } from './sync/revalidate'
 
 type Db = {
@@ -52,6 +55,8 @@ export interface AdminDeps {
   generate: typeof generateTourDraft
   /** The tour's wording in the page language; defaults to the engine's. */
   translate?: typeof generateTourTranslation
+  /** Connects agencies' own domains (step 11); null when not configured. */
+  domains?: DomainProvider | null
   revalidate: (tenantId: string, tags: string[]) => Promise<void>
   now: () => Date
 }
@@ -60,6 +65,7 @@ export const defaultDeps: AdminDeps = {
   facts: loadTourFacts,
   generate: generateTourDraft,
   translate: generateTourTranslation,
+  domains: (() => { const c = railwayConfigFromEnv(); return c ? railwayProvider(c) : null })(),
   revalidate: (tenantId, tags) => createRevalidator({
     rendererUrl: process.env.PUBLISH_RENDERER_URL, secret: process.env.PUBLISH_REVALIDATE_SECRET,
   })(tenantId, tags),
@@ -499,4 +505,187 @@ export async function saveEmbedSettings(db: Db, actor: Actor, input: { origins: 
   const { error } = await db.from('publish_sites').update({ settings }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not save: ${error.message}`, 500)
   return { key, origins, warning: await refresh(deps, actor.tenantId) }
+}
+
+// ---------- the website's addresses (step 11, lib/publish/domains) ----------
+
+/** Railway's limit on custom domains per service (Pro plan). */
+export const PROVIDER_DOMAIN_LIMIT = 20
+
+/** The domain we own whose subdomains agencies may claim for free
+ *  (sunrise.<base>), served by one wildcard domain on the renderer. */
+export function freeBaseDomain(env: NodeJS.ProcessEnv = process.env): string | null {
+  const raw = (env.PUBLISH_SITES_BASE_DOMAIN ?? '').trim().toLowerCase()
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(raw) ? raw : null
+}
+
+/** Hostnames no agency may connect: our own, and the hosting's. */
+function reservedHost(host: string, base: string | null): boolean {
+  return /(^|\.)(getautoura\.net|railway\.app|up\.railway\.app)$/.test(host) || (base !== null && (host === base || host.endsWith(`.${base}`)))
+}
+
+type DomainRow = { id: string; hostname: string; kind: string; status: string; provider_ref: string | null; last_error: string | null; last_checked_at: string | null; verified_at: string | null }
+
+async function domainRows(db: Db, siteId: string): Promise<DomainRow[]> {
+  const { data, error } = await db.from('publish_domains')
+    .select('id, hostname, kind, status, provider_ref, last_error, last_checked_at, verified_at').eq('site_id', siteId).order('created_at')
+  check('the domains', error)
+  return (data ?? []) as DomainRow[]
+}
+
+export async function domainsOf(db: Db, actor: Actor, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const rows = await domainRows(db, site!.id)
+  return {
+    site: { status: site!.status },
+    domains: rows.map(r => ({ id: r.id, hostname: r.hostname, kind: r.kind, status: r.status, lastError: r.last_error, lastCheckedAt: r.last_checked_at, connected: !!r.provider_ref })),
+    freeBase: freeBaseDomain(),
+    providerReady: !!deps.domains,
+  }
+}
+
+const kindForNew = (rows: DomainRow[]) => rows.some(r => r.kind === 'primary') ? 'alias_redirect' : 'primary'
+
+/** Connect the agency's own domain: register it with the provider, keep the
+ *  row, and answer with the DNS records the agency adds. Managers. */
+export async function addDomain(db: Db, actor: Actor, rawHost: unknown, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const host = normalizeHost(typeof rawHost === 'string' ? rawHost.replace(/^https?:\/\//, '').split('/')[0] : '')
+  if (!host) fail('Enter a domain such as tours.youragency.com.')
+  if (reservedHost(host!, freeBaseDomain())) fail('That address belongs to Autoura — choose your own domain, or claim a free address below.')
+  if (!deps.domains) fail('Connecting your own domain is not switched on yet — contact Autoura.', 503)
+  const { data: taken, error: tErr } = await db.from('publish_domains').select('id').eq('hostname', host).maybeSingle()
+  check('the domain', tErr)
+  if (taken) fail('That domain is already connected to a website.', 409)
+  const rows = await domainRows(db, site!.id)
+  const connected = rows.filter(r => !!r.provider_ref).length
+  if (connected >= PROVIDER_DOMAIN_LIMIT) fail('The domain limit on our hosting is reached — contact Autoura to connect more domains.', 409)
+
+  let state: DomainState
+  try {
+    state = await deps.domains!.add(host!)
+  } catch (e) {
+    fail(e instanceof Error ? e.message : 'The domain could not be connected.', 502)
+  }
+  const { data: row, error } = await db.from('publish_domains').insert({
+    tenant_id: actor.tenantId, site_id: site!.id, hostname: host, kind: kindForNew(rows),
+    status: state!.status, provider_ref: state!.ref, last_error: state!.error, last_checked_at: deps.now().toISOString(),
+  }).select('id').single()
+  if (error) {
+    await deps.domains!.remove(state!.ref).catch(() => {})
+    fail(`Could not save the domain: ${error.message}`, 500)
+  }
+  return { id: row.id as string, hostname: host, status: state!.status, records: state!.records }
+}
+
+/** Ask the provider how far a domain has got; when it is ready, the website
+ *  starts answering on it. Anyone may ask; the answer updates the row. */
+export async function checkDomain(db: Db, actor: Actor, id: string, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const row = (await domainRows(db, site!.id)).find(r => r.id === id) ?? fail('No such domain on your website.', 404)
+  if (!row!.provider_ref) return { id, hostname: row!.hostname, status: row!.status, records: [] as DnsRecord[] }
+  if (!deps.domains) fail('Connecting your own domain is not switched on yet — contact Autoura.', 503)
+  let state: DomainState
+  try {
+    state = await deps.domains!.check(row!.provider_ref!, row!.hostname)
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'The domain could not be checked.'
+    await db.from('publish_domains').update({ last_error: message, last_checked_at: deps.now().toISOString() }).eq('id', id).eq('tenant_id', actor.tenantId)
+    fail(message, 502)
+  }
+  const became = state!.status === 'active' && row!.status !== 'active'
+  const { error } = await db.from('publish_domains').update({
+    status: state!.status, last_error: state!.error, last_checked_at: deps.now().toISOString(),
+    ...(became ? { verified_at: deps.now().toISOString() } : {}),
+  }).eq('id', id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not save the domain's status: ${error.message}`, 500)
+  return { id, hostname: row!.hostname, status: state!.status, records: state!.records, error: state!.error, warning: became ? await refresh(deps, actor.tenantId) : null }
+}
+
+/** A free address on our domain (sunrise.<base>) — ready at once, no DNS. Managers. */
+export async function claimFreeAddress(db: Db, actor: Actor, rawLabel: unknown, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const base = freeBaseDomain() ?? fail('Free addresses are not switched on yet — contact Autoura.', 503)
+  const label = typeof rawLabel === 'string' ? rawLabel.trim().toLowerCase() : ''
+  if (!/^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$/.test(label)) fail('Use 3 to 40 letters, numbers or dashes, for example sunrise-travel.')
+  if (['www', 'api', 'app', 'admin', 'mail', 'tours', 'autoura', 'support', 'help'].includes(label)) fail('That name is reserved — choose another.')
+  const host = `${label}.${base}`
+  const { data: taken, error: tErr } = await db.from('publish_domains').select('id').eq('hostname', host).maybeSingle()
+  check('the address', tErr)
+  if (taken) fail('That address is taken — choose another.', 409)
+  const rows = await domainRows(db, site!.id)
+  const { data: row, error } = await db.from('publish_domains').insert({
+    tenant_id: actor.tenantId, site_id: site!.id, hostname: host, kind: kindForNew(rows),
+    status: 'active', verified_at: deps.now().toISOString(), last_checked_at: deps.now().toISOString(),
+  }).select('id').single()
+  if (error) fail(`Could not save the address: ${error.message}`, 500)
+  return { id: row.id as string, hostname: host, warning: await refresh(deps, actor.tenantId) }
+}
+
+/** Make a ready address the website's main one; the others then redirect to it. Managers. */
+export async function setMainDomain(db: Db, actor: Actor, id: string, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const rows = await domainRows(db, site!.id)
+  const row = rows.find(r => r.id === id) ?? fail('No such domain on your website.', 404)
+  if (row!.kind === 'test') fail('A test address cannot be the main one.')
+  if (row!.status !== 'active') fail('Only a ready domain can be the main one — finish its DNS first.', 409)
+  // One main address per site (unique index): demote first, then promote.
+  for (const r of rows.filter(r => r.kind === 'primary' && r.id !== id)) {
+    const { error } = await db.from('publish_domains').update({ kind: 'alias_redirect' }).eq('id', r.id).eq('tenant_id', actor.tenantId)
+    if (error) fail(`Could not change the main address: ${error.message}`, 500)
+  }
+  const { error } = await db.from('publish_domains').update({ kind: 'primary' }).eq('id', id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not change the main address: ${error.message}`, 500)
+  return { id, warning: await refresh(deps, actor.tenantId) }
+}
+
+/** Disconnect a domain. Managers. */
+export async function removeDomain(db: Db, actor: Actor, id: string, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const row = (await domainRows(db, site!.id)).find(r => r.id === id) ?? fail('No such domain on your website.', 404)
+  if (row!.kind === 'test') fail('Test addresses are managed by Autoura.')
+  if (row!.provider_ref) {
+    if (!deps.domains) fail('Connecting your own domain is not switched on yet — contact Autoura.', 503)
+    try { await deps.domains!.remove(row!.provider_ref!) } catch (e) { fail(e instanceof Error ? e.message : 'The hosting provider refused.', 502) }
+  }
+  const { error } = await db.from('publish_domains').delete().eq('id', id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not remove the domain: ${error.message}`, 500)
+  return { removed: true, warning: await refresh(deps, actor.tenantId) }
+}
+
+/** Make the website public (search engines may index its main address) or
+ *  take it back to draft. Public needs a ready main address. Managers. */
+export async function setSiteLive(db: Db, actor: Actor, live: boolean, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  if (site!.status === 'suspended') fail('This website is suspended — contact Autoura.', 409)
+  if (live) {
+    const rows = await domainRows(db, site!.id)
+    if (!rows.some(r => r.kind === 'primary' && r.status === 'active')) fail('Connect a domain (or claim a free address) and let it finish first — the website needs a ready main address to go public.', 409)
+  }
+  const { error } = await db.from('publish_sites').update({ status: live ? 'live' : 'draft' }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not change it: ${error.message}`, 500)
+  return { status: live ? 'live' : 'draft', warning: await refresh(deps, actor.tenantId) }
+}
+
+/** The sync job's pass over domains still waiting on DNS or a certificate. */
+export async function checkPendingDomains(db: Db, deps: AdminDeps = defaultDeps, limit = 20): Promise<{ checked: number; ready: number }> {
+  if (!deps.domains) return { checked: 0, ready: 0 }
+  const { data, error } = await db.from('publish_domains').select('id, tenant_id, hostname, status, provider_ref')
+    .in('status', ['pending_dns', 'verifying']).not('provider_ref', 'is', null).order('last_checked_at', { ascending: true, nullsFirst: true }).limit(limit)
+  check('domains waiting', error)
+  let ready = 0
+  for (const r of (data ?? []) as Array<{ id: string; tenant_id: string; hostname: string; status: string; provider_ref: string }>) {
+    try {
+      const state = await deps.domains.check(r.provider_ref, r.hostname)
+      const became = state.status === 'active'
+      await db.from('publish_domains').update({
+        status: state.status, last_error: state.error, last_checked_at: deps.now().toISOString(),
+        ...(became ? { verified_at: deps.now().toISOString() } : {}),
+      }).eq('id', r.id)
+      if (became) { ready++; await refresh(deps, r.tenant_id) }
+    } catch (e) {
+      await db.from('publish_domains').update({ last_error: e instanceof Error ? e.message : String(e), last_checked_at: deps.now().toISOString() }).eq('id', r.id)
+    }
+  }
+  return { checked: (data ?? []).length, ready }
 }
