@@ -77,3 +77,19 @@ describe('resolveBrand', () => {
     expect(Object.keys(vars).sort()).toEqual(['--brand-accent', '--brand-ink', '--brand-on-accent', '--brand-on-primary', '--brand-primary', '--brand-surface'])
   })
 })
+
+describe('the brand studio\'s ready-made palettes (redesign)', () => {
+  it('every one is readable and none is gold or beige', async () => {
+    const { PALETTE_PRESETS, resolveBrand } = await import('@/lib/publish/brand')
+    expect(PALETTE_PRESETS.length).toBeGreaterThanOrEqual(6)
+    for (const p of PALETTE_PRESETS) {
+      expect(resolveBrand('modern', { palette: p.palette }).problems, p.key).toEqual([])
+      expect(JSON.stringify(p.palette), p.key).not.toMatch(/#b08d57|#7a5c3e|#fbf8f3/i)
+    }
+  })
+  it('the Modern theme starts teal, never the old gold and beige', async () => {
+    const { ARCHETYPE_DEFAULTS } = await import('@/lib/publish/brand')
+    expect(ARCHETYPE_DEFAULTS.modern.palette.primary).toBe('#1d6b64')
+    expect(ARCHETYPE_DEFAULTS.modern.fontPair).toBe('sleek')
+  })
+})

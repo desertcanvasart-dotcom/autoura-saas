@@ -27,6 +27,7 @@ import { indicativeCurrenciesOf } from './site-data'
 import { engineBrand, generateTourDraft, generateTourTranslation } from './engine/generate'
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
 import { publishTags } from './sync/events'
+import { ARCHETYPES, ARCHETYPE_DEFAULTS, FONT_PAIRS, PALETTE_PRESETS, resolveBrand, type Archetype } from './brand'
 import { createRevalidator } from './sync/revalidate'
 
 type Db = {
@@ -81,7 +82,7 @@ export async function siteOf(db: Db, tenantId: string) {
     .select('id, tenant_id, archetype, status, languages, brand, settings, tenants(company_name)').eq('tenant_id', tenantId).maybeSingle()
   check('the site', error)
   return data as null | {
-    id: string; tenant_id: string; archetype: 'private_journeys' | 'transparent_value'; status: string
+    id: string; tenant_id: string; archetype: Archetype; status: string
     languages: string[]; brand: Record<string, unknown>; settings: unknown; tenants: { company_name: string } | null
   }
 }
@@ -426,4 +427,40 @@ export async function setPublished(db: Db, actor: Actor, localeId: string, publi
     .eq('id', localeId).eq('tenant_id', actor.tenantId)
   if (uErr) fail(`Could not change it: ${uErr.message}`, 500)
   return { published, warning: await refresh(deps, actor.tenantId) }
+}
+
+// ---------- the look: theme, palette, fonts (brand studio) ----------
+
+/** The site's look as stored, as it resolves (what the website shows), and
+ *  the choices a manager can make. */
+export async function lookOf(db: Db, actor: Actor) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const stored = (site!.brand ?? {}) as Record<string, unknown>
+  const resolved = resolveBrand(site!.archetype, stored)
+  return {
+    archetype: site!.archetype,
+    stored: { palette: stored.palette ?? null, fontPair: stored.fontPair ?? null },
+    resolved: { palette: resolved.palette, fontPair: resolved.fontPair, onPrimary: resolved.onPrimary, onAccent: resolved.onAccent },
+    problems: resolved.problems,
+    choices: {
+      archetypes: ARCHETYPES.map(a => ({ key: a, defaults: ARCHETYPE_DEFAULTS[a] })),
+      palettes: PALETTE_PRESETS,
+      fontPairs: Object.entries(FONT_PAIRS).map(([key, f]) => ({ key, label: f.label, display: f.display, text: f.text })),
+    },
+  }
+}
+
+/** Save the theme, palette and fonts. Colours that would be hard to read
+ *  are refused with the reason — the website never gets them. The rest of
+ *  the stored brand (tone, claims, words to avoid) is kept. */
+export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown }, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  if (typeof input.archetype !== 'string' || !(ARCHETYPES as readonly string[]).includes(input.archetype)) fail(`Choose a theme: one of ${ARCHETYPES.join(', ')}.`)
+  const archetype = input.archetype as Archetype
+  const next = { ...((site!.brand ?? {}) as Record<string, unknown>), palette: input.palette, fontPair: input.fontPair }
+  const problems = resolveBrand(archetype, next).problems
+  if (problems.length) fail(problems.join(' '))
+  const { error } = await db.from('publish_sites').update({ archetype, brand: next }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not save the look: ${error.message}`, 500)
+  return { saved: true, warning: await refresh(deps, actor.tenantId) }
 }

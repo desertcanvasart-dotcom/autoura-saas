@@ -35,6 +35,7 @@
       "name": "sites",
       "runtimeExecutable": "env",
       "runtimeArgs": [
+        "PUBLISH_PHOTO_LIBRARY=commons",
         "PUBLISH_APP_URL=http://127.0.0.1:4010",
         "PUBLISH_INTERNAL_SECRET=dev-internal",
         "PUBLISH_REVALIDATE_SECRET=dev-revalidate",
@@ -48,6 +49,7 @@
       "name": "sites-prod",
       "runtimeExecutable": "env",
       "runtimeArgs": [
+        "PUBLISH_PHOTO_LIBRARY=commons",
         "PUBLISH_APP_URL=http://127.0.0.1:4010",
         "PUBLISH_INTERNAL_SECRET=dev-internal",
         "PUBLISH_REVALIDATE_SECRET=dev-revalidate",

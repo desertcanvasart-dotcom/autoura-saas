@@ -24,7 +24,7 @@ interface Overview {
   toursWithoutPage?: Array<{ id: string; template_name: string }>
 }
 
-const ARCHETYPE: Record<string, string> = { private_journeys: 'Private journeys', transparent_value: 'Transparent value' }
+const ARCHETYPE: Record<string, string> = { private_journeys: 'Private journeys', transparent_value: 'Transparent value', modern: 'Modern' }
 const HEALTH: Record<string, { label: string; tone: string }> = {
   ok: { label: 'In step with your records', tone: 'bg-green-50 text-green-700 border-green-200' },
   lagging: { label: 'Behind — changes are waiting', tone: 'bg-amber-50 text-amber-800 border-amber-200' },
@@ -89,6 +89,7 @@ export default function PublishOverviewPage() {
               <p className="text-xs uppercase tracking-wide text-gray-400">Site</p>
               <p className="mt-1 font-medium text-gray-900">{ARCHETYPE[data.site.archetype] ?? data.site.archetype}</p>
               <p className="text-sm text-gray-500">{data.site.status === 'live' ? 'Live' : data.site.status === 'draft' ? 'Not live yet' : 'Suspended'} · {data.site.languages.map(l => l.toUpperCase()).join(' + ')}</p>
+              <Link href="/publish/look" className="mt-2 inline-block text-sm text-[#647C47] hover:underline">Look and feel — theme, colours, fonts →</Link>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs uppercase tracking-wide text-gray-400">Sync with your records</p>
