@@ -19,6 +19,14 @@
 
 import { z } from 'zod'
 
+/**
+ * Bumped whenever a shape below changes. The renderer sends it with every
+ * request, so a cached answer in the old shape is never read back after a
+ * deploy (it sits under a different cache key) — and the app can refuse a
+ * renderer that is a version behind.
+ */
+export const CONTRACT_VERSION = 2
+
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
 
@@ -53,6 +61,20 @@ export type SiteResolution = z.infer<typeof siteResolutionSchema>
 
 const pageLink = z.object({ title: z.string(), path: z.string() })
 
+/** The company as its records say — shown in the header and footer. From
+ *  `tenants`, read at render time like every other fact. */
+export const companyIdentitySchema = z.object({
+  tagline: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  whatsapp: z.string().nullable(),
+  address: z.string().nullable(),
+  /** e.g. the ETAA licence number. */
+  licenseNumber: z.string().nullable(),
+})
+export type CompanyIdentity = z.infer<typeof companyIdentitySchema>
+
 export const pagePayloadSchema = z.object({
   kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal']),
   language: languageCode,
@@ -65,6 +87,9 @@ export const pagePayloadSchema = z.object({
     archetype: z.enum(['private_journeys', 'transparent_value']),
     companyName: z.string(),
     languages: z.array(languageCode),
+    /** publish_sites.brand as stored; lib/publish/brand.ts resolveBrand reads it. */
+    brand: z.record(z.string(), z.unknown()),
+    identity: companyIdentitySchema,
   }),
   /** The same page in the site's other languages, for hreflang (step 10). */
   alternates: z.array(z.object({ language: languageCode, path: z.string() })),

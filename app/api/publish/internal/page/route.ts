@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { bearerMatches } from '@/lib/support/probe-auth'
+import { CONTRACT_VERSION } from '@/lib/publish/contract'
 import { createAdminClient } from '@/lib/supabase-server'
 import { loadPagePayload } from '@/lib/publish/site-data'
 
@@ -20,6 +21,12 @@ export async function GET(request: NextRequest) {
   const authorized = bearerMatches(header, process.env.PUBLISH_INTERNAL_SECRET)
     || bearerMatches(header, process.env.PUBLISH_INTERNAL_SECRET_PREVIOUS)
   if (!authorized) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // A renderer on another contract version would misread the answer: refuse
+  // plainly (409) rather than let it render half a page.
+  const asked = request.nextUrl.searchParams.get('v')
+  if (asked !== null && asked !== String(CONTRACT_VERSION)) {
+    return NextResponse.json({ error: `contract version ${asked} asked, this app speaks ${CONTRACT_VERSION}` }, { status: 409 })
+  }
 
   const q = request.nextUrl.searchParams
   const siteId = q.get('site') ?? ''

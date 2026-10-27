@@ -8,7 +8,7 @@
 // Env: PUBLISH_APP_URL (the GetAutoura app), PUBLISH_INTERNAL_SECRET.
 
 import {
-  INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, internalAuthHeader,
+  CONTRACT_VERSION, INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, internalAuthHeader,
   pagePayloadSchema, siteResolutionSchema,
   type PagePayload, type SiteResolution,
 } from '@/lib/publish/contract'
@@ -47,7 +47,7 @@ export async function siteForHost(host: string, fetchImpl: typeof fetch = fetch,
   const hit = hostCache.get(host)
   if (hit && now - hit.at < HOST_TTL_MS) return hit.value
   const { base, secret } = config()
-  const res = await fetchImpl(`${base}${INTERNAL_SITE_PATH}?host=${encodeURIComponent(host)}`, {
+  const res = await fetchImpl(`${base}${INTERNAL_SITE_PATH}?host=${encodeURIComponent(host)}&v=${CONTRACT_VERSION}`, {
     headers: internalAuthHeader(secret),
     cache: 'no-store',
     signal: AbortSignal.timeout(5000),
@@ -73,7 +73,7 @@ export async function loadPage(
   fetchImpl: typeof fetch = fetch,
 ): Promise<PagePayload | null> {
   const { base, secret } = config()
-  const q = new URLSearchParams({ site: input.siteId, lang: input.language, path: input.path })
+  const q = new URLSearchParams({ site: input.siteId, lang: input.language, path: input.path, v: String(CONTRACT_VERSION) })
   if (input.mode === 'preview') q.set('preview', '1')
   const res = await fetchImpl(`${base}${INTERNAL_PAGE_PATH}?${q}`, {
     headers: internalAuthHeader(secret),

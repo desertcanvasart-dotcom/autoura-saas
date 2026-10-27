@@ -1,0 +1,49 @@
+/* Private journeys — quiet, editorial, generous space. Brand colours and
+   faces arrive as CSS variables (lib/publish/brand.ts); nothing here is a
+   company's. Mobile first; 16px gutters. */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: var(--brand-surface); color: var(--brand-ink); font-family: var(--font-text); }
+.preview, .unpublished { background: #fff4ce; color: #3d3000; font-size: 14px; padding: 8px 16px; text-align: center; }
+.unpublished { margin: 16px; border-radius: 4px; }
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 16px; max-width: 1120px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.brand { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--brand-ink); text-decoration: none; letter-spacing: 0.02em; }
+.brand img { height: 40px; width: auto; display: block; }
+.nav { display: flex; align-items: center; gap: 20px; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.nav a { color: var(--brand-ink); text-decoration: none; }
+.nav a:hover { color: var(--brand-primary); }
+.languages { display: flex; gap: 12px; text-transform: none; letter-spacing: 0; }
+
+.main { flex: 1; width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 16px; box-sizing: border-box; }
+
+.hero, .tourHero { padding: 64px 0 48px; text-align: center; border-bottom: 1px solid color-mix(in srgb, var(--brand-accent) 40%, transparent); }
+.eyebrow { display: inline-block; font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand-primary); text-decoration: none; margin: 0 0 16px; }
+.heroTitle { font-family: var(--font-display); font-weight: 500; font-size: clamp(34px, 6vw, 60px); line-height: 1.1; margin: 0 auto 28px; max-width: 18ch; }
+
+.button, .buttonOutline { display: inline-block; padding: 14px 28px; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; border-radius: 2px; }
+.button { background: var(--brand-primary); color: var(--brand-on-primary); }
+.buttonOutline { border: 1px solid var(--brand-primary); color: var(--brand-primary); }
+.button:hover, .buttonOutline:hover { filter: brightness(1.08); }
+
+.section { padding: 56px 0; }
+.sectionTitle { font-family: var(--font-display); font-weight: 500; font-size: clamp(28px, 4vw, 40px); margin: 0 0 32px; text-align: center; }
+.empty { text-align: center; color: color-mix(in srgb, var(--brand-ink) 70%, transparent); }
+
+.cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 32px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .cards { grid-template-columns: 1fr 1fr; } }
+.card a { display: flex; flex-direction: column; gap: 12px; color: inherit; text-decoration: none; }
+.cardArt { aspect-ratio: 4 / 3; display: grid; place-items: center; font-family: var(--font-display); font-size: 72px; color: var(--brand-on-primary);
+  background: linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-accent) 70%, var(--brand-primary))); }
+.cardTitle { font-family: var(--font-display); font-size: 26px; line-height: 1.2; }
+.cardMore { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-primary); }
+.card a:hover .cardTitle { color: var(--brand-primary); }
+
+.band { padding: 48px 0 64px; text-align: center; }
+
+.footer { background: var(--brand-ink); color: var(--brand-surface); margin-top: 48px; }
+.footerInner { max-width: 1120px; margin: 0 auto; padding: 40px 16px; box-sizing: border-box; }
+.footerName { font-family: var(--font-display); font-size: 24px; margin: 0 0 8px; }
+.footerTagline { margin: 0 0 20px; opacity: 0.8; }
+.footerContact { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 15px; }
+.footerContact a { color: inherit; }
+.licence { margin: 20px 0 0; font-size: 13px; opacity: 0.7; }

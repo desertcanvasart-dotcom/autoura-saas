@@ -103,7 +103,7 @@ describe('internal API client', () => {
     expect(await siteForHost('sillage.example', f, 30_000)).toEqual(resolution())
     expect(f).toHaveBeenCalledTimes(1)
     const [url, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(url).toBe('https://app.test/api/publish/internal/site?host=sillage.example')
+    expect(url).toBe('https://app.test/api/publish/internal/site?host=sillage.example&v=2')
     expect((init as RequestInit).headers).toEqual({ authorization: 'Bearer internal-secret' })
     await siteForHost('sillage.example', f, 70_000)
     expect(f).toHaveBeenCalledTimes(2)
@@ -122,7 +122,8 @@ describe('internal API client', () => {
 
   const page: PagePayload = {
     kind: 'tour', language: 'fr', path: 'tours/nile', title: 'Nile classic',
-    site: { id: SITE, tenantId: TENANT, archetype: 'private_journeys', companyName: 'Sillage', languages: ['en', 'fr'] },
+    site: { id: SITE, tenantId: TENANT, archetype: 'private_journeys', companyName: 'Sillage', languages: ['en', 'fr'], brand: {},
+      identity: { tagline: null, logoUrl: null, phone: null, email: null, whatsapp: null, address: null, licenseNumber: null } },
     alternates: [{ language: 'en', path: 'tours/nile' }],
     tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic' }, tours: [], unpublished: false,
   }
@@ -130,7 +131,7 @@ describe('internal API client', () => {
     const f = answer(200, page)
     expect(await loadPage({ tenantId: TENANT, siteId: SITE, mode: 'live', language: 'fr', path: 'tours/nile' }, f)).toEqual(page)
     const [url, init] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(url).toBe(`https://app.test/api/publish/internal/page?site=${SITE}&lang=fr&path=tours%2Fnile`)
+    expect(url).toBe(`https://app.test/api/publish/internal/page?site=${SITE}&lang=fr&path=tours%2Fnile&v=2`)
     expect((init as { next: unknown }).next).toEqual({ tags: [publishTags.site(TENANT), publishTags.tours(TENANT)], revalidate: 3600 })
     await loadPage({ tenantId: TENANT, siteId: SITE, mode: 'preview', language: 'fr', path: '' }, f)
     expect(String((f as unknown as ReturnType<typeof vi.fn>).mock.calls[1][0])).toContain('preview=1')

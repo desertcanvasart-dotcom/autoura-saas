@@ -33,7 +33,8 @@ function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
   }
 }
 
-const site = { id: SITE, tenant_id: TENANT, archetype: 'private_journeys', status: 'live', languages: ['en', 'fr'], brand: {}, tenants: { company_name: 'Sillage' } }
+const site = { id: SITE, tenant_id: TENANT, archetype: 'private_journeys', status: 'live', languages: ['en', 'fr'], brand: { tone: 'warm' },
+  tenants: { company_name: 'Sillage', tagline: '  Private journeys since 2003 ', logo_url: 'https://cdn.test/logo.png', company_phone: '', contact_email: 'hello@sillage.test', whatsapp_number: '+201000000000', company_address: null, license_number: 'ETAA 1234' } }
 const tourPage = (slug: string, language: string, published: boolean, pageId = PAGE, active = true) => ({
   page_id: pageId, site_id: SITE, language, slug, is_published: published,
   publish_pages: { id: pageId, kind: 'tour', tour_template_id: TOUR, tour_templates: { template_name: active ? 'Nile classic' : 'Retired tour', is_active: active } },
@@ -108,6 +109,12 @@ describe('loadPagePayload', () => {
     expect(page).toMatchObject({ kind: 'tour', title: 'Nile classic', path: 'tours/nile-classic', unpublished: false,
       tour: { templateId: TOUR, name: 'Nile classic' }, alternates: [{ language: 'fr', path: 'tours/croisiere-nil' }] })
   })
+  it('carries the company identity from its records and the stored brand, blanks as null', async () => {
+    const page = await load('')
+    expect(page!.site.identity).toEqual({ tagline: 'Private journeys since 2003', logoUrl: 'https://cdn.test/logo.png', phone: null,
+      email: 'hello@sillage.test', whatsapp: '+201000000000', address: null, licenseNumber: 'ETAA 1234' })
+    expect(page!.site.brand).toEqual({ tone: 'warm' })
+  })
   it('the home page exists before any home page row, listing the published, switched-on tours', async () => {
     const home = await load('')
     expect(home).toMatchObject({ kind: 'home', title: 'Sillage', alternates: [{ language: 'fr', path: '' }] })
@@ -154,6 +161,12 @@ describe('the internal endpoints', () => {
     expect(r.status).toBe(200)
     expect((await r.json()).site.id).toBe(SITE)
     expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&path=tours/nile-classic`, 'Bearer old-secret'))).status).toBe(200)
+  })
+  it('a renderer on another contract version is refused plainly', async () => {
+    const r = await siteGET(req('/api/publish/internal/site?host=sillage.example&v=1', 'Bearer internal-secret'))
+    expect(r.status).toBe(409)
+    expect((await siteGET(req('/api/publish/internal/site?host=sillage.example&v=2', 'Bearer internal-secret'))).status).toBe(200)
+    expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&v=9`, 'Bearer internal-secret'))).status).toBe(409)
   })
   it('404 for no site or no page; 400 for a malformed ask', async () => {
     expect((await siteGET(req('/api/publish/internal/site?host=nobody.example', 'Bearer internal-secret'))).status).toBe(404)
