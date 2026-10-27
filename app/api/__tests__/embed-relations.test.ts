@@ -32,6 +32,7 @@ const ALLOW: Array<{ from: string; embed: string; reason: string }> = [
   // Probed on production 2026-10-25: both selects answer 200.
   { from: 'publish_domains', embed: 'publish_sites', reason: 'composite FK (site_id, tenant_id), migration 440; probed 200' },
   { from: 'publish_page_locales', embed: 'publish_pages', reason: 'composite FK (page_id, site_id, tenant_id), migration 440; probed 200' },
+  { from: 'publish_pages', embed: 'publish_page_locales', reason: 'the same composite FK, read the other way (a page\'s language rows); probed 200 on production 2026-10-25' },
 ]
 
 interface Rel { fkeyName: string; columns: string[]; referencedRelation: string }

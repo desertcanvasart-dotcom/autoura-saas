@@ -92,11 +92,12 @@ interface NavSection {
 
 // Define navigation with role-based visibility.
 //
-// Nine sections, ordered by how often a person opens them, each named for the
+// Ten sections, ordered by how often a person opens them, each named for the
 // work it holds rather than the kind of screen: Home (read the day),
 // Communicate (the channels where new things arrive: Inbox, WhatsApp,
 // Concierge Leads; second, straight under Home — operator, 2026-09-24), Sell
-// (quote → itinerary → booking), Operate (run what was sold), Tours (define
+// (quote → itinerary → booking), Operate (run what was sold), Publish (the
+// company's website), Tours (define
 // and price the catalogue), Suppliers & Rates (what you buy and what it
 // costs), People, Finance, Settings. Section KEYS are kept from the old
 // layout where a section survived, so remembered collapse states
@@ -178,6 +179,17 @@ const navigation: NavSection[] = [
       // Contracts and vouchers generated from itineraries — operational
       // paperwork, not content.
       { label: 'Documents', href: '/documents', icon: FileText, roles: ['admin', 'manager'] },
+    ]
+  },
+  // The fourth module (docs/publish/PLAN.md): the company's own website,
+  // built from its tours and kept true to its records. Next to Operate and
+  // Tours because it publishes what they define.
+  {
+    title: 'Publish',
+    key: 'publish',
+    roles: ['admin', 'manager', 'member'],
+    items: [
+      { label: 'Website', href: '/publish', icon: Globe },
     ]
   },
   // The catalogue: tour templates, their variations and the packages that

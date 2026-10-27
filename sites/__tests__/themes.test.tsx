@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { THEMES } from '../themes'
 import { TOUR_SECTIONS } from '../themes/types'
 import { ARCHETYPES } from '@/lib/publish/brand'
-import type { PagePayload, TourFacts } from '@/lib/publish/contract'
+import type { PagePayload, PageNarrative, TourFacts } from '@/lib/publish/contract'
+import { narrativeText } from '../themes/blocks/narrative'
 
 // ============================================================================
 // The archetype themes (docs/publish/PLAN.md §7, step 4). Each is a package —
@@ -64,7 +65,7 @@ for (const archetype of ARCHETYPES) {
     })
     it('language links go to this page in the other language — real URLs, no script', () => {
       const page = payload({ kind: 'tour', path: 'tours/croisiere', title: 'Nile classic', tours: [],
-        tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic', facts: null },
+        tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic', facts: null, narrative: null },
         alternates: [{ language: 'en', path: 'tours/nile-classic' }] }, archetype)
       const html = render(archetype, page)
       expect(html).toContain('href="/en/tours/nile-classic" hrefLang="en" lang="en"')
@@ -86,7 +87,7 @@ for (const archetype of ARCHETYPES) {
     })
     it('a test hostname says it is a preview; an unpublished page says so', () => {
       expect(render(archetype, payload({}, archetype), true)).toContain('Preview — this site is not public')
-      const draft = payload({ kind: 'tour', title: 'Soon', unpublished: true, tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Soon', facts: null } }, archetype)
+      const draft = payload({ kind: 'tour', title: 'Soon', unpublished: true, tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Soon', facts: null, narrative: null } }, archetype)
       expect(render(archetype, draft)).toContain('Not yet published')
     })
     it('an empty site says so instead of showing an empty grid', () => {
@@ -123,9 +124,9 @@ const FACTS: TourFacts = {
     indicative: [{ currency: 'USD', perPerson: 905, rateDate: '2026-10-25' }] },
   publishable: { ok: true, reasons: [] },
 }
-const tourPage = (archetype: PagePayload['site']['archetype'], facts: TourFacts | null) => payload({
+const tourPage = (archetype: PagePayload['site']['archetype'], facts: TourFacts | null, narrative: PageNarrative | null = null) => payload({
   kind: 'tour', language: 'en', path: 'tours/nile', title: 'Nile classic', tours: [],
-  tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic', facts },
+  tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Nile classic', facts, narrative },
   site: { ...payload({}, archetype).site, identity: blank },
 }, archetype)
 
@@ -179,3 +180,44 @@ for (const archetype of ARCHETYPES) {
     })
   })
 }
+
+// ---------- step 7: approved narrative, slots filled from the facts ----------
+
+const NARRATIVE: PageNarrative = {
+  overview: [{ type: 'text', text: 'Temples by the river, from' }, { type: 'slot', slot: 'price_from' }, { type: 'text', text: '.\n\nA second paragraph, for' }, { type: 'slot', slot: 'group_size' }, { type: 'text', text: '.' }],
+  highlights: [[{ type: 'text', text: 'Karnak at dawn' }], [{ type: 'text', text: 'Departing' }, { type: 'slot', slot: 'departure_days' }]],
+  days: [{ day: 2, segments: [{ type: 'text', text: 'A quiet morning in Luxor.' }] }],
+  seo: { title: 'Nile classic', description: 'Temples by the river.' },
+}
+
+for (const archetype of ARCHETYPES) {
+  describe(`${archetype}: approved narrative`, () => {
+    const words = text(render(archetype, tourPage(archetype, FACTS, NARRATIVE)))
+    it('the overview, in paragraphs, with its slots filled from today\'s facts', () => {
+      expect(words).toContain('Temples by the river, from €841 per person.')
+      expect(words).toContain('A second paragraph, for 2–8 travellers.')
+    })
+    it('written highlights replace the records\' list; a day\'s text sits under its day', () => {
+      expect(words).toContain('Departing Monday and Friday')
+      expect(words).toContain('Karnak at dawn')
+      expect(words).toMatch(/Day 2[^]*A quiet morning in Luxor\./)
+    })
+    it('the overview section comes where the archetype puts it', () => {
+      const html = render(archetype, tourPage(archetype, FACTS, NARRATIVE))
+      const order = [...html.matchAll(/data-section="([a-zA-Z]+)"/g)].map(m => m[1])
+      expect(order.indexOf('overview')).toBeGreaterThan(-1)
+      expect(order).toEqual(THEMES[archetype].tourSections.filter(sct => order.includes(sct)))
+    })
+  })
+}
+
+describe('filling slots', () => {
+  it('a slot whose fact is gone drops the whole text — never a hole in a sentence', () => {
+    const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, from: null, byNationality: null, table: [], indicative: [] } }
+    expect(narrativeText(NARRATIVE.overview, onRequest, 'en')).toBeNull()
+  })
+  it('the cancellation slot states the tiers as they are', () => {
+    expect(narrativeText([{ type: 'text', text: 'Terms:' }, { type: 'slot', slot: 'cancellation' }], FACTS, 'en'))
+      .toBe('Terms: 30 days or fewer before departure: 25% charged when cancelled; On the day of departure: 100% charged when cancelled')
+  })
+})

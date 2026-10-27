@@ -7,13 +7,25 @@
 // Themes choose the order (tourSections) and the look (variant); the words
 // and figures are the same for every theme.
 
-import type { TourFacts } from '@/lib/publish/contract'
+import type { PageNarrative, TourFacts } from '@/lib/publish/contract'
+import { narrativeText, paragraphs } from './narrative'
 import { t } from '../../i18n/strings'
 import { formatApprox, formatDate, formatPrice, formatWeekdays } from './format'
 import s from './facts.module.css'
 
 export type FactsVariant = 'editorial' | 'compact'
-type P = { facts: TourFacts; lang: string; variant: FactsVariant }
+type P = { facts: TourFacts; lang: string; variant: FactsVariant; narrative?: PageNarrative | null }
+
+/** The approved overview, slots filled; nothing when there is none. */
+export function OverviewSection({ facts, lang, variant, narrative }: P) {
+  const text = narrativeText(narrative?.overview, facts, lang)
+  if (!text) return null
+  return (
+    <section className={cx(variant, 'section', 'overview')}>
+      {paragraphs(text).map((p, i) => <p key={i}>{p}</p>)}
+    </section>
+  )
+}
 
 const cx = (variant: FactsVariant, ...names: string[]) => [...names.map(n => s[n]), s[variant]].filter(Boolean).join(' ')
 
@@ -71,7 +83,17 @@ export function PriceSection({ facts, lang, variant }: P) {
   )
 }
 
-export function HighlightsSection({ facts, lang, variant }: P) {
+export function HighlightsSection({ facts, lang, variant, narrative }: P) {
+  // Approved highlight lines first; the records' own list when there are none.
+  const written = (narrative?.highlights ?? []).map(i => narrativeText(i, facts, lang)).filter((x): x is string => !!x)
+  if (written.length) {
+    return (
+      <section className={cx(variant, 'section')}>
+        <h2>{t(lang, 'highlights')}</h2>
+        <ul className={s.list}>{written.map(w => <li key={w}>{w}</li>)}</ul>
+      </section>
+    )
+  }
   const items = [...new Set([...facts.highlights, ...facts.mainAttractions])]
   if (items.length === 0) return null
   return (
@@ -82,8 +104,9 @@ export function HighlightsSection({ facts, lang, variant }: P) {
   )
 }
 
-export function ItinerarySection({ facts, lang, variant }: P) {
+export function ItinerarySection({ facts, lang, variant, narrative }: P) {
   if (facts.days.length === 0) return null
+  const dayText = new Map((narrative?.days ?? []).map(d => [d.day, narrativeText(d.segments, facts, lang)]))
   return (
     <section className={cx(variant, 'section')}>
       <h2>{t(lang, 'itinerary')}</h2>
@@ -94,6 +117,7 @@ export function ItinerarySection({ facts, lang, variant }: P) {
           return (
             <li key={d.day} className={s.dayItem}>
               <h3><span className={s.dayNo}>{t(lang, 'day')} {d.day}</span>{d.title ? ` — ${d.title}` : d.city ? ` — ${d.city}` : ''}</h3>
+              {paragraphs(dayText.get(d.day) ?? null).map((p, i) => <p key={i} className={s.dayText}>{p}</p>)}
               {d.sights.length > 0 && <p><span className={s.label}>{t(lang, 'sights')}:</span> {d.sights.join(', ')}</p>}
               {meals.length > 0 && <p><span className={s.label}>{meals.map(m => t(lang, m)).join(' · ')}</span></p>}
               {d.overnight && d.city && <p className={s.note}>{t(lang, 'overnightIn')} {d.city}</p>}

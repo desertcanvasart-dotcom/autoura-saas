@@ -10,7 +10,7 @@ import type { Theme, ThemePageProps } from '../types'
 import { BrandMark } from '../blocks/BrandMark'
 import { LanguageLinks } from '../blocks/LanguageLinks'
 import { TourSections } from '../blocks/TourSections'
-import { AccommodationSection, CancellationSection, DeparturesSection, GroupSizeSection, HighlightsSection, InclusionsSection, ItinerarySection, PriceSection, TourImage } from '../blocks/TourFacts'
+import { OverviewSection, AccommodationSection, CancellationSection, DeparturesSection, GroupSizeSection, HighlightsSection, InclusionsSection, ItinerarySection, PriceSection, TourImage } from '../blocks/TourFacts'
 import { emailHref, phoneHref, whatsappHref } from '../blocks/contact'
 import { t } from '../../i18n/strings'
 import s from './theme.module.css'
@@ -98,7 +98,7 @@ function Page(props: ThemePageProps) {
   }
   if (page.kind === 'tour') {
     const facts = page.tour?.facts ?? null
-    const f = facts ? { facts, lang, variant: 'compact' as const } : null
+    const f = facts ? { facts, lang, variant: 'compact' as const, narrative: page.tour?.narrative ?? null } : null
     return (
       <article className={s.section}>
         {page.unpublished && <p className={s.unpublished}>{t(lang, 'notYetPublished')}</p>}
@@ -117,6 +117,7 @@ function Page(props: ThemePageProps) {
             inclusions: () => f && <InclusionsSection {...f} />,
             groupSize: () => f && <GroupSizeSection {...f} />,
             departures: () => f && <DeparturesSection {...f} />,
+            overview: () => f && <OverviewSection {...f} />,
             highlights: () => f && <HighlightsSection {...f} />,
             itinerary: () => f && <ItinerarySection {...f} />,
             accommodation: () => f && <AccommodationSection {...f} />,

@@ -115,7 +115,18 @@ function page(s, lang, path, preview) {
   const t = m && list.find(x => slugIn(x, lang) === m[1])
   if (!t) return null
   return { ...base, kind: 'tour', path, title: t.name, unpublished: !t.published,
-    tour: { templateId: '00000000-0000-4000-8000-00000000d003', name: t.name, facts: facts(t.price ?? 'on_request', 'EUR') },
+    tour: { templateId: '00000000-0000-4000-8000-00000000d003', name: t.name, facts: facts(t.price ?? 'on_request', 'EUR'),
+      // Approved text (step 7), for the priced tours — slots filled by the renderer.
+      narrative: t.price === 'available' ? {
+        overview: [
+          { type: 'text', text: 'Sail between the great temples of Upper Egypt at the pace of the river, with an Egyptologist at your side. From' },
+          { type: 'slot', slot: 'price_from' },
+          { type: 'text', text: '.\n\nEvenings are for the deck, the light on the water and dinner as the banks slip by.' },
+        ],
+        highlights: [[{ type: 'text', text: 'The Valley of the Kings before the heat' }], [{ type: 'text', text: 'Philae Temple by motorboat' }], [{ type: 'text', text: 'Departing' }, { type: 'slot', slot: 'departure_days' }]],
+        days: [{ day: 2, segments: [{ type: 'text', text: 'Cross to the West Bank early, while the valley is still cool, and descend into the tombs of the pharaohs.' }] }],
+        seo: { title: `${t.name} — a Nile journey`, description: 'Temples, tombs and the river, with an Egyptologist.' },
+      } : null },
     alternates: [{ language: other, path: `tours/${slugIn(t, other)}` }] }
 }
 

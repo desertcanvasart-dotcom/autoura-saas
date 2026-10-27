@@ -47,3 +47,7 @@
 
 .fact p { font-size: 18px; }
 .wording { white-space: pre-line; font-size: 15px; }
+
+.overview p { font-size: 18px; line-height: 1.65; margin: 0 0 14px; }
+.editorial.overview p { font-size: 19px; }
+.dayText { margin: 6px 0 8px; }

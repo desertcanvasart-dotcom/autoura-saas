@@ -251,10 +251,17 @@ On entering `failing`, `lagging` or `stalled` (de-duplicated, at most one alert 
 
 ## 10. Draft and approval workflow
 
-- Engine output → `publish_drafts` (`in_review`). Reviewer edits inline, sees slots highlighted with their current values, source citations per paragraph, and the check result. **Approve** (admin/manager) creates a `publish_versions` row and points `publish_page_locales.current_version_id` at it, then revalidates the page. **Reject** requires a note; the note becomes the `instruction` for the next draft.
-- **Facts never wait.** Prices, inclusions, departures, terms render live from records, so a rate change republishes through revalidation with no draft at all. Each such refresh is logged as a `fact_refresh` version entry (no approver, D15 snapshot).
-- **When the product changes:** fields are classified as fact-only (rates, group size, inclusions, departure fields) or narrative-relevant (days added/removed/re-ordered, day city/title/description, main attractions, hotel/ship choice, template description/highlights). Fact-only → the `auto_publish_fact_only` rule decides only whether reviewers get a notification (D12). Narrative-relevant → a regeneration draft is queued; meanwhile each **affected day's narrative is withdrawn** and the day renders facts-only, and the overview is marked stale in admin. Nothing describing the old itinerary stays live.
-- `fact_fingerprint` on each draft/version (hash of the narrative-relevant fields) is how "only a fact slot changed" is decided — testable and deterministic.
+*Built in step 7 — this section describes what exists.*
+
+- **Parts:** a page's text in one language is four parts — overview, highlights, day narratives, search title/description — drafted and approved separately (`lib/publish/admin.ts`). A published version (`publish_versions.content`) is the whole **bundle** at an approval: the approved part replaces its predecessor, the others carry over (`lib/publish/narrative.ts`).
+- **Roles:** writers (owner/admin/manager/member) ask the engine for a draft and edit drafts; managers (owner/admin/manager) add tour pages, approve, reject and publish (`lib/publish/admin-route.ts` → `roleDenied`). Viewers read. Server writes use the service role with the company named in every query; RLS (mig 440) already refuses approvals, versions and engine drafts from a browser.
+- **Approval** (`POST /api/publish/drafts/[id]/approve`): only an `in_review` draft; the post-check is **re-run on the text as it stands** (a fact slipped in sends it back to `failed_check`); a draft written before the tour's days, sights or stays changed is refused ("draft it again"); a new numbered version records the approver (id and name), the draft, and the D15 snapshot of the facts as shown; the page language points at it; older open drafts of that part are retired; the site is refreshed if the language is published (a renderer that is down leaves a warning, never undoes the approval).
+- **Rejection** needs a note, kept as the next draft's instruction. **Edits** (`PATCH /api/publish/drafts/[id]`) are shape-checked and held to the same post-check as the engine; only open drafts can be edited; an edit cannot change which part a draft is.
+- **Publishing a language** (`POST /api/publish/locales/[id]/publish`): a tour page publishes only past the thin-page rule (D7: days, inclusions, a complete price, switched on) — with or without approved text, since the facts are the page. Unpublishing is always allowed.
+- **Facts never wait.** Prices and other facts render live; nothing about them needs approval.
+- **Text the records have overtaken is withheld at render, not by a job** (*changed from the plan*): each part stores a fingerprint of what it could mention (cities, sights, nights, stays; each day its own). When the records change those, the part stops showing — the page shows its facts — and a part whose fact slot can no longer be filled (price on request) stops showing too. The company's managers get one bell notice per page and language per week ("new text needed"). No draft is generated automatically: a person asks for one (an engine call per change would cost money on every edit).
+- **The fact-only rule (D12):** on by default — a change of facts alone republishes silently. Switched off, the company is also told (weekly) when a page's facts changed under approved text. *Changed from the plan:* no `fact_refresh` version row is written per change — rates change often and every tour page would gain a row each time; what a page showed at any moment is reconstructable from the approval snapshots plus `rate_audit_log`.
+- **Rendering** (contract v4): the page payload carries only the renderable parts; themes print the overview (in paragraphs), written highlights in place of the records' list, each day's text under its day, and the approved SEO title/description in the page metadata — every slot filled from today's facts (`sites/themes/blocks/narrative.ts`).
 
 ---
 
@@ -299,6 +306,8 @@ Test: export a fixture site, unzip, assert every published page/language, every 
 
 ## 15. Admin screens (inside GetAutoura, `/publish`)
 
+*Step 7 built **Overview** (`/publish`, with "add a tour page") and **Page review** (`/publish/pages/[id]`, with drafting, editing under the post-check, approve/reject, publish, version history), and the sidebar section "Publish → Website". The rest are still to come.*
+
 | Screen | Purpose |
 | --- | --- |
 | Overview | Site status, domains, **sync health badge**, pages published per language, drafts waiting |
@@ -333,7 +342,9 @@ Test: export a fixture site, unzip, assert every published page/language, every 
 | 11 | Domains | provider adapter with fake + one real test domain | D13, Q6 |
 | 12 | Export | §14 | — |
 
-**Phase 0 gate** = steps 1–4 plus step 5 enough to show our own brands' tour pages on test domains, with sync alerts working. I report after each step: what was built, what was tested, what changed from this plan.
+**Phase 0 gate** = steps 1–4 plus step 5 enough to show tour pages on a test domain, with sync alerts working. *Changed 2026-10-25 (operator): the four own brands keep their existing websites, so the gate runs on a **fictional test brand** instead — the "Autoura Sandbox" company, seeded with invented rates and tours by `scripts/publish-seed-sandbox.mjs` (dry run by default; `--apply`; `--remove`). Seeded 2026-10-25: 72 invented rows, site + test domain `sandbox.localhost`, enrolled; its three tours price completely in all four tiers and pass the thin-page rule.*
+
+**Found while seeding (pricing engine, outside Publish):** the engine prices hotels and Nile cruises from the EU column only (`ppd_eur`, seasonal periods' `ppd_eur`) for every traveller — the other-nationality hotel/cruise rates are entered but never used. So a tour page's EU/other split (Q5) can today only come from entrance fees, flights, trains and activities. Raised with the operator; not changed. I report after each step: what was built, what was tested, what changed from this plan.
 
 ---
 
