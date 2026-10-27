@@ -13,7 +13,7 @@
 
 import { z } from 'zod'
 
-export const ARCHETYPES = ['private_journeys', 'transparent_value'] as const
+export const ARCHETYPES = ['private_journeys', 'transparent_value', 'modern'] as const
 export type Archetype = typeof ARCHETYPES[number]
 
 export const TONES = ['formal', 'warm', 'expert', 'playful'] as const
@@ -32,6 +32,7 @@ export const FONT_PAIRS = {
   modern: { label: 'Modern — DM Serif Display & DM Sans', display: 'DM Serif Display', text: 'DM Sans' },
   clean: { label: 'Clean — Poppins & Inter', display: 'Poppins', text: 'Inter' },
   friendly: { label: 'Friendly — Nunito & Nunito Sans', display: 'Nunito', text: 'Nunito Sans' },
+  sleek: { label: 'Sleek — Outfit & Inter', display: 'Outfit', text: 'Inter' },
 } as const
 export type FontPairKey = keyof typeof FONT_PAIRS
 
@@ -66,6 +67,13 @@ export const ARCHETYPE_DEFAULTS: Record<Archetype, Brand> = {
   transparent_value: {
     palette: { primary: '#0b6e4f', accent: '#f2a541', ink: '#14213d', surface: '#ffffff' },
     fontPair: 'clean',
+    tone: 'warm',
+  },
+  // Operator, 2026-10-27: modern and sleek, never a default of gold or beige;
+  // each agency picks its own palette. Deep teal with a mint accent.
+  modern: {
+    palette: { primary: '#1d6b64', accent: '#38d9a9', ink: '#0f1720', surface: '#ffffff' },
+    fontPair: 'sleek',
     tone: 'warm',
   },
 }

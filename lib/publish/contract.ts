@@ -20,6 +20,7 @@
 // joins in step 7 — always as data, never as text written for them.
 
 import { z } from 'zod'
+import { ARCHETYPES } from './brand'
 
 /**
  * Bumped whenever a shape below changes. The renderer sends it with every
@@ -41,7 +42,7 @@ export const siteResolutionSchema = z.object({
   site: z.object({
     id: z.string().uuid(),
     tenantId: z.string().uuid(),
-    archetype: z.enum(['private_journeys', 'transparent_value']),
+    archetype: z.enum(ARCHETYPES),
     status: z.enum(['draft', 'live', 'suspended']),
     languages: z.array(languageCode).min(1),
     companyName: z.string(),
@@ -171,7 +172,7 @@ export const pagePayloadSchema = z.object({
   site: z.object({
     id: z.string().uuid(),
     tenantId: z.string().uuid(),
-    archetype: z.enum(['private_journeys', 'transparent_value']),
+    archetype: z.enum(ARCHETYPES),
     companyName: z.string(),
     languages: z.array(languageCode),
     /** publish_sites.brand as stored; lib/publish/brand.ts resolveBrand reads it. */

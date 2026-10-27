@@ -11,6 +11,9 @@
  *   sillage.localhost       Private journeys, English + French, archetype defaults
  *   afford.localhost        Transparent value, English + Spanish, its own brand
  *   www.sillage.localhost   an alias that 301s to sillage.example
+ *   modern.localhost        Modern (redesign mock-up), English + French, default teal palette
+ *   navy.localhost          the same tours, Modern, an agency's navy + coral palette
+ *   mono.localhost          the same tours, Modern, charcoal + lime and the Clean fonts
  *   anything else           no site
  *
  * The fixture is shaped by lib/publish/contract.ts — keep it in step.
@@ -49,9 +52,66 @@ const SITES = {
       { slug: 'felucca-sunset', other: 'falua-atardecer', name: 'Felucca at sunset', published: true },
     ],
   },
+  'modern.localhost': {
+    id: '00000000-0000-4000-8000-00000000f002', tenantId: '00000000-0000-4000-8000-00000000f001',
+    archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
+    companyName: 'Nile & Co (dev)', brand: {},
+    identity: { tagline: 'Egypt, your way', logoUrl: null, phone: '+20 2 2222 2222',
+      email: 'hello@nileco.invalid', whatsapp: '+20 122 222 2222', address: 'Garden City, Cairo', licenseNumber: 'ETAA 2222 (dev)' },
+    tours: [
+      { slug: 'classic-nile-cruise', other: 'croisiere-classique', name: 'Classic Nile cruise: Luxor to Aswan', published: true, price: 'available', plan: 'nile' },
+      { slug: 'pyramids-and-sphinx', other: 'pyramides-et-sphinx', name: 'Giza Pyramids and the Sphinx', published: true, price: 'available', plan: 'giza' },
+      { slug: 'cairo-and-the-museum', other: 'le-caire-et-le-musee', name: 'Cairo and the Egyptian Museum', published: true, price: 'available', plan: 'cairo' },
+      { slug: 'white-desert', other: 'desert-blanc', name: 'White Desert and the oases', published: true, plan: 'desert' },
+    ],
+  },
+  'navy.localhost': {
+    id: '00000000-0000-4000-8000-00000000f102', tenantId: '00000000-0000-4000-8000-00000000f101',
+    archetype: 'modern', status: 'draft', languages: ['en', 'es'],
+    companyName: 'Horizon Egypt (dev)',
+    brand: { palette: { primary: '#1e2a78', accent: '#ff6b5b', ink: '#111827', surface: '#ffffff' }, fontPair: 'sleek' },
+    identity: { tagline: 'Discover Egypt beyond the postcard', logoUrl: null, phone: null,
+      email: 'trips@horizon.invalid', whatsapp: '+20 100 333 3333', address: null, licenseNumber: null },
+    tours: [
+      { slug: 'classic-nile-cruise', other: 'croisiere-classique', name: 'Classic Nile cruise: Luxor to Aswan', published: true, price: 'available', plan: 'nile' },
+      { slug: 'pyramids-and-sphinx', other: 'pyramides-et-sphinx', name: 'Giza Pyramids and the Sphinx', published: true, price: 'available', plan: 'giza' },
+      { slug: 'cairo-and-the-museum', other: 'le-caire-et-le-musee', name: 'Cairo and the Egyptian Museum', published: true, price: 'available', plan: 'cairo' },
+      { slug: 'white-desert', other: 'desert-blanc', name: 'White Desert and the oases', published: true, plan: 'desert' },
+    ],
+  },
+  'mono.localhost': {
+    id: '00000000-0000-4000-8000-00000000f202', tenantId: '00000000-0000-4000-8000-00000000f201',
+    archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
+    companyName: 'Kemet Trails (dev)',
+    brand: { palette: { primary: '#161616', accent: '#c6f432', ink: '#161616', surface: '#ffffff' }, fontPair: 'clean' },
+    identity: { tagline: 'Small groups. Big Egypt.', logoUrl: null, phone: '+20 2 4444 4444',
+      email: 'go@kemet.invalid', whatsapp: null, address: 'Dokki, Giza', licenseNumber: 'ETAA 4444 (dev)' },
+    tours: [
+      { slug: 'classic-nile-cruise', other: 'croisiere-classique', name: 'Classic Nile cruise: Luxor to Aswan', published: true, price: 'available', plan: 'nile' },
+      { slug: 'pyramids-and-sphinx', other: 'pyramides-et-sphinx', name: 'Giza Pyramids and the Sphinx', published: true, price: 'available', plan: 'giza' },
+      { slug: 'cairo-and-the-museum', other: 'le-caire-et-le-musee', name: 'Cairo and the Egyptian Museum', published: true, price: 'available', plan: 'cairo' },
+      { slug: 'white-desert', other: 'desert-blanc', name: 'White Desert and the oases', published: true, plan: 'desert' },
+    ],
+  },
 }
 // Invented facts, in the contract's shape (lib/publish/contract.ts tourFacts).
-function facts(kind, currency) {
+const PLANS = {
+  giza: { durationDays: 1, durationNights: 0, days: [
+    { day: 1, title: 'The pyramids and the Sphinx', city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Giza Pyramids', 'Great Sphinx', 'Valley Temple of Khafre'] },
+  ], mainAttractions: ['Giza Pyramids', 'Great Sphinx'], accommodation: [], inclusions: ['Egyptologist guide', 'Air-conditioned vehicle', 'Entrance fees to the sites listed', 'Lunch'], departureDays: ['mon', 'wed', 'fri', 'sat', 'sun'] },
+  cairo: { durationDays: 3, durationNights: 2, days: [
+    { day: 1, title: 'Arrival in Cairo', city: 'Cairo', overnight: true, meals: { breakfast: false, lunch: false, dinner: true }, sights: [] },
+    { day: 2, title: 'The Egyptian Museum and Islamic Cairo', city: 'Cairo', overnight: true, meals: { breakfast: true, lunch: true, dinner: false }, sights: ['Egyptian Museum', 'Citadel of Salah El Din', 'Khan el-Khalili'] },
+    { day: 3, title: 'Saqqara and Memphis', city: 'Saqqara', overnight: false, meals: { breakfast: true, lunch: true, dinner: false }, sights: ['Step Pyramid of Djoser', 'Memphis'] },
+  ], mainAttractions: ['Egyptian Museum'], accommodation: [{ kind: 'hotel', name: 'Garden City House (dev)', city: 'Cairo' }], inclusions: ['2 nights with breakfast', 'Egyptologist guide', 'Entrance fees to the sites listed'], departureDays: ['thu', 'sat'] },
+  desert: { durationDays: 3, durationNights: 2, days: [
+    { day: 1, title: 'Cairo to Bahariya', city: 'Bahariya', overnight: true, meals: { breakfast: false, lunch: true, dinner: true }, sights: ['Black Desert'] },
+    { day: 2, title: 'Into the White Desert', city: 'White Desert', overnight: true, meals: { breakfast: true, lunch: true, dinner: true }, sights: ['White Desert', 'Crystal Mountain'] },
+    { day: 3, title: 'Back to Cairo', city: 'Cairo', overnight: false, meals: { breakfast: true, lunch: false, dinner: false }, sights: [] },
+  ], mainAttractions: ['White Desert'], accommodation: [{ kind: 'hotel', name: 'Oasis Eco Lodge (dev)', city: 'Bahariya' }], inclusions: ['1 night in a lodge, 1 night camping', '4x4 with driver', 'All meals in the desert'], departureDays: ['fri'] },
+}
+
+function facts(kind, currency, plan) {
   const base = {
     durationDays: 4, durationNights: 3, images: [],
     days: [
@@ -69,6 +129,7 @@ function facts(kind, currency) {
     departures: [{ date: '2026-11-16', endDate: '2026-11-19', status: 'guaranteed', seatsLeft: 4 }, { date: '2026-11-20', endDate: '2026-11-23', status: 'full', seatsLeft: 0 }],
     cancellation: { tiers: [{ daysBefore: 30, chargePercent: 25 }, { daysBefore: 7, chargePercent: 50 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
     publishable: { ok: true, reasons: [] },
+    ...(PLANS[plan] ?? {}),
   }
   if (kind === 'on_request') {
     return { ...base, price: { status: 'on_request', currency, basis: { pax: 2, season: 'lowest' }, from: null, byNationality: null, table: [], indicative: [] },
@@ -115,9 +176,9 @@ function page(s, lang, path, preview) {
   const t = m && list.find(x => slugIn(x, lang) === m[1])
   if (!t) return null
   return { ...base, kind: 'tour', path, title: t.name, unpublished: !t.published,
-    tour: { templateId: '00000000-0000-4000-8000-00000000d003', name: t.name, facts: facts(t.price ?? 'on_request', 'EUR'),
+    tour: { templateId: '00000000-0000-4000-8000-00000000d003', name: t.name, facts: facts(t.price ?? 'on_request', 'EUR', t.plan),
       // Approved text (step 7), for the priced tours — slots filled by the renderer.
-      narrative: t.price === 'available' ? {
+      narrative: t.price === 'available' && (!t.plan || t.plan === 'nile') ? {
         overview: [
           { type: 'text', text: 'Sail between the great temples of Upper Egypt at the pace of the river, with an Egyptologist at your side. From' },
           { type: 'slot', slot: 'price_from' },
