@@ -14,6 +14,11 @@ export function formatPrice(amount: number, currency: string, language: string):
     .format(shownAmount(amount))
 }
 
+/** "25%" / "25 %" — the percentage as the language writes it. */
+export function formatPercent(percent: number, language: string): string {
+  return new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 0 }).format(percent / 100)
+}
+
 /** An indicative conversion: approximate by nature, rounded normally. */
 export function formatApprox(amount: number, currency: string, language: string): string {
   return `≈ ${new Intl.NumberFormat(language, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Math.round(amount))}`

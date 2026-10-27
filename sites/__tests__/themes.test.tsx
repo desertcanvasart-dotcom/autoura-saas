@@ -87,12 +87,12 @@ for (const archetype of ARCHETYPES) {
       expect(html).not.toContain('tel:')
     })
     it('a test hostname says it is a preview; an unpublished page says so', () => {
-      expect(render(archetype, payload({}, archetype), true)).toContain('Preview — this site is not public')
+      expect(render(archetype, payload({}, archetype), true)).toContain('Aperçu — ce site n’est pas public')
       const draft = payload({ kind: 'tour', title: 'Soon', unpublished: true, tour: { templateId: '00000000-0000-4000-8000-0000000000cc', name: 'Soon', facts: null, narrative: null } }, archetype)
-      expect(render(archetype, draft)).toContain('Not yet published')
+      expect(render(archetype, draft)).toContain('Pas encore publié')
     })
     it('an empty site says so instead of showing an empty grid', () => {
-      expect(render(archetype, payload({ tours: [] }, archetype))).toContain('Our journeys will be listed here soon.')
+      expect(render(archetype, payload({ tours: [] }, archetype))).toContain('Nos voyages seront bientôt présentés ici.')
     })
   })
 }

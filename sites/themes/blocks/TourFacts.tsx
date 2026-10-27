@@ -9,8 +9,8 @@
 
 import type { PageNarrative, TourFacts } from '@/lib/publish/contract'
 import { narrativeText, paragraphs } from './narrative'
-import { countOf, t } from '../../i18n/strings'
-import { formatApprox, formatDate, formatPrice, formatWeekdays } from './format'
+import { colon, countOf, t } from '../../i18n/strings'
+import { formatApprox, formatDate, formatPercent, formatPrice, formatWeekdays } from './format'
 import s from './facts.module.css'
 
 export type FactsVariant = 'editorial' | 'compact'
@@ -52,7 +52,7 @@ export function PriceSection({ facts, lang, variant }: P) {
       <p className={s.note}>{p.from.tierLabel} · {t(lang, 'priceBasis')}</p>
       {p.indicative.length > 0 && (
         <p className={s.note}>
-          {t(lang, 'indicative')}: {p.indicative.map(i => formatApprox(i.perPerson, i.currency, lang)).join(' · ')}
+          {t(lang, 'indicative')}{colon(lang)} {p.indicative.map(i => formatApprox(i.perPerson, i.currency, lang)).join(' · ')}
           {' '}({t(lang, 'youPayIn')} {p.currency}; {t(lang, 'rateOf')} {formatDate(p.indicative[0].rateDate, lang)})
         </p>
       )}
@@ -118,7 +118,7 @@ export function ItinerarySection({ facts, lang, variant, narrative }: P) {
             <li key={d.day} className={s.dayItem}>
               <h3><span className={s.dayNo}>{t(lang, 'day')} {d.day}</span>{d.title ? ` — ${d.title}` : d.city ? ` — ${d.city}` : ''}</h3>
               {paragraphs(dayText.get(d.day) ?? null).map((p, i) => <p key={i} className={s.dayText}>{p}</p>)}
-              {d.sights.length > 0 && <p><span className={s.label}>{t(lang, 'sights')}:</span> {d.sights.join(', ')}</p>}
+              {d.sights.length > 0 && <p><span className={s.label}>{t(lang, 'sights')}{colon(lang)}</span> {d.sights.join(', ')}</p>}
               {meals.length > 0 && <p><span className={s.label}>{meals.map(m => t(lang, m)).join(' · ')}</span></p>}
               {d.overnight && d.city && <p className={s.note}>{t(lang, 'overnightIn')} {d.city}</p>}
             </li>
@@ -137,7 +137,7 @@ export function AccommodationSection({ facts, lang, variant }: P) {
       <ul className={s.list}>
         {facts.accommodation.map(a => (
           <li key={`${a.kind}:${a.name}:${a.city ?? ''}`}>
-            {a.kind === 'cruise' ? `${t(lang, 'nileCruise')}: ${a.name}` : a.city ? `${a.name}, ${a.city}` : a.name}
+            {a.kind === 'cruise' ? `${t(lang, 'nileCruise')}${colon(lang)} ${a.name}` : a.city ? `${a.name}, ${a.city}` : a.name}
           </li>
         ))}
       </ul>
@@ -184,7 +184,7 @@ export function DeparturesSection({ facts, lang, variant }: P) {
   return (
     <section className={cx(variant, 'section')}>
       {facts.departureDays.length > 0 && (
-        <p><span className={s.label}>{t(lang, 'departs')}:</span> {formatWeekdays(facts.departureDays, lang)}</p>
+        <p><span className={s.label}>{t(lang, 'departs')}{colon(lang)}</span> {formatWeekdays(facts.departureDays, lang)}</p>
       )}
       {facts.departures.length > 0 && (
         <>
@@ -218,7 +218,7 @@ export function CancellationSection({ facts, lang, variant }: P) {
         <ul className={s.list}>
           {c.tiers.map(tier => (
             <li key={tier.daysBefore}>
-              {tier.daysBefore === 0 ? t(lang, 'onDeparture') : `${tier.daysBefore} ${t(lang, 'daysBeforeDeparture')}`}: {tier.chargePercent}% {t(lang, 'cancellationCharge')}
+              {tier.daysBefore === 0 ? t(lang, 'onDeparture') : `${tier.daysBefore} ${t(lang, 'daysBeforeDeparture')}`}{colon(lang)} {formatPercent(tier.chargePercent, lang)} {t(lang, 'cancellationCharge')}
             </li>
           ))}
         </ul>
