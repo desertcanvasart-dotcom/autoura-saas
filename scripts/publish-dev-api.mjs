@@ -56,6 +56,8 @@ const SITES = {
     id: '00000000-0000-4000-8000-00000000f002', tenantId: '00000000-0000-4000-8000-00000000f001',
     archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
     companyName: 'Nile & Co (dev)', brand: {},
+    // Blocks on a pretend agency website (embed-demo in .claude/launch.json).
+    embed: { key: 'DevEmbedKeyNileCo2026xyz', origins: ['http://agency.localhost:8898'] },
     identity: { tagline: 'Egypt, your way', logoUrl: null, phone: '+20 2 2222 2222',
       email: 'hello@nileco.invalid', whatsapp: '+20 122 222 2222', address: 'Garden City, Cairo', licenseNumber: 'ETAA 2222 (dev)' },
     tours: [
@@ -219,10 +221,23 @@ http.createServer((req, res) => {
     if (s) s.companyName = url.searchParams.get('name') || s.companyName
     return send(200, { companyName: s?.companyName })
   }
+  // Dev only: the last enquiry the renderer forwarded, to check what reached the app.
+  if (req.method === 'GET' && url.pathname === '/dev/last-enquiry') return send(200, globalThis.lastEnquiry ?? null)
   if (req.headers.authorization !== `Bearer ${SECRET}`) return send(401, { error: 'Unauthorized' })
+  if (req.method === 'POST' && url.pathname === '/api/publish/internal/enquiry') {
+    let body = ''
+    req.on('data', c => { body += c })
+    req.on('end', () => { globalThis.lastEnquiry = JSON.parse(body || 'null'); send(201, { ok: true, enquiryId: '00000000-0000-4000-8000-0000000000e1' }) })
+    return
+  }
   if (url.pathname === '/api/publish/internal/site') {
     const r = resolution(url.searchParams.get('host'))
     return r ? send(200, r) : send(404, { error: 'No site for this hostname' })
+  }
+  if (url.pathname === '/api/publish/internal/embed') {
+    const s = Object.values(SITES).find(x => x.embed?.key === url.searchParams.get('key'))
+    if (!s) return send(404, { error: 'No such embed key' })
+    return send(200, { site: { id: s.id, tenantId: s.tenantId, archetype: s.archetype, status: s.status, languages: s.languages, companyName: s.companyName, brand: s.brand }, origins: s.embed.origins })
   }
   if (url.pathname === '/api/publish/internal/page') {
     const s = byId[url.searchParams.get('site')]

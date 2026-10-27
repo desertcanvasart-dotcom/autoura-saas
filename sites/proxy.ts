@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { decideRoute, UNKNOWN_HOST_PATH } from './lib/routing'
-import { siteForHost } from './lib/internal-api'
+import { decideRoute, embedPath, frameAncestors, internalPath, MISSING_SEGMENT, UNKNOWN_HOST_PATH } from './lib/routing'
+import { siteForEmbedKey, siteForHost } from './lib/internal-api'
 import { normalizeHost } from '@/lib/publish/site-data'
 
 // ============================================
@@ -11,6 +11,24 @@ import { normalizeHost } from '@/lib/publish/site-data'
 // tell search engines a live site's pages are gone.
 
 export async function proxy(request: NextRequest) {
+  // A block on the agency's own website: the site comes from the embed key,
+  // and only the agency's listed websites may frame it.
+  const embed = embedPath(request.nextUrl.pathname)
+  if (embed) {
+    let found
+    try {
+      found = await siteForEmbedKey(embed.key)
+    } catch (e) {
+      console.error('[sites] embed lookup failed:', e instanceof Error ? e.message : e)
+      return new NextResponse('Temporarily unavailable', { status: 503, headers: { 'Retry-After': '30' } })
+    }
+    if (!found) return NextResponse.rewrite(new URL(UNKNOWN_HOST_PATH, request.url))
+    const lang = found.site.languages.includes(embed.lang) ? embed.lang : found.site.languages[0]
+    const res = NextResponse.rewrite(new URL(internalPath(found.site, 'embed', lang, embed.rest || MISSING_SEGMENT), request.url))
+    res.headers.set('Content-Security-Policy', frameAncestors(found.origins))
+    return res
+  }
+
   const host = normalizeHost(request.headers.get('host'))
   let resolution
   try {
@@ -43,7 +61,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Everything but Next's own assets and the app's own routes: the sync
   // worker's revalidate call, the enquiry form and WhatsApp button
-  // (sites/app/api/*), robots.txt and the sitemaps — which resolve the
-  // hostname themselves.
-  matcher: ['/((?!_next/|api/|robots\\.txt|sitemap\\.xml|sitemaps/).*)'],
+  // (sites/app/api/*), robots.txt, the sitemaps and the embed loader —
+  // which resolve the hostname (or embed key) themselves.
+  matcher: ['/((?!_next/|api/|robots\\.txt|sitemap\\.xml|sitemaps/|embed\\.js).*)'],
 }

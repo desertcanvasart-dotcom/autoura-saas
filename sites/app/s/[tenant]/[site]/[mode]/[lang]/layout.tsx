@@ -22,7 +22,7 @@ type Params = { tenant: string; site: string; mode: string; lang: string }
 
 export default async function SiteLayout({ children, params }: { children: React.ReactNode; params: Promise<Params> }) {
   const p = await params
-  if (p.mode !== 'live' && p.mode !== 'preview') notFound()
+  if (p.mode !== 'live' && p.mode !== 'preview' && p.mode !== 'embed') notFound()
   const home = await loadPage({ tenantId: p.tenant, siteId: p.site, mode: p.mode as Mode, language: p.lang, path: '' })
   if (!home) notFound()
   const brand = resolveBrand(home.site.archetype, home.site.brand)

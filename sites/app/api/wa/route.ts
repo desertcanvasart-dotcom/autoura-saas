@@ -1,5 +1,5 @@
 import { normalizeHost } from '@/lib/publish/site-data'
-import { requestWaRef, siteForHost } from '../../../lib/internal-api'
+import { requestWaRef, siteForEmbedKey, siteForHost } from '../../../lib/internal-api'
 import { backTo, landingFrom, whatsAppLink } from '../../../lib/lead-capture'
 
 // ============================================
@@ -16,10 +16,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function GET(request: Request) {
   const host = normalizeHost(request.headers.get('host'))
-  const resolution = host ? await siteForHost(host).catch(() => null) : null
+  const url = new URL(request.url)
+  // From a block on the agency's own website: the site comes from its key.
+  const key = url.searchParams.get('key')
+  const resolution = key
+    ? await siteForEmbedKey(key).catch(() => null)
+    : host ? await siteForHost(host).catch(() => null) : null
   if (!host || !resolution) return new Response('Not found', { status: 404 })
 
-  const url = new URL(request.url)
   const page = url.searchParams.get('page') ?? ''
   const lang = url.searchParams.get('lang') ?? ''
   const language = resolution.site.languages.includes(lang) ? lang : resolution.site.languages[0]

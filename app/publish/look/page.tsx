@@ -18,6 +18,7 @@ import { contrastRatio, readableOn, MIN_TEXT_CONTRAST, MIN_UI_CONTRAST } from '@
 type Palette = { primary: string; accent: string; ink: string; surface: string }
 interface Look {
   archetype: string
+  stored: { website: string | null }
   resolved: { palette: Palette; fontPair: string }
   problems: string[]
   choices: {
@@ -44,6 +45,7 @@ export default function PublishLookPage() {
   const [archetype, setArchetype] = useState('modern')
   const [palette, setPalette] = useState<Palette | null>(null)
   const [fontPair, setFontPair] = useState('sleek')
+  const [website, setWebsite] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function PublishLookPage() {
       setArchetype(j.data.archetype)
       setPalette(j.data.resolved.palette)
       setFontPair(j.data.resolved.fontPair)
+      setWebsite(j.data.stored.website ?? '')
     }).catch(e => showToast('error', e instanceof Error ? e.message : 'Could not load the look'))
   }, [])
 
@@ -76,7 +79,7 @@ export default function PublishLookPage() {
   async function save() {
     setSaving(true)
     try {
-      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair }) })
+      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website }) })
       const j = await res.json()
       if (!j.success) throw new Error(j.error)
       showToast(j.data.warning ? 'warning' : 'success', j.data.warning ?? 'Saved — your website shows the new look now')
@@ -153,6 +156,13 @@ export default function PublishLookPage() {
             <select value={fontPair} disabled={!canManage} onChange={e => setFontPair(e.target.value)} className="text-sm border border-gray-300 rounded-md px-3 py-2">
               {look.choices.fontPairs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
             </select>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-gray-900 mb-1">Your main website</h2>
+            <p className="text-xs text-gray-500 mb-2">If your tours live apart from your main website (for example on tours.youragency.com), the header links back to it. Leave empty if not.</p>
+            <input value={website} disabled={!canManage} onChange={e => setWebsite(e.target.value)} placeholder="https://www.youragency.com"
+              className="w-full max-w-md text-sm border border-gray-300 rounded-md px-3 py-2" />
           </section>
 
           {canManage && (

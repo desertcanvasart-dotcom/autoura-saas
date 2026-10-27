@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent, lookOf, saveLook,
+  createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent, lookOf, saveLook, embedSettingsOf, saveEmbedSettings,
   PublishError, type AdminDeps, type Actor,
 } from '@/lib/publish/admin'
 import type { TourFacts } from '@/lib/publish/contract'
@@ -378,5 +378,40 @@ describe('the look (brand studio)', () => {
   it('refuses a theme or font that does not exist', async () => {
     await expectError(saveLook(db as never, actor, { archetype: 'gold_luxury', palette: undefined, fontPair: 'sleek' }, deps), 400, /Choose a theme/)
     await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'comic-sans' }, deps), 400, /fontPair/)
+  })
+})
+
+describe('tours on the agency\'s own website (embed settings)', () => {
+  it('saving websites makes a key once, keeps it, and keeps the other settings', async () => {
+    db.tables.publish_sites[0].settings = { indicativeCurrencies: ['USD'] }
+    const first = await saveEmbedSettings(db as never, actor, { origins: ['www.agency.com', 'https://www.agency.com/tours'] }, deps)
+    expect(first.origins).toEqual(['https://www.agency.com'])
+    expect(first.key).toMatch(/^[A-Za-z0-9]{24}$/)
+    const again = await saveEmbedSettings(db as never, actor, { origins: ['https://www.agency.com', 'https://agency.com'] }, deps)
+    expect(again.key).toBe(first.key)
+    expect(db.tables.publish_sites[0].settings).toEqual({ indicativeCurrencies: ['USD'], embed: { key: first.key, origins: ['https://www.agency.com', 'https://agency.com'] } })
+    expect((await embedSettingsOf(db as never, actor)).key).toBe(first.key)
+  })
+  it('a new key on request; the old one stops at once', async () => {
+    const { key } = await saveEmbedSettings(db as never, actor, { origins: ['https://www.agency.com'] }, deps)
+    const fresh = await saveEmbedSettings(db as never, actor, { origins: ['https://www.agency.com'], newKey: true }, deps)
+    expect(fresh.key).not.toBe(key)
+  })
+  it('refuses an address that is not an https website', async () => {
+    await expectError(saveEmbedSettings(db as never, actor, { origins: ['http://www.agency.com'] }, deps), 400, /https/)
+    await expectError(saveEmbedSettings(db as never, actor, { origins: 'https://www.agency.com' }, deps), 400, /List the websites/)
+  })
+})
+
+describe('the agency\'s main website (header link back)', () => {
+  const palette = { primary: '#1d6b64', accent: '#38d9a9', ink: '#0f1720', surface: '#ffffff' }
+  it('is saved as an https origin, and cleared when left empty', async () => {
+    await saveLook(db as never, actor, { archetype: 'modern', palette, fontPair: 'sleek', website: 'www.sunrise-travel.example/home' }, deps)
+    expect((db.tables.publish_sites[0].brand as { website?: string }).website).toBe('https://www.sunrise-travel.example')
+    await saveLook(db as never, actor, { archetype: 'modern', palette, fontPair: 'sleek', website: '' }, deps)
+    expect(db.tables.publish_sites[0].brand).not.toHaveProperty('website')
+  })
+  it('refuses a plain http address', async () => {
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette, fontPair: 'sleek', website: 'http://www.sunrise-travel.example' }, deps), 400, /https/)
   })
 })

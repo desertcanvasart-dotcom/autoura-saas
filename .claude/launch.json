@@ -61,6 +61,18 @@
         "3002"
       ],
       "port": 3002
+    },
+    {
+      "name": "embed-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8898",
+        "-d",
+        "/private/tmp/claude-501/-Users-islamhussein-autoura-saas/fe2ca70c-cfa4-45c0-9ee3-f02dacdead0f/scratchpad/embed-demo"
+      ],
+      "port": 8898
     }
   ]
 }

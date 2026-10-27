@@ -33,6 +33,18 @@ export function landingFrom(referer: string | null, host: string): URL | null {
   }
 }
 
+/** An embedded form's landing page: the agency's page the block sits on
+ *  (the frame's referrer), only when it is on one of the listed websites. */
+export function embedLanding(raw: FormDataEntryValue | null, origins: string[]): URL | null {
+  if (typeof raw !== 'string' || !raw) return null
+  try {
+    const url = new URL(raw)
+    return origins.includes(url.origin.toLowerCase()) ? url : null
+  } catch {
+    return null
+  }
+}
+
 /** Where to send the visitor back to: their page, else the site's front door. */
 export function backTo(landing: URL | null, language: string, anchor?: string): string {
   const path = landing ? `${landing.pathname}${landing.search}` : `/${language}`
