@@ -267,6 +267,12 @@ On entering `failing`, `lagging` or `stalled` (de-duplicated, at most one alert 
 
 ## 11. Lead capture
 
+*Built in step 8 (2026-10-27), with the operator's answers to Q1, Q3 and Q7:*
+- ***Q1 — no concierge on company sites in Phase 1.*** *The concierge lives inside `travel2egypt-next` (its prompt speaks as Travel2Egypt, its tours come from that site's CMS, and it routes only our four brands), so it cannot be embedded on another company's site. A white-label concierge built inside Autoura from each company's own Publish facts is a later phase.*
+- ***Q3 — a form enquiry is a lead + an enquiry row + a client note + a bell notice; no Inbox conversation.***
+- ***Q7 — click-to-WhatsApp only for a company with its own number*** *(`tenants.whatsapp_number`); a shared-number company shows the form and its email/phone.*
+- *Routes: the renderer's `/api/enquire` (form POST) and `/api/wa` (button), which call `/api/publish/internal/enquiry` and `/api/publish/internal/wa-ref`; the outcome is shown by a `:target` anchor so pages stay static. Code: `lib/publish/enquiries.ts`, `sites/lib/lead-capture.ts`.*
+
 All three paths write a lead into `clients` (find-or-create, existing logic factored out of `lib/concierge-brief-intake.ts`), a `publish_enquiries` row, and a bell notification.
 
 - **Enquiry form:** pre-filled with tour, tier and dates from the page; POST to `/api/publish/enquiries` on the GetAutoura app via the renderer (site resolved from the host, never from the body). Honeypot + per-IP rate limit (existing `lib/rate-limit`). Landing URL, `utm_*` and `campaign` are captured from the page URL into hidden fields. Also adds a `client_notes` entry with the message.

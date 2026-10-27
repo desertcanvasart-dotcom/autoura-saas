@@ -20,6 +20,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MappedBrief } from './concierge-brief-schema'
+import { findOrCreateLead } from './clients/find-or-create-lead'
 
 export type IngestOutcome = 'received' | 'updated' | 'duplicate_ignored' | 'older_revision_filed'
 
@@ -39,32 +40,6 @@ interface IngestMeta {
 }
 
 const PG_UNIQUE_VIOLATION = '23505'
-
-// ---- clients ----
-async function findOrCreateClient(mapped: MappedBrief, supabase: SupabaseClient, tenantId: string): Promise<string | null> {
-  const { email, phone } = mapped.clientMatch
-
-  if (email) {
-    const { data } = await supabase.from('clients').select('id').eq('tenant_id', tenantId).eq('email', email).limit(1).maybeSingle()
-    if (data?.id) return data.id
-  }
-  if (phone) {
-    const { data } = await supabase.from('clients').select('id').eq('tenant_id', tenantId).eq('phone', phone).limit(1).maybeSingle()
-    if (data?.id) return data.id
-  }
-
-  const { data: created, error } = await supabase
-    .from('clients')
-    .insert({ ...mapped.client, tenant_id: tenantId })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('[concierge] client insert failed:', error.message)
-    return null
-  }
-  return created.id
-}
 
 async function upsertClientPreferences(clientId: string, mapped: MappedBrief, supabase: SupabaseClient, tenantId: string): Promise<void> {
   try {
@@ -154,7 +129,7 @@ export async function ingestBrief(
 
   // 1. Client (find-or-create). Best-effort: a brief is still stored even
   //    if the client write fails, so we never lose a lead.
-  const clientId = await findOrCreateClient(mapped, supabase, tenantId)
+  const clientId = await findOrCreateLead(supabase, tenantId, mapped.clientMatch, mapped.client, '[concierge]')
 
   // 2. Look up the current brief row for this conversation — tenant-scoped:
   //    with multi-brand routing several tenants receive briefs, and a

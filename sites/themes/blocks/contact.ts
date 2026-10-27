@@ -1,12 +1,17 @@
 // Contact links built from the company's records.
-// Step 8 replaces the plain WhatsApp link with the tracked /go/wa redirect
-// (tour reference in the message, enquiry recorded with its source).
 
-import type { CompanyIdentity } from '@/lib/publish/contract'
+import type { CompanyIdentity, PagePayload } from '@/lib/publish/contract'
 
-export function whatsappHref(identity: CompanyIdentity): string | null {
-  const digits = identity.whatsapp?.replace(/\D/g, '')
-  return digits && digits.length >= 8 ? `https://wa.me/${digits}` : null
+/** The WhatsApp button: through /api/wa, which records the page (and its
+ *  campaign) under a reference the message carries (step 8). Only for a
+ *  company with its own number — `identity.whatsapp` is
+ *  tenants.whatsapp_number, which a shared-number company does not have. */
+export function whatsappHref(page: PagePayload): string | null {
+  const digits = page.site.identity.whatsapp?.replace(/\D/g, '')
+  if (!digits || digits.length < 8) return null
+  const q = new URLSearchParams({ lang: page.language })
+  if (page.pageId) q.set('page', page.pageId)
+  return `/api/wa?${q}`
 }
 
 export function emailHref(identity: CompanyIdentity): string | null {

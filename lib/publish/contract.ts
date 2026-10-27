@@ -9,6 +9,8 @@
 //
 //   GET /api/publish/internal/site?host=…              which site a hostname serves
 //   GET /api/publish/internal/page?site=…&lang=…&path=… one page of it
+//   POST /api/publish/internal/enquiry                  an enquiry form sent (step 8)
+//   POST /api/publish/internal/wa-ref                   a tracked WhatsApp click (step 8)
 //
 // Authenticated with `Authorization: Bearer <PUBLISH_INTERNAL_SECRET>` — a
 // fixed header, so the renderer's fetch cache key stays stable.
@@ -28,6 +30,8 @@ export const CONTRACT_VERSION = 4
 
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
+export const INTERNAL_ENQUIRY_PATH = '/api/publish/internal/enquiry'
+export const INTERNAL_WA_REF_PATH = '/api/publish/internal/wa-ref'
 
 export const languageCode = z.string().regex(/^[a-z]{2}$/)
 
@@ -185,8 +189,55 @@ export const pagePayloadSchema = z.object({
   tours: z.array(pageLink),
   /** Not yet published — shown only on a test hostname. */
   unpublished: z.boolean(),
+  /** The page row, for the enquiry form and the tracked WhatsApp link
+   *  (step 8); null for a home page or listing that has no row yet.
+   *  Additive and optional, so a renderer one deploy behind ignores it. */
+  pageId: z.string().uuid().nullable().optional(),
 })
 export type PagePayload = z.infer<typeof pagePayloadSchema>
+
+// ---------- lead capture (step 8, PLAN §11) ----------
+// The renderer resolves the site from the hostname it was asked for, never
+// from what the visitor sent, and passes the visitor's address only so the
+// app can rate-limit it.
+
+const optionalText = (max: number) => z.string().trim().max(max).transform(v => v === '' ? null : v).nullable()
+
+export const enquiryInputSchema = z.object({
+  siteId: z.string().uuid(),
+  pageId: z.string().uuid().nullable(),
+  language: languageCode,
+  name: z.string().trim().min(1).max(120),
+  email: z.string().trim().toLowerCase().email().max(200),
+  phone: optionalText(40),
+  travellers: z.number().int().min(1).max(99).nullable(),
+  /** The month or day the visitor hopes to travel, as they gave it (YYYY-MM or YYYY-MM-DD). */
+  travelDate: z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/).nullable(),
+  message: optionalText(4000),
+  /** The page they enquired from, with its utm_* / campaign parameters. */
+  landingUrl: z.string().url().max(2000).nullable(),
+  visitorIp: z.string().max(64).nullable(),
+})
+export type EnquiryInput = z.infer<typeof enquiryInputSchema>
+
+export const enquiryResultSchema = z.object({ ok: z.literal(true), enquiryId: z.string().uuid() })
+
+export const waRefInputSchema = z.object({
+  siteId: z.string().uuid(),
+  pageId: z.string().uuid().nullable(),
+  language: languageCode,
+  landingUrl: z.string().url().max(2000).nullable(),
+})
+export type WaRefInput = z.infer<typeof waRefInputSchema>
+
+/** null number = the company has no WhatsApp number of its own (decision Q7:
+ *  no button is shown, and nothing is created). */
+export const waRefResultSchema = z.object({
+  number: z.string().nullable(),
+  token: z.string().nullable(),
+  tourName: z.string().nullable(),
+})
+export type WaRefResult = z.infer<typeof waRefResultSchema>
 
 export function internalAuthHeader(secret: string): Record<string, string> {
   return { authorization: `Bearer ${secret}` }

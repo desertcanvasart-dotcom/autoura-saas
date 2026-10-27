@@ -68,6 +68,23 @@ const en = {
   days: 'days',
   oneNight: 'night',
   nights: 'nights',
+  // ---- enquiries (step 8) ----
+  enquireTitle: 'Ask us about this journey',
+  enquireGeneral: 'Send us an enquiry',
+  yourName: 'Your name',
+  yourEmail: 'Email',
+  yourPhone: 'Phone (optional)',
+  travellersLabel: 'Travellers',
+  travelMonth: 'When would you like to travel?',
+  yourMessage: 'Anything we should know?',
+  sendEnquiry: 'Send enquiry',
+  enquirySent: 'Thank you — your enquiry has reached us. We will reply soon.',
+  enquirySlow: 'You have sent several enquiries just now. Please try again in a minute.',
+  enquiryInvalid: 'Please check your name and email address, then send it again.',
+  enquiryFailed: 'Your enquiry could not be sent just now. Please try again, or write to us directly.',
+  orWhatsApp: 'Or message us on WhatsApp',
+  waHello: 'Hello, I would like to plan a trip.',
+  waInterestedIn: 'Hello, I am interested in',
 } as const
 
 export type StringKey = keyof typeof en

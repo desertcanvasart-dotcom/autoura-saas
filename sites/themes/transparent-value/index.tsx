@@ -12,13 +12,14 @@ import { LanguageLinks } from '../blocks/LanguageLinks'
 import { TourSections } from '../blocks/TourSections'
 import { OverviewSection, AccommodationSection, CancellationSection, DeparturesSection, GroupSizeSection, HighlightsSection, InclusionsSection, ItinerarySection, PriceSection, TourImage } from '../blocks/TourFacts'
 import { emailHref, phoneHref, whatsappHref } from '../blocks/contact'
+import { EnquiryForm } from '../blocks/EnquiryForm'
 import { t } from '../../i18n/strings'
 import s from './theme.module.css'
 
 function Frame({ page, preview, children }: ThemePageProps & { children: React.ReactNode }) {
   const lang = page.language
   const { identity, companyName } = page.site
-  const wa = whatsappHref(identity)
+  const wa = whatsappHref(page)
   const email = emailHref(identity)
   const phone = phoneHref(identity)
   return (
@@ -29,7 +30,7 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
         <nav className={s.nav} aria-label={companyName}>
           <a href={`/${lang}/tours`}>{t(lang, 'tours')}</a>
           <LanguageLinks page={page} className={s.languages} />
-          {wa && <a className={s.waButton} href={wa} rel="noopener">{t(lang, 'askOnWhatsApp')}</a>}
+          {wa && <a className={s.waButton} href={wa} rel="nofollow">{t(lang, 'askOnWhatsApp')}</a>}
         </nav>
       </header>
       <main className={s.main}>{children}</main>
@@ -37,7 +38,7 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
         <div className={s.footerInner}>
           <strong>{companyName}</strong>
           <ul className={s.footerContact}>
-            {wa && <li><a href={wa} rel="noopener">WhatsApp {identity.whatsapp}</a></li>}
+            {wa && <li><a href={wa} rel="nofollow">WhatsApp {identity.whatsapp}</a></li>}
             {phone && <li><a href={phone}>{identity.phone}</a></li>}
             {email && <li><a href={email}>{identity.email}</a></li>}
             {identity.address && <li>{identity.address}</li>}
@@ -46,7 +47,7 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
         </div>
       </footer>
       {/* On a phone the way to ask stays in reach. */}
-      {wa && <a className={s.stickyWa} href={wa} rel="noopener">{t(lang, 'askOnWhatsApp')}</a>}
+      {wa && <a className={s.stickyWa} href={wa} rel="nofollow">{t(lang, 'askOnWhatsApp')}</a>}
     </div>
   )
 }
@@ -71,7 +72,7 @@ function TourGrid({ page }: ThemePageProps) {
 function Page(props: ThemePageProps) {
   const { page } = props
   const lang = page.language
-  const wa = whatsappHref(page.site.identity)
+  const wa = whatsappHref(page)
   if (page.kind === 'home') {
     const { identity, companyName } = page.site
     return (
@@ -79,7 +80,7 @@ function Page(props: ThemePageProps) {
         <section className={s.hero}>
           <h1 className={s.heroTitle}>{companyName}</h1>
           {identity.tagline && <p className={s.heroLead}>{identity.tagline}</p>}
-          {wa && <a className={s.heroButton} href={wa} rel="noopener">{t(lang, 'askOnWhatsApp')}</a>}
+          {wa && <a className={s.heroButton} href={wa} rel="nofollow">{t(lang, 'askOnWhatsApp')}</a>}
         </section>
         <section className={s.section}>
           <h2 className={s.sectionTitle}>{t(lang, 'dealsTitle')}</h2>
@@ -113,7 +114,14 @@ function Page(props: ThemePageProps) {
               </header>
             ),
             price: () => f && <PriceSection {...f} />,
-            enquiry: () => wa ? <a className={s.heroButton} href={wa} rel="noopener">{t(lang, 'askOnWhatsApp')}</a> : null,
+            // Ask straight away: WhatsApp when the company has its own
+            // number, and always the form (at the foot of the page).
+            enquiry: () => (
+              <p className={s.askRow}>
+                {wa && <a className={s.heroButton} href={wa} rel="nofollow">{t(lang, 'askOnWhatsApp')}</a>}
+                <a className={s.askLink} href="#enquire">{t(lang, 'enquireGeneral')}</a>
+              </p>
+            ),
             inclusions: () => f && <InclusionsSection {...f} />,
             groupSize: () => f && <GroupSizeSection {...f} />,
             departures: () => f && <DeparturesSection {...f} />,
@@ -124,12 +132,14 @@ function Page(props: ThemePageProps) {
             terms: () => f && <CancellationSection {...f} />,
           }}
         />
+        <EnquiryForm page={page} variant="compact" showWhatsApp={false} />
       </article>
     )
   }
   return (
     <section className={s.section}>
       <h1 className={s.sectionTitle}>{page.title}</h1>
+      {page.kind === 'contact' && <EnquiryForm page={page} variant="compact" />}
     </section>
   )
 }
