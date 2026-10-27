@@ -93,4 +93,11 @@ export const es: Record<StringKey, string> = {
   toursThere: 'Viajes que pasan por aquí',
   journeysCount: 'viajes',
   oneJourney: 'viaje',
+  stepWhen: 'Cuándo y cuántos',
+  stepTrip: 'Su viaje',
+  stepContact: 'Sus datos',
+  next: 'Siguiente',
+  back: 'Atrás',
+  step: 'Paso',
+  of: 'de',
 }

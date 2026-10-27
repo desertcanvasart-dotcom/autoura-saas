@@ -101,6 +101,14 @@ const en = {
   toursThere: 'Journeys that go there',
   journeysCount: 'journeys',
   oneJourney: 'journey',
+  // ---- step-by-step enquiry (redesign) ----
+  stepWhen: 'When and who',
+  stepTrip: 'Your trip',
+  stepContact: 'Your details',
+  next: 'Next',
+  back: 'Back',
+  step: 'Step',
+  of: 'of',
 } as const
 
 export type StringKey = keyof typeof en
