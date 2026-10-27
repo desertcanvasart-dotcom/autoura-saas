@@ -6,6 +6,7 @@ import { supabaseSyncStore } from '@/lib/publish/sync/store'
 import { runSyncCycle } from '@/lib/publish/sync/worker'
 import { createRevalidator } from '@/lib/publish/sync/revalidate'
 import { sendSyncAlert } from '@/lib/publish/sync/alerts'
+import { checkPendingDomains } from '@/lib/publish/admin'
 
 // ============================================
 // Publish sync — every 5 minutes
@@ -32,7 +33,10 @@ async function getHandler(request: NextRequest) {
       }),
       alert: sendSyncAlert,
     })
-    return NextResponse.json(report)
+    // Agencies' own domains still waiting on DNS or a certificate (step 11).
+    // Its own failure must not fail the sync run, which is about prices.
+    const domains = await checkPendingDomains(createAdminClient() as never).catch(e => ({ error: e instanceof Error ? e.message : String(e) }))
+    return NextResponse.json({ ...report, domains })
   } catch (e) {
     return NextResponse.json(
       { success: false, error: `Publish sync could not run: ${e instanceof Error ? e.message : String(e)}` },

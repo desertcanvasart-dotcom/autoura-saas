@@ -83,6 +83,13 @@ export default defineRailway(() => {
       PUBLISH_INTERNAL_SECRET_PREVIOUS: preserve(),
       PUBLISH_RENDERER_URL: preserve(),
       PUBLISH_REVALIDATE_SECRET: preserve(),
+      // Agencies' own domains (step 11): Railway's API, and the publish-sites
+      // service the domains are added to; our domain for free addresses.
+      RAILWAY_API_TOKEN: preserve(),
+      RAILWAY_PUBLISH_PROJECT_ID: preserve(),
+      RAILWAY_PUBLISH_ENVIRONMENT_ID: preserve(),
+      RAILWAY_PUBLISH_SERVICE_ID: preserve(),
+      PUBLISH_SITES_BASE_DOMAIN: preserve(),
       // Added in the dashboard, never written here — an apply without these
       // three would DELETE them from the live site (caught 2026-09-24).
       NEXT_PUBLIC_GROWTH_WIDGET_URL: preserve(),
