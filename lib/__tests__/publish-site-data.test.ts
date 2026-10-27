@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload } from '@/lib/publish/site-data'
-import { siteResolutionSchema, pagePayloadSchema } from '@/lib/publish/contract'
+import { siteResolutionSchema, pagePayloadSchema, type TourFacts } from '@/lib/publish/contract'
+import { indicativeCurrenciesOf } from '@/lib/publish/site-data'
+
+const FACTS: TourFacts = {
+  durationDays: 1, durationNights: 0, images: [], days: [{ day: 1, title: null, city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: [] }],
+  mainAttractions: [], highlights: [], inclusions: ['Guide'], exclusions: [], accommodation: [], groupSize: null, departureDays: [], departures: [], cancellation: null,
+  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 99, tier: 'standard', tierLabel: 'Standard' }, byNationality: null, table: [], indicative: [] },
+  publishable: { ok: true, reasons: [] },
+}
 
 // ============================================================================
 // The GetAutoura side of the renderer's two internal endpoints (Publish step
@@ -33,7 +41,7 @@ function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
   }
 }
 
-const site = { id: SITE, tenant_id: TENANT, archetype: 'private_journeys', status: 'live', languages: ['en', 'fr'], brand: { tone: 'warm' },
+const site = { id: SITE, tenant_id: TENANT, archetype: 'private_journeys', status: 'live', languages: ['en', 'fr'], brand: { tone: 'warm' }, settings: { indicativeCurrencies: ['USD', 'eur', 'GBP', 'JPY', 'CHF'] },
   tenants: { company_name: 'Sillage', tagline: '  Private journeys since 2003 ', logo_url: 'https://cdn.test/logo.png', company_phone: '', contact_email: 'hello@sillage.test', whatsapp_number: '+201000000000', company_address: null, license_number: 'ETAA 1234' } }
 const tourPage = (slug: string, language: string, published: boolean, pageId = PAGE, active = true) => ({
   page_id: pageId, site_id: SITE, language, slug, is_published: published,
@@ -99,15 +107,24 @@ describe('resolveSiteByHost', () => {
   })
 })
 
+describe('indicative currencies from the site settings', () => {
+  it('three-letter codes only, at most three', () => {
+    expect(indicativeCurrenciesOf({ indicativeCurrencies: ['USD', 'eur', 'GBP', 'JPY', 'CHF'] })).toEqual(['USD', 'GBP', 'JPY'])
+    expect(indicativeCurrenciesOf(null)).toEqual([])
+  })
+})
+
 describe('loadPagePayload', () => {
+  const factsFor = vi.fn(async () => FACTS)
   const load = (path: string, opts: { language?: string; preview?: boolean; siteStatus?: string } = {}) =>
-    loadPagePayload(db({ siteStatus: opts.siteStatus }) as never, { siteId: SITE, language: opts.language ?? 'en', path, preview: opts.preview ?? false })
+    loadPagePayload(db({ siteStatus: opts.siteStatus }) as never, { siteId: SITE, language: opts.language ?? 'en', path, preview: opts.preview ?? false }, { tourFacts: factsFor })
 
   it('a published tour page, with its other language for hreflang', async () => {
     const page = await load('tours/nile-classic')
     expect(pagePayloadSchema.parse(page)).toEqual(page)
     expect(page).toMatchObject({ kind: 'tour', title: 'Nile classic', path: 'tours/nile-classic', unpublished: false,
-      tour: { templateId: TOUR, name: 'Nile classic' }, alternates: [{ language: 'fr', path: 'tours/croisiere-nil' }] })
+      tour: { templateId: TOUR, name: 'Nile classic', facts: FACTS }, alternates: [{ language: 'fr', path: 'tours/croisiere-nil' }] })
+    expect(factsFor).toHaveBeenCalledWith(expect.anything(), { tenantId: TENANT, templateId: TOUR, language: 'en', indicativeCurrencies: ['USD', 'GBP', 'JPY'] })
   })
   it('carries the company identity from its records and the stored brand, blanks as null', async () => {
     const page = await load('')
@@ -140,7 +157,19 @@ describe('loadPagePayload', () => {
 
 // ---------- only the renderer may ask ----------
 
-vi.mock('@/lib/supabase-server', () => ({ createAdminClient: () => db() }))
+let existingNotice = false
+const notifyTeam = vi.fn(async () => {})
+vi.mock('@/lib/notifications', () => ({ notifyTeam: (...a: unknown[]) => notifyTeam(...(a as [])) }))
+vi.mock('@/lib/publish/tour-facts', () => ({ loadTourFacts: async () => routeFacts }))
+let routeFacts: TourFacts = FACTS
+vi.mock('@/lib/supabase-server', () => ({
+  createAdminClient: () => {
+    const d = db() as unknown as { from: (t: string) => unknown }
+    return { from: (t: string) => t === 'notifications'
+      ? { select: () => ({ eq: () => ({ gte: () => ({ limit: async () => ({ data: existingNotice ? [{ id: 'n' }] : [], error: null }) }) }) }) }
+      : d.from(t) }
+  },
+}))
 const { GET: siteGET } = await import('@/app/api/publish/internal/site/route')
 const { GET: pageGET } = await import('@/app/api/publish/internal/page/route')
 
@@ -165,8 +194,23 @@ describe('the internal endpoints', () => {
   it('a renderer on another contract version is refused plainly', async () => {
     const r = await siteGET(req('/api/publish/internal/site?host=sillage.example&v=1', 'Bearer internal-secret'))
     expect(r.status).toBe(409)
-    expect((await siteGET(req('/api/publish/internal/site?host=sillage.example&v=2', 'Bearer internal-secret'))).status).toBe(200)
+    expect((await siteGET(req('/api/publish/internal/site?host=sillage.example&v=3', 'Bearer internal-secret'))).status).toBe(200)
     expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&v=9`, 'Bearer internal-secret'))).status).toBe(409)
+  })
+  it('a published tour that can no longer be published tells its company — once a week, not every render', async () => {
+    routeFacts = { ...FACTS, price: { ...FACTS.price, status: 'on_request', from: null }, publishable: { ok: false, reasons: ['No tier of the tour has a complete price — every rate it needs must be entered.'] } }
+    notifyTeam.mockClear()
+    existingNotice = false
+    const r = await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&path=tours/nile-classic`, 'Bearer internal-secret'))
+    expect(r.status).toBe(200)
+    await new Promise(res => setTimeout(res, 0))
+    expect(notifyTeam).toHaveBeenCalledWith(expect.objectContaining({ tenant_id: TENANT, dedupe_key: `publish-tour-incomplete:${TOUR}`, roles: ['owner', 'admin', 'manager'] }))
+    notifyTeam.mockClear()
+    existingNotice = true
+    await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&path=tours/nile-classic`, 'Bearer internal-secret'))
+    await new Promise(res => setTimeout(res, 0))
+    expect(notifyTeam).not.toHaveBeenCalled()
+    routeFacts = FACTS
   })
   it('404 for no site or no page; 400 for a malformed ask', async () => {
     expect((await siteGET(req('/api/publish/internal/site?host=nobody.example', 'Bearer internal-secret'))).status).toBe(404)

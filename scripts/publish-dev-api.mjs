@@ -30,8 +30,8 @@ const SITES = {
     identity: { tagline: 'Private journeys along the Nile, shaped around you', logoUrl: null, phone: '+20 2 0000 0000',
       email: 'hello@sillage.invalid', whatsapp: '+20 100 000 0000', address: 'Zamalek, Cairo', licenseNumber: 'ETAA 0000 (dev)' },
     tours: [
-      { slug: 'nile-classic', other: 'croisiere-classique', name: 'Classic Nile journey', published: true },
-      { slug: 'cairo-in-depth', other: 'le-caire-en-profondeur', name: 'Cairo in depth', published: false },
+      { slug: 'nile-classic', other: 'croisiere-classique', name: 'Classic Nile journey', published: true, price: 'available' },
+      { slug: 'cairo-in-depth', other: 'le-caire-en-profondeur', name: 'Cairo in depth', published: false, price: 'on_request' },
       { slug: 'desert-and-oases', other: 'desert-et-oasis', name: 'White Desert and the oases', published: true },
     ],
   },
@@ -43,13 +43,43 @@ const SITES = {
     identity: { tagline: 'Day tours and short breaks, priced up front', logoUrl: null, phone: null,
       email: 'tours@afford.invalid', whatsapp: '+20 111 111 1111', address: null, licenseNumber: null },
     tours: [
-      { slug: 'pyramids-day-tour', other: 'tour-piramides', name: 'Pyramids and Sphinx day tour', published: true },
+      { slug: 'pyramids-day-tour', other: 'tour-piramides', name: 'Pyramids and Sphinx day tour', published: true, price: 'available' },
       { slug: 'luxor-day-trip', other: 'excursion-luxor', name: 'Luxor day trip from Hurghada', published: true },
       { slug: 'alexandria-day', other: 'dia-alejandria', name: 'Alexandria in a day', published: true },
       { slug: 'felucca-sunset', other: 'falua-atardecer', name: 'Felucca at sunset', published: true },
     ],
   },
 }
+// Invented facts, in the contract's shape (lib/publish/contract.ts tourFacts).
+function facts(kind, currency) {
+  const base = {
+    durationDays: 4, durationNights: 3, images: [],
+    days: [
+      { day: 1, title: 'Arrival in Luxor', city: 'Luxor', overnight: true, meals: { breakfast: false, lunch: false, dinner: true }, sights: [] },
+      { day: 2, title: 'The West Bank', city: 'Luxor', overnight: true, meals: { breakfast: true, lunch: true, dinner: true }, sights: ['Valley of the Kings', 'Temple of Hatshepsut'] },
+      { day: 3, title: 'Edfu and Kom Ombo', city: 'Aswan', overnight: true, meals: { breakfast: true, lunch: true, dinner: true }, sights: ['Temple of Horus', 'Kom Ombo Temple'] },
+      { day: 4, title: 'Philae and departure', city: 'Aswan', overnight: false, meals: { breakfast: true, lunch: false, dinner: false }, sights: ['Philae Temple'] },
+    ],
+    mainAttractions: ['Valley of the Kings', 'Philae Temple'], highlights: [],
+    inclusions: ['3 nights on the cruise, full board', 'Egyptologist guide', 'Entrance fees to the sites listed'],
+    exclusions: ['International flights', 'Visa', 'Tips'],
+    accommodation: [{ kind: 'cruise', name: 'MS Example Star', city: null }],
+    groupSize: { min: 2, max: 12 },
+    departureDays: ['mon', 'fri'],
+    departures: [{ date: '2026-11-16', endDate: '2026-11-19', status: 'guaranteed', seatsLeft: 4 }, { date: '2026-11-20', endDate: '2026-11-23', status: 'full', seatsLeft: 0 }],
+    cancellation: { tiers: [{ daysBefore: 30, chargePercent: 25 }, { daysBefore: 7, chargePercent: 50 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
+    publishable: { ok: true, reasons: [] },
+  }
+  if (kind === 'on_request') {
+    return { ...base, price: { status: 'on_request', currency, basis: { pax: 2, season: 'lowest' }, from: null, byNationality: null, table: [], indicative: [] },
+      publishable: { ok: false, reasons: ['No tier of the tour has a complete price — every rate it needs must be entered.'] } }
+  }
+  return { ...base, price: { status: 'available', currency, basis: { pax: 2, season: 'lowest' },
+    from: { perPerson: 840.4, tier: 'deluxe', tierLabel: 'Deluxe' }, byNationality: { eu: 910, other: 840.4 },
+    table: [{ pax: 2, perPerson: null, eu: 910, other: 840.4 }, { pax: 4, perPerson: null, eu: 802.5, other: 735 }, { pax: 6, perPerson: null, eu: 760, other: 698.25 }],
+    indicative: [{ currency: 'USD', perPerson: 905, rateDate: '2026-10-25' }] } }
+}
+
 const byId = Object.fromEntries(Object.values(SITES).map(s => [s.id, s]))
 
 function siteInfo(s) {
@@ -85,7 +115,7 @@ function page(s, lang, path, preview) {
   const t = m && list.find(x => slugIn(x, lang) === m[1])
   if (!t) return null
   return { ...base, kind: 'tour', path, title: t.name, unpublished: !t.published,
-    tour: { templateId: '00000000-0000-4000-8000-00000000d003', name: t.name },
+    tour: { templateId: '00000000-0000-4000-8000-00000000d003', name: t.name, facts: facts(t.price ?? 'on_request', 'EUR') },
     alternates: [{ language: other, path: `tours/${slugIn(t, other)}` }] }
 }
 

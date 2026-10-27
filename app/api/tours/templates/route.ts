@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeSailingDays } from '@/lib/rates/cruise-sailing'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 
@@ -134,6 +135,8 @@ export async function POST(request: NextRequest) {
       template_name: body.template_name,
       tour_theme: body.tour_theme || null,
       tour_type: body.tour_type,
+      // Weekdays it departs (migration 441); anything that is not a day is dropped, none = not stated.
+      departure_days: sanitizeSailingDays(body.departure_days),
       duration_days: body.duration_days || 1,
       // `|| null` swallowed the wizard's legitimate 0 (a day tour has zero
       // nights) and the column is NOT NULL — so creating any day-tour

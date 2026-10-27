@@ -40,6 +40,7 @@
 
 .tourHead { margin: 0 0 20px; }
 .crumb { color: var(--brand-primary); text-decoration: none; font-weight: 600; font-size: 14px; }
+.tourImage { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; margin: 16px 0 0; }
 .tourTitle { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 4.5vw, 42px); line-height: 1.15; margin: 8px 0 0; }
 
 .footer { border-top: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); margin-top: 32px; }

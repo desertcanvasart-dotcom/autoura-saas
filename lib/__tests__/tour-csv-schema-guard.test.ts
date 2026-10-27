@@ -31,6 +31,7 @@ const NOT_IN_THE_SHEET: Record<string, string> = {
   cached_starting_tier: 'derived, as above',
   cached_price_updated_at: 'derived, as above',
   popularity_score: 'behavioural, earned on the install that serves the tour',
+  cancellation_policy_id: 'local id of a policy (Settings) — another install has its own policies; set per tour after import',
 }
 
 function tourTemplateColumns(): string[] {

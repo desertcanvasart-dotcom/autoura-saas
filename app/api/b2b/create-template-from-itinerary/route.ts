@@ -135,6 +135,8 @@ export async function POST(request: NextRequest) {
             short_description: 'Custom tour created from itinerary',
             is_active: true,
             is_featured: false,
+            // Not stated: a tour built from one trip has no fixed weekdays (migration 441).
+            departure_days: [],
           })
           .select().single()
 

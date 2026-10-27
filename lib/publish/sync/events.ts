@@ -23,6 +23,8 @@ export const WATCHED_TABLES = [
   'tour_templates', 'tour_variations', 'tour_days', 'tour_day_activities',
   'tour_variation_services', 'variation_services', 'variation_pricing',
   'variation_daily_itinerary', 'tour_departures', 'tenants', 'exchange_rates',
+  // Migration 441: the company's cancellation terms, shown on tour pages.
+  'cancellation_policies',
 ] as const
 
 /** Product tables that hang off a variation: the trigger finds their tour
@@ -110,6 +112,7 @@ const departurePayload = z.object({
 })
 const policyPayload = z.object({
   tenantId: uuid,
+  table: z.enum(['tenants', 'cancellation_policies']),
   op,
   changedFields: z.array(z.string()),
 })
@@ -175,6 +178,9 @@ function handleDepartureChanged(p: DeparturePayload, tenantId: string): HandlerR
 }
 
 function handlePolicyChanged(p: PolicyPayload, tenantId: string): HandlerResult {
+  // Cancellation terms appear on tour pages; which tours use the default is
+  // not in the row, so all of them refresh.
+  if (p.table === 'cancellation_policies') return { tags: [publishTags.tours(tenantId)] }
   const shown = p.op !== 'UPDATE' || p.changedFields.some(f => (SITE_IDENTITY_FIELDS as readonly string[]).includes(f))
   return { tags: shown ? [publishTags.site(tenantId)] : [] }
 }
@@ -227,7 +233,8 @@ export function classifyChange(row: ChangeRow): ClassifiedChange {
     case 'tour_departures':
       return { ok: true, type: 'departure.changed', payload: { tenantId: row.tenant_id, templateId: row.template_id, recordId: row.record_id, op: row.op } }
     case 'tenants':
-      return { ok: true, type: 'policy.changed', payload: { ...base, tenantId: row.tenant_id } }
+    case 'cancellation_policies':
+      return { ok: true, type: 'policy.changed', payload: { ...base, tenantId: row.tenant_id, table: row.table_name } }
     case 'exchange_rates':
       return { ok: true, type: 'fx.changed', payload: { tenantId: row.tenant_id, op: row.op } }
     default:

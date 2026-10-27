@@ -8,7 +8,8 @@
 //
 // Step 3: identity and page structure. Facts join the page in step 5.
 
-import type { SiteResolution, PagePayload } from './contract'
+import type { SiteResolution, PagePayload, TourFacts } from './contract'
+import { loadTourFacts } from './tour-facts'
 
 type Db = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,14 +152,24 @@ function pathOf(row: LocaleRow): string {
   return row.slug
 }
 
+export interface PageDeps {
+  tourFacts: (db: Db, input: { tenantId: string; templateId: string; language: string; indicativeCurrencies: string[] }) => Promise<TourFacts>
+}
+
+/** The currencies a site shows indicative prices in (publish_sites.settings). */
+export function indicativeCurrenciesOf(settings: unknown): string[] {
+  const list = (settings as { indicativeCurrencies?: unknown } | null)?.indicativeCurrencies
+  return Array.isArray(list) ? list.filter((c): c is string => typeof c === 'string' && /^[A-Z]{3}$/.test(c)).slice(0, 3) : []
+}
+
 export async function loadPagePayload(db: Db, input: {
   siteId: string
   language: string
   path: string
   preview: boolean
-}): Promise<PagePayload | null> {
+}, deps: PageDeps = { tourFacts: loadTourFacts }): Promise<PagePayload | null> {
   const { data: site, error: sErr } = await db.from('publish_sites')
-    .select('id, tenant_id, archetype, status, languages, brand, tenants(company_name, tagline, logo_url, company_phone, contact_email, whatsapp_number, company_address, license_number)')
+    .select('id, tenant_id, archetype, status, languages, brand, settings, tenants(company_name, tagline, logo_url, company_phone, contact_email, whatsapp_number, company_address, license_number)')
     .eq('id', input.siteId).maybeSingle()
   if (sErr) throw new Error(`reading the site: ${sErr.message}`)
   if (!site || site.status === 'suspended' || !site.languages.includes(input.language)) return null
@@ -198,8 +209,16 @@ export async function loadPagePayload(db: Db, input: {
   if (!row && target.kind !== 'home' && target.kind !== 'listing') return null
 
   const kind: PagePayload['kind'] = row?.publish_pages?.kind ?? (target.kind === 'home' ? 'home' : 'listing')
-  const tour = kind === 'tour' && row?.publish_pages?.tour_template_id
-    ? { templateId: row.publish_pages.tour_template_id, name: row.publish_pages.tour_templates!.template_name }
+  const templateId = kind === 'tour' ? row?.publish_pages?.tour_template_id ?? null : null
+  const tour = templateId
+    ? {
+        templateId,
+        name: row!.publish_pages!.tour_templates!.template_name,
+        facts: await deps.tourFacts(db, {
+          tenantId: siteInfo.tenantId, templateId, language: input.language,
+          indicativeCurrencies: indicativeCurrenciesOf(site.settings),
+        }),
+      }
     : null
 
   let alternates: PagePayload['alternates'] = []

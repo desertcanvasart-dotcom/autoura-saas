@@ -69,6 +69,12 @@ beforeAll(async () => {
     for each row execute function rate_audit_trigger();`)
   await db.exec(MIG('439_publish_sync_foundation.sql'))
   await db.exec(MIG('439_publish_sync_foundation.sql')) // idempotent: a second run is harmless
+  // 441 adds the cancellation policies to the watched set.
+  await db.exec(`
+    create function public.update_updated_at_column() returns trigger language plpgsql as 'begin new.updated_at = now(); return new; end';
+    create function public.member_can_write(uuid) returns boolean language sql as 'select true';
+  `)
+  await db.exec(MIG('441_departure_days_and_cancellation_policies.sql'))
   await db.exec(`insert into publish_sync_health(tenant_id) values ('${A}')`)
 }, 60_000)
 
@@ -108,7 +114,7 @@ describe('migration 439 triggers', () => {
       insert into exchange_rates(tenant_id, target_currency, rate) values ('${A}', 'USD', 1.08);
     `)
     expect(await changes()).toEqual([
-      { tenant_id: A, table_name: 'tour_templates', op: 'INSERT', template_id: TOUR, changed_fields: ['id', 'is_active', 'template_name', 'tenant_id'], is_active: true },
+      { tenant_id: A, table_name: 'tour_templates', op: 'INSERT', template_id: TOUR, changed_fields: ['cancellation_policy_id', 'departure_days', 'id', 'is_active', 'template_name', 'tenant_id'], is_active: true },
       { tenant_id: A, table_name: 'tour_days', op: 'INSERT', template_id: TOUR, changed_fields: ['city', 'id', 'template_id', 'tenant_id'], is_active: null },
       { tenant_id: A, table_name: 'tour_variations', op: 'INSERT', template_id: TOUR, changed_fields: ['id', 'template_id', 'tenant_id', 'tier'], is_active: null },
       { tenant_id: A, table_name: 'tour_departures', op: 'INSERT', template_id: TOUR, changed_fields: ['booked_pax', 'id', 'template_id', 'tenant_id'], is_active: null },
@@ -132,6 +138,16 @@ describe('migration 439 triggers', () => {
       ['tour_variations', 'DELETE', TOUR],
       ['variation_pricing', 'DELETE', null],
     ])
+  })
+
+  it('a cancellation policy change is logged for its company (migration 441)', async () => {
+    await clear()
+    await db.exec(`insert into cancellation_policies(tenant_id, name, is_default, tiers) values ('${A}', 'Standard', true, '[{"days_before":30,"charge_percent":25}]')`)
+    expect((await changes()).map(r => [r.table_name, r.op, r.tenant_id])).toEqual([['cancellation_policies', 'INSERT', A]])
+    await expect(db.exec(`insert into cancellation_policies(tenant_id, name, tiers) values ('${A}', 'Bad', '[{"days_before":30,"charge_percent":250}]')`))
+      .rejects.toThrow(/cancellation_policies_tiers_valid/)
+    await expect(db.exec(`update tour_templates set departure_days = '{mon,funday}' where id = '${TOUR}'`))
+      .rejects.toThrow(/departure_days_keys/)
   })
 
   it('switching a tour off records is_active = false; deleting records the old row', async () => {

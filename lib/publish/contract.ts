@@ -13,9 +13,8 @@
 // Authenticated with `Authorization: Bearer <PUBLISH_INTERNAL_SECRET>` — a
 // fixed header, so the renderer's fetch cache key stays stable.
 //
-// Step 3 carries identity and page structure only. Facts (prices,
-// inclusions, departures, terms) join the page payload in step 5, narrative
-// in step 7 — always as data, never as text written for them.
+// Identity and page structure (step 3), the tour's facts (step 5); narrative
+// joins in step 7 — always as data, never as text written for them.
 
 import { z } from 'zod'
 
@@ -25,7 +24,7 @@ import { z } from 'zod'
  * deploy (it sits under a different cache key) — and the app can refuse a
  * renderer that is a version behind.
  */
-export const CONTRACT_VERSION = 2
+export const CONTRACT_VERSION = 3
 
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
@@ -75,6 +74,70 @@ export const companyIdentitySchema = z.object({
 })
 export type CompanyIdentity = z.infer<typeof companyIdentitySchema>
 
+const money = z.number().positive().finite()
+const weekday = z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
+
+/**
+ * A tour's facts, read from Autoura records each time the page is rendered
+ * (docs/publish/PLAN.md §8). Nothing here is written for the page: an absent
+ * fact is absent (null / empty), never filled in.
+ *
+ * Prices (decisions Q4/Q4b/Q5, 2026-10-25): per person for 2 travellers
+ * sharing, at the agency's house margin, lowest season (no travel date); a
+ * table for 2/4/6; EU and other-nationality prices when the rates differ.
+ * An amount appears ONLY from a tier the engine priced completely (D7):
+ * otherwise the status is `on_request` and there is no number at all.
+ */
+export const tourFactsSchema = z.object({
+  durationDays: z.number().int().positive(),
+  durationNights: z.number().int().nonnegative(),
+  images: z.array(z.string()),
+  days: z.array(z.object({
+    day: z.number().int().positive(),
+    title: z.string().nullable(),
+    city: z.string().nullable(),
+    overnight: z.boolean(),
+    meals: z.object({ breakfast: z.boolean(), lunch: z.boolean(), dinner: z.boolean() }),
+    sights: z.array(z.string()),
+  })),
+  mainAttractions: z.array(z.string()),
+  highlights: z.array(z.string()),
+  inclusions: z.array(z.string()),
+  exclusions: z.array(z.string()),
+  accommodation: z.array(z.object({ kind: z.enum(['hotel', 'cruise']), name: z.string(), city: z.string().nullable() })),
+  groupSize: z.object({ min: z.number().int().positive().nullable(), max: z.number().int().positive().nullable() }).nullable(),
+  departureDays: z.array(weekday),
+  departures: z.array(z.object({
+    date: z.string(),
+    endDate: z.string().nullable(),
+    status: z.enum(['open', 'guaranteed', 'full']),
+    seatsLeft: z.number().int().nonnegative().nullable(),
+  })),
+  cancellation: z.object({
+    tiers: z.array(z.object({ daysBefore: z.number().int().nonnegative(), chargePercent: z.number().min(0).max(100) })),
+    /** The agency's own wording in this page's language, if it wrote one. */
+    wording: z.string().nullable(),
+  }).nullable(),
+  price: z.object({
+    status: z.enum(['available', 'on_request']),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+    basis: z.object({ pax: z.literal(2), season: z.literal('lowest') }),
+    from: z.object({ perPerson: money, tier: z.string(), tierLabel: z.string() }).nullable(),
+    byNationality: z.object({ eu: money, other: money }).nullable(),
+    table: z.array(z.object({ pax: z.number().int().positive(), perPerson: money.nullable(), eu: money.nullable(), other: money.nullable() })),
+    /** Display-only conversions, labelled indicative: the customer pays in `currency`. */
+    indicative: z.array(z.object({ currency: z.string().regex(/^[A-Z]{3}$/), perPerson: money, rateDate: z.string() })),
+  }),
+  /** The thin-page rule (D7): whether this tour may be published, and why not. */
+  publishable: z.object({ ok: z.boolean(), reasons: z.array(z.string()) }),
+}).superRefine((f, ctx) => {
+  // The one rule, enforced at the boundary too: no amount without a complete price.
+  if (f.price.status !== 'available' && (f.price.from || f.price.byNationality || f.price.table.length || f.price.indicative.length)) {
+    ctx.addIssue({ code: 'custom', message: 'a price on request carries no amount' })
+  }
+})
+export type TourFacts = z.infer<typeof tourFactsSchema>
+
 export const pagePayloadSchema = z.object({
   kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal']),
   language: languageCode,
@@ -93,8 +156,8 @@ export const pagePayloadSchema = z.object({
   }),
   /** The same page in the site's other languages, for hreflang (step 10). */
   alternates: z.array(z.object({ language: languageCode, path: z.string() })),
-  /** A tour page's product. Facts about it arrive in step 5. */
-  tour: z.object({ templateId: z.string().uuid(), name: z.string() }).nullable(),
+  /** A tour page's product, and its facts from the records. */
+  tour: z.object({ templateId: z.string().uuid(), name: z.string(), facts: tourFactsSchema.nullable() }).nullable(),
   /** Home and listing: the tours the site shows. */
   tours: z.array(pageLink),
   /** Not yet published — shown only on a test hostname. */

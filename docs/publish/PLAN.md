@@ -44,7 +44,7 @@ Each line is what this plan assumes unless you say otherwise. ✅ = approve as w
 | **D5** | Where "published" lives | **`publish_pages` row per tour, with per-language publish state.** `tour_templates` is not changed. | Leaves the Sell module untouched. |
 | **D6** | Content store | **Supabase-native tables** (§4). Sanity not used. | Prompt default; keeps RLS, export and tests in one place. |
 | **D7** | A tour whose price is incomplete | **Not publishable.** A tour can be published only with at least one fully priced tier (plus days and inclusions — the spec's thin-page rule). If its price later becomes incomplete, the page stays up with the price block replaced by "Ask for a price" and the tenant is alerted. | Never show a partial number a customer could hold the agency to. Alternative: show the incomplete figure with a warning (as the internal tours list does) — not safe on a public page. |
-| **D8** | Cancellation terms and departure weekdays (no records exist) | **Cancellation:** a new tenant-level `cancellation_policies` record in Sell (text per language, structured tiers), with an optional per-tour override. **Departure weekdays:** a `departure_days` column on `tour_templates`, same shape as `nile_cruises.sailing_days`. Until these exist, the page shows dated departures when there are any and omits the sections otherwise. | They are customer promises, so they must be records an operator owns, not Publish text. **Both change Sell's schema — needs your OK.** |
+| **D8** | Cancellation terms and departure weekdays (no records exist) — *approved and built in step 5 (migration 441)* | **Cancellation:** a new tenant-level `cancellation_policies` record in Sell (text per language, structured tiers), with an optional per-tour override. **Departure weekdays:** a `departure_days` column on `tour_templates`, same shape as `nile_cruises.sailing_days`. Until these exist, the page shows dated departures when there are any and omits the sections otherwise. | They are customer promises, so they must be records an operator owns, not Publish text. **Both change Sell's schema — needs your OK.** |
 | **D9** | Sync trigger mechanism | **Outbox + poller.** All changes land in `publish_change_log` (E1): products/departures/tenant brand/FX through their own triggers, rates through one trigger on `rate_audit_log` (which every rate table already feeds). Each row is marked processed once delivered — no cursor. A `cron:publish-sync` worker runs **every 5 minutes**, maps changes to pages, calls the renderer's revalidate endpoint, and records health. Pages also carry a 1-hour time-based revalidation as a backstop. | Survives deploys and outages (unprocessed rows wait); a transaction that commits late still shows up as unprocessed, which a cursor over `rate_audit_log`'s timestamps would have skipped — *changed in step 1*; every step is observable. Fast path (Postgres → HTTP via `pg_net`) can be added later. **Revalidation window = 5 minutes** (worst case ~6). If Railway's cron minimum turns out to be finer, we tighten it. |
 | **D10** | Which pages a rate change touches | **All of that tenant's tour pages** (45 live tours today). Product/departure changes touch only that tour's page plus listings. | Rates reach tours only through engine lookups (city, tier, preferred hotel, season), so exact dependency tracking would be guesswork. Coarse is correct; at today's sizes it's cheap. |
 | **D11** | Module name in the UI | **"Publish"** (sidebar section under its own group). | Open decision from the prompt; one-string change later. |
@@ -192,10 +192,32 @@ On entering `failing`, `lagging` or `stalled` (de-duplicated, at most one alert 
 
 ## 8. Tour page — where every fact comes from
 
-Assembled by `lib/publish/facts/tour-facts.ts` in the GetAutoura app; returned in the page payload; never stored except the D15 snapshot.
+*Built in step 5 — this section describes what exists.* Assembled by `lib/publish/tour-facts.ts` in the GetAutoura app on every (re)build of a page; returned in the page payload (`tour.facts`, contract v3); never stored.
 
 | Shown on page | Read from |
 | --- | --- |
+| Images | `tour_templates.image_url`, `gallery_urls` (https only) |
+| Itinerary by day | `tour_templates.itinerary` (where the day editor writes): title, city, meals provided (in the rate or bought), sights by the engine's own rule (`lib/tours/day-attractions.ts`), night = the record's accommodation (a one-day tour never has one). Free-text day descriptions are left for the approved narrative (step 7). |
+| Highlights | `tour_templates.highlights` + `main_attractions` |
+| Inclusions / exclusions | the tour's, plus the priced tier's `tour_variations` lists, once each |
+| Where it sleeps | the engine's priced hotel/cruise lines for the priced tier (`PricedService.property`, added for this — never parsed from a label; an unpriced line is never shown) |
+| Price | engine, **2 travellers sharing, both nationality bases, every tier, the agency's house margin (`tenants.default_margin_percent`; 25% only if unset — a test pins that unset never becomes 0%), no travel date = lowest season**. "From" = the cheapest **complete** (tier, basis); EU / other nationalities both shown when they differ; table for 2/4/6 (the 2-traveller row is the "from" figure). Displayed in whole units rounded **up**. |
+| Indicative currencies | `publish_sites.settings.indicativeCurrencies` (≤ 3), converted with an `exchange_rates` row no older than 7 days (the company's own rate first); labelled "Indicative only … you pay in {currency}; rate of {date}". No fresh rate → no conversion. |
+| Departure days | `tour_templates.departure_days` (migration 441); empty → nothing shown, never "daily" |
+| Upcoming departures | `tour_departures` from today: open / guaranteed / full, seats left = max − booked, up to 12 |
+| Group size | the priced tier's `min_pax` / `max_pax` |
+| Cancellation terms | `cancellation_policies` (migration 441): the tour's own, else the company default. Tiers render as "N days or fewer before departure: X% charged when cancelled"; anything earlier than the largest N is not stated — never called free. The agency's own wording shows only in the language it was written in. |
+| Agency identity, licence | `tenants` (step 4) |
+
+**Price on request (D7):** no complete tier → `status: on_request`, and the payload carries **no amount at all** (the contract refuses one). The page says "Price on request — ask us for a price for your dates."
+
+**Publishability (D7):** days, inclusions, a complete price, switched on. Returned with each tour as `publishable { ok, reasons }`. A *published* page that stops qualifying still shows (price on request) and the company's owners/admins/managers get one bell notice per tour per week. **Blocking a publish** is the approval workflow's job (step 7), using the same rule.
+
+**Measured on production (2026-10-25, read-only):** of 52 active tours, 14 have a complete price and 13 would pass the publishability rule today; 38 would show "price on request". None of the 14 has differing EU/other rates.
+
+**Not in step 5:** prices on listing cards (each needs a full engine run — a lighter price-only path first); admin screens for departure days and cancellation policies (the tour CSV carries departure days already); the Lighthouse CI budget.
+
+--- | --- |
 | Name, images | `tour_templates.template_name`, `image_url`, `gallery_urls` (+ `publish_media` replacements) |
 | Itinerary by day (city, hotel, meals, sights) | `tour_days` + `tour_templates.main_attractions` / day sightseeing as the engine reads them |
 | Inclusions / exclusions | `tour_templates.inclusions`/`exclusions`, refined by the tier's `tour_variations` values |
@@ -350,8 +372,9 @@ Test: export a fixture site, unzip, assert every published page/language, every 
 - **Q1** Where does the concierge widget code live, and can it accept `data-*` attributes and send an `attribution` object? (Blocks step 8 concierge path.)
 - **Q2** Which two tenants are our first brands, and which test hostnames can we CNAME to the `sites` service?
 - **Q3** Do web-form enquiries also need to appear as an **Inbox conversation** (a `unified_conversations` row), or are a lead + bell notification enough for Phase 1?
-- **Q4** Reference group size for "price from" (2 adults sharing?), and should the price table show other group sizes?
-- **Q5** EU/non-EU wording on the page and in `Offer` markup: "EU passport holders" / "Other nationalities", or the agency's own vocabulary labels?
+- ~~**Q4**~~ **Answered (2026-10-25):** "price from" is per person for **2 travellers sharing**, plus a per-person table for **2, 4 and 6** travellers on the tour page.
+- **Q4b (answered 2026-10-25):** public prices use the **agency's house margin** (`tenants.default_margin_percent`, as quotes do; 25% only where none is set), not the engine's fixed 25%; and "from" is the **lowest season** (no travel date), with the page saying prices vary by date.
+- ~~**Q5**~~ **Answered (2026-10-25):** both prices, labelled **"EU passport holders"** and **"Other nationalities"**, only on tours whose rates actually differ.
 - **Q6** Railway custom-domain limits per service and whether to put a CDN (e.g. Cloudflare) in front of `sites` for Core Web Vitals outside Europe.
 - **Q7** Do shared-number WhatsApp tenants (no own number) get click-to-WhatsApp at all, given E3 makes it possible via the ref token?
 - ~~**Q8** Second language~~ — **answered (Ruth, 2026-10-25): each tenant picks its own second language from the supported LTR languages.** See D14.
