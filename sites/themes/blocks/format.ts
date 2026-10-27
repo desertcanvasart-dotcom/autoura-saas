@@ -3,9 +3,15 @@
 
 /** A price as shown: whole units, rounded UP, so the page never states less
  *  than the engine's price (a cent-rounding the customer could hold us to). */
+/** The whole amount a price is shown as: rounded UP, never below the real
+ *  price. The structured data (sites/lib/seo.ts) states this same number. */
+export function shownAmount(amount: number): number {
+  return Math.ceil(amount)
+}
+
 export function formatPrice(amount: number, currency: string, language: string): string {
   return new Intl.NumberFormat(language, { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 })
-    .format(Math.ceil(amount))
+    .format(shownAmount(amount))
 }
 
 /** An indicative conversion: approximate by nature, rounded normally. */

@@ -11,6 +11,7 @@
 //   GET /api/publish/internal/page?site=…&lang=…&path=… one page of it
 //   POST /api/publish/internal/enquiry                  an enquiry form sent (step 8)
 //   POST /api/publish/internal/wa-ref                   a tracked WhatsApp click (step 8)
+//   GET /api/publish/internal/sitemap?site=…            the published pages, for sitemaps (step 9)
 //
 // Authenticated with `Authorization: Bearer <PUBLISH_INTERNAL_SECRET>` — a
 // fixed header, so the renderer's fetch cache key stays stable.
@@ -32,6 +33,7 @@ export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
 export const INTERNAL_ENQUIRY_PATH = '/api/publish/internal/enquiry'
 export const INTERNAL_WA_REF_PATH = '/api/publish/internal/wa-ref'
+export const INTERNAL_SITEMAP_PATH = '/api/publish/internal/sitemap'
 
 export const languageCode = z.string().regex(/^[a-z]{2}$/)
 
@@ -175,6 +177,10 @@ export const pagePayloadSchema = z.object({
     /** publish_sites.brand as stored; lib/publish/brand.ts resolveBrand reads it. */
     brand: z.record(z.string(), z.unknown()),
     identity: companyIdentitySchema,
+    /** The site's active primary hostname — the address search engines are
+     *  given (canonical, hreflang, structured data); null before it has one
+     *  (step 9). Additive and optional, like pageId. */
+    publicHost: z.string().nullable().optional(),
   }),
   /** The same page in the site's other languages, for hreflang (step 10). */
   alternates: z.array(z.object({ language: languageCode, path: z.string() })),
@@ -242,3 +248,19 @@ export type WaRefResult = z.infer<typeof waRefResultSchema>
 export function internalAuthHeader(secret: string): Record<string, string> {
   return { authorization: `Bearer ${secret}` }
 }
+
+// ---------- sitemaps (step 9, PLAN §12) ----------
+
+/** Every published page of a site, each with its path in every language it
+ *  is published in — what the per-language sitemaps list, with hreflang. */
+export const sitemapSchema = z.object({
+  languages: z.array(languageCode),
+  pages: z.array(z.object({
+    kind: z.enum(['home', 'listing', 'tour', 'about', 'how_we_work', 'contact', 'legal']),
+    /** language → path inside it ('' for the home page). */
+    paths: z.record(languageCode, z.string()),
+    /** ISO date of the latest publication, when known. */
+    lastModified: z.string().nullable(),
+  })),
+})
+export type SitemapData = z.infer<typeof sitemapSchema>

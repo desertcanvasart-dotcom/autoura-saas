@@ -8,7 +8,7 @@
 //
 // Step 3: identity and page structure. Facts join the page in step 5.
 
-import type { SiteResolution, PagePayload, PageNarrative, TourFacts } from './contract'
+import type { SitemapData, SiteResolution, PagePayload, PageNarrative, TourFacts } from './contract'
 import { loadTourFacts } from './tour-facts'
 import { factsHash, renderableNarrative, type NarrativeBundle } from './narrative'
 
@@ -194,6 +194,10 @@ export async function loadPagePayload(db: Db, input: {
   const target = targetOf(input.path)
   if (target.kind === 'none') return null
 
+  const { data: primary, error: hErr } = await db.from('publish_domains').select('hostname')
+    .eq('site_id', input.siteId).eq('kind', 'primary').eq('status', 'active').maybeSingle()
+  if (hErr) throw new Error(`reading the primary domain: ${hErr.message}`)
+
   const siteInfo = {
     id: site.id as string,
     tenantId: site.tenant_id as string,
@@ -202,6 +206,7 @@ export async function loadPagePayload(db: Db, input: {
     languages: site.languages as string[],
     brand: (site.brand ?? {}) as Record<string, unknown>,
     identity: identityOf(site.tenants),
+    publicHost: (primary?.hostname as string | undefined) ?? null,
   }
 
   // Every locale of the site in this language: few enough per company to
@@ -277,4 +282,33 @@ export async function loadPagePayload(db: Db, input: {
     unpublished: row ? !row.is_published : false,
     pageId: row?.page_id ?? null,
   }
+}
+
+// ---------- the sitemap (step 9) ----------
+
+/** The site's published pages, each with its path per published language.
+ *  The home page and the tour listing are always there (they exist without
+ *  a page row); nothing unpublished, and no tour that is switched off. */
+export async function loadSitemap(db: Db, siteId: string): Promise<SitemapData | null> {
+  const { data: site, error: sErr } = await db.from('publish_sites').select('id, status, languages').eq('id', siteId).maybeSingle()
+  if (sErr) throw new Error(`reading the site: ${sErr.message}`)
+  if (!site || site.status === 'suspended') return null
+  const languages = site.languages as string[]
+
+  const { data: rows, error } = await db.from('publish_page_locales')
+    .select(`${LOCALE_SELECT}, published_at`).eq('site_id', siteId)
+  if (error) throw new Error(`reading pages: ${error.message}`)
+  const byPage = new Map<string, SitemapData['pages'][number]>()
+  for (const row of (rows ?? []) as Array<LocaleRow & { published_at: string | null }>) {
+    if (!languages.includes(row.language) || !showable(row, false)) continue
+    const entry = byPage.get(row.page_id) ?? { kind: row.publish_pages!.kind, paths: {}, lastModified: null }
+    entry.paths[row.language] = pathOf(row)
+    if (row.published_at && (!entry.lastModified || row.published_at > entry.lastModified)) entry.lastModified = row.published_at.slice(0, 10)
+    byPage.set(row.page_id, entry)
+  }
+  const pages = [...byPage.values()]
+  const all = (path: string) => Object.fromEntries(languages.map(l => [l, path]))
+  if (!pages.some(p => p.kind === 'home')) pages.unshift({ kind: 'home', paths: all(''), lastModified: null })
+  if (!pages.some(p => p.kind === 'listing')) pages.splice(1, 0, { kind: 'listing', paths: all('tours'), lastModified: null })
+  return { languages, pages }
 }

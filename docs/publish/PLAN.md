@@ -283,6 +283,8 @@ All three paths write a lead into `clients` (find-or-create, existing logic fact
 
 ## 12. SEO, structured data, languages
 
+*Built in step 9 (2026-10-27): `sites/lib/seo.ts` (canonical + hreflang + x-default on the primary hostname only — the page payload carries `site.publicHost`; JSON-LD TravelAgency / TouristTrip + Offer(s) / BreadcrumbList; robots.txt and sitemaps), `/api/publish/internal/sitemap`. Editable SEO title/description were already built in step 7 (draft kind `seo`). FAQPage waits for an FAQ block; no Review/AggregateRating. The manual Rich Results check needs a live site on a public primary domain (step 11).*
+
 - **JSON-LD from the payload only:** `TravelAgency` (name, address, phone, licence as `identifier`), `TouristTrip` (name, description from the approved overview, `itinerary` as an `ItemList` of days, `provider`), `Offer` (price, `priceCurrency`, `availability`, `url`; EU and non-EU as two offers distinguished by `name`/`eligibleCustomerType`-style description — Q5), `BreadcrumbList`, `FAQPage` only when the page has an approved FAQ block. No `Review`/`AggregateRating` in Phase 1.
 - Tests: snapshot + structural validation of each type against a fixture tour; the price in JSON-LD must equal the price in the HTML (same payload field); manual Rich Results check recorded for one page per archetype.
 - Canonical per language; `hreflang` for each enabled language plus `x-default` on every page and in sitemaps (`xhtml:link`); sitemap index + one sitemap per language; `robots.txt` per host; editable title and meta description as `seo` drafts (same post-check).
