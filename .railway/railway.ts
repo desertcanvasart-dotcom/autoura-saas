@@ -173,7 +173,24 @@ export default defineRailway(() => {
     },
   });
 
+  // Publish sync: each product, rate, departure, company or exchange-rate
+  // change refreshes the Publish pages that show it, and each enrolled
+  // company's sync health is recorded and alerted on (docs/publish/PLAN.md §5).
+  // Every 5 minutes — the promised revalidation window.
+  const cronPublishSync = service("cron:publish-sync", {
+    source: autouraSaas,
+    build: "",
+    start: "npm run cron:publish-sync",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    deploy: { cronSchedule: "*/5 * * * *", restartPolicyType: "NEVER" },
+    networking: { privateNetworkEndpoint: "publish-sync-cron" },
+    env: {
+      CRON_TARGET_URL: preserve(),
+      CRON_SECRET: preserve(),
+    },
+  });
+
   return project("Autoura multi-tenant", {
-    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend],
+    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend, cronPublishSync],
   });
 });

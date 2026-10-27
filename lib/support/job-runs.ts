@@ -26,6 +26,7 @@ export type JobName =
   | 'gmail-sync'
   | 'mail-alerts'
   | 'scheduled-send'
+  | 'publish-sync'
 
 export { STALE_AFTER_HOURS }
 
@@ -202,6 +203,7 @@ export function withJobRun<A extends unknown[]>(
               : bodyFailure ?? await reportedSummary(response),
           )
           await pruneOldRuns(db, name)
+          if (name !== 'publish-sync') await watchPublishSync(db)
         }
       }
       return response
@@ -262,6 +264,25 @@ async function finishRun(db: DbClient, runId: string, outcome: 'ok' | 'failed', 
       .eq('id', runId)
   } catch {
     // Bookkeeping only. Never let it change what the caller sees.
+  }
+}
+
+/**
+ * Every other job checks that the Publish sync worker is still running — a
+ * stopped worker cannot report itself (lib/publish/sync/watchdog.ts). Loaded
+ * lazily so jobs that never meet Publish carry none of it; fail-open like
+ * everything else here.
+ */
+async function watchPublishSync(db: DbClient) {
+  try {
+    const [{ watchPublishWorker }, { supabaseSyncStore }, { sendSyncAlert }] = await Promise.all([
+      import('@/lib/publish/sync/watchdog'),
+      import('@/lib/publish/sync/store'),
+      import('@/lib/publish/sync/alerts'),
+    ])
+    await watchPublishWorker({ store: supabaseSyncStore(db), alert: sendSyncAlert })
+  } catch {
+    // No Publish tables yet, or the database is down: not this job's problem.
   }
 }
 

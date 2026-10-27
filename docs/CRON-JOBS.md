@@ -21,6 +21,7 @@ start command that runs once and exits. They do not serve traffic.
 | Gmail sync | `npm run cron:gmail-sync` | `*/10 * * * *` | `GET /api/cron/gmail-sync` |
 | Mail alerts | `npm run cron:mail-alerts` | `*/5 * * * *` | `GET /api/cron/mail-alerts` |
 | Scheduled send | `npm run cron:scheduled-send` | `*/5 * * * *` | `GET /api/cron/scheduled-send` |
+| Publish sync | `npm run cron:publish-sync` | `*/5 * * * *` | `GET /api/cron/publish-sync` |
 
 The reminders service also runs the **traveller-document retention sweep**
 (passport and visa scans are deleted once the trip is over) — it has no
@@ -31,7 +32,7 @@ being kept too.
 
 Every run is recorded in `job_runs`. Each job has its own limit for how long
 it may be quiet before it counts as stopped (`lib/support/bundle-core.mjs`,
-`STALE_AFTER_HOURS_BY_JOB`): **1 hour** for scheduled send and mail alerts,
+`STALE_AFTER_HOURS_BY_JOB`): **1 hour** for scheduled send, mail alerts and Publish sync,
 **2 hours** for Gmail sync, **48 hours** for the daily jobs.
 `GET /api/health/deep?strict=1` (with `Authorization: Bearer $CRON_SECRET`)
 answers **503** and names the job when one has stopped, failed or never
