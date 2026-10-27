@@ -64,7 +64,9 @@ const en = {
   onDeparture: 'On the day of departure',
   highlights: 'Highlights',
   duration: 'Duration',
+  oneDay: 'day',
   days: 'days',
+  oneNight: 'night',
   nights: 'nights',
   // ---- enquiries (step 8) ----
   enquireTitle: 'Ask us about this journey',
@@ -91,6 +93,12 @@ const dictionaries: Record<string, Partial<Record<StringKey, string>>> = { en }
 
 export function t(language: string, key: StringKey): string {
   return dictionaries[language]?.[key] ?? en[key]
+}
+
+/** "1 day", "5 days", "1 night", "4 nights". */
+export function countOf(language: string, n: number, unit: 'day' | 'night'): string {
+  const key: StringKey = unit === 'day' ? (n === 1 ? 'oneDay' : 'days') : (n === 1 ? 'oneNight' : 'nights')
+  return `${n} ${t(language, key)}`
 }
 
 /** The language's own name, for the language switcher. */

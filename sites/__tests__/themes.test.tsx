@@ -5,6 +5,7 @@ import { TOUR_SECTIONS } from '../themes/types'
 import { ARCHETYPES } from '@/lib/publish/brand'
 import type { PagePayload, PageNarrative, TourFacts } from '@/lib/publish/contract'
 import { narrativeText } from '../themes/blocks/narrative'
+import { ItinerarySection } from '../themes/blocks/TourFacts'
 
 // ============================================================================
 // The archetype themes (docs/publish/PLAN.md §7, step 4). Each is a package —
@@ -219,5 +220,11 @@ describe('filling slots', () => {
   it('the cancellation slot states the tiers as they are', () => {
     expect(narrativeText([{ type: 'text', text: 'Terms:' }, { type: 'slot', slot: 'cancellation' }], FACTS, 'en'))
       .toBe('Terms: 30 days or fewer before departure: 25% charged when cancelled; On the day of departure: 100% charged when cancelled')
+  })
+  it('a one-day tour is "1 day", never "1 days"', () => {
+    const dayTour = { ...FACTS, durationDays: 1, durationNights: 0 }
+    expect(narrativeText([{ type: 'slot', slot: 'duration' }], dayTour, 'en')).toBe('1 day')
+    expect(narrativeText([{ type: 'slot', slot: 'duration' }], { ...FACTS, durationDays: 2, durationNights: 1 }, 'en')).toBe('2 days / 1 night')
+    expect(renderToStaticMarkup(<ItinerarySection facts={dayTour} lang="en" variant="private_journeys" />)).toContain('1 day<')
   })
 })
