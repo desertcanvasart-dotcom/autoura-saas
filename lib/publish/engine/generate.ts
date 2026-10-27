@@ -8,7 +8,7 @@
 import type { TourFacts } from '../contract'
 import { createMessageWithRetry, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
-import { resolveBrand } from '../brand'
+import { resolveBrand, type Archetype } from '../brand'
 import { loadTourFacts } from '../tour-facts'
 import { indicativeCurrenciesOf } from '../site-data'
 import { draftNarrative, type DraftKind, type DraftResult, type EngineBrand, type ModelCall, type SourceNote } from './engine'
@@ -43,7 +43,7 @@ const strings = (v: unknown): string[] =>
 
 /** The brand as the engine reads it: tone (resolved), plus the claims the
  *  agency may make and the words it avoids (publish_sites.brand). */
-export function engineBrand(archetype: 'private_journeys' | 'transparent_value', stored: unknown): EngineBrand {
+export function engineBrand(archetype: Archetype, stored: unknown): EngineBrand {
   const raw = (stored && typeof stored === 'object' ? stored : {}) as Record<string, unknown>
   return { tone: resolveBrand(archetype, stored).tone, claims: strings(raw.claims), avoid: strings(raw.avoid) }
 }

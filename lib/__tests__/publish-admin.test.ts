@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent,
+  createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent, lookOf, saveLook,
   PublishError, type AdminDeps, type Actor,
 } from '@/lib/publish/admin'
 import type { TourFacts } from '@/lib/publish/contract'
@@ -357,5 +357,26 @@ describe('the tour\'s wording in the second language (translated, approved)', ()
     const r = await editDraft(db as never, actor, draftId, { kind: 'labels', items: [{ source: 'Guide', text: 'Guide (2 jours)' }] }, deps)
     expect(r.status).toBe('failed_check')
     await expectError(approveDraft(db as never, actor, draftId, deps), 409, /changes a number, price or date/)
+  })
+})
+
+describe('the look (brand studio)', () => {
+  it('saves the theme, colours and fonts, keeps the rest of the brand, and refreshes the website', async () => {
+    db.tables.publish_sites[0].brand = { claims: ['Egyptologist guides'], tone: 'warm' }
+    const palette = { primary: '#1e2a78', accent: '#ff6b5b', ink: '#111827', surface: '#ffffff' }
+    await saveLook(db as never, actor, { archetype: 'modern', palette, fontPair: 'sleek' }, deps)
+    expect(db.tables.publish_sites[0]).toMatchObject({ archetype: 'modern', brand: { claims: ['Egyptologist guides'], tone: 'warm', palette, fontPair: 'sleek' } })
+    expect(revalidate).toHaveBeenCalled()
+    const look = await lookOf(db as never, actor)
+    expect(look).toMatchObject({ archetype: 'modern', resolved: { palette, fontPair: 'sleek' }, problems: [] })
+    expect(look.choices.archetypes.map(a => a.key)).toContain('modern')
+  })
+  it('refuses colours that would be hard to read — the website never gets them', async () => {
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: { primary: '#eeeeee', accent: '#ffffff', ink: '#dddddd', surface: '#ffffff' }, fontPair: 'sleek' }, deps), 400, /hard to read/)
+    expect(db.tables.publish_sites[0].archetype).toBe('private_journeys')
+  })
+  it('refuses a theme or font that does not exist', async () => {
+    await expectError(saveLook(db as never, actor, { archetype: 'gold_luxury', palette: undefined, fontPair: 'sleek' }, deps), 400, /Choose a theme/)
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'comic-sans' }, deps), 400, /fontPair/)
   })
 })

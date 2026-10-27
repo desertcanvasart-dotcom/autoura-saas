@@ -78,6 +78,21 @@ export const ARCHETYPE_DEFAULTS: Record<Archetype, Brand> = {
   },
 }
 
+/** Ready-made palettes for the brand studio (operator, 2026-10-27: modern,
+ *  each agency choosing its own — never a default of gold or beige). Each
+ *  one passes the contrast rules below (tested); an agency may also enter
+ *  its own colours, held to the same rules. */
+export const PALETTE_PRESETS: Array<{ key: string; label: string; palette: Palette }> = [
+  { key: 'teal', label: 'Teal and mint', palette: { primary: '#1d6b64', accent: '#38d9a9', ink: '#0f1720', surface: '#ffffff' } },
+  { key: 'navy', label: 'Navy and coral', palette: { primary: '#1e2a78', accent: '#ff6b5b', ink: '#111827', surface: '#ffffff' } },
+  { key: 'mono', label: 'Charcoal and lime', palette: { primary: '#161616', accent: '#c6f432', ink: '#161616', surface: '#ffffff' } },
+  { key: 'ocean', label: 'Ocean and sky', palette: { primary: '#0b5fa5', accent: '#7dd3fc', ink: '#0f172a', surface: '#ffffff' } },
+  { key: 'forest', label: 'Forest and lemon', palette: { primary: '#2f5d3a', accent: '#e9f26b', ink: '#13201a', surface: '#ffffff' } },
+  { key: 'plum', label: 'Plum and peach', palette: { primary: '#5b2a6e', accent: '#ffb38a', ink: '#1c1222', surface: '#ffffff' } },
+  { key: 'red', label: 'Nile red and white', palette: { primary: '#b42318', accent: '#fecdca', ink: '#1a1a1a', surface: '#ffffff' } },
+  { key: 'night', label: 'Midnight and violet', palette: { primary: '#111c44', accent: '#a78bfa', ink: '#0b1020', surface: '#ffffff' } },
+]
+
 // ---------- contrast (WCAG 2.1) ----------
 
 function luminance(color: string): number {
