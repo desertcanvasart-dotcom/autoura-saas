@@ -32,6 +32,7 @@ function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
         select: () => q,
         eq: (col: string, v: unknown) => { filters.push(r => r[col] === v); return q },
         neq: (col: string, v: unknown) => { filters.push(r => r[col] !== v); return q },
+        in: (col: string, v: unknown[]) => { filters.push(r => v.includes(r[col])); return q },
         rows: () => (tables[table] ?? []).filter(r => filters.every(f => f(r))),
         maybeSingle: async () => ({ data: q.rows()[0] ?? null, error: null }),
         then: (resolve: (v: { data: unknown; error: null }) => unknown) => resolve({ data: q.rows(), error: null }),
@@ -263,5 +264,28 @@ describe('search engines (step 9)', () => {
   })
   it('a suspended site has no sitemap', async () => {
     expect(await loadSitemap(db({ siteStatus: 'suspended' }) as never, SITE)).toBeNull()
+  })
+})
+
+describe('the tour\'s wording in the page language (approved translation)', () => {
+  it('a French page and its listing show the approved names and wording; prices stay the records\'', async () => {
+    const { toStoredPart, withPart } = await import('@/lib/publish/narrative')
+    const bundle = withPart(null, toStoredPart({ kind: 'labels', items: [
+      { source: 'Nile classic', text: 'Le Nil classique' }, { source: 'Giza', text: 'Gizeh' }, { source: 'Guide', text: 'Guide égyptologue' },
+    ] }, FACTS, 'Nile classic'))
+    const base = fakeDb({
+      publish_sites: [{ ...site }],
+      publish_page_locales: [{ ...tourPage('le-nil-classique', 'fr', true), current_version_id: 'v-fr' }],
+      publish_versions: [{ id: 'v-fr', tenant_id: TENANT, content: bundle, facts_snapshot: null }],
+    })
+    const page = await loadPagePayload(base as never, { siteId: SITE, language: 'fr', path: 'tours/le-nil-classique', preview: false }, { tourFacts: async () => FACTS })
+    expect(page!.title).toBe('Le Nil classique')
+    expect(page!.tour!.name).toBe('Le Nil classique')
+    expect(page!.tour!.facts!.days[0].city).toBe('Gizeh')
+    expect(page!.tour!.facts!.inclusions).toEqual(['Guide égyptologue'])
+    expect(page!.tour!.facts!.price).toEqual(FACTS.price)
+
+    const listing = await loadPagePayload(base as never, { siteId: SITE, language: 'fr', path: 'tours', preview: false }, { tourFacts: async () => FACTS })
+    expect(listing!.tours).toEqual([{ title: 'Le Nil classique', path: 'tours/le-nil-classique' }])
   })
 })

@@ -20,10 +20,11 @@
 import type { TourFacts } from './contract'
 import { checkSegments, type CheckResult, type Segment } from './engine/fact-check'
 import { namesFromFacts } from './engine/slots'
-import type { DraftKind, EngineContent, DraftResult } from './engine/engine'
+import type { EngineContent, DraftResult, PartKind } from './engine/engine'
+import { checkTranslation } from './engine/translate'
 import { loadTourFacts } from './tour-facts'
 import { indicativeCurrenciesOf } from './site-data'
-import { engineBrand, generateTourDraft } from './engine/generate'
+import { engineBrand, generateTourDraft, generateTourTranslation } from './engine/generate'
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
 import { publishTags } from './sync/events'
 import { createRevalidator } from './sync/revalidate'
@@ -47,6 +48,8 @@ export interface Actor { tenantId: string; userId: string; name: string }
 export interface AdminDeps {
   facts: typeof loadTourFacts
   generate: typeof generateTourDraft
+  /** The tour's wording in the page language; defaults to the engine's. */
+  translate?: typeof generateTourTranslation
   revalidate: (tenantId: string, tags: string[]) => Promise<void>
   now: () => Date
 }
@@ -54,6 +57,7 @@ export interface AdminDeps {
 export const defaultDeps: AdminDeps = {
   facts: loadTourFacts,
   generate: generateTourDraft,
+  translate: generateTourTranslation,
   revalidate: (tenantId, tags) => createRevalidator({
     rendererUrl: process.env.PUBLISH_RENDERER_URL, secret: process.env.PUBLISH_REVALIDATE_SECRET,
   })(tenantId, tags),
@@ -190,10 +194,10 @@ export async function pageDetail(db: Db, actor: Actor, pageId: string, language:
 
 // ---------- drafts ----------
 
-const KIND_FOR_PART: Record<DraftKind, 'narrative' | 'seo'> = { overview: 'narrative', highlights: 'narrative', days: 'narrative', seo: 'seo' }
+const KIND_FOR_PART: Record<PartKind, 'narrative' | 'seo'> = { overview: 'narrative', highlights: 'narrative', days: 'narrative', seo: 'seo', labels: 'narrative' }
 
 /** The open drafts of the same part and language, replaced by a newer one. */
-async function supersedeOpen(db: Db, tenantId: string, pageId: string, language: string, part: DraftKind, exceptId: string) {
+async function supersedeOpen(db: Db, tenantId: string, pageId: string, language: string, part: PartKind, exceptId: string) {
   const { data, error } = await db.from('publish_drafts').select('id, content, status')
     .eq('page_id', pageId).eq('tenant_id', tenantId).eq('language', language).in('status', ['draft', 'in_review', 'failed_check'])
   check('open drafts', error)
@@ -204,15 +208,17 @@ async function supersedeOpen(db: Db, tenantId: string, pageId: string, language:
   }
 }
 
-export async function draftWithEngine(db: Db, actor: Actor, pageId: string, input: { language: string; kind: DraftKind; instruction?: string | null }, deps: AdminDeps = defaultDeps) {
+export async function draftWithEngine(db: Db, actor: Actor, pageId: string, input: { language: string; kind: PartKind; instruction?: string | null }, deps: AdminDeps = defaultDeps) {
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   const page = await pageOf(db, actor.tenantId, pageId)
   if (page.kind !== 'tour') fail('The engine writes tour pages.')
   if (!page.publish_page_locales.some(l => l.language === input.language)) fail(`This page has no ${input.language} version.`, 404)
+  if (input.kind === 'labels' && input.language === 'en') fail('The tour\'s records are already in English — there is nothing to translate.')
 
-  const result: DraftResult & { facts: TourFacts } = await deps.generate(db, {
-    siteId: site!.id, pageId, language: input.language, kind: input.kind, instruction: input.instruction ?? null,
-  })
+  const ask = { siteId: site!.id, pageId, language: input.language, instruction: input.instruction ?? null }
+  const result: DraftResult & { facts: TourFacts } = input.kind === 'labels'
+    ? await (deps.translate ?? generateTourTranslation)(db, ask)
+    : await deps.generate(db, { ...ask, kind: input.kind })
   const { data: draft, error } = await db.from('publish_drafts').insert({
     tenant_id: actor.tenantId, page_id: pageId, language: input.language, kind: KIND_FOR_PART[input.kind],
     content: result.content ?? { kind: input.kind, empty: true },
@@ -271,11 +277,21 @@ export function validEditedContent(kind: string, content: unknown): EngineConten
       const description = typeof c.description === 'string' ? c.description.trim().slice(0, 400) : ''
       return title && description && kind === 'seo' ? { kind: 'seo', title, description } : null
     }
+    case 'labels': {
+      const items = (Array.isArray(c.items) ? c.items : [])
+        .map(i => i as { source?: unknown; text?: unknown })
+        .filter(i => typeof i.source === 'string' && typeof i.text === 'string' && i.text.trim())
+        .map(i => ({ source: (i.source as string), text: (i.text as string).trim().slice(0, 500) }))
+      return items.length && kind === 'narrative' ? { kind: 'labels', items } : null
+    }
   }
   return null
 }
 
 function checkFor(content: EngineContent, facts: TourFacts | null, language: string, tourName: string, companyName: string, brand: { claims: string[] }, glossary: string[]): CheckResult {
+  // Translated wording states facts on purpose: it is held to faithfulness —
+  // the same numbers, currencies and dates as the records — not to "no facts".
+  if (content.kind === 'labels') return checkTranslation(content.items, language)
   return checkSegments(partSegments(content), {
     language,
     allowedTerms: namesFromFacts(facts, [tourName, companyName, ...glossary]),
@@ -313,7 +329,9 @@ export async function editDraft(db: Db, actor: Actor, draftId: string, content: 
 export async function approveDraft(db: Db, actor: Actor, draftId: string, deps: AdminDeps = defaultDeps) {
   const draft = await draftOf(db, actor.tenantId, draftId)
   if (draft.status !== 'in_review') fail(draft.status === 'failed_check'
-    ? 'This draft still states a fact outside a slot — fix the words the check names, then approve.'
+    ? (draft.content && 'kind' in draft.content && draft.content.kind === 'labels'
+      ? 'A translation here changes a number, price or date — fix the ones the check names, then approve.'
+      : 'This draft still states a fact outside a slot — fix the words the check names, then approve.')
     : `A draft that is ${draft.status.replace('_', ' ')} cannot be approved.`, 409)
   const content = (draft.content && 'kind' in draft.content && !('empty' in draft.content)) ? draft.content as EngineContent : fail('The draft has no text.', 409)
 
@@ -328,7 +346,9 @@ export async function approveDraft(db: Db, actor: Actor, draftId: string, deps: 
     engineBrand(site.archetype, site.brand), await glossaryOf(db, actor.tenantId, draft.language))
   if (!result.ok) {
     await db.from('publish_drafts').update({ status: 'failed_check', check_result: { ...result, notes: [] } }).eq('id', draftId).eq('tenant_id', actor.tenantId)
-    fail('This draft states a fact outside a slot — it has been sent back for a fix.', 409)
+    fail(content!.kind === 'labels'
+      ? 'A translation here changes a number, price or date — it has been sent back for a fix.'
+      : 'This draft states a fact outside a slot — it has been sent back for a fix.', 409)
   }
   // Written about a tour that has since changed: it may describe days, sights
   // or hotels that are no longer there.
@@ -359,6 +379,18 @@ export async function approveDraft(db: Db, actor: Actor, draftId: string, deps: 
     .eq('id', draft.id).eq('tenant_id', actor.tenantId)
   if (dErr) fail(`Could not mark the draft approved: ${dErr.message}`, 500)
   await supersedeOpen(db, actor.tenantId, page.id, draft.language, content!.kind, draft.id)
+
+  // The tour's name in this language becomes its address in this language —
+  // only before the page is published, so no live link ever breaks.
+  if (content!.kind === 'labels' && !locale!.is_published) {
+    const name = content!.items.find(i => i.source === tourName)?.text
+    const slug = name ? slugify(name) : null
+    if (slug && slug !== locale!.slug) {
+      const { error: sErr } = await db.from('publish_page_locales').update({ slug }).eq('id', locale!.id).eq('tenant_id', actor.tenantId)
+      // Taken by another page in this language: keep the address it has.
+      if (sErr && !/duplicate|unique/i.test(sErr.message)) fail(`Could not set the page's address: ${sErr.message}`, 500)
+    }
+  }
 
   return { versionId: version.id as string, versionNo: version.version_no as number, warning: locale!.is_published ? await refresh(deps, actor.tenantId) : null }
 }

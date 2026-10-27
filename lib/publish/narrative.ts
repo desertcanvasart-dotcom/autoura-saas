@@ -23,9 +23,10 @@ import type { TourFacts } from './contract'
 import type { EngineContent } from './engine/engine'
 import type { Segment } from './engine/fact-check'
 import { availableSlots } from './engine/slots'
+import { labelSources } from './engine/translate'
 
-export type NarrativePart = 'overview' | 'highlights' | 'days' | 'seo'
-export const NARRATIVE_PARTS: readonly NarrativePart[] = ['overview', 'highlights', 'days', 'seo']
+export type NarrativePart = 'overview' | 'highlights' | 'days' | 'seo' | 'labels'
+export const NARRATIVE_PARTS: readonly NarrativePart[] = ['overview', 'highlights', 'days', 'seo', 'labels']
 
 /** One approved part, with the fingerprint of the facts it was written from. */
 export type StoredPart =
@@ -33,6 +34,9 @@ export type StoredPart =
   | { part: 'highlights'; items: Segment[][]; fingerprint: string }
   | { part: 'days'; days: Array<{ day: number; segments: Segment[]; fingerprint: string }>; fingerprint: string }
   | { part: 'seo'; title: string; description: string; fingerprint: string }
+  /** The tour's own wording translated, keyed by the original words: a
+   *  translation applies only while its original is still in the records. */
+  | { part: 'labels'; items: Array<{ source: string; text: string }>; fingerprint: string }
 
 /** publish_versions.content */
 export type NarrativeBundle = Partial<Record<NarrativePart, StoredPart>>
@@ -43,7 +47,10 @@ export interface RenderableNarrative {
   highlights: Segment[][] | null
   days: Array<{ day: number; segments: Segment[] }>
   seo: { title: string; description: string } | null
-  /** Parts withheld because the records changed under them — for the admin. */
+  /** Original words → their approved translation, for those still in the records. */
+  labels: Record<string, string>
+  /** Parts withheld because the records changed under them — for the admin.
+   *  'labels' here: some of the tour's wording has no approved translation. */
   stale: string[]
 }
 
@@ -79,6 +86,7 @@ export function toStoredPart(content: EngineContent, facts: TourFacts, tourName:
     case 'overview': return { part: 'overview', segments: content.segments, fingerprint }
     case 'highlights': return { part: 'highlights', items: content.items, fingerprint }
     case 'seo': return { part: 'seo', title: content.title, description: content.description, fingerprint }
+    case 'labels': return { part: 'labels', items: content.items, fingerprint }
     case 'days': return {
       part: 'days',
       fingerprint,
@@ -97,7 +105,7 @@ const slotsFillable = (segments: Segment[], fillable: Set<string>) =>
 
 /** The parts of a bundle that may show against today's facts. */
 export function renderableNarrative(bundle: NarrativeBundle | null, facts: TourFacts | null, tourName: string): RenderableNarrative {
-  const out: RenderableNarrative = { overview: null, highlights: null, days: [], seo: null, stale: [] }
+  const out: RenderableNarrative = { overview: null, highlights: null, days: [], seo: null, labels: {}, stale: [] }
   if (!bundle || !facts) return out
   const current = tourFingerprint(facts, tourName)
   const fillable = new Set<string>(availableSlots(facts))
@@ -125,7 +133,32 @@ export function renderableNarrative(bundle: NarrativeBundle | null, facts: TourF
     if (s.fingerprint === current) out.seo = { title: s.title, description: s.description }
     else out.stale.push('seo')
   }
+  const l = bundle.labels
+  if (l?.part === 'labels') {
+    const sources = labelSources(facts, tourName)
+    for (const item of l.items) if (sources.includes(item.source)) out.labels[item.source] = item.text
+    if (sources.some(src => !(src in out.labels))) out.stale.push('labels')
+  }
   return out
+}
+
+/** The facts with the tour's own wording in the page language. Only words:
+ *  every number, price, date and term is the record's, untouched. An item
+ *  without an approved translation stays as the records have it. */
+export function translateFacts(facts: TourFacts, labels: Record<string, string>): TourFacts {
+  if (Object.keys(labels).length === 0) return facts
+  const tr = (s: string) => labels[s.trim()] ?? s
+  const trn = (s: string | null) => (s === null ? null : tr(s))
+  return {
+    ...facts,
+    days: facts.days.map(d => ({ ...d, title: trn(d.title), city: trn(d.city), sights: d.sights.map(tr) })),
+    mainAttractions: facts.mainAttractions.map(tr),
+    highlights: facts.highlights.map(tr),
+    inclusions: facts.inclusions.map(tr),
+    exclusions: facts.exclusions.map(tr),
+    accommodation: facts.accommodation.map(a => ({ ...a, city: trn(a.city) })),
+    price: facts.price.from ? { ...facts.price, from: { ...facts.price.from, tierLabel: tr(facts.price.from.tierLabel) } } : facts.price,
+  }
 }
 
 /** The text of a stored part, as segments — for the post-check on approval. */
@@ -135,5 +168,6 @@ export function partSegments(content: EngineContent): Segment[] {
     case 'highlights': return content.items.flat()
     case 'days': return content.days.flatMap(d => d.segments)
     case 'seo': return [{ type: 'text', text: content.title }, { type: 'text', text: content.description }]
+    case 'labels': return content.items.map(i => ({ type: 'text', text: i.text }))
   }
 }

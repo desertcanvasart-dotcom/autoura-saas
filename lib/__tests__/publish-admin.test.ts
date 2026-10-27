@@ -314,3 +314,48 @@ describe('roles at the routes', () => {
     expect((await r.json()).error).toMatch(/No such draft/)
   })
 })
+
+describe('the tour\'s wording in the second language (translated, approved)', () => {
+  const translated = (items: Array<[string, string]>) => vi.fn(async () => ({
+    status: 'in_review' as const, content: { kind: 'labels' as const, items: items.map(([source, text]) => ({ source, text })) },
+    check: { ok: true, violations: [], flags: [] }, notes: [], sourcesUsed: [], attempts: 1, model: 'claude-test', promptVersion: 'publish-labels-v1', facts,
+  }))
+
+  it('is not offered in English — the records are already English', async () => {
+    await expectError(draftWithEngine(db as never, actor, PAGE, { language: 'en', kind: 'labels' }, deps), 400, /already in English/)
+  })
+
+  it('is drafted for review, approved into a version, and gives the unpublished page its address in that language', async () => {
+    deps.translate = translated([['Giza & the Pyramids', 'Gizeh et les pyramides'], ['Guide', 'Guide']])
+    const { draftId, status } = await draftWithEngine(db as never, actor, PAGE, { language: 'fr', kind: 'labels' }, deps)
+    expect(status).toBe('in_review')
+    expect(draftRow(draftId)).toMatchObject({ kind: 'narrative', language: 'fr', content: { kind: 'labels' } })
+
+    await approveDraft(db as never, actor, draftId, deps)
+    const version = db.tables.publish_versions[0]
+    expect((version.content as { labels: { items: unknown[] } }).labels.items).toEqual([
+      { source: 'Giza & the Pyramids', text: 'Gizeh et les pyramides' }, { source: 'Guide', text: 'Guide' },
+    ])
+    expect(db.tables.publish_page_locales.find(l => l.id === 'loc-fr')!.slug).toBe('gizeh-et-les-pyramides')
+    expect(db.tables.publish_page_locales.find(l => l.id === 'loc-en')!.slug).toBe('giza-and-the-pyramids')
+
+    const detail = await pageDetail(db as never, actor, PAGE, 'fr', deps)
+    expect(detail.narrative.labels).toEqual({ 'Giza & the Pyramids': 'Gizeh et les pyramides', Guide: 'Guide' })
+  })
+
+  it('a published page keeps its address — no live link breaks', async () => {
+    db.tables.publish_page_locales.find(l => l.id === 'loc-fr')!.is_published = true
+    deps.translate = translated([['Giza & the Pyramids', 'Gizeh et les pyramides']])
+    const { draftId } = await draftWithEngine(db as never, actor, PAGE, { language: 'fr', kind: 'labels' }, deps)
+    await approveDraft(db as never, actor, draftId, deps)
+    expect(db.tables.publish_page_locales.find(l => l.id === 'loc-fr')!.slug).toBe('giza-and-the-pyramids')
+  })
+
+  it('an edit that changes a number is sent to failed_check and cannot be approved', async () => {
+    deps.translate = translated([['Guide', 'Guide']])
+    const { draftId } = await draftWithEngine(db as never, actor, PAGE, { language: 'fr', kind: 'labels' }, deps)
+    const r = await editDraft(db as never, actor, draftId, { kind: 'labels', items: [{ source: 'Guide', text: 'Guide (2 jours)' }] }, deps)
+    expect(r.status).toBe('failed_check')
+    await expectError(approveDraft(db as never, actor, draftId, deps), 409, /changes a number, price or date/)
+  })
+})
