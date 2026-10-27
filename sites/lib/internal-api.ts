@@ -8,9 +8,9 @@
 // Env: PUBLISH_APP_URL (the GetAutoura app), PUBLISH_INTERNAL_SECRET.
 
 import {
-  CONTRACT_VERSION, INTERNAL_ENQUIRY_PATH, INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, INTERNAL_WA_REF_PATH, internalAuthHeader,
-  pagePayloadSchema, siteResolutionSchema, waRefResultSchema,
-  type EnquiryInput, type PagePayload, type SiteResolution, type WaRefInput, type WaRefResult,
+  CONTRACT_VERSION, INTERNAL_ENQUIRY_PATH, INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, INTERNAL_SITEMAP_PATH, INTERNAL_WA_REF_PATH, internalAuthHeader,
+  pagePayloadSchema, siteResolutionSchema, sitemapSchema, waRefResultSchema,
+  type EnquiryInput, type PagePayload, type SiteResolution, type SitemapData, type WaRefInput, type WaRefResult,
 } from '@/lib/publish/contract'
 import { publishTags } from '@/lib/publish/sync/events'
 import type { Mode } from './routing'
@@ -90,6 +90,19 @@ export async function loadPage(
     throw new InternalApiError('page payload is for a different site')
   }
   return page
+}
+
+// ---------- the sitemap (step 9): cached under the site's tags ----------
+
+export async function loadSitemap(input: { tenantId: string; siteId: string }, fetchImpl: typeof fetch = fetch): Promise<SitemapData | null> {
+  const { base, secret } = config()
+  const res = await fetchImpl(`${base}${INTERNAL_SITEMAP_PATH}?site=${input.siteId}&v=${CONTRACT_VERSION}`, {
+    headers: internalAuthHeader(secret),
+    next: { tags: pageTags(input.tenantId), revalidate: 3600 },
+    signal: AbortSignal.timeout(10_000),
+  } as RequestInit)
+  const json = await readJson(res, 'sitemap')
+  return json === null ? null : sitemapSchema.parse(json)
 }
 
 // ---------- lead capture (step 8): never cached ----------

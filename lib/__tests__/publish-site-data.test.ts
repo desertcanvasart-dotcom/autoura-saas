@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload } from '@/lib/publish/site-data'
-import { siteResolutionSchema, pagePayloadSchema, CONTRACT_VERSION, type TourFacts } from '@/lib/publish/contract'
+import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload, loadSitemap } from '@/lib/publish/site-data'
+import { siteResolutionSchema, pagePayloadSchema, sitemapSchema, CONTRACT_VERSION, type TourFacts } from '@/lib/publish/contract'
 import { indicativeCurrenciesOf } from '@/lib/publish/site-data'
 
 const FACTS: TourFacts = {
@@ -238,5 +238,30 @@ describe('the internal endpoints', () => {
     expect((await siteGET(req('/api/publish/internal/site?host=nobody.example', 'Bearer internal-secret'))).status).toBe(404)
     expect((await pageGET(req(`/api/publish/internal/page?site=${SITE}&lang=en&path=nope`, 'Bearer internal-secret'))).status).toBe(404)
     expect((await pageGET(req(`/api/publish/internal/page?site=not-a-uuid&lang=en`, 'Bearer internal-secret'))).status).toBe(400)
+  })
+})
+
+describe('search engines (step 9)', () => {
+  it("a page carries the site's primary hostname, for canonical and hreflang", async () => {
+    const page = await loadPagePayload(db() as never, { siteId: SITE, language: 'en', path: '', preview: false }, { tourFacts: async () => FACTS })
+    expect(page!.site.publicHost).toBe('sillage.example')
+  })
+  it('none while the hostname is only a test one', async () => {
+    const page = await loadPagePayload(db({ domainKind: 'test' }) as never, { siteId: SITE, language: 'en', path: '', preview: false }, { tourFacts: async () => FACTS })
+    expect(page!.site.publicHost).toBeNull()
+  })
+  it('the sitemap lists published pages per language — never a draft or a switched-off tour', async () => {
+    const map = await loadSitemap(db() as never, SITE)
+    expect(sitemapSchema.parse(map)).toEqual(map)
+    expect(map!.languages).toEqual(['en', 'fr'])
+    expect(map!.pages).toEqual([
+      { kind: 'home', paths: { en: '', fr: '' }, lastModified: null },
+      { kind: 'listing', paths: { en: 'tours', fr: 'tours' }, lastModified: null },
+      { kind: 'tour', paths: { en: 'tours/nile-classic', fr: 'tours/croisiere-nil' }, lastModified: null },
+      { kind: 'about', paths: { en: 'about-us' }, lastModified: null },
+    ])
+  })
+  it('a suspended site has no sitemap', async () => {
+    expect(await loadSitemap(db({ siteStatus: 'suspended' }) as never, SITE)).toBeNull()
   })
 })

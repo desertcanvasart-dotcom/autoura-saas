@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { loadPage } from '../../../../../../../lib/internal-api'
 import type { Mode } from '../../../../../../../lib/routing'
 import { THEMES } from '../../../../../../../themes'
+import { alternateLinks, jsonLdScript, structuredData } from '../../../../../../../lib/seo'
 
 // ============================================
 // One page of a company's site, drawn by its archetype's theme
@@ -35,11 +36,24 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const { page, preview } = found
   // An approved SEO title/description (still true to the facts) wins.
   const seo = page.tour?.narrative?.seo ?? null
+  const title = seo?.title ?? (page.kind === 'home' ? page.site.companyName : `${page.title} · ${page.site.companyName}`)
+  // The address search engines are given: the site's primary hostname, with
+  // every language version and x-default (step 9). None before it has one.
+  const links = alternateLinks(page)
   return {
-    title: seo?.title ?? (page.kind === 'home' ? page.site.companyName : `${page.title} · ${page.site.companyName}`),
+    title,
     description: seo?.description,
     // A test hostname, or a page not yet published, is never indexed.
     robots: preview || page.unpublished ? { index: false, follow: false } : undefined,
+    ...(links ? {
+      metadataBase: new URL(links.canonical),
+      alternates: { canonical: links.canonical, languages: links.languages },
+      openGraph: {
+        type: 'website', url: links.canonical, title, description: seo?.description,
+        siteName: page.site.companyName, locale: page.language,
+        images: page.tour?.facts?.images.slice(0, 1),
+      },
+    } : {}),
   }
 }
 
@@ -49,6 +63,9 @@ export default async function SitePage({ params }: { params: Promise<Params> }) 
   const theme = THEMES[found.page.site.archetype]
   return (
     <theme.Frame page={found.page} preview={found.preview}>
+      {structuredData(found.page).map((block, i) => (
+        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(block) }} />
+      ))}
       <theme.Page page={found.page} preview={found.preview} />
     </theme.Frame>
   )
