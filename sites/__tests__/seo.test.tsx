@@ -69,8 +69,8 @@ describe('structured data', () => {
   it('EU passport holders and other nationalities are two offers when the rates differ', () => {
     const facts = { ...FACTS, price: { ...FACTS.price, byNationality: { eu: 440.2, other: 425.5 } } } as TourFacts
     expect(trip(tourPage({}, facts)).offers).toEqual([
-      expect.objectContaining({ name: 'EU passport holders', price: 441 }),
-      expect.objectContaining({ name: 'Other nationalities', price: 426 }),
+      expect.objectContaining({ name: 'Titulaires d’un passeport de l’UE', price: 441 }),
+      expect.objectContaining({ name: 'Autres nationalités', price: 426 }),
     ])
   })
 
@@ -83,7 +83,7 @@ describe('structured data', () => {
     const blocks = structuredData(tourPage())
     expect(blocks.map(b => b['@type'])).toEqual(['TravelAgency', 'TouristTrip', 'BreadcrumbList'])
     expect(blocks[0]).toMatchObject({ name: 'Co Voyages', telephone: '+20 2 1234 5678', identifier: 'ETAA 77', address: 'Cairo' })
-    expect(trip(tourPage()).itinerary).toMatchObject({ numberOfItems: 2, itemListElement: [{ name: 'Day 1 — Saqqara' }, { name: 'Day 2 — Giza' }] })
+    expect(trip(tourPage()).itinerary).toMatchObject({ numberOfItems: 2, itemListElement: [{ name: 'Jour 1 — Saqqara' }, { name: 'Jour 2 — Giza' }] })
     expect(JSON.stringify(blocks)).not.toMatch(/Review|Rating/)
   })
 

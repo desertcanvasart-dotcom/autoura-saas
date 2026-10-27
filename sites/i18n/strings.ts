@@ -1,10 +1,13 @@
 // ============================================
 // The site's own interface words (not the agency's content)
 // ============================================
-// Buttons, headings and labels the themes print. English only for now: the
-// second language's words arrive with step 10, translated and reviewed
-// (PLAN D14) — until then a French or Spanish page falls back to English for
-// these, and to nothing invented.
+// Buttons, headings and labels the themes print, in English and in each
+// supported second language (step 10, PLAN D14: French and Spanish in Phase
+// 1). Each language's dictionary is complete by type (./fr.ts, ./es.ts). Left
+// to right only — no right-to-left language is ever supported.
+
+import { fr } from './fr'
+import { es } from './es'
 
 const en = {
   tours: 'Tours',
@@ -89,10 +92,18 @@ const en = {
 
 export type StringKey = keyof typeof en
 
-const dictionaries: Record<string, Partial<Record<StringKey, string>>> = { en }
+const dictionaries: Record<string, Record<StringKey, string>> = { en, fr, es }
+
+/** The languages a site may be built in: English plus one of the others. */
+export const SUPPORTED_LANGUAGES = Object.keys(dictionaries)
 
 export function t(language: string, key: StringKey): string {
   return dictionaries[language]?.[key] ?? en[key]
+}
+
+/** A label's colon: French sets a narrow no-break space before it. */
+export function colon(language: string): string {
+  return language === 'fr' ? '\u202f:' : ':'
 }
 
 /** "1 day", "5 days", "1 night", "4 nights". */

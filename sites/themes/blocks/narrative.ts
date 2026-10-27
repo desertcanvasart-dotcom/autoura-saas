@@ -4,8 +4,8 @@
 // the whole text is dropped rather than shown with a hole in it.
 
 import type { PageNarrative, TourFacts } from '@/lib/publish/contract'
-import { countOf, t } from '../../i18n/strings'
-import { formatDate, formatPrice, formatWeekdays } from './format'
+import { colon, countOf, t } from '../../i18n/strings'
+import { formatDate, formatPercent, formatPrice, formatWeekdays } from './format'
 
 type Seg = NonNullable<PageNarrative['overview']>[number]
 
@@ -34,7 +34,7 @@ export function slotText(slot: string, facts: TourFacts, lang: string): string |
     case 'cancellation': {
       const c = facts.cancellation
       if (!c || c.tiers.length === 0) return null
-      return c.tiers.map(tier => `${tier.daysBefore === 0 ? t(lang, 'onDeparture') : `${tier.daysBefore} ${t(lang, 'daysBeforeDeparture')}`}: ${tier.chargePercent}% ${t(lang, 'cancellationCharge')}`).join('; ')
+      return c.tiers.map(tier => `${tier.daysBefore === 0 ? t(lang, 'onDeparture') : `${tier.daysBefore} ${t(lang, 'daysBeforeDeparture')}`}${colon(lang)} ${formatPercent(tier.chargePercent, lang)} ${t(lang, 'cancellationCharge')}`).join('; ')
     }
     default:
       return null

@@ -101,7 +101,7 @@ export function structuredData(page: PagePayload): Json[] {
       availability: 'https://schema.org/InStock',
     })
     if (price.byNationality) {
-      trip.offers = [offer(price.byNationality.eu, 'EU passport holders'), offer(price.byNationality.other, 'Other nationalities')]
+      trip.offers = [offer(price.byNationality.eu, t(page.language, 'euPassport')), offer(price.byNationality.other, t(page.language, 'otherNationalities'))]
     } else if (price.from) {
       trip.offers = offer(price.from.perPerson, undefined)
     }
