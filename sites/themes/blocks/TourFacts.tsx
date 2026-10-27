@@ -9,7 +9,7 @@
 
 import type { PageNarrative, TourFacts } from '@/lib/publish/contract'
 import { narrativeText, paragraphs } from './narrative'
-import { t } from '../../i18n/strings'
+import { countOf, t } from '../../i18n/strings'
 import { formatApprox, formatDate, formatPrice, formatWeekdays } from './format'
 import s from './facts.module.css'
 
@@ -110,7 +110,7 @@ export function ItinerarySection({ facts, lang, variant, narrative }: P) {
   return (
     <section className={cx(variant, 'section')}>
       <h2>{t(lang, 'itinerary')}</h2>
-      <p className={s.note}>{facts.durationDays} {t(lang, 'days')}{facts.durationNights > 0 ? ` · ${facts.durationNights} ${t(lang, 'nights')}` : ''}</p>
+      <p className={s.note}>{countOf(lang, facts.durationDays, 'day')}{facts.durationNights > 0 ? ` · ${countOf(lang, facts.durationNights, 'night')}` : ''}</p>
       <ol className={s.days}>
         {facts.days.map(d => {
           const meals = (['breakfast', 'lunch', 'dinner'] as const).filter(m => d.meals[m])
