@@ -12,6 +12,7 @@ import { resolveBrand } from '../brand'
 import { loadTourFacts } from '../tour-facts'
 import { indicativeCurrenciesOf } from '../site-data'
 import { draftNarrative, type DraftKind, type DraftResult, type EngineBrand, type ModelCall, type SourceNote } from './engine'
+import { draftTranslation, labelSources } from './translate'
 
 type Db = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,6 +89,48 @@ export async function generateTourDraft(db: Db, input: {
     brand: engineBrand(site.archetype, site.brand),
     sources: input.sources ?? [],
     glossary: ((glossary.data ?? []) as Array<{ term_key: string; spelling: string }>).map(g => ({ term: g.term_key, spelling: g.spelling })),
+    instruction: input.instruction ?? null,
+  }, callModel)
+  return { ...result, facts }
+}
+
+/** The tour's own wording in the page's language, for review (the 'labels'
+ *  part). Reads only, like generateTourDraft. */
+export async function generateTourTranslation(db: Db, input: {
+  siteId: string
+  pageId: string
+  language: string
+  instruction?: string | null
+}, callModel: ModelCall = claudeModelCall, deps: { tourFacts?: typeof loadTourFacts } = {}): Promise<DraftResult & { facts: TourFacts }> {
+  const check = (what: string, error: { message: string } | null) => {
+    if (error) throw new Error(`reading ${what}: ${error.message}`)
+  }
+  const { data: site, error: sErr } = await db.from('publish_sites')
+    .select('id, tenant_id, archetype, languages, brand, settings').eq('id', input.siteId).maybeSingle()
+  check('the site', sErr)
+  if (!site) throw new Error('no such site')
+  if (!site.languages.includes(input.language)) throw new Error(`the site does not publish in "${input.language}"`)
+
+  const { data: page, error: pErr } = await db.from('publish_pages')
+    .select('id, kind, tour_template_id, tour_templates(template_name)')
+    .eq('id', input.pageId).eq('site_id', input.siteId).eq('tenant_id', site.tenant_id).maybeSingle()
+  check('the page', pErr)
+  if (!page || page.kind !== 'tour' || !page.tour_template_id) throw new Error('the page is not a tour page of this site')
+
+  const [facts, glossary] = await Promise.all([
+    (deps.tourFacts ?? loadTourFacts)(db, {
+      tenantId: site.tenant_id, templateId: page.tour_template_id, language: input.language,
+      indicativeCurrencies: indicativeCurrenciesOf(site.settings),
+    }),
+    db.from('publish_glossary').select('term_key, spelling').eq('tenant_id', site.tenant_id).eq('language', input.language),
+  ])
+  check('the glossary', glossary.error)
+
+  const result = await draftTranslation({
+    language: input.language,
+    sources: labelSources(facts, page.tour_templates?.template_name ?? ''),
+    glossary: ((glossary.data ?? []) as Array<{ term_key: string; spelling: string }>).map(g => ({ term: g.term_key, spelling: g.spelling })),
+    avoid: engineBrand(site.archetype, site.brand).avoid,
     instruction: input.instruction ?? null,
   }, callModel)
   return { ...result, facts }

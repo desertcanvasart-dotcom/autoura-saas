@@ -50,6 +50,11 @@ export type EngineContent =
   | { kind: 'highlights'; items: Segment[][] }
   | { kind: 'days'; days: Array<{ day: number; segments: Segment[] }> }
   | { kind: 'seo'; title: string; description: string }
+  /** The tour's own wording in the page language (./translate.ts). */
+  | { kind: 'labels'; items: Array<{ source: string; text: string }> }
+
+/** Every part of a page a draft can be: the narrative kinds, and the translated wording. */
+export type PartKind = DraftKind | 'labels'
 
 export interface DraftResult {
   status: 'in_review' | 'failed_check'
@@ -232,6 +237,7 @@ export function segmentsOf(content: EngineContent): Segment[] {
     case 'highlights': return content.items.flat()
     case 'days': return content.days.flatMap(d => d.segments)
     case 'seo': return [{ type: 'text', text: content.title }, { type: 'text', text: content.description }]
+    case 'labels': return content.items.map(i => ({ type: 'text', text: i.text }))
   }
 }
 

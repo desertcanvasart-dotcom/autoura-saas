@@ -74,7 +74,7 @@ describe('what shows', () => {
     expect(r.days).toHaveLength(2)
   })
   it('no version or no facts: nothing to show', () => {
-    expect(renderableNarrative(null, FACTS, NAME)).toEqual({ overview: null, highlights: null, days: [], seo: null, stale: [] })
+    expect(renderableNarrative(null, FACTS, NAME)).toEqual({ overview: null, highlights: null, days: [], seo: null, labels: {}, stale: [] })
   })
 })
 

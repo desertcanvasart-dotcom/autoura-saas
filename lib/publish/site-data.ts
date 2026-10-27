@@ -10,7 +10,7 @@
 
 import type { SitemapData, SiteResolution, PagePayload, PageNarrative, TourFacts } from './contract'
 import { loadTourFacts } from './tour-facts'
-import { factsHash, renderableNarrative, type NarrativeBundle } from './narrative'
+import { factsHash, renderableNarrative, translateFacts, type NarrativeBundle } from './narrative'
 
 type Db = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,10 +215,14 @@ export async function loadPagePayload(db: Db, input: {
     .select(LOCALE_SELECT).eq('site_id', input.siteId).eq('language', input.language)
   if (lErr) throw new Error(`reading pages: ${lErr.message}`)
   const locales = ((rows ?? []) as LocaleRow[]).filter(r => showable(r, input.preview))
-  const tourLinks = locales
-    .filter(r => r.publish_pages!.kind === 'tour')
-    .map(r => ({ title: r.publish_pages!.tour_templates!.template_name, path: tourPath(r.slug) }))
-    .sort((a, b) => a.title.localeCompare(b.title))
+  const tourLocales = locales.filter(r => r.publish_pages!.kind === 'tour')
+  const names = await approvedNames(db, siteInfo.tenantId, tourLocales)
+  const tourLinks = tourLocales
+    .map(r => {
+      const name = r.publish_pages!.tour_templates!.template_name
+      return { title: names.get(r.current_version_id ?? '')?.[name] ?? name, path: tourPath(r.slug) }
+    })
+    .sort((a, b) => a.title.localeCompare(b.title, input.language))
 
   let row: LocaleRow | undefined
   if (target.kind === 'home') row = locales.find(r => r.publish_pages!.kind === 'home')
@@ -240,6 +244,7 @@ export async function loadPagePayload(db: Db, input: {
       indicativeCurrencies: indicativeCurrenciesOf(site.settings),
     })
     let narrative: PageNarrative | null = null
+    let labels: Record<string, string> = {}
     if (row!.current_version_id) {
       const { data: version, error: vErr } = await db.from('publish_versions').select('content, facts_snapshot')
         .eq('id', row!.current_version_id).eq('tenant_id', siteInfo.tenantId).maybeSingle()
@@ -247,13 +252,16 @@ export async function loadPagePayload(db: Db, input: {
       const r = renderableNarrative((version?.content as NarrativeBundle) ?? null, facts, name)
       // renderableNarrative keeps only slots the tour can fill — all of them known keys.
       narrative = { overview: r.overview, highlights: r.highlights, days: r.days, seo: r.seo } as PageNarrative
+      labels = r.labels
       deps.onNarrative?.({
         tenantId: siteInfo.tenantId, pageId: row!.page_id, templateId, tourName: name, language: input.language,
         published: row!.is_published, stale: r.stale,
         factsChanged: Boolean(version?.facts_snapshot?.hash && version.facts_snapshot.hash !== factsHash(facts)),
       })
     }
-    tour = { templateId, name, facts, narrative }
+    // The tour's own wording in this language, where a person approved it
+    // (the 'labels' part); numbers, prices and terms stay the records'.
+    tour = { templateId, name: labels[name] ?? name, facts: translateFacts(facts, labels), narrative }
   }
 
   let alternates: PagePayload['alternates'] = []
@@ -282,6 +290,21 @@ export async function loadPagePayload(db: Db, input: {
     unpublished: row ? !row.is_published : false,
     pageId: row?.page_id ?? null,
   }
+}
+
+/** Each tour locale's approved translations ('labels'), by version id — for
+ *  the tour names on the home page and the listing. One read for all. */
+async function approvedNames(db: Db, tenantId: string, rows: LocaleRow[]): Promise<Map<string, Record<string, string>>> {
+  const ids = rows.map(r => r.current_version_id).filter((v): v is string => !!v)
+  const out = new Map<string, Record<string, string>>()
+  if (ids.length === 0) return out
+  const { data, error } = await db.from('publish_versions').select('id, content').in('id', ids).eq('tenant_id', tenantId)
+  if (error) throw new Error(`reading tour names: ${error.message}`)
+  for (const v of (data ?? []) as Array<{ id: string; content: NarrativeBundle | null }>) {
+    const l = v.content?.labels
+    if (l?.part === 'labels') out.set(v.id, Object.fromEntries(l.items.map(i => [i.source, i.text])))
+  }
+  return out
 }
 
 // ---------- the sitemap (step 9) ----------

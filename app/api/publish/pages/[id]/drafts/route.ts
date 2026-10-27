@@ -3,7 +3,7 @@ import { draftWithEngine, PublishError } from '@/lib/publish/admin'
 
 export const maxDuration = 120
 
-const KINDS = ['overview', 'highlights', 'days', 'seo'] as const
+const KINDS = ['overview', 'highlights', 'days', 'seo', 'labels'] as const
 
 // Ask the content engine for a draft of one part of the page. Writers.
 // The draft lands for review — nothing is published by this.
