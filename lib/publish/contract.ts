@@ -12,6 +12,7 @@
 //   POST /api/publish/internal/enquiry                  an enquiry form sent (step 8)
 //   POST /api/publish/internal/wa-ref                   a tracked WhatsApp click (step 8)
 //   GET /api/publish/internal/sitemap?site=…            the published pages, for sitemaps (step 9)
+//   GET /api/publish/internal/embed?key=…               which site an embed key shows (own-website blocks)
 //
 // Authenticated with `Authorization: Bearer <PUBLISH_INTERNAL_SECRET>` — a
 // fixed header, so the renderer's fetch cache key stays stable.
@@ -35,6 +36,7 @@ export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
 export const INTERNAL_ENQUIRY_PATH = '/api/publish/internal/enquiry'
 export const INTERNAL_WA_REF_PATH = '/api/publish/internal/wa-ref'
 export const INTERNAL_SITEMAP_PATH = '/api/publish/internal/sitemap'
+export const INTERNAL_EMBED_PATH = '/api/publish/internal/embed'
 
 export const languageCode = z.string().regex(/^[a-z]{2}$/)
 
@@ -282,3 +284,12 @@ export const sitemapSchema = z.object({
   })),
 })
 export type SitemapData = z.infer<typeof sitemapSchema>
+
+// ---------- blocks on the agency's own website (lib/publish/embed.ts) ----------
+
+export const embedResolutionSchema = z.object({
+  site: siteResolutionSchema.shape.site,
+  /** The websites (origins) the blocks may appear on — nowhere else. */
+  origins: z.array(z.string().url()).min(1),
+})
+export type EmbedResolution = z.infer<typeof embedResolutionSchema>

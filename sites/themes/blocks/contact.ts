@@ -22,3 +22,18 @@ export function phoneHref(identity: CompanyIdentity): string | null {
   const tel = identity.phone?.replace(/[^\d+]/g, '')
   return tel && tel.replace(/\D/g, '').length >= 6 ? `tel:${tel}` : null
 }
+
+/** The agency's main website, when its tours live apart from it (a tours
+ *  subdomain): the header links back there. Stored as publish_sites.brand
+ *  .website, https only; null when not set. */
+export function agencyWebsite(page: PagePayload): { href: string; label: string } | null {
+  const raw = page.site.brand.website
+  if (typeof raw !== 'string') return null
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'https:') return null
+    return { href: url.href, label: url.hostname.replace(/^www\./, '') }
+  } catch {
+    return null
+  }
+}

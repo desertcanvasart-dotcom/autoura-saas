@@ -114,3 +114,17 @@ describe('the route and the photos', () => {
     expect(html.match(/class="[^"]*panel/g)?.length).toBeGreaterThanOrEqual(tours.length)
   })
 })
+
+describe('matching the agency\'s own website', () => {
+  it('every theme links back to the agency\'s main website when it has one (https only)', () => {
+    for (const archetype of ['modern', 'private_journeys', 'transparent_value'] as const) {
+      const page = home({ site: { ...site, archetype, brand: { website: 'https://www.sunrise-travel.example' } } })
+      const theme = THEMES[archetype]
+      const html = renderToStaticMarkup(<theme.Frame page={page} preview={false}><theme.Page page={page} preview={false} /></theme.Frame>)
+      expect(html, archetype).toContain('href="https://www.sunrise-travel.example/"')
+      expect(text(html), archetype).toContain('← sunrise-travel.example')
+    }
+    const plain = render(home({ site: { ...site, brand: { website: 'http://insecure.example' } } }))
+    expect(plain).not.toContain('insecure.example')
+  })
+})

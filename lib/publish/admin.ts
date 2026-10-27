@@ -28,6 +28,7 @@ import { engineBrand, generateTourDraft, generateTourTranslation } from './engin
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
 import { publishTags } from './sync/events'
 import { ARCHETYPES, ARCHETYPE_DEFAULTS, FONT_PAIRS, PALETTE_PRESETS, resolveBrand, type Archetype } from './brand'
+import { MAX_ORIGINS, embedOf, newEmbedKey, normalizeOrigin } from './embed'
 import { createRevalidator } from './sync/revalidate'
 
 type Db = {
@@ -439,7 +440,7 @@ export async function lookOf(db: Db, actor: Actor) {
   const resolved = resolveBrand(site!.archetype, stored)
   return {
     archetype: site!.archetype,
-    stored: { palette: stored.palette ?? null, fontPair: stored.fontPair ?? null },
+    stored: { palette: stored.palette ?? null, fontPair: stored.fontPair ?? null, website: typeof stored.website === 'string' ? stored.website : null },
     resolved: { palette: resolved.palette, fontPair: resolved.fontPair, onPrimary: resolved.onPrimary, onAccent: resolved.onAccent },
     problems: resolved.problems,
     choices: {
@@ -453,14 +454,49 @@ export async function lookOf(db: Db, actor: Actor) {
 /** Save the theme, palette and fonts. Colours that would be hard to read
  *  are refused with the reason — the website never gets them. The rest of
  *  the stored brand (tone, claims, words to avoid) is kept. */
-export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown }, deps: AdminDeps = defaultDeps) {
+export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown }, deps: AdminDeps = defaultDeps) {
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   if (typeof input.archetype !== 'string' || !(ARCHETYPES as readonly string[]).includes(input.archetype)) fail(`Choose a theme: one of ${ARCHETYPES.join(', ')}.`)
   const archetype = input.archetype as Archetype
-  const next = { ...((site!.brand ?? {}) as Record<string, unknown>), palette: input.palette, fontPair: input.fontPair }
+  // The agency's main website, for the header's link back (empty = none).
+  let website: string | undefined
+  if (typeof input.website === 'string' && input.website.trim()) {
+    const origin = normalizeOrigin(input.website)
+    if (!origin || origin.startsWith('http:')) fail('Your main website must be an https:// address.')
+    website = origin!
+  }
+  const { website: _old, ...rest } = (site!.brand ?? {}) as Record<string, unknown>
+  void _old
+  const next = { ...rest, palette: input.palette, fontPair: input.fontPair, ...(website ? { website } : {}) }
   const problems = resolveBrand(archetype, next).problems
   if (problems.length) fail(problems.join(' '))
   const { error } = await db.from('publish_sites').update({ archetype, brand: next }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not save the look: ${error.message}`, 500)
   return { saved: true, warning: await refresh(deps, actor.tenantId) }
+}
+
+// ---------- tours on the agency's own website (lib/publish/embed.ts) ----------
+
+/** The site's embed key and the websites its blocks may appear on. */
+export async function embedSettingsOf(db: Db, actor: Actor) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  // Where the loader is served from: the renderer (publish-sites).
+  return { ...embedOf(site!.settings), languages: site!.languages, rendererUrl: process.env.PUBLISH_RENDERER_URL ?? null }
+}
+
+/** Save the websites; make a key on first use (or a new one on request —
+ *  the old one stops working at once). Managers. */
+export async function saveEmbedSettings(db: Db, actor: Actor, input: { origins: unknown; newKey?: unknown }, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  if (!Array.isArray(input.origins)) fail('List the websites your tours may appear on.')
+  const bad = (input.origins as unknown[]).filter(o => normalizeOrigin(o) === null)
+  if (bad.length) fail(`Not a website address (https:// only): ${bad.map(String).join(', ')}`)
+  const origins = [...new Set((input.origins as unknown[]).map(o => normalizeOrigin(o)!))]
+  if (origins.length > MAX_ORIGINS) fail(`At most ${MAX_ORIGINS} websites.`)
+  const current = embedOf(site!.settings)
+  const key = input.newKey === true || !current.key ? newEmbedKey() : current.key
+  const settings = { ...((site!.settings ?? {}) as Record<string, unknown>), embed: { key, origins } }
+  const { error } = await db.from('publish_sites').update({ settings }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not save: ${error.message}`, 500)
+  return { key, origins, warning: await refresh(deps, actor.tenantId) }
 }

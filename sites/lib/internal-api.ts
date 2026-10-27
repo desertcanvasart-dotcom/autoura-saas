@@ -8,9 +8,9 @@
 // Env: PUBLISH_APP_URL (the GetAutoura app), PUBLISH_INTERNAL_SECRET.
 
 import {
-  CONTRACT_VERSION, INTERNAL_ENQUIRY_PATH, INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, INTERNAL_SITEMAP_PATH, INTERNAL_WA_REF_PATH, internalAuthHeader,
-  pagePayloadSchema, siteResolutionSchema, sitemapSchema, waRefResultSchema,
-  type EnquiryInput, type PagePayload, type SiteResolution, type SitemapData, type WaRefInput, type WaRefResult,
+  CONTRACT_VERSION, INTERNAL_EMBED_PATH, INTERNAL_ENQUIRY_PATH, INTERNAL_PAGE_PATH, INTERNAL_SITE_PATH, INTERNAL_SITEMAP_PATH, INTERNAL_WA_REF_PATH, internalAuthHeader,
+  embedResolutionSchema, pagePayloadSchema, siteResolutionSchema, sitemapSchema, waRefResultSchema,
+  type EmbedResolution, type EnquiryInput, type PagePayload, type SiteResolution, type SitemapData, type WaRefInput, type WaRefResult,
 } from '@/lib/publish/contract'
 import { publishTags } from '@/lib/publish/sync/events'
 import type { Mode } from './routing'
@@ -41,6 +41,7 @@ const hostCache: Map<string, HostEntry> =
 
 export function forgetHosts(): void {
   hostCache.clear()
+  ;((globalThis as { __publishEmbedCache?: Map<string, unknown> }).__publishEmbedCache)?.clear()
 }
 
 export async function siteForHost(host: string, fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<SiteResolution | null> {
@@ -59,6 +60,26 @@ export async function siteForHost(host: string, fetchImpl: typeof fetch = fetch,
   return value
 }
 
+// ---------- embed key → site (blocks on the agency's own website) ----------
+
+type EmbedEntry = { at: number; value: EmbedResolution | null }
+const embedCache: Map<string, EmbedEntry> =
+  ((globalThis as { __publishEmbedCache?: Map<string, EmbedEntry> }).__publishEmbedCache ??= new Map())
+
+export async function siteForEmbedKey(key: string, fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<EmbedResolution | null> {
+  const hit = embedCache.get(key)
+  if (hit && now - hit.at < HOST_TTL_MS) return hit.value
+  const { base, secret } = config()
+  const res = await fetchImpl(`${base}${INTERNAL_EMBED_PATH}?key=${encodeURIComponent(key)}&v=${CONTRACT_VERSION}`, {
+    headers: internalAuthHeader(secret), cache: 'no-store', signal: AbortSignal.timeout(5000),
+  })
+  const json = await readJson(res, 'embed lookup')
+  const value = json === null ? null : embedResolutionSchema.parse(json)
+  embedCache.set(key, { at: now, value })
+  if (embedCache.size > 1000) embedCache.delete(embedCache.keys().next().value!)
+  return value
+}
+
 // ---------- one page (used by the page, cached until its tags change) ----------
 
 /** The tags a page's data is cached under — what the sync worker revalidates. */
@@ -74,7 +95,7 @@ export async function loadPage(
 ): Promise<PagePayload | null> {
   const { base, secret } = config()
   const q = new URLSearchParams({ site: input.siteId, lang: input.language, path: input.path, v: String(CONTRACT_VERSION) })
-  if (input.mode === 'preview') q.set('preview', '1')
+  if (input.mode === 'preview') q.set('preview', '1') // 'embed' shows published pages, like 'live'
   const res = await fetchImpl(`${base}${INTERNAL_PAGE_PATH}?${q}`, {
     headers: internalAuthHeader(secret),
     // Kept until the sync worker revalidates one of these tags; the hour is

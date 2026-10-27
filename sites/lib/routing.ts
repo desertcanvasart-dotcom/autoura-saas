@@ -22,7 +22,8 @@
 
 import type { SiteResolution } from '@/lib/publish/contract'
 
-export type Mode = 'live' | 'preview'
+/** live: the public site · preview: a test hostname · embed: a block on the agency's own website (published pages only, no frame). */
+export type Mode = 'live' | 'preview' | 'embed'
 
 export type RouteDecision =
   | { type: 'rewrite'; path: string }
@@ -86,4 +87,21 @@ export function decideRoute(input: {
     return { type: 'rewrite', path: internalPath(r.site, mode, first, rest.join('/')) }
   }
   return { type: 'rewrite', path: internalPath(r.site, mode, languages[0] ?? 'en', MISSING_SEGMENT) }
+}
+
+// ---------- blocks on the agency's own website ----------
+
+export const EMBED_PREFIX = '/embed/'
+
+/** /embed/{key}/{lang}/{…path} → its parts; null when it is not one. */
+export function embedPath(pathname: string): { key: string; lang: string; rest: string } | null {
+  if (!pathname.startsWith(EMBED_PREFIX)) return null
+  const [key = '', lang = '', ...rest] = pathname.slice(EMBED_PREFIX.length).split('/')
+  if (!/^[A-Za-z0-9]{20,40}$/.test(key) || !/^[a-z]{2}$/.test(lang)) return null
+  return { key, lang, rest: rest.join('/') }
+}
+
+/** The CSP that lets only the agency's listed websites show the block. */
+export function frameAncestors(origins: string[]): string {
+  return `frame-ancestors 'self' ${origins.join(' ')}`
 }

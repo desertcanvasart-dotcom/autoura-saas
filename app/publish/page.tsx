@@ -89,7 +89,8 @@ export default function PublishOverviewPage() {
               <p className="text-xs uppercase tracking-wide text-gray-400">Site</p>
               <p className="mt-1 font-medium text-gray-900">{ARCHETYPE[data.site.archetype] ?? data.site.archetype}</p>
               <p className="text-sm text-gray-500">{data.site.status === 'live' ? 'Live' : data.site.status === 'draft' ? 'Not live yet' : 'Suspended'} · {data.site.languages.map(l => l.toUpperCase()).join(' + ')}</p>
-              <Link href="/publish/look" className="mt-2 inline-block text-sm text-[#647C47] hover:underline">Look and feel — theme, colours, fonts →</Link>
+              <Link href="/publish/look" className="mt-2 block text-sm text-[#647C47] hover:underline">Look and feel — theme, colours, fonts →</Link>
+              <Link href="/publish/embed" className="mt-1 block text-sm text-[#647C47] hover:underline">On your own website — show your tours there →</Link>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs uppercase tracking-wide text-gray-400">Sync with your records</p>
