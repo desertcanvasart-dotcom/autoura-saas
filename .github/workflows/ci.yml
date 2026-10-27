@@ -99,6 +99,11 @@ jobs:
         # this step keeps it that way.
         run: NODE_OPTIONS=--max-old-space-size=4096 npx next build
 
+      - name: Publish site renderer build (sites/)
+        # The second Next app (docs/publish/PLAN.md D1) is its own Railway
+        # service; the step above builds only the main app. Also env-less.
+        run: npx next build sites
+
       - name: Install Playwright browser
         # Chromium only: the smoke suite is one project, and the full
         # `--with-deps` install of three engines costs minutes per run.

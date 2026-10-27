@@ -30,6 +30,7 @@ export const SELF_AUTH_API_PREFIXES = [
   '/api/portal/',
   '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief, departure mirror)
   '/api/integrations/',     // server-to-server feeds; verifies SAWA_SYNC_SECRET inside the handler
+  '/api/publish/internal/', // the Publish site renderer → us; verifies PUBLISH_INTERNAL_SECRET inside the handler
   '/api/auth/',             // login / signup / OAuth callbacks (no session yet)
   '/api/cron/',             // cron-job-only, verifies CRON_SECRET inside the handler
   '/api/version',           // deploy-verification probe: public by design, sha+uptime only

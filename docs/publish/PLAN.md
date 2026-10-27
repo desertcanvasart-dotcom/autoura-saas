@@ -160,14 +160,18 @@ On entering `failing`, `lagging` or `stalled` (de-duplicated, at most one alert 
 
 ## 6. Renderer and routing (`sites/`)
 
-- **Hostname → site:** `sites/middleware.ts` resolves `Host` against active `publish_domains` via the internal API, cached in memory (60 s TTL, invalidated by the worker on domain changes). Unknown host → plain 404 page with no tenant branding. `kind=alias_redirect` hosts 301 to the primary.
-- **Internal rewrite:** `/{lang}/{...path}` → `/s/{siteId}/{lang}/{...path}`. Direct requests to `/s/...` are refused by the middleware.
-- **Routes (Phase 1):** `/{lang}` home, `/{lang}/tours` listing, `/{lang}/tours/{slug}`, `/{lang}/{core-page-slug}`, `/{lang}/enquire/thanks`, `/sitemap.xml`, `/sitemap-{lang}.xml`, `/robots.txt`, `/go/wa` (WhatsApp redirect, §11). `/` redirects to the default language (by `Accept-Language` only as a first-visit hint; never a JS toggle).
-- **Rendering:** each route uses `fetch` to the page-data API with `next: { tags }`; `generateStaticParams` empty plus `dynamicParams = true` (built on first request, then served static until a tag is revalidated); `revalidate = 3600` backstop.
-- **Tags:** `site:{siteId}`, `site:{siteId}:tours`, `tour:{templateId}`, `page:{pageId}`, `domains`.
-- **Redirects:** `publish_redirects` checked in middleware before the 404.
-- **One instance first:** Next's file-system cache is per instance; if we scale `sites` beyond one replica we add a shared cache handler (noted, not built).
-- **Test domains:** locally `{site-slug}.localhost:3001` (browsers resolve `*.localhost`). On Railway a `test` domain row per site (e.g. a subdomain of the agency's own domain, CNAMEd to the `sites` service).
+*Built in step 3 — this section describes what exists.*
+
+- **Hostname → site:** `sites/proxy.ts` (Next 16's name for middleware) asks `/api/publish/internal/site?host=…`, cached in memory for 60 s and cleared on every revalidate call. A hostname serves its site when it is a `test` domain (any status — how a site is seen before launch), or a verified `primary`/`alias_redirect` of a `live` site; a suspended site is served nowhere. Unknown host → plain 404 naming no company. Alias → 301 to the active primary. The app unreachable → 503 with Retry-After, never a 404.
+- **Internal path:** `/{lang}/{...path}` → `/s/{tenant}/{site}/{mode}/{lang}/{...path}`, `mode` = `live` or `preview` (test hostnames; unpublished pages shown and flagged, everything `noindex`). Every visitor path is rewritten, so a typed `/s/…` is just an unknown page of the site.
+- **Routes built:** `/{lang}` home (exists even with no home page row: lists the published tours), `/{lang}/tours`, `/{lang}/tours/{slug}`, `/{lang}/{core-page-slug}`; the site's own 404 for anything else. `/` → 302 to the visitor's language if the site has it (Accept-Language as a hint, `Vary: Accept-Language`), else English. Still to come: `/enquire/thanks`, sitemaps, robots, `/go/wa`.
+- **Rendering:** the root layout sits at the language segment, so `<html lang>` is right per language. `generateStaticParams` empty + `dynamicParams` → built on first request, then static (verified on a production build: MISS, then HIT); `revalidate = 3600` backstop.
+- **Tags:** company-keyed, as the worker sends them: every page carries `publish:tenant:{id}` and `publish:tenant:{id}:tours` (*coarser than first planned*: a tour's product id is only known after its data is read, and the worker refreshes `tours` on any product change anyway). The renderer expires a tag at once (`revalidateTag(tag, { expire: 0 })`) — verified: a change reaches the very next request.
+- **Internal API auth:** `Authorization: Bearer PUBLISH_INTERNAL_SECRET` (*changed from "signed"*): a timestamped signature would change the fetch cache key on every request. Read-only, server to server, over HTTPS.
+- **Redirects:** `publish_redirects`, exact path match, before language handling; internal targets keep the query string.
+- **One instance first:** Next's file-system cache is per instance; if we scale `sites` beyond one replica we add a shared cache handler (noted, not built). The pages send `s-maxage=3600, stale-while-revalidate`: **a CDN in front (Q6) must not serve stale after a revalidation** — decide with step 11.
+- **No healthcheck path** on the renderer service yet: every path is a company site, so Railway's own hostname is an unknown host by design.
+- **Test domains:** locally `{name}.localhost:3001` against `scripts/publish-dev-api.mjs` (a fixture standing in for the internal API — no database needed; see `sites/README.md`). On Railway a `test` domain row per site (e.g. a subdomain of the agency's own domain, CNAMEd to the `publish-sites` service).
 
 ---
 

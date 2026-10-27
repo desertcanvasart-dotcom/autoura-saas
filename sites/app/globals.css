@@ -1,0 +1,9 @@
+/* Step 3 frame only — the archetype themes (step 4) replace this. */
+body { margin: 0; font-family: system-ui, sans-serif; color: #1a1a1a; line-height: 1.5; }
+.site-header, .site-footer, main { max-width: 960px; margin: 0 auto; padding: 16px; }
+.site-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.site-header nav { display: flex; gap: 16px; }
+.site-name { font-weight: 700; text-decoration: none; color: inherit; }
+.site-footer { color: #666; font-size: 14px; }
+.preview-banner, .unpublished { background: #fff4ce; padding: 8px 16px; font-size: 14px; }
+.tour-list { padding-left: 20px; }
