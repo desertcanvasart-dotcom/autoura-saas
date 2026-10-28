@@ -8096,6 +8096,10 @@ export interface Database {
           blocks: Json
           created_at: string
           updated_at: string
+          public_rate: Json | null
+          public_rate_approved_at: string | null
+          public_rate_approved_by: string | null
+          public_rate_approver_name: string | null
         }
         Insert: {
           id?: string
@@ -8106,6 +8110,10 @@ export interface Database {
           blocks: Json
           created_at?: string
           updated_at?: string
+          public_rate?: Json | null
+          public_rate_approved_at?: string | null
+          public_rate_approved_by?: string | null
+          public_rate_approver_name?: string | null
         }
         Update: {
           id?: string
@@ -8116,6 +8124,10 @@ export interface Database {
           blocks?: Json
           created_at?: string
           updated_at?: string
+          public_rate?: Json | null
+          public_rate_approved_at?: string | null
+          public_rate_approved_by?: string | null
+          public_rate_approver_name?: string | null
         }
         Relationships: [
           {

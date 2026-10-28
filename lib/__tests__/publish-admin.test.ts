@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent, lookOf, saveLook, embedSettingsOf, saveEmbedSettings,
-  PublishError, type AdminDeps, type Actor,
+  approvePublicRate, PublishError, type AdminDeps, type Actor,
 } from '@/lib/publish/admin'
 import type { TourFacts } from '@/lib/publish/contract'
+import type { RateProposal } from '@/lib/publish/public-rate'
 
 // ============================================================================
 // The approval workflow (docs/publish/PLAN.md §10, step 7), against an
@@ -87,17 +88,23 @@ const FACTS: TourFacts = {
   days: [{ day: 1, title: 'Giza', city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Great Pyramid'] }],
   mainAttractions: ['Great Pyramid'], highlights: [], inclusions: ['Guide'], exclusions: [], accommodation: [],
   groupSize: null, departureDays: [], departures: [], cancellation: null,
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 70, tier: 'standard', tierLabel: 'Standard' }, byNationality: null, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Standard', fromPrice: 70, bands: [{ minPax: 2, maxPax: 6, perPerson: 70 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 }
 
 let facts: TourFacts
+let proposal: RateProposal
 let deps: AdminDeps
+const PROPOSAL: RateProposal = {
+  currency: 'EUR', tier: 'standard', tierLabel: 'Standard', range: { min: 2, max: 6 },
+  bands: [{ minPax: 2, maxPax: 3, perPerson: 80 }, { minPax: 4, maxPax: 6, perPerson: 70 }], missing: [], reasons: [],
+}
 const revalidate = vi.fn(async () => {})
 
 beforeEach(() => {
   seq = 0
   facts = FACTS
+  proposal = PROPOSAL
   revalidate.mockReset()
   revalidate.mockImplementation(async () => {})
   db = makeDb({
@@ -117,6 +124,7 @@ beforeEach(() => {
   })
   deps = {
     facts: async () => facts,
+    proposal: async () => proposal,
     generate: vi.fn(async () => ({
       status: 'in_review' as const, content: { kind: 'overview' as const, segments: [{ type: 'text' as const, text: 'Stand before the Great Pyramid at first light.' }] },
       check: { ok: true, violations: [], flags: [] }, notes: [], sourcesUsed: [], attempts: 1, model: 'claude-test', promptVersion: 'publish-narrative-v1', facts,
@@ -273,6 +281,34 @@ describe('the review screen\'s data', () => {
     expect(d.narrative.overview).toEqual([{ type: 'text', text: 'Stand before the Great Pyramid at first light.' }])
     expect(d.versions).toHaveLength(1)
     await expectError(pageDetail(db as never, actor, PAGE, 'es', deps), 404, /no es version/)
+  })
+})
+
+describe('the one public price', () => {
+  const page = () => db.tables.publish_pages.find(p => p.id === PAGE)!
+  it('a manager publishes the price they were shown — saved with who and when, and the website refreshed', async () => {
+    const r = await approvePublicRate(db as never, actor, PAGE, PROPOSAL.bands, deps)
+    expect(r.approved).toBe(true)
+    expect(page()).toMatchObject({
+      public_rate: { tier: 'standard', currency: 'EUR', bands: PROPOSAL.bands },
+      public_rate_approved_at: '2026-10-25T12:00:00.000Z', public_rate_approved_by: 'user-1', public_rate_approver_name: 'Mona Manager',
+    })
+    expect(revalidate).toHaveBeenCalled()
+  })
+  it('a price that moved since the manager looked is refused — nothing is saved', async () => {
+    await expectError(approvePublicRate(db as never, actor, PAGE, [{ minPax: 2, maxPax: 6, perPerson: 75 }], deps), 409, /changed since you opened/)
+    expect(page().public_rate).toBeUndefined()
+  })
+  it('a proposal with uncovered group sizes cannot be published — the reasons are given', async () => {
+    proposal = { ...PROPOSAL, bands: [], missing: [5, 6], reasons: ['No price for 5\u20136 travellers — enter the rates these group sizes need.'] }
+    await expectError(approvePublicRate(db as never, actor, PAGE, PROPOSAL.bands, deps), 409, /cannot be published yet: No price for 5–6 travellers/)
+  })
+  it('the review screen shows the approved price and whether the rates still give it', async () => {
+    expect((await pageDetail(db as never, actor, PAGE, 'en', deps)).rate).toMatchObject({ status: 'none', saved: null })
+    await approvePublicRate(db as never, actor, PAGE, PROPOSAL.bands, deps)
+    expect((await pageDetail(db as never, actor, PAGE, 'en', deps)).rate).toMatchObject({ status: 'in_step', saved: { approverName: 'Mona Manager' } })
+    proposal = { ...PROPOSAL, bands: [{ minPax: 2, maxPax: 6, perPerson: 90 }] }
+    expect((await pageDetail(db as never, actor, PAGE, 'en', deps)).rate).toMatchObject({ status: 'changed', saved: { bands: PROPOSAL.bands } })
   })
 })
 

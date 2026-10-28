@@ -6,9 +6,8 @@
 //   * the canonical address and hreflang links (+ x-default = English), on
 //     the site's primary hostname only;
 //   * JSON-LD — TravelAgency, TouristTrip with its Offer(s), BreadcrumbList —
-//     stating ONLY what the payload holds. The offer's price is the very
-//     number the page shows (shownAmount), and EU / other-nationality prices
-//     appear as two offers only when the rates differ (Q5). No reviews or
+//     stating ONLY what the payload holds. ONE Offer: the tour's public
+//     "from", the very number the cards show (shownAmount). No reviews or
 //     ratings (Phase 1);
 //   * robots.txt per hostname: open only on a live site's primary hostname;
 //   * a sitemap index and one sitemap per language, with hreflang.
@@ -90,21 +89,16 @@ export function structuredData(page: PagePayload): Json[] {
       })),
     }
   }
+  // One public rate: one Offer, at the tour's "from" — never one per nationality.
   const price = facts?.price
-  if (price?.status === 'available') {
-    const offer = (amount: number, name: string | undefined): Json => prune({
+  if (price?.status === 'available' && price.fromPrice !== null) {
+    trip.offers = prune({
       '@type': 'Offer',
-      name,
-      price: shownAmount(amount),
+      price: shownAmount(price.fromPrice),
       priceCurrency: price.currency,
       url,
       availability: 'https://schema.org/InStock',
     })
-    if (price.byNationality) {
-      trip.offers = [offer(price.byNationality.eu, t(page.language, 'euPassport')), offer(price.byNationality.other, t(page.language, 'otherNationalities'))]
-    } else if (price.from) {
-      trip.offers = offer(price.from.perPerson, undefined)
-    }
   }
   blocks.push(prune(trip))
 

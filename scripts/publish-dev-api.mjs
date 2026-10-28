@@ -134,13 +134,13 @@ function facts(kind, currency, plan) {
     ...(PLANS[plan] ?? {}),
   }
   if (kind === 'on_request') {
-    return { ...base, price: { status: 'on_request', currency, basis: { pax: 2, season: 'lowest' }, from: null, byNationality: null, table: [], indicative: [] },
-      publishable: { ok: false, reasons: ['No tier of the tour has a complete price — every rate it needs must be entered.'] } }
+    return { ...base, price: { status: 'on_request', currency, tierLabel: null, fromPrice: null, bands: [], indicative: [] },
+      publishable: { ok: false, reasons: ['The tour has no public price yet — review the price and publish it.'] } }
   }
-  return { ...base, price: { status: 'available', currency, basis: { pax: 2, season: 'lowest' },
-    from: { perPerson: 840.4, tier: 'deluxe', tierLabel: 'Deluxe' }, byNationality: { eu: 910, other: 840.4 },
-    table: [{ pax: 2, perPerson: null, eu: 910, other: 840.4 }, { pax: 4, perPerson: null, eu: 802.5, other: 735 }, { pax: 6, perPerson: null, eu: 760, other: 698.25 }],
-    indicative: [{ currency: 'USD', perPerson: 905, rateDate: '2026-10-25' }] } }
+  // One public rate: per person for every count in the group size (2–12).
+  return { ...base, price: { status: 'available', currency, tierLabel: 'Deluxe', fromPrice: 698.25,
+    bands: [{ minPax: 2, maxPax: 3, perPerson: 910 }, { minPax: 4, maxPax: 5, perPerson: 802.5 }, { minPax: 6, maxPax: 12, perPerson: 698.25 }],
+    indicative: [{ currency: 'USD', rate: 1.075, rateDate: new Date().toISOString().slice(0, 10) }] } }
 }
 
 const byId = Object.fromEntries(Object.values(SITES).map(s => [s.id, s]))
@@ -174,7 +174,7 @@ function page(s, lang, path, preview) {
   const placeSlug = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
   const factsOf = t => facts(t.price ?? 'on_request', 'EUR', t.plan)
   const cardFor = f => ({ days: f.durationDays, nights: f.durationNights, cities: [...new Set(f.days.map(d => d.city).filter(Boolean))],
-    from: f.price.status === 'available' && f.price.from ? { amount: f.price.from.perPerson, currency: f.price.currency } : null, image: f.images[0] ?? null })
+    from: f.price.status === 'available' && f.price.fromPrice !== null ? { amount: f.price.fromPrice, currency: f.price.currency } : null, image: f.images[0] ?? null })
   const links = list.map(t => ({ title: t.name, path: `tours/${slugIn(t, lang)}`, card: cardFor(factsOf(t)) }))
   const places = new Map()
   for (const t of list) for (const c of cardFor(factsOf(t)).cities) {

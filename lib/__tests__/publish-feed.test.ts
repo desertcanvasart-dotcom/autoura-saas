@@ -66,7 +66,7 @@ describe('the feed key', () => {
 describe('a tour in the feed', () => {
   it('carries the records\' facts and the approved text as plain text', () => {
     const facts = { days: [{ day: 1, title: 'Giza', city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: [] }],
-      price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 99, tier: 's', tierLabel: 'Standard' }, byNationality: null, table: [], indicative: [] },
+      price: { status: 'available', currency: 'EUR', tierLabel: 'Standard', fromPrice: 99, bands: [{ minPax: 2, maxPax: 6, perPerson: 99 }], indicative: [] },
       durationDays: 1, durationNights: 0 } as unknown as TourFacts
     const page = {
       kind: 'tour', language: 'en', path: 'tours/giza-day', title: 'Giza day',

@@ -20,7 +20,7 @@ const FACTS: TourFacts = {
   mainAttractions: ['Karnak Temple'], highlights: [], inclusions: ['Guide'], exclusions: [],
   accommodation: [{ kind: 'hotel', name: 'Winter Palace', city: 'Luxor' }],
   groupSize: null, departureDays: [], departures: [], cancellation: null,
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 500, tier: 'standard', tierLabel: 'Standard' }, byNationality: null, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Standard', fromPrice: 500, bands: [{ minPax: 2, maxPax: 6, perPerson: 500 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 }
 const NAME = 'Luxor and Aswan'

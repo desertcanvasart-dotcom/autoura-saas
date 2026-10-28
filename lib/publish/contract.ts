@@ -29,7 +29,7 @@ import { ARCHETYPES } from './brand'
  * deploy (it sits under a different cache key) — and the app can refuse a
  * renderer that is a version behind.
  */
-export const CONTRACT_VERSION = 4
+export const CONTRACT_VERSION = 5
 
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
@@ -91,7 +91,7 @@ const tourCard = z.object({
   days: z.number().int().nonnegative(),
   nights: z.number().int().nonnegative(),
   cities: z.array(z.string()),
-  /** The tour page's "from" (per person, 2 sharing); null = price on request. */
+  /** The tour's public "from": its lowest per-person price; null = price on request. */
   from: z.object({ amount: money, currency: z.string() }).nullable(),
   /** The agency's own first photo, if it has one. */
   image: z.string().nullable(),
@@ -104,11 +104,11 @@ const weekday = z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
  * (docs/publish/PLAN.md §8). Nothing here is written for the page: an absent
  * fact is absent (null / empty), never filled in.
  *
- * Prices (decisions Q4/Q4b/Q5, 2026-10-25): per person for 2 travellers
- * sharing, at the agency's house margin, lowest season (no travel date); a
- * table for 2/4/6; EU and other-nationality prices when the rates differ.
- * An amount appears ONLY from a tier the engine priced completely (D7):
- * otherwise the status is `on_request` and there is no number at all.
+ * Price: the tour's ONE public rate (operator brief 2026-10-28) — the bands a
+ * manager approved (lib/publish/public-rate.ts): a per-person price for every
+ * traveller count in the group size, the same for every visitor. Nothing
+ * here is, or can carry, a nationality, passport or residence figure. No
+ * approved rate = `on_request`, with no number at all.
  */
 export const tourFactsSchema = z.object({
   durationDays: z.number().int().positive(),
@@ -143,20 +143,28 @@ export const tourFactsSchema = z.object({
   price: z.object({
     status: z.enum(['available', 'on_request']),
     currency: z.string().regex(/^[A-Z]{3}$/),
-    basis: z.object({ pax: z.literal(2), season: z.literal('lowest') }),
-    from: z.object({ perPerson: money, tier: z.string(), tierLabel: z.string() }).nullable(),
-    byNationality: z.object({ eu: money, other: money }).nullable(),
-    table: z.array(z.object({ pax: z.number().int().positive(), perPerson: money.nullable(), eu: money.nullable(), other: money.nullable() })),
+    /** The tier the rate is for, in the agency's words ("Deluxe"). */
+    tierLabel: z.string().nullable(),
+    /** The lowest per-person price across the bands: "From X per person". */
+    fromPrice: money.nullable(),
+    /** Per person by traveller count, contiguous from the fewest to the most. */
+    bands: z.array(z.object({ minPax: z.number().int().positive(), maxPax: z.number().int().positive(), perPerson: money })),
     /** Display-only conversions, labelled indicative: the customer pays in `currency`. */
-    indicative: z.array(z.object({ currency: z.string().regex(/^[A-Z]{3}$/), perPerson: money, rateDate: z.string() })),
-  }),
+    indicative: z.array(z.object({ currency: z.string().regex(/^[A-Z]{3}$/), rate: z.number().positive().finite(), rateDate: z.string() })),
+  }).strict(),
   /** The thin-page rule (D7): whether this tour may be published, and why not. */
   publishable: z.object({ ok: z.boolean(), reasons: z.array(z.string()) }),
 }).superRefine((f, ctx) => {
   // The one rule, enforced at the boundary too: no amount without a complete price.
-  if (f.price.status !== 'available' && (f.price.from || f.price.byNationality || f.price.table.length || f.price.indicative.length)) {
-    ctx.addIssue({ code: 'custom', message: 'a price on request carries no amount' })
+  const p = f.price
+  if (p.status !== 'available') {
+    if (p.fromPrice !== null || p.bands.length || p.indicative.length) ctx.addIssue({ code: 'custom', message: 'a price on request carries no amount' })
+    return
   }
+  // One public rate: contiguous bands, and "from" is their lowest price.
+  const contiguous = p.bands.length > 0 && p.bands.every((b, i) => b.minPax <= b.maxPax && (i === 0 || b.minPax === p.bands[i - 1].maxPax + 1))
+  if (!contiguous) ctx.addIssue({ code: 'custom', message: 'an available price needs contiguous bands' })
+  else if (p.fromPrice !== Math.min(...p.bands.map(b => b.perPerson))) ctx.addIssue({ code: 'custom', message: '"from" must be the lowest band price' })
 })
 export type TourFacts = z.infer<typeof tourFactsSchema>
 

@@ -18,13 +18,13 @@ import { BrandMark } from '../blocks/BrandMark'
 import { LanguageLinks } from '../blocks/LanguageLinks'
 import { EnquiryForm } from '../blocks/EnquiryForm'
 import { Reviews } from '../blocks/Reviews'
-import { CancellationSection, DeparturesSection, PriceSection } from '../blocks/TourFacts'
+import { CancellationSection, DeparturesSection } from '../blocks/TourFacts'
 import { agencyWebsite, emailHref, phoneHref, whatsappHref } from '../blocks/contact'
 import { narrativeText, paragraphs } from '../blocks/narrative'
 import { formatWeekdays } from '../blocks/format'
 import { colon, countOf, t } from '../../i18n/strings'
 import { photoFor, tourPhotos, type Photo } from '../../lib/photos'
-import { PriceExplorer } from './PriceExplorer'
+import { PriceStepper } from '../blocks/PriceStepper'
 import { RouteMap } from './RouteMap'
 import { TourFinder, type FinderTour } from './TourFinder'
 import s from './theme.module.css'
@@ -271,9 +271,6 @@ function TourPage({ page }: ThemePageProps) {
             </section>
           )}
           <Reviews page={page} />
-          {/* Every price in full — both nationalities, each group size, the
-              basis — readable without script; the card beside it is the quick view. */}
-          {facts && <div className={s.block} data-section="price"><PriceSection facts={facts} lang={lang} variant="compact" /></div>}
           {facts && <div className={s.block} data-section="departures"><DeparturesSection facts={facts} lang={lang} variant="compact" /></div>}
           {facts && <div className={s.block} data-section="terms"><CancellationSection facts={facts} lang={lang} variant="compact" /></div>}
           <div className={s.block} data-section="enquiry"><EnquiryForm page={page} variant="compact" /></div>
@@ -281,7 +278,8 @@ function TourPage({ page }: ThemePageProps) {
         {facts && (
           <aside className={s.side}>
             <div className={s.sticky}>
-              <PriceExplorer price={facts.price} lang={lang} />
+              {/* The one public price: per person and total for the chosen group. */}
+              <div className={s.priceCard} data-section="price"><PriceStepper price={facts.price} lang={lang} /></div>
               <a className={s.pillDark} href="#enquire">{t(lang, 'enquireGeneral')}</a>
               {whatsappHref(page) && <a className={s.ghost} href={whatsappHref(page)!} rel="nofollow">{t(lang, 'askOnWhatsApp')}</a>}
             </div>
@@ -354,7 +352,7 @@ export const modern: Theme = {
   description: 'Sleek and photo-led for any palette: a bold colour hero, a route map, a day-by-day timeline and a price for your group.',
   // The order the page draws its sections in (TourPage); the price card
   // beside them is a quick view of the 'price' section, not a second one.
-  tourSections: ['hero', 'groupSize', 'overview', 'highlights', 'itinerary', 'inclusions', 'accommodation', 'price', 'departures', 'terms', 'enquiry'],
+  tourSections: ['hero', 'groupSize', 'overview', 'highlights', 'itinerary', 'inclusions', 'accommodation', 'departures', 'terms', 'enquiry', 'price'],
   Frame,
   Page,
 }

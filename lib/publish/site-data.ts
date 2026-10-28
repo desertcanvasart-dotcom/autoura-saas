@@ -79,7 +79,7 @@ export function cardOf(facts: TourFacts, labels: Record<string, string> = {}): C
     days: facts.durationDays,
     nights: facts.durationNights,
     cities: cities.map(c => labels[c] ?? c),
-    from: facts.price.status === 'available' && facts.price.from ? { amount: facts.price.from.perPerson, currency: facts.price.currency } : null,
+    from: facts.price.status === 'available' && facts.price.fromPrice !== null ? { amount: facts.price.fromPrice, currency: facts.price.currency } : null,
     image: facts.images[0] ?? null,
   }
 }

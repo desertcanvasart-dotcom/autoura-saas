@@ -26,7 +26,7 @@ const FACTS = {
   inclusions: ['Four nights with breakfast', '2 bottles of water a day'], exclusions: ['Tips'],
   accommodation: [{ kind: 'hotel', name: 'Sandbox Lotus Inn Cairo', city: 'Cairo' }],
   groupSize: { min: 2, max: 16 }, departureDays: ['sat'], departures: [], cancellation: null,
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 441, tier: 'budget', tierLabel: 'Budget' }, byNationality: null, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Budget', fromPrice: 441, bands: [{ minPax: 2, maxPax: 6, perPerson: 441 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 } as unknown as TourFacts
 
@@ -121,7 +121,7 @@ describe('on the page', () => {
     expect(t.days[0]).toMatchObject({ title: 'Arrival in Cairo', city: 'Le Caire' })
     expect(t.inclusions).toEqual(['Quatre nuits avec petit-déjeuner', '2 bottles of water a day'])
     expect(t.accommodation[0]).toEqual({ kind: 'hotel', name: 'Sandbox Lotus Inn Cairo', city: 'Le Caire' })
-    expect(t.price).toEqual({ ...FACTS.price, from: { ...FACTS.price.from!, tierLabel: 'Économique' } })
+    expect(t.price).toEqual({ ...FACTS.price, tierLabel: 'Économique' })
     expect({ ...t, days: FACTS.days, inclusions: FACTS.inclusions, accommodation: FACTS.accommodation, price: FACTS.price, mainAttractions: FACTS.mainAttractions, highlights: FACTS.highlights, exclusions: FACTS.exclusions }).toEqual(FACTS)
   })
 

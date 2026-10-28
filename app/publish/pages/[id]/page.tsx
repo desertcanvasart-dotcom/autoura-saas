@@ -36,9 +36,17 @@ interface Detail {
   page: { id: string; kind: string; tourName: string; languages: string[] }
   locale: { id: string; language: string; slug: string; is_published: boolean; current_version_id: string | null }
   facts: null | { days: Array<{ day: number; title: string | null; city: string | null }>; publishable: { ok: boolean; reasons: string[] }; price: { status: string } }
+  rate: null | RateView
   narrative: { overview: Seg[] | null; highlights: Seg[][] | null; days: Array<{ day: number }>; seo: unknown; labels?: Record<string, string>; stale: string[] }
   drafts: Draft[]
   versions: Array<{ id: string; version_no: number; reason: string; approver_name: string | null; approved_at: string }>
+}
+
+type Band = { minPax: number; maxPax: number; perPerson: number }
+interface RateView {
+  proposal: { currency: string; tier: string | null; tierLabel: string | null; range: { min: number; max: number } | null; bands: Band[]; missing: number[]; reasons: string[] }
+  saved: { tier: string; currency: string; bands: Band[]; approvedAt: string | null; approverName: string | null } | null
+  status: 'none' | 'in_step' | 'changed'
 }
 
 const LANGUAGE_NAME: Record<string, string> = { fr: 'French', es: 'Spanish' }
@@ -150,6 +158,70 @@ function ContentEditor({ content, onChange, dayTitles }: { content: Content; onC
         </div>
       )
   }
+}
+
+const money = (n: number, currency: string) =>
+  new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 0 }).format(Math.round(n))
+const paxLabel = (b: Band) => (b.minPax === b.maxPax ? `${b.minPax}` : `${b.minPax}\u2013${b.maxPax}`)
+
+function BandList({ bands, currency }: { bands: Band[]; currency: string }) {
+  return (
+    <table className="mt-2 text-sm">
+      <thead><tr className="text-left text-gray-500"><th className="pr-6 font-normal">Travellers</th><th className="font-normal">Per person</th></tr></thead>
+      <tbody>{bands.map(b => <tr key={b.minPax}><td className="pr-6">{paxLabel(b)}</td><td className="font-medium">{money(b.perPerson, currency)}</td></tr>)}</tbody>
+    </table>
+  )
+}
+
+/** The tour's one public price: today's proposal, what is approved, and approving it. */
+function PublicPriceCard({ pageId, rate, canManage, onDone }: { pageId: string; rate: RateView; canManage: boolean; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const p = rate.proposal
+  const ready = p.reasons.length === 0 && p.bands.length > 0
+  async function approve() {
+    setBusy(true)
+    try {
+      const r = await call(`/api/publish/pages/${pageId}/rate`, { method: 'POST', body: JSON.stringify({ bands: p.bands }) })
+      showToast('success', r.warning ?? 'Public price published')
+      onDone()
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : 'Failed')
+      onDone()
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+      <div>
+        <h3 className="font-medium text-gray-900">Public price</h3>
+        <p className="text-sm text-gray-500">Every visitor sees one price per person for their group size — never a price by nationality. It is worked out from your rates at the higher of the EU and other-nationality figures, for every group size the tour allows, and goes on the website only when you publish it.</p>
+      </div>
+      {rate.saved && (
+        <div className={`text-sm rounded-md border p-3 ${rate.status === 'changed' ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}>
+          <p className="font-medium text-gray-900">
+            On the website{rate.saved.approvedAt ? ` since ${new Date(rate.saved.approvedAt).toLocaleDateString()}` : ''}{rate.saved.approverName ? `, approved by ${rate.saved.approverName}` : ''}
+          </p>
+          {rate.status === 'changed' && <p className="text-amber-800 flex items-center gap-1"><AlertTriangle className="h-4 w-4" />Your rates now give a different price. The website keeps the approved one until you publish the new one.</p>}
+          {rate.status === 'in_step' && <p className="text-gray-500">In step with your rates.</p>}
+          <BandList bands={rate.saved.bands} currency={rate.saved.currency} />
+        </div>
+      )}
+      {rate.status !== 'in_step' && (
+        <div className="text-sm">
+          <p className="font-medium text-gray-900">{rate.saved ? 'New price from your rates' : 'Price from your rates'}{p.tierLabel ? ` · ${p.tierLabel}` : ''}{p.range ? ` · ${p.range.min}\u2013${p.range.max} travellers` : ''}</p>
+          {p.reasons.length > 0
+            ? <ul className="mt-1 text-amber-800 list-disc pl-5">{p.reasons.map(r => <li key={r}>{r}</li>)}</ul>
+            : <BandList bands={p.bands} currency={p.currency} />}
+          {canManage && (
+            <button onClick={approve} disabled={busy || !ready} className="mt-3 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+              {busy ? 'Publishing…' : 'Publish this price'}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  )
 }
 
 function PartCard({ part, label, help, detail, canWrite, canManage, onDone }: {
@@ -307,7 +379,7 @@ export default function PublishPageReview({ params }: { params: Promise<{ id: st
           <p className="font-medium text-gray-900">{detail.locale.is_published ? 'Published in this language' : 'Not published in this language'}</p>
           {f && !f.publishable.ok
             ? <ul className="mt-1 text-amber-800 list-disc pl-5">{f.publishable.reasons.map(r => <li key={r}>{r}</li>)}</ul>
-            : <p className="text-gray-500">Facts, prices and terms always come straight from your records{f?.price.status === 'on_request' ? ' (price on request)' : ''}.</p>}
+            : <p className="text-gray-500">Facts and terms come straight from your records; the price is the public price you published.</p>}
         </div>
         {canManage && (
           <button onClick={togglePublished} disabled={!detail.locale.is_published && !!f && !f.publishable.ok}
@@ -316,6 +388,8 @@ export default function PublishPageReview({ params }: { params: Promise<{ id: st
           </button>
         )}
       </section>
+
+      {detail.rate && <PublicPriceCard pageId={detail.page.id} rate={detail.rate} canManage={canManage} onDone={load} />}
 
       {PARTS.filter(p => p.part !== 'labels' || lang !== 'en').map(p => (
         <PartCard key={`${p.part}-${lang}`} {...p} label={p.part === 'labels' ? `Tour wording in ${LANGUAGE_NAME[lang] ?? lang.toUpperCase()}` : p.label}

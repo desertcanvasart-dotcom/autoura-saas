@@ -35,7 +35,7 @@ const FACTS = {
   days: [{ day: 1, title: 'Giza', city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Great Sphinx'] }],
   mainAttractions: [], highlights: ['Camel ride'], inclusions: ['Guide'], exclusions: ['Tips'], accommodation: [],
   groupSize: null, departureDays: ['sat'], departures: [], cancellation: null,
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 99.2, tier: 'standard', tierLabel: 'Standard' }, byNationality: null, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Standard', fromPrice: 99.2, bands: [{ minPax: 2, maxPax: 6, perPerson: 99.2 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 } as unknown as TourFacts
 

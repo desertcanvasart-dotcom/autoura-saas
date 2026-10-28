@@ -27,7 +27,7 @@ export const SLOT_MEANING: Record<SlotKey, string> = {
 export function availableSlots(facts: TourFacts | null): SlotKey[] {
   if (!facts) return []
   const out: SlotKey[] = ['duration']
-  if (facts.price.status === 'available' && facts.price.from) out.push('price_from')
+  if (facts.price.status === 'available' && facts.price.fromPrice !== null) out.push('price_from')
   if (facts.groupSize && (facts.groupSize.min !== null || facts.groupSize.max !== null)) out.push('group_size')
   if (facts.departureDays.length > 0) out.push('departure_days')
   if (facts.departures.some(d => d.status !== 'full')) out.push('next_departure')
