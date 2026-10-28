@@ -41,9 +41,12 @@ export default function PublishEmbedPage() {
   const [originsText, setOriginsText] = useState('')
   const [lang, setLang] = useState('en')
   const [saving, setSaving] = useState(false)
+  const [feed, setFeed] = useState<{ exists: boolean; prefix: string | null; createdAt: string | null } | null>(null)
+  const [freshKey, setFreshKey] = useState<string | null>(null)
 
   async function load() {
-    const [s, o] = await Promise.all([fetch('/api/publish/embed').then(r => r.json()), fetch('/api/publish/overview').then(r => r.json())])
+    const [s, o, fk] = await Promise.all([fetch('/api/publish/embed').then(r => r.json()), fetch('/api/publish/overview').then(r => r.json()), fetch('/api/publish/feed-key').then(r => r.json())])
+    if (fk.success) setFeed(fk.data)
     if (!s.success) return showToast('error', s.error)
     setSettings(s.data)
     setOriginsText(s.data.origins.join('\n'))
@@ -72,6 +75,14 @@ export default function PublishEmbedPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function makeFeedKey() {
+    if (feed?.exists && !confirm('Make a new key? The old key stops working at once — your developer must use the new one.')) return
+    const j = await fetch('/api/publish/feed-key', { method: 'POST' }).then(r => r.json())
+    if (!j.success) return showToast('error', j.error)
+    setFreshKey(j.data.key)
+    await load()
   }
 
   const loader = useMemo(() => settings?.key && settings.rendererUrl
@@ -134,6 +145,27 @@ export default function PublishEmbedPage() {
       ) : (
         <p className="text-sm text-gray-500">{settings.rendererUrl ? 'Add your website above and save — your code appears here.' : 'The website renderer is not set up for this installation (PUBLISH_RENDERER_URL).'}</p>
       )}
+
+      <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+        <h2 className="font-medium text-gray-900">For your developer: the data feed</h2>
+        <p className="text-sm text-gray-600">If a developer builds your website, they can read your published tours — live prices, facts and approved text — as data. Give them this key; keep it private (it is for their server, not for a web page).</p>
+        {freshKey ? (
+          <div className="space-y-2">
+            <p className="text-sm text-amber-800">Copy it now — it is shown only once.</p>
+            <Snippet label="Feed key" help="Authorization: Bearer <key>" code={freshKey} />
+          </div>
+        ) : feed?.exists ? (
+          <p className="text-sm text-gray-600">A key is in use (starts <span className="font-mono">{feed.prefix}…</span>{feed.createdAt ? `, made ${new Date(feed.createdAt).toLocaleDateString()}` : ''}).</p>
+        ) : null}
+        {settings.rendererUrl && (
+          <Snippet label="Example" help="Your tours, in English" code={`curl -H "Authorization: Bearer <your key>" "${typeof window !== 'undefined' ? window.location.origin : ''}/api/publish/feed/v1/tours?lang=en"`} />
+        )}
+        {canManage && (
+          <button type="button" onClick={makeFeedKey} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md border border-gray-300">
+            <RefreshCw className="h-4 w-4" />{feed?.exists ? 'Make a new key' : 'Make a key'}
+          </button>
+        )}
+      </section>
     </div>
   )
 }
