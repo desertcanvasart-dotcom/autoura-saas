@@ -49,9 +49,16 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   // The address search engines are given: the site's primary hostname, with
   // every language version and x-default (step 9). None before it has one.
   const links = alternateLinks(page)
+  // Pages without approved SEO text still get a description: the agency's
+  // own tagline, else its name and the place or tour — never invented copy.
+  const fallback = page.kind === 'destination' && page.destination
+    ? `${page.destination.name} · ${page.site.companyName}`
+    : page.kind === 'tour' ? `${page.title} · ${page.site.companyName}`
+    : page.site.identity.tagline ?? page.site.companyName
   return {
     title,
-    description: seo?.description,
+    description: seo?.description ?? fallback,
+    icons: { icon: '/icon.svg' },
     // A test hostname, or a page not yet published, is never indexed.
     robots: preview || page.unpublished ? { index: false, follow: false } : undefined,
     ...(links ? {
