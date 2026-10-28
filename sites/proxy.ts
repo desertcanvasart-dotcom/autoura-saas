@@ -63,5 +63,5 @@ export const config = {
   // worker's revalidate call, the enquiry form and WhatsApp button
   // (sites/app/api/*), robots.txt, the sitemaps and the embed loader —
   // which resolve the hostname (or embed key) themselves.
-  matcher: ['/((?!_next/|api/|robots\\.txt|sitemap\\.xml|sitemaps/|embed\\.js).*)'],
+  matcher: ['/((?!_next/|api/|robots\\.txt|sitemap\\.xml|sitemaps/|embed\\.js|icon\\.svg|favicon\\.ico).*)'],
 }

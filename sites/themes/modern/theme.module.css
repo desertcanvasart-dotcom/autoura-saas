@@ -194,14 +194,14 @@
 }
 
 /* ---------- footer ---------- */
-.footer { background: color-mix(in srgb, var(--brand-primary) 92%, black); color: #fff; padding: 48px 0 32px; margin-top: 24px; }
+.footer { background: color-mix(in srgb, var(--brand-primary) 92%, black); color: var(--brand-on-primary); padding: 48px 0 32px; margin-top: 24px; }
 .footerGrid { display: grid; gap: 24px; }
 @media (min-width: 720px) { .footerGrid { grid-template-columns: 1fr auto; } }
 .footerName { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin: 0 0 6px; }
-.footerTagline { margin: 0; opacity: 0.8; max-width: 40ch; }
+.footerTagline { margin: 0; max-width: 40ch; }
 .footerContact { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .footerContact a { text-decoration: none; }
-.licence { margin: 28px 0 0; font-size: 13px; opacity: 0.7; }
+.licence { margin: 28px 0 0; font-size: 13px; }
 
 @media (prefers-reduced-motion: reduce) {
   .strip { animation: none; }

@@ -30,6 +30,7 @@ import { publishTags } from './sync/events'
 import { ARCHETYPES, ARCHETYPE_DEFAULTS, FONT_PAIRS, PALETTE_PRESETS, resolveBrand, type Archetype } from './brand'
 import { MAX_ORIGINS, embedOf, newEmbedKey, normalizeOrigin } from './embed'
 import { placeReviews, reviewsSettingsOf, searchPlaces } from './reviews'
+import { feedOf, hashFeedKey, newFeedKey } from './feed'
 import type { DnsRecord, DomainProvider, DomainState } from './domains/provider'
 import { railwayConfigFromEnv, railwayProvider } from './domains/railway'
 import { normalizeHost } from './site-data'
@@ -722,4 +723,22 @@ export async function saveReviews(db: Db, actor: Actor, input: { placeId: unknow
   const { error } = await db.from('publish_sites').update({ settings }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not save: ${error.message}`, 500)
   return { placeId, show: placeId ? input.show !== false : false, warning: await refresh(deps, actor.tenantId) }
+}
+
+// ---------- the data feed's key (lib/publish/feed.ts) ----------
+
+export async function feedKeyOf(db: Db, actor: Actor) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const f = feedOf(site!.settings)
+  return { exists: f !== null, prefix: f?.prefix ?? null, createdAt: f?.created_at ?? null }
+}
+
+/** Make a new key: returned ONCE, stored only as its hash; the old one stops. */
+export async function newFeedKeyFor(db: Db, actor: Actor, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const key = newFeedKey()
+  const settings = { ...((site!.settings ?? {}) as Record<string, unknown>), feed: { hash: hashFeedKey(key), prefix: key.slice(0, 10), created_at: deps.now().toISOString() } }
+  const { error } = await db.from('publish_sites').update({ settings }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not make the key: ${error.message}`, 500)
+  return { key, prefix: key.slice(0, 10) }
 }

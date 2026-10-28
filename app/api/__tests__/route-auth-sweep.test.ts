@@ -52,6 +52,9 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   '/api/integrations/': ['SAWA_SYNC_SECRET'],
   // The Publish site renderer (sites/) → internal page data; bearer secret.
   '/api/publish/internal/': ['PUBLISH_INTERNAL_SECRET'],
+  // Agencies' developers → the data feed; the site's feed key, checked by
+  // feedSite (app/api/publish/feed/v1/_auth.ts → lib/publish/feed.ts).
+  '/api/publish/feed/': ['feedSite'],
   '/api/auth/': null, // OAuth callbacks / pre-session by nature (state verified in-handler)
   '/api/cron/': ['CRON_SECRET'],
   '/api/version': null, // sha + uptime only, public by design
