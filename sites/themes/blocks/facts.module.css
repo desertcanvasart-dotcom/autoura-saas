@@ -15,13 +15,6 @@
 
 .price { padding: 20px; border-radius: 12px; margin: 16px 0; background: color-mix(in srgb, var(--brand-surface) 90%, var(--brand-primary)); }
 .editorial.price { border-radius: 2px; text-align: center; background: transparent; border: 1px solid color-mix(in srgb, var(--brand-accent) 50%, transparent); }
-.from { font-size: 18px; margin: 0 0 6px; }
-.from strong, .nationality strong { font-family: var(--font-display); font-size: 32px; color: var(--brand-primary); }
-.nationality { display: grid; gap: 12px; grid-template-columns: 1fr; margin: 0 0 8px; }
-@media (min-width: 600px) { .nationality { grid-template-columns: 1fr 1fr; } }
-.nationality dt { font-size: 14px; font-weight: 600; }
-.nationality dd { margin: 2px 0 0; }
-.priceOnRequest { font-family: var(--font-display); font-size: 24px; margin: 0 0 4px; color: var(--brand-primary); }
 
 .table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 15px; }
 .table caption { text-align: start; font-weight: 600; margin-bottom: 6px; }

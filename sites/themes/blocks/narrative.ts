@@ -13,7 +13,7 @@ export function slotText(slot: string, facts: TourFacts, lang: string): string |
   switch (slot) {
     case 'price_from': {
       const p = facts.price
-      return p.status === 'available' && p.from ? `${formatPrice(p.from.perPerson, p.currency, lang)} ${t(lang, 'perPerson')}` : null
+      return p.status === 'available' && p.fromPrice !== null ? `${formatPrice(p.fromPrice, p.currency, lang)} ${t(lang, 'perPerson')}` : null
     }
     case 'duration':
       return facts.durationNights > 0

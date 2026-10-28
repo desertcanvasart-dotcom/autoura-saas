@@ -25,7 +25,7 @@ describe('the supported languages', () => {
   })
 
   // Words that are the same in the language (or a brand-neutral label).
-  const SAME: Partial<Record<string, StringKey[]>> = { fr: ['contact', 'menu', 'licensed', 'destinationLabel'], es: [] }
+  const SAME: Partial<Record<string, StringKey[]>> = { fr: ['contact', 'menu', 'licensed', 'destinationLabel', 'total'], es: ['total'] }
   for (const [lang, dict] of [['fr', fr], ['es', es]] as const) {
     it(`${lang}: every word is there, filled in, and actually translated`, () => {
       for (const key of Object.keys(dict) as StringKey[]) {
@@ -67,8 +67,8 @@ const FACTS = {
   mainAttractions: [], highlights: ['Giza Pyramids'], inclusions: ['Guide'], exclusions: ['Visa'], accommodation: [],
   groupSize: { min: 2, max: 12 }, departureDays: ['sat'], departures: [],
   cancellation: { tiers: [{ daysBefore: 30, chargePercent: 25 }], wording: null },
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 440.2, tier: 'standard', tierLabel: 'Standard' },
-    byNationality: { eu: 440.2, other: 425.5 }, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Standard', fromPrice: 425.5,
+    bands: [{ minPax: 2, maxPax: 3, perPerson: 440.2 }, { minPax: 4, maxPax: 12, perPerson: 425.5 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 } as unknown as TourFacts
 
@@ -91,12 +91,12 @@ describe('a French tour page', () => {
       const page = frenchTourPage(archetype)
       const html = renderToStaticMarkup(<theme.Frame page={page} preview={false}><theme.Page page={page} preview={false} /></theme.Frame>)
       const text = html.replace(/<[^>]+>/g, ' ').replace(/[ \t\r\n]+/g, ' ')
-      for (const word of ['Itinéraire', 'Ce qui est inclus', 'Non inclus', 'Titulaires d’un passeport de l’UE', 'Autres nationalités', 'Envoyer la demande', '5 jours · 4 nuits', 'Départs\u202f: samedi']) {
+      for (const word of ['Itinéraire', 'Ce qui est inclus', 'Non inclus', 'Voyageurs', 'Moins cher par personne pour les groupes plus grands', 'Envoyer la demande', '5 jours · 4 nuits', 'Départs\u202f: samedi']) {
         expect(text, word).toContain(word)
       }
       expect(text).toContain('441 €')
       expect(text).toContain('30 jours ou moins avant le départ : 25 % retenus en cas d’annulation')
-      for (const english of ['Itinerary', 'What is included', 'Not included', 'per person', 'Send enquiry', 'EU passport holders']) {
+      for (const english of ['Itinerary', 'What is included', 'Not included', 'per person', 'Send enquiry', 'EU passport holders', 'nationalit', 'Lower per person']) {
         expect(text, english).not.toContain(english)
       }
     })

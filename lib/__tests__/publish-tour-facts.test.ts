@@ -4,9 +4,9 @@ import { tourFactsSchema } from '@/lib/publish/contract'
 
 // ============================================================================
 // A tour's facts for its Publish page (docs/publish/PLAN.md §8, step 5).
-// Every figure from the records and the engine; an amount ONLY from a tier
-// priced completely (D7); prices per the 2026-10-25 decisions — 2 sharing,
-// 2/4/6 table, EU vs other nationalities, house margin, lowest season.
+// Every figure from the records. The price is the tour's ONE public rate —
+// the bands a manager approved (lib/publish/public-rate.ts) — never the
+// engine's live answer and never a nationality figure (brief 2026-10-28).
 // ============================================================================
 
 const TODAY = new Date('2026-10-25T10:00:00Z')
@@ -43,6 +43,7 @@ function input(over: Partial<FactsInput> = {}): FactsInput {
     tierLabels: new Map([['standard', 'Standard'], ['deluxe', 'Deluxe']]),
     eu: results({ standard: { complete: true, pp: 500 }, deluxe: { complete: true, pp: 800 } }),
     other: results({ standard: { complete: true, pp: 500 }, deluxe: { complete: true, pp: 800 } }),
+    publicRate: { tier: 'standard', currency: 'EUR', bands: [{ minPax: 2, maxPax: 3, perPerson: 540 }, { minPax: 4, maxPax: 16, perPerson: 500 }] },
     indicativeCurrencies: [],
     fx: [],
     today: TODAY,
@@ -50,78 +51,57 @@ function input(over: Partial<FactsInput> = {}): FactsInput {
   }
 }
 
-describe('the price', () => {
-  it('"from" is the cheapest COMPLETE tier — a cheaper incomplete one is never shown', () => {
-    const f = assembleTourFacts(input({
-      eu: results({ economy: { complete: false, pp: 200 }, standard: { complete: true, pp: 500 } }),
-      other: results({ economy: { complete: false, pp: 190 }, standard: { complete: true, pp: 480 } }),
-      tierLabels: new Map([['standard', 'Standard']]),
-    }))
-    expect(f.price).toMatchObject({ status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' },
-      from: { perPerson: 480, tier: 'standard', tierLabel: 'Standard' } })
+describe('the price: the approved public rate, and only that', () => {
+  it('the approved bands, "from" their lowest price, in the agency\'s tier word', () => {
+    const f = assembleTourFacts(input())
+    expect(f.price).toEqual({
+      status: 'available', currency: 'EUR', tierLabel: 'Standard', fromPrice: 500,
+      bands: [{ minPax: 2, maxPax: 3, perPerson: 540 }, { minPax: 4, maxPax: 16, perPerson: 500 }], indicative: [],
+    })
   })
-  it('no complete tier: price on request, with no amount anywhere, and the tour is not publishable', () => {
+  it('never the engine\'s figures and never a nationality — whatever the engine says today', () => {
     const f = assembleTourFacts(input({
-      eu: results({ standard: { complete: false, pp: 300 } }), other: results({ standard: { complete: false, pp: 290 } }),
+      eu: results({ standard: { complete: true, pp: 777, table: { 2: 777, 4: 666 } } }),
+      other: results({ standard: { complete: true, pp: 444, table: { 2: 444, 4: 333 } } }),
+    }))
+    expect(f.price.fromPrice).toBe(500)
+    expect(JSON.stringify(f)).not.toMatch(/777|666|444|333|nationalit|passport|\beu\b|other"/i)
+  })
+  it('no approved rate: price on request, no amount anywhere, and the page cannot be published', () => {
+    const f = assembleTourFacts(input({
+      publicRate: null,
       indicativeCurrencies: ['USD'], fx: [{ base_currency: 'EUR', target_currency: 'USD', rate: 1.1, last_updated_at: TODAY.toISOString() }],
     }))
-    expect(f.price).toEqual({ status: 'on_request', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: null, byNationality: null, table: [], indicative: [] })
+    expect(f.price).toEqual({ status: 'on_request', currency: 'EUR', tierLabel: null, fromPrice: null, bands: [], indicative: [] })
     expect(f.publishable.ok).toBe(false)
-    expect(f.publishable.reasons).toContain('No tier of the tour has a complete price — every rate it needs must be entered.')
-    expect(JSON.stringify(f.price)).not.toMatch(/29\d|30\d/)
+    expect(f.publishable.reasons).toContain('The tour has no public price yet — review the price and publish it.')
   })
-  it('EU and other nationalities are both shown, with the table split, only when their rates differ', () => {
-    const f = assembleTourFacts(input({
-      eu: results({ standard: { complete: true, pp: 560, table: { 2: 560, 4: 470, 6: 430 } } }),
-      other: results({ standard: { complete: true, pp: 500, table: { 2: 500, 4: 420, 6: 390 } } }),
-    }))
-    expect(f.price.byNationality).toEqual({ eu: 560, other: 500 })
-    expect(f.price.from!.perPerson).toBe(500)
-    expect(f.price.table).toEqual([
-      { pax: 2, perPerson: null, eu: 560, other: 500 }, { pax: 4, perPerson: null, eu: 470, other: 420 }, { pax: 6, perPerson: null, eu: 430, other: 390 },
-    ])
+  it('a rate approved in another currency than the company now runs is on request until approved again', () => {
+    const f = assembleTourFacts(input({ currency: 'USD' }))
+    expect(f.price).toMatchObject({ status: 'on_request', fromPrice: null, bands: [] })
+    expect(f.publishable.reasons).toContain('The public price was approved in another currency — review it and publish it again.')
   })
-  it('the same on both bases: one price, one column', () => {
-    const f = assembleTourFacts(input({
-      eu: results({ standard: { complete: true, pp: 500, table: { 2: 500, 4: 420, 6: 390 } } }),
-      other: results({ standard: { complete: true, pp: 500, table: { 2: 500, 4: 420, 6: 390 } } }),
-    }))
-    expect(f.price.byNationality).toBeNull()
-    expect(f.price.table.map(r => [r.pax, r.perPerson])).toEqual([[2, 500], [4, 420], [6, 390]])
+  it('what is included and where it sleeps follow the approved tier, even when another is cheaper', () => {
+    const f = assembleTourFacts(input({ publicRate: { tier: 'deluxe', currency: 'EUR', bands: [{ minPax: 2, maxPax: 8, perPerson: 800 }] } }))
+    expect(f.price.tierLabel).toBe('Deluxe')
+    expect(f.inclusions).toContain('5-star hotels')
+    expect(f.groupSize).toEqual({ min: 2, max: 8 })
   })
-  it('one basis incomplete: only the complete one is shown, never the other\'s partial figure', () => {
-    const f = assembleTourFacts(input({
-      eu: results({ standard: { complete: false, pp: 300 } }), other: results({ standard: { complete: true, pp: 500 } }),
-    }))
-    expect(f.price.byNationality).toBeNull()
-    expect(f.price.from!.perPerson).toBe(500)
-  })
-  it('indicative conversions from a fresh rate only — direct or inverse; stale or missing means none', () => {
+  it('indicative conversions: a rate at most 2 days old — direct or inverse; stale or missing means none', () => {
     const fresh = TODAY.toISOString()
-    const stale = new Date(TODAY.getTime() - 8 * 86400_000).toISOString()
+    const stale = new Date(TODAY.getTime() - 3 * 86400_000).toISOString()
     const f = assembleTourFacts(input({
       indicativeCurrencies: ['USD', 'GBP', 'JPY'],
       fx: [
         { base_currency: 'EUR', target_currency: 'USD', rate: 1.08, last_updated_at: fresh },
-        { base_currency: 'GBP', target_currency: 'EUR', rate: 1.2, last_updated_at: fresh },
+        { base_currency: 'GBP', target_currency: 'EUR', rate: 1.25, last_updated_at: fresh },
         { base_currency: 'EUR', target_currency: 'JPY', rate: 160, last_updated_at: stale },
       ],
     }))
     expect(f.price.indicative).toEqual([
-      { currency: 'USD', perPerson: 540, rateDate: '2026-10-25' },
-      { currency: 'GBP', perPerson: 417, rateDate: '2026-10-25' },
+      { currency: 'USD', rate: 1.08, rateDate: '2026-10-25' },
+      { currency: 'GBP', rate: 0.8, rateDate: '2026-10-25' },
     ])
-  })
-})
-
-describe('one page, one price for one thing', () => {
-  it('the table\'s 2-traveller row is the "from" figure even when the engine\'s rate sheet is a cent off', () => {
-    const f = assembleTourFacts(input({
-      eu: results({ standard: { complete: true, pp: 70.89, table: { 2: 70.88, 4: 48.18, 6: 39.1 } } }),
-      other: results({ standard: { complete: true, pp: 70.89, table: { 2: 70.88, 4: 48.18, 6: 39.1 } } }),
-    }))
-    expect(f.price.from!.perPerson).toBe(70.89)
-    expect(f.price.table[0]).toEqual({ pax: 2, perPerson: 70.89, eu: null, other: null })
   })
 })
 
@@ -195,6 +175,11 @@ describe('the rest of the facts', () => {
     expect(tourFactsSchema.parse(f)).toEqual(f)
     const bad = { ...f, price: { ...f.price, status: 'on_request' as const } }
     expect(() => tourFactsSchema.parse(bad)).toThrow(/carries no amount/)
+    // The contract itself has no room for a nationality price…
+    expect(() => tourFactsSchema.parse({ ...f, price: { ...f.price, byNationality: { eu: 1, other: 2 } } })).toThrow()
+    // …nor for a "from" that is not the lowest band, nor bands with a gap.
+    expect(() => tourFactsSchema.parse({ ...f, price: { ...f.price, fromPrice: 540 } })).toThrow(/lowest band/)
+    expect(() => tourFactsSchema.parse({ ...f, price: { ...f.price, bands: [{ minPax: 2, maxPax: 3, perPerson: 540 }, { minPax: 5, maxPax: 16, perPerson: 500 }] } })).toThrow(/contiguous/)
   })
 })
 
@@ -218,6 +203,8 @@ function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
         eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return q },
         gte: (c: string, v: string) => { filters.push(r => String(r[c]) >= v); return q },
         in: (c: string, v: unknown[]) => { filters.push(r => v.includes(r[c])); return q },
+        order: () => q,
+        limit: () => q,
         rows: () => (tables[table] ?? []).filter(r => filters.every(f => f(r))),
         maybeSingle: async () => ({ data: q.rows()[0] ?? null, error: null }),
         then: (res: (v: { data: unknown; error: null }) => unknown) => res({ data: q.rows(), error: null }),
@@ -243,9 +230,19 @@ describe('loadTourFacts', () => {
       { id: 'p-own', tenant_id: T, is_default: false, tiers: [{ days_before: 60, charge_percent: 10 }], wording: {} },
     ],
     exchange_rates: [],
+    publish_pages: [{ tenant_id: T, tour_template_id: 'tour-1', public_rate: { tier: 'standard', currency: 'EUR', bands: [{ minPax: 2, maxPax: 10, perPerson: 450 }] } }],
   })
 
-  it('prices both nationalities for 2 travellers at the company\'s house margin', async () => {
+  it('shows the approved public rate it reads from the tour\'s page — not the engine\'s 500', async () => {
+    const f = await loadTourFacts(fakeDb(tables(30)) as never, { tenantId: T, templateId: 'tour-1', language: 'en', indicativeCurrencies: [], today: TODAY })
+    expect(f.price).toMatchObject({ status: 'available', fromPrice: 450, bands: [{ minPax: 2, maxPax: 10, perPerson: 450 }] })
+  })
+  it('a malformed stored rate is no rate: price on request', async () => {
+    const t = tables(30); t.publish_pages[0].public_rate = { tier: 'standard', currency: 'EUR', bands: [{ minPax: 2, maxPax: 3, perPerson: 1 }, { minPax: 6, maxPax: 9, perPerson: 1 }] }
+    const f = await loadTourFacts(fakeDb(t) as never, { tenantId: T, templateId: 'tour-1', language: 'en', indicativeCurrencies: [], today: TODAY })
+    expect(f.price.status).toBe('on_request')
+  })
+  it('runs the engine on both bases for 2 travellers at the company\'s house margin (for what the tier includes)', async () => {
     await loadTourFacts(fakeDb(tables(32)) as never, { tenantId: T, templateId: 'tour-1', language: 'en', indicativeCurrencies: [], today: TODAY })
     expect(engine.mock.calls).toEqual([
       ['tour-1', T, ['standard'], 2, true, { marginPercent: 32 }],

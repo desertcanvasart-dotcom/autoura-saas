@@ -23,7 +23,7 @@ const FACTS: TourFacts = {
   ],
   mainAttractions: [], highlights: [], inclusions: ['Guide'], exclusions: [], accommodation: [],
   groupSize: null, departureDays: [], departures: [], cancellation: null,
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 99.89, tier: 'budget', tierLabel: 'Budget' }, byNationality: null, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Budget', fromPrice: 99.89, bands: [{ minPax: 2, maxPax: 6, perPerson: 99.89 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 } as unknown as TourFacts
 
@@ -66,16 +66,16 @@ describe('structured data', () => {
     expect(html).toContain('€100')
   })
 
-  it('EU passport holders and other nationalities are two offers when the rates differ', () => {
-    const facts = { ...FACTS, price: { ...FACTS.price, byNationality: { eu: 440.2, other: 425.5 } } } as TourFacts
-    expect(trip(tourPage({}, facts)).offers).toEqual([
-      expect.objectContaining({ name: 'Titulaires d’un passeport de l’UE', price: 441 }),
-      expect.objectContaining({ name: 'Autres nationalités', price: 426 }),
-    ])
+  it('one public rate is ONE offer, at the lowest per-person price — never one per nationality', () => {
+    const facts = { ...FACTS, price: { ...FACTS.price, fromPrice: 425.5, bands: [{ minPax: 2, maxPax: 3, perPerson: 440.2 }, { minPax: 4, maxPax: 8, perPerson: 425.5 }] } } as TourFacts
+    const offers = trip(tourPage({}, facts)).offers
+    expect(Array.isArray(offers)).toBe(false)
+    expect(offers).toMatchObject({ '@type': 'Offer', price: 426, priceCurrency: 'EUR' })
+    expect(JSON.stringify(structuredData(tourPage({}, facts)))).not.toMatch(/passport|nationalit|440/i)
   })
 
   it('a price on request has no offer at all', () => {
-    const facts = { ...FACTS, price: { ...FACTS.price, status: 'on_request', from: null, byNationality: null } } as unknown as TourFacts
+    const facts = { ...FACTS, price: { ...FACTS.price, status: 'on_request', fromPrice: null, bands: [] } } as unknown as TourFacts
     expect(trip(tourPage({}, facts)).offers).toBeUndefined()
   })
 

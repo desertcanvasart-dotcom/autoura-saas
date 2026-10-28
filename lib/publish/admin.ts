@@ -15,7 +15,9 @@
 //   · a draft written from facts that have since changed cannot be approved —
 //     it would describe a tour that no longer exists; draft again;
 //   · a version is never edited: approving makes a new one;
-//   · a tour page publishes only if the thin-page rule allows it (D7).
+//   · a tour page publishes only if the thin-page rule allows it (D7);
+//   · a tour shows ONE public price: the engine proposes it, a manager
+//     approves it, and only the approved bands reach the website.
 
 import type { TourFacts } from './contract'
 import { checkSegments, type CheckResult, type Segment } from './engine/fact-check'
@@ -23,6 +25,7 @@ import { namesFromFacts } from './engine/slots'
 import type { EngineContent, DraftResult, PartKind } from './engine/engine'
 import { checkTranslation } from './engine/translate'
 import { loadTourFacts } from './tour-facts'
+import { loadRateProposal, rateStatus, readSavedRate, sameBands, bandSchema, type RateProposal } from './public-rate'
 import { indicativeCurrenciesOf } from './site-data'
 import { engineBrand, generateTourDraft, generateTourTranslation } from './engine/generate'
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
@@ -54,6 +57,8 @@ export interface Actor { tenantId: string; userId: string; name: string }
 
 export interface AdminDeps {
   facts: typeof loadTourFacts
+  /** Today's proposal for a tour's public rate. */
+  proposal: typeof loadRateProposal
   generate: typeof generateTourDraft
   /** The tour's wording in the page language; defaults to the engine's. */
   translate?: typeof generateTourTranslation
@@ -65,6 +70,7 @@ export interface AdminDeps {
 
 export const defaultDeps: AdminDeps = {
   facts: loadTourFacts,
+  proposal: loadRateProposal,
   generate: generateTourDraft,
   translate: generateTourTranslation,
   domains: (() => { const c = railwayConfigFromEnv(); return c ? railwayProvider(c) : null })(),
@@ -153,12 +159,13 @@ export async function createTourPage(db: Db, actor: Actor, templateId: string) {
 
 async function pageOf(db: Db, tenantId: string, pageId: string) {
   const { data, error } = await db.from('publish_pages')
-    .select('id, site_id, kind, tour_template_id, tour_templates(template_name), publish_page_locales(id, language, slug, is_published, current_version_id, published_at)')
+    .select('id, site_id, kind, tour_template_id, public_rate, public_rate_approved_at, public_rate_approver_name, tour_templates(template_name), publish_page_locales(id, language, slug, is_published, current_version_id, published_at)')
     .eq('id', pageId).eq('tenant_id', tenantId).maybeSingle()
   check('the page', error)
   if (!data) fail('No such page in this company.', 404)
   return data as {
     id: string; site_id: string; kind: string; tour_template_id: string | null; tour_templates: { template_name: string } | null
+    public_rate: unknown; public_rate_approved_at: string | null; public_rate_approver_name: string | null
     publish_page_locales: Array<{ id: string; language: string; slug: string; is_published: boolean; current_version_id: string | null; published_at: string | null }>
   }
 }
@@ -179,8 +186,9 @@ export async function pageDetail(db: Db, actor: Actor, pageId: string, language:
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   const page = await pageOf(db, actor.tenantId, pageId)
   const locale = page.publish_page_locales.find(l => l.language === language) ?? fail(`This page has no ${language} version.`, 404)
-  const [facts, drafts, versions] = await Promise.all([
+  const [facts, rate, drafts, versions] = await Promise.all([
     factsFor(db, deps, actor.tenantId, page, language, site!.settings),
+    rateOf(db, deps, actor.tenantId, page),
     db.from('publish_drafts').select('id, kind, content, check_result, status, origin, model, reviewer_note, reviewed_at, created_at, updated_at')
       .eq('page_id', pageId).eq('tenant_id', actor.tenantId).eq('language', language).order('created_at', { ascending: false }).limit(40),
     db.from('publish_versions').select('id, version_no, reason, approver_name, approved_at, draft_id')
@@ -196,10 +204,56 @@ export async function pageDetail(db: Db, actor: Actor, pageId: string, language:
     locale,
     locales: page.publish_page_locales,
     facts,
+    rate,
     narrative,
     drafts: drafts.data ?? [],
     versions: versions.data ?? [],
   }
+}
+
+// ---------- the public rate: one price per tour ----------
+
+export interface PublicRateView {
+  proposal: RateProposal
+  saved: { tier: string; currency: string; bands: Array<{ minPax: number; maxPax: number; perPerson: number }>; approvedAt: string | null; approverName: string | null } | null
+  /** none = never approved · in_step = matches today's proposal · changed = the engine's answer moved */
+  status: ReturnType<typeof rateStatus>
+}
+
+async function rateOf(db: Db, deps: AdminDeps, tenantId: string, page: Awaited<ReturnType<typeof pageOf>>): Promise<PublicRateView | null> {
+  if (!page.tour_template_id) return null
+  const proposal = await deps.proposal(db, tenantId, page.tour_template_id)
+  const saved = readSavedRate(page.public_rate)
+  return {
+    proposal,
+    saved: saved ? { ...saved, approvedAt: page.public_rate_approved_at, approverName: page.public_rate_approver_name } : null,
+    status: rateStatus(saved, proposal),
+  }
+}
+
+/**
+ * A manager approves today's proposal as the tour's public rate. The bands
+ * they were shown come back with the request: if the engine's answer has
+ * moved since, nothing is saved — they must look at the new figures first.
+ */
+export async function approvePublicRate(db: Db, actor: Actor, pageId: string, shown: unknown, deps: AdminDeps = defaultDeps) {
+  const page = await pageOf(db, actor.tenantId, pageId)
+  if (!page.tour_template_id) fail('Only a tour page has a price.', 409)
+  const parsed = bandSchema.array().safeParse(shown)
+  if (!parsed.success) fail('Say which price you approve.')
+  const proposal = await deps.proposal(db, actor.tenantId, page.tour_template_id!)
+  if (proposal.reasons.length || !proposal.tier || !proposal.bands.length) {
+    fail(`This price cannot be published yet: ${proposal.reasons.join(' ')}`, 409)
+  }
+  if (!sameBands(parsed.data!, proposal.bands)) fail('The price has changed since you opened this page — look at the new figures and approve again.', 409)
+  const { error } = await db.from('publish_pages').update({
+    public_rate: { tier: proposal.tier, currency: proposal.currency, bands: proposal.bands },
+    public_rate_approved_at: deps.now().toISOString(),
+    public_rate_approved_by: actor.userId,
+    public_rate_approver_name: actor.name,
+  }).eq('id', pageId).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not save the price: ${error.message}`, 500)
+  return { approved: true, warning: await refresh(deps, actor.tenantId) }
 }
 
 // ---------- drafts ----------

@@ -7,7 +7,7 @@ import { indicativeCurrenciesOf } from '@/lib/publish/site-data'
 const FACTS: TourFacts = {
   durationDays: 1, durationNights: 0, images: [], days: [{ day: 1, title: null, city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: [] }],
   mainAttractions: [], highlights: [], inclusions: ['Guide'], exclusions: [], accommodation: [], groupSize: null, departureDays: [], departures: [], cancellation: null,
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 99, tier: 'standard', tierLabel: 'Standard' }, byNationality: null, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Standard', fromPrice: 99, bands: [{ minPax: 2, maxPax: 6, perPerson: 99 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 }
 
@@ -314,7 +314,7 @@ describe('tour cards and destination pages (redesign)', () => {
     expect(home!.destinations).toEqual([])
   })
   it('a price on request gives a card without an amount', async () => {
-    const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, from: null, byNationality: null, table: [], indicative: [] } }
+    const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, tierLabel: null, fromPrice: null, bands: [], indicative: [] } }
     const home = await load('', { facts: async () => onRequest })
     expect(home!.tours[0].card!.from).toBeNull()
   })

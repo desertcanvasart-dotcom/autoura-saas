@@ -1,0 +1,15 @@
+.stepper { display: grid; gap: 4px; }
+.amount { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; color: var(--brand-primary); }
+.note { margin: 0; font-size: 14px; color: color-mix(in srgb, var(--brand-ink) 72%, transparent); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.label { font-weight: 600; font-size: 15px; }
+.control { display: inline-flex; align-items: center; gap: 4px; }
+.step {
+  width: 44px; height: 44px; border-radius: 999px; font-size: 20px; line-height: 1; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--brand-ink) 25%, transparent); background: transparent; color: var(--brand-ink);
+}
+.step:disabled { opacity: 0.35; cursor: default; }
+.step:focus-visible { outline: 3px solid var(--brand-primary); outline-offset: 2px; }
+.count { min-width: 2.5ch; text-align: center; font-weight: 700; font-size: 18px; }
+.total { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 0 4px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); }
+.total strong { font-size: 20px; }

@@ -48,7 +48,7 @@ export function labelSources(facts: TourFacts | null, tourName: string): string[
   facts.inclusions.forEach(add)
   facts.exclusions.forEach(add)
   for (const a of facts.accommodation) add(a.city)
-  if (facts.price.from) add(facts.price.from.tierLabel)
+  add(facts.price.tierLabel)
   return out
 }
 

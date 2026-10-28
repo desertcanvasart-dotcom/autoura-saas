@@ -157,7 +157,7 @@ export function translateFacts(facts: TourFacts, labels: Record<string, string>)
     inclusions: facts.inclusions.map(tr),
     exclusions: facts.exclusions.map(tr),
     accommodation: facts.accommodation.map(a => ({ ...a, city: trn(a.city) })),
-    price: facts.price.from ? { ...facts.price, from: { ...facts.price.from, tierLabel: tr(facts.price.from.tierLabel) } } : facts.price,
+    price: { ...facts.price, tierLabel: trn(facts.price.tierLabel) },
   }
 }
 

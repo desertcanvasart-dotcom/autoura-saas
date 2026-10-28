@@ -119,10 +119,9 @@ const FACTS: TourFacts = {
   groupSize: { min: 2, max: 8 }, departureDays: ['mon', 'fri'],
   departures: [{ date: '2026-11-16', endDate: null, status: 'open', seatsLeft: 5 }],
   cancellation: { tiers: [{ daysBefore: 30, chargePercent: 25 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' },
-    from: { perPerson: 840.2, tier: 'deluxe', tierLabel: 'Deluxe' }, byNationality: { eu: 910, other: 840.2 },
-    table: [{ pax: 2, perPerson: null, eu: 910, other: 840.2 }, { pax: 4, perPerson: null, eu: 802.5, other: 735 }],
-    indicative: [{ currency: 'USD', perPerson: 905, rateDate: '2026-10-25' }] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Deluxe', fromPrice: 735,
+    bands: [{ minPax: 2, maxPax: 3, perPerson: 840.2 }, { minPax: 4, maxPax: 8, perPerson: 735 }],
+    indicative: [{ currency: 'USD', rate: 1.075, rateDate: '2026-10-25' }] },
   publishable: { ok: true, reasons: [] },
 }
 const tourPage = (archetype: PagePayload['site']['archetype'], facts: TourFacts | null, narrative: PageNarrative | null = null) => payload({
@@ -135,18 +134,19 @@ for (const archetype of ARCHETYPES) {
   describe(`${archetype}: tour facts`, () => {
     const html = render(archetype, tourPage(archetype, FACTS))
     const words = text(html)
-    it('prices as given, rounded UP to whole units, both nationalities labelled, the basis stated', () => {
-      expect(words).toContain('EU passport holders')
-      expect(words).toContain('Other nationalities')
-      expect(words).toContain('€910')
+    it('one price for the chosen group, rounded UP, with its total — never a price by nationality', () => {
       expect(words).toContain('€841') // 840.20 is never shown as €840
       expect(words).not.toContain('€840')
-      expect(words).toContain('€803') // 802.50 → 803
-      expect(words).toContain('per person, based on 2 travellers sharing. Prices vary by travel date.')
-      expect(words).toMatch(/Indicative only: ≈ \$905 \(you pay in EUR/)
+      expect(words).toContain('per person · Deluxe')
+      expect(words).toContain('Total €1,682') // the shown €841 × 2 travellers
+      expect(words).toContain('Lower per person for larger groups')
+      expect(words).toMatch(/≈ \$904 per person · Indicative only \(you pay in EUR/)
+      // One price for one configuration: no band table, no second figure.
+      expect(words).not.toContain('€735')
+      expect(words).not.toMatch(/passport|nationalit|residen/i)
     })
     it('every number on the page comes from the facts', () => {
-      const allowed = new Set(['910', '841', '803', '735', '905', '25', '2026', '16', '30', '100', '5', '2', '8', '3', '4', '1'])
+      const allowed = new Set(['841', '682', '904', '25', '2026', '16', '30', '100', '5', '2', '8', '3', '4', '1'])
       for (const n of words.match(/\d+/g) ?? []) expect(allowed, n).toContain(n)
     })
     it('days, inclusions, where it sleeps, group size, departure days and terms — no "daily", no "free"', () => {
@@ -167,7 +167,7 @@ for (const archetype of ARCHETYPES) {
       else expect(order.indexOf('itinerary')).toBeLessThan(order.indexOf('price'))
     })
     it('a price on request shows no amount and no currency anywhere', () => {
-      const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, from: null, byNationality: null, table: [], indicative: [] } }
+      const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, tierLabel: null, fromPrice: null, bands: [], indicative: [] } }
       const w = text(render(archetype, tourPage(archetype, onRequest)))
       expect(w).toContain('Price on request')
       expect(w).not.toMatch(/[€$£]|\bEUR\b|\bUSD\b/)
@@ -195,7 +195,7 @@ for (const archetype of ARCHETYPES) {
   describe(`${archetype}: approved narrative`, () => {
     const words = text(render(archetype, tourPage(archetype, FACTS, NARRATIVE)))
     it('the overview, in paragraphs, with its slots filled from today\'s facts', () => {
-      expect(words).toContain('Temples by the river, from €841 per person.')
+      expect(words).toContain('Temples by the river, from €735 per person.') // the tour's "from": its lowest band
       expect(words).toContain('A second paragraph, for 2–8 travellers.')
     })
     it('written highlights replace the records\' list; a day\'s text sits under its day', () => {
@@ -214,7 +214,7 @@ for (const archetype of ARCHETYPES) {
 
 describe('filling slots', () => {
   it('a slot whose fact is gone drops the whole text — never a hole in a sentence', () => {
-    const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, from: null, byNationality: null, table: [], indicative: [] } }
+    const onRequest = { ...FACTS, price: { ...FACTS.price, status: 'on_request' as const, tierLabel: null, fromPrice: null, bands: [], indicative: [] } }
     expect(narrativeText(NARRATIVE.overview, onRequest, 'en')).toBeNull()
   })
   it('the cancellation slot states the tiers as they are', () => {

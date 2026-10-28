@@ -24,7 +24,7 @@ const FACTS: TourFacts = {
   mainAttractions: ['Karnak Temple'], highlights: [], inclusions: ['Guide'], exclusions: [],
   accommodation: [{ kind: 'hotel', name: 'Winter Palace', city: 'Luxor' }],
   groupSize: { min: 2, max: 8 }, departureDays: ['mon'], departures: [], cancellation: null,
-  price: { status: 'available', currency: 'EUR', basis: { pax: 2, season: 'lowest' }, from: { perPerson: 840, tier: 'deluxe', tierLabel: 'Deluxe' }, byNationality: null, table: [], indicative: [] },
+  price: { status: 'available', currency: 'EUR', tierLabel: 'Deluxe', fromPrice: 840, bands: [{ minPax: 2, maxPax: 6, perPerson: 840 }], indicative: [] },
   publishable: { ok: true, reasons: [] },
 }
 

@@ -10,7 +10,8 @@
 import type { PageNarrative, TourFacts } from '@/lib/publish/contract'
 import { narrativeText, paragraphs } from './narrative'
 import { colon, countOf, t } from '../../i18n/strings'
-import { formatApprox, formatDate, formatPercent, formatPrice, formatWeekdays } from './format'
+import { formatDate, formatPercent, formatWeekdays } from './format'
+import { PriceStepper } from './PriceStepper'
 import s from './facts.module.css'
 
 export type FactsVariant = 'editorial' | 'compact'
@@ -30,55 +31,9 @@ export function OverviewSection({ facts, lang, variant, narrative }: P) {
 const cx = (variant: FactsVariant, ...names: string[]) => [...names.map(n => s[n]), s[variant]].filter(Boolean).join(' ')
 
 export function PriceSection({ facts, lang, variant }: P) {
-  const p = facts.price
-  if (p.status !== 'available' || !p.from) {
-    return (
-      <section className={cx(variant, 'price')}>
-        <p className={s.priceOnRequest}>{t(lang, 'priceOnRequest')}</p>
-        <p className={s.note}>{t(lang, 'askForPrice')}</p>
-      </section>
-    )
-  }
   return (
     <section className={cx(variant, 'price')}>
-      {p.byNationality ? (
-        <dl className={s.nationality}>
-          <div><dt>{t(lang, 'euPassport')}</dt><dd>{t(lang, 'from')} <strong>{formatPrice(p.byNationality.eu, p.currency, lang)}</strong></dd></div>
-          <div><dt>{t(lang, 'otherNationalities')}</dt><dd>{t(lang, 'from')} <strong>{formatPrice(p.byNationality.other, p.currency, lang)}</strong></dd></div>
-        </dl>
-      ) : (
-        <p className={s.from}>{t(lang, 'from')} <strong>{formatPrice(p.from.perPerson, p.currency, lang)}</strong></p>
-      )}
-      <p className={s.note}>{p.from.tierLabel} · {t(lang, 'priceBasis')}</p>
-      {p.indicative.length > 0 && (
-        <p className={s.note}>
-          {t(lang, 'indicative')}{colon(lang)} {p.indicative.map(i => formatApprox(i.perPerson, i.currency, lang)).join(' · ')}
-          {' '}({t(lang, 'youPayIn')} {p.currency}; {t(lang, 'rateOf')} {formatDate(p.indicative[0].rateDate, lang)})
-        </p>
-      )}
-      {p.table.length > 1 && (
-        <table className={s.table}>
-          <caption>{t(lang, 'groupSizePrices')}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t(lang, 'travellers')}</th>
-              {p.byNationality
-                ? <><th scope="col">{t(lang, 'euPassport')}</th><th scope="col">{t(lang, 'otherNationalities')}</th></>
-                : <th scope="col">{t(lang, 'perPerson')}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {p.table.map(r => (
-              <tr key={r.pax}>
-                <th scope="row">{r.pax}</th>
-                {p.byNationality
-                  ? <><td>{r.eu !== null ? formatPrice(r.eu, p.currency, lang) : '—'}</td><td>{r.other !== null ? formatPrice(r.other, p.currency, lang) : '—'}</td></>
-                  : <td>{r.perPerson !== null ? formatPrice(r.perPerson, p.currency, lang) : '—'}</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <PriceStepper price={facts.price} lang={lang} />
     </section>
   )
 }

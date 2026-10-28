@@ -68,8 +68,8 @@ export function pageMarkdown(page: PagePayload): string {
     `language: ${lang}`,
     `path: ${JSON.stringify(`/${lang}${page.path ? `/${page.path}` : ''}`)}`,
     `kind: ${page.kind}`,
-    ...(facts?.price.status === 'available' && facts.price.from
-      ? [`price_from: ${JSON.stringify(formatPrice(facts.price.from.perPerson, facts.price.currency, lang))}`, `price_basis: "per person, 2 sharing, lowest season"`]
+    ...(facts?.price.status === 'available' && facts.price.fromPrice !== null
+      ? [`price_from: ${JSON.stringify(formatPrice(facts.price.fromPrice, facts.price.currency, lang))}`, `price_basis: "per person"`]
       : facts ? ['price_from: "on request"'] : []),
     '---',
     '',
