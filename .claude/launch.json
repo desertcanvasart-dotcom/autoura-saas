@@ -73,6 +73,22 @@
         "/private/tmp/claude-501/-Users-islamhussein-autoura-saas/fe2ca70c-cfa4-45c0-9ee3-f02dacdead0f/scratchpad/embed-demo"
       ],
       "port": 8898
+    },
+    {
+      "name": "sites-prod-live",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PUBLISH_APP_URL=http://127.0.0.1:4010",
+        "PUBLISH_INTERNAL_SECRET=dev-internal",
+        "PUBLISH_REVALIDATE_SECRET=dev-revalidate",
+        "npx",
+        "next",
+        "start",
+        "sites",
+        "--port",
+        "3003"
+      ],
+      "port": 3003
     }
   ]
 }
