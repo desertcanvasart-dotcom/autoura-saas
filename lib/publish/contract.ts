@@ -211,6 +211,15 @@ export const pagePayloadSchema = z.object({
   tours: z.array(pageLink),
   /** The places the site's tours go, each a page of its own (redesign). */
   destinations: z.array(z.object({ name: z.string(), path: z.string(), count: z.number().int().positive() })).optional(),
+  /** The agency's Google reviews (lib/publish/reviews.ts) — on the home and
+   *  tour pages, only when the agency picked its business and Google answered. */
+  reviews: z.object({
+    name: z.string(), rating: z.number().nullable(), count: z.number().int().nullable(), url: z.string().nullable(),
+    reviews: z.array(z.object({
+      author: z.string(), authorUrl: z.string().nullable(), authorPhoto: z.string().nullable(), rating: z.number(),
+      text: z.string(), translated: z.boolean(), original: z.string().nullable(), when: z.string(), url: z.string().nullable(),
+    })),
+  }).nullable().optional(),
   /** A destination page: the place it is about. */
   destination: z.object({ name: z.string(), slug: z.string() }).nullable().optional(),
   /** Not yet published — shown only on a test hostname. */

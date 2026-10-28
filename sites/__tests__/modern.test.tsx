@@ -127,3 +127,32 @@ describe('matching the agency\'s own website', () => {
     expect(plain).not.toContain('insecure.example')
   })
 })
+
+describe('the agency\'s Google reviews on the page', () => {
+  const reviews: NonNullable<PagePayload['reviews']> = {
+    name: 'Sunrise Travel', rating: 4.8, count: 213, url: 'https://maps.google.com/p',
+    reviews: [
+      { author: 'Lena F.', authorUrl: 'https://maps.google.com/u/1', authorPhoto: null, rating: 5, text: 'Wonderful guide.', translated: false, original: null, when: '2 weeks ago', url: 'https://maps.google.com/r/1' },
+      { author: 'Jean P.', authorUrl: null, authorPhoto: null, rating: 4, text: 'Very good.', translated: true, original: 'Très bien.', when: 'a month ago', url: 'https://maps.google.com/r/2' },
+    ],
+  }
+  it('every theme shows them credited, linked to Google Maps, translations marked, and says Google does not verify them', () => {
+    for (const archetype of ['modern', 'private_journeys', 'transparent_value'] as const) {
+      const page = home({ site: { ...site, archetype }, reviews })
+      const theme = THEMES[archetype]
+      const html = renderToStaticMarkup(<theme.Frame page={page} preview={false}><theme.Page page={page} preview={false} /></theme.Frame>)
+      const w = text(html)
+      expect(w, archetype).toContain('What travellers say')
+      expect(w, archetype).toContain('4.8')
+      expect(w, archetype).toContain('213 reviews on Google')
+      expect(html, archetype).toContain('href="https://maps.google.com/u/1"')
+      expect(html, archetype).toContain('href="https://maps.google.com/r/1"')
+      expect(w, archetype).toContain('Translated by Google')
+      expect(w, archetype).toContain('Reviews are not verified by Google.')
+      expect(html, archetype).toContain('>Google Maps</a>')
+    }
+  })
+  it('no reviews, no section — nothing is ever invented', () => {
+    expect(text(render(home()))).not.toContain('What travellers say')
+  })
+})

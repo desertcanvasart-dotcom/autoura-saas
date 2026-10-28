@@ -100,4 +100,11 @@ export const es: Record<StringKey, string> = {
   back: 'Atrás',
   step: 'Paso',
   of: 'de',
+  reviewsTitle: 'Lo que dicen los viajeros',
+  reviewsOnGoogle: 'opiniones en Google',
+  translatedByGoogle: 'Traducido por Google',
+  seeOriginal: 'Ver el original',
+  onGoogleMaps: 'En Google Maps',
+  reviewsNotVerified: 'Google no verifica las opiniones.',
+  reviewsPolicy: 'Cómo gestiona Google las opiniones',
 }

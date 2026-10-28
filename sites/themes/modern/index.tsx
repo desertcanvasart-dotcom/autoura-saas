@@ -17,6 +17,7 @@ import type { PageNarrative, TourFacts } from '@/lib/publish/contract'
 import { BrandMark } from '../blocks/BrandMark'
 import { LanguageLinks } from '../blocks/LanguageLinks'
 import { EnquiryForm } from '../blocks/EnquiryForm'
+import { Reviews } from '../blocks/Reviews'
 import { CancellationSection, DeparturesSection, PriceSection } from '../blocks/TourFacts'
 import { agencyWebsite, emailHref, phoneHref, whatsappHref } from '../blocks/contact'
 import { narrativeText, paragraphs } from '../blocks/narrative'
@@ -269,6 +270,7 @@ function TourPage({ page }: ThemePageProps) {
               <ul className={s.stays}>{facts.accommodation.map(a => <li key={`${a.kind}-${a.name}`}>{a.kind === 'cruise' ? `${t(lang, 'nileCruise')}${colon(lang)} ${a.name}` : a.city ? `${a.name}, ${a.city}` : a.name}</li>)}</ul>
             </section>
           )}
+          <Reviews page={page} />
           {/* Every price in full — both nationalities, each group size, the
               basis — readable without script; the card beside it is the quick view. */}
           {facts && <div className={s.block} data-section="price"><PriceSection facts={facts} lang={lang} variant="compact" /></div>}
@@ -301,6 +303,7 @@ function Page(props: ThemePageProps) {
           <h2 className={s.h2Big}>{t(lang, 'findJourney')}</h2>
           <TourCards {...props} />
         </section>
+        <div className={s.container}><Reviews page={page} /></div>
         <Destinations {...props} />
       </>
     )
