@@ -13,6 +13,7 @@ import { TourSections } from '../blocks/TourSections'
 import { OverviewSection, AccommodationSection, CancellationSection, DeparturesSection, GroupSizeSection, HighlightsSection, InclusionsSection, ItinerarySection, PriceSection, TourImage } from '../blocks/TourFacts'
 import { agencyWebsite, emailHref, phoneHref, whatsappHref } from '../blocks/contact'
 import { EnquiryForm } from '../blocks/EnquiryForm'
+import { Reviews } from '../blocks/Reviews'
 import { t } from '../../i18n/strings'
 import s from './theme.module.css'
 
@@ -87,6 +88,7 @@ function Page(props: ThemePageProps) {
           <h2 className={s.sectionTitle}>{t(lang, 'dealsTitle')}</h2>
           <TourGrid {...props} />
         </section>
+        <div className={s.section}><Reviews page={page} /></div>
       </>
     )
   }
@@ -133,6 +135,7 @@ function Page(props: ThemePageProps) {
             terms: () => f && <CancellationSection {...f} />,
           }}
         />
+        <Reviews page={page} />
         <EnquiryForm page={page} variant="compact" showWhatsApp={false} />
       </article>
     )

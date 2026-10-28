@@ -109,6 +109,14 @@ const en = {
   back: 'Back',
   step: 'Step',
   of: 'of',
+  // ---- Google reviews (redesign) ----
+  reviewsTitle: 'What travellers say',
+  reviewsOnGoogle: 'reviews on Google',
+  translatedByGoogle: 'Translated by Google',
+  seeOriginal: 'See the original',
+  onGoogleMaps: 'On Google Maps',
+  reviewsNotVerified: 'Reviews are not verified by Google.',
+  reviewsPolicy: 'How Google handles reviews',
 } as const
 
 export type StringKey = keyof typeof en

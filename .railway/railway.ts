@@ -90,6 +90,8 @@ export default defineRailway(() => {
       RAILWAY_PUBLISH_ENVIRONMENT_ID: preserve(),
       RAILWAY_PUBLISH_SERVICE_ID: preserve(),
       PUBLISH_SITES_BASE_DOMAIN: preserve(),
+      // Agencies' Google reviews on their websites (Places API).
+      GOOGLE_MAPS_API_KEY: preserve(),
       // Added in the dashboard, never written here — an apply without these
       // three would DELETE them from the live site (caught 2026-09-24).
       NEXT_PUBLIC_GROWTH_WIDGET_URL: preserve(),

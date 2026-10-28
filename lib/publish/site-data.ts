@@ -10,6 +10,7 @@
 
 import type { SitemapData, SiteResolution, PagePayload, PageNarrative, TourFacts } from './contract'
 import { loadTourFacts } from './tour-facts'
+import { placeReviews, reviewsSettingsOf, type PlaceReviews } from './reviews'
 import { factsHash, renderableNarrative, translateFacts, type NarrativeBundle } from './narrative'
 
 type Db = {
@@ -205,6 +206,8 @@ export interface PageDeps {
   tourFacts: (db: Db, input: { tenantId: string; templateId: string; language: string; indicativeCurrencies: string[] }) => Promise<TourFacts>
   /** Told what the page's narrative looks like against today's facts. */
   onNarrative?: (info: NarrativeInfo) => void
+  /** The agency's Google reviews; defaults to lib/publish/reviews placeReviews. */
+  reviews?: (placeId: string, language: string) => Promise<PlaceReviews | null>
 }
 
 /** The currencies a site shows indicative prices in (publish_sites.settings). */
@@ -351,10 +354,17 @@ export async function loadPagePayload(db: Db, input: {
       .map(l => ({ language: l, path: kind === 'home' ? '' : 'tours' }))
   }
 
+  // Real reviews only, from the business the agency picked; home and tours.
+  const rv = reviewsSettingsOf(site.settings)
+  const reviews = rv.show && rv.placeId && (kind === 'home' || kind === 'tour')
+    ? await (deps.reviews ?? placeReviews)(rv.placeId, input.language).catch(() => null)
+    : null
+
   return {
     kind,
     language: input.language,
     path: row ? pathOf(row) : (kind === 'home' ? '' : 'tours'),
+    ...(reviews ? { reviews } : {}),
     title: tour?.name ?? siteInfo.companyName,
     site: siteInfo,
     alternates,

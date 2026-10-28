@@ -29,6 +29,7 @@ import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerp
 import { publishTags } from './sync/events'
 import { ARCHETYPES, ARCHETYPE_DEFAULTS, FONT_PAIRS, PALETTE_PRESETS, resolveBrand, type Archetype } from './brand'
 import { MAX_ORIGINS, embedOf, newEmbedKey, normalizeOrigin } from './embed'
+import { placeReviews, reviewsSettingsOf, searchPlaces } from './reviews'
 import type { DnsRecord, DomainProvider, DomainState } from './domains/provider'
 import { railwayConfigFromEnv, railwayProvider } from './domains/railway'
 import { normalizeHost } from './site-data'
@@ -688,4 +689,37 @@ export async function checkPendingDomains(db: Db, deps: AdminDeps = defaultDeps,
     }
   }
   return { checked: (data ?? []).length, ready }
+}
+
+// ---------- the agency's Google reviews (lib/publish/reviews.ts) ----------
+
+/** Which business the reviews come from, whether they show, and a preview. */
+export async function reviewsOf(db: Db, actor: Actor) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const r = reviewsSettingsOf(site!.settings)
+  const ready = !!process.env.GOOGLE_MAPS_API_KEY
+  const preview = ready && r.placeId ? await placeReviews(r.placeId, site!.languages[0] ?? 'en') : null
+  return { placeId: r.placeId, show: r.show, ready, preview }
+}
+
+export async function findReviewPlaces(db: Db, actor: Actor, query: unknown) {
+  if (!(await siteOf(db, actor.tenantId))) fail('This company has no website yet.', 404)
+  const q = typeof query === 'string' ? query.trim() : ''
+  if (q.length < 3) fail('Type your business name as it appears on Google Maps.')
+  try {
+    return { places: await searchPlaces(q.slice(0, 200)) }
+  } catch (e) {
+    fail(e instanceof Error ? e.message : 'Google could not search just now.', 502)
+  }
+}
+
+/** Pick the business (Google's place ID — the one thing we may keep) and
+ *  whether its reviews show. Managers. */
+export async function saveReviews(db: Db, actor: Actor, input: { placeId: unknown; show: unknown }, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const placeId = input.placeId === null ? null : typeof input.placeId === 'string' && /^[A-Za-z0-9_-]{10,300}$/.test(input.placeId) ? input.placeId : fail('Pick your business from the search.')
+  const settings = { ...((site!.settings ?? {}) as Record<string, unknown>), reviews: placeId ? { placeId, show: input.show !== false } : null }
+  const { error } = await db.from('publish_sites').update({ settings }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not save: ${error.message}`, 500)
+  return { placeId, show: placeId ? input.show !== false : false, warning: await refresh(deps, actor.tenantId) }
 }
