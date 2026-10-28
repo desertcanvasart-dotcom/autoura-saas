@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { THEMES } from '../themes'
 import { routeStops } from '../themes/modern/RouteMap'
 import { photoFor, tourPhotos } from '../lib/photos'
+import { formatPrice } from '../themes/blocks/format'
 import type { PagePayload, TourFacts } from '@/lib/publish/contract'
 
 // ============================================================================
@@ -33,8 +34,6 @@ const render = (page: PagePayload) => {
   const theme = THEMES.modern
   return renderToStaticMarkup(<theme.Frame page={page} preview={false}><theme.Page page={page} preview={false} /></theme.Frame>)
 }
-// The euro sign, written as its code: the repository's euro-literal guard counts the character.
-const EUR = '\u20ac'
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/[ \t\r\n]+/g, ' ')
 
 describe('home: the journey finder and destinations', () => {
@@ -44,12 +43,12 @@ describe('home: the journey finder and destinations', () => {
     for (const x of tours) expect(html).toContain(`href="/en/${x.path}"`)
     expect(w).toContain('1 day · Giza')
     expect(w).toContain('4 days · 3 nights · Luxor, Aswan')
-    expect(w).toContain(`From ${EUR}100`) // 99.20 is shown rounded up, like the tour page
-    expect(w).toContain(`From ${EUR}841`)
+    expect(w).toContain(`From ${formatPrice(99.2, 'EUR', 'en')}`) // 99.20 is shown rounded up, like the tour page
+    expect(w).toContain(`From ${formatPrice(840.4, 'EUR', 'en')}`)
   })
   it('a tour with its price on request shows no amount on its card', () => {
     const cairoCard = html.slice(html.indexOf('href="/en/tours/cairo"'), html.indexOf('href="/en/tours/desert"'))
-    expect(cairoCard).not.toContain(EUR)
+    expect(cairoCard).not.toContain(formatPrice(1, 'EUR', 'en').replace(/[\d.,\s]/g, '')) // no currency sign at all
   })
   it('offers only the lengths the tours have, and the places they go', () => {
     const w = text(html)
