@@ -12,7 +12,9 @@ import s from './enquiry.module.css'
 
 type Variant = 'editorial' | 'compact'
 
-export function EnquiryForm({ page, variant, showWhatsApp = true }: { page: PagePayload; variant: Variant; showWhatsApp?: boolean }) {
+/** single: every field in one step, with a day to travel rather than a month
+ *  (the website template: one short form, prefilled from the booking card). */
+export function EnquiryForm({ page, variant, showWhatsApp = true, single = false }: { page: PagePayload; variant: Variant; showWhatsApp?: boolean; single?: boolean }) {
   const lang = page.language
   const wa = showWhatsApp ? whatsappHref(page) : null
   return (
@@ -29,7 +31,21 @@ export function EnquiryForm({ page, variant, showWhatsApp = true }: { page: Page
         <div className={s.trap} aria-hidden="true">
           <label>Website <input type="text" name="website" tabIndex={-1} autoComplete="off" /></label>
         </div>
-        <EnquirySteps
+        {single ? (
+          <>
+            <div className={s.row}>
+              <label>{t(lang, 'travellersLabel')}<input id="enq-travellers" name="travellers" type="number" min={1} max={99} inputMode="numeric" /></label>
+              <label>{t(lang, 'travelDate')}<input id="enq-date" name="travel_date" type="date" /></label>
+            </div>
+            <div className={s.row}>
+              <label>{t(lang, 'yourName')}<input name="name" required maxLength={120} autoComplete="name" /></label>
+              <label>{t(lang, 'yourEmail')}<input name="email" type="email" required maxLength={200} autoComplete="email" /></label>
+            </div>
+            <label>{t(lang, 'yourPhone')}<input name="phone" type="tel" maxLength={40} autoComplete="tel" /></label>
+            <label>{t(lang, 'yourMessage')}<textarea name="message" rows={4} maxLength={4000} /></label>
+            <div className={s.actions}><button type="submit" className={s.submit}>{t(lang, 'sendEnquiry')}</button></div>
+          </>
+        ) : <EnquirySteps
           titles={[t(lang, 'stepWhen'), t(lang, 'stepTrip'), t(lang, 'stepContact')]}
           labels={{ next: t(lang, 'next'), back: t(lang, 'back'), send: t(lang, 'sendEnquiry'), step: t(lang, 'step'), of: t(lang, 'of') }}
           steps={[
@@ -44,7 +60,7 @@ export function EnquiryForm({ page, variant, showWhatsApp = true }: { page: Page
               <label>{t(lang, 'yourPhone')}<input name="phone" type="tel" maxLength={40} autoComplete="tel" /></label>
             </div>,
           ]}
-        />
+        />}
       </form>
       {wa && <p className={s.alt}><a href={wa} rel="nofollow">{t(lang, 'orWhatsApp')}</a></p>}
     </section>

@@ -33,6 +33,7 @@ export const FONT_PAIRS = {
   clean: { label: 'Clean — Poppins & Inter', display: 'Poppins', text: 'Inter' },
   friendly: { label: 'Friendly — Nunito & Nunito Sans', display: 'Nunito', text: 'Nunito Sans' },
   sleek: { label: 'Sleek — Outfit & Inter', display: 'Outfit', text: 'Inter' },
+  manrope: { label: 'Template — Manrope & Inter', display: 'Manrope', text: 'Inter' },
 } as const
 export type FontPairKey = keyof typeof FONT_PAIRS
 
@@ -73,7 +74,8 @@ export const ARCHETYPE_DEFAULTS: Record<Archetype, Brand> = {
   // each agency picks its own palette. Deep teal with a mint accent.
   modern: {
     palette: { primary: '#1d6b64', accent: '#38d9a9', ink: '#0f1720', surface: '#ffffff' },
-    fontPair: 'sleek',
+    // The website template brief (2026-10-28): Manrope headings, Inter text.
+    fontPair: 'manrope',
     tone: 'warm',
   },
 }

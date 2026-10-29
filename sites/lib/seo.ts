@@ -102,6 +102,15 @@ export function structuredData(page: PagePayload): Json[] {
   }
   blocks.push(prune(trip))
 
+  // The page's approved questions, exactly as it shows them.
+  if (facts?.faq?.length) {
+    blocks.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: facts.faq.map(f => ({ '@type': 'Question', name: f.question, acceptedAnswer: { '@type': 'Answer', text: f.answer } })),
+    })
+  }
+
   if (host) {
     blocks.push({
       '@context': 'https://schema.org',

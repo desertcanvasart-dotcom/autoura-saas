@@ -55,11 +55,18 @@ const SITES = {
   'modern.localhost': {
     id: '00000000-0000-4000-8000-00000000f002', tenantId: '00000000-0000-4000-8000-00000000f001',
     archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
-    companyName: 'Nile & Co (dev)', brand: {},
+    companyName: 'Nile & Co (dev)', brand: { claims: ['Egyptologist guides on every tour', 'Private tours — just your group'] },
+    // Invented Google reviews, to see the reviews sections in dev.
+    reviews: { name: 'Nile & Co (dev)', rating: 4.8, count: 312, url: null, reviews: [
+      { author: 'Sam (dev)', authorUrl: null, authorPhoto: null, rating: 5, text: 'Our guide made the pyramids come alive. Pickup on time, everything as promised.', translated: false, original: null, when: '2 weeks ago', url: null },
+      { author: 'Léa (dev)', authorUrl: null, authorPhoto: null, rating: 5, text: 'A perfect day in Giza — clear price, no surprises.', translated: true, original: null, when: 'a month ago', url: null },
+      { author: 'Marco (dev)', authorUrl: null, authorPhoto: null, rating: 4, text: 'Great cruise, the Philae boat ride was the highlight.', translated: false, original: null, when: '3 months ago', url: null },
+    ] },
     // Blocks on a pretend agency website (embed-demo in .claude/launch.json).
     embed: { key: 'DevEmbedKeyNileCo2026xyz', origins: ['http://agency.localhost:8898'] },
     identity: { tagline: 'Egypt, your way', logoUrl: null, phone: '+20 2 2222 2222',
-      email: 'hello@nileco.invalid', whatsapp: '+20 122 222 2222', address: 'Garden City, Cairo', licenseNumber: 'ETAA 2222 (dev)' },
+      email: 'hello@nileco.invalid', whatsapp: '+20 122 222 2222', address: '12 Garden City St, Cairo', licenseNumber: 'ETAA 2222 (dev)',
+      legalEntity: 'Nile & Co Travel S.A.E. (dev)', termsUrl: 'https://nileco.invalid/terms', privacyUrl: 'https://nileco.invalid/privacy' },
     tours: [
       { slug: 'classic-nile-cruise', other: 'croisiere-classique', name: 'Classic Nile cruise: Luxor to Aswan', published: true, price: 'available', plan: 'nile' },
       { slug: 'pyramids-and-sphinx', other: 'pyramides-et-sphinx', name: 'Giza Pyramids and the Sphinx', published: true, price: 'available', plan: 'giza' },
@@ -99,18 +106,25 @@ const SITES = {
 // Invented facts, in the contract's shape (lib/publish/contract.ts tourFacts).
 const PLANS = {
   giza: { durationDays: 1, durationNights: 0, days: [
-    { day: 1, title: 'The pyramids and the Sphinx', city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Giza Pyramids', 'Great Sphinx', 'Valley Temple of Khafre'] },
+    { day: 1, title: 'The pyramids and the Sphinx', city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Giza Pyramids', 'Great Sphinx', 'Valley Temple of Khafre'],
+      stops: [{ time: '08:00', name: 'Hotel pickup in Cairo or Giza' }, { time: '09:00', name: 'Giza Pyramids' }, { time: '11:00', name: 'Panorama point' }, { time: '11:45', name: 'Great Sphinx and the Valley Temple of Khafre' }, { time: '13:00', name: 'Lunch' }, { time: '14:30', name: 'Back at your hotel' }] },
+  ], durationHours: 7, tourType: 'Day tour', guideLanguages: ['English', 'French', 'Spanish'],
+  pickup: { included: true, area: 'Cairo and Giza', meetingPoint: 'Your guide meets you in the hotel lobby, holding a Nile & Co sign.' },
+  faq: [
+    { question: 'Is the inside of the Great Pyramid included?', answer: 'No — entry to the inside of the Great Pyramid is a separate ticket. Your guide can buy it for you on the day.' },
+    { question: 'What should I wear?', answer: 'Comfortable shoes and a hat. The plateau has little shade.' },
+    { question: 'Can we start earlier?', answer: 'Yes. Tell us in your enquiry and we will set the pickup time with you.' },
   ], mainAttractions: ['Giza Pyramids', 'Great Sphinx'], accommodation: [], inclusions: ['Egyptologist guide', 'Air-conditioned vehicle', 'Entrance fees to the sites listed', 'Lunch'], departureDays: ['mon', 'wed', 'fri', 'sat', 'sun'] },
   cairo: { durationDays: 3, durationNights: 2, days: [
     { day: 1, title: 'Arrival in Cairo', city: 'Cairo', overnight: true, meals: { breakfast: false, lunch: false, dinner: true }, sights: [] },
     { day: 2, title: 'The Egyptian Museum and Islamic Cairo', city: 'Cairo', overnight: true, meals: { breakfast: true, lunch: true, dinner: false }, sights: ['Egyptian Museum', 'Citadel of Salah El Din', 'Khan el-Khalili'] },
     { day: 3, title: 'Saqqara and Memphis', city: 'Saqqara', overnight: false, meals: { breakfast: true, lunch: true, dinner: false }, sights: ['Step Pyramid of Djoser', 'Memphis'] },
-  ], mainAttractions: ['Egyptian Museum'], accommodation: [{ kind: 'hotel', name: 'Garden City House (dev)', city: 'Cairo' }], inclusions: ['2 nights with breakfast', 'Egyptologist guide', 'Entrance fees to the sites listed'], departureDays: ['thu', 'sat'] },
+  ], tourType: 'Multi-day tour', guideLanguages: ['English', 'French'], mainAttractions: ['Egyptian Museum'], accommodation: [{ kind: 'hotel', name: 'Garden City House (dev)', city: 'Cairo' }], inclusions: ['2 nights with breakfast', 'Egyptologist guide', 'Entrance fees to the sites listed'], departureDays: ['thu', 'sat'] },
   desert: { durationDays: 3, durationNights: 2, days: [
     { day: 1, title: 'Cairo to Bahariya', city: 'Bahariya', overnight: true, meals: { breakfast: false, lunch: true, dinner: true }, sights: ['Black Desert'] },
     { day: 2, title: 'Into the White Desert', city: 'White Desert', overnight: true, meals: { breakfast: true, lunch: true, dinner: true }, sights: ['White Desert', 'Crystal Mountain'] },
     { day: 3, title: 'Back to Cairo', city: 'Cairo', overnight: false, meals: { breakfast: true, lunch: false, dinner: false }, sights: [] },
-  ], mainAttractions: ['White Desert'], accommodation: [{ kind: 'hotel', name: 'Oasis Eco Lodge (dev)', city: 'Bahariya' }], inclusions: ['1 night in a lodge, 1 night camping', '4x4 with driver', 'All meals in the desert'], departureDays: ['fri'] },
+  ], tourType: 'Desert safari', mainAttractions: ['White Desert'], accommodation: [{ kind: 'hotel', name: 'Oasis Eco Lodge (dev)', city: 'Bahariya' }], inclusions: ['1 night in a lodge, 1 night camping', '4x4 with driver', 'All meals in the desert'], departureDays: ['fri'] },
 }
 
 function facts(kind, currency, plan) {
@@ -129,7 +143,9 @@ function facts(kind, currency, plan) {
     groupSize: { min: 2, max: 12 },
     departureDays: ['mon', 'fri'],
     departures: [{ date: '2026-11-16', endDate: '2026-11-19', status: 'guaranteed', seatsLeft: 4 }, { date: '2026-11-20', endDate: '2026-11-23', status: 'full', seatsLeft: 0 }],
-    cancellation: { tiers: [{ daysBefore: 30, chargePercent: 25 }, { daysBefore: 7, chargePercent: 50 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
+    cancellation: { tiers: [{ daysBefore: 45, chargePercent: 10 }, { daysBefore: 30, chargePercent: 25 }, { daysBefore: 7, chargePercent: 50 }], wording: null },
+    tourType: 'Nile cruise', guideLanguages: ['English'], durationHours: null,
+    pickup: { included: true, area: 'Luxor', meetingPoint: null },
     publishable: { ok: true, reasons: [] },
     ...(PLANS[plan] ?? {}),
   }
@@ -174,7 +190,8 @@ function page(s, lang, path, preview) {
   const placeSlug = n => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
   const factsOf = t => facts(t.price ?? 'on_request', 'EUR', t.plan)
   const cardFor = f => ({ days: f.durationDays, nights: f.durationNights, cities: [...new Set(f.days.map(d => d.city).filter(Boolean))],
-    from: f.price.status === 'available' && f.price.fromPrice !== null ? { amount: f.price.fromPrice, currency: f.price.currency } : null, image: f.images[0] ?? null })
+    from: f.price.status === 'available' && f.price.fromPrice !== null ? { amount: f.price.fromPrice, currency: f.price.currency } : null, image: f.images[0] ?? null,
+    type: f.tourType ?? null, hours: f.durationHours ?? null })
   const links = list.map(t => ({ title: t.name, path: `tours/${slugIn(t, lang)}`, card: cardFor(factsOf(t)) }))
   const places = new Map()
   for (const t of list) for (const c of cardFor(factsOf(t)).cities) {
@@ -183,7 +200,8 @@ function page(s, lang, path, preview) {
   }
   const destinations = [...places].map(([slug, p]) => ({ name: p.name, path: `destinations/${slug}`, count: p.tours.size })).sort((a, b) => b.count - a.count)
   const base = { language: lang, site: siteInfo(s), tour: null, tours: [], unpublished: false, destinations }
-  if (path === '') return { ...base, kind: 'home', path: '', title: s.companyName, alternates: [{ language: other, path: '' }], tours: links }
+  if (path === '') return { ...base, kind: 'home', path: '', title: s.companyName, alternates: [{ language: other, path: '' }], tours: links, ...(s.reviews ? { reviews: s.reviews } : {}) }
+  if (path === 'about' || path === 'contact') return { ...base, kind: path, path, title: s.companyName, alternates: [{ language: other, path }], pageId: null, ...(s.reviews && path === 'about' ? { reviews: s.reviews } : {}) }
   if (path === 'tours') return { ...base, kind: 'listing', path: 'tours', title: s.companyName, alternates: [{ language: other, path: 'tours' }], tours: links }
   const dm = path.match(/^destinations\/([a-z0-9-]+)$/)
   if (dm) {
@@ -196,6 +214,8 @@ function page(s, lang, path, preview) {
   const t = m && list.find(x => slugIn(x, lang) === m[1])
   if (!t) return null
   return { ...base, kind: 'tour', path, title: t.name, unpublished: !t.published,
+    ...(s.reviews ? { reviews: s.reviews } : {}),
+    related: links.filter(l => l.path !== `tours/${slugIn(t, lang)}`).slice(0, 3),
     tour: { templateId: '00000000-0000-4000-8000-00000000d003', name: t.name, facts: facts(t.price ?? 'on_request', 'EUR', t.plan),
       // Approved text (step 7), for the priced tours — slots filled by the renderer.
       narrative: t.price === 'available' && (!t.plan || t.plan === 'nile') ? {

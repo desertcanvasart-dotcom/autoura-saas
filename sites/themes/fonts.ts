@@ -10,7 +10,7 @@
 
 import {
   Cormorant_Garamond, Inter, Playfair_Display, Source_Sans_3,
-  DM_Serif_Display, DM_Sans, Poppins, Nunito, Nunito_Sans, Outfit,
+  DM_Serif_Display, DM_Sans, Poppins, Nunito, Nunito_Sans, Outfit, Manrope,
 } from 'next/font/google'
 import type { FontPairKey } from '@/lib/publish/brand'
 
@@ -25,6 +25,7 @@ const dmSans = DM_Sans({ subsets: ['latin', 'latin-ext'], display: 'swap', prelo
 const poppins = Poppins({ subsets: ['latin', 'latin-ext'], display: 'swap', preload: false, weight: ['400', '600', '700'], variable: '--font-poppins' })
 const nunito = Nunito({ subsets: ['latin', 'latin-ext'], display: 'swap', preload: false, variable: '--font-nunito' })
 const outfit = Outfit({ subsets: ['latin', 'latin-ext'], display: 'swap', preload: false, variable: '--font-outfit' })
+const manrope = Manrope({ subsets: ['latin', 'latin-ext'], display: 'swap', preload: false, variable: '--font-manrope' })
 const nunitoSans = Nunito_Sans({ subsets: ['latin', 'latin-ext'], display: 'swap', preload: false, variable: '--font-nunito-sans' })
 
 type Face = { variable: string; style: { fontFamily: string } }
@@ -36,6 +37,7 @@ const PAIRS: Record<FontPairKey, { display: Face; text: Face }> = {
   clean: { display: poppins, text: inter },
   friendly: { display: nunito, text: nunitoSans },
   sleek: { display: outfit, text: inter },
+  manrope: { display: manrope, text: inter },
 }
 
 /** The class names that load a pair, and the CSS variables the themes read. */

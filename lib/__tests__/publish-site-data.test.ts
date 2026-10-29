@@ -152,13 +152,15 @@ describe('loadPagePayload', () => {
   it('carries the company identity from its records and the stored brand, blanks as null', async () => {
     const page = await load('')
     expect(page!.site.identity).toEqual({ tagline: 'Private journeys since 2003', logoUrl: 'https://cdn.test/logo.png', phone: null,
-      email: 'hello@sillage.test', whatsapp: '+201000000000', address: null, licenseNumber: 'ETAA 1234' })
+      email: 'hello@sillage.test', whatsapp: '+201000000000', address: null, licenseNumber: 'ETAA 1234',
+      // The footer's legal details: none stored for this site.
+      legalEntity: null, termsUrl: null, privacyUrl: null })
     expect(page!.site.brand).toEqual({ tone: 'warm' })
   })
   it('the home page exists before any home page row, listing the published, switched-on tours', async () => {
     const home = await load('')
     expect(home).toMatchObject({ kind: 'home', title: 'Sillage', alternates: [{ language: 'fr', path: '' }] })
-    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic', card: { days: 1, nights: 0, cities: ['Giza'], from: { amount: 99, currency: 'EUR' }, image: null } }])
+    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic', card: { days: 1, nights: 0, cities: ['Giza'], from: { amount: 99, currency: 'EUR' }, image: null, type: null, hours: null } }])
     expect(home!.destinations).toEqual([{ name: 'Giza', path: 'destinations/giza', count: 1 }])
   })
   it('an unpublished page shows only in preview, flagged', async () => {
@@ -288,7 +290,7 @@ describe('the tour\'s wording in the page language (approved translation)', () =
     expect(page!.tour!.facts!.price).toEqual(FACTS.price)
 
     const listing = await loadPagePayload(base as never, { siteId: SITE, language: 'fr', path: 'tours', preview: false }, { tourFacts: async () => FACTS })
-    expect(listing!.tours).toEqual([{ title: 'Le Nil classique', path: 'tours/le-nil-classique', card: { days: 1, nights: 0, cities: ['Gizeh'], from: { amount: 99, currency: 'EUR' }, image: null } }])
+    expect(listing!.tours).toEqual([{ title: 'Le Nil classique', path: 'tours/le-nil-classique', card: { days: 1, nights: 0, cities: ['Gizeh'], from: { amount: 99, currency: 'EUR' }, image: null, type: null, hours: null } }])
     expect(listing!.destinations).toEqual([{ name: 'Gizeh', path: 'destinations/giza', count: 1 }])
   })
 })

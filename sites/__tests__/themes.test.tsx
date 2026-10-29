@@ -147,17 +147,27 @@ for (const archetype of ARCHETYPES) {
     })
     it('every number on the page comes from the facts', () => {
       const allowed = new Set(['841', '682', '904', '25', '2026', '16', '30', '100', '5', '2', '8', '3', '4', '1'])
+      // Modern's free window starts the day after the policy's earliest charge (30 → "31+ days").
+      if (archetype === 'modern') allowed.add('31')
       for (const n of words.match(/\d+/g) ?? []) expect(allowed, n).toContain(n)
     })
     it('days, inclusions, where it sleeps, group size, departure days and terms — no "daily", no "free"', () => {
       expect(words).toContain('Day 1')
       expect(words).toContain('Visits: Giza Pyramids')
       expect(words).toContain('Nile View, Cairo')
-      expect(words).toContain('2–8 travellers')
       expect(words).toContain('Departs: Monday and Friday')
-      expect(words).toContain('30 days or fewer before departure: 25% charged when cancelled')
-      expect(words).toContain('On the day of departure: 100% charged when cancelled')
-      expect(words.toLowerCase()).not.toMatch(/\bdaily\b|\bfree\b|refund/)
+      if (archetype === 'modern') {
+        // The template: the terms as one row of cells, the free window first —
+        // the stretch before the policy's earliest charge, and nothing else.
+        expect(words).toContain('31+ days Free 1–30 days 25% On the day 100%')
+        expect(words).toContain('Free cancellation up to 31 days before')
+        expect(words.toLowerCase()).not.toMatch(/\bdaily\b|refund/)
+      } else {
+        expect(words).toContain('2–8 travellers')
+        expect(words).toContain('30 days or fewer before departure: 25% charged when cancelled')
+        expect(words).toContain('On the day of departure: 100% charged when cancelled')
+        expect(words.toLowerCase()).not.toMatch(/\bdaily\b|\bfree\b|refund/)
+      }
       expect(html).toContain('src="https://cdn.test/hero.jpg"')
     })
     it('the archetype decides the order', () => {
