@@ -125,6 +125,14 @@ export function legalOf(settings: unknown): { legalEntity: string | null; termsU
   return { legalEntity: blankToNull(l.entity), termsUrl: https(l.termsUrl), privacyUrl: https(l.privacyUrl) }
 }
 
+/** The agency's About text in a language (publish_sites.settings.about),
+ *  written and saved by a manager; null when there is none. */
+export function aboutOf(settings: unknown, language: string): string | null {
+  const a = (settings as { about?: Record<string, unknown> } | null)?.about
+  const v = a && typeof a === 'object' ? a[language] : null
+  return typeof v === 'string' && v.trim() ? v.trim() : null
+}
+
 // ---------- the site behind a hostname ----------
 
 export async function resolveSiteByHost(db: Db, rawHost: string): Promise<SiteResolution | null> {
@@ -320,11 +328,14 @@ export async function loadPagePayload(db: Db, input: {
     }
   }
 
-  // The home page and the tour listing exist even before a page row is made
-  // for them: a site with only tour pages still has a front door.
-  if (!row && target.kind !== 'home' && target.kind !== 'listing') return null
+  // The home page, the tour listing, and the About and Contact pages exist
+  // even before a page row is made for them: every site has a front door and
+  // a way to reach the company. A row of that kind, where there is one, wins.
+  const standing = target.kind === 'page' && (target.slug === 'about' || target.slug === 'contact')
+    && !locales.some(r => r.publish_pages!.kind === target.slug) ? target.slug as 'about' | 'contact' : null
+  if (!row && target.kind !== 'home' && target.kind !== 'listing' && !standing) return null
 
-  const kind: PagePayload['kind'] = row?.publish_pages?.kind ?? (target.kind === 'home' ? 'home' : 'listing')
+  const kind: PagePayload['kind'] = row?.publish_pages?.kind ?? standing ?? (target.kind === 'home' ? 'home' : 'listing')
   const templateId = kind === 'tour' ? row?.publish_pages?.tour_template_id ?? null : null
   let tour: PagePayload['tour'] = null
   if (templateId) {
@@ -386,9 +397,9 @@ export async function loadPagePayload(db: Db, input: {
       .filter(r => siteInfo.languages.includes(r.language) && showable(r, input.preview))
       .map(r => ({ language: r.language, path: pathOf(r) }))
   } else {
-    // A synthetic home or listing exists in every language of the site.
+    // A synthetic home, listing, About or Contact exists in every language of the site.
     alternates = siteInfo.languages.filter(l => l !== input.language)
-      .map(l => ({ language: l, path: kind === 'home' ? '' : 'tours' }))
+      .map(l => ({ language: l, path: standing ?? (kind === 'home' ? '' : 'tours') }))
   }
 
   // Real reviews only, from the business the agency picked; home and tours.
@@ -400,7 +411,8 @@ export async function loadPagePayload(db: Db, input: {
   return {
     kind,
     language: input.language,
-    path: row ? pathOf(row) : (kind === 'home' ? '' : 'tours'),
+    path: row ? pathOf(row) : standing ?? (kind === 'home' ? '' : 'tours'),
+    ...(kind === 'about' && aboutOf(site.settings, input.language) ? { about: aboutOf(site.settings, input.language)! } : {}),
     ...(reviews ? { reviews } : {}),
     title: tour?.name ?? siteInfo.companyName,
     site: siteInfo,
@@ -458,6 +470,7 @@ export async function loadSitemap(db: Db, siteId: string, deps: Pick<PageDeps, '
   const all = (path: string) => Object.fromEntries(languages.map(l => [l, path]))
   if (!pages.some(p => p.kind === 'home')) pages.unshift({ kind: 'home', paths: all(''), lastModified: null })
   if (!pages.some(p => p.kind === 'listing')) pages.splice(1, 0, { kind: 'listing', paths: all('tours'), lastModified: null })
+  for (const k of ['about', 'contact'] as const) if (!pages.some(p => p.kind === k)) pages.push({ kind: k, paths: all(k), lastModified: null })
 
   // Destination pages: one per place a published tour goes, in the languages
   // that tour is published in (the same rule as the pages themselves).

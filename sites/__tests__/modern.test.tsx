@@ -308,6 +308,12 @@ describe('the website template', () => {
     expect(a).toContain('Licences and registration')
     expect(a.replace(/&amp;/g, '&')).toContain('Registered company Nile & Co Travel S.A.E.')
     expect(a).toContain('Licence number ETAA 1234')
+    const withText = render(home({ kind: 'about', path: 'about', site: fullSite, about: 'A family business.\n\nSince 2003.' }))
+    expect(withText).toContain('<p>A family business.</p><p>Since 2003.</p>')
+  })
+  it('every page\'s footer links to About and Contact', () => {
+    expect(html).toContain('href="/en/about"')
+    expect(html).toContain('href="/en/contact"')
   })
   it('contact: the ways to reach them, the form, and a confirmation shown in its place once sent', () => {
     const c = render(home({ kind: 'contact', path: 'contact', site: fullSite }))

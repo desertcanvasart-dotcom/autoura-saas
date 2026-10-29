@@ -137,6 +137,8 @@ export async function POST(request: NextRequest) {
             is_featured: false,
             // Not stated: a tour built from one trip has no fixed weekdays (migration 441).
             departure_days: [],
+            // Not stated either: the guides' languages (migration 444).
+            guide_languages: [],
           })
           .select().single()
 

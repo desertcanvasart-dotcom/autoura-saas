@@ -151,13 +151,15 @@ export function translateFacts(facts: TourFacts, labels: Record<string, string>)
   const trn = (s: string | null) => (s === null ? null : tr(s))
   return {
     ...facts,
-    days: facts.days.map(d => ({ ...d, title: trn(d.title), city: trn(d.city), sights: d.sights.map(tr) })),
+    days: facts.days.map(d => ({ ...d, title: trn(d.title), city: trn(d.city), sights: d.sights.map(tr), ...(d.stops ? { stops: d.stops.map(x => ({ ...x, name: tr(x.name) })) } : {}) })),
     mainAttractions: facts.mainAttractions.map(tr),
     highlights: facts.highlights.map(tr),
     inclusions: facts.inclusions.map(tr),
     exclusions: facts.exclusions.map(tr),
     accommodation: facts.accommodation.map(a => ({ ...a, city: trn(a.city) })),
     price: { ...facts.price, tierLabel: trn(facts.price.tierLabel) },
+    ...(facts.tourType !== undefined ? { tourType: trn(facts.tourType ?? null) } : {}),
+    ...(facts.pickup ? { pickup: { ...facts.pickup, area: trn(facts.pickup.area), meetingPoint: trn(facts.pickup.meetingPoint) } } : {}),
   }
 }
 

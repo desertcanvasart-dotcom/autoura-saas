@@ -84,6 +84,8 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
             </ul>
             <ul className={s.footerList}>
               <li><a href={`/${lang}/tours`}>{t(lang, 'tours')}</a></li>
+              <li><a href={`/${lang}/about`}>{t(lang, 'aboutTitle')}</a></li>
+              <li><a href={`/${lang}/contact`}>{t(lang, 'contact')}</a></li>
               {identity.termsUrl && <li><a href={identity.termsUrl}>{t(lang, 'bookingTerms')}</a></li>}
               {identity.privacyUrl && <li><a href={identity.privacyUrl}>{t(lang, 'privacy')}</a></li>}
               <li><button type="button" className={s.linkButton} popoverTarget="cookie-settings">{t(lang, 'cookieSettings')}</button></li>
@@ -537,6 +539,8 @@ function AboutPage({ page }: ThemePageProps) {
       <section className={`${s.container} ${s.pageHead}`}>
         <h1 className={s.h1}>{t(lang, 'aboutTitle')}</h1>
         <p className={s.lead}>{identity.tagline ?? companyName}</p>
+        {/* The agency's own words, as a manager saved them; nothing when there are none. */}
+        {page.about && <div className={s.aboutText}>{paragraphs(page.about).map((p, i) => <p key={i}>{p}</p>)}</div>}
       </section>
       <WhyUs page={page} />
       {rows.some(([, v]) => v) && (

@@ -24,9 +24,9 @@ import { checkSegments, type CheckResult, type Segment } from './engine/fact-che
 import { namesFromFacts } from './engine/slots'
 import type { EngineContent, DraftResult, PartKind } from './engine/engine'
 import { checkTranslation } from './engine/translate'
-import { loadTourFacts } from './tour-facts'
+import { loadTourFacts, stopsOf } from './tour-facts'
 import { loadRateProposal, rateStatus, readSavedRate, sameBands, bandSchema, type RateProposal } from './public-rate'
-import { indicativeCurrenciesOf, legalOf } from './site-data'
+import { aboutOf, indicativeCurrenciesOf, legalOf } from './site-data'
 import { engineBrand, generateTourDraft, generateTourTranslation } from './engine/generate'
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
 import { publishTags } from './sync/events'
@@ -159,13 +159,14 @@ export async function createTourPage(db: Db, actor: Actor, templateId: string) {
 
 async function pageOf(db: Db, tenantId: string, pageId: string) {
   const { data, error } = await db.from('publish_pages')
-    .select('id, site_id, kind, tour_template_id, public_rate, public_rate_approved_at, public_rate_approver_name, tour_templates(template_name), publish_page_locales(id, language, slug, is_published, current_version_id, published_at)')
+    .select('id, site_id, kind, tour_template_id, public_rate, public_rate_approved_at, public_rate_approver_name, faq, tour_templates(template_name), publish_page_locales(id, language, slug, is_published, current_version_id, published_at)')
     .eq('id', pageId).eq('tenant_id', tenantId).maybeSingle()
   check('the page', error)
   if (!data) fail('No such page in this company.', 404)
   return data as {
     id: string; site_id: string; kind: string; tour_template_id: string | null; tour_templates: { template_name: string } | null
     public_rate: unknown; public_rate_approved_at: string | null; public_rate_approver_name: string | null
+    faq: unknown
     publish_page_locales: Array<{ id: string; language: string; slug: string; is_published: boolean; current_version_id: string | null; published_at: string | null }>
   }
 }
@@ -186,9 +187,10 @@ export async function pageDetail(db: Db, actor: Actor, pageId: string, language:
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   const page = await pageOf(db, actor.tenantId, pageId)
   const locale = page.publish_page_locales.find(l => l.language === language) ?? fail(`This page has no ${language} version.`, 404)
-  const [facts, rate, drafts, versions] = await Promise.all([
+  const [facts, rate, details, drafts, versions] = await Promise.all([
     factsFor(db, deps, actor.tenantId, page, language, site!.settings),
     rateOf(db, deps, actor.tenantId, page),
+    tourDetailsOf(db, actor.tenantId, page),
     db.from('publish_drafts').select('id, kind, content, check_result, status, origin, model, reviewer_note, reviewed_at, created_at, updated_at')
       .eq('page_id', pageId).eq('tenant_id', actor.tenantId).eq('language', language).order('created_at', { ascending: false }).limit(40),
     db.from('publish_versions').select('id, version_no, reason, approver_name, approved_at, draft_id')
@@ -205,10 +207,120 @@ export async function pageDetail(db: Db, actor: Actor, pageId: string, language:
     locales: page.publish_page_locales,
     facts,
     rate,
+    details,
     narrative,
     drafts: drafts.data ?? [],
     versions: versions.data ?? [],
   }
+}
+
+// ---------- the details the website template shows (migration 444) ----------
+
+/** Languages a manager can say a tour's guides speak (two-letter codes). */
+export const GUIDE_LANGUAGES = ['en', 'fr', 'es', 'de', 'it', 'pt', 'nl', 'ru', 'pl', 'zh', 'ja', 'ko', 'ar'] as const
+const MAX_FAQ = 12
+
+interface TourDetails {
+  meetingPoint: string | null
+  guideLanguages: string[]
+  durationHours: number | null
+  /** Only a one-day tour has stops with times; null for a longer one. */
+  stops: Array<{ time: string | null; name: string }> | null
+  faq: Record<string, Array<{ question: string; answer: string }>>
+}
+
+async function tourDetailsOf(db: Db, tenantId: string, page: Awaited<ReturnType<typeof pageOf>>): Promise<TourDetails | null> {
+  if (!page.tour_template_id) return null
+  const { data, error } = await db.from('tour_templates').select('meeting_point, guide_languages, duration_hours, duration_days, itinerary')
+    .eq('id', page.tour_template_id).eq('tenant_id', tenantId).maybeSingle()
+  check('the tour', error)
+  if (!data) return null
+  const days = Array.isArray(data.itinerary) ? data.itinerary : []
+  const oneDay = (data.duration_days ?? days.length) === 1 && days.length <= 1
+  const faq: TourDetails['faq'] = {}
+  for (const [lang, list] of Object.entries((page.faq ?? {}) as Record<string, unknown>)) {
+    if (Array.isArray(list)) faq[lang] = list.filter((x): x is { question: string; answer: string } => !!x && typeof x.question === 'string' && typeof x.answer === 'string')
+  }
+  return {
+    meetingPoint: data.meeting_point ?? null,
+    guideLanguages: data.guide_languages ?? [],
+    durationHours: data.duration_hours ?? null,
+    stops: oneDay ? stopsOf(days[0]?.stops) : null,
+    faq,
+  }
+}
+
+/**
+ * A manager states the tour facts the website shows that no other screen
+ * records: where it meets, the guides' languages, a day tour's length in
+ * hours and its stops with approximate times. Written to the tour itself;
+ * the itinerary is MERGED (only the day's `stops` change) — never rebuilt.
+ */
+export async function saveTourDetails(db: Db, actor: Actor, pageId: string, input: Record<string, unknown>, deps: AdminDeps = defaultDeps) {
+  const page = await pageOf(db, actor.tenantId, pageId)
+  if (!page.tour_template_id) fail('Only a tour page has tour details.', 409)
+  const { data: tour, error } = await db.from('tour_templates').select('id, duration_days, itinerary')
+    .eq('id', page.tour_template_id!).eq('tenant_id', actor.tenantId).maybeSingle()
+  check('the tour', error)
+  if (!tour) fail('The tour no longer exists.', 404)
+
+  const patch: Record<string, unknown> = {}
+  if ('meetingPoint' in input) {
+    const v = input.meetingPoint
+    if (v !== null && typeof v !== 'string') fail('Say where the tour meets, or leave it empty.')
+    patch.meeting_point = typeof v === 'string' && v.trim() ? v.trim().slice(0, 500) : null
+  }
+  if ('guideLanguages' in input) {
+    const v = input.guideLanguages
+    if (!Array.isArray(v) || v.some(c => !(GUIDE_LANGUAGES as readonly string[]).includes(c as string))) fail(`Guide languages must be among: ${GUIDE_LANGUAGES.join(', ')}.`)
+    patch.guide_languages = [...new Set(v as string[])]
+  }
+  if ('durationHours' in input) {
+    const v = input.durationHours
+    if (v !== null && !(typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 24)) fail('A day tour lasts between 1 and 24 hours.')
+    // Whole hours, as the tour sheet carries them (a round trip stays exact).
+    patch.duration_hours = v === null ? null : Math.round(v as number)
+  }
+  if ('stops' in input) {
+    const days = Array.isArray(tour!.itinerary) ? [...tour!.itinerary as Record<string, unknown>[]] : []
+    if ((tour!.duration_days ?? days.length) !== 1 || days.length > 1) fail('Stops with times are for a one-day tour.', 409)
+    const raw = input.stops
+    if (!Array.isArray(raw) || raw.length > 20) fail('List up to 20 stops.')
+    for (const x of raw as unknown[]) {
+      const r = (x ?? {}) as { time?: unknown; name?: unknown }
+      if (typeof r.name !== 'string' || !r.name.trim()) fail('Every stop needs a name.')
+      if (r.time !== null && r.time !== undefined && r.time !== '' && !(typeof r.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.time))) fail(`"${r.time}" is not a time — use HH:MM, or leave it empty.`)
+    }
+    const stops = stopsOf(raw).map(x => ({ time: x.time, name: x.name.slice(0, 200) }))
+    // Merge into the day as stored: every other key of the day is kept.
+    days[0] = { ...(days[0] ?? { day: 1 }), stops }
+    patch.itinerary = days
+  }
+  if (Object.keys(patch).length === 0) fail('Nothing to save.')
+  const { error: uErr } = await db.from('tour_templates').update(patch).eq('id', tour!.id).eq('tenant_id', actor.tenantId)
+  if (uErr) fail(`Could not save the tour details: ${uErr.message}`, 500)
+  return { saved: true, warning: await refresh(deps, actor.tenantId) }
+}
+
+/** A manager saves the page's questions and answers in one language. What
+ *  they save is what the page shows — nothing is written for them. */
+export async function savePageFaq(db: Db, actor: Actor, pageId: string, language: unknown, items: unknown, deps: AdminDeps = defaultDeps) {
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  if (typeof language !== 'string' || !site!.languages.includes(language)) fail('Choose one of the website\'s languages.')
+  const page = await pageOf(db, actor.tenantId, pageId)
+  if (!Array.isArray(items) || items.length > MAX_FAQ) fail(`Up to ${MAX_FAQ} questions.`)
+  const clean = (items as unknown[]).map(x => {
+    const r = (x ?? {}) as { question?: unknown; answer?: unknown }
+    const q = typeof r.question === 'string' ? r.question.trim() : ''
+    const a = typeof r.answer === 'string' ? r.answer.trim() : ''
+    if (!q || !a) fail('Every question needs its answer (and every answer its question).')
+    if (q.length > 200 || a.length > 2000) fail('Keep a question under 200 characters and an answer under 2,000.')
+    return { question: q, answer: a }
+  })
+  const faq = { ...((page.faq ?? {}) as Record<string, unknown>), [language as string]: clean }
+  const { error } = await db.from('publish_pages').update({ faq }).eq('id', pageId).eq('tenant_id', actor.tenantId)
+  if (error) fail(`Could not save the questions: ${error.message}`, 500)
+  return { saved: true, warning: await refresh(deps, actor.tenantId) }
 }
 
 // ---------- the public rate: one price per tour ----------
@@ -533,6 +645,8 @@ export async function lookOf(db: Db, actor: Actor) {
     resolved: { palette: resolved.palette, fontPair: resolved.fontPair, onPrimary: resolved.onPrimary, onAccent: resolved.onAccent },
     problems: resolved.problems,
     footer: await footerOf(db, actor.tenantId, site!.settings),
+    languages: site!.languages,
+    about: Object.fromEntries(site!.languages.map(l => [l, aboutOf(site!.settings, l) ?? ''])),
     choices: {
       archetypes: ARCHETYPES.map(a => ({ key: a, defaults: ARCHETYPE_DEFAULTS[a] })),
       palettes: PALETTE_PRESETS,
@@ -544,7 +658,7 @@ export async function lookOf(db: Db, actor: Actor) {
 /** Save the theme, palette and fonts. Colours that would be hard to read
  *  are refused with the reason — the website never gets them. The rest of
  *  the stored brand (tone, claims, words to avoid) is kept. */
-export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown; legal?: unknown }, deps: AdminDeps = defaultDeps) {
+export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown; legal?: unknown; about?: unknown }, deps: AdminDeps = defaultDeps) {
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   if (typeof input.archetype !== 'string' || !(ARCHETYPES as readonly string[]).includes(input.archetype)) fail(`Choose a theme: one of ${ARCHETYPES.join(', ')}.`)
   const archetype = input.archetype as Archetype
@@ -573,6 +687,19 @@ export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown
     }
     const legal = { entity: text(raw.entity, 200), termsUrl: link(raw.termsUrl, 'The booking terms link'), privacyUrl: link(raw.privacyUrl, 'The privacy notice link') }
     settings = { ...((site!.settings ?? {}) as Record<string, unknown>), legal }
+  }
+  // The About page's text, per language of the site, as the manager wrote it.
+  if (input.about !== undefined) {
+    const raw = (input.about ?? {}) as Record<string, unknown>
+    const about: Record<string, string> = {}
+    for (const lang of site!.languages) {
+      const v = raw[lang]
+      if (typeof v === 'string' && v.trim()) {
+        if (v.length > 6000) fail('Keep the About text under 6,000 characters.')
+        about[lang] = v.trim()
+      }
+    }
+    settings = { ...(settings ?? (site!.settings ?? {}) as Record<string, unknown>), about }
   }
   const { error } = await db.from('publish_sites').update({ archetype, brand: next, ...(settings ? { settings } : {}) }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not save the look: ${error.message}`, 500)

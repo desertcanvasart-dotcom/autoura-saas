@@ -42,13 +42,15 @@ export function labelSources(facts: TourFacts | null, tourName: string): string[
   }
   add(tourName)
   if (!facts) return out
-  for (const d of facts.days) { add(d.title); add(d.city); d.sights.forEach(add) }
+  for (const d of facts.days) { add(d.title); add(d.city); d.sights.forEach(add); d.stops?.forEach(x => add(x.name)) }
   facts.mainAttractions.forEach(add)
   facts.highlights.forEach(add)
   facts.inclusions.forEach(add)
   facts.exclusions.forEach(add)
   for (const a of facts.accommodation) add(a.city)
   add(facts.price.tierLabel)
+  add(facts.tourType)
+  add(facts.pickup?.meetingPoint)
   return out
 }
 

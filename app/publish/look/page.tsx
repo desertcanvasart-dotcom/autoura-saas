@@ -21,6 +21,8 @@ interface Look {
   stored: { website: string | null }
   resolved: { palette: Palette; fontPair: string }
   problems: string[]
+  languages: string[]
+  about: Record<string, string>
   footer: { legalEntity: string | null; termsUrl: string | null; privacyUrl: string | null; licenseNumber: string | null; address: string | null; whatsapp: string | null }
   choices: {
     archetypes: Array<{ key: string; defaults: { palette: Palette; fontPair: string } }>
@@ -48,6 +50,7 @@ export default function PublishLookPage() {
   const [fontPair, setFontPair] = useState('sleek')
   const [website, setWebsite] = useState('')
   const [legal, setLegal] = useState({ entity: '', termsUrl: '', privacyUrl: '' })
+  const [about, setAbout] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -58,6 +61,7 @@ export default function PublishLookPage() {
       setPalette(j.data.resolved.palette)
       setFontPair(j.data.resolved.fontPair)
       setWebsite(j.data.stored.website ?? '')
+      setAbout(j.data.about ?? {})
       setLegal({ entity: j.data.footer.legalEntity ?? '', termsUrl: j.data.footer.termsUrl ?? '', privacyUrl: j.data.footer.privacyUrl ?? '' })
     }).catch(e => showToast('error', e instanceof Error ? e.message : 'Could not load the look'))
   }, [])
@@ -82,7 +86,7 @@ export default function PublishLookPage() {
   async function save() {
     setSaving(true)
     try {
-      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website, legal }) })
+      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website, legal, about }) })
       const j = await res.json()
       if (!j.success) throw new Error(j.error)
       showToast(j.data.warning ? 'warning' : 'success', j.data.warning ?? 'Saved — your website shows the new look now')
@@ -193,6 +197,19 @@ export default function PublishLookPage() {
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-gray-900 mb-1">About page</h2>
+            <p className="text-xs text-gray-500 mb-3">Your own words about the company, shown on the About page above your licence and registration. Separate paragraphs with an empty line. Leave a language empty and its About page shows only your details.</p>
+            <div className="space-y-3">
+              {look.languages.map(l => (
+                <label key={l} className="block text-xs text-gray-600">{new Intl.DisplayNames(['en'], { type: 'language' }).of(l) ?? l}
+                  <textarea value={about[l] ?? ''} disabled={!canManage} rows={5} maxLength={6000} onChange={e => setAbout({ ...about, [l]: e.target.value })}
+                    className="mt-1 w-full text-sm border border-gray-300 rounded-md px-3 py-2" />
+                </label>
+              ))}
+            </div>
           </section>
 
           {canManage && (

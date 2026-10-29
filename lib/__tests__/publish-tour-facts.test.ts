@@ -267,3 +267,31 @@ describe('loadTourFacts', () => {
       .rejects.toThrow(/does not exist for this company/)
   })
 })
+
+describe('the template\'s details (migration 444)', () => {
+  const day = (over: Record<string, unknown> = {}) => input({
+    language: 'fr',
+    template: { ...input().template, duration_days: 1, duration_nights: 0, duration_hours: 7, tour_type: 'day_tour', pickup_required: null, transportation_city: 'Cairo',
+      meeting_point: 'Hotel lobby', guide_languages: ['en', 'fr', 'xx1'],
+      itinerary: [{ day: 1, city: 'Giza', title: 'Giza', meals: {}, stops: [{ time: '08:00', name: 'Pickup' }, { time: '8am', name: 'Giza Pyramids' }, { time: '09:00', name: '' }] }], ...over },
+    tourTypeLabels: new Map([['day_tour', 'Excursion']]),
+    faq: { en: [{ question: 'Q?', answer: 'A.' }], fr: [{ question: 'Q ?', answer: 'R.' }, { question: 'Sans réponse', answer: '' }] },
+  })
+  it('states what the records hold, in the page language — and nothing they do not', () => {
+    const f = assembleTourFacts(day())
+    expect(f.days[0].stops).toEqual([{ time: '08:00', name: 'Pickup' }, { time: null, name: 'Giza Pyramids' }])
+    expect(f.guideLanguages).toEqual(['Anglais', 'Français'])
+    expect(f.faq).toEqual([{ question: 'Q ?', answer: 'R.' }])
+    expect(f.durationHours).toBe(7)
+    expect(f.tourType).toBe('Excursion')
+    // pickup not stated, but a meeting point is: shown, with no pickup claimed
+    expect(f.pickup).toEqual({ included: false, area: null, meetingPoint: 'Hotel lobby' })
+    expect(tourFactsSchema.safeParse(f).success).toBe(true)
+  })
+  it('nothing stated, nothing shown', () => {
+    const f = assembleTourFacts(day({ meeting_point: null, guide_languages: [], itinerary: [{ day: 1, city: 'Giza' }] }))
+    expect(f.pickup).toBeNull()
+    expect(f.guideLanguages).toEqual([])
+    expect(f.days[0].stops).toBeUndefined()
+  })
+})

@@ -55,7 +55,9 @@ const SITES = {
   'modern.localhost': {
     id: '00000000-0000-4000-8000-00000000f002', tenantId: '00000000-0000-4000-8000-00000000f001',
     archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
-    companyName: 'Nile & Co (dev)', brand: { claims: ['Egyptologist guides on every tour', 'Private tours — just your group'] },
+    companyName: 'Nile & Co (dev)',
+    about: { en: 'Nile & Co is a family business from Garden City, Cairo (dev text).\n\nOur Egyptologist guides have shown travellers the Nile valley for twenty years — every tour is private, just your group.' },
+    brand: { claims: ['Egyptologist guides on every tour', 'Private tours — just your group'] },
     // Invented Google reviews, to see the reviews sections in dev.
     reviews: { name: 'Nile & Co (dev)', rating: 4.8, count: 312, url: null, reviews: [
       { author: 'Sam (dev)', authorUrl: null, authorPhoto: null, rating: 5, text: 'Our guide made the pyramids come alive. Pickup on time, everything as promised.', translated: false, original: null, when: '2 weeks ago', url: null },
@@ -201,7 +203,8 @@ function page(s, lang, path, preview) {
   const destinations = [...places].map(([slug, p]) => ({ name: p.name, path: `destinations/${slug}`, count: p.tours.size })).sort((a, b) => b.count - a.count)
   const base = { language: lang, site: siteInfo(s), tour: null, tours: [], unpublished: false, destinations }
   if (path === '') return { ...base, kind: 'home', path: '', title: s.companyName, alternates: [{ language: other, path: '' }], tours: links, ...(s.reviews ? { reviews: s.reviews } : {}) }
-  if (path === 'about' || path === 'contact') return { ...base, kind: path, path, title: s.companyName, alternates: [{ language: other, path }], pageId: null, ...(s.reviews && path === 'about' ? { reviews: s.reviews } : {}) }
+  if (path === 'about' || path === 'contact') return { ...base, kind: path, path, title: s.companyName, alternates: [{ language: other, path }], pageId: null, ...(s.reviews && path === 'about' ? { reviews: s.reviews } : {}),
+    ...(path === 'about' && s.about?.[lang] ? { about: s.about[lang] } : {}) }
   if (path === 'tours') return { ...base, kind: 'listing', path: 'tours', title: s.companyName, alternates: [{ language: other, path: 'tours' }], tours: links }
   const dm = path.match(/^destinations\/([a-z0-9-]+)$/)
   if (dm) {

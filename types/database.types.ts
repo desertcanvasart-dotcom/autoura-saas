@@ -8100,6 +8100,7 @@ export interface Database {
           public_rate_approved_at: string | null
           public_rate_approved_by: string | null
           public_rate_approver_name: string | null
+          faq: Json
         }
         Insert: {
           id?: string
@@ -8114,6 +8115,7 @@ export interface Database {
           public_rate_approved_at?: string | null
           public_rate_approved_by?: string | null
           public_rate_approver_name?: string | null
+          faq: Json
         }
         Update: {
           id?: string
@@ -8128,6 +8130,7 @@ export interface Database {
           public_rate_approved_at?: string | null
           public_rate_approved_by?: string | null
           public_rate_approver_name?: string | null
+          faq?: Json
         }
         Relationships: [
           {
@@ -11247,6 +11250,8 @@ export interface Database {
           tour_theme: string | null
           departure_days: string[]
           cancellation_policy_id: string | null
+          meeting_point: string | null
+          guide_languages: string[]
         }
         Insert: {
           id?: string
@@ -11289,6 +11294,8 @@ export interface Database {
           tour_theme?: string | null
           departure_days: string[]
           cancellation_policy_id?: string | null
+          meeting_point?: string | null
+          guide_languages: string[]
         }
         Update: {
           id?: string
@@ -11331,6 +11338,8 @@ export interface Database {
           tour_theme?: string | null
           departure_days?: string[]
           cancellation_policy_id?: string | null
+          meeting_point?: string | null
+          guide_languages?: string[]
         }
         Relationships: [
           {
