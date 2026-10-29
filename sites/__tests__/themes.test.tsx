@@ -140,8 +140,14 @@ for (const archetype of ARCHETYPES) {
       expect(words).not.toContain('€840')
       expect(words).toContain('per person · Deluxe')
       expect(words).toContain('Total €1,682') // the shown €841 × 2 travellers
-      expect(words).toContain('Lower per person for larger groups')
-      expect(words).toMatch(/≈ \$904 per person · Indicative only \(you pay in EUR/)
+      if (archetype === 'modern') {
+        // The template's wording (boards, 2026-10-29).
+        expect(words).toContain('Price for 2 travellers · lower for larger groups')
+        expect(words).toMatch(/Charged in EUR\. About \$904 per person at the rate of/)
+      } else {
+        expect(words).toContain('Lower per person for larger groups')
+        expect(words).toMatch(/≈ \$904 per person · Indicative only \(you pay in EUR/)
+      }
       // One price for one configuration: no band table, no second figure.
       expect(words).not.toContain('€735')
       expect(words).not.toMatch(/passport|nationalit|residen/i)
@@ -161,7 +167,7 @@ for (const archetype of ARCHETYPES) {
       if (archetype === 'modern') {
         // The template: the terms as one row of cells, the free window first —
         // the stretch before the policy's earliest charge, and nothing else.
-        expect(words).toContain('31+ days Free 1–30 days 25% On the day 100%')
+        expect(words).toContain('31+ days before Free 30 to 1 days 25% charged Day of the tour 100% charged')
         expect(words).toContain('Free cancellation up to 31 days before')
         expect(words.toLowerCase()).not.toMatch(/\bdaily\b|refund/)
       } else {

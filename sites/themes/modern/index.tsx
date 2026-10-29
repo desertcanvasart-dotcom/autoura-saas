@@ -33,6 +33,8 @@ import { defaultPicture, tourPicture, tourPhotos, type Picture } from '../../lib
 import { RouteMap } from './RouteMap'
 import { BookingCard } from './BookingCard'
 import { TourCard, TourFinder, type FinderTour } from './TourFinder'
+import { ShareButton } from './ShareButton'
+import { GalleryRail } from './GalleryRail'
 import s from './theme.module.css'
 
 const AUTOURA = 'https://getautoura.net'
@@ -50,6 +52,7 @@ const ICONS = {
   guide: <path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4.5 21c.8-4 3.8-6 7.5-6s6.7 2 7.5 6" />,
   tag: <path d="M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01" />,
   whatsapp: <path d="M5 19l1.2-3.6A7.5 7.5 0 1112 19.5a7.4 7.4 0 01-3.5-.9L5 19z" />,
+  pin: <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />,
 } as const
 function Icon({ name, className }: { name: keyof typeof ICONS; className?: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className={className ?? s.icon}>{ICONS[name]}</svg>
@@ -122,10 +125,8 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
               </ul>
             </div>
             <div>
-              <p className={s.footerHead}>{t(lang, 'exploreHeading')}</p>
+              <p className={s.footerHead}>{t(lang, 'legalHeading')}</p>
               <ul className={s.footerList}>
-                <li><a href={`/${lang}/tours`}>{t(lang, 'tours')}</a></li>
-                <li><a href={`/${lang}/contact`}>{t(lang, 'contact')}</a></li>
                 {identity.termsUrl && <li><a href={identity.termsUrl}>{t(lang, 'bookingTerms')}</a></li>}
                 {identity.privacyUrl && <li><a href={identity.privacyUrl}>{t(lang, 'privacyPolicy')}</a></li>}
                 <li><button type="button" className={s.linkButton} popoverTarget="cookie-settings">{t(lang, 'cookieSettings')}</button></li>
@@ -442,8 +443,10 @@ function Gallery({ pictures, name, lang }: { pictures: Picture[]; name: string; 
   const shown = pictures.slice(0, 5)
   const photos = pictures.filter(p => p.kind === 'photo')
   return (
-    <section className={s.gallery} data-count={shown.length} aria-label={name}>
-      {shown.map((p, i) => <PictureView key={p.kind === 'photo' ? p.src : p.art} picture={p} className={i === 0 ? s.galleryMain : s.galleryImg} eager={i === 0} fit={shown.length === 1 ? 'contain' : 'cover'} />)}
+    <section className={s.gallery} data-count={shown.length}>
+      <GalleryRail count={shown.length} label={name}>
+        {shown.map((p, i) => <PictureView key={p.kind === 'photo' ? p.src : p.art} picture={p} className={i === 0 ? s.galleryMain : s.galleryImg} eager={i === 0} fit={shown.length === 1 ? 'contain' : 'cover'} />)}
+      </GalleryRail>
       {photos.length > 1 && (
         <>
           <button type="button" className={s.galleryAll} popoverTarget="all-photos">{t(lang, 'viewAllPhotos')} {photos.length} {t(lang, 'photosWord')}</button>
@@ -458,6 +461,16 @@ function Gallery({ pictures, name, lang }: { pictures: Picture[]; name: string; 
 }
 
 const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+
+/** "Runs Mon, Wed and Fri" — the booking card's line under the date. */
+function runsText(facts: TourFacts, lang: string): string | null {
+  if (facts.departureDays.length === 7) return t(lang, 'runsEveryDay')
+  if (facts.departureDays.length === 0) return null
+  const fmt = new Intl.DateTimeFormat(lang, { weekday: 'short', timeZone: 'UTC' })
+  const names = WEEK.filter(d => facts.departureDays.includes(d)).map(d => fmt.format(new Date(Date.UTC(2023, 0, 2 + WEEK.indexOf(d)))))
+  // British English, as the site's own words are ("Mon, Wed and Fri").
+  return `${t(lang, 'runsOn')} ${new Intl.ListFormat(lang === 'en' ? 'en-GB' : lang, { style: 'long', type: 'conjunction' }).format(names)}`
+}
 
 /** "Mon, Wed, Fri" — or "Every day"; else the next dated departure. */
 function departsText(facts: TourFacts, lang: string): string | null {
@@ -606,8 +619,15 @@ function TourPage({ page }: ThemePageProps) {
         {page.unpublished && <p className={s.unpublished}>{t(lang, 'notYetPublished')}</p>}
         <Breadcrumb page={page} name={tour.name} />
         <header className={s.tourHead} data-section="hero">
-          <h1 className={s.tourTitle}>{tour.name}</h1>
-          <RatingLine page={page} />
+          <div className={s.tourHeadRow}>
+            <h1 className={s.tourTitle}>{tour.name}</h1>
+            <ShareButton title={tour.name} lang={lang} />
+          </div>
+          <div className={s.byLine}>
+            <RatingLine page={page} />
+            {/* A tour with dated departures is shared; otherwise it is the visitor's own. */}
+            <span>{t(lang, facts && facts.departures.length > 0 ? 'tourBy' : 'privateTourBy')} {page.site.companyName}</span>
+          </div>
         </header>
         <Gallery pictures={pictures} name={tour.name} lang={lang} />
         {facts && <KeyFacts facts={facts} lang={lang} />}
@@ -626,12 +646,12 @@ function TourPage({ page }: ThemePageProps) {
             </Section>
           )}
           {facts && facts.days.length > 0 && (
-            <Section id="itinerary" title={t(lang, 'itinerary')} note={facts.days.length === 1 && facts.days[0].stops?.some(x => x.time) ? t(lang, 'approxTimes') : null}>
+            <Section id="itinerary" title={t(lang, facts.days.length === 1 ? 'yourDay' : 'itinerary')} note={facts.days.length === 1 && facts.days[0].stops?.some(x => x.time) ? t(lang, 'approxTimes') : null}>
               <Itinerary facts={facts} lang={lang} narrative={narrative} />
             </Section>
           )}
           {facts && (facts.inclusions.length > 0 || facts.exclusions.length > 0) && (
-            <section className={`${s.block} ${s.twoCol}`} data-section="inclusions">
+            <section className={`${s.block} ${s.twoCol} ${s.includedBox}`} data-section="inclusions">
               {facts.inclusions.length > 0 && <div><h2 className={s.h2}>{t(lang, 'included')}</h2><Ticks items={facts.inclusions} kind="yes" /></div>}
               {facts.exclusions.length > 0 && <div><h2 className={s.h2}>{t(lang, 'notIncluded')}</h2><Ticks items={facts.exclusions} kind="no" /></div>}
             </section>
@@ -643,10 +663,21 @@ function TourPage({ page }: ThemePageProps) {
           )}
           {pickup && (
             <Section id="pickup" title={t(lang, 'pickupTitle')}>
-              <dl className={s.defs}>
-                <div><dt>{t(lang, 'pickupLabel')}</dt><dd>{pickup.included ? (pickup.area ? `${t(lang, 'hotelPickupIn')} ${pickup.area}` : t(lang, 'hotelPickup')) : t(lang, 'noPickup')}</dd></div>
-                {pickup.meetingPoint && <div><dt>{t(lang, 'meetingPoint')}</dt><dd>{pickup.meetingPoint}</dd></div>}
-              </dl>
+              <ul className={s.pickupCards}>
+                <li>
+                  <Icon name="pin" className={s.pickupIcon} />
+                  <span>
+                    <strong>{pickup.included ? t(lang, 'hotelPickup') : t(lang, 'noPickup')}</strong>
+                    {pickup.included && pickup.area && <span className={s.pickupText}>{fill(lang, 'pickupFromHotel', { area: pickup.area })}</span>}
+                  </span>
+                </li>
+                {pickup.meetingPoint && (
+                  <li>
+                    <Icon name="chat" className={s.pickupIcon} />
+                    <span><strong>{t(lang, 'meetingPoint')}</strong><span className={s.pickupText}>{pickup.meetingPoint}</span></span>
+                  </li>
+                )}
+              </ul>
             </Section>
           )}
           {facts?.cancellation && (cells.length > 0 || facts.cancellation.wording) && (
@@ -670,7 +701,7 @@ function TourPage({ page }: ThemePageProps) {
           )}
           {page.reviews && <div className={s.block} data-section="reviews"><Reviews page={page} /></div>}
           {facts?.faq && facts.faq.length > 0 && (
-            <Section id="faq" title={t(lang, 'faqTitle')}>
+            <Section id="faq" title={t(lang, 'questionsTitle')}>
               <div className={s.faq}>
                 {facts.faq.map(f => (
                   <details key={f.question}>
@@ -681,12 +712,12 @@ function TourPage({ page }: ThemePageProps) {
               </div>
             </Section>
           )}
-          <div className={s.block} data-section="enquiry"><EnquiryForm page={page} variant="compact" single /></div>
+          <div className={`${s.block} ${s.enquiryCard}`} data-section="enquiry"><EnquiryForm page={page} variant="compact" single title={t(lang, 'askTourTitle')} intro={t(lang, 'askTourSub')} /></div>
         </div>
         {facts && (
           <aside className={s.side}>
             <div className={s.sticky}>
-              <BookingCard price={facts.price} lang={lang} whatsapp={whatsappHref(page)} trust={trust} />
+              <BookingCard price={facts.price} lang={lang} whatsapp={whatsappHref(page)} trust={trust} runs={runsText(facts, lang)} />
             </div>
           </aside>
         )}
@@ -694,7 +725,7 @@ function TourPage({ page }: ThemePageProps) {
 
       {related.length > 0 && (
         <section className={`${s.container} ${s.section}`} data-section="related">
-          <h2 className={s.h2Big}>{t(lang, 'relatedTitle')}</h2>
+          <h2 className={s.h2Big}>{t(lang, 'pairItWith')}</h2>
           <ul className={s.cards}>{related.map(x => <li key={x.href}><TourCard tour={x} lang={lang} /></li>)}</ul>
         </section>
       )}

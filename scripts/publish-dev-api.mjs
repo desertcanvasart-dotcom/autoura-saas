@@ -168,7 +168,10 @@ const PLANS = {
     mainAttractions: ['Step Pyramid of Djoser'], inclusions: ['Egyptologist guide', 'Air-conditioned car with driver', 'Hotel pickup and drop-off', 'Entrance fees to the sites listed', 'Lunch'],
     exclusions: ['Tips for guide and driver', 'Drinks'], departureDays: ['mon', 'wed', 'fri', 'sun'],
     bands: [{ minPax: 1, maxPax: 1, perPerson: 150 }, { minPax: 2, maxPax: 3, perPerson: 105 }, { minPax: 4, maxPax: 5, perPerson: 80 }, { minPax: 6, maxPax: 12, perPerson: 58 }] },
-  museum: { durationDays: 1, durationNights: 0, days: [
+  museum: { durationDays: 1, durationNights: 0,
+    // Three photos (Wikimedia, dev only), to see the gallery swipe on a phone.
+    images: ['https://commons.wikimedia.org/wiki/Special:FilePath/Egyptian_Museum_Cairo.jpg?width=1200', 'https://commons.wikimedia.org/wiki/Special:FilePath/Cairo_From_Tower_(cropped).jpg?width=1200', 'https://commons.wikimedia.org/wiki/Special:FilePath/All_Gizah_Pyramids.jpg?width=1200'],
+    days: [
     { day: 1, title: 'The Egyptian Museum and Old Cairo', city: 'Cairo', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Egyptian Museum', 'Hanging Church', 'Khan el-Khalili'] },
   ], durationHours: 7, tourType: 'Day tour', guideLanguages: ['English', 'French', 'Spanish'], accommodation: [], departures: [],
     pickup: { included: true, area: 'Cairo', meetingPoint: null }, groupSize: { min: 1, max: 12 },

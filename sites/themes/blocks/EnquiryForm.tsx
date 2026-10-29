@@ -13,13 +13,15 @@ import s from './enquiry.module.css'
 type Variant = 'editorial' | 'compact'
 
 /** single: every field in one step, with a day to travel rather than a month
- *  (the website template: one short form, prefilled from the booking card). */
-export function EnquiryForm({ page, variant, showWhatsApp = true, single = false }: { page: PagePayload; variant: Variant; showWhatsApp?: boolean; single?: boolean }) {
+ *  (the website template: one short form, prefilled from the booking card,
+ *  the visitor's name and email first). title / intro: the template's own. */
+export function EnquiryForm({ page, variant, showWhatsApp = true, single = false, title, intro }: { page: PagePayload; variant: Variant; showWhatsApp?: boolean; single?: boolean; title?: string; intro?: string }) {
   const lang = page.language
   const wa = showWhatsApp ? whatsappHref(page) : null
   return (
     <section className={`${s.enquiry} ${s[variant]}`} id="enquire">
-      <h2>{t(lang, page.kind === 'tour' ? 'enquireTitle' : 'enquireGeneral')}</h2>
+      <h2>{title ?? t(lang, page.kind === 'tour' ? 'enquireTitle' : 'enquireGeneral')}</h2>
+      {intro && <p className={s.intro}>{intro}</p>}
       <p id="enquiry-sent" className={`${s.notice} ${s.ok}`} role="status">{t(lang, 'enquirySent')}</p>
       <p id="enquiry-slow" className={s.notice} role="alert">{t(lang, 'enquirySlow')}</p>
       <p id="enquiry-invalid" className={s.notice} role="alert">{t(lang, 'enquiryInvalid')}</p>
@@ -34,12 +36,12 @@ export function EnquiryForm({ page, variant, showWhatsApp = true, single = false
         {single ? (
           <>
             <div className={s.row}>
-              <label>{t(lang, 'travellersLabel')}<input id="enq-travellers" name="travellers" type="number" min={1} max={99} inputMode="numeric" /></label>
-              <label>{t(lang, 'travelDate')}<input id="enq-date" name="travel_date" type="date" /></label>
-            </div>
-            <div className={s.row}>
               <label>{t(lang, 'yourName')}<input name="name" required maxLength={120} autoComplete="name" /></label>
               <label>{t(lang, 'yourEmail')}<input name="email" type="email" required maxLength={200} autoComplete="email" /></label>
+            </div>
+            <div className={s.row}>
+              <label>{t(lang, 'travelDate')}<input id="enq-date" name="travel_date" type="date" /></label>
+              <label>{t(lang, 'travellersLabel')}<input id="enq-travellers" name="travellers" type="number" min={1} max={99} inputMode="numeric" /></label>
             </div>
             <label>{t(lang, 'yourPhone')}<input name="phone" type="tel" maxLength={40} autoComplete="tel" /></label>
             <label>{t(lang, 'yourMessage')}<textarea name="message" rows={4} maxLength={4000} /></label>

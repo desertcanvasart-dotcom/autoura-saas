@@ -5,6 +5,7 @@
 .enquiry h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 12px; }
 .editorial h2 { font-weight: 500; font-size: 28px; }
 .compact h2 { font-size: 20px; font-weight: 700; }
+.intro { margin: -4px 0 16px; color: color-mix(in srgb, var(--brand-ink) 70%, transparent); }
 
 .form { display: grid; gap: 12px; max-width: 560px; }
 .editorial .form { margin: 0 auto; }

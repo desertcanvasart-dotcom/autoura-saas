@@ -8,12 +8,14 @@
 import { useEffect, useState } from 'react'
 import type { TourFacts } from '@/lib/publish/contract'
 import { formatApprox, formatDate, formatPrice, shownAmount } from './format'
-import { t } from '../../i18n/strings'
+import { fill, t } from '../../i18n/strings'
 import s from './stepper.module.css'
 
 /** onPax: told the chosen number of travellers (the tour page's booking
- *  card passes it on to the enquiry form). */
-export function PriceStepper({ price, lang, onPax }: { price: TourFacts['price']; lang: string; onPax?: (pax: number) => void }) {
+ *  card passes it on to the enquiry form). wording 'template': the website
+ *  template's lines ("Price for 2 travellers · lower for larger groups",
+ *  "Charged in EUR. About $117 per person at the rate of …"). */
+export function PriceStepper({ price, lang, onPax, wording }: { price: TourFacts['price']; lang: string; onPax?: (pax: number) => void; wording?: 'template' }) {
   const bands = price.bands
   const min = bands[0]?.minPax ?? 1
   const max = bands[bands.length - 1]?.maxPax ?? min
@@ -51,12 +53,19 @@ export function PriceStepper({ price, lang, onPax }: { price: TourFacts['price']
         <span>{t(lang, 'total')}</span>
         <strong>{formatPrice(total, price.currency, lang)}</strong>
       </p>
+      {wording === 'template' ? (
+        <>
+          <p className={s.note}>{pax === 1 ? t(lang, 'priceForOne') : fill(lang, 'priceForN', { n: pax })}{varies ? ` · ${t(lang, 'lowerForLarger')}` : ''}</p>
+          {usd && <p className={s.note}>{fill(lang, 'chargedInAbout', { currency: price.currency, amount: formatApprox(shownAmount(perPerson) * usd.rate, usd.currency, lang).replace(/^≈\s*/, ''), date: formatDate(usd.rateDate, lang) })}</p>}
+        </>
+      ) : <>
       {varies && <p className={s.note}>{t(lang, 'lowerForGroups')}</p>}
       {usd && (
         <p className={s.note}>
           {formatApprox(shownAmount(perPerson) * usd.rate, usd.currency, lang)} {t(lang, 'perPerson')} · {t(lang, 'indicative')} ({t(lang, 'youPayIn')} {price.currency}; {t(lang, 'rateOf')} {formatDate(usd.rateDate, lang)})
         </p>
       )}
+      </>}
     </div>
   )
 }
