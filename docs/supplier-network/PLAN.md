@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PLANNED, NOT STARTED** · written 2026-10-28 · nothing here is built yet.
+Status: **PLANNED, NOT STARTED** · written 2026-10-28, D5 added 2026-10-30 · nothing here is built yet.
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -14,7 +14,8 @@ hotel night) becomes a **service booking** that a named supplier accepts and cov
 inside the booking, without the operator leaving Autoura. The operator's **own resources come
 first** (own cars, guides, staff — assigned directly); **own suppliers** are requested and confirm
 by a one-tap link; a **shared network** of suppliers other operators also use is optional, off by
-default, and last. Clients never see suppliers' companies or rates; the public website and the
+default, and last. **Each agency chooses where its suppliers come from** — its own suppliers only,
+the network only, or both (D5). Clients never see suppliers' companies or rates; the public website and the
 one-public-rate rule are untouched.
 
 ## 2. Decisions already taken (operator, 2026-10-28)
@@ -25,6 +26,7 @@ one-public-rate rule are untouched.
 | D2 | **Send from the operator's own WhatsApp** (already built: wa.me deep link with the message pre-typed). Meta templates are optional, later. | No dependency on Meta template approval. Every request/reminder is one tap by a person. Replies typed in WhatsApp stay in WhatsApp; **the status flows back through the one-tap link** in the message. |
 | D3 | **English only. No Arabic / RTL** — everybody in tourism uses English. | The supplier portal is English, same UI kit as the app. (The brief's "Arabic-first" wording is void.) |
 | D4 | **QuickBooks postponed** — no current or prospective customer uses it. | No accounting integration. Confirmed services become supplier payables inside Autoura (existing `supplier_invoices`). |
+| D5 | **Each agency chooses its supplier sourcing** (operator, 2026-10-30): **own suppliers only**, **network only**, or **both**. | A per-agency setting, owner/admin only, default **own suppliers only** (the network stays off until an agency turns it on). It decides which suppliers the supplier picker offers and the engine may price from. The agency's **own resources** (its cars, guides, staff) are always available in every mode — the choice is about outside suppliers. Detailed in §7.1. |
 
 Still open — see §9.
 
@@ -127,6 +129,36 @@ prices from may be global") and every RLS policy's single-owner assumption — d
 profiles + `tenant_suppliers` so one operator's negotiated rates and notes can never be read by
 another. Legal: data shared between operators.
 
+### 7.1 Supplier sourcing per agency (D5)
+
+One setting per agency, `tenants.supplier_sourcing` (or `tenant_settings`): `own` · `network` ·
+`both`. Default `own`. Changed only by an owner or admin, in Settings → Company, with a line
+explaining each choice.
+
+| | Own suppliers only (`own`, default) | Network only (`network`) | Both (`both`) |
+|---|---|---|---|
+| Supplier picker on a service line | The agency's supplier book | Network suppliers it has linked (`tenant_suppliers`) and network search | Own suppliers first, then a separate, labelled **Network** group |
+| Rates the engine prices from | The agency's own rate sheets | Network rates it has linked (its negotiated copy, or the supplier's published network rate) | Own rate sheets first; a network rate only where no own supplier has a rate for that line |
+| Network search in the itinerary builder | Hidden | Shown | Shown |
+| Own resources (own cars, guides, staff) | Always | Always | Always |
+
+Rules:
+- **Never mixes data between agencies.** Choosing the network gives an agency access to network
+  *profiles* and their *published* rates, and to its *own* links, notes and negotiated rates
+  (`tenant_suppliers`) — never another agency's suppliers, notes or rates.
+- **Consuming is not sharing.** This setting decides whom the agency books. Whether an agency's own
+  suppliers appear in the network is a separate thing: a supplier joins the network itself by
+  claiming its profile (Phase 2), never because an agency switched a setting.
+- **Changing the setting never rewrites the past.** Bookings keep the suppliers already assigned;
+  only new assignments follow the new choice. Moving to `own` with network suppliers on open
+  bookings shows a list of those lines, so nothing is silently dropped.
+- **No price is made up when a source is off.** If the chosen source has no rate for a line, the
+  line is a visible gap (rule in §10), not a fall-back to the other source.
+- **Before Phase 3 ships**, the setting shows only "Own suppliers" (the other two are listed as
+  coming); Phase 1–2 work is unaffected.
+
+Estimate: ≈ 3–5 days inside Phase 3 (setting + picker grouping + engine source filter + tests).
+
 ## 8. Estimate
 
 | Phase | Estimate |
@@ -150,6 +182,13 @@ another. Legal: data shared between operators.
 - [ ] **Deployment** — GetAutoura (multi-tenant) only, or also standalone installs? (Standalone
       has no network → Phase 3 is GetAutoura-only.) *(before Phase 3)*
 - [ ] **Link-only vs logins** for suppliers (§6) *(before Phase 2)*
+- [ ] **D5 detail — per service type?** One sourcing choice for the whole agency, or per service
+      type (e.g. own guides, network cars)? *(before Phase 3)*
+- [ ] **D5 detail — "network only" and private suppliers:** may a network-only agency still keep a
+      few private suppliers of its own (e.g. a favourite restaurant)? If yes, "network only" is
+      really "both" with network first. *(before Phase 3)*
+- [ ] **D5 detail — in "both", who wins on price?** Own supplier first always (as written), or the
+      cheaper of own vs network? *(before Phase 3)*
 
 ## 10. Rules to hold throughout
 
