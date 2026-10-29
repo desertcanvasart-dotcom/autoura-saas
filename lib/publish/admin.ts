@@ -26,7 +26,7 @@ import type { EngineContent, DraftResult, PartKind } from './engine/engine'
 import { checkTranslation } from './engine/translate'
 import { loadTourFacts } from './tour-facts'
 import { loadRateProposal, rateStatus, readSavedRate, sameBands, bandSchema, type RateProposal } from './public-rate'
-import { indicativeCurrenciesOf } from './site-data'
+import { indicativeCurrenciesOf, legalOf } from './site-data'
 import { engineBrand, generateTourDraft, generateTourTranslation } from './engine/generate'
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
 import { publishTags } from './sync/events'
@@ -492,6 +492,33 @@ export async function setPublished(db: Db, actor: Actor, localeId: string, publi
   return { published, warning: await refresh(deps, actor.tenantId) }
 }
 
+// ---------- the footer's legal details (operator brief 2026-10-28) ----------
+
+/** What a website's footer must state before the site may go public. */
+export const FOOTER_REQUIRED = [
+  ['legalEntity', 'the registered company name (Look and feel → Footer)'],
+  ['licenseNumber', 'the ETAA licence number (Settings → Company)'],
+  ['address', 'the company address (Settings → Company)'],
+  ['whatsapp', 'the company WhatsApp number (Settings → Company)'],
+  ['termsUrl', 'a link to your booking terms (Look and feel → Footer)'],
+  ['privacyUrl', 'a link to your privacy notice (Look and feel → Footer)'],
+] as const
+
+export type FooterDetails = Record<typeof FOOTER_REQUIRED[number][0], string | null>
+
+/** The footer's details as the website would show them. */
+export async function footerOf(db: Db, tenantId: string, settings: unknown): Promise<FooterDetails> {
+  const { data, error } = await db.from('tenants').select('license_number, company_address, whatsapp_number').eq('id', tenantId).maybeSingle()
+  check('the company', error)
+  const blank = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+  return { ...legalOf(settings), licenseNumber: blank(data?.license_number), address: blank(data?.company_address), whatsapp: blank(data?.whatsapp_number) }
+}
+
+/** What is still missing from the footer, in words a manager can act on. */
+export function footerMissing(f: FooterDetails): string[] {
+  return FOOTER_REQUIRED.filter(([k]) => !f[k]).map(([, words]) => words)
+}
+
 // ---------- the look: theme, palette, fonts (brand studio) ----------
 
 /** The site's look as stored, as it resolves (what the website shows), and
@@ -505,6 +532,7 @@ export async function lookOf(db: Db, actor: Actor) {
     stored: { palette: stored.palette ?? null, fontPair: stored.fontPair ?? null, website: typeof stored.website === 'string' ? stored.website : null },
     resolved: { palette: resolved.palette, fontPair: resolved.fontPair, onPrimary: resolved.onPrimary, onAccent: resolved.onAccent },
     problems: resolved.problems,
+    footer: await footerOf(db, actor.tenantId, site!.settings),
     choices: {
       archetypes: ARCHETYPES.map(a => ({ key: a, defaults: ARCHETYPE_DEFAULTS[a] })),
       palettes: PALETTE_PRESETS,
@@ -516,7 +544,7 @@ export async function lookOf(db: Db, actor: Actor) {
 /** Save the theme, palette and fonts. Colours that would be hard to read
  *  are refused with the reason — the website never gets them. The rest of
  *  the stored brand (tone, claims, words to avoid) is kept. */
-export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown }, deps: AdminDeps = defaultDeps) {
+export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown; legal?: unknown }, deps: AdminDeps = defaultDeps) {
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   if (typeof input.archetype !== 'string' || !(ARCHETYPES as readonly string[]).includes(input.archetype)) fail(`Choose a theme: one of ${ARCHETYPES.join(', ')}.`)
   const archetype = input.archetype as Archetype
@@ -532,7 +560,21 @@ export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown
   const next = { ...rest, palette: input.palette, fontPair: input.fontPair, ...(website ? { website } : {}) }
   const problems = resolveBrand(archetype, next).problems
   if (problems.length) fail(problems.join(' '))
-  const { error } = await db.from('publish_sites').update({ archetype, brand: next }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
+  // The footer's legal details, kept in the site's settings beside the rest.
+  let settings: Record<string, unknown> | undefined
+  if (input.legal !== undefined) {
+    const raw = (input.legal ?? {}) as Record<string, unknown>
+    const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
+    const link = (v: unknown, what: string) => {
+      const t = text(v, 500)
+      if (!t) return null
+      try { if (new URL(t).protocol === 'https:') return t } catch { /* refused below */ }
+      return fail(`${what} must be an https:// address.`) as never
+    }
+    const legal = { entity: text(raw.entity, 200), termsUrl: link(raw.termsUrl, 'The booking terms link'), privacyUrl: link(raw.privacyUrl, 'The privacy notice link') }
+    settings = { ...((site!.settings ?? {}) as Record<string, unknown>), legal }
+  }
+  const { error } = await db.from('publish_sites').update({ archetype, brand: next, ...(settings ? { settings } : {}) }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not save the look: ${error.message}`, 500)
   return { saved: true, warning: await refresh(deps, actor.tenantId) }
 }
@@ -717,6 +759,9 @@ export async function setSiteLive(db: Db, actor: Actor, live: boolean, deps: Adm
   if (live) {
     const rows = await domainRows(db, site!.id)
     if (!rows.some(r => r.kind === 'primary' && r.status === 'active')) fail('Connect a domain (or claim a free address) and let it finish first — the website needs a ready main address to go public.', 409)
+    // The footer must say who the visitor is dealing with before anyone sees it.
+    const missing = footerMissing(await footerOf(db, actor.tenantId, site!.settings))
+    if (missing.length) fail(`Before the website goes public, its footer needs ${missing.join('; ')}.`, 409)
   }
   const { error } = await db.from('publish_sites').update({ status: live ? 'live' : 'draft' }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not change it: ${error.message}`, 500)

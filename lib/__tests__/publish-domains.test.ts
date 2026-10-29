@@ -132,6 +132,7 @@ beforeEach(() => {
   db = makeDb({
     publish_sites: [{ id: SITE, tenant_id: T, archetype: 'modern', status: 'draft', languages: ['en'], brand: {}, settings: {}, tenants: { company_name: 'Sunrise' } }],
     publish_domains: [{ id: 'd-test', tenant_id: T, site_id: SITE, hostname: 'sunrise.up.railway.app', kind: 'test', status: 'active', provider_ref: null, created_at: '0000' }],
+    tenants: [{ id: T, license_number: null, company_address: null, whatsapp_number: null }],
   })
   deps = { facts: vi.fn(), generate: vi.fn(), revalidate, now: () => new Date('2026-10-28T10:00:00Z'), domains: provider } as unknown as AdminDeps
   vi.stubEnv('PUBLISH_SITES_BASE_DOMAIN', 'autoura.site')
@@ -213,6 +214,13 @@ describe('the main address and going public', () => {
   it('a website goes public only with a ready main address, and can go back to draft', async () => {
     await expectError(setSiteLive(db as never, actor, true, deps), 409, /ready main address/)
     await claimFreeAddress(db as never, actor, 'sunrise', deps)
+    // A ready address is not enough: the footer must say who the visitor deals with.
+    await expectError(setSiteLive(db as never, actor, true, deps), 409, /registered company name.*ETAA licence number.*company address.*WhatsApp.*booking terms.*privacy notice/)
+    Object.assign(db.tables.tenants[0], { license_number: 'ETAA 1234', company_address: '1 Nile St, Cairo', whatsapp_number: '+20 100 000 0000' })
+    db.tables.publish_sites[0].settings = { legal: { entity: 'Sunrise Travel S.A.E.', termsUrl: 'https://sunrise.example/terms', privacyUrl: 'http://sunrise.example/privacy' } }
+    // An http:// link is not a link the site will show — still missing.
+    await expectError(setSiteLive(db as never, actor, true, deps), 409, /privacy notice/)
+    ;(db.tables.publish_sites[0].settings as { legal: Record<string, string> }).legal.privacyUrl = 'https://sunrise.example/privacy'
     await setSiteLive(db as never, actor, true, deps)
     expect(db.tables.publish_sites[0].status).toBe('live')
     await setSiteLive(db as never, actor, false, deps)

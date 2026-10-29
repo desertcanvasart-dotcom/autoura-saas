@@ -29,7 +29,7 @@ import { ARCHETYPES } from './brand'
  * deploy (it sits under a different cache key) — and the app can refuse a
  * renderer that is a version behind.
  */
-export const CONTRACT_VERSION = 5
+export const CONTRACT_VERSION = 6
 
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
@@ -79,6 +79,12 @@ export const companyIdentitySchema = z.object({
   address: z.string().nullable(),
   /** e.g. the ETAA licence number. */
   licenseNumber: z.string().nullable(),
+  /** The registered company behind the brand ("Nile & Co Travel S.A.E."),
+   *  for the footer — publish_sites.settings.legal. Optional (v6). */
+  legalEntity: z.string().nullable().optional(),
+  /** The agency's own booking terms and privacy notice (https). Optional (v6). */
+  termsUrl: z.string().nullable().optional(),
+  privacyUrl: z.string().nullable().optional(),
 })
 export type CompanyIdentity = z.infer<typeof companyIdentitySchema>
 
@@ -95,6 +101,10 @@ const tourCard = z.object({
   from: z.object({ amount: money, currency: z.string() }).nullable(),
   /** The agency's own first photo, if it has one. */
   image: z.string().nullable(),
+  /** The tour's kind in the agency's words, for the type chips. Optional (v6). */
+  type: z.string().nullable().optional(),
+  /** A day tour's length in hours. Optional (v6). */
+  hours: z.number().positive().nullable().optional(),
 })
 const pageLink = z.object({ title: z.string(), path: z.string(), card: tourCard.optional() })
 const weekday = z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
@@ -121,6 +131,9 @@ export const tourFactsSchema = z.object({
     overnight: z.boolean(),
     meals: z.object({ breakfast: z.boolean(), lunch: z.boolean(), dinner: z.boolean() }),
     sights: z.array(z.string()),
+    /** A day tour's stops with their approximate times, as the operator set
+     *  them (HH:MM, or null where no time was given). Optional (v6). */
+    stops: z.array(z.object({ time: z.string().regex(/^\d{2}:\d{2}$/).nullable(), name: z.string() })).optional(),
   })),
   mainAttractions: z.array(z.string()),
   highlights: z.array(z.string()),
@@ -152,6 +165,22 @@ export const tourFactsSchema = z.object({
     /** Display-only conversions, labelled indicative: the customer pays in `currency`. */
     indicative: z.array(z.object({ currency: z.string().regex(/^[A-Z]{3}$/), rate: z.number().positive().finite(), rateDate: z.string() })),
   }).strict(),
+  /** A day tour's length in hours, from the tour's record. Optional (v6). */
+  durationHours: z.number().positive().nullable().optional(),
+  /** The tour's kind in the agency's words ("Day tour", "Nile cruise"). Optional (v6). */
+  tourType: z.string().nullable().optional(),
+  /** Hotel pickup and where the tour meets. Optional (v6). */
+  pickup: z.object({
+    included: z.boolean(),
+    /** The city pickup is from, as the tour records it. */
+    area: z.string().nullable(),
+    /** The operator's own words on where to meet. */
+    meetingPoint: z.string().nullable(),
+  }).nullable().optional(),
+  /** The languages the tour's guides speak, in the visitor's language. Optional (v6). */
+  guideLanguages: z.array(z.string()).optional(),
+  /** Approved questions and answers for this page's language. Optional (v6). */
+  faq: z.array(z.object({ question: z.string().min(1), answer: z.string().min(1) })).optional(),
   /** The thin-page rule (D7): whether this tour may be published, and why not. */
   publishable: z.object({ ok: z.boolean(), reasons: z.array(z.string()) }),
 }).superRefine((f, ctx) => {
@@ -228,6 +257,8 @@ export const pagePayloadSchema = z.object({
       text: z.string(), translated: z.boolean(), original: z.string().nullable(), when: z.string(), url: z.string().nullable(),
     })),
   }).nullable().optional(),
+  /** A tour page: up to three of the site's other tours, as cards. Optional (v6). */
+  related: z.array(pageLink).optional(),
   /** A destination page: the place it is about. */
   destination: z.object({ name: z.string(), slug: z.string() }).nullable().optional(),
   /** Not yet published — shown only on a test hostname. */

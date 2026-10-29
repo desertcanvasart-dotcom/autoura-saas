@@ -81,6 +81,8 @@ export function cardOf(facts: TourFacts, labels: Record<string, string> = {}): C
     cities: cities.map(c => labels[c] ?? c),
     from: facts.price.status === 'available' && facts.price.fromPrice !== null ? { amount: facts.price.fromPrice, currency: facts.price.currency } : null,
     image: facts.images[0] ?? null,
+    type: facts.tourType ?? null,
+    hours: facts.durationHours ?? null,
   }
 }
 
@@ -109,6 +111,18 @@ export function identityOf(t: Record<string, unknown> | null | undefined): PageP
     address: blankToNull(t?.company_address),
     licenseNumber: blankToNull(t?.license_number),
   }
+}
+
+/** The footer's legal details the agency set for its website
+ *  (publish_sites.settings.legal): the registered company, and https links
+ *  to its booking terms and privacy notice. Anything else reads as unset. */
+export function legalOf(settings: unknown): { legalEntity: string | null; termsUrl: string | null; privacyUrl: string | null } {
+  const l = (settings as { legal?: Record<string, unknown> } | null)?.legal ?? {}
+  const https = (v: unknown) => {
+    if (typeof v !== 'string') return null
+    try { return new URL(v).protocol === 'https:' ? v : null } catch { return null }
+  }
+  return { legalEntity: blankToNull(l.entity), termsUrl: https(l.termsUrl), privacyUrl: https(l.privacyUrl) }
 }
 
 // ---------- the site behind a hostname ----------
@@ -242,7 +256,7 @@ export async function loadPagePayload(db: Db, input: {
     companyName: (site.tenants?.company_name as string | undefined) ?? '',
     languages: site.languages as string[],
     brand: (site.brand ?? {}) as Record<string, unknown>,
-    identity: identityOf(site.tenants),
+    identity: { ...identityOf(site.tenants), ...legalOf(site.settings) },
     publicHost: (primary?.hostname as string | undefined) ?? null,
   }
 
@@ -340,6 +354,29 @@ export async function loadPagePayload(db: Db, input: {
     tour = { templateId, name: labels[name] ?? name, facts: translateFacts(facts, labels), narrative }
   }
 
+  // A tour page's related tours: the site's others, those sharing a place
+  // with this one first. A few are read, not all — each runs the engine.
+  let related: PagePayload['tours'] = []
+  if (tour?.facts) {
+    const mine = new Set(tour.facts.days.map(d => d.city).filter(Boolean))
+    const others = tourLocales.filter(r => r.page_id !== row!.page_id).slice(0, 6)
+    const otherFacts = await inBatches(others, 3, r => deps.tourFacts(db, {
+      tenantId: siteInfo.tenantId, templateId: r.publish_pages!.tour_template_id!, language: input.language,
+      indicativeCurrencies: indicativeCurrenciesOf(site.settings),
+    }).catch(() => null))
+    related = others
+      .map((r, i) => {
+        const f = otherFacts[i]
+        const name = r.publish_pages!.tour_templates!.template_name
+        const labels = names.get(r.current_version_id ?? '') ?? {}
+        const shared = f ? f.days.filter(d => d.city && mine.has(d.city)).length : 0
+        return { shared, link: { title: labels[name] ?? name, path: tourPath(r.slug), ...(f ? { card: cardOf(f, labels) } : {}) } }
+      })
+      .sort((a, b) => b.shared - a.shared || a.link.title.localeCompare(b.link.title, input.language))
+      .slice(0, 3)
+      .map(x => x.link)
+  }
+
   let alternates: PagePayload['alternates'] = []
   if (row) {
     const { data: others, error: aErr } = await db.from('publish_page_locales')
@@ -371,6 +408,7 @@ export async function loadPagePayload(db: Db, input: {
     tour,
     tours: kind === 'home' || kind === 'listing' ? tourLinks : [],
     ...(kind === 'home' || kind === 'listing' ? { destinations } : {}),
+    ...(related.length ? { related } : {}),
     unpublished: row ? !row.is_published : false,
     pageId: row?.page_id ?? null,
   }

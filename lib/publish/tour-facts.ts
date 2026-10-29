@@ -22,6 +22,7 @@ import { fromPriceOf, readSavedRate, runEngine, type SavedRate, type TierResults
 export type { TierResults }
 import { readDayMeals, type DayMeals } from '@/lib/tours/day-meals'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
+import { vocabularyLabelsForTenant } from '@/lib/vocabulary-server'
 
 /** An exchange rate older than this is not shown, even as indicative. */
 export const FX_MAX_AGE_DAYS = 2
@@ -42,6 +43,10 @@ export interface TemplateRow {
   exclusions: string[] | null
   departure_days: string[] | null
   is_active: boolean | null
+  duration_hours?: number | null
+  tour_type?: string | null
+  pickup_required?: boolean | null
+  transportation_city?: string | null
 }
 
 export interface VariationRow {
@@ -82,6 +87,8 @@ export interface FactsInput {
   policy: PolicyRow | null
   currency: string
   tierLabels: Map<string, string>
+  /** The company's words for its tour types (vocabulary 'tour_type'). */
+  tourTypeLabels?: Map<string, string>
   /** The engine's answer (both bases) — for what a tier includes, never for the price. */
   eu: TierResults
   other: TierResults
@@ -229,6 +236,13 @@ export function assembleTourFacts(input: FactsInput): TourFacts {
     cancellation,
     price,
     publishable: { ok: reasons.length === 0, reasons },
+    durationHours: usable(Number(t.duration_hours)) ? Number(t.duration_hours) : null,
+    // The agency's own label; an unknown key is shown as nothing, not as a code.
+    tourType: t.tour_type ? input.tourTypeLabels?.get(t.tour_type) ?? null : null,
+    // Pickup only when the record says so: absent = not stated, never "no".
+    pickup: t.pickup_required === true || t.pickup_required === false
+      ? { included: t.pickup_required, area: t.pickup_required && t.transportation_city?.trim() ? t.transportation_city.trim() : null, meetingPoint: null }
+      : null,
   }
 }
 
@@ -239,7 +253,7 @@ type Db = {
   from: (table: string) => any
 }
 
-const TEMPLATE_COLUMNS = 'id, tenant_id, duration_days, duration_nights, image_url, gallery_urls, itinerary, main_attractions, highlights, inclusions, exclusions, departure_days, is_active, cancellation_policy_id'
+const TEMPLATE_COLUMNS = 'id, tenant_id, duration_days, duration_nights, image_url, gallery_urls, itinerary, main_attractions, highlights, inclusions, exclusions, departure_days, is_active, cancellation_policy_id, duration_hours, tour_type, pickup_required, transportation_city'
 
 /**
  * Everything assembleTourFacts needs, read for one tour. Throws when a read
@@ -280,7 +294,10 @@ export async function loadTourFacts(db: Db, input: {
   const policies = (policyRows.data ?? []) as Array<PolicyRow & { id: string; is_default: boolean }>
   const policy = policies.find(p => p.id === template.cancellation_policy_id) ?? policies.find(p => p.is_default) ?? null
 
-  const { currency, tierLabels, eu, other } = await runEngine(db, input.tenantId, input.templateId)
+  const [{ currency, tierLabels, eu, other }, tourTypeLabels] = await Promise.all([
+    runEngine(db, input.tenantId, input.templateId),
+    vocabularyLabelsForTenant(db as never, input.tenantId, 'tour_type'),
+  ])
 
   const wanted = input.indicativeCurrencies.filter(c => /^[A-Z]{3}$/.test(c) && c !== currency).slice(0, 3)
   let fx: FxRow[] = []
@@ -304,6 +321,7 @@ export async function loadTourFacts(db: Db, input: {
     policy,
     currency,
     tierLabels,
+    tourTypeLabels,
     eu,
     other,
     publicRate: readSavedRate(page.data?.public_rate),

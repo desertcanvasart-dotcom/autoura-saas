@@ -5,17 +5,20 @@
 // Nothing here knows, or asks, a nationality. The server renders the fewest
 // travellers, so it reads the same without script.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TourFacts } from '@/lib/publish/contract'
 import { formatApprox, formatDate, formatPrice, shownAmount } from './format'
 import { t } from '../../i18n/strings'
 import s from './stepper.module.css'
 
-export function PriceStepper({ price, lang }: { price: TourFacts['price']; lang: string }) {
+/** onPax: told the chosen number of travellers (the tour page's booking
+ *  card passes it on to the enquiry form). */
+export function PriceStepper({ price, lang, onPax }: { price: TourFacts['price']; lang: string; onPax?: (pax: number) => void }) {
   const bands = price.bands
   const min = bands[0]?.minPax ?? 1
   const max = bands[bands.length - 1]?.maxPax ?? min
   const [pax, setPax] = useState(min)
+  useEffect(() => { if (price.status === 'available' && bands.length) onPax?.(pax) }, [pax]) // eslint-disable-line react-hooks/exhaustive-deps
   if (price.status !== 'available' || !bands.length) {
     return (
       <div className={s.stepper}>

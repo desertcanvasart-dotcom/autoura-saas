@@ -21,6 +21,7 @@ interface Look {
   stored: { website: string | null }
   resolved: { palette: Palette; fontPair: string }
   problems: string[]
+  footer: { legalEntity: string | null; termsUrl: string | null; privacyUrl: string | null; licenseNumber: string | null; address: string | null; whatsapp: string | null }
   choices: {
     archetypes: Array<{ key: string; defaults: { palette: Palette; fontPair: string } }>
     palettes: Array<{ key: string; label: string; palette: Palette }>
@@ -29,7 +30,7 @@ interface Look {
 }
 
 const THEME_TEXT: Record<string, { label: string; text: string }> = {
-  modern: { label: 'Modern', text: 'Sleek and photo-led: a bold colour hero, photo cards, a route map, a day-by-day timeline and a price for each group size.' },
+  modern: { label: 'Modern', text: 'Clean and photo-led: a gallery, key facts at a glance, a sticky price for each group size, FAQ and related tours.' },
   private_journeys: { label: 'Private journeys', text: 'Quiet and editorial, for tailor-made trips: long itineraries, the price late, a consultation last.' },
   transparent_value: { label: 'Transparent value', text: 'Price-led: clear prices and what they buy up front, WhatsApp to ask.' },
 }
@@ -46,6 +47,7 @@ export default function PublishLookPage() {
   const [palette, setPalette] = useState<Palette | null>(null)
   const [fontPair, setFontPair] = useState('sleek')
   const [website, setWebsite] = useState('')
+  const [legal, setLegal] = useState({ entity: '', termsUrl: '', privacyUrl: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -56,6 +58,7 @@ export default function PublishLookPage() {
       setPalette(j.data.resolved.palette)
       setFontPair(j.data.resolved.fontPair)
       setWebsite(j.data.stored.website ?? '')
+      setLegal({ entity: j.data.footer.legalEntity ?? '', termsUrl: j.data.footer.termsUrl ?? '', privacyUrl: j.data.footer.privacyUrl ?? '' })
     }).catch(e => showToast('error', e instanceof Error ? e.message : 'Could not load the look'))
   }, [])
 
@@ -79,7 +82,7 @@ export default function PublishLookPage() {
   async function save() {
     setSaving(true)
     try {
-      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website }) })
+      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website, legal }) })
       const j = await res.json()
       if (!j.success) throw new Error(j.error)
       showToast(j.data.warning ? 'warning' : 'success', j.data.warning ?? 'Saved — your website shows the new look now')
@@ -163,6 +166,33 @@ export default function PublishLookPage() {
             <p className="text-xs text-gray-500 mb-2">If your tours live apart from your main website (for example on tours.youragency.com), the header links back to it. Leave empty if not.</p>
             <input value={website} disabled={!canManage} onChange={e => setWebsite(e.target.value)} placeholder="https://www.youragency.com"
               className="w-full max-w-md text-sm border border-gray-300 rounded-md px-3 py-2" />
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-gray-900 mb-1">Footer — who visitors are dealing with</h2>
+            <p className="text-xs text-gray-500 mb-3">Every page&apos;s footer shows these. The website cannot go public until all six are filled in.</p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="text-xs text-gray-600">Registered company name
+                <input value={legal.entity} disabled={!canManage} onChange={e => setLegal({ ...legal, entity: e.target.value })} placeholder="Nile & Co Travel S.A.E."
+                  className="mt-1 w-full text-sm border border-gray-300 rounded-md px-3 py-2" />
+              </label>
+              <label className="text-xs text-gray-600">Booking terms (link)
+                <input value={legal.termsUrl} disabled={!canManage} onChange={e => setLegal({ ...legal, termsUrl: e.target.value })} placeholder="https://…"
+                  className="mt-1 w-full text-sm border border-gray-300 rounded-md px-3 py-2" />
+              </label>
+              <label className="text-xs text-gray-600">Privacy notice (link)
+                <input value={legal.privacyUrl} disabled={!canManage} onChange={e => setLegal({ ...legal, privacyUrl: e.target.value })} placeholder="https://…"
+                  className="mt-1 w-full text-sm border border-gray-300 rounded-md px-3 py-2" />
+              </label>
+            </div>
+            <ul className="mt-3 grid gap-1 text-sm md:grid-cols-3">
+              {([['ETAA licence number', look.footer.licenseNumber], ['Address', look.footer.address], ['WhatsApp', look.footer.whatsapp]] as const).map(([label, v]) => (
+                <li key={label} className={`flex items-start gap-1 ${v ? 'text-gray-700' : 'text-amber-700'}`}>
+                  {v ? <Check className="h-4 w-4 mt-0.5 flex-none text-[#647C47]" /> : <AlertTriangle className="h-4 w-4 mt-0.5 flex-none" />}
+                  <span>{label}: {v ?? <>missing — <Link href="/settings/tenant" className="underline">add it in company settings</Link></>}</span>
+                </li>
+              ))}
+            </ul>
           </section>
 
           {canManage && (

@@ -90,6 +90,6 @@ describe('the brand studio\'s ready-made palettes (redesign)', () => {
   it('the Modern theme starts teal, never the old gold and beige', async () => {
     const { ARCHETYPE_DEFAULTS } = await import('@/lib/publish/brand')
     expect(ARCHETYPE_DEFAULTS.modern.palette.primary).toBe('#1d6b64')
-    expect(ARCHETYPE_DEFAULTS.modern.fontPair).toBe('sleek')
+    expect(ARCHETYPE_DEFAULTS.modern.fontPair).toBe('manrope') // the template brief: Manrope headings, Inter text
   })
 })
