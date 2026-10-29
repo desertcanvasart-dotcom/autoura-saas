@@ -110,8 +110,13 @@ function Filtered({ tours, lang }: { tours: FinderTour[]; lang: string }) {
   const [type, setType] = useState('')
   const [places, setPlaces] = useState<string[]>([])
   const [lengths, setLengths] = useState<Length[]>([])
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
   const [sort, setSort] = useState<Sort>('recommended')
   const [page, setPage] = useState(0)
+  const currency = tours.find(x => x.from)?.from?.currency ?? null
+  const lo = minPrice === '' ? null : Number(minPrice)
+  const hi = maxPrice === '' ? null : Number(maxPrice)
   const types = useMemo(() => [...new Set(tours.map(x => x.type).filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, lang)), [tours, lang])
   const allPlaces = useMemo(() => {
     const count = new Map<string, number>()
@@ -122,13 +127,16 @@ function Filtered({ tours, lang }: { tours: FinderTour[]; lang: string }) {
 
   const matching = tours.filter(x => (!type || x.type === type)
     && (places.length === 0 || x.cities.some(c => places.includes(c)))
-    && (lengths.length === 0 || lengths.includes(lengthOfDays(x)!)))
+    && (lengths.length === 0 || lengths.includes(lengthOfDays(x)!))
+    // A price bound shows only tours with a price inside it (none "on request").
+    && (lo === null || (x.from !== null && x.from.amount >= lo))
+    && (hi === null || (x.from !== null && x.from.amount <= hi)))
   const ordered = sorted(matching, sort)
   const pages = Math.max(1, Math.ceil(ordered.length / PAGE))
   const at = Math.min(page, pages - 1)
   const shown = ordered.slice(at * PAGE, at * PAGE + PAGE)
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter(x => x !== v) : [...list, v])
-  const active = type !== '' || places.length > 0 || lengths.length > 0
+  const active = type !== '' || places.length > 0 || lengths.length > 0 || lo !== null || hi !== null
 
   const panel = (
     <>
@@ -166,7 +174,18 @@ function Filtered({ tours, lang }: { tours: FinderTour[]; lang: string }) {
           ))}
         </fieldset>
       )}
-      {active && <button type="button" className={s.linkButton} onClick={() => { setType(''); setPlaces([]); setLengths([]); setPage(0) }}>{t(lang, 'clearFilters')}</button>}
+      {currency && (
+        <fieldset className={s.filterGroup}>
+          <legend>{t(lang, 'priceFilter')}</legend>
+          <div className={s.priceRange}>
+            <label><span>{t(lang, 'minPrice')} {currencySymbol(currency, lang)}</span>
+              <input type="number" min={0} inputMode="numeric" placeholder="0" value={minPrice} onChange={e => { setMinPrice(e.target.value); setPage(0) }} /></label>
+            <label><span>{t(lang, 'maxPrice')} {currencySymbol(currency, lang)}</span>
+              <input type="number" min={0} inputMode="numeric" placeholder={t(lang, 'anyPrice')} value={maxPrice} onChange={e => { setMaxPrice(e.target.value); setPage(0) }} /></label>
+          </div>
+        </fieldset>
+      )}
+      {active && <button type="button" className={s.linkButton} onClick={() => { setType(''); setPlaces([]); setLengths([]); setMinPrice(''); setMaxPrice(''); setPage(0) }}>{t(lang, 'clearFilters')}</button>}
     </>
   )
 
@@ -197,6 +216,11 @@ function Filtered({ tours, lang }: { tours: FinderTour[]; lang: string }) {
       </div>
     </div>
   )
+}
+
+/** "€" for EUR in this language — the price boxes' label. */
+function currencySymbol(currency: string, lang: string): string {
+  return new Intl.NumberFormat(lang, { style: 'currency', currency }).formatToParts(0).find(p => p.type === 'currency')?.value ?? currency
 }
 
 function lengthOf(x: FinderTour, lang: string): string | null {
