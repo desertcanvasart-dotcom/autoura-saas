@@ -153,6 +153,39 @@ export function homeOf(settings: unknown, language: string): { headline: string 
   }
 }
 
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** When the company answers (publish_sites.settings.hours); null when unset
+ *  or not a sensible span. */
+export function hoursOf(settings: unknown): NonNullable<PagePayload['site']['identity']['hours']> | null {
+  const h = (settings as { hours?: { opens?: unknown; closes?: unknown; days?: unknown } } | null)?.hours
+  if (!h || typeof h.opens !== 'string' || typeof h.closes !== 'string' || !HHMM.test(h.opens) || !HHMM.test(h.closes) || h.opens >= h.closes) return null
+  const days = Array.isArray(h.days) ? WEEKDAYS.filter(d => (h.days as unknown[]).includes(d)) : []
+  return days.length ? { opens: h.opens, closes: h.closes, days } : null
+}
+
+/** The About page's own parts (publish_sites.settings): the headline in this
+ *  language, the team photo, and the people — each only as saved. */
+export function aboutPageOf(settings: unknown, language: string): NonNullable<PagePayload['aboutPage']> {
+  const st = (settings ?? {}) as { aboutHeadline?: Record<string, unknown>; teamPhoto?: unknown; people?: unknown }
+  const h = st.aboutHeadline && typeof st.aboutHeadline === 'object' ? st.aboutHeadline[language] : null
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+  const people = Array.isArray(st.people) ? st.people.flatMap(p => {
+    const x = (p ?? {}) as Record<string, unknown>
+    const name = text(x.name)
+    if (!name) return []
+    return [{
+      name,
+      role: text(x.role) ?? '',
+      kind: x.kind === 'staff' ? 'staff' as const : 'guide' as const,
+      languages: Array.isArray(x.languages) ? x.languages.filter((l): l is string => typeof l === 'string' && /^[a-z]{2}$/.test(l)) : [],
+      photo: text(x.photo),
+    }]
+  }) : []
+  return { headline: text(h), teamPhoto: text(st.teamPhoto), people }
+}
+
 // ---------- the site behind a hostname ----------
 
 export async function resolveSiteByHost(db: Db, rawHost: string): Promise<SiteResolution | null> {
@@ -284,7 +317,7 @@ export async function loadPagePayload(db: Db, input: {
     companyName: (site.tenants?.company_name as string | undefined) ?? '',
     languages: site.languages as string[],
     brand: (site.brand ?? {}) as Record<string, unknown>,
-    identity: { ...identityOf(site.tenants), ...legalOf(site.settings), ...homeOf(site.settings, input.language) },
+    identity: { ...identityOf(site.tenants), ...legalOf(site.settings), ...homeOf(site.settings, input.language), hours: hoursOf(site.settings) },
     publicHost: (primary?.hostname as string | undefined) ?? null,
   }
 
@@ -298,7 +331,9 @@ export async function loadPagePayload(db: Db, input: {
   const names = await approvedNames(db, siteInfo.tenantId, tourLocales)
   // Cards (and the places they add up to) only where tours are listed: a
   // tour page needs neither, and each card runs the pricing engine.
+  // The Contact page reads them too: its interest chips are the places the tours go.
   const listed = target.kind === 'home' || target.kind === 'listing' || target.kind === 'destination'
+    || (target.kind === 'page' && target.slug === 'contact')
   const facts = listed
     ? await inBatches(tourLocales, 6, r => deps.tourFacts(db, {
       tenantId: siteInfo.tenantId, templateId: r.publish_pages!.tour_template_id!, language: input.language,
@@ -422,9 +457,9 @@ export async function loadPagePayload(db: Db, input: {
       .map(l => ({ language: l, path: standing ?? (kind === 'home' ? '' : 'tours') }))
   }
 
-  // Real reviews only, from the business the agency picked; home and tours.
+  // Real reviews only, from the business the agency picked; home, tours and About.
   const rv = reviewsSettingsOf(site.settings)
-  const reviews = rv.show && rv.placeId && (kind === 'home' || kind === 'tour')
+  const reviews = rv.show && rv.placeId && (kind === 'home' || kind === 'tour' || kind === 'about')
     ? await (deps.reviews ?? placeReviews)(rv.placeId, input.language).catch(() => null)
     : null
 
@@ -433,6 +468,8 @@ export async function loadPagePayload(db: Db, input: {
     language: input.language,
     path: row ? pathOf(row) : standing ?? (kind === 'home' ? '' : 'tours'),
     ...(kind === 'about' && aboutOf(site.settings, input.language) ? { about: aboutOf(site.settings, input.language)! } : {}),
+    ...(kind === 'about' ? { aboutPage: aboutPageOf(site.settings, input.language) } : {}),
+    ...(kind === 'contact' ? { interests: destinations.map(d => d.name).slice(0, 8) } : {}),
     ...(reviews ? { reviews } : {}),
     title: tour?.name ?? siteInfo.companyName,
     site: siteInfo,

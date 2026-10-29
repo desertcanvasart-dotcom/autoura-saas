@@ -449,6 +449,65 @@
 .contactForm:has([id="enquiry-sent"]:target) .sent { display: grid; }
 .contactForm:has([id="enquiry-sent"]:target) [id="enquire"] { display: none; }
 
+/* ---------- About (board 11) ---------- */
+.aboutHeadline { max-width: 22ch; }
+.teamPhoto { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 24px; margin-top: 36px; }
+@media (min-width: 960px) { .teamPhoto { aspect-ratio: 21 / 8; } }
+.stats { list-style: none; margin: 32px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+@media (min-width: 900px) { .stats { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); } }
+.stats li { display: grid; gap: 4px; padding: 20px 24px; }
+.stats li + li { border-left: 1px solid var(--line); }
+@media (max-width: 899px) { .stats li:nth-child(odd) { border-left: 0; } .stats li:nth-child(n + 3) { border-top: 1px solid var(--line); } }
+.stats strong { font-family: var(--font-display); font-weight: 800; font-size: clamp(26px, 3vw, 36px); line-height: 1.1; }
+.stats span { color: var(--muted); font-size: 15px; }
+.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 900px) { .people { grid-template-columns: repeat(4, 1fr); gap: 24px; } }
+.people li { display: grid; gap: 4px; align-content: start; }
+.portrait { display: block; aspect-ratio: 1; border-radius: var(--radius); overflow: hidden; margin-bottom: 8px; background: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-surface)); }
+.portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.initials { display: grid; place-items: center; width: 100%; height: 100%; font-family: var(--font-display); font-weight: 800; font-size: clamp(28px, 4vw, 44px); color: var(--brand-primary); }
+.personName { font-family: var(--font-display); font-weight: 700; font-size: 17px; }
+.personRole { color: var(--muted); font-size: 14px; }
+.promises { list-style: none; margin: 0; padding: 0; display: grid; gap: 24px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .promises { grid-template-columns: repeat(3, 1fr); gap: 40px; } }
+.promises li { display: grid; gap: 8px; }
+.licences { padding: 28px 0 8px; border-top: 1px solid var(--line); }
+.licences .h2 { margin-bottom: 6px; }
+.licences p { margin: 0; color: var(--muted); }
+
+/* ---------- Contact (board 12) ---------- */
+.contactAside { display: grid; gap: 12px; align-content: start; }
+.contactSide .h2 { margin-bottom: 14px; }
+.wide { width: 100%; box-sizing: border-box; }
+.contactDefs { display: grid; gap: 10px; margin: 18px 0 0; font-size: 15px; }
+.contactDefs div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; }
+.contactDefs dt { color: var(--muted); }
+.contactDefs dd { margin: 0; }
+.notice { display: none; padding: 12px 14px; border-radius: 10px; margin: 0 0 16px; background: color-mix(in srgb, #c0392b 12%, var(--brand-surface)); }
+.notice:target { display: block; }
+.trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.cForm { display: grid; gap: 16px; margin-top: 8px; }
+.cForm label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+.cRow { display: grid; gap: 16px; grid-template-columns: 1fr; align-items: end; }
+@media (min-width: 640px) { .cRow { grid-template-columns: 1fr 1fr; } }
+.cForm input:not([type='checkbox']), .cForm select, .cForm textarea {
+  font: inherit; font-weight: 400; font-size: 15px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--brand-ink) 22%, transparent); border-radius: 10px;
+  background: #fff; color: var(--brand-ink); width: 100%; box-sizing: border-box; min-height: 46px;
+}
+.cHint { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
+.cChips { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.cChips legend { font-size: 14px; font-weight: 600; margin-bottom: 8px; padding: 0; }
+.cChips legend .cHint { display: inline; }
+.cChip { display: inline-flex !important; cursor: pointer; }
+.cChip input { position: absolute; opacity: 0; pointer-events: none; }
+.cChip span { padding: 9px 16px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-weight: 500; font-size: 15px; }
+.cChip:has(input:checked) span { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--brand-on-primary); }
+.cChip:has(input:focus-visible) span { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
+.cConsent { display: flex !important; gap: 10px; align-items: flex-start; font-weight: 400 !important; }
+.cConsent input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--brand-primary); flex: none; }
+.cActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.cActions .cHint { display: inline; }
+
 /* ---------- footer ---------- */
 .footer { background: color-mix(in srgb, var(--brand-primary) 92%, black); color: var(--brand-on-primary); padding: 48px 0 28px; margin-top: 24px; font-size: 15px; }
 .footerGrid { display: grid; gap: 28px; }

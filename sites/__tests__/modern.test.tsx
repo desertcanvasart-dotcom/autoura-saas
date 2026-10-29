@@ -380,22 +380,47 @@ describe('the website template', () => {
     const priced = render(home({ kind: 'listing', path: 'tours', tours: many.map((x, i) => ({ ...x, card: { ...x.card, from: { amount: 50 + i * 10, currency: 'EUR' } } })) }))
     expect(text(priced)).toContain('Price per person Min € Max €')
   })
-  it('about: who the company is, from its records', () => {
-    const a = text(render(home({ kind: 'about', path: 'about', site: fullSite })))
-    expect(a).toContain('About us')
-    expect(a).toContain('Licences and registration')
-    expect(a.replace(/&amp;/g, '&')).toContain('Registered company Nile & Co Travel S.A.E.')
-    expect(a).toContain('Licence number ETAA 1234')
-    const withText = render(home({ kind: 'about', path: 'about', site: fullSite, about: 'A family business.\n\nSince 2003.' }))
-    expect(withText).toContain('<p>A family business.</p><p>Since 2003.</p>')
+  it('about (board 11): headline, the agency\'s words, stats from the records, the people, the promises, the licences', () => {
+    const plain = text(render(home({ kind: 'about', path: 'about', site: fullSite })))
+    expect(plain).toContain('About us')
+    expect(plain.replace(/&amp;/g, '&')).toContain('Licences and memberships Nile & Co Travel S.A.E. · ETAA licence No. ETAA 1234 · 1 Nile St, Cairo')
+    expect(plain).toContain('What we promise One clear price')
+    expect(plain).toContain('Our own team')
+    expect(plain).toContain('Reachable on the day')
+    expect(plain).not.toContain('The people who will guide you') // no people saved, no section
+    expect(plain).not.toContain('Year founded') // no stat without its number
+    const page = home({ kind: 'about', path: 'about', site: { ...fullSite, identity: { ...fullSite.identity, foundedYear: 2008 } },
+      about: 'A family business.\n\nSince 2003.',
+      aboutPage: { headline: 'A Cairo team since 2008.', teamPhoto: 'https://cdn.example/team.jpg', people: [
+        { name: 'Mona Adel', role: 'Egyptologist', kind: 'guide', languages: ['en', 'es'], photo: 'https://cdn.example/mona.jpg' },
+        { name: 'Omar Nabil', role: 'Trip planner', kind: 'staff', languages: ['en', 'fr'], photo: null },
+      ] } })
+    const html = render(page)
+    const a = text(html)
+    expect(a).toContain('About us A Cairo team since 2008.')
+    expect(html).toContain('A family business.</p><p>Since 2003.</p>')
+    expect(html).toContain('src="https://cdn.example/team.jpg"')
+    expect(a).toContain('2008 Year founded 1 Licensed Egyptologists 3 Guest languages')
+    expect(a).toContain('The people who will guide you')
+    expect(a).toContain('Mona Adel Egyptologist · English, Spanish')
+    expect(a).toContain('ON Omar Nabil Trip planner · English, French') // no photo: initials
   })
   it('every page\'s footer links to About and Contact', () => {
     expect(html).toContain('href="/en/about"')
     expect(html).toContain('href="/en/contact"')
   })
   it('contact: the ways to reach them, the form, and a confirmation shown in its place once sent', () => {
-    const c = render(home({ kind: 'contact', path: 'contact', site: fullSite }))
-    expect(text(c)).toContain('Contact us')
+    const c = render(home({ kind: 'contact', path: 'contact', interests: ['Cairo', 'Luxor'],
+      site: { ...fullSite, identity: { ...fullSite.identity, hours: { opens: '09:00', closes: '21:00', days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] } } } }))
+    const w = text(c)
+    expect(w).toContain('Plan your journey')
+    for (const name of ['name', 'email', 'whatsapp', 'country', 'travel_date', 'nights', 'adults', 'children', 'message']) expect(c).toContain(`name="${name}"`)
+    expect(c).toMatch(/<input type="checkbox" name="interests" value="Luxor"\/>/)
+    expect(c.match(/<input[^>]*name="consent"[^>]*>/)?.[0]).toContain('required=""')
+    expect(c).toContain('<option value="Spain">Spain</option>')
+    expect(w).toContain('Prefer to talk?')
+    expect(w).toContain('Hours 09:00 to 21:00 Cairo time, every day')
+    expect(w).toContain('Office 1 Nile St, Cairo')
     expect(c).toContain('id="enquire"')
     expect(c).toContain('Thank you — we have your enquiry')
     expect(c).toContain('id="enquiry-sent"')
