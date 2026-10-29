@@ -9,5 +9,5 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const body = await jsonBody(request)
-  return withActor('manage', (db, actor) => saveLook(db, actor, { archetype: body.archetype, palette: body.palette, fontPair: body.fontPair, website: body.website, legal: body.legal, about: body.about }))
+  return withActor('manage', (db, actor) => saveLook(db, actor, { archetype: body.archetype, palette: body.palette, fontPair: body.fontPair, website: body.website, legal: body.legal, about: body.about, headline: body.headline, foundedYear: body.foundedYear }))
 }

@@ -89,6 +89,19 @@
         "3003"
       ],
       "port": 3003
+    },
+    {
+      "name": "sites-live-pictures",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PUBLISH_APP_URL=http://127.0.0.1:4010",
+        "PUBLISH_INTERNAL_SECRET=dev-internal",
+        "PUBLISH_REVALIDATE_SECRET=dev-revalidate",
+        "npm",
+        "run",
+        "sites:dev"
+      ],
+      "port": 3001
     }
   ]
 }

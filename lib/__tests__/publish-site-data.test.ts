@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload, loadSitemap } from '@/lib/publish/site-data'
+import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload, loadSitemap, homeOf, cardOf } from '@/lib/publish/site-data'
 import { siteResolutionSchema, pagePayloadSchema, sitemapSchema, CONTRACT_VERSION, type TourFacts } from '@/lib/publish/contract'
 import { indicativeCurrenciesOf } from '@/lib/publish/site-data'
 
@@ -154,13 +154,16 @@ describe('loadPagePayload', () => {
     expect(page!.site.identity).toEqual({ tagline: 'Private journeys since 2003', logoUrl: 'https://cdn.test/logo.png', phone: null,
       email: 'hello@sillage.test', whatsapp: '+201000000000', address: null, licenseNumber: 'ETAA 1234',
       // The footer's legal details: none stored for this site.
-      legalEntity: null, termsUrl: null, privacyUrl: null })
+      legalEntity: null, termsUrl: null, privacyUrl: null,
+      // The home page's own headline and the year it started: none set.
+      headline: null, foundedYear: null })
     expect(page!.site.brand).toEqual({ tone: 'warm' })
   })
   it('the home page exists before any home page row, listing the published, switched-on tours', async () => {
     const home = await load('')
     expect(home).toMatchObject({ kind: 'home', title: 'Sillage', alternates: [{ language: 'fr', path: '' }] })
-    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic', card: { days: 1, nights: 0, cities: ['Giza'], from: { amount: 99, currency: 'EUR' }, image: null, type: null, hours: null } }])
+    expect(home!.tours).toEqual([{ title: 'Nile classic', path: 'tours/nile-classic', card: { days: 1, nights: 0, cities: ['Giza'], from: { amount: 99, currency: 'EUR' }, image: null, type: null, hours: null,
+      highlights: [], places: ['Giza'], guideLanguages: [] } }])
     expect(home!.destinations).toEqual([{ name: 'Giza', path: 'destinations/giza', count: 1 }])
   })
   it('an unpublished page shows only in preview, flagged', async () => {
@@ -305,7 +308,9 @@ describe('the tour\'s wording in the page language (approved translation)', () =
     expect(page!.tour!.facts!.price).toEqual(FACTS.price)
 
     const listing = await loadPagePayload(base as never, { siteId: SITE, language: 'fr', path: 'tours', preview: false }, { tourFacts: async () => FACTS })
-    expect(listing!.tours).toEqual([{ title: 'Le Nil classique', path: 'tours/le-nil-classique', card: { days: 1, nights: 0, cities: ['Gizeh'], from: { amount: 99, currency: 'EUR' }, image: null, type: null, hours: null } }])
+    expect(listing!.tours).toEqual([{ title: 'Le Nil classique', path: 'tours/le-nil-classique', card: { days: 1, nights: 0, cities: ['Gizeh'], from: { amount: 99, currency: 'EUR' }, image: null, type: null, hours: null,
+      // the default picture is matched on the records' own names, not the translation
+      highlights: [], places: ['Giza'], guideLanguages: [] } }])
     expect(listing!.destinations).toEqual([{ name: 'Gizeh', path: 'destinations/giza', count: 1 }])
   })
 })
@@ -339,5 +344,23 @@ describe('tour cards and destination pages (redesign)', () => {
     const facts = vi.fn(async () => FACTS)
     await load('tours/nile-classic', { facts })
     expect(facts).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the home page settings and the tour cards (adaptive home and tours, 2026-10-29)', () => {
+  it('homeOf: the headline in the page language and a sensible year; anything else reads as unset', () => {
+    expect(homeOf({ headline: { en: ' Egypt, slowly ', fr: '' }, foundedYear: 2008 }, 'en')).toEqual({ headline: 'Egypt, slowly', foundedYear: 2008 })
+    expect(homeOf({ headline: { en: 'Egypt, slowly' } }, 'fr')).toEqual({ headline: null, foundedYear: null })
+    expect(homeOf({ foundedYear: '2008' }, 'en').foundedYear).toBeNull()
+    expect(homeOf(null, 'en')).toEqual({ headline: null, foundedYear: null })
+  })
+  it('a card carries three highlights (else the main attractions), the sights first-day-first, and the guide languages', () => {
+    const facts = { ...FACTS, highlights: [], mainAttractions: ['Step Pyramid', 'Memphis', 'Dahshur', 'Giza'], guideLanguages: ['English'],
+      days: [{ ...FACTS.days[0], sights: ['Step Pyramid', 'Red Pyramid'], city: 'Cairo' }] }
+    const c = cardOf(facts as never)
+    expect(c.highlights).toEqual(['Step Pyramid', 'Memphis', 'Dahshur'])
+    expect(c.places!.slice(0, 2)).toEqual(['Step Pyramid', 'Red Pyramid'])
+    expect(c.places).toContain('Cairo')
+    expect(c.guideLanguages).toEqual(['English'])
   })
 })

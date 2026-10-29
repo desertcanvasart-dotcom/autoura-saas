@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { THEMES } from '../themes'
 import { routeStops } from '../themes/modern/RouteMap'
-import { photoFor, tourPhotos } from '../lib/photos'
+import { defaultPicture, photoFor, tourPhotos, tourPicture } from '../lib/photos'
 import { formatPrice } from '../themes/blocks/format'
 import type { PagePayload, TourFacts } from '@/lib/publish/contract'
 
@@ -50,18 +50,21 @@ describe('home: the journey finder and destinations', () => {
     const cairoCard = html.slice(html.indexOf('href="/en/tours/cairo"'), html.indexOf('href="/en/tours/desert"'))
     expect(cairoCard).not.toContain(formatPrice(1, 'EUR', 'en').replace(/[\d.,\s]/g, '')) // no currency sign at all
   })
-  it('the tours listing offers only the lengths the tours have, and the places they go', () => {
-    const html = render(home({ kind: 'listing', path: 'tours' }))
-    const w = text(html)
-    expect(w).toContain('Day trips')
-    expect(w).toContain('Up to 4 days')
-    expect(w).toContain('5 days or more')
-    expect(html).toContain('<option value="Luxor">Luxor</option>')
+  it('the Tours page of four to six: type chips, the count and a sort — no filters, no destinations', () => {
+    const l = render(home({ kind: 'listing', path: 'tours', tours: tours.map((x, i) => ({ ...x, card: { ...x.card!, type: i % 2 ? 'Day tour' : 'Nile cruise' } })) }))
+    const w = text(l)
+    expect(w).toContain('All Day tour Nile cruise')
+    expect(w).toContain('4 tours')
+    expect(l).toContain('<option value="priceAsc">Price: lowest first</option>')
+    expect(l).not.toContain('type="checkbox"')
+    expect(l).not.toContain('href="/en/destinations/')
   })
-  it('lists the destinations, each with how many journeys go there', () => {
+  it('lists the destinations, each with how many tours go there — when there are two or more', () => {
     expect(html).toContain('href="/en/destinations/cairo"')
-    expect(text(html)).toContain('Cairo 2 journeys')
-    expect(text(html)).toContain('Luxor 1 journey')
+    expect(text(html)).toContain('Cairo 2 tours')
+    expect(text(html)).toContain('Luxor 1 tour')
+    const one = render(home({ destinations: [{ name: 'Cairo', path: 'destinations/cairo', count: 4 }] }))
+    expect(one).not.toContain('href="/en/destinations/cairo"')
   })
   it('the brand colour is the agency\'s — the theme names no colour of its own', () => {
     expect(html).not.toMatch(/#b08d57|#7a5c3e|gold|beige/i)
@@ -106,12 +109,21 @@ describe('the route and the photos', () => {
     expect(tourPhotos({ name: 'Giza day', sights: ['Giza Pyramids'] })).toEqual([])
     expect(tourPhotos({ name: 'Giza day', images: ['https://cdn.example/own.jpg'] }).map(p => p.src)).toEqual(['https://cdn.example/own.jpg'])
   })
-  it('a live site draws colour panels where there is no photo, and loads nothing from Wikimedia', () => {
+  it('a live site never shows an empty box: each tour draws its first site, and nothing loads from Wikimedia', () => {
     vi.stubEnv('PUBLISH_PHOTO_LIBRARY', '')
     const html = render(home())
     expect(html).not.toContain('wikimedia')
     expect(html).not.toContain('<img')
-    expect(html.match(/class="[^"]*panel/g)?.length).toBeGreaterThanOrEqual(tours.length)
+    expect(html).not.toMatch(/class="[^"]*panel/)
+    // the hero, every card and every destination tile
+    expect(html.match(/<svg[^>]*class="[^"]*_art_/g)?.length).toBeGreaterThanOrEqual(1 + tours.length + 2)
+  })
+  it('the default picture is the first itinerary site\'s, then the destination\'s', () => {
+    vi.stubEnv('PUBLISH_PHOTO_LIBRARY', '')
+    expect(tourPicture({ name: 'A day out', places: ['Step Pyramid of Djoser', 'Giza Pyramids'], cities: ['Cairo'] })).toMatchObject({ kind: 'art', art: 'step-pyramid' })
+    expect(tourPicture({ name: 'A day out', places: ['Somewhere new'], cities: ['Luxor'] })).toMatchObject({ kind: 'art', art: 'karnak' })
+    expect(tourPicture({ name: 'Mine', image: 'https://cdn.example/own.jpg', places: ['Giza Pyramids'] })).toEqual({ kind: 'photo', src: 'https://cdn.example/own.jpg', alt: 'Mine' })
+    expect(defaultPicture(['Nowhere known'])).toMatchObject({ kind: 'art' })
   })
 })
 
@@ -122,7 +134,7 @@ describe('matching the agency\'s own website', () => {
       const theme = THEMES[archetype]
       const html = renderToStaticMarkup(<theme.Frame page={page} preview={false}><theme.Page page={page} preview={false} /></theme.Frame>)
       expect(html, archetype).toContain('href="https://www.sunrise-travel.example/"')
-      expect(text(html), archetype).toContain('← sunrise-travel.example')
+      expect(text(html), archetype).toContain('sunrise-travel.example')
     }
     const plain = render(home({ site: { ...site, brand: { website: 'http://insecure.example' } } }))
     expect(plain).not.toContain('insecure.example')
@@ -201,14 +213,14 @@ describe('the website template', () => {
     expect(w).toContain('Duration 7 hours')
     expect(w).toContain('Tour type Day tour')
     expect(w).toContain('Pickup Hotel pickup in Cairo')
-    expect(w).toContain('Guide English, French')
+    expect(w).toContain('Guide speaks English, French')
     expect(w).toContain('Cancellation Free cancellation up to 46 days before')
   })
   it('a day tour is one open timeline with its approximate times — no map, no days to open', () => {
     const itinerary = html.slice(html.indexOf('data-section="itinerary"'), html.indexOf('data-section="inclusions"'))
     expect(itinerary).not.toContain('<details')
     expect(itinerary).not.toContain('<svg')
-    expect(text(itinerary)).toContain('≈ 08:00 Hotel pickup ≈ 09:00 Giza Pyramids Great Sphinx')
+    expect(text(itinerary)).toContain('08:00 Hotel pickup 09:00 Giza Pyramids Great Sphinx')
     expect(text(itinerary)).toContain('Times are approximate.')
   })
   it('a tour to more than one place keeps its map; days still open one by one', () => {
@@ -243,7 +255,7 @@ describe('the website template', () => {
     expect(c).toContain('Ask on WhatsApp')
     expect(c).toContain('Free cancellation up to 46 days before')
     expect(c).toContain('No payment to enquire')
-    expect(c).toContain('Licensed tour operator · ETAA 1234')
+    expect(c).toContain('Licensed by ETAA · No. ETAA 1234')
   })
   it('no free window, no licence: those promises are not made', () => {
     const strict = render(tourPage({ ...dayTour, cancellation: { tiers: [{ daysBefore: 400, chargePercent: 100 }], wording: null } }, { site: { ...fullSite, identity: { ...fullSite.identity, licenseNumber: null } } }))
@@ -270,7 +282,7 @@ describe('the website template', () => {
   })
   it('the footer says who the visitor deals with', () => {
     const foot = text(html.slice(html.indexOf('<footer')))
-    for (const x of ['Nile & Co Travel S.A.E.', 'Licence ETAA 1234', '1 Nile St, Cairo', 'WhatsApp +20 100 000 0000', 'Booking terms', 'Privacy', 'Cookie settings', 'Website by Autoura'])
+    for (const x of ['Nile & Co Travel S.A.E.', 'ETAA licence No. ETAA 1234', '1 Nile St, Cairo', 'WhatsApp +20 100 000 0000', 'Booking terms', 'Privacy policy', 'Cookie settings', 'Website by Autoura'])
       expect(foot.replace(/&amp;/g, '&')).toContain(x)
     expect(html).toContain('href="https://nileco.example/terms"')
   })
@@ -281,26 +293,67 @@ describe('the website template', () => {
     expect(structuredData(tourPage({ ...dayTour, faq: [] })).some(b => b['@type'] === 'FAQPage')).toBe(false)
   })
 
-  it('home: headline, value line, two buttons, no decorative strips; why us, how booking works, a call to action', () => {
-    const h = render(home({ site: fullSite, tours: tours.map((x, i) => ({ ...x, card: { ...x.card!, type: i % 2 ? 'Day tour' : 'Nile cruise' } })) }))
+  it('home: the fallback headline, two buttons, the trust strip, why us (an icon and a line each) and the custom-trip band', () => {
+    const h = render(home({ site: { ...fullSite, identity: { ...fullSite.identity, foundedYear: 2010 } },
+      tours: tours.map((x, i) => ({ ...x, card: { ...x.card!, guideLanguages: i ? ['English'] : ['English', 'French'] } })) }))
     const hw = text(h)
-    expect(hw).toContain('Egypt, your way')
-    expect(hw).toContain('Tours in Giza, Luxor, Aswan and Cairo — one clear price per person for your group.')
+    expect(hw).toContain('Licensed tour operator in Egypt')
+    expect(hw).toContain('Private tours across Egypt with Egyptologist guides')
+    expect(hw).toContain('One clear price per person — the price you pay.')
     expect(hw).toContain('Browse tours')
-    expect(h).toMatch(/href="\/api\/wa\?[^"]*" rel="nofollow">WhatsApp</)
-    expect(h).not.toMatch(/strip/i)
+    expect(h).toMatch(/href="\/api\/wa\?[^"]*" rel="nofollow">.*WhatsApp us</)
+    expect(hw).toContain('Licensed by ETAA No. ETAA 1234')
+    expect(hw).toContain('Operating since 2010')
+    expect(hw).toContain('Guides speak English, French')
+    expect(hw).not.toMatch(/reviews|★/) // no review score without real reviews
     expect(hw).toContain('Why travel with us')
-    expect(hw).toContain('How booking works')
-    expect(hw).toContain('Ready to plan your trip?')
-    // the type chips: every type the tours have, and "All"
-    expect(hw).toContain('All Day tour Nile cruise')
+    const why = h.slice(h.indexOf('data-section="why"'), h.indexOf('data-section="destinations"'))
+    expect(why.match(/<li>/g)?.length).toBe(why.match(/<svg/g)?.length)
+    expect(why.match(/<li>/g)?.length).toBe(why.match(/_whyText_/g)?.length)
+    expect(hw).toContain('Don’t see what you need? We build private trips around your dates. Plan your journey')
+    expect(hw).toContain('All 4 tours')
+    expect(hw).not.toContain('How booking works') // a large catalogue's
   })
-  it('listing: sort, and pages of nine', () => {
-    const many = Array.from({ length: 11 }, (_, i) => ({ title: `Tour ${String.fromCharCode(65 + i)}`, path: `tours/t${i}`, card: card(1, ['Giza'], null) }))
+  it('home with one place: the headline names it; the agency\'s own headline wins, and the place moves to the subline', () => {
+    const one = { destinations: [{ name: 'Cairo', path: 'destinations/cairo', count: 1 }], tours: [tours[0]] }
+    const hw = text(render(home({ ...one, site: fullSite })))
+    expect(hw).toContain('Private tours in Cairo with Egyptologist guides')
+    expect(hw).toContain('See the tour')
+    expect(hw).toContain('Our tour')
+    expect(hw).not.toContain('Destinations')
+    const own = text(render(home({ ...one, site: { ...fullSite, identity: { ...fullSite.identity, headline: 'Egypt, slowly' } } })))
+    expect(own).toContain('Egypt, slowly')
+    expect(own).toContain('Private tours in Cairo. One clear price per person')
+  })
+  it('one tour is one featured card; two or three are large cards', () => {
+    const one = render(home({ kind: 'listing', path: 'tours', tours: [{ ...tours[0], card: { ...tours[0].card!, highlights: ['The Great Pyramid', 'The Sphinx'] } }] }))
+    expect(one).toMatch(/<article class="[^"]*_featured_/)
+    expect(text(one)).toContain('The Great Pyramid The Sphinx')
+    expect(text(one)).toContain('View tour')
+    expect(one).not.toContain('<select')
+    const two = render(home({ kind: 'listing', path: 'tours', tours: tours.slice(0, 2) }))
+    expect(two).toMatch(/<ul class="[^"]*_cardsLarge_[^"]*" data-n="2"/)
+    expect(text(two)).toContain('Don’t see what you need?')
+  })
+  it('home: the type chips and how booking works belong to a large catalogue', () => {
+    const many = Array.from({ length: 8 }, (_, i) => ({ title: `Tour ${i}`, path: `tours/t${i}`, card: { ...card(1, ['Giza'], null), type: i % 2 ? 'Day tour' : 'Nile cruise' } }))
+    const hw = text(render(home({ tours: many })))
+    expect(hw).toContain('All Day tour Nile cruise')
+    expect(hw).toContain('How booking works')
+    expect(hw).toContain('All 8 tours')
+  })
+  it('listing of seven or more: filters by type, place and length, a sort, and pages of nine', () => {
+    const many = Array.from({ length: 11 }, (_, i) => ({ title: `Tour ${String.fromCharCode(65 + i)}`, path: `tours/t${i}`,
+      card: { ...card(i < 6 ? 1 : 3, i % 3 ? ['Giza'] : ['Luxor'], null), type: i % 2 ? 'Day tour' : 'Multi-day' } }))
     const l = render(home({ kind: 'listing', path: 'tours', tours: many }))
+    const w = text(l)
     expect(l).toContain('<option value="priceAsc">Price: lowest first</option>')
     expect((l.match(/class="[^"]*_card_/g) ?? []).length).toBe(9)
-    expect(text(l)).toContain('Previous 1 2 Next')
+    expect(w).toContain('Previous 1 2 Next')
+    expect(w).toContain('11 tours')
+    expect(w).toContain('Tour type All tours 11 Day tour 5 Multi-day 6')
+    expect(w).toContain('Destination Giza Luxor')
+    expect(w).toContain('Duration Full day 2 to 5 days')
   })
   it('about: who the company is, from its records', () => {
     const a = text(render(home({ kind: 'about', path: 'about', site: fullSite })))

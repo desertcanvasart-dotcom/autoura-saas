@@ -23,26 +23,36 @@ import { LanguageMenu } from '../blocks/LanguageMenu'
 import { EnquiryForm } from '../blocks/EnquiryForm'
 import { Reviews } from '../blocks/Reviews'
 import { DeparturesSection } from '../blocks/TourFacts'
+import { PictureView } from '../blocks/SiteArt'
+import { formatDate } from '../blocks/format'
 import { agencyWebsite, emailHref, phoneHref, whatsappHref } from '../blocks/contact'
 import { cancellationCells, cancellationHeadline } from '../blocks/cancellation'
 import { narrativeText, paragraphs } from '../blocks/narrative'
-import { colon, countOf, t } from '../../i18n/strings'
-import { photoFor, tourPhotos, type Photo } from '../../lib/photos'
+import { colon, countOf, fill, t } from '../../i18n/strings'
+import { defaultPicture, tourPicture, tourPhotos, type Picture } from '../../lib/photos'
 import { RouteMap } from './RouteMap'
 import { BookingCard } from './BookingCard'
 import { TourCard, TourFinder, type FinderTour } from './TourFinder'
 import s from './theme.module.css'
 
-/* eslint-disable @next/next/no-img-element -- remote library and agency storage; sized by CSS */
-
 const AUTOURA = 'https://getautoura.net'
-
-function Img({ photo, className, eager }: { photo: Photo; className?: string; eager?: boolean }) {
-  return <img src={photo.src} alt={photo.alt} className={className} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} decoding="async" />
-}
 
 function Check() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className={s.icon}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+}
+
+/** Line icons for the trust strip and "Why travel with us" — one per idea. */
+const ICONS = {
+  shield: <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3zM9 12l2 2 4-4" />,
+  calendar: <path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4" />,
+  chat: <path d="M4 5h16v11H9l-5 4zM8 9h8M8 12h5" />,
+  star: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />,
+  guide: <path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4.5 21c.8-4 3.8-6 7.5-6s6.7 2 7.5 6" />,
+  tag: <path d="M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01" />,
+  whatsapp: <path d="M5 19l1.2-3.6A7.5 7.5 0 1112 19.5a7.4 7.4 0 01-3.5-.9L5 19z" />,
+} as const
+function Icon({ name, className }: { name: keyof typeof ICONS; className?: string }) {
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className={className ?? s.icon}>{ICONS[name]}</svg>
 }
 
 // ---------- frame ----------
@@ -54,18 +64,36 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
   const email = emailHref(identity)
   const phone = phoneHref(identity)
   const site = agencyWebsite(page)
+  const cta = page.kind === 'tour' ? '#enquire' : `/${lang}/contact`
+  const links = [
+    ['tours', `/${lang}/tours`, t(lang, 'tours')],
+    ['about', `/${lang}/about`, t(lang, 'aboutTitle')],
+    ['contact', `/${lang}/contact`, t(lang, 'contact')],
+  ] as const
+  const current = (k: string) => (page.kind === 'listing' && k === 'tours') || page.kind === k ? 'page' : undefined
   return (
     <div className={s.page}>
       {preview && <div className={s.preview}>{t(lang, 'previewBanner')}</div>}
       <header className={s.headerBar}>
         <div className={`${s.container} ${s.header}`}>
           <BrandMark page={page} className={s.brand} />
-          <nav className={s.nav} aria-label={companyName}>
-            {site && <a className={s.navHide} href={site.href}>← {site.label}</a>}
-            <a href={`/${lang}/tours`}>{t(lang, 'tours')}</a>
-            <LanguageMenu page={page} className={s.langMenu} listClassName={s.langList} />
-            <a className={s.navCta} href={page.kind === 'tour' ? '#enquire' : wa ?? email ?? `/${lang}/tours`}>{t(lang, 'planYourJourney')}</a>
+          <nav className={s.navLinks} aria-label={companyName}>
+            {links.map(([k, href, label]) => <a key={k} href={href} aria-current={current(k)}>{label}</a>)}
+            {site && <a href={site.href}>{site.label} ↗</a>}
           </nav>
+          <div className={s.headerEnd}>
+            <LanguageMenu page={page} className={s.langMenu} listClassName={s.langList} />
+            <a className={s.navCta} href={cta}>{t(lang, 'planYourJourney')}</a>
+            {/* Phones: the same links behind one button, without script. */}
+            <details className={s.menu}>
+              <summary aria-label={t(lang, 'menu')}><svg viewBox="0 0 24 24" aria-hidden="true" className={s.icon}><path d="M4 7h16M4 12h16M4 17h16" /></svg></summary>
+              <div className={s.menuPanel}>
+                {links.map(([k, href, label]) => <a key={k} href={href} aria-current={current(k)}>{label}</a>)}
+                {site && <a href={site.href}>{site.label} ↗</a>}
+                <a className={s.pillDark} href={cta}>{t(lang, 'planYourJourney')}</a>
+              </div>
+            </details>
+          </div>
         </div>
       </header>
       <main className={s.main}>{children}</main>
@@ -76,26 +104,36 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
               <p className={s.footerName}>{companyName}</p>
               {identity.tagline && <p className={s.footerTagline}>{identity.tagline}</p>}
             </div>
-            <ul className={s.footerList}>
-              {wa && <li><a href={wa} rel="nofollow">WhatsApp{identity.whatsapp ? ` ${identity.whatsapp}` : ''}</a></li>}
-              {email && <li><a href={email}>{identity.email}</a></li>}
-              {phone && <li><a href={phone}>{identity.phone}</a></li>}
-              {identity.address && <li>{identity.address}</li>}
-            </ul>
-            <ul className={s.footerList}>
-              <li><a href={`/${lang}/tours`}>{t(lang, 'tours')}</a></li>
-              <li><a href={`/${lang}/about`}>{t(lang, 'aboutTitle')}</a></li>
-              <li><a href={`/${lang}/contact`}>{t(lang, 'contact')}</a></li>
-              {identity.termsUrl && <li><a href={identity.termsUrl}>{t(lang, 'bookingTerms')}</a></li>}
-              {identity.privacyUrl && <li><a href={identity.privacyUrl}>{t(lang, 'privacy')}</a></li>}
-              <li><button type="button" className={s.linkButton} popoverTarget="cookie-settings">{t(lang, 'cookieSettings')}</button></li>
-            </ul>
+            <div>
+              <p className={s.footerHead}>{t(lang, 'contactHeading')}</p>
+              <ul className={s.footerList}>
+                {email && <li><a href={email}>{identity.email}</a></li>}
+                {wa && <li><a href={wa} rel="nofollow">WhatsApp{identity.whatsapp ? ` ${identity.whatsapp}` : ''}</a></li>}
+                {phone && <li><a href={phone}>{identity.phone}</a></li>}
+                {identity.address && <li>{identity.address}</li>}
+              </ul>
+            </div>
+            <div>
+              <p className={s.footerHead}>{t(lang, 'companyHeading')}</p>
+              <ul className={s.footerList}>
+                {identity.legalEntity && <li>{identity.legalEntity}</li>}
+                {identity.licenseNumber && <li>{t(lang, 'etaaLicence')} {identity.licenseNumber}</li>}
+                <li><a href={`/${lang}/about`}>{t(lang, 'aboutTitle')}</a></li>
+              </ul>
+            </div>
+            <div>
+              <p className={s.footerHead}>{t(lang, 'exploreHeading')}</p>
+              <ul className={s.footerList}>
+                <li><a href={`/${lang}/tours`}>{t(lang, 'tours')}</a></li>
+                <li><a href={`/${lang}/contact`}>{t(lang, 'contact')}</a></li>
+                {identity.termsUrl && <li><a href={identity.termsUrl}>{t(lang, 'bookingTerms')}</a></li>}
+                {identity.privacyUrl && <li><a href={identity.privacyUrl}>{t(lang, 'privacyPolicy')}</a></li>}
+                <li><button type="button" className={s.linkButton} popoverTarget="cookie-settings">{t(lang, 'cookieSettings')}</button></li>
+              </ul>
+            </div>
           </div>
           <div className={s.footerLegal}>
-            <p>
-              © {identity.legalEntity ?? companyName}
-              {identity.licenseNumber && <> · {t(lang, 'licensed')} {identity.licenseNumber}</>}
-            </p>
+            <p>© {new Date().getFullYear()} {identity.legalEntity ?? companyName}</p>
             <p>{t(lang, 'websiteBy')} <a href={AUTOURA} rel="noopener">Autoura</a></p>
           </div>
         </div>
@@ -112,17 +150,27 @@ function Frame({ page, preview, children }: ThemePageProps & { children: React.R
 
 // ---------- shared pieces ----------
 
-/** The page's tours as cards: the agency's own photo first, else the library's. */
+/** The page's tours as cards: the agency's own photo, else the default
+ *  picture of the tour's first itinerary site. */
 function finderTours(list: PagePayload['tours'], lang: string): FinderTour[] {
   return list.map(tour => {
     const c = tour.card
-    const photo = c?.image ? { src: c.image, alt: tour.title } : tourPhotos({ name: tour.title, cities: c?.cities ?? [] })[0] ?? null
     return {
-      title: tour.title, href: `/${lang}/${tour.path}`, photo: photo ? { src: photo.src, alt: photo.alt } : null,
+      title: tour.title, href: `/${lang}/${tour.path}`,
+      picture: tourPicture({ name: tour.title, image: c?.image, places: c?.places, cities: c?.cities }),
       days: c?.days ?? null, nights: c?.nights ?? null, hours: c?.hours ?? null, cities: c?.cities ?? [], type: c?.type ?? null, from: c?.from ?? null,
+      highlights: c?.highlights ?? [], guideLanguages: c?.guideLanguages ?? [],
     }
   })
 }
+
+/** "Cairo", "Cairo and Luxor", "Cairo, Luxor and Aswan". */
+function listOf(lang: string, items: string[]): string {
+  return items.length > 1 ? `${items.slice(0, -1).join(', ')} ${t(lang, 'and')} ${items[items.length - 1]}` : items[0] ?? ''
+}
+
+/** The places the site's tours go, most-visited first. */
+const placesOf = (page: PagePayload) => (page.destinations ?? []).map(d => d.name)
 
 /** "4.8 ★★★★★ · 312 reviews on Google" — only when Google gave a rating. */
 function RatingLine({ page, className }: { page: PagePayload; className?: string }) {
@@ -139,57 +187,55 @@ function RatingLine({ page, className }: { page: PagePayload; className?: string
   )
 }
 
-function Destinations({ page }: ThemePageProps) {
+/** Where the tours go — only when there is more than one place to choose. */
+function Destinations({ page, soft }: { page: PagePayload; soft?: boolean }) {
   const lang = page.language
-  const list = (page.destinations ?? []).filter(d => d.path !== `destinations/${page.destination?.slug}`).slice(0, 8)
-  if (list.length === 0) return null
+  const all = page.destinations ?? []
+  if (all.length < 2) return null
+  const list = all.filter(d => d.path !== `destinations/${page.destination?.slug}`).slice(0, 6)
   return (
-    <section className={`${s.container} ${s.section}`}>
-      <h2 className={s.h2Big}>{t(lang, 'destinationsTitle')}</h2>
-      <ul className={s.places}>
-        {list.map(d => {
-          const photo = photoFor(d.name) ?? tourPhotos({ name: d.name })[0] ?? null
-          return (
+    <section className={soft ? s.soft : undefined} data-section="destinations">
+      <div className={`${s.container} ${s.section}`}>
+        <h2 className={s.h2Big}>{t(lang, 'destinationsTitle')}</h2>
+        <ul className={s.places} data-n={list.length}>
+          {list.map(d => (
             <li key={d.path}>
               <a className={s.place} href={`/${lang}/${d.path}`}>
-                {photo ? <Img photo={photo} className={s.placeImg} /> : <span className={s.panel} aria-hidden="true" />}
-                <span className={s.placeShade} aria-hidden="true" />
-                <span className={s.placeBody}>
-                  <span className={s.placeName}>{d.name}</span>
-                  <span className={s.placeCount}>{d.count} {t(lang, d.count === 1 ? 'oneJourney' : 'journeysCount')}</span>
-                </span>
+                <span className={s.placeMedia}><PictureView picture={defaultPicture([d.name])} className={s.cardImg} decorative /></span>
+                <span className={s.placeName}>{d.name}</span>
+                <span className={s.placeCount}>{d.count} {t(lang, d.count === 1 ? 'oneTourWord' : 'toursWord')}</span>
               </a>
             </li>
-          )
-        })}
-      </ul>
+          ))}
+        </ul>
+      </div>
     </section>
   )
 }
 
-/** What the agency can truly promise: its own claims, the one-price rule,
- *  free enquiries and its licence. Nothing here is invented for it. */
-function whyItems(page: PagePayload): Array<{ title: string; text: string | null }> {
+/** The trust strip under the home hero: only what the records can show —
+ *  the licence, the years, the guides' languages, a real review score. */
+function TrustStrip({ page }: { page: PagePayload }) {
   const lang = page.language
-  const claims = Array.isArray(page.site.brand.claims) ? (page.site.brand.claims as unknown[]).filter((c): c is string => typeof c === 'string' && c.trim() !== '') : []
-  const items: Array<{ title: string; text: string | null }> = claims.slice(0, 3).map(c => ({ title: c, text: null }))
-  if (page.tours.some(x => x.card?.from)) items.push({ title: t(lang, 'whyOnePrice'), text: t(lang, 'whyOnePriceText') })
-  items.push({ title: t(lang, 'trustNoPayment'), text: t(lang, 'whyNoPaymentText') })
-  if (page.site.identity.licenseNumber) items.push({ title: t(lang, 'trustLicensed'), text: `${t(lang, 'whyLicensedText')} ${page.site.identity.licenseNumber}` })
-  return items.slice(0, 4)
-}
-
-function WhyUs({ page }: { page: PagePayload }) {
-  const items = whyItems(page)
+  const { identity } = page.site
+  const langs = [...new Set(page.tours.flatMap(x => x.card?.guideLanguages ?? []))]
+  const r = page.reviews
+  const nf = new Intl.NumberFormat(lang, { maximumFractionDigits: 1, minimumFractionDigits: 1 })
+  const years = identity.foundedYear ? new Date().getFullYear() - identity.foundedYear : 0
+  const items: Array<{ icon: keyof typeof ICONS; title: string; text: string | null }> = [
+    ...(identity.licenseNumber ? [{ icon: 'shield' as const, title: t(lang, 'licensedByEtaa'), text: `${t(lang, 'licenceNo')} ${identity.licenseNumber}` }] : []),
+    ...(identity.foundedYear ? [{ icon: 'calendar' as const, title: `${t(lang, 'operatingSince')} ${identity.foundedYear}`, text: years > 1 ? `${years} ${t(lang, 'yearsWord')}` : null }] : []),
+    ...(langs.length ? [{ icon: 'chat' as const, title: t(lang, 'guidesSpeak'), text: langs.join(', ') }] : []),
+    ...(r && r.rating !== null ? [{ icon: 'star' as const, title: `${nf.format(r.rating)}${r.count ? ` ${fill(lang, 'reviewsFromCount', { n: new Intl.NumberFormat(lang).format(r.count) })}` : ''}`, text: t(lang, 'onGoogle') }] : []),
+  ]
+  if (items.length === 0) return null
   return (
-    <section className={`${s.container} ${s.section}`} data-section="why">
-      <h2 className={s.h2Big}>{t(page.language, 'whyTitle')}</h2>
-      <ul className={s.why}>
+    <section className={s.container} data-section="trust">
+      <ul className={s.trustStrip} style={{ '--n': items.length } as React.CSSProperties}>
         {items.map(x => (
-          <li key={x.title}>
-            <span className={s.whyIcon}><Check /></span>
-            <span className={s.whyTitle}>{x.title}</span>
-            {x.text && <span className={s.whyText}>{x.text}</span>}
+          <li key={x.icon}>
+            <Icon name={x.icon} className={x.icon === 'star' ? s.trustStar : s.trustIcon} />
+            <span><strong>{x.title}</strong>{x.text && <span className={s.trustText}>{x.text}</span>}</span>
           </li>
         ))}
       </ul>
@@ -197,21 +243,73 @@ function WhyUs({ page }: { page: PagePayload }) {
   )
 }
 
+/** What the agency can truly promise, each with its own icon and line. */
+function whyItems(page: PagePayload): Array<{ icon: keyof typeof ICONS; title: string; text: string }> {
+  const lang = page.language
+  const priced = page.tours.map(x => x.card?.from).find(Boolean) ?? page.tour?.facts?.price
+  const currency = priced && 'currency' in priced ? priced.currency : null
+  const items: Array<{ icon: keyof typeof ICONS; title: string; text: string }> = [
+    { icon: 'guide', title: t(lang, 'whyGuides'), text: t(lang, 'whyGuidesText') },
+  ]
+  if (page.tours.some(x => x.card?.from) && currency) items.push({ icon: 'tag', title: t(lang, 'whyOnePrice'), text: fill(lang, 'whyOnePriceIn', { currency }) })
+  items.push({ icon: 'chat', title: t(lang, 'trustNoPayment'), text: t(lang, 'whyNoPaymentLine') })
+  if (page.site.identity.licenseNumber) items.push({ icon: 'shield', title: t(lang, 'licensedByEtaa'), text: fill(lang, 'whyLicensedLine', { n: page.site.identity.licenseNumber }) })
+  return items
+}
+
+function WhyUs({ page }: { page: PagePayload }) {
+  const items = whyItems(page)
+  return (
+    <section className={s.soft} data-section="why">
+      <div className={`${s.container} ${s.section}`}>
+        <h2 className={s.h2Big}>{t(page.language, 'whyTitle')}</h2>
+        <ul className={s.why} style={{ '--n': items.length } as React.CSSProperties}>
+          {items.map(x => (
+            <li key={x.title}>
+              <span className={s.whyIcon}><Icon name={x.icon} /></span>
+              <span className={s.whyTitle}>{x.title}</span>
+              <span className={s.whyText}>{x.text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
 function HowItWorks({ lang }: { lang: string }) {
   const steps = [['how1', 'how1Text'], ['how2', 'how2Text'], ['how3', 'how3Text']] as const
   return (
-    <section className={s.soft} data-section="how">
-      <div className={`${s.container} ${s.section}`}>
-        <h2 className={s.h2Big}>{t(lang, 'howTitle')}</h2>
-        <ol className={s.how}>
-          {steps.map(([title, text]) => (
-            <li key={title}>
-              <span className={s.howNo} aria-hidden="true" />
-              <span className={s.whyTitle}>{t(lang, title)}</span>
-              <span className={s.whyText}>{t(lang, text)}</span>
-            </li>
-          ))}
-        </ol>
+    <section className={`${s.container} ${s.section}`} data-section="how">
+      <h2 className={s.h2Big}>{t(lang, 'howTitle')}</h2>
+      <ol className={s.how}>
+        {steps.map(([title, text]) => (
+          <li key={title}>
+            <span className={s.howNo} aria-hidden="true" />
+            <span className={s.whyTitle}>{t(lang, title)}</span>
+            <span className={s.whyText}>{t(lang, text)}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+/** "Don't see what you need?" — on Home (dark) and Tours (soft). */
+function CustomTripBand({ page, tone }: { page: PagePayload; tone: 'dark' | 'soft' }) {
+  const lang = page.language
+  const wa = whatsappHref(page)
+  return (
+    <section className={`${s.container} ${s.section}`} data-section="custom">
+      <div className={tone === 'dark' ? s.cta : `${s.cta} ${s.ctaSoft}`}>
+        <div>
+          <h2 className={s.ctaTitle}>{t(lang, 'customTitle')}</h2>
+          <p className={s.ctaText}>{t(lang, 'customText')}</p>
+        </div>
+        <div className={s.ctaActions}>
+          <a className={tone === 'dark' ? s.pillLight : s.pillDark} href={`/${lang}/contact`}>{t(lang, 'planYourJourney')}</a>
+          {wa && <a className={tone === 'dark' ? s.pillGhostLight : s.ghost} href={wa} rel="nofollow"><Icon name="whatsapp" />{t(lang, 'whatsappUs')}</a>}
+        </div>
       </div>
     </section>
   )
@@ -228,7 +326,7 @@ function CtaBand({ page }: { page: PagePayload }) {
           <p className={s.ctaText}>{t(lang, 'ctaText')}</p>
         </div>
         <div className={s.ctaActions}>
-          <a className={s.pill} href={`/${lang}/contact`}>{t(lang, 'enquireGeneral')}</a>
+          <a className={s.pillLight} href={`/${lang}/contact`}>{t(lang, 'enquireGeneral')}</a>
           {wa && <a className={s.pillGhostLight} href={wa} rel="nofollow">{t(lang, 'askOnWhatsApp')}</a>}
         </div>
       </div>
@@ -240,27 +338,86 @@ function CtaBand({ page }: { page: PagePayload }) {
 
 function HomeHero({ page }: ThemePageProps) {
   const lang = page.language
-  const { identity, companyName } = page.site
+  const { identity } = page.site
   const wa = whatsappHref(page)
-  const places = [...new Set(page.tours.flatMap(x => x.card?.cities ?? []))].slice(0, 4)
-  const placeList = places.length > 1 ? `${places.slice(0, -1).join(', ')} ${t(lang, 'and')} ${places[places.length - 1]}` : places[0]
-  const photo = page.tours.map(x => x.card?.image ? { src: x.card.image, alt: x.title, credit: '' } : null).find(Boolean)
-    ?? page.tours.map(x => photoFor(x.title)).find(Boolean) ?? tourPhotos({ name: 'giza pyramids' })[0] ?? null
+  const places = placesOf(page)
+  const one = places.length === 1 ? places[0] : null
+  const headline = identity.headline ?? (one ? fill(lang, 'heroTitleIn', { place: one }) : t(lang, 'heroTitleAcross'))
+  const priced = page.tours.some(x => x.card?.from)
+  // With one place, the subline names it when the agency wrote its own headline.
+  const sub = [identity.headline && one ? fill(lang, 'heroSubIn', { place: one }) : null, t(lang, priced ? 'heroSubPrice' : 'heroSubAsk')].filter(Boolean).join(' ')
+  // The agency's own photo where it has one, else the main destination's picture.
+  const own = page.tours.find(x => x.card?.image)
+  const picture: Picture = own?.card?.image ? { kind: 'photo', src: own.card.image, alt: own.title } : defaultPicture([places[0], ...page.tours.flatMap(x => x.card?.places ?? [])])
+  const single = page.tours.length === 1 ? `/${lang}/${page.tours[0].path}` : null
   return (
     <section className={`${s.container} ${s.hero}`} data-section="hero">
       <div className={s.heroText}>
-        <h1 className={s.heroTitle}>{identity.tagline ?? companyName}</h1>
-        {placeList && <p className={s.heroValue}>{t(lang, 'toursIn')} {placeList} — {t(lang, 'valueLine')}</p>}
+        {identity.licenseNumber && <p className={s.eyebrow}>{one ? fill(lang, 'heroEyebrowIn', { place: one }) : t(lang, 'heroEyebrowAcross')}</p>}
+        <h1 className={s.heroTitle}>{headline}</h1>
+        <p className={s.heroValue}>{sub}</p>
         <div className={s.heroActions}>
-          <a className={s.pillDark} href={`/${lang}/tours`}>{t(lang, 'browseTours')}</a>
-          {wa && <a className={s.ghost} href={wa} rel="nofollow">WhatsApp</a>}
+          <a className={s.pillDark} href={single ?? `/${lang}/tours`}>{t(lang, single ? 'seeTheTour' : 'browseTours')}</a>
+          {wa && <a className={s.ghost} href={wa} rel="nofollow"><Icon name="whatsapp" />{t(lang, 'whatsappUs')}</a>}
         </div>
-        <RatingLine page={page} />
       </div>
       <div className={s.heroMedia}>
-        {photo ? <Img photo={photo} className={s.heroImg} eager /> : <span className={s.panel} aria-hidden="true" />}
+        <PictureView picture={picture} className={s.heroImg} eager />
       </div>
     </section>
+  )
+}
+
+function HomeTours({ page }: { page: PagePayload }) {
+  const lang = page.language
+  const n = page.tours.length
+  return (
+    <section className={`${s.container} ${s.section}`} data-section="popular">
+      <div className={s.sectionHead}>
+        <h2 className={s.h2Big}>{t(lang, n === 1 ? 'ourTour' : 'popularTours')}</h2>
+        {n > 3 && <a className={s.more} href={`/${lang}/tours`}>{fill(lang, 'allNTours', { n })}</a>}
+      </div>
+      {n === 0 ? <p className={s.empty}>{t(lang, 'noToursYet')}</p> : <TourFinder tours={finderTours(page.tours, lang)} lang={lang} where="home" limit={6} />}
+    </section>
+  )
+}
+
+function HomePage(props: ThemePageProps) {
+  const { page } = props
+  const lang = page.language
+  const large = page.tours.length >= 7
+  return (
+    <>
+      <HomeHero {...props} />
+      <TrustStrip page={page} />
+      {large && <Destinations page={page} soft />}
+      <HomeTours page={page} />
+      <WhyUs page={page} />
+      {large && <HowItWorks lang={lang} />}
+      {!large && <Destinations page={page} />}
+      {page.reviews && <div className={`${s.container} ${s.section}`}><Reviews page={page} /></div>}
+      <CustomTripBand page={page} tone="dark" />
+    </>
+  )
+}
+
+function ToursPage({ page }: ThemePageProps) {
+  const lang = page.language
+  const places = placesOf(page)
+  const priced = page.tours.some(x => x.card?.from)
+  const intro = [places.length ? fill(lang, 'toursIntroIn', { places: listOf(lang, places.slice(0, 4)) }) : null, priced ? t(lang, 'toursIntroPrice') : null].filter(Boolean).join(' ')
+  return (
+    <>
+      <section className={`${s.container} ${s.pageHead}`}>
+        <nav aria-label={t(lang, 'breadcrumb')} className={s.crumbs}>
+          <ol><li><a href={`/${lang}`}>{t(lang, 'home')}</a></li><li aria-current="page">{t(lang, 'tours')}</li></ol>
+        </nav>
+        <h1 className={s.h1}>{t(lang, 'ourTours')}</h1>
+        {intro && <p className={s.intro}>{intro}</p>}
+        {page.tours.length === 0 ? <p className={s.empty}>{t(lang, 'noToursYet')}</p> : <TourFinder tours={finderTours(page.tours, lang)} lang={lang} where="listing" />}
+      </section>
+      <CustomTripBand page={page} tone="soft" />
+    </>
   )
 }
 
@@ -281,23 +438,37 @@ function Breadcrumb({ page, name }: { page: PagePayload; name: string }) {
   )
 }
 
-function Gallery({ photos, name, lang }: { photos: Photo[]; name: string; lang: string }) {
-  if (photos.length === 0) return null
-  const shown = photos.slice(0, 5)
+function Gallery({ pictures, name, lang }: { pictures: Picture[]; name: string; lang: string }) {
+  const shown = pictures.slice(0, 5)
+  const photos = pictures.filter(p => p.kind === 'photo')
   return (
     <section className={s.gallery} data-count={shown.length} aria-label={name}>
-      {shown.map((p, i) => <Img key={p.src} photo={p} className={i === 0 ? s.galleryMain : s.galleryImg} eager={i === 0} />)}
+      {shown.map((p, i) => <PictureView key={p.kind === 'photo' ? p.src : p.art} picture={p} className={i === 0 ? s.galleryMain : s.galleryImg} eager={i === 0} fit={shown.length === 1 ? 'contain' : 'cover'} />)}
       {photos.length > 1 && (
         <>
           <button type="button" className={s.galleryAll} popoverTarget="all-photos">{t(lang, 'viewAllPhotos')} {photos.length} {t(lang, 'photosWord')}</button>
           <div id="all-photos" popover="auto" className={s.lightbox}>
             <button type="button" className={s.lightboxClose} popoverTarget="all-photos" popoverTargetAction="hide">{t(lang, 'close')}</button>
-            <ul>{photos.map(p => <li key={p.src}><Img photo={p} /></li>)}</ul>
+            <ul>{photos.map(p => <li key={p.kind === 'photo' ? p.src : ''}><PictureView picture={p} /></li>)}</ul>
           </div>
         </>
       )}
     </section>
   )
+}
+
+const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+
+/** "Mon, Wed, Fri" — or "Every day"; else the next dated departure. */
+function departsText(facts: TourFacts, lang: string): string | null {
+  if (facts.departureDays.length === 7) return t(lang, 'everyDay')
+  if (facts.departureDays.length > 0) {
+    const fmt = new Intl.DateTimeFormat(lang, { weekday: 'short', timeZone: 'UTC' })
+    // 2023-01-02 was a Monday.
+    return WEEK.filter(d => facts.departureDays.includes(d)).map(d => fmt.format(new Date(Date.UTC(2023, 0, 2 + WEEK.indexOf(d))))).join(', ')
+  }
+  const next = facts.departures.find(d => d.status !== 'full')
+  return next ? `${t(lang, 'nextDeparture')} ${formatDate(next.date, lang)}` : null
 }
 
 function KeyFacts({ facts, lang }: { facts: TourFacts; lang: string }) {
@@ -311,7 +482,8 @@ function KeyFacts({ facts, lang }: { facts: TourFacts; lang: string }) {
     [t(lang, 'duration'), length],
     [t(lang, 'tourTypeLabel'), facts.tourType],
     [t(lang, 'pickupLabel'), pickup],
-    [t(lang, 'guideLabel'), facts.guideLanguages?.length ? facts.guideLanguages.join(', ') : null],
+    [t(lang, 'departs'), departsText(facts, lang)],
+    [t(lang, 'guideSpeaks'), facts.guideLanguages?.length ? facts.guideLanguages.join(', ') : null],
     [t(lang, 'cancellation'), cancellationHeadline(facts.cancellation, lang)],
   ]
   return (
@@ -323,26 +495,27 @@ function KeyFacts({ facts, lang }: { facts: TourFacts; lang: string }) {
   )
 }
 
-/** A day tour: one open timeline of its stops, with approximate times where
- *  the operator gave them. */
+/** A day tour: one open timeline of its stops, the approximate time of each
+ *  beside it where the operator gave one. */
 function DayTimeline({ day, lang, text }: { day: TourFacts['days'][number]; lang: string; text: string | null }) {
   const stops = day.stops?.length ? day.stops : day.sights.map(name => ({ time: null, name }))
+  const timed = stops.some(x => x.time)
   const meals = (['breakfast', 'lunch', 'dinner'] as const).filter(m => day.meals[m])
   return (
     <div>
       {text && paragraphs(text).map((p, j) => <p key={j}>{p}</p>)}
       {stops.length > 0 && (
-        <ol className={s.stops}>
+        <ol className={timed ? `${s.stops} ${s.stopsTimed}` : s.stops}>
           {stops.map((x, i) => (
             <li key={`${x.name}-${i}`}>
-              {x.time && <span className={s.stopTime}>≈ {x.time}</span>}
+              {timed && <span className={s.stopTime}>{x.time ?? ''}</span>}
+              <span className={s.stopDot} aria-hidden="true" />
               <span className={s.stopName}>{x.name}</span>
             </li>
           ))}
         </ol>
       )}
       {meals.length > 0 && <p className={s.muted}>{meals.map(m => t(lang, m)).join(' · ')}</p>}
-      {stops.some(x => x.time) && <p className={s.muted}>{t(lang, 'approxTimes')}</p>}
     </div>
   )
 }
@@ -395,10 +568,10 @@ function Ticks({ items, kind }: { items: string[]; kind: 'yes' | 'no' }) {
   )
 }
 
-function Section({ id, title, children }: { id: string; title?: string; children: React.ReactNode }) {
+function Section({ id, title, note, children }: { id: string; title?: string; note?: string | null; children: React.ReactNode }) {
   return (
     <section className={s.block} data-section={id}>
-      {title && <h2 className={s.h2}>{title}</h2>}
+      {title && <div className={s.blockHead}><h2 className={s.h2}>{title}</h2>{note && <span className={s.muted}>{note}</span>}</div>}
       {children}
     </section>
   )
@@ -409,16 +582,20 @@ function TourPage({ page }: ThemePageProps) {
   const tour = page.tour!
   const facts = tour.facts
   const narrative = tour.narrative
-  const photos = tourPhotos({ name: tour.name, images: facts?.images, sights: facts?.days.flatMap(d => d.sights), cities: facts?.days.map(d => d.city) })
+  const sights = facts ? [...facts.days.flatMap(d => [...d.sights, ...(d.stops ?? []).map(x => x.name)]), ...facts.mainAttractions] : []
+  const photos: Picture[] = tourPhotos({ name: tour.name, images: facts?.images, sights, cities: facts?.days.map(d => d.city) })
+    .map(p => ({ kind: 'photo' as const, src: p.src, alt: p.alt }))
+  // Never an empty gallery: the default picture of the tour's first site.
+  const pictures = photos.length ? photos : [defaultPicture([...sights, tour.name, ...(facts?.days.map(d => d.city) ?? [])])]
   const overview = narrativeText(narrative?.overview, facts, lang)
   const highlights = (narrative?.highlights ?? []).map(h => narrativeText(h, facts, lang)).filter((h): h is string => !!h)
   const listed = highlights.length ? highlights : facts ? [...new Set([...facts.highlights, ...facts.mainAttractions])] : []
   const cells = facts?.cancellation ? cancellationCells(facts.cancellation.tiers, lang) : []
   const free = facts ? cancellationHeadline(facts.cancellation, lang) : null
-  const trust = [
-    ...(free ? [free] : []),
-    t(lang, 'trustNoPayment'),
-    ...(page.site.identity.licenseNumber ? [`${t(lang, 'trustLicensed')} · ${page.site.identity.licenseNumber}`] : []),
+  const trust: Array<{ text: string; licence?: boolean }> = [
+    ...(free ? [{ text: free }] : []),
+    { text: t(lang, 'trustNoPayment') },
+    ...(page.site.identity.licenseNumber ? [{ text: `${t(lang, 'licensedByEtaa')} · ${t(lang, 'licenceNo')} ${page.site.identity.licenseNumber}`, licence: true }] : []),
   ]
   const pickup = facts?.pickup
   const related = finderTours(page.related ?? [], lang)
@@ -432,7 +609,7 @@ function TourPage({ page }: ThemePageProps) {
           <h1 className={s.tourTitle}>{tour.name}</h1>
           <RatingLine page={page} />
         </header>
-        <Gallery photos={photos} name={tour.name} lang={lang} />
+        <Gallery pictures={pictures} name={tour.name} lang={lang} />
         {facts && <KeyFacts facts={facts} lang={lang} />}
       </div>
 
@@ -449,7 +626,7 @@ function TourPage({ page }: ThemePageProps) {
             </Section>
           )}
           {facts && facts.days.length > 0 && (
-            <Section id="itinerary" title={t(lang, 'itinerary')}>
+            <Section id="itinerary" title={t(lang, 'itinerary')} note={facts.days.length === 1 && facts.days[0].stops?.some(x => x.time) ? t(lang, 'approxTimes') : null}>
               <Itinerary facts={facts} lang={lang} narrative={narrative} />
             </Section>
           )}
@@ -487,8 +664,9 @@ function TourPage({ page }: ThemePageProps) {
               {facts.cancellation.wording && <p className={s.muted}>{facts.cancellation.wording}</p>}
             </Section>
           )}
-          {facts && (facts.departureDays.length > 0 || facts.departures.length > 0) && (
-            <div className={s.block} data-section="departures"><DeparturesSection facts={facts} lang={lang} variant="compact" /></div>
+          {/* The weekdays sit in the key facts; dated departures are listed here. */}
+          {facts && facts.departures.length > 0 && (
+            <div className={s.block} data-section="departures"><DeparturesSection facts={{ ...facts, departureDays: [] }} lang={lang} variant="compact" /></div>
           )}
           {page.reviews && <div className={s.block} data-section="reviews"><Reviews page={page} /></div>}
           {facts?.faq && facts.faq.length > 0 && (
@@ -597,36 +775,8 @@ function ContactPage({ page }: ThemePageProps) {
 function Page(props: ThemePageProps) {
   const { page } = props
   const lang = page.language
-  if (page.kind === 'home') {
-    return (
-      <>
-        <HomeHero {...props} />
-        <section className={`${s.container} ${s.section}`} data-section="popular">
-          <div className={s.sectionHead}>
-            <h2 className={s.h2Big}>{t(lang, 'popularTours')}</h2>
-            <a className={s.more} href={`/${lang}/tours`}>{t(lang, 'allTours')} →</a>
-          </div>
-          {page.tours.length === 0 ? <p className={s.empty}>{t(lang, 'noToursYet')}</p> : <TourFinder tours={finderTours(page.tours, lang)} lang={lang} mode="chips" limit={6} />}
-        </section>
-        <WhyUs {...props} />
-        <HowItWorks lang={lang} />
-        {page.reviews && <div className={`${s.container} ${s.section}`}><Reviews page={page} /></div>}
-        <Destinations {...props} />
-        <CtaBand {...props} />
-      </>
-    )
-  }
-  if (page.kind === 'listing') {
-    return (
-      <>
-        <section className={`${s.container} ${s.pageHead}`}>
-          <h1 className={s.h1}>{t(lang, 'ourTours')}</h1>
-          {page.tours.length === 0 ? <p className={s.empty}>{t(lang, 'noToursYet')}</p> : <TourFinder tours={finderTours(page.tours, lang)} lang={lang} mode="full" />}
-        </section>
-        <Destinations {...props} />
-      </>
-    )
-  }
+  if (page.kind === 'home') return <HomePage {...props} />
+  if (page.kind === 'listing') return <ToursPage {...props} />
   if (page.kind === 'destination' && page.destination) {
     return (
       <>
@@ -634,9 +784,9 @@ function Page(props: ThemePageProps) {
           <p className={s.eyebrow}>{t(lang, 'destinationLabel')}</p>
           <h1 className={s.h1}>{page.destination.name}</h1>
           <h2 className={s.h2}>{t(lang, 'toursThere')}</h2>
-          <TourFinder tours={finderTours(page.tours, lang)} lang={lang} mode="none" />
+          <TourFinder tours={finderTours(page.tours, lang)} lang={lang} where="destination" />
         </section>
-        <Destinations {...props} />
+        <Destinations page={page} />
       </>
     )
   }

@@ -29,7 +29,7 @@ import { ARCHETYPES } from './brand'
  * deploy (it sits under a different cache key) — and the app can refuse a
  * renderer that is a version behind.
  */
-export const CONTRACT_VERSION = 6
+export const CONTRACT_VERSION = 7
 
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
@@ -85,6 +85,11 @@ export const companyIdentitySchema = z.object({
   /** The agency's own booking terms and privacy notice (https). Optional (v6). */
   termsUrl: z.string().nullable().optional(),
   privacyUrl: z.string().nullable().optional(),
+  /** The home page's headline in this page's language, as a manager wrote it
+   *  (publish_sites.settings.headline); null = the theme's own. Optional (v7). */
+  headline: z.string().nullable().optional(),
+  /** The year the company started operating (publish_sites.settings.foundedYear). Optional (v7). */
+  foundedYear: z.number().int().min(1900).max(2100).nullable().optional(),
 })
 export type CompanyIdentity = z.infer<typeof companyIdentitySchema>
 
@@ -105,6 +110,13 @@ const tourCard = z.object({
   type: z.string().nullable().optional(),
   /** A day tour's length in hours. Optional (v6). */
   hours: z.number().positive().nullable().optional(),
+  /** Up to three of the tour's highlights, in the page language. Optional (v7). */
+  highlights: z.array(z.string()).optional(),
+  /** The tour's sights and places as the records name them, the first day's
+   *  first — what the renderer matches its default pictures on. Optional (v7). */
+  places: z.array(z.string()).optional(),
+  /** The languages its guides speak, in the page language. Optional (v7). */
+  guideLanguages: z.array(z.string()).optional(),
 })
 const pageLink = z.object({ title: z.string(), path: z.string(), card: tourCard.optional() })
 const weekday = z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
