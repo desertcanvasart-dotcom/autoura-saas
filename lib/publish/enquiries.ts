@@ -80,8 +80,12 @@ export async function recordWebEnquiry(db: SupabaseClient, input: EnquiryInput, 
     preferred_language: LANGUAGE_LABELS[input.language] ?? 'English',
     client_source: 'website',
     vip_status: false,
+    ...(input.whatsapp ? { whatsapp: input.whatsapp } : {}),
+    ...(input.country ? { country: input.country } : {}),
+    ...(input.interests?.length ? { special_interests: input.interests } : {}),
   }, '[publish enquiry]')
   if (!clientId) throw new Error('the lead could not be saved')
+  await fillLeadGaps(db, site.tenant_id, clientId, input)
 
   const { utm, campaign } = attributionOf(input.landingUrl)
   const { data: enquiry, error } = await db.from('publish_enquiries').insert({
@@ -98,14 +102,27 @@ export async function recordWebEnquiry(db: SupabaseClient, input: EnquiryInput, 
     dates: input.travelDate ? { from: input.travelDate } : null,
     travellers: input.travellers,
     message: input.message,
+    whatsapp: input.whatsapp ?? null,
+    country: input.country ?? null,
+    nights: input.nights ?? null,
+    adults: input.adults ?? null,
+    children: input.children ?? null,
+    interests: input.interests ?? [],
+    consent_at: input.consent ? new Date().toISOString() : null,
   }).select('id').single()
   if (error) throw new Error(`saving the enquiry: ${error.message}`)
 
   const about = page?.tourName ? `about ${page.tourName}` : 'from the website'
   const details = [
     input.travelDate && `travel ${input.travelDate}`,
-    input.travellers && `${input.travellers} traveller${input.travellers === 1 ? '' : 's'}`,
+    input.nights && `${input.nights} night${input.nights === 1 ? '' : 's'}`,
+    input.adults
+      ? `${input.adults} adult${input.adults === 1 ? '' : 's'}${input.children ? `, ${input.children} child${input.children === 1 ? '' : 'ren'}` : ''}`
+      : input.travellers && `${input.travellers} traveller${input.travellers === 1 ? '' : 's'}`,
     input.phone && `phone ${input.phone}`,
+    input.whatsapp && `WhatsApp ${input.whatsapp}`,
+    input.country && `from ${input.country}`,
+    input.interests?.length && `interested in ${input.interests.join(', ')}`,
   ].filter(Boolean).join(', ')
   try {
     await db.from('client_notes').insert({
@@ -131,6 +148,25 @@ export async function recordWebEnquiry(db: SupabaseClient, input: EnquiryInput, 
     console.error('[publish enquiry] bell notification failed:', (e as Error).message)
   }
   return { enquiryId: enquiry.id, clientId }
+}
+
+/** A lead that already existed keeps what it had; the enquiry only fills
+ *  what was empty (its WhatsApp, its country) and adds new interests. */
+async function fillLeadGaps(db: SupabaseClient, tenantId: string, clientId: string, input: EnquiryInput): Promise<void> {
+  if (!input.whatsapp && !input.country && !input.interests?.length) return
+  try {
+    const { data } = await db.from('clients').select('whatsapp, country, special_interests').eq('id', clientId).eq('tenant_id', tenantId).maybeSingle()
+    if (!data) return
+    const had = (data.special_interests as string[] | null) ?? []
+    const patch: Record<string, unknown> = {}
+    if (input.whatsapp && !data.whatsapp) patch.whatsapp = input.whatsapp
+    if (input.country && !data.country) patch.country = input.country
+    const added = (input.interests ?? []).filter(x => !had.includes(x))
+    if (added.length) patch.special_interests = [...had, ...added]
+    if (Object.keys(patch).length) await db.from('clients').update(patch).eq('id', clientId).eq('tenant_id', tenantId)
+  } catch (e) {
+    console.warn('[publish enquiry] could not fill the lead\'s details (non-blocking):', e)
+  }
 }
 
 // ---------- click-to-WhatsApp ----------

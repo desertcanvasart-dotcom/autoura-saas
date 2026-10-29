@@ -28,6 +28,18 @@ import http from 'node:http'
 const PORT = Number(process.env.PORT || 4010)
 const SECRET = process.env.PUBLISH_INTERNAL_SECRET || 'dev-internal'
 
+// The About page's own parts (a website-only list; dev data, no photos).
+const ABOUT = {
+  headline: 'A Cairo team that has shown Egypt to travellers since 2012.',
+  teamPhoto: null,
+  people: [
+    { name: 'Mona Adel', role: 'Egyptologist', kind: 'guide', languages: ['en', 'es'], photo: null },
+    { name: 'Karim Fathy', role: 'Egyptologist', kind: 'guide', languages: ['en', 'de'], photo: null },
+    { name: 'Hana Samir', role: 'Egyptologist', kind: 'guide', languages: ['en', 'fr'], photo: null },
+    { name: 'Omar Nabil', role: 'Trip planner', kind: 'staff', languages: ['en', 'fr'], photo: null },
+  ],
+}
+
 const SIX = [
   { slug: 'saqqara-and-the-first-pyramids', other: 'saqqarah-et-les-premieres-pyramides', name: 'Saqqara and the First Pyramids', published: true, price: 'available', plan: 'saqqara' },
   { slug: 'giza-pyramids-and-the-sphinx', other: 'pyramides-de-gizeh', name: 'Giza Pyramids and the Sphinx', published: true, price: 'available', plan: 'giza' },
@@ -124,7 +136,9 @@ const SITES = {
     identity: { tagline: 'Private tours in Egypt', logoUrl: null, phone: null,
       email: 'hello@sandbox.invalid', whatsapp: '+20 100 555 0101', address: '14 Champollion St, Downtown, Cairo', licenseNumber: '2241 (dev)',
       legalEntity: 'Sandbox Travel S.A.E. (dev)', termsUrl: 'https://sandbox.invalid/terms', privacyUrl: 'https://sandbox.invalid/privacy',
-      headline: null, foundedYear: 2012 },
+      headline: null, foundedYear: 2012, hours: { opens: '09:00', closes: '21:00', days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] } },
+    about: { en: 'We are a small Cairo company (dev text). Our founders guided for twenty years before starting their own agency.\n\nEvery tour is private: your guide, your driver, your pace.' },
+    aboutPage: ABOUT,
     tours: [
       { slug: 'saqqara-and-the-first-pyramids', other: 'saqqarah-et-les-premieres-pyramides', name: 'Saqqara and the First Pyramids', published: true, price: 'available', plan: 'saqqara' },
     ],
@@ -137,7 +151,9 @@ const SITES = {
     identity: { tagline: 'Private tours in Egypt', logoUrl: null, phone: null,
       email: 'hello@sandbox.invalid', whatsapp: '+20 100 555 0101', address: '14 Champollion St, Downtown, Cairo', licenseNumber: '2241 (dev)',
       legalEntity: 'Sandbox Travel S.A.E. (dev)', termsUrl: 'https://sandbox.invalid/terms', privacyUrl: 'https://sandbox.invalid/privacy',
-      headline: null, foundedYear: 2012 },
+      headline: null, foundedYear: 2012, hours: { opens: '09:00', closes: '21:00', days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] } },
+    about: { en: 'We are a small Cairo company (dev text). Our founders guided for twenty years before starting their own agency.\n\nEvery tour is private: your guide, your driver, your pace.' },
+    aboutPage: ABOUT,
     tours: SIX,
   },
   'many.localhost': {
@@ -148,7 +164,9 @@ const SITES = {
     identity: { tagline: 'Private tours in Egypt', logoUrl: null, phone: null,
       email: 'hello@sandbox.invalid', whatsapp: '+20 100 555 0101', address: '14 Champollion St, Downtown, Cairo', licenseNumber: '2241 (dev)',
       legalEntity: 'Sandbox Travel S.A.E. (dev)', termsUrl: 'https://sandbox.invalid/terms', privacyUrl: 'https://sandbox.invalid/privacy',
-      headline: null, foundedYear: 2012 },
+      headline: null, foundedYear: 2012, hours: { opens: '09:00', closes: '21:00', days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] } },
+    about: { en: 'We are a small Cairo company (dev text). Our founders guided for twenty years before starting their own agency.\n\nEvery tour is private: your guide, your driver, your pace.' },
+    aboutPage: ABOUT,
     tours: [...SIX,
       { slug: 'alexandria-in-a-day', other: 'alexandrie-en-un-jour', name: 'Alexandria in a day', published: true, price: 'available', plan: 'alex' },
       { slug: 'white-desert', other: 'desert-blanc', name: 'White Desert and the oases', published: true, plan: 'desert' },
@@ -304,7 +322,9 @@ function page(s, lang, path, preview) {
   const destinations = [...places].map(([slug, p]) => ({ name: p.name, path: `destinations/${slug}`, count: p.tours.size })).sort((a, b) => b.count - a.count)
   const base = { language: lang, site: siteInfo(s), tour: null, tours: [], unpublished: false, destinations }
   if (path === '') return { ...base, kind: 'home', path: '', title: s.companyName, alternates: [{ language: other, path: '' }], tours: links, ...(s.reviews ? { reviews: s.reviews } : {}) }
-  if (path === 'about' || path === 'contact') return { ...base, kind: path, path, title: s.companyName, alternates: [{ language: other, path }], pageId: null, ...(s.reviews && path === 'about' ? { reviews: s.reviews } : {}),
+  if (path === 'about' || path === 'contact') return { ...base, kind: path, path, title: s.companyName, alternates: [{ language: other, path }], pageId: null,
+    ...(path === 'about' && s.aboutPage ? { aboutPage: s.aboutPage } : {}),
+    ...(path === 'contact' ? { interests: destinations.map(d => d.name).slice(0, 8) } : {}), ...(s.reviews && path === 'about' ? { reviews: s.reviews } : {}),
     ...(path === 'about' && s.about?.[lang] ? { about: s.about[lang] } : {}) }
   if (path === 'tours') return { ...base, kind: 'listing', path: 'tours', title: s.companyName, alternates: [{ language: other, path: 'tours' }], tours: links }
   const dm = path.match(/^destinations\/([a-z0-9-]+)$/)

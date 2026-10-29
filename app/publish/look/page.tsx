@@ -14,6 +14,7 @@ import { ArrowLeft, Check, AlertTriangle, Palette as PaletteIcon } from 'lucide-
 import { useRole } from '@/hooks/useRole'
 import { showToast } from '@/app/contexts/ToastContext'
 import { contrastRatio, readableOn, MIN_TEXT_CONTRAST, MIN_UI_CONTRAST } from '@/lib/publish/brand'
+import { HoursEditor, PeopleEditor, TeamPhoto, type Hours, type Person } from './AboutParts'
 
 type Palette = { primary: string; accent: string; ink: string; surface: string }
 interface Look {
@@ -25,6 +26,10 @@ interface Look {
   about: Record<string, string>
   headline: Record<string, string>
   foundedYear: number | null
+  aboutHeadline: Record<string, string>
+  teamPhoto: string | null
+  people: Person[]
+  hours: Hours | null
   footer: { legalEntity: string | null; termsUrl: string | null; privacyUrl: string | null; licenseNumber: string | null; address: string | null; whatsapp: string | null }
   choices: {
     archetypes: Array<{ key: string; defaults: { palette: Palette; fontPair: string } }>
@@ -55,6 +60,10 @@ export default function PublishLookPage() {
   const [about, setAbout] = useState<Record<string, string>>({})
   const [headline, setHeadline] = useState<Record<string, string>>({})
   const [foundedYear, setFoundedYear] = useState('')
+  const [aboutHeadline, setAboutHeadline] = useState<Record<string, string>>({})
+  const [teamPhoto, setTeamPhoto] = useState<string | null>(null)
+  const [people, setPeople] = useState<Person[]>([])
+  const [hours, setHours] = useState<Hours | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -68,6 +77,10 @@ export default function PublishLookPage() {
       setAbout(j.data.about ?? {})
       setHeadline(j.data.headline ?? {})
       setFoundedYear(j.data.foundedYear ? String(j.data.foundedYear) : '')
+      setAboutHeadline(j.data.aboutHeadline ?? {})
+      setTeamPhoto(j.data.teamPhoto ?? null)
+      setPeople(j.data.people ?? [])
+      setHours(j.data.hours ?? null)
       setLegal({ entity: j.data.footer.legalEntity ?? '', termsUrl: j.data.footer.termsUrl ?? '', privacyUrl: j.data.footer.privacyUrl ?? '' })
     }).catch(e => showToast('error', e instanceof Error ? e.message : 'Could not load the look'))
   }, [])
@@ -92,7 +105,7 @@ export default function PublishLookPage() {
   async function save() {
     setSaving(true)
     try {
-      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website, legal, about, headline, foundedYear: foundedYear.trim() || null }) })
+      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website, legal, about, headline, foundedYear: foundedYear.trim() || null, aboutHeadline, teamPhoto, people, hours }) })
       const j = await res.json()
       if (!j.success) throw new Error(j.error)
       showToast(j.data.warning ? 'warning' : 'success', j.data.warning ?? 'Saved — your website shows the new look now')
@@ -224,15 +237,29 @@ export default function PublishLookPage() {
 
           <section className="bg-white border border-gray-200 rounded-lg p-4">
             <h2 className="font-medium text-gray-900 mb-1">About page</h2>
-            <p className="text-xs text-gray-500 mb-3">Your own words about the company, shown on the About page above your licence and registration. Separate paragraphs with an empty line. Leave a language empty and its About page shows only your details.</p>
+            <p className="text-xs text-gray-500 mb-3">A headline in your own voice (&ldquo;A Cairo team that has shown Egypt to travellers since 2008.&rdquo;), then two or three sentences about who you are. Separate paragraphs with an empty line. Leave a language empty and its About page shows only your details.</p>
             <div className="space-y-3">
               {look.languages.map(l => (
-                <label key={l} className="block text-xs text-gray-600">{new Intl.DisplayNames(['en'], { type: 'language' }).of(l) ?? l}
+                <label key={`h-${l}`} className="block text-xs text-gray-600">Headline · {new Intl.DisplayNames(['en'], { type: 'language' }).of(l) ?? l}
+                  <input value={aboutHeadline[l] ?? ''} disabled={!canManage} maxLength={140} onChange={e => setAboutHeadline({ ...aboutHeadline, [l]: e.target.value })}
+                    className="mt-1 w-full text-sm border border-gray-300 rounded-md px-3 py-2" />
+                </label>
+              ))}
+              {look.languages.map(l => (
+                <label key={l} className="block text-xs text-gray-600">Your words · {new Intl.DisplayNames(['en'], { type: 'language' }).of(l) ?? l}
                   <textarea value={about[l] ?? ''} disabled={!canManage} rows={5} maxLength={6000} onChange={e => setAbout({ ...about, [l]: e.target.value })}
                     className="mt-1 w-full text-sm border border-gray-300 rounded-md px-3 py-2" />
                 </label>
               ))}
             </div>
+            <TeamPhoto value={teamPhoto} onChange={setTeamPhoto} disabled={!canManage} />
+            <PeopleEditor people={people} onChange={setPeople} disabled={!canManage} />
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-gray-900 mb-1">Opening hours</h2>
+            <p className="text-xs text-gray-500 mb-3">When a person answers — shown on the Contact page, in Cairo time.</p>
+            <HoursEditor hours={hours} onChange={setHours} disabled={!canManage} />
           </section>
 
           {canManage && (

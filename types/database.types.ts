@@ -7849,6 +7849,13 @@ export interface Database {
           whatsapp_conversation_id: string | null
           ref_token: string | null
           created_at: string
+          whatsapp: string | null
+          country: string | null
+          nights: number | null
+          adults: number | null
+          children: number | null
+          interests: string[]
+          consent_at: string | null
         }
         Insert: {
           id?: string
@@ -7869,6 +7876,13 @@ export interface Database {
           whatsapp_conversation_id?: string | null
           ref_token?: string | null
           created_at?: string
+          whatsapp?: string | null
+          country?: string | null
+          nights?: number | null
+          adults?: number | null
+          children?: number | null
+          interests: string[]
+          consent_at?: string | null
         }
         Update: {
           id?: string
@@ -7889,6 +7903,13 @@ export interface Database {
           whatsapp_conversation_id?: string | null
           ref_token?: string | null
           created_at?: string
+          whatsapp?: string | null
+          country?: string | null
+          nights?: number | null
+          adults?: number | null
+          children?: number | null
+          interests?: string[]
+          consent_at?: string | null
         }
         Relationships: [
           {

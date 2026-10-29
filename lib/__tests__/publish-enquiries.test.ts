@@ -109,6 +109,27 @@ describe('the enquiry form', () => {
     expect(db.tables.clients).toHaveLength(1)
   })
 
+  it('the Contact page\'s fuller form: each answer its own column; a new lead takes WhatsApp, country and interests', async () => {
+    const { enquiryId, clientId } = await recordWebEnquiry(db as never, input({ pageId: null, travelDate: '2026-12-10', travellers: 3,
+      whatsapp: '+34 600 000 000', country: 'Spain', nights: 7, adults: 2, children: 1, interests: ['Luxor', 'Aswan'], consent: true }), { notify })
+    const e = db.tables.publish_enquiries.find(x => x.id === enquiryId)!
+    expect(e).toMatchObject({ whatsapp: '+34 600 000 000', country: 'Spain', nights: 7, adults: 2, children: 1, interests: ['Luxor', 'Aswan'], dates: { from: '2026-12-10' } })
+    expect(typeof e.consent_at).toBe('string')
+    expect(db.tables.clients.find(c => c.id === clientId)).toMatchObject({ whatsapp: '+34 600 000 000', country: 'Spain', special_interests: ['Luxor', 'Aswan'] })
+    expect(db.tables.client_notes[0].note_text).toContain('travel 2026-12-10, 7 nights, 2 adults, 1 child, WhatsApp +34 600 000 000, from Spain, interested in Luxor, Aswan.')
+  })
+
+  it('an existing lead keeps what it had: only empty details are filled, interests are added', async () => {
+    Object.assign(db.tables.clients[0], { whatsapp: '+20 100 000 0000', country: null, special_interests: ['Cairo'] })
+    await recordWebEnquiry(db as never, input({ email: 'ana@example.com', whatsapp: '+34 600 000 000', country: 'Spain', interests: ['Luxor', 'Cairo'] }), { notify })
+    expect(db.tables.clients[0]).toMatchObject({ whatsapp: '+20 100 000 0000', country: 'Spain', special_interests: ['Cairo', 'Luxor'] })
+  })
+
+  it('without consent there is no consent time; the tour form\'s enquiries leave the new columns empty', async () => {
+    const { enquiryId } = await recordWebEnquiry(db as never, input(), { notify })
+    expect(db.tables.publish_enquiries.find(x => x.id === enquiryId)).toMatchObject({ whatsapp: null, country: null, nights: null, adults: null, children: null, interests: [], consent_at: null })
+  })
+
   it('a page of another company is dropped — the enquiry stays on the site the hostname served', async () => {
     const { enquiryId } = await recordWebEnquiry(db as never, input({ pageId: FOREIGN_PAGE }), { notify })
     const e = db.tables.publish_enquiries.find(x => x.id === enquiryId)!

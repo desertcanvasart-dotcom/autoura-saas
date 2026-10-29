@@ -44,7 +44,19 @@ describe('reading the form', () => {
     }), { site, landing, visitorIp: '203.0.113.9' })).toEqual({
       siteId: SITE_ID, pageId: PAGE_ID, language: 'fr', name: 'Lena', email: 'lena@example.com', phone: null,
       travellers: 3, travelDate: '2027-03', message: null, landingUrl: landing.toString(), visitorIp: '203.0.113.9',
+      whatsapp: null, country: null, nights: null, adults: null, children: null, interests: [], consent: false,
     })
+  })
+
+  it('the Contact page\'s fuller form: WhatsApp, country, nights, adults and children (their sum is the travellers), interests, consent', () => {
+    const f = form({ lang: 'en', name: 'Ana', email: 'ana@example.com', whatsapp: '+34 600 000 000', country: 'Spain', travel_date: '2026-12-10',
+      nights: '7', adults: '2', children: '1', consent: 'yes' })
+    f.append('interests', 'Luxor'); f.append('interests', 'Aswan'); f.append('interests', 'Luxor')
+    expect(readEnquiryForm(f, { site, landing: null, visitorIp: null })).toMatchObject({
+      whatsapp: '+34 600 000 000', country: 'Spain', nights: 7, adults: 2, children: 1, travellers: 3, interests: ['Luxor', 'Aswan'], consent: true,
+    })
+    expect(readEnquiryForm(form({ name: 'A', email: 'a@b.co', nights: '400', adults: '0', children: '-1' }), { site, landing: null, visitorIp: null }))
+      .toMatchObject({ nights: null, adults: null, children: null, travellers: null, consent: false })
   })
 
   it('drops what does not belong: a bad page id, an unknown language, odd numbers and dates', () => {

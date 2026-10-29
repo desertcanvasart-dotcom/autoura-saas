@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent, lookOf, saveLook, embedSettingsOf, saveEmbedSettings,
+  createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent, lookOf, saveLook, embedSettingsOf, saveEmbedSettings, uploadPublishMedia, isOwnMedia,
   approvePublicRate, saveTourDetails, savePageFaq, PublishError, type AdminDeps, type Actor,
 } from '@/lib/publish/admin'
 import type { TourFacts } from '@/lib/publish/contract'
@@ -519,6 +519,40 @@ describe('tour details and questions for the website', () => {
     expect(look.foundedYear).toBe(2008)
     await saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', foundedYear: null }, deps)
     expect((db.tables.publish_sites[0].settings as { foundedYear: unknown }).foundedYear).toBeNull()
+  })
+  it('the About page\'s headline, people and hours are saved; only this company\'s own uploads are accepted as photos', async () => {
+    const own = `https://x.supabase.co/storage/v1/object/public/publish-media/${actor.tenantId}/a.jpg`
+    await saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope',
+      aboutHeadline: { en: ' Since 2008. ', de: 'Nein' }, teamPhoto: own,
+      people: [{ name: ' Mona ', role: 'Egyptologist', kind: 'guide', languages: ['en', 'xx-bad', 'es'], photo: own }, { name: '', role: 'nobody' }],
+      hours: { opens: '09:00', closes: '21:00', days: ['mon', 'sun'] } }, deps)
+    const st = db.tables.publish_sites[0].settings as Record<string, unknown>
+    expect(st.aboutHeadline).toEqual({ en: 'Since 2008.' })
+    expect(st.teamPhoto).toBe(own)
+    expect(st.people).toEqual([{ name: 'Mona', role: 'Egyptologist', kind: 'guide', languages: ['en', 'es'], photo: own }])
+    expect(st.hours).toEqual({ opens: '09:00', closes: '21:00', days: ['mon', 'sun'] })
+    const look = await lookOf(db as never, actor)
+    expect(look.people).toHaveLength(1)
+    expect(look.hours).toEqual({ opens: '09:00', closes: '21:00', days: ['mon', 'sun'] })
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', teamPhoto: 'https://elsewhere.example/a.jpg' }, deps), 400, /Upload the team photo/)
+    const foreign = 'https://x.supabase.co/storage/v1/object/public/publish-media/another-company/a.jpg'
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', people: [{ name: 'Mona', photo: foreign }] }, deps), 400, /Mona's photo/)
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', hours: { opens: '21:00', closes: '09:00', days: ['mon'] } }, deps), 400, /opening time before/)
+  })
+  it('a website photo must be a PNG, JPEG, WebP or AVIF under 10 MB, and goes into the company\'s own folder', async () => {
+    const uploads: string[] = []
+    db.tables.publish_media = []
+    const storage = Object.assign(db, { storage: { from: () => ({
+      upload: async (path: string) => { uploads.push(path); return { error: null } },
+      getPublicUrl: (path: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/publish-media/${path}` } }),
+    }) } })
+    const { url } = await uploadPublishMedia(storage as never, actor, { type: 'image/jpeg', size: 1000, bytes: new ArrayBuffer(8) })
+    expect(uploads[0]).toMatch(new RegExp(`^${actor.tenantId}/[0-9a-f-]{36}\\.jpg$`))
+    expect(isOwnMedia(url, actor.tenantId)).toBe(true)
+    // listed with the site's media, so the export carries it
+    expect(db.tables.publish_media).toEqual([expect.objectContaining({ tenant_id: actor.tenantId, site_id: db.tables.publish_sites[0].id, storage_path: uploads[0] })])
+    await expectError(uploadPublishMedia(storage as never, actor, { type: 'image/svg+xml', size: 10, bytes: new ArrayBuffer(1) }), 400, /PNG, JPEG, WebP or AVIF/)
+    await expectError(uploadPublishMedia(storage as never, actor, { type: 'image/png', size: 11 * 1024 * 1024, bytes: new ArrayBuffer(1) }), 400, /under 10 MB/)
   })
   it('a year in the future, or a headline too long for a hero, is refused', async () => {
     await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', foundedYear: new Date().getFullYear() + 1 }, deps), 400, /year you started/)

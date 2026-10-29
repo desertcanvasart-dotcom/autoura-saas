@@ -35,6 +35,7 @@ import { BookingCard } from './BookingCard'
 import { TourCard, TourFinder, type FinderTour } from './TourFinder'
 import { ShareButton } from './ShareButton'
 import { GalleryRail } from './GalleryRail'
+import { ContactForm } from './ContactForm'
 import s from './theme.module.css'
 
 const AUTOURA = 'https://getautoura.net'
@@ -735,29 +736,98 @@ function TourPage({ page }: ThemePageProps) {
 
 // ---------- about and contact ----------
 
+/** "09:00 to 21:00 Cairo time, every day" — or the weekdays it is open. */
+function hoursText(hours: NonNullable<PagePayload['site']['identity']['hours']>, lang: string): string {
+  const days = hours.days.length === 7 ? t(lang, 'everyDayLower') : (() => {
+    const fmt = new Intl.DateTimeFormat(lang, { weekday: 'short', timeZone: 'UTC' })
+    return WEEK.filter(d => hours.days.includes(d)).map(d => fmt.format(new Date(Date.UTC(2023, 0, 2 + WEEK.indexOf(d))))).join(', ')
+  })()
+  return fill(lang, 'hoursSpan', { opens: hours.opens, closes: hours.closes, days })
+}
+
+/** "Nile & Co Travel S.A.E. · ETAA licence No. 1234" — what the records give. */
+function legalLine(identity: PagePayload['site']['identity'], lang: string): string | null {
+  const parts = [identity.legalEntity, identity.licenseNumber && `${t(lang, 'etaaLicence')} ${identity.licenseNumber}`].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
+
+function Initials({ name }: { name: string }) {
+  const letters = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('')
+  return <span className={s.initials} aria-hidden="true">{letters}</span>
+}
+
 function AboutPage({ page }: ThemePageProps) {
   const lang = page.language
   const { identity, companyName } = page.site
-  const rows: Array<[string, string | null | undefined]> = [
-    [t(lang, 'registeredCompany'), identity.legalEntity],
-    [t(lang, 'licenceNumber'), identity.licenseNumber],
-    [t(lang, 'addressLabel'), identity.address],
+  const about = page.aboutPage ?? { headline: null, teamPhoto: null, people: [] }
+  const guides = about.people.filter(p => p.kind === 'guide').length
+  const languages = [...new Set(about.people.flatMap(p => p.languages))]
+  const names = new Intl.DisplayNames([lang], { type: 'language' })
+  const langName = (code: string) => { const n = names.of(code) ?? code; return n.charAt(0).toLocaleUpperCase(lang) + n.slice(1) }
+  const r = page.reviews
+  const nf = new Intl.NumberFormat(lang, { maximumFractionDigits: 1, minimumFractionDigits: 1 })
+  // Only what the records show: no stat is drawn without its number.
+  const stats: Array<[string, string]> = [
+    ...(identity.foundedYear ? [[String(identity.foundedYear), t(lang, 'statFounded')] as [string, string]] : []),
+    ...(guides ? [[String(guides), t(lang, 'statGuides')] as [string, string]] : []),
+    ...(languages.length ? [[String(languages.length), t(lang, 'statLanguages')] as [string, string]] : []),
+    ...(r && r.rating !== null ? [[nf.format(r.rating), t(lang, 'statReview')] as [string, string]] : []),
   ]
+  const promises = [['promisePrice', 'promisePriceText'], ['promiseTeam', 'promiseTeamText'], ['promiseReach', 'promiseReachText']] as const
+  const legal = legalLine(identity, lang)
   return (
     <>
-      <section className={`${s.container} ${s.pageHead}`}>
-        <h1 className={s.h1}>{t(lang, 'aboutTitle')}</h1>
-        <p className={s.lead}>{identity.tagline ?? companyName}</p>
-        {/* The agency's own words, as a manager saved them; nothing when there are none. */}
-        {page.about && <div className={s.aboutText}>{paragraphs(page.about).map((p, i) => <p key={i}>{p}</p>)}</div>}
+      <section className={`${s.container} ${s.pageHead}`} data-section="about">
+        {about.headline && <p className={s.eyebrow}>{t(lang, 'aboutEyebrow')}</p>}
+        <h1 className={`${s.h1} ${s.aboutHeadline}`}>{about.headline ?? t(lang, 'aboutTitle')}</h1>
+        {page.about
+          ? <div className={s.aboutText}>{paragraphs(page.about).map((p, i) => <p key={i} className={i === 0 ? s.lead : undefined}>{p}</p>)}</div>
+          : <p className={s.lead}>{identity.tagline ?? companyName}</p>}
+        {about.teamPhoto && (
+          // eslint-disable-next-line @next/next/no-img-element -- the agency's own upload; sized by CSS
+          <img src={about.teamPhoto} alt={companyName} className={s.teamPhoto} loading="eager" decoding="async" />
+        )}
+        {stats.length > 0 && (
+          <ul className={s.stats} style={{ '--n': stats.length } as React.CSSProperties} data-section="stats">
+            {stats.map(([n, label]) => <li key={label}><strong>{n}</strong><span>{label}</span></li>)}
+          </ul>
+        )}
       </section>
-      <WhyUs page={page} />
-      {rows.some(([, v]) => v) && (
-        <section className={`${s.container} ${s.section}`} data-section="licences">
-          <h2 className={s.h2Big}>{t(lang, 'aboutLicences')}</h2>
-          <dl className={s.defs}>
-            {rows.filter(([, v]) => v).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
-          </dl>
+      {about.people.length > 0 && (
+        <section className={s.soft} data-section="people">
+          <div className={`${s.container} ${s.section}`}>
+            <h2 className={s.h2Big}>{t(lang, 'peopleTitle')}</h2>
+            <ul className={s.people}>
+              {about.people.map((p, i) => (
+                <li key={`${p.name}-${i}`}>
+                  <span className={s.portrait}>
+                    {p.photo
+                      // eslint-disable-next-line @next/next/no-img-element -- the agency's own upload; sized by CSS
+                      ? <img src={p.photo} alt={p.name} loading="lazy" decoding="async" />
+                      : <Initials name={p.name} />}
+                  </span>
+                  <span className={s.personName}>{p.name}</span>
+                  <span className={s.personRole}>{[p.role, p.languages.map(langName).join(', ')].filter(Boolean).join(' · ')}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+      <section className={`${s.container} ${s.section}`} data-section="promises">
+        <h2 className={s.h2Big}>{t(lang, 'promiseTitle')}</h2>
+        <ul className={s.promises}>
+          {promises.map(([title, text]) => (
+            <li key={title}><span className={s.whyTitle}>{t(lang, title)}</span><span className={s.whyText}>{t(lang, text)}</span></li>
+          ))}
+        </ul>
+      </section>
+      {legal && (
+        <section className={s.container} data-section="licences">
+          <div className={s.licences}>
+            <h2 className={s.h2}>{t(lang, 'licencesTitle')}</h2>
+            <p>{legal}{identity.address ? ` · ${identity.address}` : ''}</p>
+          </div>
         </section>
       )}
       {page.reviews && <div className={`${s.container} ${s.section}`}><Reviews page={page} /></div>}
@@ -772,11 +842,13 @@ function ContactPage({ page }: ThemePageProps) {
   const wa = whatsappHref(page)
   const email = emailHref(identity)
   const phone = phoneHref(identity)
+  const legal = legalLine(identity, lang)
   return (
     <section className={`${s.container} ${s.pageHead}`}>
-      <h1 className={s.h1}>{t(lang, 'contactTitle')}</h1>
       <div className={s.contactGrid}>
         <div className={s.contactForm}>
+          <h1 className={s.h1}>{t(lang, 'planTitle')}</h1>
+          <p className={s.intro}>{t(lang, 'planIntro')}</p>
           {/* The confirmation: shown in place of the form once it is sent. */}
           <div id="sent" className={s.sent} role="status">
             <span className={s.whyIcon}><Check /></span>
@@ -784,17 +856,20 @@ function ContactPage({ page }: ThemePageProps) {
             <p>{t(lang, 'sentText')}</p>
             <a className={s.ghost} href={`/${lang}/contact`}>{t(lang, 'sendAnother')}</a>
           </div>
-          <EnquiryForm page={page} variant="compact" single showWhatsApp={false} />
+          <ContactForm page={page} />
         </div>
-        <aside className={s.contactSide}>
-          <h2 className={s.h2}>{t(lang, 'getInTouch')}</h2>
-          <dl className={s.defs}>
-            {wa && <div><dt>WhatsApp</dt><dd><a href={wa} rel="nofollow">{identity.whatsapp ?? t(lang, 'askOnWhatsApp')}</a></dd></div>}
-            {email && <div><dt>{t(lang, 'emailLabel')}</dt><dd><a href={email}>{identity.email}</a></dd></div>}
-            {phone && <div><dt>{t(lang, 'phoneLabel')}</dt><dd><a href={phone}>{identity.phone}</a></dd></div>}
-            {identity.address && <div><dt>{t(lang, 'addressLabel')}</dt><dd>{identity.address}</dd></div>}
-            {identity.licenseNumber && <div><dt>{t(lang, 'licenceNumber')}</dt><dd>{identity.licenseNumber}</dd></div>}
-          </dl>
+        <aside className={s.contactAside}>
+          <div className={s.contactSide}>
+            <h2 className={s.h2}>{t(lang, 'preferToTalk')}</h2>
+            {wa && <a className={`${s.pillDark} ${s.wide}`} href={wa} rel="nofollow"><Icon name="whatsapp" />{t(lang, 'whatsappUs')}</a>}
+            <dl className={s.contactDefs}>
+              {email && <div><dt>{t(lang, 'emailLabel')}</dt><dd><a href={email}>{identity.email}</a></dd></div>}
+              {phone && <div><dt>{t(lang, 'phoneLabel')}</dt><dd><a href={phone}>{identity.phone}</a></dd></div>}
+              {identity.hours && <div><dt>{t(lang, 'hoursLabel')}</dt><dd>{hoursText(identity.hours, lang)}</dd></div>}
+              {identity.address && <div><dt>{t(lang, 'officeLabel')}</dt><dd>{identity.address}</dd></div>}
+            </dl>
+          </div>
+          {legal && <p className={s.muted}>{legal}</p>}
         </aside>
       </div>
     </section>

@@ -26,7 +26,7 @@ import type { EngineContent, DraftResult, PartKind } from './engine/engine'
 import { checkTranslation } from './engine/translate'
 import { loadTourFacts, stopsOf } from './tour-facts'
 import { loadRateProposal, rateStatus, readSavedRate, sameBands, bandSchema, type RateProposal } from './public-rate'
-import { aboutOf, homeOf, indicativeCurrenciesOf, legalOf } from './site-data'
+import { aboutOf, aboutPageOf, homeOf, hoursOf, indicativeCurrenciesOf, legalOf } from './site-data'
 import { engineBrand, generateTourDraft, generateTourTranslation } from './engine/generate'
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
 import { publishTags } from './sync/events'
@@ -649,6 +649,10 @@ export async function lookOf(db: Db, actor: Actor) {
     about: Object.fromEntries(site!.languages.map(l => [l, aboutOf(site!.settings, l) ?? ''])),
     headline: Object.fromEntries(site!.languages.map(l => [l, homeOf(site!.settings, l).headline ?? ''])),
     foundedYear: homeOf(site!.settings, site!.languages[0] ?? 'en').foundedYear,
+    aboutHeadline: Object.fromEntries(site!.languages.map(l => [l, aboutPageOf(site!.settings, l).headline ?? ''])),
+    teamPhoto: aboutPageOf(site!.settings, site!.languages[0] ?? 'en').teamPhoto,
+    people: aboutPageOf(site!.settings, site!.languages[0] ?? 'en').people,
+    hours: hoursOf(site!.settings),
     choices: {
       archetypes: ARCHETYPES.map(a => ({ key: a, defaults: ARCHETYPE_DEFAULTS[a] })),
       palettes: PALETTE_PRESETS,
@@ -660,7 +664,7 @@ export async function lookOf(db: Db, actor: Actor) {
 /** Save the theme, palette and fonts. Colours that would be hard to read
  *  are refused with the reason — the website never gets them. The rest of
  *  the stored brand (tone, claims, words to avoid) is kept. */
-export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown; legal?: unknown; about?: unknown; headline?: unknown; foundedYear?: unknown }, deps: AdminDeps = defaultDeps) {
+export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown; legal?: unknown; about?: unknown; headline?: unknown; foundedYear?: unknown; aboutHeadline?: unknown; teamPhoto?: unknown; people?: unknown; hours?: unknown }, deps: AdminDeps = defaultDeps) {
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   if (typeof input.archetype !== 'string' || !(ARCHETYPES as readonly string[]).includes(input.archetype)) fail(`Choose a theme: one of ${ARCHETYPES.join(', ')}.`)
   const archetype = input.archetype as Archetype
@@ -716,6 +720,51 @@ export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown
     }
     settings = { ...(settings ?? (site!.settings ?? {}) as Record<string, unknown>), headline }
   }
+  const base = () => (settings ?? (site!.settings ?? {}) as Record<string, unknown>)
+  // The About page's headline, per language (empty = the plain "About us").
+  if (input.aboutHeadline !== undefined) {
+    const raw = (input.aboutHeadline ?? {}) as Record<string, unknown>
+    const aboutHeadline: Record<string, string> = {}
+    for (const lang of site!.languages) {
+      const v = raw[lang]
+      if (typeof v === 'string' && v.trim()) {
+        if (v.trim().length > 140) fail('Keep the About headline under 140 characters.')
+        aboutHeadline[lang] = v.trim()
+      }
+    }
+    settings = { ...base(), aboutHeadline }
+  }
+  // The team photo and the people on the About page: only photos this company
+  // uploaded (publishMediaUrl), so the website never shows someone else's file.
+  if (input.teamPhoto !== undefined) {
+    const v = typeof input.teamPhoto === 'string' && input.teamPhoto.trim() ? input.teamPhoto.trim() : null
+    if (v && !isOwnMedia(v, actor.tenantId)) fail('Upload the team photo here; links to other websites are not used.')
+    settings = { ...base(), teamPhoto: v }
+  }
+  if (input.people !== undefined) {
+    if (!Array.isArray(input.people)) fail('List the people as name, role, languages and photo.')
+    if ((input.people as unknown[]).length > 12) fail('At most 12 people on the About page.')
+    const people = (input.people as unknown[]).flatMap(p => {
+      const x = (p ?? {}) as Record<string, unknown>
+      const name = typeof x.name === 'string' ? x.name.trim().slice(0, 80) : ''
+      if (!name) return []
+      const photo = typeof x.photo === 'string' && x.photo.trim() ? x.photo.trim() : null
+      if (photo && !isOwnMedia(photo, actor.tenantId)) fail(`Upload ${name}'s photo here; links to other websites are not used.`)
+      const languages = Array.isArray(x.languages) ? [...new Set(x.languages.filter((l): l is string => typeof l === 'string' && /^[a-z]{2}$/.test(l)))].slice(0, 8) : []
+      return [{ name, role: typeof x.role === 'string' ? x.role.trim().slice(0, 80) : '', kind: x.kind === 'staff' ? 'staff' : 'guide', languages, photo }]
+    })
+    settings = { ...base(), people }
+  }
+  // When the company answers: opens before it closes, on at least one day.
+  if (input.hours !== undefined) {
+    let hours: unknown = null
+    if (input.hours !== null) {
+      const h = input.hours as Record<string, unknown>
+      hours = { opens: h.opens, closes: h.closes, days: h.days }
+      if (!hoursOf({ hours })) fail('Opening hours need an opening time before the closing time, and at least one day.')
+    }
+    settings = { ...base(), hours }
+  }
   // The year the company started operating, for "Operating since" (empty = not shown).
   if (input.foundedYear !== undefined) {
     const y = input.foundedYear === null || input.foundedYear === '' ? null : Number(input.foundedYear)
@@ -725,6 +774,44 @@ export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown
   const { error } = await db.from('publish_sites').update({ archetype, brand: next, ...(settings ? { settings } : {}) }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not save the look: ${error.message}`, 500)
   return { saved: true, warning: await refresh(deps, actor.tenantId) }
+}
+
+// ---------- website photos (the About page) ----------
+
+export const PUBLISH_MEDIA_BUCKET = 'publish-media'
+// The bucket's own limits (migration 440): JPEG, PNG, WebP or AVIF, up to 10 MB.
+const MEDIA_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif' }
+const MEDIA_MAX_BYTES = 10 * 1024 * 1024
+
+/** A photo in this company's own folder of the website bucket. */
+export function isOwnMedia(url: string, tenantId: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' && u.pathname.includes(`/storage/v1/object/public/${PUBLISH_MEDIA_BUCKET}/${tenantId}/`)
+  } catch {
+    return false
+  }
+}
+
+/** Upload one website photo (PNG, JPEG, WebP or AVIF, up to 10 MB) into the
+ *  company's folder; its public address comes back. Managers. */
+type StorageDb = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  storage: { from: (bucket: string) => any }
+}
+
+export async function uploadPublishMedia(db: Db & StorageDb, actor: Actor, file: { type: string; size: number; bytes: ArrayBuffer }) {
+  const ext = MEDIA_TYPES[file.type]
+  if (!ext) fail('Choose a PNG, JPEG, WebP or AVIF photo.')
+  if (file.size > MEDIA_MAX_BYTES) fail('Photos must be under 10 MB.')
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
+  const path = `${actor.tenantId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await db.storage.from(PUBLISH_MEDIA_BUCKET).upload(path, file.bytes, { contentType: file.type, cacheControl: '31536000', upsert: false })
+  if (error) fail(`The photo could not be uploaded: ${error.message}`, 500)
+  // Listed with the site's media (publish_media, 440), so the website export carries it.
+  const { error: rowErr } = await db.from('publish_media').insert({ tenant_id: actor.tenantId, site_id: site!.id, storage_path: path, created_by: actor.userId })
+  if (rowErr) fail(`The photo was uploaded but could not be listed: ${rowErr.message}`, 500)
+  return { url: db.storage.from(PUBLISH_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl }
 }
 
 // ---------- tours on the agency's own website (lib/publish/embed.ts) ----------

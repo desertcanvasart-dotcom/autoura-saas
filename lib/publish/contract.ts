@@ -29,7 +29,7 @@ import { ARCHETYPES } from './brand'
  * deploy (it sits under a different cache key) — and the app can refuse a
  * renderer that is a version behind.
  */
-export const CONTRACT_VERSION = 7
+export const CONTRACT_VERSION = 8
 
 export const INTERNAL_SITE_PATH = '/api/publish/internal/site'
 export const INTERNAL_PAGE_PATH = '/api/publish/internal/page'
@@ -90,6 +90,13 @@ export const companyIdentitySchema = z.object({
   headline: z.string().nullable().optional(),
   /** The year the company started operating (publish_sites.settings.foundedYear). Optional (v7). */
   foundedYear: z.number().int().min(1900).max(2100).nullable().optional(),
+  /** When the company answers (publish_sites.settings.hours): local times
+   *  HH:MM and the weekdays it is open. Optional (v8). */
+  hours: z.object({
+    opens: z.string().regex(/^\d{2}:\d{2}$/),
+    closes: z.string().regex(/^\d{2}:\d{2}$/),
+    days: z.array(z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])),
+  }).nullable().optional(),
 })
 export type CompanyIdentity = z.infer<typeof companyIdentitySchema>
 
@@ -271,6 +278,23 @@ export const pagePayloadSchema = z.object({
   }).nullable().optional(),
   /** The About page: the agency's own text, as a manager saved it. Optional (v6). */
   about: z.string().optional(),
+  /** The About page's headline, team photo and the people a visitor meets
+   *  (a website-only list the agency keeps in Look and feel; boards 11). Optional (v8). */
+  aboutPage: z.object({
+    headline: z.string().nullable(),
+    teamPhoto: z.string().nullable(),
+    people: z.array(z.object({
+      name: z.string(),
+      role: z.string(),
+      /** A guide is counted in "licensed Egyptologists"; staff (a trip planner) is not. */
+      kind: z.enum(['guide', 'staff']),
+      /** Two-letter language codes; the page names them in its own language. */
+      languages: z.array(z.string()),
+      photo: z.string().nullable(),
+    })),
+  }).optional(),
+  /** The Contact page's interest chips: the places the site's tours go. Optional (v8). */
+  interests: z.array(z.string()).optional(),
   /** A tour page: up to three of the site's other tours, as cards. Optional (v6). */
   related: z.array(pageLink).optional(),
   /** A destination page: the place it is about. */
@@ -302,6 +326,17 @@ export const enquiryInputSchema = z.object({
   /** The month or day the visitor hopes to travel, as they gave it (YYYY-MM or YYYY-MM-DD). */
   travelDate: z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/).nullable(),
   message: optionalText(4000),
+  /** The Contact page's fuller form (boards 11/12, v8, all optional): a
+   *  WhatsApp number, the country they travel from (never used for pricing),
+   *  nights, adults, children, what interests them, and their consent to be
+   *  contacted. */
+  whatsapp: optionalText(40).optional(),
+  country: optionalText(80).optional(),
+  nights: z.number().int().min(1).max(90).nullable().optional(),
+  adults: z.number().int().min(1).max(99).nullable().optional(),
+  children: z.number().int().min(0).max(99).nullable().optional(),
+  interests: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
+  consent: z.boolean().optional(),
   /** The page they enquired from, with its utm_* / campaign parameters. */
   landingUrl: z.string().url().max(2000).nullable(),
   visitorIp: z.string().max(64).nullable(),

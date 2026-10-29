@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload, loadSitemap, homeOf, cardOf } from '@/lib/publish/site-data'
+import { normalizeHost, domainServes, targetOf, resolveSiteByHost, loadPagePayload, loadSitemap, homeOf, cardOf, hoursOf, aboutPageOf } from '@/lib/publish/site-data'
 import { siteResolutionSchema, pagePayloadSchema, sitemapSchema, CONTRACT_VERSION, type TourFacts } from '@/lib/publish/contract'
 import { indicativeCurrenciesOf } from '@/lib/publish/site-data'
 
@@ -156,7 +156,9 @@ describe('loadPagePayload', () => {
       // The footer's legal details: none stored for this site.
       legalEntity: null, termsUrl: null, privacyUrl: null,
       // The home page's own headline and the year it started: none set.
-      headline: null, foundedYear: null })
+      headline: null, foundedYear: null,
+      // No opening hours set.
+      hours: null })
     expect(page!.site.brand).toEqual({ tone: 'warm' })
   })
   it('the home page exists before any home page row, listing the published, switched-on tours', async () => {
@@ -362,5 +364,25 @@ describe('the home page settings and the tour cards (adaptive home and tours, 20
     expect(c.places!.slice(0, 2)).toEqual(['Step Pyramid', 'Red Pyramid'])
     expect(c.places).toContain('Cairo')
     expect(c.guideLanguages).toEqual(['English'])
+  })
+})
+
+describe('the About and Contact settings (boards 11/12, 2026-10-30)', () => {
+  it('hoursOf: opening before closing, on known weekdays in week order; anything else is no hours', () => {
+    expect(hoursOf({ hours: { opens: '09:00', closes: '21:00', days: ['sun', 'mon', 'xyz'] } })).toEqual({ opens: '09:00', closes: '21:00', days: ['mon', 'sun'] })
+    expect(hoursOf({ hours: { opens: '21:00', closes: '09:00', days: ['mon'] } })).toBeNull()
+    expect(hoursOf({ hours: { opens: '09:00', closes: '21:00', days: [] } })).toBeNull()
+    expect(hoursOf({ hours: { opens: '9', closes: '21:00', days: ['mon'] } })).toBeNull()
+    expect(hoursOf(null)).toBeNull()
+  })
+  it('aboutPageOf: the headline in the page language, the photo, and only people with a name', () => {
+    const a = aboutPageOf({ aboutHeadline: { en: ' Since 2008. ' }, teamPhoto: 'https://x.supabase.co/storage/v1/object/public/publish-media/t/a.jpg',
+      people: [{ name: 'Mona', role: 'Egyptologist', kind: 'guide', languages: ['en', 'es', 'English'], photo: null }, { name: ' ', role: 'x' }, { name: 'Omar', kind: 'staff' }] }, 'en')
+    expect(a.headline).toBe('Since 2008.')
+    expect(a.people).toEqual([
+      { name: 'Mona', role: 'Egyptologist', kind: 'guide', languages: ['en', 'es'], photo: null },
+      { name: 'Omar', role: '', kind: 'staff', languages: [], photo: null },
+    ])
+    expect(aboutPageOf({}, 'fr')).toEqual({ headline: null, teamPhoto: null, people: [] })
   })
 })
