@@ -1,5 +1,5 @@
 -- ============================================
--- 445: the website template's Contact form answers, and website photos
+-- 445: the website template's Contact form answers
 -- ============================================
 -- Boards 11/12 (operator, 2026-10-29). The Contact page asks more than the
 -- tour form: a WhatsApp number, the country the visitor travels from, arrival
@@ -8,11 +8,8 @@
 -- as its own column so it can be searched and used later; the country is
 -- never used for pricing (one public price per tour, brief 2026-10-28).
 --
--- Website photos (the About page's team photo and people's portraits) live in
--- a public bucket of their own. Only the app's server writes to it (the
--- upload route checks the manager role and the file), so there are no
--- insert/update policies for signed-in users; reading is public because the
--- photos are on the public website.
+-- Website photos (the About page's team photo and portraits) go into the
+-- publish-media bucket that 440 already made, under the company's own folder.
 
 BEGIN;
 
@@ -33,23 +30,5 @@ ALTER TABLE public.publish_enquiries
     AND (adults IS NULL OR adults BETWEEN 1 AND 99)
     AND (children IS NULL OR children BETWEEN 0 AND 99)
   );
-
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'buckets') THEN
-    INSERT INTO storage.buckets (id, name, public)
-    VALUES ('publish-media', 'publish-media', true)
-    ON CONFLICT (id) DO UPDATE SET public = true;
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'storage' AND table_name = 'buckets' AND column_name = 'allowed_mime_types'
-    ) THEN
-      UPDATE storage.buckets
-         SET allowed_mime_types = ARRAY['image/png', 'image/jpeg', 'image/webp']::text[],
-             file_size_limit = 5242880
-       WHERE id = 'publish-media';
-    END IF;
-  END IF;
-END $$;
 
 COMMIT;

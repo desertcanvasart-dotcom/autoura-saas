@@ -539,17 +539,20 @@ describe('tour details and questions for the website', () => {
     await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', people: [{ name: 'Mona', photo: foreign }] }, deps), 400, /Mona's photo/)
     await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', hours: { opens: '21:00', closes: '09:00', days: ['mon'] } }, deps), 400, /opening time before/)
   })
-  it('a website photo must be a PNG, JPEG or WebP under 5 MB, and goes into the company\'s own folder', async () => {
+  it('a website photo must be a PNG, JPEG, WebP or AVIF under 10 MB, and goes into the company\'s own folder', async () => {
     const uploads: string[] = []
-    const storage = { storage: { from: () => ({
+    db.tables.publish_media = []
+    const storage = Object.assign(db, { storage: { from: () => ({
       upload: async (path: string) => { uploads.push(path); return { error: null } },
       getPublicUrl: (path: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/publish-media/${path}` } }),
-    }) } }
-    const { url } = await uploadPublishMedia(storage, actor, { type: 'image/jpeg', size: 1000, bytes: new ArrayBuffer(8) })
+    }) } })
+    const { url } = await uploadPublishMedia(storage as never, actor, { type: 'image/jpeg', size: 1000, bytes: new ArrayBuffer(8) })
     expect(uploads[0]).toMatch(new RegExp(`^${actor.tenantId}/[0-9a-f-]{36}\\.jpg$`))
     expect(isOwnMedia(url, actor.tenantId)).toBe(true)
-    await expectError(uploadPublishMedia(storage, actor, { type: 'image/svg+xml', size: 10, bytes: new ArrayBuffer(1) }), 400, /PNG, JPEG or WebP/)
-    await expectError(uploadPublishMedia(storage, actor, { type: 'image/png', size: 6 * 1024 * 1024, bytes: new ArrayBuffer(1) }), 400, /under 5 MB/)
+    // listed with the site's media, so the export carries it
+    expect(db.tables.publish_media).toEqual([expect.objectContaining({ tenant_id: actor.tenantId, site_id: db.tables.publish_sites[0].id, storage_path: uploads[0] })])
+    await expectError(uploadPublishMedia(storage as never, actor, { type: 'image/svg+xml', size: 10, bytes: new ArrayBuffer(1) }), 400, /PNG, JPEG, WebP or AVIF/)
+    await expectError(uploadPublishMedia(storage as never, actor, { type: 'image/png', size: 11 * 1024 * 1024, bytes: new ArrayBuffer(1) }), 400, /under 10 MB/)
   })
   it('a year in the future, or a headline too long for a hero, is refused', async () => {
     await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', foundedYear: new Date().getFullYear() + 1 }, deps), 400, /year you started/)

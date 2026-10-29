@@ -45,7 +45,7 @@ function PhotoPicker({ value, onChange, disabled, label }: { value: string | nul
         : <div className="h-14 w-14 rounded-md border border-dashed border-gray-300 grid place-items-center text-gray-400"><ImagePlus className="h-5 w-5" /></div>}
       <label className={`text-xs px-3 py-1.5 rounded-md border border-gray-300 ${disabled || busy ? 'opacity-40' : 'cursor-pointer hover:bg-gray-50'}`}>
         {busy ? 'Uploading…' : value ? `Replace ${label}` : `Upload ${label}`}
-        <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={disabled || busy}
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" className="hidden" disabled={disabled || busy}
           onChange={async e => {
             const file = e.target.files?.[0]
             e.target.value = ''
@@ -64,7 +64,7 @@ function PhotoPicker({ value, onChange, disabled, label }: { value: string | nul
 export function TeamPhoto({ value, onChange, disabled }: { value: string | null; onChange: (url: string | null) => void; disabled: boolean }) {
   return (
     <div className="mt-3">
-      <p className="text-xs text-gray-600 mb-1">Team photo (wide, shown under the headline; PNG, JPEG or WebP, up to 5 MB)</p>
+      <p className="text-xs text-gray-600 mb-1">Team photo (wide, shown under the headline; PNG, JPEG, WebP or AVIF, up to 10 MB)</p>
       <PhotoPicker value={value} onChange={onChange} disabled={disabled} label="team photo" />
     </div>
   )

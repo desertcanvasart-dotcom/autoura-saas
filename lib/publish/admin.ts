@@ -779,8 +779,9 @@ export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown
 // ---------- website photos (the About page) ----------
 
 export const PUBLISH_MEDIA_BUCKET = 'publish-media'
-const MEDIA_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
-const MEDIA_MAX_BYTES = 5 * 1024 * 1024
+// The bucket's own limits (migration 440): JPEG, PNG, WebP or AVIF, up to 10 MB.
+const MEDIA_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif' }
+const MEDIA_MAX_BYTES = 10 * 1024 * 1024
 
 /** A photo in this company's own folder of the website bucket. */
 export function isOwnMedia(url: string, tenantId: string): boolean {
@@ -792,20 +793,24 @@ export function isOwnMedia(url: string, tenantId: string): boolean {
   }
 }
 
-/** Upload one website photo (PNG, JPEG or WebP, up to 5 MB) into the
+/** Upload one website photo (PNG, JPEG, WebP or AVIF, up to 10 MB) into the
  *  company's folder; its public address comes back. Managers. */
 type StorageDb = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   storage: { from: (bucket: string) => any }
 }
 
-export async function uploadPublishMedia(db: StorageDb, actor: Actor, file: { type: string; size: number; bytes: ArrayBuffer }) {
+export async function uploadPublishMedia(db: Db & StorageDb, actor: Actor, file: { type: string; size: number; bytes: ArrayBuffer }) {
   const ext = MEDIA_TYPES[file.type]
-  if (!ext) fail('Choose a PNG, JPEG or WebP photo.')
-  if (file.size > MEDIA_MAX_BYTES) fail('Photos must be under 5 MB.')
+  if (!ext) fail('Choose a PNG, JPEG, WebP or AVIF photo.')
+  if (file.size > MEDIA_MAX_BYTES) fail('Photos must be under 10 MB.')
+  const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   const path = `${actor.tenantId}/${crypto.randomUUID()}.${ext}`
   const { error } = await db.storage.from(PUBLISH_MEDIA_BUCKET).upload(path, file.bytes, { contentType: file.type, cacheControl: '31536000', upsert: false })
   if (error) fail(`The photo could not be uploaded: ${error.message}`, 500)
+  // Listed with the site's media (publish_media, 440), so the website export carries it.
+  const { error: rowErr } = await db.from('publish_media').insert({ tenant_id: actor.tenantId, site_id: site!.id, storage_path: path, created_by: actor.userId })
+  if (rowErr) fail(`The photo was uploaded but could not be listed: ${rowErr.message}`, 500)
   return { url: db.storage.from(PUBLISH_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl }
 }
 
