@@ -195,7 +195,7 @@ const POLICY = {
 }
 
 const SITE = {
-  archetype: 'private_journeys', status: 'draft', languages: ['en', 'fr'],
+  archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
   brand: { tone: 'warm', claims: ['Egyptologist guides'], avoid: [] },
   settings: { indicativeCurrencies: ['USD', 'GBP'] },
 }
