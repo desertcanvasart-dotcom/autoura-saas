@@ -26,7 +26,7 @@ import type { EngineContent, DraftResult, PartKind } from './engine/engine'
 import { checkTranslation } from './engine/translate'
 import { loadTourFacts, stopsOf } from './tour-facts'
 import { loadRateProposal, rateStatus, readSavedRate, sameBands, bandSchema, type RateProposal } from './public-rate'
-import { aboutOf, indicativeCurrenciesOf, legalOf } from './site-data'
+import { aboutOf, homeOf, indicativeCurrenciesOf, legalOf } from './site-data'
 import { engineBrand, generateTourDraft, generateTourTranslation } from './engine/generate'
 import { factsHash, partSegments, renderableNarrative, toStoredPart, tourFingerprint, withPart, type NarrativeBundle, type RenderableNarrative } from './narrative'
 import { publishTags } from './sync/events'
@@ -647,6 +647,8 @@ export async function lookOf(db: Db, actor: Actor) {
     footer: await footerOf(db, actor.tenantId, site!.settings),
     languages: site!.languages,
     about: Object.fromEntries(site!.languages.map(l => [l, aboutOf(site!.settings, l) ?? ''])),
+    headline: Object.fromEntries(site!.languages.map(l => [l, homeOf(site!.settings, l).headline ?? ''])),
+    foundedYear: homeOf(site!.settings, site!.languages[0] ?? 'en').foundedYear,
     choices: {
       archetypes: ARCHETYPES.map(a => ({ key: a, defaults: ARCHETYPE_DEFAULTS[a] })),
       palettes: PALETTE_PRESETS,
@@ -658,7 +660,7 @@ export async function lookOf(db: Db, actor: Actor) {
 /** Save the theme, palette and fonts. Colours that would be hard to read
  *  are refused with the reason — the website never gets them. The rest of
  *  the stored brand (tone, claims, words to avoid) is kept. */
-export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown; legal?: unknown; about?: unknown }, deps: AdminDeps = defaultDeps) {
+export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown; palette: unknown; fontPair: unknown; website?: unknown; legal?: unknown; about?: unknown; headline?: unknown; foundedYear?: unknown }, deps: AdminDeps = defaultDeps) {
   const site = await siteOf(db, actor.tenantId) ?? fail('This company has no website yet.', 404)
   if (typeof input.archetype !== 'string' || !(ARCHETYPES as readonly string[]).includes(input.archetype)) fail(`Choose a theme: one of ${ARCHETYPES.join(', ')}.`)
   const archetype = input.archetype as Archetype
@@ -700,6 +702,25 @@ export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown
       }
     }
     settings = { ...(settings ?? (site!.settings ?? {}) as Record<string, unknown>), about }
+  }
+  // The home page's headline, per language (empty = the theme's own).
+  if (input.headline !== undefined) {
+    const raw = (input.headline ?? {}) as Record<string, unknown>
+    const headline: Record<string, string> = {}
+    for (const lang of site!.languages) {
+      const v = raw[lang]
+      if (typeof v === 'string' && v.trim()) {
+        if (v.trim().length > 120) fail('Keep the headline under 120 characters.')
+        headline[lang] = v.trim()
+      }
+    }
+    settings = { ...(settings ?? (site!.settings ?? {}) as Record<string, unknown>), headline }
+  }
+  // The year the company started operating, for "Operating since" (empty = not shown).
+  if (input.foundedYear !== undefined) {
+    const y = input.foundedYear === null || input.foundedYear === '' ? null : Number(input.foundedYear)
+    if (y !== null && (!Number.isInteger(y) || y < 1900 || y > new Date().getFullYear())) fail(`The year you started must be between 1900 and ${new Date().getFullYear()}.`)
+    settings = { ...(settings ?? (site!.settings ?? {}) as Record<string, unknown>), foundedYear: y }
   }
   const { error } = await db.from('publish_sites').update({ archetype, brand: next, ...(settings ? { settings } : {}) }).eq('id', site!.id).eq('tenant_id', actor.tenantId)
   if (error) fail(`Could not save the look: ${error.message}`, 500)

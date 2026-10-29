@@ -191,6 +191,55 @@ const en = {
   emailLabel: 'Email',
   phoneLabel: 'Phone',
   ourTours: 'Our tours',
+  // ---- adaptive home and tours (2026-10-29) ----
+  guideSpeaks: 'Guide speaks',
+  departsLabel: 'Departs',
+  everyDay: 'Every day',
+  nextDeparture: 'Next',
+  licensedByEtaa: 'Licensed by ETAA',
+  licenceNo: 'No.',
+  heroTitleIn: 'Private tours in {place} with Egyptologist guides',
+  heroTitleAcross: 'Private tours across Egypt with Egyptologist guides',
+  heroEyebrowIn: 'Licensed tour operator in {place}',
+  heroEyebrowAcross: 'Licensed tour operator in Egypt',
+  heroSubIn: 'Private tours in {place}.',
+  heroSubPrice: 'One clear price per person — the price you pay.',
+  heroSubAsk: 'Tell us your dates and who is travelling — a real person replies.',
+  seeTheTour: 'See the tour',
+  whatsappUs: 'WhatsApp us',
+  operatingSince: 'Operating since',
+  yearsWord: 'years of tours',
+  guidesSpeak: 'Guides speak',
+  reviewsFromCount: 'from {n} reviews',
+  onGoogle: 'on Google',
+  ourTour: 'Our tour',
+  allNTours: 'All {n} tours',
+  whyGuides: 'Egyptologist guides',
+  whyGuidesText: 'Every tour is led by a licensed Egyptologist who speaks your language.',
+  whyOnePriceIn: 'The price per person for your group, shown up front and charged in {currency}.',
+  whyNoPaymentLine: 'Ask about any tour or date. You pay only once your plan is confirmed.',
+  whyLicensedLine: 'An ETAA-licensed operator, licence No. {n}.',
+  customTitle: 'Don’t see what you need?',
+  customText: 'We build private trips around your dates.',
+  toursIntroIn: 'Private tours in {places}.',
+  toursIntroPrice: 'Every price is per person and is the price you pay.',
+  contactHeading: 'Contact',
+  companyHeading: 'Company',
+  exploreHeading: 'Explore',
+  etaaLicence: 'ETAA licence No.',
+  privacyPolicy: 'Privacy policy',
+  viewTourShort: 'View tour',
+  toursWord: 'tours',
+  oneTourWord: 'tour',
+  filterType: 'Tour type',
+  filterPlace: 'Destination',
+  allToursFilter: 'All tours',
+  durHalf: 'Half day',
+  durFull: 'Full day',
+  durShort: '2 to 5 days',
+  durLong: '6 days or more',
+  clearFilters: 'Clear filters',
+  filtersButton: 'Filters',
 } as const
 
 export type StringKey = keyof typeof en
@@ -202,6 +251,11 @@ export const SUPPORTED_LANGUAGES = Object.keys(dictionaries)
 
 export function t(language: string, key: StringKey): string {
   return dictionaries[language]?.[key] ?? en[key]
+}
+
+/** A string with its {placeholders} filled: fill('en', 'allNTours', { n: 6 }). */
+export function fill(language: string, key: StringKey, vars: Record<string, string | number>): string {
+  return t(language, key).replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m))
 }
 
 /** A label's colon: French sets a narrow no-break space before it. */

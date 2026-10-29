@@ -75,7 +75,8 @@ for (const archetype of ARCHETYPES) {
     it('prints no price, number or currency it was not given', () => {
       for (const kind of ['home', 'listing', 'tour'] as const) {
         const page = payload({ kind, site: { ...payload({}, archetype).site, identity: { ...identity, phone: null, whatsapp: null, licenseNumber: null } } }, archetype)
-        const words = text(render(archetype, page))
+        // The footer's copyright year is the only number of the site's own.
+        const words = text(render(archetype, page)).replace(/© \d{4}/, '©')
         expect(words, kind).not.toMatch(/[€$£]|\bEGP\b|\bUSD\b|\bEUR\b/)
         expect(words, kind).not.toMatch(/\d/)
       }
@@ -155,7 +156,8 @@ for (const archetype of ARCHETYPES) {
       expect(words).toContain('Day 1')
       expect(words).toContain('Visits: Giza Pyramids')
       expect(words).toContain('Nile View, Cairo')
-      expect(words).toContain('Departs: Monday and Friday')
+      // Modern names the departure days in its key facts (operator, 2026-10-29).
+      expect(words).toContain(archetype === 'modern' ? 'Departs Mon, Fri' : 'Departs: Monday and Friday')
       if (archetype === 'modern') {
         // The template: the terms as one row of cells, the free window first —
         // the stretch before the policy's earliest charge, and nothing else.

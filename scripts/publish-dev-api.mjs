@@ -14,6 +14,9 @@
  *   modern.localhost        Modern (redesign mock-up), English + French, default teal palette
  *   navy.localhost          the same tours, Modern, an agency's navy + coral palette
  *   mono.localhost          the same tours, Modern, charcoal + lime and the Clean fonts
+ *   one.localhost           Modern, ONE tour in one place (the Sandbox's navy + violet)
+ *   six.localhost           Modern, six tours in four places
+ *   many.localhost          Modern, nine tours — the large-catalogue Tours page
  *   anything else           no site
  *
  * The fixture is shaped by lib/publish/contract.ts — keep it in step.
@@ -24,6 +27,15 @@ import http from 'node:http'
 
 const PORT = Number(process.env.PORT || 4010)
 const SECRET = process.env.PUBLISH_INTERNAL_SECRET || 'dev-internal'
+
+const SIX = [
+  { slug: 'saqqara-and-the-first-pyramids', other: 'saqqarah-et-les-premieres-pyramides', name: 'Saqqara and the First Pyramids', published: true, price: 'available', plan: 'saqqara' },
+  { slug: 'giza-pyramids-and-the-sphinx', other: 'pyramides-de-gizeh', name: 'Giza Pyramids and the Sphinx', published: true, price: 'available', plan: 'giza' },
+  { slug: 'egyptian-museum-and-old-cairo', other: 'musee-egyptien-et-vieux-caire', name: 'Egyptian Museum and Old Cairo', published: true, price: 'available', plan: 'museum' },
+  { slug: 'luxor-east-and-west-banks', other: 'louxor-rives-est-et-ouest', name: 'Luxor East and West Banks', published: true, price: 'available', plan: 'luxor' },
+  { slug: 'luxor-to-aswan-nile-cruise', other: 'croisiere-louxor-assouan', name: 'Luxor to Aswan Nile cruise', published: true, price: 'available', plan: 'nile' },
+  { slug: 'abu-simbel-from-aswan', other: 'abou-simbel-depuis-assouan', name: 'Abu Simbel from Aswan', published: true, price: 'available', plan: 'abusimbel' },
+]
 
 const SITES = {
   'sillage.localhost': {
@@ -104,9 +116,89 @@ const SITES = {
       { slug: 'white-desert', other: 'desert-blanc', name: 'White Desert and the oases', published: true, plan: 'desert' },
     ],
   },
+  'one.localhost': {
+    id: '00000000-0000-4000-8000-00000000a102', tenantId: '00000000-0000-4000-8000-00000000a101',
+    archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
+    brand: { palette: { primary: '#111c44', accent: '#a78bfa', ink: '#14161c', surface: '#ffffff' }, fontPair: 'manrope' },
+    companyName: 'Autoura Sandbox (dev)',
+    identity: { tagline: 'Private tours in Egypt', logoUrl: null, phone: null,
+      email: 'hello@sandbox.invalid', whatsapp: '+20 100 555 0101', address: '14 Champollion St, Downtown, Cairo', licenseNumber: '2241 (dev)',
+      legalEntity: 'Sandbox Travel S.A.E. (dev)', termsUrl: 'https://sandbox.invalid/terms', privacyUrl: 'https://sandbox.invalid/privacy',
+      headline: null, foundedYear: 2012 },
+    tours: [
+      { slug: 'saqqara-and-the-first-pyramids', other: 'saqqarah-et-les-premieres-pyramides', name: 'Saqqara and the First Pyramids', published: true, price: 'available', plan: 'saqqara' },
+    ],
+  },
+  'six.localhost': {
+    id: '00000000-0000-4000-8000-00000000a202', tenantId: '00000000-0000-4000-8000-00000000a201',
+    archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
+    brand: { palette: { primary: '#111c44', accent: '#a78bfa', ink: '#14161c', surface: '#ffffff' }, fontPair: 'manrope' },
+    companyName: 'Autoura Sandbox (dev)',
+    identity: { tagline: 'Private tours in Egypt', logoUrl: null, phone: null,
+      email: 'hello@sandbox.invalid', whatsapp: '+20 100 555 0101', address: '14 Champollion St, Downtown, Cairo', licenseNumber: '2241 (dev)',
+      legalEntity: 'Sandbox Travel S.A.E. (dev)', termsUrl: 'https://sandbox.invalid/terms', privacyUrl: 'https://sandbox.invalid/privacy',
+      headline: null, foundedYear: 2012 },
+    tours: SIX,
+  },
+  'many.localhost': {
+    id: '00000000-0000-4000-8000-00000000a302', tenantId: '00000000-0000-4000-8000-00000000a301',
+    archetype: 'modern', status: 'draft', languages: ['en', 'fr'],
+    brand: { palette: { primary: '#111c44', accent: '#a78bfa', ink: '#14161c', surface: '#ffffff' }, fontPair: 'manrope' },
+    companyName: 'Autoura Sandbox (dev)',
+    identity: { tagline: 'Private tours in Egypt', logoUrl: null, phone: null,
+      email: 'hello@sandbox.invalid', whatsapp: '+20 100 555 0101', address: '14 Champollion St, Downtown, Cairo', licenseNumber: '2241 (dev)',
+      legalEntity: 'Sandbox Travel S.A.E. (dev)', termsUrl: 'https://sandbox.invalid/terms', privacyUrl: 'https://sandbox.invalid/privacy',
+      headline: null, foundedYear: 2012 },
+    tours: [...SIX,
+      { slug: 'alexandria-in-a-day', other: 'alexandrie-en-un-jour', name: 'Alexandria in a day', published: true, price: 'available', plan: 'alex' },
+      { slug: 'white-desert', other: 'desert-blanc', name: 'White Desert and the oases', published: true, plan: 'desert' },
+      { slug: 'cairo-in-depth', other: 'le-caire-en-profondeur', name: 'Cairo in depth', published: true, price: 'available', plan: 'cairo' },
+    ],
+  },
 }
 // Invented facts, in the contract's shape (lib/publish/contract.ts tourFacts).
 const PLANS = {
+  saqqara: { durationDays: 1, durationNights: 0, days: [
+    { day: 1, title: 'Saqqara, Dahshur and Memphis', city: 'Cairo', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Step Pyramid of Djoser', 'Red Pyramid', 'Memphis Open-Air Museum'],
+      stops: [{ time: '08:30', name: 'Hotel pickup in Cairo' }, { time: '09:30', name: 'Step Pyramid of Djoser' }, { time: '11:00', name: 'The tombs of Saqqara' }, { time: '12:30', name: 'Lunch' }, { time: '13:30', name: 'Red Pyramid at Dahshur' }, { time: '15:00', name: 'Memphis Open-Air Museum' }, { time: '16:30', name: 'Back at your hotel' }] },
+  ], durationHours: 8, tourType: 'Day tour', guideLanguages: ['English', 'French', 'Spanish'], accommodation: [], departures: [],
+    pickup: { included: true, area: 'Cairo', meetingPoint: null }, groupSize: { min: 1, max: 12 },
+    cancellation: { tiers: [{ daysBefore: 2, chargePercent: 50 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
+    highlights: ['The Step Pyramid of Djoser, the first pyramid ever built', 'The Red Pyramid at Dahshur', 'Memphis Open-Air Museum, with an Egyptologist guide'],
+    mainAttractions: ['Step Pyramid of Djoser'], inclusions: ['Egyptologist guide', 'Air-conditioned car with driver', 'Hotel pickup and drop-off', 'Entrance fees to the sites listed', 'Lunch'],
+    exclusions: ['Tips for guide and driver', 'Drinks'], departureDays: ['mon', 'wed', 'fri', 'sun'],
+    bands: [{ minPax: 1, maxPax: 1, perPerson: 150 }, { minPax: 2, maxPax: 3, perPerson: 105 }, { minPax: 4, maxPax: 5, perPerson: 80 }, { minPax: 6, maxPax: 12, perPerson: 58 }] },
+  museum: { durationDays: 1, durationNights: 0, days: [
+    { day: 1, title: 'The Egyptian Museum and Old Cairo', city: 'Cairo', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Egyptian Museum', 'Hanging Church', 'Khan el-Khalili'] },
+  ], durationHours: 7, tourType: 'Day tour', guideLanguages: ['English', 'French', 'Spanish'], accommodation: [], departures: [],
+    pickup: { included: true, area: 'Cairo', meetingPoint: null }, groupSize: { min: 1, max: 12 },
+    cancellation: { tiers: [{ daysBefore: 2, chargePercent: 50 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
+    highlights: ['Museum highlights', 'Coptic Cairo', 'Khan el-Khalili'], mainAttractions: ['Egyptian Museum'], inclusions: ['Egyptologist guide', 'Entrance fees to the sites listed', 'Lunch'],
+    exclusions: ['Tips for guide and driver'], departureDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+    bands: [{ minPax: 1, maxPax: 3, perPerson: 95 }, { minPax: 4, maxPax: 12, perPerson: 64 }] },
+  luxor: { durationDays: 2, durationNights: 1, days: [
+    { day: 1, title: 'The East Bank', city: 'Luxor', overnight: true, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Karnak Temple', 'Luxor Temple'] },
+    { day: 2, title: 'The West Bank', city: 'Luxor', overnight: false, meals: { breakfast: true, lunch: true, dinner: false }, sights: ['Valley of the Kings', 'Temple of Hatshepsut'] },
+  ], tourType: 'Multi-day', guideLanguages: ['English', 'French'], durationHours: null, departures: [],
+    highlights: ['Karnak, Luxor Temple and the Valley of the Kings'], mainAttractions: ['Karnak Temple'], accommodation: [{ kind: 'hotel', name: 'Nile-view hotel (dev)', city: 'Luxor' }],
+    inclusions: ['1 night with breakfast', 'Egyptologist guide', 'Entrance fees to the sites listed'], exclusions: ['Tips for guide and driver'], departureDays: ['tue', 'sat'],
+    bands: [{ minPax: 2, maxPax: 3, perPerson: 340 }, { minPax: 4, maxPax: 12, perPerson: 265 }] },
+  abusimbel: { durationDays: 1, durationNights: 0, days: [
+    { day: 1, title: 'Abu Simbel', city: 'Aswan', overnight: false, meals: { breakfast: true, lunch: false, dinner: false }, sights: ['Abu Simbel temples'] },
+  ], durationHours: 10, tourType: 'Day tour', guideLanguages: ['English', 'French', 'Spanish'], accommodation: [], departures: [],
+    pickup: { included: true, area: 'Aswan', meetingPoint: null }, groupSize: { min: 1, max: 12 },
+    cancellation: { tiers: [{ daysBefore: 2, chargePercent: 50 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
+    highlights: ['The temples of Ramesses II and Nefertari'], mainAttractions: ['Abu Simbel temples'], inclusions: ['Egyptologist guide', 'Air-conditioned car with driver', 'Entrance fees to the sites listed'],
+    exclusions: ['Tips for guide and driver'], departureDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+    bands: [{ minPax: 1, maxPax: 3, perPerson: 210 }, { minPax: 4, maxPax: 12, perPerson: 145 }] },
+  alex: { durationDays: 1, durationNights: 0, days: [
+    { day: 1, title: 'Alexandria', city: 'Alexandria', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Citadel of Qaitbay', 'Library of Alexandria', 'Catacombs of Kom el-Shoqafa'] },
+  ], durationHours: 12, tourType: 'Day tour', guideLanguages: ['English', 'French', 'Spanish'], accommodation: [], departures: [],
+    pickup: { included: true, area: 'Cairo', meetingPoint: null }, groupSize: { min: 1, max: 12 },
+    cancellation: { tiers: [{ daysBefore: 2, chargePercent: 50 }, { daysBefore: 0, chargePercent: 100 }], wording: null },
+    highlights: ['The Citadel of Qaitbay', 'The Library of Alexandria'], mainAttractions: ['Citadel of Qaitbay'], inclusions: ['Egyptologist guide', 'Air-conditioned car with driver', 'Lunch'],
+    exclusions: ['Tips for guide and driver'], departureDays: ['sat', 'sun'],
+    bands: [{ minPax: 1, maxPax: 3, perPerson: 180 }, { minPax: 4, maxPax: 12, perPerson: 120 }] },
   giza: { durationDays: 1, durationNights: 0, days: [
     { day: 1, title: 'The pyramids and the Sphinx', city: 'Giza', overnight: false, meals: { breakfast: false, lunch: true, dinner: false }, sights: ['Giza Pyramids', 'Great Sphinx', 'Valley Temple of Khafre'],
       stops: [{ time: '08:00', name: 'Hotel pickup in Cairo or Giza' }, { time: '09:00', name: 'Giza Pyramids' }, { time: '11:00', name: 'Panorama point' }, { time: '11:45', name: 'Great Sphinx and the Valley Temple of Khafre' }, { time: '13:00', name: 'Lunch' }, { time: '14:30', name: 'Back at your hotel' }] },
@@ -152,12 +244,15 @@ function facts(kind, currency, plan) {
     ...(PLANS[plan] ?? {}),
   }
   if (kind === 'on_request') {
+    delete base.bands
     return { ...base, price: { status: 'on_request', currency, tierLabel: null, fromPrice: null, bands: [], indicative: [] },
       publishable: { ok: false, reasons: ['The tour has no public price yet — review the price and publish it.'] } }
   }
   // One public rate: per person for every count in the group size (2–12).
-  return { ...base, price: { status: 'available', currency, tierLabel: 'Deluxe', fromPrice: 698.25,
-    bands: [{ minPax: 2, maxPax: 3, perPerson: 910 }, { minPax: 4, maxPax: 5, perPerson: 802.5 }, { minPax: 6, maxPax: 12, perPerson: 698.25 }],
+  const bands = base.bands ?? [{ minPax: 2, maxPax: 3, perPerson: 910 }, { minPax: 4, maxPax: 5, perPerson: 802.5 }, { minPax: 6, maxPax: 12, perPerson: 698.25 }]
+  delete base.bands
+  return { ...base, price: { status: 'available', currency, tierLabel: 'Deluxe', fromPrice: Math.min(...bands.map(b => b.perPerson)),
+    bands,
     indicative: [{ currency: 'USD', rate: 1.075, rateDate: new Date().toISOString().slice(0, 10) }] } }
 }
 
@@ -193,7 +288,10 @@ function page(s, lang, path, preview) {
   const factsOf = t => facts(t.price ?? 'on_request', 'EUR', t.plan)
   const cardFor = f => ({ days: f.durationDays, nights: f.durationNights, cities: [...new Set(f.days.map(d => d.city).filter(Boolean))],
     from: f.price.status === 'available' && f.price.fromPrice !== null ? { amount: f.price.fromPrice, currency: f.price.currency } : null, image: f.images[0] ?? null,
-    type: f.tourType ?? null, hours: f.durationHours ?? null })
+    type: f.tourType ?? null, hours: f.durationHours ?? null,
+    highlights: (f.highlights.length ? f.highlights : f.mainAttractions).slice(0, 3),
+    places: [...new Set([...f.days.flatMap(d => d.sights), ...f.mainAttractions, ...f.days.map(d => d.city).filter(Boolean)])].slice(0, 12),
+    guideLanguages: f.guideLanguages ?? [] })
   const links = list.map(t => ({ title: t.name, path: `tours/${slugIn(t, lang)}`, card: cardFor(factsOf(t)) }))
   const places = new Map()
   for (const t of list) for (const c of cardFor(factsOf(t)).cities) {

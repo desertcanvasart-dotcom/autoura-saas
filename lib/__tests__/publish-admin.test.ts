@@ -509,4 +509,19 @@ describe('tour details and questions for the website', () => {
     await saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', about: { en: '  We are a family business.\n\nSince 2003.  ', de: 'Nicht unsere Sprache', fr: '' } }, deps)
     expect((db.tables.publish_sites[0].settings as { about: unknown }).about).toEqual({ en: 'We are a family business.\n\nSince 2003.' })
   })
+  it('the home headline is saved per language and the year started as a number; both read back', async () => {
+    await saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', headline: { en: '  Egypt, slowly ', de: 'Nein', fr: '' }, foundedYear: '2008' }, deps)
+    const settings = db.tables.publish_sites[0].settings as { headline: unknown; foundedYear: unknown; about?: unknown }
+    expect(settings.headline).toEqual({ en: 'Egypt, slowly' })
+    expect(settings.foundedYear).toBe(2008)
+    const look = await lookOf(db as never, actor)
+    expect(look.headline).toMatchObject({ en: 'Egypt, slowly' })
+    expect(look.foundedYear).toBe(2008)
+    await saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', foundedYear: null }, deps)
+    expect((db.tables.publish_sites[0].settings as { foundedYear: unknown }).foundedYear).toBeNull()
+  })
+  it('a year in the future, or a headline too long for a hero, is refused', async () => {
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', foundedYear: new Date().getFullYear() + 1 }, deps), 400, /year you started/)
+    await expectError(saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', headline: { en: 'x'.repeat(121) } }, deps), 400, /headline/)
+  })
 })

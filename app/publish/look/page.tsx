@@ -23,6 +23,8 @@ interface Look {
   problems: string[]
   languages: string[]
   about: Record<string, string>
+  headline: Record<string, string>
+  foundedYear: number | null
   footer: { legalEntity: string | null; termsUrl: string | null; privacyUrl: string | null; licenseNumber: string | null; address: string | null; whatsapp: string | null }
   choices: {
     archetypes: Array<{ key: string; defaults: { palette: Palette; fontPair: string } }>
@@ -51,6 +53,8 @@ export default function PublishLookPage() {
   const [website, setWebsite] = useState('')
   const [legal, setLegal] = useState({ entity: '', termsUrl: '', privacyUrl: '' })
   const [about, setAbout] = useState<Record<string, string>>({})
+  const [headline, setHeadline] = useState<Record<string, string>>({})
+  const [foundedYear, setFoundedYear] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -62,6 +66,8 @@ export default function PublishLookPage() {
       setFontPair(j.data.resolved.fontPair)
       setWebsite(j.data.stored.website ?? '')
       setAbout(j.data.about ?? {})
+      setHeadline(j.data.headline ?? {})
+      setFoundedYear(j.data.foundedYear ? String(j.data.foundedYear) : '')
       setLegal({ entity: j.data.footer.legalEntity ?? '', termsUrl: j.data.footer.termsUrl ?? '', privacyUrl: j.data.footer.privacyUrl ?? '' })
     }).catch(e => showToast('error', e instanceof Error ? e.message : 'Could not load the look'))
   }, [])
@@ -86,7 +92,7 @@ export default function PublishLookPage() {
   async function save() {
     setSaving(true)
     try {
-      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website, legal, about }) })
+      const res = await fetch('/api/publish/look', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ archetype, palette, fontPair, website, legal, about, headline, foundedYear: foundedYear.trim() || null }) })
       const j = await res.json()
       if (!j.success) throw new Error(j.error)
       showToast(j.data.warning ? 'warning' : 'success', j.data.warning ?? 'Saved — your website shows the new look now')
@@ -197,6 +203,23 @@ export default function PublishLookPage() {
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-gray-900 mb-1">Home page</h2>
+            <p className="text-xs text-gray-500 mb-3">The big headline at the top of your home page. Leave a language empty to use &ldquo;Private tours in &lsquo;your city&rsquo; with Egyptologist guides&rdquo;. The year you started shows as &ldquo;Operating since&rdquo; under it.</p>
+            <div className="space-y-3">
+              {look.languages.map(l => (
+                <label key={l} className="block text-xs text-gray-600">Headline · {new Intl.DisplayNames(['en'], { type: 'language' }).of(l) ?? l}
+                  <input value={headline[l] ?? ''} disabled={!canManage} maxLength={120} onChange={e => setHeadline({ ...headline, [l]: e.target.value })}
+                    className="mt-1 w-full text-sm border border-gray-300 rounded-md px-3 py-2" />
+                </label>
+              ))}
+              <label className="block text-xs text-gray-600">Year you started operating
+                <input value={foundedYear} disabled={!canManage} inputMode="numeric" maxLength={4} placeholder="2008" onChange={e => setFoundedYear(e.target.value.replace(/\D/g, ''))}
+                  className="mt-1 w-32 text-sm border border-gray-300 rounded-md px-3 py-2" />
+              </label>
+            </div>
           </section>
 
           <section className="bg-white border border-gray-200 rounded-lg p-4">

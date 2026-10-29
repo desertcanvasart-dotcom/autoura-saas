@@ -74,15 +74,22 @@ type Card = NonNullable<PagePayload['tours'][number]['card']>
 
 /** A tour card's facts, from the same facts as the tour's page. */
 export function cardOf(facts: TourFacts, labels: Record<string, string> = {}): Card {
-  const cities = [...new Set(facts.days.map(d => d.city).filter((c): c is string => !!c))]
+  const shown = translateFacts(facts, labels)
+  const cities = [...new Set(shown.days.map(d => d.city).filter((c): c is string => !!c))]
+  const unique = (list: string[]) => [...new Set(list.map(x => x.trim()).filter(Boolean))]
   return {
     days: facts.durationDays,
     nights: facts.durationNights,
-    cities: cities.map(c => labels[c] ?? c),
+    cities,
     from: facts.price.status === 'available' && facts.price.fromPrice !== null ? { amount: facts.price.fromPrice, currency: facts.price.currency } : null,
     image: facts.images[0] ?? null,
-    type: facts.tourType ?? null,
+    type: shown.tourType ?? null,
     hours: facts.durationHours ?? null,
+    highlights: unique(shown.highlights.length ? shown.highlights : shown.mainAttractions).slice(0, 3),
+    // The records' own names (not the translation): the default pictures are
+    // matched on them. The first day's sights lead — "the first itinerary site".
+    places: unique([...facts.days.flatMap(d => d.sights), ...facts.mainAttractions, ...facts.days.map(d => d.city ?? '')]).slice(0, 12),
+    guideLanguages: facts.guideLanguages ?? [],
   }
 }
 
@@ -131,6 +138,19 @@ export function aboutOf(settings: unknown, language: string): string | null {
   const a = (settings as { about?: Record<string, unknown> } | null)?.about
   const v = a && typeof a === 'object' ? a[language] : null
   return typeof v === 'string' && v.trim() ? v.trim() : null
+}
+
+/** The home page's own headline in a language and the year the company
+ *  started (publish_sites.settings.headline / .foundedYear), as a manager
+ *  saved them; null where unset. */
+export function homeOf(settings: unknown, language: string): { headline: string | null; foundedYear: number | null } {
+  const st = (settings ?? {}) as { headline?: Record<string, unknown>; foundedYear?: unknown }
+  const h = st.headline && typeof st.headline === 'object' ? st.headline[language] : null
+  const y = st.foundedYear
+  return {
+    headline: typeof h === 'string' && h.trim() ? h.trim() : null,
+    foundedYear: typeof y === 'number' && Number.isInteger(y) && y >= 1900 && y <= 2100 ? y : null,
+  }
 }
 
 // ---------- the site behind a hostname ----------
@@ -264,7 +284,7 @@ export async function loadPagePayload(db: Db, input: {
     companyName: (site.tenants?.company_name as string | undefined) ?? '',
     languages: site.languages as string[],
     brand: (site.brand ?? {}) as Record<string, unknown>,
-    identity: { ...identityOf(site.tenants), ...legalOf(site.settings) },
+    identity: { ...identityOf(site.tenants), ...legalOf(site.settings), ...homeOf(site.settings, input.language) },
     publicHost: (primary?.hostname as string | undefined) ?? null,
   }
 
