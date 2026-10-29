@@ -7881,7 +7881,7 @@ export interface Database {
           nights?: number | null
           adults?: number | null
           children?: number | null
-          interests?: string[]
+          interests: string[]
           consent_at?: string | null
         }
         Update: {
