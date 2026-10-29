@@ -8115,7 +8115,7 @@ export interface Database {
           public_rate_approved_at?: string | null
           public_rate_approved_by?: string | null
           public_rate_approver_name?: string | null
-          faq?: Json
+          faq: Json
         }
         Update: {
           id?: string
@@ -11295,7 +11295,7 @@ export interface Database {
           departure_days: string[]
           cancellation_policy_id?: string | null
           meeting_point?: string | null
-          guide_languages?: string[]
+          guide_languages: string[]
         }
         Update: {
           id?: string

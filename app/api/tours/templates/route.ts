@@ -137,6 +137,8 @@ export async function POST(request: NextRequest) {
       tour_type: body.tour_type,
       // Weekdays it departs (migration 441); anything that is not a day is dropped, none = not stated.
       departure_days: sanitizeSailingDays(body.departure_days),
+      // Its guides' languages (migration 444) are stated on its website page; none yet.
+      guide_languages: [],
       duration_days: body.duration_days || 1,
       // `|| null` swallowed the wizard's legitimate 0 (a day tour has zero
       // nights) and the column is NOT NULL — so creating any day-tour
