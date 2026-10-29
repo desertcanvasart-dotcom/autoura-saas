@@ -257,6 +257,8 @@ export const pagePayloadSchema = z.object({
       text: z.string(), translated: z.boolean(), original: z.string().nullable(), when: z.string(), url: z.string().nullable(),
     })),
   }).nullable().optional(),
+  /** The About page: the agency's own text, as a manager saved it. Optional (v6). */
+  about: z.string().optional(),
   /** A tour page: up to three of the site's other tours, as cards. Optional (v6). */
   related: z.array(pageLink).optional(),
   /** A destination page: the place it is about. */

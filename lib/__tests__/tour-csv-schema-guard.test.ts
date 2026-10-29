@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { TEMPLATE_CSV_COLUMNS } from '@/lib/tours/template-csv'
+import Papa from 'papaparse'
+import { TEMPLATE_CSV_COLUMNS, parseTemplatesCsv, serializeTemplatesCsv } from '@/lib/tours/template-csv'
 
 // ============================================
 // The tour sheet and the table must not drift
@@ -80,5 +81,23 @@ describe('the tour sheet against the table', () => {
     for (const c of ['duration_hours', 'age_suitability', 'gallery_urls', 'destinations_covered']) {
       expect(sheet.has(c), c).toBe(true)
     }
+  })
+})
+
+describe('the website template\'s tour details in the sheet (migration 444)', () => {
+  const papa = (csv: string) => {
+    const r = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true })
+    return { data: r.data, errors: r.errors.map(e => ({ message: e.message })) }
+  }
+  const row = { template_code: 'A1', template_name: 'Giza', tour_type: 'day_tour', duration_days: 1, meeting_point: 'Hotel lobby, Garden City', guide_languages: ['en', 'fr'] }
+  it('meeting point and guide languages survive an export → re-import exactly', () => {
+    const { records } = parseTemplatesCsv(serializeTemplatesCsv([row] as never), papa)
+    expect(records[0]).toMatchObject({ meeting_point: 'Hotel lobby, Garden City', guide_languages: ['en', 'fr'] })
+  })
+  it('a language that is not a two-letter code is reported, never stored', () => {
+    const csv = serializeTemplatesCsv([row] as never).replace('"en; fr"', '"English; fr"')
+    const out = parseTemplatesCsv(csv, papa)
+    expect(out.records).toEqual([])
+    expect(out.refused.map(r => r.reason).join(' ')).toContain('Guide Languages "English; fr": use two-letter codes')
   })
 })

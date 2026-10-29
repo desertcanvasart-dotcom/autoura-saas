@@ -37,12 +37,25 @@ interface Detail {
   locale: { id: string; language: string; slug: string; is_published: boolean; current_version_id: string | null }
   facts: null | { days: Array<{ day: number; title: string | null; city: string | null }>; publishable: { ok: boolean; reasons: string[] }; price: { status: string } }
   rate: null | RateView
+  details: null | TourDetails
   narrative: { overview: Seg[] | null; highlights: Seg[][] | null; days: Array<{ day: number }>; seo: unknown; labels?: Record<string, string>; stale: string[] }
   drafts: Draft[]
   versions: Array<{ id: string; version_no: number; reason: string; approver_name: string | null; approved_at: string }>
 }
 
 type Band = { minPax: number; maxPax: number; perPerson: number }
+type Stop = { time: string | null; name: string }
+type QA = { question: string; answer: string }
+interface TourDetails {
+  meetingPoint: string | null
+  guideLanguages: string[]
+  durationHours: number | null
+  stops: Stop[] | null
+  faq: Record<string, QA[]>
+}
+/** The languages a guide can be said to speak (lib/publish/admin.ts GUIDE_LANGUAGES). */
+const GUIDE_LANGUAGES = ['en', 'fr', 'es', 'de', 'it', 'pt', 'nl', 'ru', 'pl', 'zh', 'ja', 'ko', 'ar'] as const
+const languageLabel = (code: string) => new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code
 interface RateView {
   proposal: { currency: string; tier: string | null; tierLabel: string | null; range: { min: number; max: number } | null; bands: Band[]; missing: number[]; reasons: string[] }
   saved: { tier: string; currency: string; bands: Band[]; approvedAt: string | null; approverName: string | null } | null
@@ -319,6 +332,137 @@ function PartCard({ part, label, help, detail, canWrite, canManage, onDone }: {
   )
 }
 
+/** The tour facts the website shows that no other screen records. Saved on
+ *  the tour itself, so every page and document reads the same. */
+function TourDetailsCard({ pageId, details, canManage, onDone }: { pageId: string; details: TourDetails; canManage: boolean; onDone: () => void }) {
+  const [meetingPoint, setMeetingPoint] = useState(details.meetingPoint ?? '')
+  const [languages, setLanguages] = useState<string[]>(details.guideLanguages)
+  const [hours, setHours] = useState(details.durationHours === null ? '' : String(details.durationHours))
+  const [stops, setStops] = useState<Stop[]>(details.stops ?? [])
+  const [busy, setBusy] = useState(false)
+  const dayTour = details.stops !== null
+  async function save() {
+    setBusy(true)
+    try {
+      const body: Record<string, unknown> = { meetingPoint: meetingPoint.trim() || null, guideLanguages: languages }
+      if (dayTour) {
+        body.durationHours = hours.trim() ? Number(hours) : null
+        body.stops = stops.filter(x => x.name.trim()).map(x => ({ time: x.time || null, name: x.name }))
+      }
+      const r = await call(`/api/publish/pages/${pageId}/details`, { method: 'PUT', body: JSON.stringify(body) })
+      showToast(r.warning ? 'warning' : 'success', r.warning ?? 'Tour details saved — the website shows them now')
+      onDone()
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : 'Could not save')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const input = 'text-sm border border-gray-300 rounded-md px-3 py-2'
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+      <div>
+        <h3 className="font-medium text-gray-900">Tour details</h3>
+        <p className="text-sm text-gray-500">Shown in the key facts and the pickup section. Saved on the tour itself. Leave a field empty and the page simply does not mention it.</p>
+      </div>
+      <label className="block text-sm text-gray-700">Meeting point
+        <textarea value={meetingPoint} disabled={!canManage} onChange={e => setMeetingPoint(e.target.value)} rows={2} maxLength={500}
+          placeholder="e.g. Your guide meets you in the hotel lobby." className={`mt-1 w-full ${input}`} />
+      </label>
+      <fieldset>
+        <legend className="text-sm text-gray-700 mb-1">Guide languages</legend>
+        <div className="flex flex-wrap gap-2">
+          {GUIDE_LANGUAGES.map(code => {
+            const on = languages.includes(code)
+            return (
+              <button key={code} type="button" disabled={!canManage} aria-pressed={on}
+                onClick={() => setLanguages(on ? languages.filter(l => l !== code) : [...languages, code])}
+                className={`text-sm px-3 py-1 rounded-full border ${on ? 'bg-[#647C47] border-[#647C47] text-white' : 'border-gray-300 text-gray-700'}`}>
+                {languageLabel(code)}
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
+      {dayTour && (
+        <>
+          <label className="block text-sm text-gray-700">Length in hours
+            <input type="number" min={1} max={24} step={1} value={hours} disabled={!canManage} onChange={e => setHours(e.target.value)} className={`mt-1 block w-28 ${input}`} />
+          </label>
+          <div>
+            <p className="text-sm text-gray-700">Stops, with approximate times</p>
+            <p className="text-xs text-gray-500 mb-2">The page shows these as the day&apos;s timeline, marked as approximate. A stop without a time is shown without one.</p>
+            <div className="space-y-2">
+              {stops.map((x, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input type="time" value={x.time ?? ''} disabled={!canManage} aria-label={`Stop ${i + 1} time`}
+                    onChange={e => setStops(stops.map((y, j) => j === i ? { ...y, time: e.target.value || null } : y))} className={`w-32 ${input}`} />
+                  <input value={x.name} disabled={!canManage} maxLength={200} aria-label={`Stop ${i + 1}`} placeholder="e.g. Step Pyramid of Djoser"
+                    onChange={e => setStops(stops.map((y, j) => j === i ? { ...y, name: e.target.value } : y))} className={`flex-1 ${input}`} />
+                  {canManage && <button type="button" onClick={() => setStops(stops.filter((_, j) => j !== i))} aria-label={`Remove stop ${i + 1}`} className="p-2 text-gray-400 hover:text-red-600"><X className="h-4 w-4" /></button>}
+                </div>
+              ))}
+            </div>
+            {canManage && stops.length < 20 && <button type="button" onClick={() => setStops([...stops, { time: null, name: '' }])} className="mt-2 text-sm text-[#647C47]">+ Add a stop</button>}
+          </div>
+        </>
+      )}
+      {canManage && (
+        <button type="button" onClick={save} disabled={busy} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+          <Save className="h-4 w-4" />{busy ? 'Saving…' : 'Save tour details'}
+        </button>
+      )}
+    </section>
+  )
+}
+
+/** The page's questions and answers in the language being edited. What a
+ *  manager saves is what the page shows (and states to search engines). */
+function FaqCard({ pageId, language, items, canManage, onDone }: { pageId: string; language: string; items: QA[]; canManage: boolean; onDone: () => void }) {
+  const [list, setList] = useState<QA[]>(items)
+  const [busy, setBusy] = useState(false)
+  async function save() {
+    setBusy(true)
+    try {
+      const r = await call(`/api/publish/pages/${pageId}/faq`, { method: 'PUT', body: JSON.stringify({ language, items: list.filter(x => x.question.trim() || x.answer.trim()) }) })
+      showToast(r.warning ? 'warning' : 'success', r.warning ?? 'Questions saved — the website shows them now')
+      onDone()
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : 'Could not save')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const input = 'w-full text-sm border border-gray-300 rounded-md px-3 py-2'
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+      <div>
+        <h3 className="font-medium text-gray-900">Questions and answers · {language.toUpperCase()}</h3>
+        <p className="text-sm text-gray-500">Shown as the page&apos;s FAQ in this language, word for word. No questions, no FAQ section.</p>
+      </div>
+      {list.map((x, i) => (
+        <div key={i} className="border border-gray-200 rounded-md p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <input value={x.question} disabled={!canManage} maxLength={200} placeholder="Question" aria-label={`Question ${i + 1}`}
+              onChange={e => setList(list.map((y, j) => j === i ? { ...y, question: e.target.value } : y))} className={`${input} font-medium`} />
+            {canManage && <button type="button" onClick={() => setList(list.filter((_, j) => j !== i))} aria-label={`Remove question ${i + 1}`} className="p-2 text-gray-400 hover:text-red-600"><X className="h-4 w-4" /></button>}
+          </div>
+          <textarea value={x.answer} disabled={!canManage} maxLength={2000} rows={2} placeholder="Answer" aria-label={`Answer ${i + 1}`}
+            onChange={e => setList(list.map((y, j) => j === i ? { ...y, answer: e.target.value } : y))} className={input} />
+        </div>
+      ))}
+      {canManage && (
+        <div className="flex items-center gap-3">
+          {list.length < 12 && <button type="button" onClick={() => setList([...list, { question: '', answer: '' }])} className="text-sm text-[#647C47]">+ Add a question</button>}
+          <button type="button" onClick={save} disabled={busy} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+            <Save className="h-4 w-4" />{busy ? 'Saving…' : 'Save questions'}
+          </button>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function PublishPageReview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const search = useSearchParams()
@@ -390,6 +534,9 @@ export default function PublishPageReview({ params }: { params: Promise<{ id: st
       </section>
 
       {detail.rate && <PublicPriceCard pageId={detail.page.id} rate={detail.rate} canManage={canManage} onDone={load} />}
+
+      {detail.details && <TourDetailsCard key={`details-${detail.page.id}`} pageId={detail.page.id} details={detail.details} canManage={canManage} onDone={load} />}
+      {detail.details && <FaqCard key={`faq-${lang}`} pageId={detail.page.id} language={lang} items={detail.details.faq[lang] ?? []} canManage={canManage} onDone={load} />}
 
       {PARTS.filter(p => p.part !== 'labels' || lang !== 'en').map(p => (
         <PartCard key={`${p.part}-${lang}`} {...p} label={p.part === 'labels' ? `Tour wording in ${LANGUAGE_NAME[lang] ?? lang.toUpperCase()}` : p.label}

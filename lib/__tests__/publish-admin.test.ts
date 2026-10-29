@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   createTourPage, draftWithEngine, editDraft, approveDraft, rejectDraft, setPublished, pageDetail, slugify, validEditedContent, lookOf, saveLook, embedSettingsOf, saveEmbedSettings,
-  approvePublicRate, PublishError, type AdminDeps, type Actor,
+  approvePublicRate, saveTourDetails, savePageFaq, PublishError, type AdminDeps, type Actor,
 } from '@/lib/publish/admin'
 import type { TourFacts } from '@/lib/publish/contract'
 import type { RateProposal } from '@/lib/publish/public-rate'
@@ -449,5 +449,64 @@ describe('the agency\'s main website (header link back)', () => {
   })
   it('refuses a plain http address', async () => {
     await expectError(saveLook(db as never, actor, { archetype: 'modern', palette, fontPair: 'sleek', website: 'http://www.sunrise-travel.example' }, deps), 400, /https/)
+  })
+})
+
+// ============================================================================
+// The template's details (migration 444): saved on the tour by a manager, the
+// itinerary MERGED (a partial form must never rebuild a day — the day-editor
+// lesson), and the page's FAQ per language.
+// ============================================================================
+
+describe('tour details and questions for the website', () => {
+  const dayTour = () => {
+    const t = db.tables.tour_templates.find(x => x.id === TOUR)!
+    Object.assign(t, { duration_days: 1, itinerary: [{ day: 1, city: 'Giza', title: 'Giza', attractions: ['Giza Pyramids'], meals: { lunch: 'included' }, services: { guide_required: true } }] })
+    return t
+  }
+  it('saves where it meets, the guides\' languages, hours and stops — keeping everything else the day said', async () => {
+    const t = dayTour()
+    await saveTourDetails(db as never, actor, PAGE, {
+      meetingPoint: '  Hotel lobby  ', guideLanguages: ['en', 'fr', 'en'], durationHours: 6.7,
+      stops: [{ time: '08:00', name: 'Pickup' }, { time: '', name: 'Giza Pyramids' }],
+    }, deps)
+    expect(t.meeting_point).toBe('Hotel lobby')
+    expect(t.guide_languages).toEqual(['en', 'fr'])
+    expect(t.duration_hours).toBe(7) // whole hours, as the tour sheet carries them
+    expect(t.itinerary).toEqual([{ day: 1, city: 'Giza', title: 'Giza', attractions: ['Giza Pyramids'], meals: { lunch: 'included' }, services: { guide_required: true },
+      stops: [{ time: '08:00', name: 'Pickup' }, { time: null, name: 'Giza Pyramids' }] }])
+    expect(revalidate).toHaveBeenCalled()
+  })
+  it('a field not sent is left as it is; an empty meeting point clears it', async () => {
+    const t = dayTour()
+    Object.assign(t, { meeting_point: 'Gate 2', guide_languages: ['de'] })
+    await saveTourDetails(db as never, actor, PAGE, { meetingPoint: '' }, deps)
+    expect(t.meeting_point).toBeNull()
+    expect(t.guide_languages).toEqual(['de'])
+  })
+  it('refuses what it cannot keep: stops on a longer tour, a time that is not one, an unknown language', async () => {
+    const t = dayTour()
+    await expectError(saveTourDetails(db as never, actor, PAGE, { stops: [{ time: '25:00', name: 'Late' }] }, deps), 400, /not a time/)
+    await expectError(saveTourDetails(db as never, actor, PAGE, { stops: [{ time: '09:00', name: ' ' }] }, deps), 400, /needs a name/)
+    await expectError(saveTourDetails(db as never, actor, PAGE, { guideLanguages: ['klingon'] }, deps), 400, /Guide languages/)
+    await expectError(saveTourDetails(db as never, actor, PAGE, { durationHours: 30 }, deps), 400, /24 hours/)
+    Object.assign(t, { duration_days: 3, itinerary: [{ day: 1 }, { day: 2 }, { day: 3 }] })
+    await expectError(saveTourDetails(db as never, actor, PAGE, { stops: [] }, deps), 409, /one-day tour/)
+  })
+  it('the FAQ is kept per language: saving French leaves English as it was', async () => {
+    await savePageFaq(db as never, actor, PAGE, 'en', [{ question: 'Is lunch included?', answer: 'Yes.' }], deps)
+    await savePageFaq(db as never, actor, PAGE, 'fr', [{ question: ' Le déjeuner est-il inclus ? ', answer: 'Oui.' }], deps)
+    expect(db.tables.publish_pages.find(p => p.id === PAGE)!.faq).toEqual({
+      en: [{ question: 'Is lunch included?', answer: 'Yes.' }],
+      fr: [{ question: 'Le déjeuner est-il inclus ?', answer: 'Oui.' }],
+    })
+  })
+  it('a question without its answer, or a language the site does not have, is refused', async () => {
+    await expectError(savePageFaq(db as never, actor, PAGE, 'en', [{ question: 'Why?', answer: '' }], deps), 400, /its answer/)
+    await expectError(savePageFaq(db as never, actor, PAGE, 'de', [], deps), 400, /website's languages/)
+  })
+  it('the About text is saved per language of the site, nothing else', async () => {
+    await saveLook(db as never, actor, { archetype: 'modern', palette: undefined, fontPair: 'manrope', about: { en: '  We are a family business.\n\nSince 2003.  ', de: 'Nicht unsere Sprache', fr: '' } }, deps)
+    expect((db.tables.publish_sites[0].settings as { about: unknown }).about).toEqual({ en: 'We are a family business.\n\nSince 2003.' })
   })
 })

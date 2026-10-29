@@ -47,6 +47,8 @@ export interface TemplateRow {
   tour_type?: string | null
   pickup_required?: boolean | null
   transportation_city?: string | null
+  meeting_point?: string | null
+  guide_languages?: string[] | null
 }
 
 export interface VariationRow {
@@ -94,6 +96,8 @@ export interface FactsInput {
   other: TierResults
   /** The approved public rate, if any (publish_pages.public_rate). */
   publicRate: SavedRate | null
+  /** The page's questions and answers by language (publish_pages.faq). */
+  faq?: unknown
   indicativeCurrencies: string[]
   fx: FxRow[]
   today: Date
@@ -132,6 +136,37 @@ function indicative(input: FactsInput): TourFacts['price']['indicative'] {
   return out
 }
 
+/** A day's stops as the operator set them: a name each, a time (HH:MM) or none. */
+export function stopsOf(v: unknown): Array<{ time: string | null; name: string }> {
+  if (!Array.isArray(v)) return []
+  return v.flatMap(x => {
+    const name = x && typeof x === 'object' && typeof (x as { name?: unknown }).name === 'string' ? (x as { name: string }).name.trim() : ''
+    if (!name) return []
+    const time = (x as { time?: unknown }).time
+    return [{ name, time: typeof time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : null }]
+  })
+}
+
+/** The guides' languages, named in the page's language ("French", "français"). */
+function languageNames(codes: string[] | null | undefined, language: string): string[] {
+  const names = new Intl.DisplayNames([language], { type: 'language' })
+  return [...new Set((codes ?? []).filter(c => /^[a-z]{2}$/.test(c)))].map(c => {
+    const n = names.of(c) ?? c
+    return n.charAt(0).toLocaleUpperCase(language) + n.slice(1)
+  })
+}
+
+/** The page's questions in its language; anything malformed is left out. */
+function faqOf(v: unknown, language: string): Array<{ question: string; answer: string }> {
+  const list = v && typeof v === 'object' ? (v as Record<string, unknown>)[language] : null
+  if (!Array.isArray(list)) return []
+  return list.flatMap(x => {
+    const q = x && typeof x === 'object' ? (x as { question?: unknown }).question : null
+    const a = x && typeof x === 'object' ? (x as { answer?: unknown }).answer : null
+    return typeof q === 'string' && q.trim() && typeof a === 'string' && a.trim() ? [{ question: q.trim(), answer: a.trim() }] : []
+  })
+}
+
 // ---------- assembly ----------
 
 export function assembleTourFacts(input: FactsInput): TourFacts {
@@ -150,6 +185,7 @@ export function assembleTourFacts(input: FactsInput): TourFacts {
       overnight: rawDays.length > 1 && d.accommodation_type !== 'none',
       meals: { breakfast: isProvided(meals.breakfast), lunch: isProvided(meals.lunch), dinner: isProvided(meals.dinner) },
       sights: wordedAttractionsForDay(d, rawDays.length, t.main_attractions),
+      ...(stopsOf(d.stops).length ? { stops: stopsOf(d.stops) } : {}),
     }
   }).sort((a, b) => a.day - b.day)
 
@@ -240,9 +276,15 @@ export function assembleTourFacts(input: FactsInput): TourFacts {
     // The agency's own label; an unknown key is shown as nothing, not as a code.
     tourType: t.tour_type ? input.tourTypeLabels?.get(t.tour_type) ?? null : null,
     // Pickup only when the record says so: absent = not stated, never "no".
-    pickup: t.pickup_required === true || t.pickup_required === false
-      ? { included: t.pickup_required, area: t.pickup_required && t.transportation_city?.trim() ? t.transportation_city.trim() : null, meetingPoint: null }
+    pickup: t.pickup_required === true || t.pickup_required === false || t.meeting_point?.trim()
+      ? {
+          included: t.pickup_required === true,
+          area: t.pickup_required && t.transportation_city?.trim() ? t.transportation_city.trim() : null,
+          meetingPoint: t.meeting_point?.trim() || null,
+        }
       : null,
+    guideLanguages: languageNames(t.guide_languages, input.language),
+    faq: faqOf(input.faq, input.language),
   }
 }
 
@@ -253,7 +295,7 @@ type Db = {
   from: (table: string) => any
 }
 
-const TEMPLATE_COLUMNS = 'id, tenant_id, duration_days, duration_nights, image_url, gallery_urls, itinerary, main_attractions, highlights, inclusions, exclusions, departure_days, is_active, cancellation_policy_id, duration_hours, tour_type, pickup_required, transportation_city'
+const TEMPLATE_COLUMNS = 'id, tenant_id, duration_days, duration_nights, image_url, gallery_urls, itinerary, main_attractions, highlights, inclusions, exclusions, departure_days, is_active, cancellation_policy_id, duration_hours, tour_type, pickup_required, transportation_city, meeting_point, guide_languages'
 
 /**
  * Everything assembleTourFacts needs, read for one tour. Throws when a read
@@ -283,7 +325,7 @@ export async function loadTourFacts(db: Db, input: {
     db.from('tour_departures').select('start_date, end_date, status, max_pax, booked_pax')
       .eq('template_id', input.templateId).eq('tenant_id', input.tenantId).gte('start_date', today.toISOString().slice(0, 10)),
     db.from('cancellation_policies').select('id, is_default, tiers, wording').eq('tenant_id', input.tenantId),
-    db.from('publish_pages').select('public_rate').eq('tenant_id', input.tenantId).eq('tour_template_id', input.templateId)
+    db.from('publish_pages').select('public_rate, faq').eq('tenant_id', input.tenantId).eq('tour_template_id', input.templateId)
       .order('public_rate_approved_at', { ascending: false, nullsFirst: false }).limit(1).maybeSingle(),
   ])
   check('the variations', variations.error)
@@ -325,6 +367,7 @@ export async function loadTourFacts(db: Db, input: {
     eu,
     other,
     publicRate: readSavedRate(page.data?.public_rate),
+    faq: page.data?.faq,
     indicativeCurrencies: wanted,
     fx,
     today,

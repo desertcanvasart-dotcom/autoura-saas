@@ -290,6 +290,8 @@
 }
 
 /* ---------- contact ---------- */
+.aboutText { max-width: 68ch; margin-top: 24px; }
+.aboutText p { line-height: 1.75; margin: 0 0 16px; }
 .contactGrid { display: grid; gap: 32px; margin-top: 8px; }
 @media (min-width: 960px) { .contactGrid { grid-template-columns: minmax(0, 1fr) 340px; gap: 56px; } }
 .contactSide { padding: 22px; border-radius: var(--radius); background: var(--soft); align-self: start; }

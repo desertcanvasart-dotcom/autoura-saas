@@ -42,7 +42,7 @@ function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
   }
 }
 
-const site = { id: SITE, tenant_id: TENANT, archetype: 'private_journeys', status: 'live', languages: ['en', 'fr'], brand: { tone: 'warm' }, settings: { indicativeCurrencies: ['USD', 'eur', 'GBP', 'JPY', 'CHF'] },
+const site = { id: SITE, tenant_id: TENANT, archetype: 'private_journeys', status: 'live', languages: ['en', 'fr'], brand: { tone: 'warm' }, settings: { indicativeCurrencies: ['USD', 'eur', 'GBP', 'JPY', 'CHF'], about: { fr: 'Une maison familiale.' } },
   tenants: { company_name: 'Sillage', tagline: '  Private journeys since 2003 ', logo_url: 'https://cdn.test/logo.png', company_phone: '', contact_email: 'hello@sillage.test', whatsapp_number: '+201000000000', company_address: null, license_number: 'ETAA 1234' } }
 const tourPage = (slug: string, language: string, published: boolean, pageId = PAGE, active = true) => ({
   page_id: pageId, site_id: SITE, language, slug, is_published: published,
@@ -254,6 +254,19 @@ describe('search engines (step 9)', () => {
     const page = await loadPagePayload(db({ domainKind: 'test' }) as never, { siteId: SITE, language: 'en', path: '', preview: false }, { tourFacts: async () => FACTS })
     expect(page!.site.publicHost).toBeNull()
   })
+  it('About and Contact exist on every site; a page row of that kind, where there is one, wins', async () => {
+    const load = (path: string, opts: { language?: string } = {}) =>
+      loadPagePayload(db() as never, { siteId: SITE, language: opts.language ?? 'en', path, preview: false }, { tourFacts: async () => FACTS })
+    const contact = await load('contact')
+    expect(contact).toMatchObject({ kind: 'contact', path: 'contact', alternates: [{ language: 'fr', path: 'contact' }] })
+    expect(pagePayloadSchema.parse(contact)).toEqual(contact)
+    // English has its own About row (about-us): /en/about is not a second one.
+    expect(await load('about')).toBeNull()
+    // French has none: the standing About page.
+    expect(await load('about', { language: 'fr' })).toMatchObject({ kind: 'about', path: 'about', about: 'Une maison familiale.' })
+    expect(await load('contact', { language: 'fr' })).not.toHaveProperty('about')
+    expect(await load('privacy')).toBeNull()
+  })
   it('the sitemap lists published pages per language — never a draft or a switched-off tour', async () => {
     const map = await loadSitemap(db() as never, SITE)
     expect(sitemapSchema.parse(map)).toEqual(map)
@@ -263,6 +276,8 @@ describe('search engines (step 9)', () => {
       { kind: 'listing', paths: { en: 'tours', fr: 'tours' }, lastModified: null },
       { kind: 'tour', paths: { en: 'tours/nile-classic', fr: 'tours/croisiere-nil' }, lastModified: null },
       { kind: 'about', paths: { en: 'about-us' }, lastModified: null },
+      // Contact exists on every site, before any page row (template brief).
+      { kind: 'contact', paths: { en: 'contact', fr: 'contact' }, lastModified: null },
       { kind: 'destination', paths: { en: 'destinations/giza', fr: 'destinations/giza' }, lastModified: null },
     ])
   })

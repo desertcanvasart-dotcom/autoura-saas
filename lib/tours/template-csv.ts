@@ -24,7 +24,7 @@ export interface TemplateCsvColumn {
   name: string
   label: string
   required?: boolean
-  kind?: 'text' | 'int' | 'bool' | 'list' | 'weekdays'
+  kind?: 'text' | 'int' | 'bool' | 'list' | 'weekdays' | 'languages'
   /** Written on export, never read back as a value to store. */
   readOnly?: boolean
 }
@@ -70,6 +70,10 @@ export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
   // Migration 441: the weekdays a tour departs ("mon;fri"; "daily" = all
   // seven). Shown on its Publish page; blank = not stated, never "daily".
   { name: 'departure_days', label: 'Departure Days', kind: 'weekdays' },
+  // Migration 444, shown on the tour's website page: where it meets (blank =
+  // not stated) and its guides' languages as two-letter codes ("en; fr").
+  { name: 'meeting_point', label: 'Meeting Point' },
+  { name: 'guide_languages', label: 'Guide Languages', kind: 'languages' },
 ]
 
 const csvCell = (v: unknown): string => {
@@ -289,7 +293,7 @@ const HEADER_MAP: Record<string, string> = (() => {
 // What a blank cell writes: an empty list, no value — or 0 nights, the one
 // optional number the table will not hold empty (duration_nights NOT NULL).
 function clearedValue(col: TemplateCsvColumn): unknown {
-  if (col.kind === 'list' || col.kind === 'weekdays') return []
+  if (col.kind === 'list' || col.kind === 'weekdays' || col.kind === 'languages') return []
   if (col.name === 'duration_nights') return 0
   return null
 }
@@ -377,6 +381,12 @@ export function parseTemplatesCsv(
         else badCells.push(`${col.label} "${v}" is not true or false`)
       }
       else if (col.kind === 'list') rec[field] = v.split(/[;|]/).map(s => s.trim()).filter(Boolean)
+      else if (col.kind === 'languages') {
+        const codes = v.split(/[;|,]/).map(s => s.trim().toLowerCase()).filter(Boolean)
+        const bad = codes.filter(c => !/^[a-z]{2}$/.test(c))
+        if (bad.length) badCells.push(`${col.label} "${v}": use two-letter codes such as en; fr (not ${bad.join(', ')})`)
+        else rec[field] = [...new Set(codes)]
+      }
       else if (col.kind === 'weekdays') {
         // A tour's own words first: "daily" departs every day (all seven,
         // stated); "none" / "-" states nothing. (The cruise reader treats
