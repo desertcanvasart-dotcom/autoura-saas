@@ -7,6 +7,7 @@ import { supplierBacking } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
 import LineHistory from '@/components/booking/LineHistory'
+import RequestByEmail from '@/components/booking/RequestByEmail'
 import ClientDayMessage from '@/components/booking/ClientDayMessage'
 import {
   SERVICE_BOOKING_STATUSES, STATUS_LABEL, canTransition, normalizeStatus, type CoveredBy, type ServiceBookingStatus,
@@ -221,6 +222,9 @@ export default function BookingSuppliersPanel({
                         <CoverLinePicker bookingId={bookingId} lineId={r.id} currency={currency} onSaved={load} notify={notify} />
                         {r.resource_kind !== 'own' && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
                           <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                        )}
+                        {r.resource_kind !== 'own' && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
+                          <RequestByEmail bookingId={bookingId} lineId={r.id} supplierName={r.supplier_name} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
                         )}
                         {r.resource_kind !== 'own' && normalizeStatus(r.status) === 'cancelled' && r.requested_at && (
                           <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={false} notice="cancelled" onSent={load} notify={notify} />

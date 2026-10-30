@@ -185,3 +185,32 @@ export function buildServiceCancelMessage(m: {
     'Thank you, and sorry for the change.',
   ].join('\n')
 }
+
+// ============================================
+// The same request by email (Resend) — optional second channel
+// ============================================
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** Subject: what and when, so the supplier can find it in their inbox. */
+export function requestEmailSubject(service: string, serviceDate: string | null | undefined, reminder: boolean): string {
+  const when = serviceDate ? ` — ${day(serviceDate)}` : ''
+  return `${reminder ? 'Reminder: ' : ''}Booking request: ${service.trim()}${when}`
+}
+
+/**
+ * The WhatsApp text as an email: every line escaped, the reply link as a
+ * button (and printed, for mail clients that hide buttons). No prices.
+ */
+export function requestEmailHtml(message: string, url: string): string {
+  const body = message
+    .split('\n')
+    .filter(l => l.trim() !== url)
+    .map(l => (l.trim() === '' ? '<br>' : `<div>${esc(l)}</div>`))
+    .join('\n')
+  return `<div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.5; color: #111827; max-width: 560px;">
+${body}
+<p style="margin: 20px 0;"><a href="${esc(url)}" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 8px; font-weight: 600;">Answer here — one tap</a></p>
+<p style="font-size: 12px; color: #6b7280;">Or open: ${esc(url)}</p>
+</div>`
+}
