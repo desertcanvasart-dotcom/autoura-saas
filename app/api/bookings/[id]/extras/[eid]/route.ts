@@ -17,6 +17,7 @@ import { recomputeBookingExtras } from '../recompute'
 import { manifestCost } from '@/lib/bookings/extra-supplier-cost'
 import type { ExchangeRate } from '@/lib/currency'
 import { roleDenied } from '@/lib/api-role-gate'
+import { eventRow } from '@/lib/bookings/service-booking-events'
 
 export const dynamic = 'force-dynamic'
 
@@ -234,7 +235,7 @@ async function addToSupplierManifest(tenantId: string, bookingId: string, extra:
   // and this company's own.
   const { quotedCost, note } = manifestCost(extra, booking?.currency, ratesForTenant((rates ?? []) as ExchangeRate[], tenantId))
 
-  const { error } = await admin.from('booking_supplier_status').insert({
+  const { data: row, error } = await admin.from('booking_supplier_status').insert({
     tenant_id: tenantId,
     booking_id: bookingId,
     supplier_id: typeof extra.supplier_id === 'string' ? extra.supplier_id : null,
@@ -243,6 +244,11 @@ async function addToSupplierManifest(tenantId: string, bookingId: string, extra:
     service_description: `Extra: ${String(extra.title)}${note}`,
     quoted_cost: quotedCost,
     status: 'pending',
-  })
-  if (error) console.error('extras: could not add to supplier manifest', error)
+  }).select('id').single()
+  if (error || !row) { console.error('extras: could not add to supplier manifest', error); return }
+  const { error: evErr } = await admin.from('service_booking_events').insert(eventRow({
+    tenantId, bookingId, serviceBookingId: row.id as string, actor: 'system', channel: 'system',
+    toStatus: 'pending', note: `Extra confirmed: ${String(extra.title)}`,
+  }))
+  if (evErr) console.error('extras: could not record the event', evErr)
 }

@@ -197,9 +197,13 @@ describe('446: a service booking\'s history is append-only', () => {
     expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(1)
   })
 
-  it('takes the new states and still the old words, nothing else', async () => {
-    for (const s of ['requested', 'accepted', 'assigned', 'done', 'declined', 'expired', 'contacted', 'confirmed', 'no_response']) {
+  it('takes the new states; an old word is saved as its new state (447); nothing else', async () => {
+    for (const s of ['requested', 'accepted', 'assigned', 'done', 'declined', 'expired']) {
       expect(await as(people.owner, `UPDATE booking_supplier_status SET status = '${s}' WHERE id = '${line}'`), s).toBeNull()
+    }
+    for (const [said, saved] of [['contacted', 'requested'], ['confirmed', 'accepted'], ['no_response', 'expired']]) {
+      expect(await as(people.owner, `UPDATE booking_supplier_status SET status = '${said}' WHERE id = '${line}'`), said).toBeNull()
+      expect(await count(`SELECT count(*) AS n FROM booking_supplier_status WHERE id = '${line}' AND status = '${saved}'`), said).toBe(1)
     }
     expect(await as(people.owner, `UPDATE booking_supplier_status SET status = 'maybe' WHERE id = '${line}'`)).toMatch(/check constraint/)
     expect(await as(people.owner, `UPDATE booking_supplier_status SET resource_kind = 'friend' WHERE id = '${line}'`)).toMatch(/check constraint/)

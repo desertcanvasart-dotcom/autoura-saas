@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { supplierBacking } from '@/lib/bookings/booking-suppliers'
-import { STATUS_LABEL, normalizeStatus } from '@/lib/bookings/service-booking-states'
+import {
+  SERVICE_BOOKING_STATUSES, STATUS_LABEL, canTransition, normalizeStatus, type CoveredBy, type ServiceBookingStatus,
+} from '@/lib/bookings/service-booking-states'
 
-// Who has to confirm what for this booking (booking_supplier_status). The
-// list is filled from the itinerary when the booking is made; "Sync from
-// itinerary" adds anything new. Mark each row as it is chased and confirmed —
-// "Not needed" takes it out of the count (e.g. a ticket bought at the gate).
+// The booking's service bookings (booking_supplier_status): one row per
+// service line, filled from the itinerary when the booking is made; "Sync
+// from itinerary" adds anything new. Move each line on as it is requested,
+// accepted and assigned — the list offers only the moves a line may make;
+// "Not needed" takes it out of the count.
 // Confirming a row with a cost records it as a pending expense (what the trip
 // owes that supplier); the Expense column links to it.
 
@@ -22,31 +25,27 @@ interface SupplierRow {
   quoted_cost: number | null
   confirmed_cost: number | null
   status: string
+  resource_kind: CoveredBy | null
+  service_time: string | null
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
 }
 
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'no_response', label: 'No response' },
-  { value: 'cancelled', label: 'Not needed' },
-]
+// The line's status, then only the moves it may make (service-booking-states).
+function statusChoices(status: string, coveredBy: CoveredBy): ServiceBookingStatus[] {
+  const current = normalizeStatus(status)
+  return [current, ...SERVICE_BOOKING_STATUSES.filter(s => canTransition(current, s, coveredBy).ok)]
+}
 
 const STATUS_STYLE: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-700',
-  contacted: 'bg-blue-50 text-blue-700',
-  confirmed: 'bg-green-50 text-green-700',
-  no_response: 'bg-amber-50 text-amber-700',
-  cancelled: 'bg-gray-50 text-gray-400 line-through',
-  // Service booking states (446), as the supplier reply link will set them.
   requested: 'bg-blue-50 text-blue-700',
   accepted: 'bg-green-50 text-green-700',
   assigned: 'bg-green-50 text-green-700',
   done: 'bg-green-100 text-green-800',
   declined: 'bg-red-50 text-red-700',
   expired: 'bg-amber-50 text-amber-700',
+  cancelled: 'bg-gray-50 text-gray-400 line-through',
 }
 
 // The EXPENSE's state (what the agency owes this supplier), not the
@@ -140,7 +139,7 @@ export default function BookingSuppliersPanel({
             {backing.backed && <CheckCircle2 className="w-4 h-4" />}
             {backing.total === 0
               ? 'No suppliers listed yet'
-              : `${backing.confirmed} of ${backing.total} confirmed`}
+              : `${backing.confirmed} of ${backing.total} covered`}
           </p>
         </div>
         {hasItinerary && canEdit && (
@@ -172,7 +171,7 @@ export default function BookingSuppliersPanel({
                 <th className="py-2 pr-3 font-medium text-right">Cost</th>
                 <th className="py-2 pr-3 font-medium">Status</th>
                 <th className="py-2 pr-3 font-medium">Confirmation no.</th>
-                <th className="py-2 font-medium" title="What the agency owes this supplier, recorded when the supplier is confirmed">Expense</th>
+                <th className="py-2 font-medium" title="What the agency owes this supplier, recorded when the supplier accepts">Expense</th>
               </tr>
             </thead>
             <tbody>
@@ -180,8 +179,12 @@ export default function BookingSuppliersPanel({
                 <tr key={r.id} className="border-b border-gray-100 last:border-0">
                   <td className="py-2 pr-3 whitespace-nowrap text-gray-600">
                     {r.service_date ? new Date(`${r.service_date}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}
+                    {r.service_time && <div className="text-xs text-gray-400">{r.service_time.slice(0, 5)}</div>}
                   </td>
-                  <td className="py-2 pr-3 text-gray-900">{r.supplier_name}</td>
+                  <td className="py-2 pr-3 text-gray-900">
+                    {r.supplier_name}
+                    {r.service_description && <div className="text-xs text-gray-500">{r.service_description}</div>}
+                  </td>
                   <td className="py-2 pr-3 text-gray-500 capitalize">{r.supplier_type}</td>
                   <td className="py-2 pr-3 text-right text-gray-700 whitespace-nowrap">
                     {canEdit ? (
@@ -215,17 +218,16 @@ export default function BookingSuppliersPanel({
                   <td className="py-2 pr-3">
                     <select
                       aria-label={`Status of ${r.supplier_name}`}
-                      value={r.status}
+                      value={normalizeStatus(r.status)}
                       disabled={!canEdit || savingId === r.id}
                       onChange={e => update(r, { status: e.target.value })}
                       // ! — globals.css gives every <select> width:100% and wide
                       // padding outside Tailwind's layers, crushing this pill.
-                      className={`!w-32 !px-2 !py-1 rounded-md text-xs font-medium !border-0 ${STATUS_STYLE[r.status] ?? ''}`}
+                      className={`!w-32 !px-2 !py-1 rounded-md text-xs font-medium !border-0 ${STATUS_STYLE[normalizeStatus(r.status)] ?? ''}`}
                     >
-                      {!STATUS_OPTIONS.some(o => o.value === r.status) && (
-                        <option value={r.status}>{STATUS_LABEL[normalizeStatus(r.status)]}</option>
-                      )}
-                      {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {statusChoices(r.status, r.resource_kind ?? 'supplier').map(s => (
+                        <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                      ))}
                     </select>
                   </td>
                   <td className="py-2 pr-3">
