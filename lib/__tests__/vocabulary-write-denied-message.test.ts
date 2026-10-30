@@ -30,11 +30,11 @@ describe('vocabulary write refusal', () => {
     const src = readFileSync(join(API, 'route.ts'), 'utf8')
     const msg = src.match(/export const WRITE_DENIED = '([^']+)'/)?.[1] ?? ''
     expect(msg).toMatch(/owner or an admin/)
-    expect(msg).toMatch(/User Management/)
+    expect(msg).toMatch(/Team & roles/)
   })
   it('the page tells read-only viewers the same thing', () => {
     const page = readFileSync(join(ROOT, 'app', 'settings', 'vocabulary', 'page.tsx'), 'utf8')
     expect(page).toMatch(/Only the agency owner or an admin can/)
-    expect(page).toMatch(/href="\/users"/)
+    expect(page).toMatch(/href="\/settings\/team"/)
   })
 })

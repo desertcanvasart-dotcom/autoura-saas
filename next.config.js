@@ -3,6 +3,8 @@
 // next.config.js is CommonJS; require is how it loads a module.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildCsp } = require('./lib/security/csp.js')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { navRedirects } = require('./lib/nav/redirects.js')
 
 const csp = buildCsp({
   dev: process.env.NODE_ENV !== 'production',
@@ -44,6 +46,10 @@ const nextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
+  },
+  // Every address the navigation restructure moved (lib/nav/redirects.js).
+  async redirects() {
+    return navRedirects()
   },
   async headers() {
     return [

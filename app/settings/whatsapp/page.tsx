@@ -135,8 +135,8 @@ export default function WhatsAppSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50/50 p-4 md:p-6">
-        <div className="max-w-2xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+        <div className="max-w-2xl">
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
             <div className="animate-pulse space-y-3">
               <div className="h-5 bg-gray-100 rounded w-1/3"></div>
@@ -149,21 +149,11 @@ export default function WhatsAppSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 md:p-6">
-      <div className="max-w-2xl mx-auto space-y-4">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <div className="max-w-2xl space-y-4">
         
-        {/* Header */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 bg-primary-100 rounded-lg flex items-center justify-center">
-              <MessageCircle className="w-4 h-4 text-primary-600" />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold text-gray-900">WhatsApp Integration</h1>
-              <p className="text-xs text-gray-500">Send quotes and updates directly to your clients</p>
-            </div>
-          </div>
-
+        {/* Toolbar */}
+        <div>
           {/* Status Badge */}
           <div className={`
             inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium

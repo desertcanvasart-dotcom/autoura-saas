@@ -30,7 +30,7 @@ export const WRITE_ROLES = ['owner', 'admin']
 // The refusal, in one place, says WHO can and WHAT to do — the same words
 // the page shows read-only viewers, so a refused request never reads as
 // "the app is broken".
-export const WRITE_DENIED = 'Only the agency owner or an admin can change the vocabulary. Ask one of them to make the change, or to make you an admin under Settings → User Management.'
+export const WRITE_DENIED = 'Only the agency owner or an admin can change the vocabulary. Ask one of them to make the change, or to make you an admin under Settings → Team & roles.'
 export const COLS = 'id, tenant_id, kind, key, label, description, behavior, rank, meta, is_active, created_at, updated_at'
 
 export async function GET() {

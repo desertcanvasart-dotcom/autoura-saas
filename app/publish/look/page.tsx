@@ -212,7 +212,7 @@ export default function PublishLookPage() {
               {([['ETAA licence number', look.footer.licenseNumber], ['Address', look.footer.address], ['WhatsApp', look.footer.whatsapp]] as const).map(([label, v]) => (
                 <li key={label} className={`flex items-start gap-1 ${v ? 'text-gray-700' : 'text-amber-700'}`}>
                   {v ? <Check className="h-4 w-4 mt-0.5 flex-none text-[#647C47]" /> : <AlertTriangle className="h-4 w-4 mt-0.5 flex-none" />}
-                  <span>{label}: {v ?? <>missing — <Link href="/settings/tenant" className="underline">add it in company settings</Link></>}</span>
+                  <span>{label}: {v ?? <>missing — <Link href="/settings/company" className="underline">add it in company settings</Link></>}</span>
                 </li>
               ))}
             </ul>

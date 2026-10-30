@@ -8,12 +8,10 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import {
-  Building2,
   Save,
   AlertCircle,
   CheckCircle2,
   Palette,
-  ArrowLeft,
   Upload,
   X,
   Image as ImageIcon,
@@ -451,12 +449,7 @@ export default function TenantSettingsPage() {
   // Show loading state while fetching tenant data
   if (loading || !tenant || !features) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-lg font-semibold text-gray-900">Organization Settings</h1>
-          </div>
-        </div>
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-5 h-5 text-[#647C47] animate-spin" />
         </div>
@@ -467,13 +460,8 @@ export default function TenantSettingsPage() {
   // Only show access denied AFTER we've confirmed the user's role is loaded
   if (tenantMember && !isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-lg font-semibold text-gray-900">Organization Settings</h1>
-          </div>
-        </div>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+        <div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div>
@@ -489,27 +477,9 @@ export default function TenantSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link
-            href="/settings"
-            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 mb-2"
-          >
-            <ArrowLeft className="w-3 h-3" />
-            Back to Settings
-          </Link>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[#647C47]/10 flex items-center justify-center">
-                <Building2 className="w-4 h-4 text-[#647C47]" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900">Organization Settings</h1>
-                <p className="text-xs text-gray-500">Manage your company profile and branding</p>
-              </div>
-            </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      {/* Toolbar */}
+      <div className="flex items-center justify-end mb-4">
             <button
               onClick={handleSave}
               disabled={saving || uploading || !companyName}
@@ -532,11 +502,9 @@ export default function TenantSettingsPage() {
                 </>
               )}
             </button>
-          </div>
-        </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+      <div className="space-y-4">
         {/* Where this agency books suppliers from (Supplier Network Phase 3) */}
         <SupplierSourcingSetting canEdit={isAdmin} />
 

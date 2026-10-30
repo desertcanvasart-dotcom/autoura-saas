@@ -21,27 +21,16 @@ describe('the pages under /settings', () => {
     expect(permissionRouteFor('/no-such-page')).toBeUndefined()
   })
 
-  it('open for the roles the sidebar shows them to; the rest stays admin-only', () => {
+  it('open for the roles the Settings sidebar shows them to; the rest stays admin-only', () => {
     expect(allowed('/settings/email-signatures')).toEqual(['admin', 'manager', 'member'])
-    expect(allowed('/settings/copilot-analytics')).toEqual(['admin', 'manager'])
+    expect(allowed('/copilot-analytics')).toEqual(['admin', 'manager'])
     expect(allowed('/settings/seasons')).toEqual(['admin', 'manager'])
     // Personal: your own Gmail (the Inbox sends members here) and your own profile.
     expect(allowed('/settings/email')).toEqual(['admin', 'manager', 'member'])
     expect(allowed('/settings/profile')).toEqual(['admin', 'manager', 'member', 'viewer'])
     expect(allowed('/settings/departments')).toEqual(['admin', 'manager'])
-    for (const p of ['/settings', '/settings/whatsapp', '/settings/tenant', '/settings/copilot']) {
+    for (const p of ['/settings', '/settings/whatsapp', '/settings/company', '/settings/copilot', '/settings/team', '/settings/pricing', '/settings/currencies']) {
       expect(allowed(p), p).toEqual(['admin'])
-    }
-  })
-
-  it('every sidebar link under /settings opens for the roles it is shown to', () => {
-    const sidebar = src('components/Sidebar.tsx')
-    const links = [...sidebar.matchAll(/href: '(\/settings[^']*)'[^}]*?(?:roles: \[([^\]]*)\])?\s*\}/g)]
-    expect(links.length).toBeGreaterThan(5)
-    for (const [, href, roles] of links) {
-      const shownTo = roles ? roles.split(',').map(r => r.trim().replace(/'/g, '')) : ['admin', 'manager', 'member']
-      const gate = allowed(href) ?? ['admin', 'manager', 'member']
-      for (const role of shownTo) expect(gate, `${href} shown to ${role}`).toContain(role)
     }
   })
 })

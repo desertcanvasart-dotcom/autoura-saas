@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { captureFirstTouch } from '@/lib/marketing-attribution'
 import Sidebar from "@/components/Sidebar"
+import TopBar from "@/components/nav/TopBar"
 import ImpersonationBanner from "@/components/ImpersonationBanner"
 import SupportChatWidget from "@/components/SupportChatWidget"
 import ClosureBanner from "@/components/account/ClosureBanner"
@@ -21,7 +22,7 @@ export default function ClientShell({
 }: {
   children: React.ReactNode
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
   // Pages that should NOT show the sidebar (public pages)
@@ -51,6 +52,9 @@ export default function ClientShell({
     pathname.startsWith('/onboarding') ||
     isTokenPage
   const isSuperAdminPage = pathname.startsWith('/super-admin')
+  // The Settings area has its own layout (app/settings/layout.tsx): its own
+  // grouped sidebar and a way back, never the main sidebar.
+  const isSettingsPage = pathname === '/settings' || pathname.startsWith('/settings/')
 
   // First-touch UTM/referrer capture (sessionStorage, cookie-free) so the
   // contact form can attribute a submission to the campaign that actually
@@ -76,17 +80,23 @@ export default function ClientShell({
             // Super admin pages - own layout handles sidebar
             <>{children}</>
           ) : (
-            // App pages - with sidebar
-            <div className="flex h-screen overflow-hidden bg-gray-50">
-              <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-              <main
-                className={`flex-1 overflow-y-auto transition-all duration-300 ${
-                  isCollapsed ? 'lg:ml-16' : 'lg:ml-56'
-                }`}
-              >
-                <ClosureBanner />
-                {children}
-              </main>
+            // App pages: the top bar over the main sidebar and the page. The
+            // Settings area swaps the main sidebar for its own (its layout).
+            <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
+              <TopBar
+                variant={isSettingsPage ? 'settings' : 'app'}
+                sidebarOpen={sidebarOpen}
+                onToggleSidebar={() => setSidebarOpen(o => !o)}
+              />
+              <div className="flex flex-1 min-h-0">
+                {!isSettingsPage && (
+                  <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
+                )}
+                <main className="flex-1 min-w-0 overflow-y-auto">
+                  <ClosureBanner />
+                  {children}
+                </main>
+              </div>
               <SupportChatWidget />
             </div>
           )}

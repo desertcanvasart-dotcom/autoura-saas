@@ -205,13 +205,8 @@ export default function BillingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-lg font-semibold text-gray-900">Billing & Subscription</h1>
-          </div>
-        </div>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+        <div className="py-8 flex items-center justify-center">
           <Loader2 className="w-6 h-6 text-[#647C47] animate-spin" />
         </div>
       </div>
@@ -220,13 +215,8 @@ export default function BillingPage() {
 
   if (tenantMember && !isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-lg font-semibold text-gray-900">Billing & Subscription</h1>
-          </div>
-        </div>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+        <div>
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
@@ -240,35 +230,27 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">Billing & Subscription</h1>
-              <p className="text-sm text-gray-500">Manage your plan and billing</p>
-            </div>
-            {isOwner && subscription && (
-              <button
-                type="button"
-                onClick={handleManageBilling}
-                disabled={actionLoading === 'portal'}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] disabled:opacity-50 transition-colors"
-              >
-                {actionLoading === 'portal' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <ExternalLink className="w-3.5 h-3.5" />
-                )}
-                Manage Billing
-              </button>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      {/* Toolbar */}
+      {isOwner && subscription && (
+        <div className="flex items-center justify-end mb-4">
+          <button
+            type="button"
+            onClick={handleManageBilling}
+            disabled={actionLoading === 'portal'}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] disabled:opacity-50 transition-colors"
+          >
+            {actionLoading === 'portal' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <ExternalLink className="w-3.5 h-3.5" />
             )}
-          </div>
+            Manage Billing
+          </button>
         </div>
-      </div>
+      )}
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+      <div className="space-y-4">
         {/* Error */}
         {activating === 'waiting' && (
           <div role="status" className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">

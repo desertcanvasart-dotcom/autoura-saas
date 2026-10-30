@@ -1,794 +1,168 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { ChevronDown } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
-import { useTenant } from '@/app/contexts/TenantContext'
-import { useRole, UserRole } from '@/hooks/useRole'
-import NotificationBell from '@/components/NotificationBell'
-import TenantSwitcher from '@/components/TenantSwitcher'
+import { useRole } from '@/hooks/useRole'
 import { useInboxUnreadCount, useTeamBadges } from '@/lib/use-inbox-unread'
-import {
-  LayoutDashboard,
-  Users,
-  DollarSign,
-  Settings,
-  ChevronRight,
-  ChevronDown,
-  MessageSquare,
-  FileText,
-  Calendar, 
-  CheckSquare,
-  Menu,
-  X,
-  User,
-  Truck,
-  TrendingUp,
-  Hotel,
-  UtensilsCrossed,
-  Plane,
-  Coins,
-  ClipboardCheck,
-  LogOut,
-  Mail,
-  Ticket,
-  Contact,
-  Library,
-  Receipt,
-  Wallet,
-  BarChart3,
-  CreditCard,
-  LayoutTemplate,
-  ConciergeBell,
-  Train,
-  BedDouble,
-  Ship,
-  Building,
-  Shield,
-  BookOpen,
-  Handshake,
-  Send,
-  Route,
-  Package,
-  Briefcase,
-  Car,
-  Grid3x3,
-  Sparkles,
-  PenLine,
-  CalendarRange,
-  Globe,
-  BookA,
-  Signpost,
-  Blocks,
-} from 'lucide-react'
+import { mainNavFor, activeHref, SETTINGS_LINK, LAST_APP_PATH_KEY, type NavBadge, type NavItem } from '@/lib/nav/config'
+
+// The main sidebar: the daily work only, built from lib/nav/config.ts — no
+// link is written here. Setup lives in the Settings area (its own layout),
+// the rate sheets in the Rates page's menu, and the account, notifications
+// and Copilot in the top bar.
 
 interface SidebarProps {
-  isCollapsed: boolean
-  setIsCollapsed: (collapsed: boolean) => void
+  /** Small screens: the sidebar is a drawer opened from the top bar. */
+  mobileOpen: boolean
+  onMobileClose: () => void
 }
 
-interface NavSubItem {
-  label: string
-  href: string
-  icon?: any
-  roles?: UserRole[]
-}
+// Collapsed sections, remembered per login. Storing the COLLAPSED ones means
+// a section added later starts open.
+const storageKey = (userId: string) => `autoura-sidebar-sections:${userId}`
 
-interface NavItem {
-  label: string
-  href: string
-  icon: any
-  roles?: UserRole[]
-  children?: NavSubItem[]
-}
+export const ICON_PROPS = { size: 18, strokeWidth: 1.7 } as const
 
-interface NavSection {
-  title: string
-  key: string
-  roles?: UserRole[]
-  items: NavItem[]
-}
-
-// Define navigation with role-based visibility.
-//
-// Ten sections, ordered by how often a person opens them, each named for the
-// work it holds rather than the kind of screen: Home (read the day),
-// Communicate (the channels where new things arrive: Inbox, WhatsApp,
-// Concierge Leads; second, straight under Home — operator, 2026-09-24), Sell
-// (quote → itinerary → booking), Operate (run what was sold), Publish (the
-// company's website), Tours (define
-// and price the catalogue), Suppliers & Rates (what you buy and what it
-// costs), People, Finance, Settings. Section KEYS are kept from the old
-// layout where a section survived, so remembered collapse states
-// carry over. Role gates travel with the item, never with the section, so a
-// move never widens or narrows who sees a page.
-const navigation: NavSection[] = [
-  {
-    title: 'Home',
-    key: 'main',
-    items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'Analytics', href: '/analytics', icon: TrendingUp },
-      { label: 'Reports', href: '/financial-reports', icon: BarChart3, roles: ['admin', 'manager'] },
-      // How the Copilot is doing is analytics, not a Copilot setting.
-      { label: 'Copilot Analytics', href: '/settings/copilot-analytics', icon: BarChart3, roles: ['admin', 'manager'] },
-    ]
-  },
-  // The channels, the things used while writing in them, and the library
-  // that feeds the words the Copilot and the itinerary writer use.
-  // '/communications' is deliberately not listed: it stays live but
-  // duplicates Conversations + Inbox. ('/whatsapp-parser' now just redirects
-  // to the Pricing Grid.)
-  {
-    title: 'Communicate',
-    key: 'communication',
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      { label: 'Conversations', href: '/conversations', icon: MessageSquare },
-      { label: 'Inbox', href: '/inbox', icon: Mail },
-      { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
-      // Leads the website's AI concierge hands over — a channel like the two
-      // above, so it sits with them (operator, 2026-09-24).
-      { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
-      { label: 'Copilot', href: '/copilot', icon: Sparkles },
-      { label: 'Copilot Knowledge', href: '/copilot-knowledge', icon: Sparkles },
-      { label: 'Message Templates', href: '/templates', icon: FileText },
-      { label: 'Email Signatures', href: '/settings/email-signatures', icon: PenLine },
-      { label: 'Content Library', href: '/content-library', icon: Library, roles: ['admin', 'manager'] },
-      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library, roles: ['admin', 'manager'] },
-      { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen, roles: ['admin', 'manager'] },
-    ]
-  },
-  // The sale's lifecycle in one place: start it, price it, save it, book it,
-  // see it on a calendar. A sale starts in an email or a WhatsApp and lands in
-  // an itinerary, so New Quote opens the new-itinerary form — the same place
-  // the dashboard's quick action goes; the spreadsheet calculator is its own
-  // entry. Extras and Seasonal Premiums are selling-side (what you charge),
-  // which is why they are here and not with the buying rates.
-  {
-    title: 'Sell',
-    key: 'sell',
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      // "New Quote" (the new-itinerary form) is hidden here: quotes start in
-      // the Quote Builder, and the dashboard's quick action still opens the form.
-      { label: 'Quote Builder', href: '/pricing-grid', icon: Grid3x3 },
-      { label: 'B2C Quotes', href: '/quotes/b2c', icon: User },
-      // Single B2B quote store since migration 270 — calculator and
-      // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
-      { label: 'B2B Quotes', href: '/quotes/b2b', icon: FileText, roles: ['admin', 'manager'] },
-      { label: 'Itineraries', href: '/itineraries', icon: Route, roles: ['admin', 'manager'] },
-      { label: 'Bookings', href: '/bookings', icon: BookOpen },
-      { label: 'Booking Calendar', href: '/calendar', icon: Calendar },
-      { label: 'Extras', href: '/rates/extras', icon: Sparkles, roles: ['admin', 'manager'] },
-    ]
-  },
-  // Running what was sold: the to-dos, the departures and how much the
-  // operation takes on per date, the client touchpoints, the paperwork.
-  {
-    title: 'Operate',
-    key: 'operations',
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      { label: 'Tasks', href: '/tasks', icon: CheckSquare, roles: ['admin', 'manager'] },
-      { label: 'Tour Departures', href: '/departures', icon: Calendar, roles: ['admin', 'manager'] },
-      // Planned alongside departures, not configured once. Still admin-only.
-      { label: 'Capacity Calendar', href: '/settings/capacity', icon: CalendarRange, roles: ['admin'] },
-      { label: 'Follow-ups', href: '/followups', icon: CheckSquare },
-      // Contracts and vouchers generated from itineraries — operational
-      // paperwork, not content.
-      { label: 'Documents', href: '/documents', icon: FileText, roles: ['admin', 'manager'] },
-    ]
-  },
-  // The fourth module (docs/publish/PLAN.md): the company's own website,
-  // built from its tours and kept true to its records. Next to Operate and
-  // Tours because it publishes what they define.
-  {
-    title: 'Publish',
-    key: 'publish',
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      { label: 'Website', href: '/publish', icon: Globe },
-    ]
-  },
-  // The catalogue: tour templates, their variations and the packages that
-  // price them. The key stays 'b2b': saved collapse state keys on it.
-  {
-    title: 'Tours',
-    key: 'b2b',
-    roles: ['admin', 'manager'],
-    items: [
-      { label: 'Tour Manager', href: '/tours/manage', icon: LayoutTemplate },
-      { label: 'Tour Inventory', href: '/tours', icon: Package },
-      { label: 'Transport Packages', href: '/b2b/pricing-rules', icon: Car },
-    ]
-  },
-  // What you buy and what it costs: the supplier roster, then the buying
-  // rates in four subgroups collapsed until needed; the subgroup holding the
-  // open page expands on its own. Parent hrefs are anchors on the hub: they
-  // only render as a link when the sidebar is collapsed to icons.
-  {
-    title: 'Suppliers & Rates',
-    key: 'rates',
-    roles: ['admin', 'manager'],
-    items: [
-      { label: 'Suppliers', href: '/suppliers', icon: Building },
-      { label: 'Network suppliers', href: '/network-suppliers', icon: Globe },
-      { label: 'Rates Hub', href: '/rates', icon: Coins },
-      { label: 'Rates Check', href: '/rates/check', icon: ClipboardCheck },
-      {
-        label: 'Accommodation', href: '/rates#accommodation', icon: Hotel,
-        children: [
-          { label: 'Hotels', href: '/rates/hotels', icon: Hotel },
-          { label: 'Cruises', href: '/rates/cruises', icon: Ship },
-          { label: 'Sleeping Trains', href: '/rates/sleeping-train', icon: BedDouble },
-          { label: 'Hotel Services', href: '/rates/hotel-services', icon: ConciergeBell },
-        ],
-      },
-      {
-        label: 'Transport & Tickets', href: '/rates#transport', icon: Truck,
-        children: [
-          { label: 'Transportation', href: '/rates/transportation', icon: Truck },
-          { label: 'Flights', href: '/rates/flights', icon: Plane },
-          { label: 'Trains', href: '/rates/trains', icon: Train },
-          { label: 'Airport Services', href: '/rates/airport-services', icon: Plane },
-        ],
-      },
-      {
-        label: 'Guides & Services', href: '/rates#services', icon: Users,
-        children: [
-          { label: 'Tour Guides', href: '/rates/guides', icon: Users },
-          { label: 'Meals', href: '/rates/meals', icon: UtensilsCrossed },
-          { label: 'Attractions', href: '/rates/attractions', icon: Building },
-          { label: 'Activities', href: '/rates/activities', icon: Ticket },
-        ],
-      },
-      {
-        label: 'Costs', href: '/rates#costs', icon: DollarSign,
-        children: [
-          { label: 'Tipping', href: '/rates/tipping', icon: DollarSign },
-          { label: 'Fixed Costs', href: '/rates/fixed-costs', icon: DollarSign },
-        ],
-      },
-    ]
-  },
-  // The people and organisations the agency deals with. The key stays 'crm'.
-  // 'Staff' (/contacts?type=staff) is deliberately absent: airport staff is
-  // managed via /airport-staff and the Resources page.
-  {
-    title: 'People',
-    key: 'crm',
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      { label: 'Clients', href: '/clients', icon: Users },
-      { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: ['admin', 'manager'] },
-      // The staff directory tasks are assigned to — NOT logins (User Management).
-      { label: 'Team Members', href: '/team-members', icon: Users, roles: ['admin', 'manager'] },
-    ]
-  },
-  {
-    title: 'Finance',
-    key: 'finance',
-    // Members invoice and collect on their own trips (API: staff), so they
-    // get those four pages; the finance-only ones stay pinned below.
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      { label: 'Payments', href: '/payments', icon: DollarSign },
-      { label: 'Invoices', href: '/invoices', icon: FileText },
-      { label: 'Receipts', href: '/receipts', icon: Receipt },
-      { label: 'Receivables', href: '/accounts-receivable', icon: Wallet, roles: ['admin', 'manager'] },
-      { label: 'Payables', href: '/accounts-payable', icon: CreditCard, roles: ['admin', 'manager'] },
-      { label: 'Supplier Invoices', href: '/supplier-invoices', icon: Receipt, roles: ['admin', 'manager'] },
-      { label: 'Expenses', href: '/expenses', icon: Receipt },
-      { label: 'Commissions', href: '/commissions', icon: Handshake, roles: ['admin', 'manager'] },
-      { label: 'Profit & Loss', href: '/profit-loss', icon: TrendingUp, roles: ['admin', 'manager'] },
-    ]
-  },
-  // Configured once. 'Team Management' (/settings/team) was consolidated into
-  // User Management (/users); the old route redirects there.
-  {
-    title: 'Settings',
-    key: 'settings',
-    // admin + manager: the section renders for managers so they can still reach
-    // Seasonal Premiums (a selling-side pricing tool). Every other item is
-    // pinned admin-only so widening the section does not expose admin config.
-    roles: ['admin', 'manager'],
-    items: [
-      { label: 'Settings', href: '/settings', icon: Settings, roles: ['admin'] },
-      { label: 'Organization', href: '/settings/tenant', icon: Building, roles: ['admin'] },
-      { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA, roles: ['admin'] },
-      // Which fee a tour's wording means. The agency's own since migration 370.
-      { label: 'Attraction Names', href: '/settings/attraction-aliases', icon: Signpost, roles: ['admin'] },
-      // The agency's standard days, kept once (migration 398).
-      { label: 'Day Blocks', href: '/settings/day-blocks', icon: Blocks, roles: ['admin'] },
-      { label: 'Destinations', href: '/settings/destinations', icon: Globe, roles: ['admin'] },
-      // The demand calendar: the dates you charge more on, and by how much
-      // (lib/pricing/season-uplift.ts). Managers price, so they keep this.
-      { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange, roles: ['admin', 'manager'] },
-      { label: 'Departments', href: '/settings/departments', icon: Building, roles: ['admin'] },
-      // Tenant-wide Copilot toggles: admin-only to change, so they live here.
-      { label: 'Copilot Settings', href: '/settings/copilot', icon: Sparkles, roles: ['admin'] },
-      { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare, roles: ['admin'] },
-      { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard, roles: ['admin'] },
-      { label: 'User Management', href: '/users', icon: Shield, roles: ['admin'] },
-    ]
-  }
-]
-
-// Storage key for section states
-const STORAGE_KEY = 'autoura-sidebar-sections'
-
-// Role badge colors
-// Which build you are looking at — shown beside the tenant's name.
-//
-// There are two Autoura apps and they read identically in a screenshot: this
-// one (getautoura.net, the SaaS) and the autoura.net "Autoura Ops" app. The
-// tag exists to tell them apart while working on them.
-//
-// It is therefore OFF in production by default. The slot it sits next to is
-// white-label — a paying agency should see their own brand, not a label
-// describing our deployment topology. Set NEXT_PUBLIC_APP_LABEL to show it
-// anywhere you do want it (a staging deploy, say); it is inlined at build
-// time like any NEXT_PUBLIC_ value.
-const APP_LABEL =
-  process.env.NEXT_PUBLIC_APP_LABEL ||
-  (process.env.NODE_ENV !== 'production' ? 'SaaS' : '')
-
-const ROLE_COLORS: Record<UserRole, string> = {
-  admin: 'bg-purple-100 text-purple-700',
-  manager: 'bg-blue-100 text-blue-700',
-  member: 'bg-green-100 text-green-700',
-  viewer: 'bg-gray-100 text-gray-600'
-}
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  admin: 'Admin',
-  manager: 'Manager',
-  member: 'Member',
-  viewer: 'Viewer'
-}
-
-export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
+export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
-  const { user, profile, signOut, isSuperAdmin } = useAuth()
-  const { tenant } = useTenant()
+  const { user } = useAuth()
   const { role, canAccess } = useRole()
-  // Unread emails in the user's Gmail inbox, badged on the Inbox link. A new
-  // arrival also pops a toast — except on the Inbox page, which shows it itself.
-  const inboxUnread = useInboxUnreadCount(
-    canAccess(['admin', 'manager', 'member']) ? user?.id : null, // who sees the Inbox link
-    { notify: !pathname.startsWith('/inbox') },
-  )
-  // The team's unread WhatsApp messages and concierge leads awaiting review
-  // (both links sit in sections admin/manager/member see). No toast on the
-  // page that already shows the thing.
-  const team = useTeamBadges(canAccess(['admin', 'manager', 'member']), {
+  const sections = useMemo(() => mainNavFor(role), [role])
+
+  // Unread emails in the user's Gmail inbox, badged on Inbox (a new arrival
+  // also pops a toast — except on the Inbox page, which shows it itself),
+  // plus the team's unread WhatsApp messages. Leads awaiting review on Leads.
+  const works = canAccess(['admin', 'manager', 'member'])
+  const inboxUnread = useInboxUnreadCount(works ? user?.id : null, { notify: !pathname.startsWith('/inbox') })
+  const team = useTeamBadges(works, {
     notify: {
       whatsapp: !pathname.startsWith('/whatsapp-inbox'),
       concierge: !pathname.startsWith('/concierge-briefs'),
     },
   })
-  const badgeFor: Record<string, number | null> = {
-    '/inbox': inboxUnread,
-    '/whatsapp-inbox': team.whatsapp,
-    '/concierge-briefs': team.concierge,
+  const badges: Record<NavBadge, number | null> = {
+    inbox: (inboxUnread ?? 0) + (team.whatsapp ?? 0) || null,
+    leads: team.concierge || null,
   }
 
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'communication', 'sell', 'crm', 'trips'])
-  const [expandedMenus, setExpandedMenus] = useState<string[]>([])
-  const [currentUrl, setCurrentUrl] = useState('')
+  const allItems = useMemo(() => sections.flatMap(s => s.items), [sections])
+  const current = activeHref([...allItems, SETTINGS_LINK], pathname)
+  const currentSection = sections.find(s => s.items.some(i => i.href === current))?.key
 
-  // Filter navigation by the user's role. Nothing else hides an item: the
-  // whole product is available to every tenant on every plan.
-  const filteredNavigation = navigation
-    .filter(section => !section.roles || canAccess(section.roles))
-    .map(section => ({
-      ...section,
-      items: section.items.filter(item => !item.roles || canAccess(item.roles)),
-    }))
-
-  // Load saved section states from localStorage
+  const [collapsed, setCollapsed] = useState<string[]>([])
+  const [loadedFor, setLoadedFor] = useState<string | null>(null)
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        setExpandedSections(parsed.sections || ['main', 'crm', 'trips'])
-        setExpandedMenus(parsed.menus || [])
-      } catch {
-        // Use defaults if parsing fails
-      }
-    }
-  }, [])
-
-  // Save section states to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      sections: expandedSections,
-      menus: expandedMenus
-    }))
-  }, [expandedSections, expandedMenus])
-
-  // Get full URL on client side only
-  useEffect(() => {
-    setCurrentUrl(window.location.href)
-  }, [pathname])
-
-  // Auto-expand section containing active page
-  useEffect(() => {
-    filteredNavigation.forEach(section => {
-      const hasActiveItem = section.items.some(item => 
-        pathname === item.href || 
-        (item.href !== '/dashboard' && pathname.startsWith(item.href)) ||
-        item.children?.some(child => pathname === child.href || currentUrl.includes(child.href))
-      )
-      if (hasActiveItem && !expandedSections.includes(section.key)) {
-        setExpandedSections(prev => [...prev, section.key])
-      }
-      // …and the submenu (a Rates subgroup) holding the open page.
-      section.items.forEach(item => {
-        if (item.children?.some(child => isChildActive(child.href)) && !expandedMenus.includes(item.label)) {
-          setExpandedMenus(prev => [...prev, item.label])
-        }
-      })
-    })
-  }, [pathname, currentUrl, filteredNavigation])
-
-  const toggleSection = (key: string) => {
-    setExpandedSections(prev => 
-      prev.includes(key) 
-        ? prev.filter(k => k !== key)
-        : [...prev, key]
-    )
-  }
-
-  const toggleMenu = (label: string) => {
-    setExpandedMenus(prev => 
-      prev.includes(label) 
-        ? prev.filter(l => l !== label)
-        : [...prev, label]
-    )
-  }
-
-  // Check if a child link is active (works with query params on client)
-  const isChildActive = (childHref: string): boolean => {
-    const typeMatch = childHref.match(/type=(\w+)/)
-    if (typeMatch) {
-      return !!currentUrl && currentUrl.includes(`type=${typeMatch[1]}`)
-    }
-    // A plain path child (the Rates subgroups) is active on its own page.
-    return pathname === childHref || pathname.startsWith(childHref + '/')
-  }
-
-  const handleSignOut = async () => {
+    if (!user?.id) return
     try {
-      await signOut()
-    } catch (error) {
-      console.error('Sign out error:', error)
+      const saved = JSON.parse(localStorage.getItem(storageKey(user.id)) || '[]')
+      setCollapsed(Array.isArray(saved) ? saved.filter((k: unknown) => typeof k === 'string') : [])
+    } catch {
+      setCollapsed([])
     }
+    setLoadedFor(user.id)
+  }, [user?.id])
+  useEffect(() => {
+    if (!user?.id || loadedFor !== user.id) return
+    try { localStorage.setItem(storageKey(user.id), JSON.stringify(collapsed)) } catch { /* private mode */ }
+  }, [collapsed, user?.id, loadedFor])
+
+  const toggle = (key: string) =>
+    setCollapsed(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
+
+  // Close the drawer when the page changes, and remember the page for
+  // Settings' "Back to app".
+  useEffect(() => {
+    onMobileClose()
+    try { sessionStorage.setItem(LAST_APP_PATH_KEY, pathname) } catch { /* storage blocked */ }
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const renderItem = (item: NavItem) => {
+    const Icon = item.icon
+    const isActive = item.href === current
+    const badge = item.badge ? badges[item.badge] : null
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={isActive ? 'page' : undefined}
+        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] transition-colors ${
+          isActive ? 'bg-primary-100/70 text-primary-800 font-medium' : 'text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        <Icon {...ICON_PROPS} className={`shrink-0 ${isActive ? 'text-primary-700' : 'text-gray-500'}`} aria-hidden />
+        <span className="truncate">{item.label}</span>
+        {badge !== null && (
+          <span
+            className="ml-auto min-w-[22px] px-1.5 py-0.5 rounded-full bg-primary-700 text-white text-[11px] font-semibold leading-none text-center"
+            aria-label={`${badge} new`}
+          >
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </Link>
+    )
   }
+
+  const settingsActive = current === SETTINGS_LINK.href
+  const SettingsIcon = SETTINGS_LINK.icon
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg"
-      >
-        {isMobileOpen ? (
-          <X className="w-6 h-6 text-gray-700" />
-        ) : (
-          <Menu className="w-6 h-6 text-gray-700" />
-        )}
-      </button>
-
-      {/* Overlay for mobile */}
-      {isMobileOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsMobileOpen(false)}
-        />
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 top-14 bg-black/40 z-30" onClick={onMobileClose} aria-hidden />
       )}
-
-      {/* Sidebar */}
       <aside
-        className={`
-          fixed top-0 left-0 z-40 h-screen bg-white border-r border-gray-200
-          transition-all duration-300 ease-in-out flex flex-col
-          ${isCollapsed ? 'w-16' : 'w-56'}
-          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}
+        id="main-sidebar"
+        aria-label="Main navigation"
+        className={`fixed lg:static top-14 bottom-0 left-0 z-40 w-64 shrink-0 bg-white border-r border-gray-200 flex flex-col
+          transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
-        {/* Logo Header with Tenant Name and Notification Bell */}
-        <div className="flex items-center justify-between h-14 px-3 border-b border-gray-200 flex-shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-7 h-7 flex-shrink-0">
-              {/* Icon-only mark: the sidebar collapses to a 28px square, where
-                  the full wordmark lockup would render illegibly small. */}
-              <img
-                src="/get-autoura-icon.png"
-                alt="Autoura"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            {!isCollapsed && (tenant || APP_LABEL) && (
-              // The tenant's own brand is the whole point of this slot, so the
-              // build tag sits OUTSIDE the truncating name — visible when it
-              // is there at all, and never eating into their name.
-              <span className="flex items-center gap-1.5 min-w-0">
-                {tenant && (
-                  <span className="text-sm font-semibold text-gray-900 truncate">
-                    {tenant.company_name}
-                  </span>
-                )}
-                {APP_LABEL && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 flex-shrink-0">
-                    {APP_LABEL}
-                  </span>
-                )}
-              </span>
-            )}
-          </Link>
-
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {!isCollapsed && <NotificationBell />}
-
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="hidden lg:block p-1 hover:bg-gray-100 rounded transition-colors"
-            >
-              <ChevronRight
-                className={`w-4 h-4 text-gray-500 transition-transform ${
-                  isCollapsed ? '' : 'rotate-180'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Notification Bell for collapsed state */}
-        {isCollapsed && (
-          <div className="flex justify-center py-2 border-b border-gray-100">
-            <NotificationBell />
-          </div>
-        )}
-
-        {/* Tenant Switcher */}
-        <TenantSwitcher isCollapsed={isCollapsed} />
-
-        {/* Platform owner shortcut — only rendered for SUPER_ADMIN_EMAILS accounts */}
-        {isSuperAdmin && (
-          <div className="px-2 pt-3">
-            <Link
-              href="/super-admin"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700"
-              title="Platform management"
-            >
-              <Shield className="w-4 h-4 shrink-0" />
-              {!isCollapsed && <span>Super Admin</span>}
-            </Link>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
-          {filteredNavigation.map((section) => {
-            const isSectionExpanded = expandedSections.includes(section.key)
-            
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+          {sections.map(section => {
+            const isOpen = section.key === currentSection || !collapsed.includes(section.key)
+            const folded = !isOpen
+            const hasNews = folded && section.items.some(i => i.badge && badges[i.badge])
             return (
               <div key={section.key}>
-                {/* Section Header */}
-                {!isCollapsed ? (
+                {section.title && (
                   <button
-                    onClick={() => toggleSection(section.key)}
-                    className="flex items-center justify-between w-full px-2 py-1.5 mb-1 rounded-md hover:bg-gray-50 transition-colors group"
+                    type="button"
+                    onClick={() => toggle(section.key)}
+                    aria-expanded={isOpen}
+                    className="flex items-center w-full px-3 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
                   >
-                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-600">
-                      {section.title}
-                    </h3>
-                    {/* A folded section still says something new is inside. */}
-                    {!isSectionExpanded && section.items.some(i => badgeFor[i.href]) && (
-                      <span className="ml-auto mr-1.5 w-2 h-2 rounded-full bg-red-500" title="Something new inside" />
-                    )}
-                    <ChevronDown 
-                      className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${
-                        isSectionExpanded ? '' : '-rotate-90'
-                      }`}
+                    {section.title}
+                    {hasNews && <span className="ml-2 w-2 h-2 rounded-full bg-primary-700" title="Something new inside" />}
+                    <ChevronDown
+                      size={14}
+                      strokeWidth={1.7}
+                      className={`ml-auto transition-transform ${isOpen ? '' : '-rotate-90'}`}
+                      aria-hidden
                     />
                   </button>
-                ) : (
-                  section.title !== 'Main' && (
-                    <div className="h-px bg-gray-200 my-2 mx-2"></div>
-                  )
                 )}
-
-                {/* Section Items */}
-                <div className={`
-                  space-y-0.5 overflow-hidden transition-all duration-200
-                  ${!isCollapsed && !isSectionExpanded ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100'}
-                `}>
-                  {section.items.map((item) => {
-                    const Icon = item.icon
-                    const hasChildren = item.children && item.children.length > 0
-                    const isExpanded = expandedMenus.includes(item.label)
-                    
-                    const isActive = hasChildren
-                      ? item.children!.some(child => isChildActive(child.href))
-                      : pathname === item.href ||
-                        (item.href !== '/dashboard' && pathname.startsWith(item.href))
-
-                    // For items with children (collapsible)
-                    if (hasChildren && !isCollapsed) {
-                      return (
-                        <div key={item.label}>
-                          <button
-                            onClick={() => toggleMenu(item.label)}
-                            className={`
-                              flex items-center gap-2.5 px-2 py-1.5 rounded-md w-full
-                              transition-all duration-150 text-sm
-                              ${isActive
-                                ? 'bg-primary-50 text-primary-700 font-medium'
-                                : 'text-gray-700 hover:bg-gray-50'
-                              }
-                            `}
-                          >
-                            <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-500'}`} />
-                            <span className="text-[13px] flex-1 text-left">{item.label}</span>
-                            <ChevronDown 
-                              className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
-                                isExpanded ? 'rotate-180' : ''
-                              }`} 
-                            />
-                          </button>
-                          
-                          {/* Children */}
-                          <div className={`
-                            overflow-hidden transition-all duration-200 ease-in-out
-                            ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
-                          `}>
-                            <div className="ml-4 pl-2.5 border-l border-gray-200 mt-1 space-y-0.5">
-                              {item.children!.filter(child => {
-                                if (!child.roles) return true
-                                return canAccess(child.roles)
-                              }).map((child) => {
-                                const ChildIcon = child.icon
-                                const isChildItemActive = isChildActive(child.href)
-                                
-                                return (
-                                  <Link
-                                    key={child.href}
-                                    href={child.href}
-                                    onClick={() => setIsMobileOpen(false)}
-                                    className={`
-                                      flex items-center gap-2 px-2 py-1.5 rounded-md
-                                      transition-all duration-150 text-sm
-                                      ${isChildItemActive
-                                        ? 'bg-primary-50 text-primary-700 font-medium'
-                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                                      }
-                                    `}
-                                  >
-                                    {ChildIcon && (
-                                      <ChildIcon className={`w-4 h-4 flex-shrink-0 ${isChildItemActive ? 'text-primary-600' : 'text-gray-400'}`} />
-                                    )}
-                                    <span className="text-[12px]">{child.label}</span>
-                                    {isChildItemActive && (
-                                      <div className="ml-auto w-1 h-1 rounded-full bg-primary-600" />
-                                    )}
-                                  </Link>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    }
-
-                    // Regular items. Inbox, WhatsApp and Concierge Leads carry a count.
-                    const badge = badgeFor[item.href] || null
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setIsMobileOpen(false)}
-                        className={`
-                          flex items-center gap-2.5 px-2 py-1.5 rounded-md
-                          transition-all duration-150 text-sm
-                          ${isActive
-                            ? 'bg-primary-50 text-primary-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                          }
-                          ${isCollapsed ? 'justify-center' : ''}
-                        `}
-                        title={isCollapsed ? (badge !== null ? `${item.label} (${badge} new)` : item.label) : ''}
-                      >
-                        <span className="relative flex-shrink-0">
-                          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary-600' : 'text-gray-500'}`} />
-                          {isCollapsed && badge !== null && (
-                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
-                          )}
-                        </span>
-                        {!isCollapsed && (
-                          <span className="text-[13px]">{item.label}</span>
-                        )}
-                        {!isCollapsed && badge !== null ? (
-                          <span className="ml-auto min-w-[20px] px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none text-center">
-                            {badge > 99 ? '99+' : badge}
-                          </span>
-                        ) : !isCollapsed && isActive && (
-                          <div className="ml-auto w-1 h-1 rounded-full bg-primary-600" />
-                        )}
-                      </Link>
-                    )
-                  })}
-                </div>
+                {isOpen && <div className="space-y-0.5">{section.items.map(renderItem)}</div>}
               </div>
             )
           })}
         </nav>
 
-        {/* User Profile Footer */}
-        <div className="border-t border-gray-200 p-2.5 flex-shrink-0 space-y-1">
-          {/* User Info with Role Badge — opens your own profile (every role) */}
+        <div className="border-t border-gray-200 px-3 py-2.5">
           <Link
-            href="/settings/profile"
-            title={isCollapsed ? 'My profile' : 'My profile — name, password, your activity'}
-            className={`
-              flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md hover:bg-gray-100 transition-colors
-              ${isCollapsed ? 'justify-center' : ''}
-            `}
+            href={SETTINGS_LINK.href}
+            aria-current={settingsActive ? 'page' : undefined}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] ${
+              settingsActive ? 'bg-primary-100/70 text-primary-800 font-medium' : 'text-gray-700 hover:bg-gray-100'
+            }`}
           >
-            <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-              <User className="w-3.5 h-3.5 text-green-700" />
-            </div>
-            {!isCollapsed && (
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-[13px] font-medium text-gray-700 truncate">
-                  {profile?.full_name || 'User'}
-                </p>
-                <span className={`inline-block px-1.5 py-0.5 text-[9px] font-medium rounded ${ROLE_COLORS[role]}`}>
-                  {ROLE_LABELS[role]}
-                </span>
-              </div>
-            )}
+            <SettingsIcon {...ICON_PROPS} className="shrink-0 text-gray-500" aria-hidden />
+            {SETTINGS_LINK.label}
           </Link>
-
-          {/* Sign Out Button */}
-          <button
-            onClick={handleSignOut}
-            className={`
-              flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md
-              text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors
-              ${isCollapsed ? 'justify-center' : ''}
-            `}
-            title={isCollapsed ? 'Sign out' : ''}
-          >
-            <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="text-[13px]">Sign out</span>
-            )}
-          </button>
         </div>
       </aside>
-
-      {/* Custom scrollbar styles */}
-      <style jsx global>{`
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 4px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background: #d1d5db;
-          border-radius: 2px;
-        }
-        .scrollbar-thin:hover::-webkit-scrollbar-thumb {
-          background: #9ca3af;
-        }
-      `}</style>
     </>
   )
 }

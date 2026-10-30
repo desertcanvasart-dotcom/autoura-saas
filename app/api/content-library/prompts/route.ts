@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 const VALID_PURPOSES = [
@@ -49,6 +50,8 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id, user } = authResult
     if (!supabase || !user) return NextResponse.json({ error: 'Auth failed' }, { status: 401 })
 
@@ -114,6 +117,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed' }, { status: 401 })
 
@@ -155,6 +160,8 @@ export async function DELETE(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed' }, { status: 401 })
 

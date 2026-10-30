@@ -3,9 +3,7 @@ import { isLive } from '@/lib/billing/subscription-sync'
 
 import { useState, useEffect } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
-import Link from 'next/link'
 import {
-  ArrowLeft,
   Check,
   AlertCircle,
   Loader2,
@@ -110,12 +108,7 @@ export default function BillingPlansPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-lg font-semibold text-gray-900">Choose Your Plan</h1>
-          </div>
-        </div>
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 text-[#647C47] animate-spin" />
         </div>
@@ -124,22 +117,12 @@ export default function BillingPlansPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link
-            href="/settings/billing"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-3"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Billing
-          </Link>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">Choose Your Plan</h1>
-              <p className="text-sm text-gray-500">Select the perfect plan for your business</p>
-            </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
+      {/* Toolbar */}
+      <div>
+        <div>
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <h2 className="text-base font-semibold text-gray-900">Choose your plan</h2>
 
             {/* Billing Toggle */}
             <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
@@ -173,7 +156,7 @@ export default function BillingPlansPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div>
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />

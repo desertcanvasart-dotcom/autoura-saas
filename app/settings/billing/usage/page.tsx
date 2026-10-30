@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
 import {
-  ArrowLeft,
-  TrendingUp,
   AlertCircle,
   FileText,
   Users,
@@ -113,8 +111,8 @@ export default function BillingUsagePage() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-center py-12">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
+        <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
         </div>
       </div>
@@ -125,8 +123,8 @@ export default function BillingUsagePage() {
   // flash of "access denied" on the way in.
   if (tenantMember && !isAdmin) {
     return (
-      <div className="p-6">
-        <div className="max-w-6xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
+        <div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div>
@@ -143,8 +141,8 @@ export default function BillingUsagePage() {
 
   if (error || !usage) {
     return (
-      <div className="p-6">
-        <div className="max-w-6xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
+        <div>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
@@ -158,22 +156,11 @@ export default function BillingUsagePage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
+      <div className="space-y-6">
         <div>
-          <Link
-            href="/settings/billing"
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Billing
-          </Link>
-
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-            <TrendingUp className="w-7 h-7 text-blue-600" />
-            Usage Details
-          </h1>
-          <p className="text-gray-600 mt-1">
+          <h2 className="text-base font-semibold text-gray-900">Usage details</h2>
+          <p className="text-sm text-gray-600 mt-1">
             {usage.plan
               ? `What you are using on the ${usage.plan.name} plan.`
               : 'What you are using. No active plan is attached, so nothing is being enforced.'}

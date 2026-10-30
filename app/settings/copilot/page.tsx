@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Sparkles, AlertTriangle, Zap } from 'lucide-react'
+import { Loader2, AlertTriangle, Zap } from 'lucide-react'
 
 interface Features {
   copilot_pregenerate_enabled: boolean
@@ -57,16 +57,10 @@ export default function CopilotSettingsPage() {
   const isAdmin = role === 'admin' || role === 'owner'
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-5 h-5 text-purple-600" />
-          <h1 className="text-2xl font-semibold text-gray-900">Copilot Settings</h1>
-        </div>
-        <p className="text-sm text-gray-500">
-          Workspace-level copilot behavior. {isAdmin ? 'Admin only — changes affect the whole tenant.' : 'View only — ask an admin to change these.'}
-        </p>
-      </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <p className="mb-6 text-sm text-gray-500">
+        {isAdmin ? 'Admin only — changes affect the whole tenant.' : 'View only — ask an admin to change these.'}
+      </p>
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>

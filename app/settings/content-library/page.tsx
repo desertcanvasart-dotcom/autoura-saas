@@ -184,23 +184,15 @@ export default function ContentLibraryPage() {
   const totalContent = categories.reduce((sum, cat) => sum + (cat.content_count || 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#647C47]/10 rounded-lg">
-                <Library className="w-6 h-6 text-[#647C47]" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Content Library</h1>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {totalContent} items across {categories.length} categories
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl">
+      {/* Toolbar */}
+      <div>
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-500">
+              {totalContent} items across {categories.length} categories
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
               {missingCategories.length > 0 && (
                 <button
                   onClick={addStandardCategories}
@@ -213,14 +205,14 @@ export default function ContentLibraryPage() {
                 </button>
               )}
               <Link
-                href="/content-library/rules"
+                href="/settings/writing-rules"
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <BookOpen className="w-4 h-4" />
                 Writing Rules
               </Link>
               <Link
-                href="/content-library/new"
+                href="/settings/content-library/new"
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -231,7 +223,7 @@ export default function ContentLibraryPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="pt-6">
         {/* Error Banner */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
@@ -337,7 +329,7 @@ export default function ContentLibraryPage() {
               }
             </p>
             <Link
-              href="/content-library/new"
+              href="/settings/content-library/new"
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -366,7 +358,7 @@ export default function ContentLibraryPage() {
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link
-                          href={`/content-library/${item.id}`}
+                          href={`/settings/content-library/${item.id}`}
                           className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded-lg transition-colors"
                         >
                           <Edit className="w-4 h-4" />
@@ -384,7 +376,7 @@ export default function ContentLibraryPage() {
                     </div>
 
                     {/* Title & Location */}
-                    <Link href={`/content-library/${item.id}`}>
+                    <Link href={`/settings/content-library/${item.id}`}>
                       <h3 className="font-semibold text-gray-900 mb-1 hover:text-[#647C47] transition-colors">
                         {item.name}
                       </h3>

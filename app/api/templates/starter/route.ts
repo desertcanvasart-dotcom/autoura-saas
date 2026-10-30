@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import type { TablesInsert } from '@/types/database.types'
 import { STARTER_CUSTOMER_TEMPLATES } from '@/lib/templates/starter-customer-templates'
 import { STARTER_SUPPLIER_TEMPLATES } from '@/lib/templates/starter-supplier-templates'
@@ -26,6 +27,8 @@ export async function POST() {
     if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })

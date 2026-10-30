@@ -35,6 +35,12 @@ export default function CopilotPage() {
 
   useEffect(() => { fetchThreads() }, [fetchThreads])
 
+  // The top bar's Copilot panel opens a thread here with ?thread=<id>.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('thread')
+    if (id) { setSelectedId(id); fetchDetail(id) }
+  }, [fetchDetail])
+
   useEffect(() => {
     fetch('/api/copilot/settings').then(r => r.json()).then(d => {
       if (d?.settings?.tone) setTone(d.settings.tone)

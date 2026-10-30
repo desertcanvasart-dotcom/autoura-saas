@@ -1,6 +1,7 @@
 import { orIlikeContains } from '@/lib/postgrest-search'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import type { TablesInsert } from '@/types/database.types'
 
 // GET - List all templates
@@ -61,6 +62,8 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase, tenant_id } = authResult
     if (!supabase) {

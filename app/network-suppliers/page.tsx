@@ -59,7 +59,7 @@ export default function NetworkSuppliersPage() {
 
       {off ? (
         <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {off} <Link href="/settings/tenant" className="underline">Open Settings</Link>
+          {off} <Link href="/settings/company" className="underline">Open Settings</Link>
         </div>
       ) : (
         <>

@@ -53,6 +53,6 @@ describe('the routes', () => {
   })
 
   it('the Users page says why a change was refused', () => {
-    expect(src('app/users/page.tsx')).toContain("await dialog.alert('Role not changed'")
+    expect(src('app/settings/team/page.tsx')).toContain("await dialog.alert('Role not changed'")
   })
 })

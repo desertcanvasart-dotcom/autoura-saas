@@ -48,16 +48,18 @@ describe('Copilot', () => {
 
 describe('pages a viewer does not get', () => {
   it('the Communicate pages and Documents are gated like the sidebar', () => {
-    for (const p of ['/conversations', '/concierge-briefs', '/copilot', '/copilot-knowledge', '/templates', '/documents/receipt/x']) {
+    for (const p of ['/conversations', '/concierge-briefs', '/copilot', '/settings/message-templates', '/documents/receipt/x']) {
       expect(gate(p), p).toEqual(['admin', 'manager', 'member'])
     }
-    expect(gate('/content-library/prompts')).toEqual(['admin', 'manager'])
+    // Content & AI in Settings is for managers and admins (navigation brief, 2026-10-30).
+    expect(gate('/settings/ai-prompts')).toEqual(['admin', 'manager'])
+    expect(gate('/settings/copilot-knowledge')).toEqual(['admin', 'manager'])
   })
 })
 
 describe('the Content Library', () => {
   it('a company can add the standard categories', () => {
-    const page = src('app/content-library/page.tsx')
+    const page = src('app/settings/content-library/page.tsx')
     expect(page).toContain('Object.values(CATEGORY_SCHEMAS).filter(')
     expect(page).toContain("body: JSON.stringify({ name: schema.label, slug: schema.slug, icon: schema.icon")
   })
@@ -66,6 +68,6 @@ describe('the Content Library', () => {
     const route = src('app/api/content-library/prompts/route.ts')
     expect(route).toContain(': promptVariables(user_prompt_template)')
     expect(route).toContain('updates.variables = promptVariables(updates.user_prompt_template)')
-    expect(src('app/content-library/prompts/page.tsx')).not.toContain('v{p.version}')
+    expect(src('app/settings/ai-prompts/page.tsx')).not.toContain('v{p.version}')
   })
 })

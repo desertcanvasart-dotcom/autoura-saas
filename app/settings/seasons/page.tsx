@@ -1,15 +1,14 @@
 'use client'
 
 // ============================================
-// Settings → Demand calendar (C3.1)
+// Settings → Seasonal premiums (C3.1)
 // ============================================
 // The operator's own seasons — not the suppliers'. A hotel's high season is
 // already inside its rate; this is the judgement that a date sells out and is
 // worth more, applied to the selling price after margin.
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-import { CalendarRange, Plus, Trash2, Loader2, AlertCircle, Check, X } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertCircle, Check, X } from 'lucide-react'
 import { useRole } from '@/hooks/useRole'
 
 interface SeasonDate {
@@ -114,19 +113,12 @@ export default function SeasonsPage() {
   const filtered = q ? seasons.filter(s => s.name.toLowerCase().includes(q)) : seasons
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <Link href="/settings" className="text-sm text-gray-500 hover:text-gray-700">← Settings</Link>
-        <div className="flex items-center gap-3 mt-2">
-          <CalendarRange className="w-6 h-6 text-[#647C47]" />
-          <h1 className="text-2xl font-semibold text-gray-900">Demand calendar</h1>
-        </div>
-        <p className="text-sm text-gray-500 mt-1">
-          Your own peak dates. A supplier&rsquo;s high season is already priced into their rate —
-          this is the premium you decide to charge on top, applied to the selling price after
-          your margin. A departure inside two overlapping seasons takes the higher premium.
-        </p>
-      </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <p className="mb-6 text-xs text-gray-500">
+        A supplier&rsquo;s high season is already priced into their rate — this premium is
+        applied to the selling price after your margin. A departure inside two overlapping
+        seasons takes the higher premium.
+      </p>
 
       {notice && (
         <div className={`mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm ${
@@ -142,7 +134,7 @@ export default function SeasonsPage() {
 
       {!canEdit && !loading && (
         <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
-          Viewing only — an admin or a manager can change the demand calendar.
+          Viewing only — an admin or a manager can change the seasonal premiums.
         </div>
       )}
 
@@ -152,7 +144,7 @@ export default function SeasonsPage() {
         </div>
       ) : !available ? (
         <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-          The demand calendar is not available yet (database migration pending). Pricing
+          Seasonal premiums are not available yet (database migration pending). Pricing
           runs without a premium until then.
         </div>
       ) : (

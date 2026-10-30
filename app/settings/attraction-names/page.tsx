@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, ArrowRight, Check, CheckCircle2, Loader2, Pencil, Plus, Signpost, Trash2, X } from 'lucide-react'
+import { AlertCircle, ArrowRight, Check, CheckCircle2, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 // alias-shared, NOT alias-admin: that one reaches server-only code and breaks the build.
 import { COMBO_SEPARATOR, canonicalParts, type AliasHealth, type FeeName, type UnresolvedWording } from '@/lib/pricing/alias-shared'
@@ -137,17 +137,12 @@ export default function AttractionAliasesPage() {
   const severalFees = unresolved.filter(u => u.reason === 'several_fees')
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Signpost className="w-6 h-6 text-primary-600" /> Attraction names
-        </h1>
-        <p className="text-sm text-gray-600 mt-1 max-w-3xl">
-          Your tours name a sight one way; your fee sheet may name it another. Say here which fee a wording means, and
-          every tour that uses the wording is priced from that fee. These are yours alone — they point at the names on{' '}
-          <Link href="/rates/attractions" className="text-primary-600 hover:underline">your own fee sheet</Link>, and no other agency sees them.
-        </p>
-      </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl space-y-6">
+      <p className="text-xs text-gray-500 max-w-3xl">
+        Every tour that uses a wording is priced from the fee you pick for it. These are yours alone — they point at
+        the names on{' '}
+        <Link href="/rates/attractions" className="text-primary-600 hover:underline">your own fee sheet</Link>, and no other agency sees them.
+      </p>
 
       {state === 'ready' && !canWrite && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center gap-2">

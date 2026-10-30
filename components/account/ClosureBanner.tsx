@@ -27,7 +27,7 @@ export default function ClosureBanner() {
     <div role="status" className="bg-red-600 text-white text-sm px-4 py-2 flex flex-wrap items-center gap-x-2 gap-y-1">
       <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
       <span>This company is closing: all of its data will be deleted on {date}.</span>
-      <Link href="/settings/tenant" className="underline font-medium">Export or keep it open</Link>
+      <Link href="/settings/company" className="underline font-medium">Export or keep it open</Link>
     </div>
   )
 }
