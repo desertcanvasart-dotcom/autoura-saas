@@ -167,7 +167,7 @@ export const MAIN_NAV: NavSection[] = [
     items: [
       {
         label: 'Suppliers', href: '/suppliers', icon: Truck, roles: AM,
-        match: ['/network-suppliers', '/resources', '/airport-staff'],
+        match: ['/resources', '/airport-staff'],
         keywords: ['network suppliers'],
       },
       { label: 'Rates', href: '/rates', icon: Tag, roles: AM, keywords: ['rates hub', 'rate sheets'] },
@@ -456,7 +456,7 @@ export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'New itinerary', href: '/itineraries/new', icon: Map, roles: ALL, hint: 'Itineraries' },
   { label: 'Follow-ups', href: '/tasks?type=follow-up', icon: Clock, roles: ALL, hint: 'Tasks', keywords: ['reminders'] },
   { label: 'Capacity calendar', href: '/departures?view=capacity', icon: CalendarRange, roles: A, hint: 'Departures' },
-  { label: 'Network suppliers', href: '/network-suppliers', icon: Globe, roles: AM, hint: 'Suppliers' },
+  { label: 'Network suppliers', href: '/suppliers?tab=network', icon: Globe, roles: AM, hint: 'Suppliers' },
   { label: 'Receivables', href: '/accounts-receivable', icon: ReceiptText, roles: AM, hint: 'Invoices', keywords: ['unpaid invoices'] },
   { label: 'Receipts', href: '/receipts', icon: ReceiptText, roles: ALL, hint: 'Payments & receipts' },
   { label: 'Payables', href: '/accounts-payable', icon: FileText, roles: AM, hint: 'Supplier bills', keywords: ['unpaid supplier invoices'] },

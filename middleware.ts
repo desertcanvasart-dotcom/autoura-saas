@@ -125,8 +125,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Resources page could delete suppliers.
   '/departures': ['admin', 'manager'],
   '/suppliers': ['admin', 'manager'],
-  // The supplier network search (no entry until 2026-10-30: open by URL).
-  '/network-suppliers': ['admin', 'manager'],
   '/resources': ['admin', 'manager'],
   '/airport-staff': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],
