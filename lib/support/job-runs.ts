@@ -29,6 +29,7 @@ export type JobName =
   | 'publish-sync'
   | 'service-booking-deadlines'
   | 'service-booking-done'
+  | 'client-day-reminders'
 
 export { STALE_AFTER_HOURS }
 
