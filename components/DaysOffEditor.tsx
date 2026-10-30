@@ -14,6 +14,7 @@ export default function DaysOffEditor({
   who,
   initial,
   canEdit = true,
+  extraBody,
 }: {
   /** GET (office only) / POST / DELETE endpoint. */
   url: string
@@ -21,6 +22,8 @@ export default function DaysOffEditor({
   /** Server-rendered days (the supplier page); the office loads them. */
   initial?: DayOff[]
   canEdit?: boolean
+  /** Sent with every change (the signed-in inbox names the agency). */
+  extraBody?: Record<string, unknown>
 }) {
   const [days, setDays] = useState<DayOff[]>(initial ?? [])
   const [day, setDay] = useState('')
@@ -38,7 +41,7 @@ export default function DaysOffEditor({
   const call = async (method: 'POST' | 'DELETE', body: Record<string, unknown>) => {
     setBusy(true); setError(null)
     try {
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...extraBody, ...body }) })
       const d = await res.json().catch(() => ({}))
       if (!res.ok || !d.success) { setError(d.error || 'Could not save — please try again'); return false }
       return true

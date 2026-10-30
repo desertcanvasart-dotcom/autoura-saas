@@ -61,7 +61,8 @@ describe('what the page and its link can touch', () => {
 
   it('the page lists only that supplier at that agency and 404s a switched-off link', () => {
     const page = readFileSync('app/supplier/[token]/page.tsx', 'utf8')
-    expect(page).toContain(".eq('tenant_id', link.tenant_id).eq('supplier_id', link.supplier_id)")
+    expect(page).toContain('loadSupplierAgency(db, link.tenant_id, link.supplier_id')
+    expect(readFileSync('lib/supplier-page-data.ts', 'utf8')).toContain(".eq('tenant_id', tenantId).eq('supplier_id', supplierId)")
     expect(page).toContain(".is('revoked_at', null)")
     expect(page).toContain('notFound()')
   })
