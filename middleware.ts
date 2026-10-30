@@ -154,7 +154,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/documents': ['admin', 'manager', 'member'],
   '/whatsapp-parser': ['admin', 'manager', 'member'],
   '/communications': ['admin', 'manager', 'member'],
-  '/followups': ['admin', 'manager', 'member'],
   '/tours': ['admin', 'manager', 'member'],
   // The Tour Manager edits the catalogue: managers and admins, as the sidebar.
   '/tours/manage': ['admin', 'manager'],

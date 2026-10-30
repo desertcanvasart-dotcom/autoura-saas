@@ -139,7 +139,7 @@ export const MAIN_NAV: NavSection[] = [
     key: 'operate',
     title: 'Operate',
     items: [
-      { label: 'Tasks', href: '/tasks', icon: Check, roles: ALL, match: ['/followups'], keywords: ['follow-ups', 'to do'] },
+      { label: 'Tasks', href: '/tasks', icon: Check, roles: ALL, keywords: ['follow-ups', 'to do'] },
       {
         label: 'Departures', href: '/departures', icon: CalendarDays, roles: AM,
         keywords: ['tour departures', 'capacity calendar'],
@@ -454,7 +454,7 @@ export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'B2C quotes', href: '/quotes?tab=b2c', icon: File, roles: ALL, hint: 'Quotes' },
   { label: 'B2B quotes', href: '/quotes?tab=b2b', icon: File, roles: AM, hint: 'Quotes' },
   { label: 'New itinerary', href: '/itineraries/new', icon: Map, roles: ALL, hint: 'Itineraries' },
-  { label: 'Follow-ups', href: '/followups', icon: Clock, roles: ALL, hint: 'Tasks', keywords: ['reminders'] },
+  { label: 'Follow-ups', href: '/tasks?type=follow-up', icon: Clock, roles: ALL, hint: 'Tasks', keywords: ['reminders'] },
   { label: 'Capacity calendar', href: '/departures/capacity', icon: CalendarRange, roles: A, hint: 'Departures' },
   { label: 'Network suppliers', href: '/network-suppliers', icon: Globe, roles: AM, hint: 'Suppliers' },
   { label: 'Receivables', href: '/accounts-receivable', icon: ReceiptText, roles: AM, hint: 'Invoices', keywords: ['unpaid invoices'] },

@@ -1042,7 +1042,7 @@ export default function AnalyticsPage() {
             <p className="text-xs text-gray-500 mt-1">View all clients</p>
           </Link>
           
-          <Link href="/followups" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all text-left group">
+          <Link href="/tasks?type=follow-up" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.followups }} />
