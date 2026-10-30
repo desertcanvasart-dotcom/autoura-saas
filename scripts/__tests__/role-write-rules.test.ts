@@ -164,3 +164,262 @@ describe('425: the team role rules hold in the database', () => {
     expect(await as(people.manager, invite('manager'))).toMatch(/below your own|row-level security/)
   })
 })
+
+describe('446: a service booking\'s history is append-only', () => {
+  let line: string
+  let booking: string
+
+  beforeAll(async () => {
+    booking = ((await db.query(`
+      INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date,
+                            total_days, num_travelers, total_amount, balance_due, status)
+      VALUES ('${tenant}', 'BK-446', 'Trip', DATE '2027-01-01', DATE '2027-01-05', 5, 2, 1000, 1000, 'pending_deposit')
+      RETURNING id`)).rows[0] as { id: string }).id
+    line = ((await db.query(`
+      INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status)
+      VALUES ('${tenant}', '${booking}', 'transport', 'Nile Cars', 'pending') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  const event = (to: string) => `INSERT INTO service_booking_events
+    (tenant_id, booking_id, service_booking_id, actor_kind, channel, from_status, to_status)
+    VALUES ('${tenant}', '${booking}', '${line}', 'operator', 'app', 'pending', '${to}')`
+
+  it('the team adds events; a viewer cannot', async () => {
+    expect(await as(people.owner, event('requested'))).toBeNull()
+    expect(await as(people.viewer, event('accepted'))).toMatch(/row-level security/)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(1)
+  })
+
+  it('nobody edits an event — not even the service role — and a signed-in user cannot delete one', async () => {
+    await expect(db.exec(`UPDATE service_booking_events SET to_status = 'done' WHERE service_booking_id = '${line}'`))
+      .rejects.toThrow(/append-only/)
+    await as(people.owner, `DELETE FROM service_booking_events WHERE service_booking_id = '${line}'`)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(1)
+  })
+
+  it('takes the new states; an old word is saved as its new state (447); nothing else', async () => {
+    for (const s of ['requested', 'accepted', 'assigned', 'done', 'declined', 'expired']) {
+      expect(await as(people.owner, `UPDATE booking_supplier_status SET status = '${s}' WHERE id = '${line}'`), s).toBeNull()
+    }
+    for (const [said, saved] of [['contacted', 'requested'], ['confirmed', 'accepted'], ['no_response', 'expired']]) {
+      expect(await as(people.owner, `UPDATE booking_supplier_status SET status = '${said}' WHERE id = '${line}'`), said).toBeNull()
+      expect(await count(`SELECT count(*) AS n FROM booking_supplier_status WHERE id = '${line}' AND status = '${saved}'`), said).toBe(1)
+    }
+    expect(await as(people.owner, `UPDATE booking_supplier_status SET status = 'maybe' WHERE id = '${line}'`)).toMatch(/check constraint/)
+    expect(await as(people.owner, `UPDATE booking_supplier_status SET resource_kind = 'friend' WHERE id = '${line}'`)).toMatch(/check constraint/)
+  })
+
+  it('the events go with their line', async () => {
+    await db.exec(`DELETE FROM booking_supplier_status WHERE id = '${line}'`)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(0)
+  })
+})
+
+describe('448: a supplier reply link', () => {
+  let line: string
+  let booking: string
+
+  beforeAll(async () => {
+    booking = ((await db.query(`
+      INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date,
+                            total_days, num_travelers, total_amount, balance_due, status)
+      VALUES ('${tenant}', 'BK-448', 'Trip', DATE '2027-01-01', DATE '2027-01-05', 5, 2, 1000, 1000, 'pending_deposit')
+      RETURNING id`)).rows[0] as { id: string }).id
+    line = ((await db.query(`
+      INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status)
+      VALUES ('${tenant}', '${booking}', 'transport', 'Cairo Cars', 'pending') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  const link = (token: string) => `INSERT INTO service_booking_links (tenant_id, booking_id, service_booking_id, token)
+    VALUES ('${tenant}', '${booking}', '${line}', '${token}')`
+
+  it('the team makes one; a viewer cannot', async () => {
+    expect(await as(people.viewer, link('tok-viewer'))).toMatch(/row-level security/)
+    expect(await as(people.owner, link('tok-1'))).toBeNull()
+  })
+
+  it('one active link per line; a revoked one frees the slot', async () => {
+    expect(await as(people.owner, link('tok-2'))).toMatch(/unique|duplicate/)
+    expect(await as(people.owner, `UPDATE service_booking_links SET revoked_at = NOW() WHERE token = 'tok-1'`)).toBeNull()
+    expect(await as(people.owner, link('tok-2'))).toBeNull()
+  })
+
+  it('goes with its line', async () => {
+    await db.exec(`DELETE FROM booking_supplier_status WHERE id = '${line}'`)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_links WHERE service_booking_id = '${line}'`)).toBe(0)
+  })
+})
+
+describe('449: a supplier\'s own page and their days off', () => {
+  let supplier: string
+
+  beforeAll(async () => {
+    supplier = ((await db.query(`
+      INSERT INTO suppliers (tenant_id, name) VALUES ('${tenant}', 'Giza Cars') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  const link = (token: string) => `INSERT INTO supplier_portal_links (tenant_id, supplier_id, token) VALUES ('${tenant}', '${supplier}', '${token}')`
+  const off = (day: string, by = 'supplier') => `INSERT INTO supplier_unavailable_days (tenant_id, supplier_id, day, marked_by) VALUES ('${tenant}', '${supplier}', DATE '${day}', '${by}')`
+
+  it('the team makes the link; a viewer cannot; one active link per supplier', async () => {
+    expect(await as(people.viewer, link('p-viewer'))).toMatch(/row-level security/)
+    expect(await as(people.owner, link('p-1'))).toBeNull()
+    expect(await as(people.owner, link('p-2'))).toMatch(/unique|duplicate/)
+    expect(await as(people.owner, `UPDATE supplier_portal_links SET revoked_at = NOW() WHERE token = 'p-1'`)).toBeNull()
+    expect(await as(people.owner, link('p-2'))).toBeNull()
+  })
+
+  it('a day off once per day; only supplier or office marks it; a viewer cannot', async () => {
+    expect(await as(people.owner, off('2027-02-01'))).toBeNull()
+    expect(await as(people.owner, off('2027-02-01', 'office'))).toMatch(/unique|duplicate/)
+    expect(await as(people.owner, off('2027-02-02', 'someone'))).toMatch(/check constraint/)
+    expect(await as(people.viewer, off('2027-02-03'))).toMatch(/row-level security/)
+  })
+
+  it('both go with their supplier', async () => {
+    await db.exec(`DELETE FROM suppliers WHERE id = '${supplier}'`)
+    expect(await count(`SELECT count(*) AS n FROM supplier_portal_links WHERE supplier_id = '${supplier}'`)).toBe(0)
+    expect(await count(`SELECT count(*) AS n FROM supplier_unavailable_days WHERE supplier_id = '${supplier}'`)).toBe(0)
+  })
+})
+
+describe('450: supplier accounts are never tenant users', () => {
+  let supplier: string
+  let account: string
+
+  /** Count rows as a signed-in user, through RLS. */
+  const countAs = (userId: string, sql: string) => db.transaction(async tx => {
+    await tx.exec(`SET LOCAL ROLE authenticated; SELECT set_config('test.uid', '${userId}', true);`)
+    const r = await tx.query(sql)
+    return Number((r.rows[0] as { n: number }).n)
+  })
+
+  beforeAll(async () => {
+    supplier = ((await db.query(`INSERT INTO suppliers (tenant_id, name) VALUES ('${tenant}', 'Aswan Boats') RETURNING id`)).rows[0] as { id: string }).id
+    account = ((await db.query(`INSERT INTO supplier_accounts (phone) VALUES ('201001234567') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  it('accounts, codes and sessions: nobody signed in sees or writes them — not even the owner', async () => {
+    expect(await as(people.owner, `INSERT INTO supplier_accounts (phone) VALUES ('201009999999')`)).toMatch(/row-level security/)
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_accounts`)).toBe(0)
+    await db.exec(`INSERT INTO supplier_sessions (account_id, token_hash, expires_at) VALUES ('${account}', 'h1', NOW() + interval '1 day')`)
+    await db.exec(`INSERT INTO supplier_login_codes (account_id, code_hash, channel, sent_to, expires_at) VALUES ('${account}', 'c1', 'email', 'a@b.c', NOW() + interval '10 minutes')`)
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_sessions`)).toBe(0)
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_login_codes`)).toBe(0)
+  })
+
+  it('a phone is international digits, once', async () => {
+    await expect(db.exec(`INSERT INTO supplier_accounts (phone) VALUES ('+201001234567')`)).rejects.toThrow(/check constraint/)
+    await expect(db.exec(`INSERT INTO supplier_accounts (phone) VALUES ('201001234567')`)).rejects.toThrow(/unique|duplicate/)
+  })
+
+  it('the agency sees and decides its claims but never creates one; a viewer cannot decide', async () => {
+    const claim = `INSERT INTO supplier_account_links (account_id, tenant_id, supplier_id) VALUES ('${account}', '${tenant}', '${supplier}')`
+    expect(await as(people.owner, claim)).toMatch(/row-level security/)
+    await db.exec(claim)
+    expect(await countAs(people.manager, `SELECT count(*) AS n FROM supplier_account_links WHERE supplier_id = '${supplier}'`)).toBe(1)
+    await as(people.viewer, `UPDATE supplier_account_links SET status = 'approved' WHERE supplier_id = '${supplier}'`)
+    expect(await count(`SELECT count(*) AS n FROM supplier_account_links WHERE supplier_id = '${supplier}' AND status = 'approved'`)).toBe(0)
+    expect(await as(people.owner, `UPDATE supplier_account_links SET status = 'approved' WHERE supplier_id = '${supplier}'`)).toBeNull()
+    expect(await as(people.owner, `UPDATE supplier_account_links SET status = 'maybe' WHERE supplier_id = '${supplier}'`)).toMatch(/check constraint/)
+  })
+
+  it('a supplier record is approved for one account only', async () => {
+    const other = ((await db.query(`INSERT INTO supplier_accounts (phone) VALUES ('201007654321') RETURNING id`)).rows[0] as { id: string }).id
+    await expect(db.exec(`INSERT INTO supplier_account_links (account_id, tenant_id, supplier_id, status) VALUES ('${other}', '${tenant}', '${supplier}', 'approved')`))
+      .rejects.toThrow(/unique|duplicate/)
+    await db.exec(`INSERT INTO supplier_account_links (account_id, tenant_id, supplier_id) VALUES ('${other}', '${tenant}', '${supplier}')`)
+  })
+
+  it('removing the account removes its claims, codes and sessions', async () => {
+    await db.exec(`DELETE FROM supplier_accounts WHERE id = '${account}'`)
+    for (const t of ['supplier_account_links', 'supplier_login_codes', 'supplier_sessions']) {
+      expect(await count(`SELECT count(*) AS n FROM ${t} WHERE account_id = '${account}'`), t).toBe(0)
+    }
+  })
+})
+
+describe('451: lines never borrow the service name as a supplier', () => {
+  it('moves the service into the description and leaves own cars/guides and real suppliers alone', async () => {
+    const booking = ((await db.query(`
+      INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date, total_days, num_travelers, total_amount, balance_due, status)
+      VALUES ('${tenant}', 'BK-451', 'Trip', DATE '2027-01-01', DATE '2027-01-05', 5, 2, 1000, 1000, 'pending_deposit') RETURNING id`)).rows[0] as { id: string }).id
+    const svc = '00000000-0000-0000-0000-000000000451'
+    const ins = (name: string, kind: string, desc: string | null) => db.query(`
+      INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status, resource_kind, service_description)
+      VALUES ('${tenant}', '${booking}', 'transport', '${name}', 'pending', '${kind}', ${desc ? `'${desc}'` : 'NULL'}) RETURNING id`)
+    const borrowed = ((await ins('day_tour sedan Cairo', 'supplier', null)).rows[0] as { id: string }).id
+    const own = ((await ins('Toyota Hiace', 'own', null)).rows[0] as { id: string }).id
+    // itinerary_service_id is what marks a line built from the itinerary; set without the FK check.
+    await db.exec(`ALTER TABLE booking_supplier_status DISABLE TRIGGER ALL;
+      UPDATE booking_supplier_status SET itinerary_service_id = '${svc}' WHERE id IN ('${borrowed}', '${own}');
+      ALTER TABLE booking_supplier_status ENABLE TRIGGER ALL;`)
+    await db.exec(readFileSync(path.join(MIGRATIONS_DIR, '451_service_lines_no_borrowed_supplier.sql'), 'utf8'))
+    const row = async (id: string) => (await db.query(`SELECT supplier_name, service_description FROM booking_supplier_status WHERE id = '${id}'`)).rows[0]
+    expect(await row(borrowed)).toEqual({ supplier_name: '', service_description: 'day_tour sedan Cairo' })
+    expect(await row(own)).toEqual({ supplier_name: 'Toyota Hiace', service_description: null })
+  })
+})
+
+describe('452: older lines that borrowed a service name as their supplier', () => {
+  it('moves an exact trip-service name into the description; hotels, own cars and other names untouched', async () => {
+    const trip = ((await db.query(`INSERT INTO itineraries (tenant_id, itinerary_code, client_name, start_date, end_date, status)
+      VALUES ('${tenant}', 'ITN-452', 'Test', DATE '2027-02-01', DATE '2027-02-03', 'confirmed') RETURNING id`)).rows[0] as { id: string }).id
+    const day = ((await db.query(`INSERT INTO itinerary_days (itinerary_id, day_number, date) VALUES ('${trip}', 1, DATE '2027-02-01') RETURNING id`)).rows[0] as { id: string }).id
+    await db.query(`INSERT INTO itinerary_services (itinerary_id, day_id, service_type, service_name) VALUES ('${trip}', '${day}', 'transportation', 'airport_transfer sedan Cairo'), ('${trip}', '${day}', 'accommodation', 'Marriott Mena House | Cairo')`)
+    const booking = ((await db.query(`INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date, total_days, num_travelers, total_amount, balance_due, status, itinerary_id)
+      VALUES ('${tenant}', 'BK-452', 'Trip', DATE '2027-02-01', DATE '2027-02-03', 3, 2, 1000, 1000, 'pending_deposit', '${trip}') RETURNING id`)).rows[0] as { id: string }).id
+    const ins = async (type: string, name: string, kind = 'supplier') => ((await db.query(`INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status, resource_kind)
+      VALUES ('${tenant}', '${booking}', '${type}', '${name}', 'accepted', '${kind}') RETURNING id`)).rows[0] as { id: string }).id
+    const borrowed = await ins('transport', 'airport_transfer sedan Cairo')
+    const hotel = await ins('hotel', 'Marriott Mena House | Cairo')
+    const realName = await ins('transport', 'Cairo Limo Co')
+    const own = await ins('transport', 'airport_transfer sedan Cairo', 'own')
+    await db.exec(readFileSync(path.join(MIGRATIONS_DIR, '452_older_lines_no_borrowed_supplier.sql'), 'utf8'))
+    const row = async (id: string) => (await db.query(`SELECT supplier_name, service_description FROM booking_supplier_status WHERE id = '${id}'`)).rows[0]
+    expect(await row(borrowed)).toEqual({ supplier_name: '', service_description: 'airport_transfer sedan Cairo' })
+    expect(await row(hotel)).toEqual({ supplier_name: 'Marriott Mena House | Cairo', service_description: null })
+    expect(await row(realName)).toEqual({ supplier_name: 'Cairo Limo Co', service_description: null })
+    expect(await row(own)).toEqual({ supplier_name: 'airport_transfer sedan Cairo', service_description: null })
+  })
+})
+
+describe('453: the shared network — profiles found only when listed and verified', () => {
+  const countAs = (userId: string, sql: string) => db.transaction(async tx => {
+    await tx.exec(`SET LOCAL ROLE authenticated; SELECT set_config('test.uid', '${userId}', true);`)
+    const r = await tx.query(sql)
+    return Number((r.rows[0] as { n: number }).n)
+  })
+  let a: string, b: string, c: string
+
+  beforeAll(async () => {
+    const acc = async (phone: string) => ((await db.query(`INSERT INTO supplier_accounts (phone) VALUES ('${phone}') RETURNING id`)).rows[0] as { id: string }).id
+    a = await acc('201000000453'); b = await acc('201000000454'); c = await acc('201000000455')
+    await db.exec(`INSERT INTO supplier_network_profiles (account_id, display_name, listed, verification_status) VALUES
+      ('${a}', 'Listed and verified', true, 'verified'),
+      ('${b}', 'Verified, not listed', false, 'verified'),
+      ('${c}', 'Listed, pending', true, 'pending')`)
+    await db.exec(`INSERT INTO supplier_network_documents (account_id, kind, title, storage_path) VALUES ('${a}', 'licence', 'Licence', 'k/licence.pdf')`)
+  })
+
+  it('an agency user finds only listed AND verified profiles, and writes none', async () => {
+    expect(await countAs(people.viewer, `SELECT count(*) AS n FROM supplier_network_profiles`)).toBe(1)
+    expect(await as(people.owner, `INSERT INTO supplier_network_profiles (account_id, display_name) VALUES ('${a}', 'Hijack')`)).toMatch(/row-level security|duplicate/)
+    await as(people.owner, `UPDATE supplier_network_profiles SET verification_status = 'verified', listed = true WHERE account_id = '${c}'`)
+    expect(await count(`SELECT count(*) AS n FROM supplier_network_profiles WHERE account_id = '${c}' AND verification_status = 'pending'`)).toBe(1)
+  })
+
+  it('papers are invisible to every signed-in user', async () => {
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_network_documents`)).toBe(0)
+  })
+
+  it('sourcing is own by default and only own / network / both', async () => {
+    expect(await count(`SELECT count(*) AS n FROM tenants WHERE id = '${tenant}' AND supplier_sourcing = 'own'`)).toBe(1)
+    await expect(db.exec(`UPDATE tenants SET supplier_sourcing = 'everything' WHERE id = '${tenant}'`)).rejects.toThrow(/check constraint/)
+  })
+
+  it('one copy of a network supplier per agency', async () => {
+    await db.exec(`INSERT INTO suppliers (tenant_id, name, network_account_id) VALUES ('${tenant}', 'Copy 1', '${a}')`)
+    await expect(db.exec(`INSERT INTO suppliers (tenant_id, name, network_account_id) VALUES ('${tenant}', 'Copy 2', '${a}')`)).rejects.toThrow(/unique|duplicate/)
+  })
+})

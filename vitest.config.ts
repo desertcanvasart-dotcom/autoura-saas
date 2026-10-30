@@ -12,6 +12,8 @@ export default defineConfig({
       // Cron entrypoints: spawned as real processes so their EXIT CODES are
       // asserted — that is the only signal Railway records.
       'scripts/**/__tests__/**/*.test.ts',
+      // The Publish site renderer (a second Next app, docs/publish/PLAN.md D1).
+      'sites/**/__tests__/**/*.test.{ts,tsx}',
     ],
     // Determinism is part of what we assert; keep timers/dates real but stable.
     clearMocks: true,

@@ -21,6 +21,18 @@ export const SELF_AUTH_API_PREFIXES = [
   // Staff tap-event endpoint: the token in the path IS the auth (drivers
   // have no login). The route 404s invalid/revoked tokens itself.
   '/api/staff/',
+  // Supplier reply endpoint (448): same shape — the unrevoked, unexpired
+  // reply token in the path IS the auth (suppliers have no login).
+  '/api/reply/',
+  // Supplier page endpoints (449): same shape — the unrevoked supplier-page
+  // token in the path IS the auth; the line must be that supplier's.
+  '/api/supplier-page/',
+  // Supplier sign-in (450): open by design — a phone + emailed code, or the
+  // supplier session cookie checked by hash; suppliers have no app login.
+  '/api/supplier-auth/',
+  // The signed-in supplier's inbox (450): the supplier session cookie, checked
+  // by hash, and only agencies that confirmed the account (approved claims).
+  '/api/supplier-account/',
   // Traveller report endpoint on the share page: same shape — the unrevoked
   // share token in the path IS the auth. The route 404s anything else.
   '/api/share/',
@@ -30,6 +42,8 @@ export const SELF_AUTH_API_PREFIXES = [
   '/api/portal/',
   '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief, departure mirror)
   '/api/integrations/',     // server-to-server feeds; verifies SAWA_SYNC_SECRET inside the handler
+  '/api/publish/internal/', // the Publish site renderer → us; verifies PUBLISH_INTERNAL_SECRET inside the handler
+  '/api/publish/feed/',     // agencies' developers → us; verifies the site's feed key (hash) inside the handler
   '/api/auth/',             // login / signup / OAuth callbacks (no session yet)
   '/api/cron/',             // cron-job-only, verifies CRON_SECRET inside the handler
   '/api/version',           // deploy-verification probe: public by design, sha+uptime only
@@ -122,6 +136,9 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // from viewers, but a viewer with the link got in (no entry here = open).
   '/conversations': ['admin', 'manager', 'member'],
   '/concierge-briefs': ['admin', 'manager', 'member'],
+  // Publish: everyone who works reads and drafts; the API lets only managers
+  // approve and publish (lib/publish/admin-route.ts).
+  '/publish': ['admin', 'manager', 'member'],
   '/copilot': ['admin', 'manager', 'member'],
   '/copilot-knowledge': ['admin', 'manager', 'member'],
   '/templates': ['admin', 'manager', 'member'],
@@ -238,6 +255,18 @@ export async function middleware(request: NextRequest) {
     // page 404s any token that does not resolve to an active staff_link
     // (app/staff/[token]/page.tsx).
     '/staff',
+    // Supplier reply pages (448) — token-gated, service-role lookup, page
+    // 404s any token that does not resolve to a live service_booking_link
+    // (app/reply/[token]/page.tsx).
+    '/reply',
+    // A supplier's own page (449) — token-gated, service-role lookup, page
+    // 404s any token that does not resolve to an unrevoked supplier_portal_link
+    // (app/supplier/[token]/page.tsx).
+    '/supplier',
+    // Supplier sign-in and their signed-in home (450): the home checks the
+    // supplier session cookie itself and redirects to sign-in without one.
+    '/supplier-login',
+    '/supplier-home',
     // Customer portal pages (C1a) — token-gated, service-role lookup, and a
     // confirmation-gate cookie before any booking data renders
     // (app/portal/[token]/page.tsx).

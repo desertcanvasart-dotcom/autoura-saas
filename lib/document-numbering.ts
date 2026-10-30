@@ -49,6 +49,10 @@ interface NextDocumentNumberOpts {
   column: string
   /** Optional override for the year (defaults to current year). */
   year?: number
+  /** Scope the scan to this company. Required when `supabase` is a
+   *  service-role client (e.g. a supplier answering by link, with no
+   *  session); harmless with an RLS client. */
+  tenantId?: string
 }
 
 /**
@@ -87,9 +91,9 @@ export async function nextDocumentNumber(opts: NextDocumentNumberOpts): Promise<
   // invoices failed for the rest of the year.
   const likeNeedle = `${opts.prefix}-${year}-%`
   const { data: rows, error: scanError } = await fetchAllPages<Record<string, unknown>, { message: string }>((from, to) =>
-    opts.supabase
-      .from(opts.table)
-      .select(opts.column)
+    (opts.tenantId
+      ? opts.supabase.from(opts.table).select(opts.column).eq('tenant_id', opts.tenantId)
+      : opts.supabase.from(opts.table).select(opts.column))
       .like(opts.column, likeNeedle)
       .order('id')
       .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,

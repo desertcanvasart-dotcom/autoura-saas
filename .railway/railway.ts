@@ -77,6 +77,21 @@ export default defineRailway(() => {
       GOOGLE_CLIENT_SECRET: preserve(),
       GOOGLE_REDIRECT_URI: preserve(),
       NEXT_PUBLIC_APP_URL: preserve(),
+      // Publish (docs/publish/PLAN.md): the renderer's internal API secret, and
+      // where/how the sync worker reaches the renderer.
+      PUBLISH_INTERNAL_SECRET: preserve(),
+      PUBLISH_INTERNAL_SECRET_PREVIOUS: preserve(),
+      PUBLISH_RENDERER_URL: preserve(),
+      PUBLISH_REVALIDATE_SECRET: preserve(),
+      // Agencies' own domains (step 11): Railway's API, and the publish-sites
+      // service the domains are added to; our domain for free addresses.
+      RAILWAY_API_TOKEN: preserve(),
+      RAILWAY_PUBLISH_PROJECT_ID: preserve(),
+      RAILWAY_PUBLISH_ENVIRONMENT_ID: preserve(),
+      RAILWAY_PUBLISH_SERVICE_ID: preserve(),
+      PUBLISH_SITES_BASE_DOMAIN: preserve(),
+      // Agencies' Google reviews on their websites (Places API).
+      GOOGLE_MAPS_API_KEY: preserve(),
       // Added in the dashboard, never written here — an apply without these
       // three would DELETE them from the live site (caught 2026-09-24).
       NEXT_PUBLIC_GROWTH_WIDGET_URL: preserve(),
@@ -173,7 +188,43 @@ export default defineRailway(() => {
     },
   });
 
+  // Publish sync: each product, rate, departure, company or exchange-rate
+  // change refreshes the Publish pages that show it, and each enrolled
+  // company's sync health is recorded and alerted on (docs/publish/PLAN.md §5).
+  // Every 5 minutes — the promised revalidation window.
+  const cronPublishSync = service("cron:publish-sync", {
+    source: autouraSaas,
+    build: "",
+    start: "npm run cron:publish-sync",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    deploy: { cronSchedule: "*/5 * * * *", restartPolicyType: "NEVER" },
+    networking: { privateNetworkEndpoint: "publish-sync-cron" },
+    env: {
+      CRON_TARGET_URL: preserve(),
+      CRON_SECRET: preserve(),
+    },
+  });
+
+  // Publish site renderer (sites/, docs/publish/PLAN.md D1): every company's
+  // website, by hostname. Data only through the web service's internal API —
+  // no database credentials here. Agency domains are added to THIS service
+  // (step 11). No healthcheck path yet: every path is a company site, so a
+  // probe from Railway's own hostname is an unknown host (404) by design.
+  const publishSites = service("publish-sites", {
+    source: autouraSaas,
+    build: "npm run sites:build",
+    start: "npm run sites:start",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    networking: { privateNetworkEndpoint: "publish-sites" },
+    env: {
+      PUBLISH_APP_URL: preserve(),
+      PUBLISH_INTERNAL_SECRET: preserve(),
+      PUBLISH_REVALIDATE_SECRET: preserve(),
+      PUBLISH_REVALIDATE_SECRET_PREVIOUS: preserve(),
+    },
+  });
+
   return project("Autoura multi-tenant", {
-    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend],
+    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts, cronScheduledSend, cronPublishSync, publishSites],
   });
 });

@@ -37,7 +37,7 @@
 import { citiesFarApart } from '@/lib/pricing/day-trip'
 import { resolveCityCoordinates } from '@/lib/constants/egypt-city-coordinates'
 
-export type DocCategory = 'meals' | 'entrance' | 'assistance'
+export type DocCategory = 'meals' | 'entrance' | 'assistance' | 'activities' | 'other'
 
 export interface ServiceMapping {
   docType: string | null
@@ -72,27 +72,68 @@ export const SERVICE_TO_DOC_TYPE: Record<string, ServiceMapping> = {
   tips: { docType: null },
   tip: { docType: null },
   flight: { docType: null },
-  other: { docType: null },
   supplies: { docType: null },
   water: { docType: null },
   service_fee: { docType: null },
+  // Anything else the trip pays a supplier for. 'other' is what the Pricing
+  // Grid saves for its experiences, boat rides and extras — and its water and
+  // hotel assist, which its slot tag sorts out first (docMappingFor).
+  other: { docType: 'service_order', category: 'other' },
+  extra: { docType: 'service_order', category: 'other' },
 }
 
-const GRID_ASSISTANCE = /^\[pricing-grid:(airport_services|hotel_services)\]/
+/** Why a line goes on no document, for the documents page. */
+export const NO_DOCUMENT_REASON: Record<string, string> = {
+  tips: 'Tips are paid on the day',
+  tip: 'Tips are paid on the day',
+  tipping: 'Tips are paid on the day',
+  water: 'Water and supplies are bought by the team',
+  supplies: 'Water and supplies are bought by the team',
+  flight: 'Flights are ticketed by the airline',
+  flights: 'Flights are ticketed by the airline',
+  service_fee: 'An agency fee, not a supplier service',
+}
 
-/** What a service line goes on; undefined / docType null = no document. */
-export function docMappingFor(service: { service_type?: string | null; description?: string | null }): ServiceMapping | undefined {
-  // The grid saves a cruise as 'accommodation' (its slot tag says cruise) —
-  // that is a cruise voucher, not a hotel voucher.
-  const description = String(service.description ?? '')
-  if (description.startsWith('[pricing-grid:cruise]')) return SERVICE_TO_DOC_TYPE.cruise
-  // The grid saves its airport services as 'transfer' and its hotel services
-  // (check-in / check-out assist, porters) as 'other'. Typed by the type alone,
-  // the airport meet & assist went on the driver's transport voucher and the
-  // hotel assist on no document (live ITN-S-2026-8987). Both are the meet &
-  // assist representative's.
-  if (GRID_ASSISTANCE.test(description)) return SERVICE_TO_DOC_TYPE.airport_service
-  return service.service_type ? SERVICE_TO_DOC_TYPE[service.service_type] : undefined
+const GRID_SLOT = /^\[pricing-grid:([a-z_]+)\]/
+
+// The Pricing Grid saves several slots under one generic type — 'other' for
+// experiences, boat rides, extras, water and hotel assist; 'transfer' for
+// airport services; 'accommodation' for a cruise — so its slot tag says what
+// a line really is. Read by type alone, the experiences and boat rides went
+// on no document at all, and nothing said so.
+const BY_GRID_SLOT: Record<string, ServiceMapping> = {
+  cruise: { docType: 'cruise_voucher' },
+  airport_services: { docType: 'service_order', category: 'assistance' },
+  hotel_services: { docType: 'service_order', category: 'assistance' },
+  experiences: { docType: 'service_order', category: 'activities' },
+  boat_rides: { docType: 'service_order', category: 'activities' },
+  other_group: { docType: 'service_order', category: 'other' },
+  other_pp: { docType: 'service_order', category: 'other' },
+  water: { docType: null },
+  tipping: { docType: null },
+  flights: { docType: null },
+}
+
+/** The Pricing Grid slot a line was saved from, if any. */
+export const gridSlot = (service: { description?: string | null }): string | null =>
+  String(service.description ?? '').match(GRID_SLOT)?.[1] ?? null
+
+/** What a service line goes on; docType null = no document, on purpose. A
+ *  type nobody listed goes on Other Services, where it is seen — never
+ *  nowhere. */
+export function docMappingFor(service: { service_type?: string | null; description?: string | null }): ServiceMapping {
+  const slot = gridSlot(service)
+  if (slot && BY_GRID_SLOT[slot]) return BY_GRID_SLOT[slot]
+  const type = String(service.service_type ?? '').trim().toLowerCase()
+  return SERVICE_TO_DOC_TYPE[type] ?? { docType: 'service_order', category: 'other' }
+}
+
+/** Why a line goes on no document (tips, water, a flight…), or null. */
+export function noDocumentReason(service: { service_type?: string | null; description?: string | null }): string | null {
+  if (docMappingFor(service).docType) return null
+  const slot = gridSlot(service)
+  const type = String(service.service_type ?? '').trim().toLowerCase()
+  return (slot && NO_DOCUMENT_REASON[slot]) || NO_DOCUMENT_REASON[type] || 'Not a supplier service'
 }
 
 const clean = (s: unknown): string => String(s ?? '').trim()

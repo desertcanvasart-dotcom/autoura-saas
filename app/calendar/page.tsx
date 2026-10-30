@@ -53,6 +53,7 @@ import {
 } from '@dnd-kit/core'
 import { showToast } from '@/app/contexts/ToastContext'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
+import type { TripCoverage } from '@/lib/bookings/service-coverage'
 
 interface BookingResource {
   id: string
@@ -78,6 +79,8 @@ interface Booking {
   assigned_vehicle_id?: string | null
   guide_name?: string
   vehicle_name?: string
+  /** Supplier service lines for the trip (lib/bookings/service-coverage). */
+  coverage?: TripCoverage | null
   resources: BookingResource[]
 }
 
@@ -174,19 +177,23 @@ export default function CalendarPage() {
 
   const fetchData = async () => {
     try {
-      const [bookingsResponse, resourcesResponse, guidesResponse, vehiclesResponse] = await Promise.all([
+      const [bookingsResponse, resourcesResponse, guidesResponse, vehiclesResponse, coverageResponse] = await Promise.all([
         fetch('/api/itineraries'),
         fetch('/api/itinerary-resources'),
         fetch('/api/guides?is_active=true'),
         fetch('/api/resources/vehicles?is_active=true'),
+        fetch('/api/service-bookings/coverage'),
       ])
 
-      const [bookingsData, resourcesData, guidesData, vehiclesData] = await Promise.all([
+      const [bookingsData, resourcesData, guidesData, vehiclesData, coverageData] = await Promise.all([
         bookingsResponse.json(),
         resourcesResponse.json(),
         guidesResponse.json(),
         vehiclesResponse.json(),
+        coverageResponse.json().catch(() => ({})),
       ])
+      // Supplier lines per trip; the calendar still works without them.
+      const coverage: Record<string, TripCoverage> = coverageData?.success ? coverageData.data : {}
 
       if (guidesData.success) setGuides(guidesData.data)
       if (vehiclesData.success) setVehicles(vehiclesData.data)
@@ -226,6 +233,7 @@ export default function CalendarPage() {
               payment_status: b.payment_status || 'not_paid',
               guide_name: guide?.resource_name || null,
               vehicle_name: vehicle?.resource_name || null,
+              coverage: coverage[b.id] ?? null,
             }
           })
         setBookings(validBookings)
@@ -1011,6 +1019,7 @@ export default function CalendarPage() {
                   tripName={assignBooking.itinerary_code}
                   onUpdate={fetchData}
                 />
+                {assignBooking.coverage && <TripSupplierLines coverage={assignBooking.coverage} />}
               </div>
             </div>
           </div>
@@ -1185,6 +1194,7 @@ function DraggableBooking({ booking, getStatusColor, conflicts, onSelect }: any)
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {booking.guide_name && <span className="flex items-center gap-0.5" title={booking.guide_name}><User className="w-3 h-3" /></span>}
           {booking.vehicle_name && <span className="flex items-center gap-0.5" title={booking.vehicle_name}><Car className="w-3 h-3" /></span>}
+          <CoverageBadge coverage={booking.coverage} />
         </div>
       </div>
       <div className="text-xs opacity-90 truncate">{booking.itinerary_code}</div>
@@ -1257,6 +1267,7 @@ function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getSta
                             {booking.vehicle_name.split(' ')[0]}
                           </span>
                         )}
+                        <CoverageBadge coverage={booking.coverage} />
                       </div>
                       {conflicts.includes(booking.id) && (
                         <div className="flex items-center gap-1 mt-1.5 text-xs">
@@ -1342,6 +1353,7 @@ function TimelineView({ bookings, conflicts, getStatusColor, onSelectBooking }: 
                       <span>{booking.itinerary_code}</span>
                       {booking.guide_name && <span className="flex items-center gap-0.5" title={booking.guide_name}><User className="w-3 h-3" /></span>}
                       {booking.vehicle_name && <span className="flex items-center gap-0.5" title={booking.vehicle_name}><Car className="w-3 h-3" /></span>}
+          <CoverageBadge coverage={booking.coverage} />
                     </div>
                   </div>
                 </div>
@@ -1481,6 +1493,58 @@ function ConfirmMoveModal({ booking, newDate, conflicts = [], onConfirm, onCance
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+/** "3/5" — the trip's supplier lines covered; amber when one within 2 days still needs someone. */
+function CoverageBadge({ coverage }: { coverage?: TripCoverage | null }) {
+  if (!coverage || coverage.total === 0) return null
+  const all = coverage.covered === coverage.total
+  return (
+    <span
+      title={`Suppliers: ${coverage.covered} of ${coverage.total} covered${coverage.waiting ? `, ${coverage.waiting} waiting for an answer` : ''}${coverage.open ? `, ${coverage.open} to arrange` : ''}`}
+      className={`px-1 rounded text-[10px] font-semibold leading-4 ${all ? 'bg-white/25' : coverage.attention ? 'bg-amber-300 text-amber-950' : 'bg-white/40'}`}
+    >
+      {coverage.covered}/{coverage.total}
+    </span>
+  )
+}
+
+const LINE_STYLE: Record<string, string> = {
+  accepted: 'text-green-700', assigned: 'text-green-700', done: 'text-green-800',
+  requested: 'text-blue-700', pending: 'text-gray-600', declined: 'text-red-700', expired: 'text-amber-700',
+}
+
+/** The trip's supplier lines in the calendar's trip window, with a link to work on them. */
+function TripSupplierLines({ coverage }: { coverage: TripCoverage }) {
+  return (
+    <div className="mt-6 border-t border-gray-200 pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-semibold text-gray-900">
+          Suppliers · {coverage.covered} of {coverage.total} covered
+        </h4>
+        <Link href={`/bookings/${coverage.booking_id}?tab=suppliers`} className="text-xs text-primary-600 hover:underline">
+          Open the booking’s suppliers →
+        </Link>
+      </div>
+      {coverage.attention && (
+        <p className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 mb-2">A service within the next 2 days still needs someone.</p>
+      )}
+      <ul className="divide-y divide-gray-100 text-xs">
+        {coverage.lines.map(l => (
+          <li key={l.id} className="py-1.5 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-gray-900 truncate">
+                {l.date ? format(parseISO(l.date), 'MMM d') : '—'}{l.time ? ` ${l.time}` : ''} · {l.what}
+              </div>
+              <div className="text-gray-500 truncate">
+                {l.supplier}{l.own ? ' (your team)' : ''}{l.named ? ` · ${l.named}` : ''}
+              </div>
+            </div>
+            <span className={`flex-shrink-0 font-medium ${LINE_STYLE[l.status] ?? 'text-gray-600'}`}>{l.label}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

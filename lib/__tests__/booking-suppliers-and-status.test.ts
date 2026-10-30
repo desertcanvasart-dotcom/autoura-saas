@@ -12,32 +12,35 @@ import { checkStatusChange, normalizeStatusChoice, statusChoiceOf } from '@/lib/
 const svc = (o: Partial<ServiceForSupplier>): ServiceForSupplier => ({ day_number: 1, ...o })
 
 describe('which lines need a supplier', () => {
-  it('tips, water, supplies, fees and "other" are left off', () => {
-    for (const t of ['tip', 'tips', 'water', 'supplies', 'service_fee', 'other', null, 'nonsense']) {
+  it('tips, water, supplies, fees, tickets and "other" are left off', () => {
+    for (const t of ['tip', 'tips', 'water', 'supplies', 'service_fee', 'other', 'entrance_fee', 'ticket', null, 'nonsense']) {
       expect(supplierTypeFor(t)).toBeNull()
     }
     expect(supplierTypeFor('transportation')).toBe('transport')
-    expect(supplierTypeFor('entrance_fee')).toBe('entrance')
     expect(supplierTypeFor('accommodation')).toBe('hotel')
   })
 
-  it('ITN-S-2026-6386 shape: 11 water lines vanish; one row per supplier per day', () => {
+  it('ITN-S-2026-6386 shape: water and tickets vanish; one row per service line (446)', () => {
     const services: ServiceForSupplier[] = [
       ...Array.from({ length: 11 }, (_, i) => svc({ service_type: 'other', service_name: 'Other (Per Person)', day_number: i + 1 })),
-      svc({ service_type: 'transportation', service_name: 'airport_transfer sedan Cairo', total_cost: 94.67, day_number: 1 }),
-      svc({ service_type: 'transfer', service_name: 'full_service CAI', total_cost: 11.83, day_number: 1 }),
-      svc({ service_type: 'entrance_fee', service_name: 'Bab Zuwaila', total_cost: 10.14, day_number: 2 }),
-      // the same linked supplier twice on one day → one row, costs summed
-      svc({ service_type: 'transportation', supplier_id: 's1', supplier_name: 'Cairo Transport', total_cost: 40, day_number: 3 }),
-      svc({ service_type: 'transportation', supplier_id: 's1', supplier_name: 'Cairo Transport Co', total_cost: 10, day_number: 3 }),
+      svc({ id: 'a', service_type: 'transportation', service_name: 'airport_transfer sedan Cairo', total_cost: 94.67, day_number: 1, pickup_time: '14:30:00', pickup_location: 'CAI T2' }),
+      svc({ id: 'b', service_type: 'transfer', service_name: 'full_service CAI', total_cost: 11.83, day_number: 1 }),
+      svc({ id: 'c', service_type: 'entrance_fee', service_name: 'Bab Zuwaila', total_cost: 10.14, day_number: 2 }),
+      // the same supplier twice on one day → two lines, each its own booking
+      svc({ id: 'd', service_type: 'transportation', supplier_id: 's1', supplier_name: 'Cairo Transport', service_name: 'Hotel → Giza', total_cost: 40, day_number: 3 }),
+      svc({ id: 'e', service_type: 'transportation', supplier_id: 's1', supplier_name: 'Cairo Transport', service_name: 'Giza → Hotel', total_cost: 10, day_number: 3 }),
     ]
-    const lines = supplierLinesFromServices(services, '2026-11-01')
-    expect(lines.map(l => [l.service_date, l.supplier_name, l.quoted_cost])).toEqual([
-      ['2026-11-01', 'airport_transfer sedan Cairo', 94.67],
-      ['2026-11-01', 'full_service CAI', 11.83],
-      ['2026-11-02', 'Bab Zuwaila', 10.14],
-      ['2026-11-03', 'Cairo Transport', 50],
+    const lines = supplierLinesFromServices(services, '2026-11-01', 2)
+    // No supplier yet: the supplier stays empty and the service is the
+    // description — never the service name in the supplier's place (2026-10-30).
+    expect(lines.map(l => [l.itinerary_service_id, l.service_date, l.supplier_name, l.service_description, l.quoted_cost])).toEqual([
+      ['b', '2026-11-01', '', 'full_service CAI', 11.83],
+      ['a', '2026-11-01', '', 'airport_transfer sedan Cairo', 94.67],
+      ['d', '2026-11-03', 'Cairo Transport', 'Hotel → Giza', 40],
+      ['e', '2026-11-03', 'Cairo Transport', 'Giza → Hotel', 10],
     ])
+    expect(lines[1]).toMatchObject({ service_time: '14:30:00', pickup_location: 'CAI T2', pax: 2 })
+    expect(lines[2].service_description).toBe('Hotel → Giza')
   })
 
   it('a grid cruise line (saved as accommodation) is a cruise supplier', () => {
@@ -58,6 +61,7 @@ describe('supplier backing', () => {
     expect(supplierBacking([{ status: 'confirmed' }, { status: 'cancelled' }])).toEqual({ total: 1, confirmed: 1, backed: true })
     expect(supplierBacking([{ status: 'cancelled' }]).backed).toBe(false)
     expect(supplierBacking([{ status: 'confirmed' }, { status: 'contacted' }])).toEqual({ total: 2, confirmed: 1, backed: false })
+    expect(supplierBacking([{ status: 'assigned' }, { status: 'done' }, { status: 'cancelled' }]).backed).toBe(true)
   })
 })
 

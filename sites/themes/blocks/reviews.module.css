@@ -1,0 +1,23 @@
+/* The agency's Google reviews — shared by every theme; brand colours and
+   faces come from the brand variables. Set apart from the agency's own
+   content, as Google asks. */
+
+.reviews { padding: 32px 0; border-top: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin-bottom: 16px; }
+.title { font-family: var(--font-display); font-size: 24px; margin: 0; }
+.summary { margin: 0; font-size: 15px; }
+.summary strong { font-family: var(--font-display); font-size: 22px; }
+.stars { color: #f5a623; letter-spacing: 1px; }
+.starsOff { color: color-mix(in srgb, var(--brand-ink) 18%, transparent); }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .list { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .list { grid-template-columns: repeat(3, 1fr); } }
+.card { border: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); border-radius: 14px; padding: 16px; background: var(--brand-surface); }
+.author { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+.author a { color: var(--brand-ink); }
+.photo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; }
+.meta { margin: 2px 0 0; font-size: 13px; font-weight: 400; color: color-mix(in srgb, var(--brand-ink) 70%, transparent); }
+.meta a { color: inherit; }
+.text { margin: 12px 0 8px; line-height: 1.55; white-space: pre-line; }
+.attribution { margin: 16px 0 0; font-size: 13px; color: color-mix(in srgb, var(--brand-ink) 70%, transparent); }
+.attribution a { color: inherit; }

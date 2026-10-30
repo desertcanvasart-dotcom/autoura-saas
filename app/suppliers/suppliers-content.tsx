@@ -20,6 +20,9 @@ import {
 } from 'lucide-react'
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
 import SupplierDocumentsPanel from '@/components/SupplierDocumentsPanel'
+import SupplierPageLink from '@/components/SupplierPageLink'
+import SupplierSignInRequests, { SupplierSignInStatus } from '@/components/SupplierSignInRequests'
+import { useRole } from '@/hooks/useRole'
 import { propertyTypesForRoles } from '@/lib/supplier-properties'
 import { SUPPLIER_CSV_HEADERS, supplierCsvSampleRow } from '@/lib/suppliers/csv-schema'
 import { useVocabulary } from '@/hooks/useVocabulary'
@@ -198,6 +201,7 @@ function MultiSelect({ options, value, onChange, placeholder, labels }: {
 }
 
 export default function SuppliersContent() {
+  const { isViewer, isAdmin } = useRole()
   const { cities: cityOptions } = useDestinationCities()
   const { fmtRate } = useRateRowFormat()
   const router = useRouter()
@@ -925,6 +929,9 @@ export default function SuppliersContent() {
         </div>
       </div>
 
+      {/* Suppliers asking to sign in (Phase 2B) — an admin confirms it is them */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><SupplierSignInRequests isAdmin={isAdmin} /></div>
+
       {/* Search & Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
         <div className="flex gap-3 flex-wrap">
@@ -1317,6 +1324,10 @@ export default function SuppliersContent() {
             </div>
 
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <div className="mb-4">
+                <SupplierPageLink supplierId={selectedSupplier.id} canEdit={!isViewer} />
+                <SupplierSignInStatus supplierId={selectedSupplier.id} isAdmin={isAdmin} />
+              </div>
               {viewTab === 'details' && (
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-4">

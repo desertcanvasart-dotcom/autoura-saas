@@ -32,6 +32,7 @@ import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { getCurrencySymbol } from '@/lib/currency'
 import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
 import { resolveTravelDateRates } from '@/lib/rates/rate-seasons'
+import { passportRate, periodRatesForPassport } from '@/lib/rates/passport-rate'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import { loadAttractionAliasIndex, resolveAttractionAlias } from '@/lib/pricing/attraction-aliases'
 import { memoRead, withQueryMemo } from '@/lib/pricing/query-memo'
@@ -362,6 +363,9 @@ export interface PricedService {
   included?: boolean
   /** The operator-facing reason for an unpriced or included line. */
   issue?: string
+  /** A hotel or ship the customer stays on, by name — for pages that show
+   *  where a tour sleeps (Publish) without parsing serviceName. */
+  property?: { kind: 'hotel' | 'cruise'; name: string; city?: string }
 }
 
 // Complete pricing result
@@ -1212,6 +1216,10 @@ export async function getCruiseRates(
      *  ask is not narrowed by tier; the refuse-to-guess rule still applies
      *  among them. Falls back to the tier's ships when none matches. */
     shipNames?: string[]
+    /** The traveller's passport: a non-EU traveller pays the ship's non-EU
+     *  rate when one is entered (lib/rates/passport-rate). Default EU — the
+     *  column every caller read before. */
+    isEurPassport?: boolean
   }
 ): Promise<{
   shipName: string
@@ -1343,6 +1351,7 @@ export async function getCruiseRates(
         periodGap: { propertyName: cruise.ship_name || 'this cruise', date: cruisePeriod.travelDate },
       }
     }
+    const eu = opts?.isEurPassport ?? true
     if (cruisePeriod.kind === 'period' && !(cruisePeriod.rates.ppd_eur > 0)) {
       // Blank nightly rate in the covering period — see the hotel path above.
       return {
@@ -1362,9 +1371,10 @@ export async function getCruiseRates(
       }
     }
     if (cruisePeriod.kind === 'period') {
-      ppdNight = cruisePeriod.rates.ppd_eur
-      singleSuppNight = cruisePeriod.rates.single_supplement_eur
-      tripleRedNight = cruisePeriod.rates.triple_reduction_eur
+      const r = periodRatesForPassport(cruisePeriod.rates, eu)
+      ppdNight = r.ppd
+      singleSuppNight = r.singleSupplement
+      tripleRedNight = r.tripleReduction
       // Guide cabin: 0 in a period means "no concession entered" (the
       // sanitizer stores blanks as 0) — null here, a hole upstream.
       guideBedNight = cruisePeriod.rates.guide_rate_eur > 0 ? cruisePeriod.rates.guide_rate_eur : null
@@ -1375,25 +1385,27 @@ export async function getCruiseRates(
       // PPD model — pick the seasonal PPD for the travel date, falling back to
       // the base (low) PPD when a seasonal rate isn't set. No travelDate => low.
       season = travelDate ? detectCruiseSeason(cruise, travelDate) : 'low'
+      // Each column for the passport (lib/rates/passport-rate).
+      const col = (field: string) => passportRate(cruise[`${field}_eur`], cruise[`${field}_non_eur`], eu)
       if (season === 'peak') {
-        ppdNight = cruise.peak_season_ppd_eur ?? cruise.ppd_eur
-        singleSuppNight = cruise.peak_season_single_supplement_eur ?? cruise.single_supplement_eur ?? 0
-        tripleRedNight = cruise.peak_season_triple_reduction_eur ?? cruise.triple_reduction_eur ?? 0
+        ppdNight = col('peak_season_ppd') ?? col('ppd')
+        singleSuppNight = col('peak_season_single_supplement') ?? col('single_supplement') ?? 0
+        tripleRedNight = col('peak_season_triple_reduction') ?? col('triple_reduction') ?? 0
       } else if (season === 'high') {
-        ppdNight = cruise.high_season_ppd_eur ?? cruise.ppd_eur
-        singleSuppNight = cruise.high_season_single_supplement_eur ?? cruise.single_supplement_eur ?? 0
-        tripleRedNight = cruise.high_season_triple_reduction_eur ?? cruise.triple_reduction_eur ?? 0
+        ppdNight = col('high_season_ppd') ?? col('ppd')
+        singleSuppNight = col('high_season_single_supplement') ?? col('single_supplement') ?? 0
+        tripleRedNight = col('high_season_triple_reduction') ?? col('triple_reduction') ?? 0
       } else {
-        ppdNight = cruise.ppd_eur
-        singleSuppNight = cruise.single_supplement_eur ?? 0
-        tripleRedNight = cruise.triple_reduction_eur ?? 0
+        ppdNight = col('ppd')
+        singleSuppNight = col('single_supplement') ?? 0
+        tripleRedNight = col('triple_reduction') ?? 0
       }
     } else {
       // Legacy model — whole-trip PER-PERSON rates (double occupancy), the
       // sibling's stated semantics and this repo's hotel convention. The
       // old code divided rate_double_eur by 2 as if it were a cabin rate,
       // which HALVED every legacy cruise price.
-      const ppdTrip = cruise.rate_double_eur
+      const ppdTrip = passportRate(cruise.rate_double_eur, cruise.rate_double_non_eur, eu)
       // A price per trip and no single trip length: there IS no nightly price.
       // Dividing by an assumed four nights made one up.
       if (Number(ppdTrip) > 0 && !statedNights) {
@@ -1412,7 +1424,7 @@ export async function getCruiseRates(
         }
       }
       ppdNight = ppdTrip / durationNights
-      const singleSuppTrip = (cruise.rate_single_eur || cruise.rate_double_eur) - ppdTrip
+      const singleSuppTrip = (passportRate(cruise.rate_single_eur, cruise.rate_single_non_eur, eu) || ppdTrip) - ppdTrip
       singleSuppNight = Math.max(0, singleSuppTrip / durationNights)
       tripleRedNight = 0
     }
@@ -1499,7 +1511,13 @@ export async function getHotelRates(
   city: string,
   tier: ServiceTier,
   travelDate?: string,
-  opts?: { rateId?: string | null }
+  opts?: {
+    rateId?: string | null
+    /** The traveller's passport: a non-EU traveller pays the hotel's non-EU
+     *  rate when one is entered (lib/rates/passport-rate). Default EU — the
+     *  column every caller read before. */
+    isEurPassport?: boolean
+  }
 ): Promise<{
   hotelName: string
   /** The accommodation_rates row priced from — the pin a caller may store. */
@@ -1528,6 +1546,7 @@ export async function getHotelRates(
   ambiguous?: Ambiguity
 } | null> {
   const cityNorm = city.trim().toLowerCase()
+  const eu = opts?.isEurPassport ?? true
 
   const mapRow = (hotel: any, source: RateSource) => {
     // C3.2: dated rate periods first — real contract windows with years.
@@ -1570,12 +1589,13 @@ export async function getHotelRates(
           },
         }
       }
+      const r = periodRatesForPassport(period.rates, eu)
       return {
         hotelName: hotel.property_name || hotel.name,
         hotelId: hotel.id,
-        ppdNight: period.rates.ppd_eur,
-        singleSuppNight: Math.max(0, period.rates.single_supplement_eur),
-        tripleRedNight: Math.max(0, period.rates.triple_reduction_eur),
+        ppdNight: r.ppd,
+        singleSuppNight: Math.max(0, r.singleSupplement),
+        tripleRedNight: Math.max(0, r.tripleReduction),
         // 0 = blank in the editor (the sanitizer's convention) = no
         // concession — null here, a hole upstream in throughout mode.
         guideBedNight: period.rates.guide_rate_eur > 0 ? period.rates.guide_rate_eur : null,
@@ -1586,20 +1606,24 @@ export async function getHotelRates(
 
     const season = travelDate ? detectHotelSeason(hotel, travelDate) : 'low'
 
+    // Each column for the passport (lib/rates/passport-rate).
+    const col = (field: string) => passportRate(hotel[`${field}_eur`], hotel[`${field}_non_eur`], eu)
+
     // Base (low season) PPD; legacy fields as last resort
-    const basePpd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
-    const baseSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - basePpd)
-    const baseRed = hotel.triple_reduction_eur ?? 0
+    const doubleRate = col('double_rate')
+    const basePpd = col('ppd') ?? (doubleRate ? doubleRate / 2 : 0)
+    const baseSupp = col('single_supplement') ?? Math.max(0, (col('single_rate') || 0) - basePpd)
+    const baseRed = col('triple_reduction') ?? 0
 
     // Seasonal columns; unset seasonal column falls back to the base rate
-    const ppd = (season === 'peak' ? hotel.peak_season_ppd_eur
-      : season === 'high' ? hotel.high_season_ppd_eur
+    const ppd = (season === 'peak' ? col('peak_season_ppd')
+      : season === 'high' ? col('high_season_ppd')
       : null) ?? basePpd
-    const singleSupp = (season === 'peak' ? hotel.peak_season_single_supplement_eur
-      : season === 'high' ? hotel.high_season_single_supplement_eur
+    const singleSupp = (season === 'peak' ? col('peak_season_single_supplement')
+      : season === 'high' ? col('high_season_single_supplement')
       : null) ?? baseSupp
-    const tripleRed = (season === 'peak' ? hotel.peak_season_triple_reduction_eur
-      : season === 'high' ? hotel.high_season_triple_reduction_eur
+    const tripleRed = (season === 'peak' ? col('peak_season_triple_reduction')
+      : season === 'high' ? col('high_season_triple_reduction')
       : null) ?? baseRed
 
     // NO PRICE IS NOT A PRICE OF ZERO. A hotel entered with its name, city and
@@ -3146,6 +3170,7 @@ export async function calculateDayBasedPricing(
         )
     const cr = namedShip.kind === 'ambiguous' ? null : await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate, {
       rateId: chosenShip ?? (namedShip.kind === 'one' ? namedShip.rateId : undefined),
+      isEurPassport,
     })
     if (namedShip.kind === 'ambiguous') {
       addHole({
@@ -3283,7 +3308,7 @@ export async function calculateDayBasedPricing(
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
   const hotelResults = await Promise.all(
     hotelCities.map(city =>
-      getHotelRates(catalogScope, city, tier, travelDate, { rateId: hotelRateIdFor(city) })
+      getHotelRates(catalogScope, city, tier, travelDate, { rateId: hotelRateIdFor(city), isEurPassport })
     )
   )
   hotelCities.forEach((city, i) => {
@@ -4129,6 +4154,7 @@ export async function calculateDayBasedPricing(
         dayNumber: day.day,
         serviceType: 'accommodation',
         serviceName: `Hotel - ${hotelRate.hotelName} (${day.city})`,
+        property: { kind: 'hotel', name: hotelRate.hotelName, city: day.city },
         quantity: 1,
         quantityMode: 'per_pax',
         unitCost: hotelRate.ppdNight,
@@ -4150,6 +4176,7 @@ export async function calculateDayBasedPricing(
       dayNumber: cruiseDays[0]?.day || 1,
       serviceType: 'cruise',
       serviceName: `Nile Cruise - ${cruiseRates.shipName} (${cruiseNights} nights)`,
+      property: { kind: 'cruise', name: cruiseRates.shipName },
       quantity: cruiseNights,
       quantityMode: 'per_pax',
       unitCost: cruiseRates.ppdNight,

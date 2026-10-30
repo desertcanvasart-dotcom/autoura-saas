@@ -37,6 +37,8 @@
   ],
   "exclude": [
     "node_modules",
+    "sites/.next",
+    "sites/next-env.d.ts",
     "vitest.config.ts",
     "**/__tests__/**",
     "**/*.test.ts"

@@ -1,0 +1,49 @@
+/* The enquiry form, shared by both archetypes; the variant class adjusts the
+   look. Colours and faces come from the brand variables. */
+
+.enquiry { padding: 24px 0; border-top: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); scroll-margin-top: 24px; }
+.enquiry h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 12px; }
+.editorial h2 { font-weight: 500; font-size: 28px; }
+.compact h2 { font-size: 20px; font-weight: 700; }
+.intro { margin: -4px 0 16px; color: color-mix(in srgb, var(--brand-ink) 70%, transparent); }
+
+.form { display: grid; gap: 12px; max-width: 560px; }
+.editorial .form { margin: 0 auto; }
+.form label { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+.form input, .form textarea {
+  font: inherit; font-weight: 400; padding: 10px 12px; width: 100%; box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--brand-ink) 25%, transparent); border-radius: 8px;
+  background: var(--brand-surface); color: var(--brand-ink);
+}
+.editorial .form input, .editorial .form textarea { border-radius: 2px; }
+.row { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 520px) { .row { grid-template-columns: 1fr 2fr; } }
+
+.submit {
+  font: inherit; font-weight: 600; padding: 12px 20px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--brand-primary); color: var(--brand-on-primary, var(--brand-surface)); justify-self: start;
+}
+.editorial .submit { border-radius: 2px; letter-spacing: 0.04em; }
+
+/* The outcome notices: hidden until the visitor is sent back to #their-anchor. */
+.notice { display: none; padding: 12px 14px; border-radius: 8px; margin: 0 0 12px; background: color-mix(in srgb, #c0392b 12%, var(--brand-surface)); }
+.notice.ok { background: color-mix(in srgb, var(--brand-primary) 14%, var(--brand-surface)); }
+.notice:target { display: block; }
+
+/* Steps (EnquirySteps): all at once without script, one at a time with it. */
+.step { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.step[hidden] { display: none; }
+.legend { font-weight: 700; font-size: 15px; padding: 0; margin: 0 0 4px; }
+.fields { display: grid; gap: 12px; }
+.progress { display: grid; gap: 8px; font-size: 14px; font-weight: 600; color: color-mix(in srgb, var(--brand-ink) 75%, transparent); }
+.bar { display: block; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--brand-ink) 10%, transparent); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--brand-primary); border-radius: inherit; transition: width 0.3s ease; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.back { font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 8px; cursor: pointer; background: transparent; color: var(--brand-ink); border: 1px solid color-mix(in srgb, var(--brand-ink) 25%, transparent); }
+.editorial .back { border-radius: 2px; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+
+.trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.alt { margin: 16px 0 0; font-size: 15px; }
+.editorial .alt { text-align: center; }

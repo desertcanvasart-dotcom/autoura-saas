@@ -124,6 +124,14 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  // A bell item opens a supplier line: /bookings/<id>?tab=suppliers&line=<lineId>
+  const [focusLineId, setFocusLineId] = useState<string | null>(null)
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    const tab = q.get('tab')
+    if (tab && ['overview', 'suppliers', 'passengers', 'payments', 'documents'].includes(tab)) setActiveTab(tab)
+    setFocusLineId(q.get('line'))
+  }, [])
   const { isAdmin, isManager, isViewer } = useRole()
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -695,6 +703,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             hasItinerary={Boolean((booking as { itinerary_id?: string | null }).itinerary_id)}
             canEdit={!isViewer}
             notify={showToast}
+            focusLineId={focusLineId}
           />
         )}
 

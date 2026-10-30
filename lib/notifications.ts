@@ -130,13 +130,17 @@ export async function notifyTeam(input: {
   title: string
   message: string
   link?: string | null
+  /** Only members holding one of these roles (default: everyone). */
+  roles?: string[]
 }) {
   const admin = createAdminClient()
-  const { data: members, error: membersError } = await admin
+  let membersQuery = admin
     .from('tenant_members')
     .select('user_id')
     .eq('tenant_id', input.tenant_id)
     .eq('status', 'active')
+  if (input.roles?.length) membersQuery = membersQuery.in('role', input.roles)
+  const { data: members, error: membersError } = await membersQuery
   if (membersError) throw membersError
 
   const userIds = [...new Set((members ?? []).map(m => m.user_id).filter((id): id is string => !!id))]

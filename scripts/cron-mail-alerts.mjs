@@ -6,8 +6,15 @@
  * Primary mail and files one bell item per email — ringing the owner's phone
  * or desktop. (Operator, 2026-09-24: nobody keeps the computer open all day.)
  *
- * Exits 1 when any mailbox failed, so Railway records a bad run as bad (same
- * rule as cron-gmail-sync.mjs).
+ * Also calls GET /api/cron/service-booking-deadlines (Supplier Network step 5):
+ * a supplier request unanswered halfway to its deadline rings the bell to send
+ * a reminder; past the deadline the line goes back to the office with the next
+ * supplier named. Same 5-minute beat, so it shares this service rather than
+ * needing a new Railway cron (docs/CRON-JOBS.md: one config per service is
+ * the mistake to make once, not twice). Both are called even if one fails.
+ *
+ * Exits 1 when any mailbox or any request failed, so Railway records a bad
+ * run as bad (same rule as cron-gmail-sync.mjs).
  *
  * DEPLOY (Railway) — .railway/railway.ts, service "cron:mail-alerts":
  *   Start command:  npm run cron:mail-alerts
@@ -27,23 +34,35 @@ if (!secret) {
   process.exit(1)
 }
 
-const url = `${base.replace(/\/$/, '')}/api/cron/mail-alerts`
+const root = base.replace(/\/$/, '')
 
-try {
-  const res = await fetch(url, { headers: { authorization: `Bearer ${secret}` } })
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    console.error(`[mail-alerts] HTTP ${res.status}: ${body.error || 'no reason given'}`)
-    process.exit(1)
+async function call(tag, path, report) {
+  try {
+    const res = await fetch(`${root}${path}`, { headers: { authorization: `Bearer ${secret}` } })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      console.error(`[${tag}] HTTP ${res.status}: ${body.error || 'no reason given'}`)
+      return false
+    }
+    return report(body)
+  } catch (err) {
+    console.error(`[${tag}] ${err instanceof Error ? err.message : err}`)
+    return false
   }
+}
+
+const mail = await call('mail-alerts', '/api/cron/mail-alerts', (body) => {
   const { mailboxes = 0, checked = 0, failed = 0 } = body
   console.log(`[mail-alerts] ${checked}/${mailboxes} mailboxes checked, ${failed} failed`)
-  if (failed > 0) {
-    for (const r of body.results || []) if (!r.ok) console.error(`[mail-alerts]   ${r.email}: ${r.error}`)
-    process.exit(1)
-  }
-  process.exit(0)
-} catch (err) {
-  console.error(`[mail-alerts] ${err instanceof Error ? err.message : err}`)
-  process.exit(1)
-}
+  for (const r of body.results || []) if (!r.ok) console.error(`[mail-alerts]   ${r.email}: ${r.error}`)
+  return failed === 0
+})
+
+const deadlines = await call('service-booking-deadlines', '/api/cron/service-booking-deadlines', (body) => {
+  const { waiting = 0, nudged = 0, expired = 0, failures = [] } = body
+  console.log(`[service-booking-deadlines] ${waiting} waiting, ${nudged} reminder(s) suggested, ${expired} past deadline`)
+  for (const f of failures) console.error(`[service-booking-deadlines]   ${f}`)
+  return failures.length === 0
+})
+
+process.exit(mail && deadlines ? 0 : 1)

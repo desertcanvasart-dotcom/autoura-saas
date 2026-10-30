@@ -18,12 +18,13 @@
 
 import { SAMPLE_TOUR_DAYS } from './itinerary-csv'
 import { summarizeMeals } from './day-meals'
+import { formatSailingDaysCell, parseSailingDaysCell, SAILING_DAYS } from '@/lib/rates/cruise-sailing'
 
 export interface TemplateCsvColumn {
   name: string
   label: string
   required?: boolean
-  kind?: 'text' | 'int' | 'bool' | 'list'
+  kind?: 'text' | 'int' | 'bool' | 'list' | 'weekdays' | 'languages'
   /** Written on export, never read back as a value to store. */
   readOnly?: boolean
 }
@@ -66,6 +67,13 @@ export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
   { name: 'pickup_required', label: 'Pickup Required', kind: 'bool' },
   { name: 'is_featured', label: 'Featured', kind: 'bool' },
   { name: 'is_active', label: 'Active', kind: 'bool' },
+  // Migration 441: the weekdays a tour departs ("mon;fri"; "daily" = all
+  // seven). Shown on its Publish page; blank = not stated, never "daily".
+  { name: 'departure_days', label: 'Departure Days', kind: 'weekdays' },
+  // Migration 444, shown on the tour's website page: where it meets (blank =
+  // not stated) and its guides' languages as two-letter codes ("en; fr").
+  { name: 'meeting_point', label: 'Meeting Point' },
+  { name: 'guide_languages', label: 'Guide Languages', kind: 'languages' },
 ]
 
 const csvCell = (v: unknown): string => {
@@ -79,6 +87,7 @@ export function serializeTemplatesCsv(rows: Array<Record<string, unknown>>): str
   const body = rows.map(r =>
     TEMPLATE_CSV_COLUMNS.map(c => {
       if (c.kind === 'bool') return csvCell(r[c.name] ? 'true' : 'false')
+      if (c.kind === 'weekdays') return csvCell(formatSailingDaysCell(r[c.name]))
       return csvCell(r[c.name])
     }).join(',')
   )
@@ -284,10 +293,13 @@ const HEADER_MAP: Record<string, string> = (() => {
 // What a blank cell writes: an empty list, no value — or 0 nights, the one
 // optional number the table will not hold empty (duration_nights NOT NULL).
 function clearedValue(col: TemplateCsvColumn): unknown {
-  if (col.kind === 'list') return []
+  if (col.kind === 'list' || col.kind === 'weekdays' || col.kind === 'languages') return []
   if (col.name === 'duration_nights') return 0
   return null
 }
+
+const EVERY_DAY = new Set(['daily', 'every day', 'everyday', 'any day', 'all'])
+const NOT_STATED = new Set(['none', '-'])
 
 const truthy = (v: string) => ['true', '1', 'yes', 'y', 'active', 'featured'].includes(v.trim().toLowerCase())
 const falsy = (v: string) => ['false', '0', 'no', 'n', 'inactive'].includes(v.trim().toLowerCase())
@@ -369,6 +381,25 @@ export function parseTemplatesCsv(
         else badCells.push(`${col.label} "${v}" is not true or false`)
       }
       else if (col.kind === 'list') rec[field] = v.split(/[;|]/).map(s => s.trim()).filter(Boolean)
+      else if (col.kind === 'languages') {
+        const codes = v.split(/[;|,]/).map(s => s.trim().toLowerCase()).filter(Boolean)
+        const bad = codes.filter(c => !/^[a-z]{2}$/.test(c))
+        if (bad.length) badCells.push(`${col.label} "${v}": use two-letter codes such as en; fr (not ${bad.join(', ')})`)
+        else rec[field] = [...new Set(codes)]
+      }
+      else if (col.kind === 'weekdays') {
+        // A tour's own words first: "daily" departs every day (all seven,
+        // stated); "none" / "-" states nothing. (The cruise reader treats
+        // "any" as no fixed day — not what a tour means by it.)
+        const word = v.toLowerCase()
+        if (EVERY_DAY.has(word)) rec[field] = [...SAILING_DAYS]
+        else if (NOT_STATED.has(word)) rec[field] = []
+        else {
+          const { days, bad } = parseSailingDaysCell(v)
+          if (bad.length || !days) badCells.push(`${col.label} "${v}": ${bad.join(', ') || v} ${bad.length === 1 ? 'is' : 'are'} not a weekday`)
+          else rec[field] = days
+        }
+      }
       else rec[field] = v
     }
 

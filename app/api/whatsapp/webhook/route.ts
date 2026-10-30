@@ -33,6 +33,7 @@ import { notifyTeam, bellSnippet } from '@/lib/notifications'
 import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbound-client'
 import { toConversationPhone, conversationPhoneKeys } from '@/lib/whatsapp-phone'
 import { tenantForWhatsAppNumber } from '@/lib/whatsapp-tenant'
+import { matchWaRef } from '@/lib/publish/enquiries'
 import { previousStatusesFor, type WhatsAppMessageStatus } from '@/lib/whatsapp-status'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
@@ -591,6 +592,17 @@ async function processInboundWhatsAppMessage({
       })
     } catch (e) {
       console.error('WhatsApp bell notification failed:', (e as Error).message)
+    }
+  }
+
+  // A visitor who came from the company's Publish website carries a
+  // reference ("Ref: …") — record which page and campaign brought them
+  // (lib/publish/enquiries). Only for a stored first delivery. Best-effort.
+  if (conversationId && tenantId && !msgError && body) {
+    try {
+      await matchWaRef(supabase as never, { tenantId, body, conversationId, clientId })
+    } catch (e) {
+      console.error('Publish WhatsApp reference match failed:', (e as Error).message)
     }
   }
 

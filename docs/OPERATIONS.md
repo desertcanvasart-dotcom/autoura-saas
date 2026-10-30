@@ -150,7 +150,11 @@ with `CRON_SECRET`. Our own Railway setup is in `docs/CRON-JOBS.md`.
 | Closed companies | `GET /api/cron/purge-closed-companies` | daily | ↑ (deletes companies 30 days after an owner closed them) |
 | Gmail sync | `GET /api/cron/gmail-sync` | every 10 minutes | `npm run cron:gmail-sync` |
 | Mail alerts | `GET /api/cron/mail-alerts` | every 5 minutes | `npm run cron:mail-alerts` |
+| Supplier reply deadlines | `GET /api/cron/service-booking-deadlines` | every 5 minutes | `npm run cron:mail-alerts` (same service) |
+| Service lines done after their date | `GET /api/cron/service-booking-done` | daily 06:00 UTC | `npm run cron:reminders` (same service) |
+| Send tomorrow's clients their details (bell) | `GET /api/cron/client-day-reminders` | daily 06:00 UTC | `npm run cron:reminders` (same service) |
 | Scheduled send | `GET /api/cron/scheduled-send` | every 5 minutes | `npm run cron:scheduled-send` |
+| Publish sync | `GET /api/cron/publish-sync` | every 5 minutes | `npm run cron:publish-sync` (keeps Publish sites in step with records; does nothing until a company is enrolled) |
 
 Each driver calls its endpoint(s) and exits with the right code, so the
 scheduler records success or failure. **Scheduled send** is the one users

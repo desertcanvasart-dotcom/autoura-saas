@@ -1,0 +1,46 @@
+/* Fact sections, shared by both archetypes; the variant class adjusts the
+   look. Colours and faces come from the brand variables. */
+
+.section { padding: 24px 0; border-top: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); }
+.section h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 12px; }
+.section h3 { font-family: var(--font-display); font-size: 19px; margin: 0 0 6px; }
+.section p { margin: 4px 0; }
+
+.editorial.section h2 { font-weight: 500; font-size: 28px; }
+.compact.section { padding: 16px 0; }
+.compact.section h2 { font-size: 20px; font-weight: 700; }
+
+.note { font-size: 14px; color: color-mix(in srgb, var(--brand-ink) 72%, transparent); }
+.label { font-weight: 600; }
+
+.price { padding: 20px; border-radius: 12px; margin: 16px 0; background: color-mix(in srgb, var(--brand-surface) 90%, var(--brand-primary)); }
+.editorial.price { border-radius: 2px; text-align: center; background: transparent; border: 1px solid color-mix(in srgb, var(--brand-accent) 50%, transparent); }
+
+.table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 15px; }
+.table caption { text-align: start; font-weight: 600; margin-bottom: 6px; }
+.table th, .table td { text-align: start; padding: 8px 6px; border-bottom: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); }
+.editorial .table caption, .editorial .table th, .editorial .table td { text-align: center; }
+
+.chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips li { padding: 6px 12px; border-radius: 999px; font-size: 14px; background: color-mix(in srgb, var(--brand-surface) 85%, var(--brand-accent)); }
+
+.days { list-style: none; padding: 0; margin: 0; display: grid; gap: 18px; }
+.dayItem { padding-inline-start: 16px; border-inline-start: 3px solid var(--brand-accent); }
+.dayNo { color: var(--brand-primary); }
+
+.list { margin: 0; padding-inline-start: 20px; }
+.list li { margin: 4px 0; }
+
+.inclusions { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .inclusions { grid-template-columns: 1fr 1fr; } }
+.yes, .no { list-style: none; padding: 0; margin: 0; }
+.yes li, .no li { padding-inline-start: 26px; position: relative; margin: 6px 0; }
+.yes li::before { content: "✓"; position: absolute; inset-inline-start: 0; color: var(--brand-primary); font-weight: 700; }
+.no li::before { content: "✕"; position: absolute; inset-inline-start: 0; color: color-mix(in srgb, var(--brand-ink) 55%, transparent); }
+
+.fact p { font-size: 18px; }
+.wording { white-space: pre-line; font-size: 15px; }
+
+.overview p { font-size: 18px; line-height: 1.65; margin: 0 0 14px; }
+.editorial.overview p { font-size: 19px; }
+.dayText { margin: 6px 0 8px; }

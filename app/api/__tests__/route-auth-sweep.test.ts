@@ -50,6 +50,11 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // signs with Svix.
   '/api/webhooks/': ['verifyConciergeSignature', 'verifySvix('],
   '/api/integrations/': ['SAWA_SYNC_SECRET'],
+  // The Publish site renderer (sites/) → internal page data; bearer secret.
+  '/api/publish/internal/': ['PUBLISH_INTERNAL_SECRET'],
+  // Agencies' developers → the data feed; the site's feed key, checked by
+  // feedSite (app/api/publish/feed/v1/_auth.ts → lib/publish/feed.ts).
+  '/api/publish/feed/': ['feedSite'],
   '/api/auth/': null, // OAuth callbacks / pre-session by nature (state verified in-handler)
   '/api/cron/': ['CRON_SECRET'],
   '/api/version': null, // sha + uptime only, public by design
@@ -72,6 +77,12 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // token in the path IS the credential. The handler validates its shape and
   // looks up an unrevoked staff_links row by it.
   '/api/staff/': ['isValidStaffToken', 'revoked_at'],
+  // Supplier reply links (448): the supplier has no session; the route checks
+  // the token's shape, then needs an unrevoked, unexpired service_booking_links row.
+  '/api/reply/': ['isValidReplyToken', 'revoked_at', 'isLinkLive'],
+  '/api/supplier-page/': ['isValidSupplierPageToken', 'revoked_at', 'supplier_id'],
+  '/api/supplier-auth/': ['normalizeLoginPhone', 'hashSessionToken'],
+  '/api/supplier-account/': ['supplierFromToken'],
   // Traveller report from the share page — the traveller has no session by
   // design; the secret share token in the path IS the credential. The handler
   // validates its shape and looks up an unrevoked itinerary_shares row by it.

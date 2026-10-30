@@ -1,0 +1,16 @@
+/* The default drawings (SiteArt.tsx): the agency's main colour on a pale wash
+   of itself, the accent for the sun. No colour of their own. */
+.art { display: block; width: 100%; height: 100%; overflow: hidden; }
+.bg { fill: color-mix(in srgb, var(--brand-primary) 9%, var(--brand-surface, #fff)); }
+.sun { fill: color-mix(in srgb, var(--brand-accent) 38%, var(--brand-surface, #fff)); }
+.mass {
+  fill: color-mix(in srgb, var(--brand-primary) 16%, var(--brand-surface, #fff));
+  stroke: color-mix(in srgb, var(--brand-primary) 62%, var(--brand-surface, #fff));
+  stroke-width: 2.2; stroke-linejoin: round;
+}
+.shade { fill: color-mix(in srgb, var(--brand-primary) 28%, var(--brand-surface, #fff)); }
+.water { fill: color-mix(in srgb, var(--brand-primary) 20%, var(--brand-surface, #fff)); }
+.line {
+  fill: none; stroke: color-mix(in srgb, var(--brand-primary) 62%, var(--brand-surface, #fff));
+  stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}

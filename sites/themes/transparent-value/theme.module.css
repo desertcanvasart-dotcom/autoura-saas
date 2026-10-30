@@ -1,0 +1,55 @@
+/* Transparent value — bright, direct, price-led. Brand colours and faces
+   arrive as CSS variables (lib/publish/brand.ts). Mobile first; 16px gutters. */
+
+.page { min-height: 100vh; display: flex; flex-direction: column; background: var(--brand-surface); color: var(--brand-ink); font-family: var(--font-text); padding-bottom: 72px; }
+@media (min-width: 720px) { .page { padding-bottom: 0; } }
+.preview, .unpublished { background: #fff4ce; color: #3d3000; font-size: 14px; padding: 8px 16px; text-align: center; }
+.unpublished { border-radius: 6px; margin: 0 0 16px; }
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--brand-ink); text-decoration: none; }
+.brand img { height: 40px; width: auto; display: block; }
+.nav { display: flex; align-items: center; gap: 16px; font-weight: 600; font-size: 15px; }
+.nav a { color: var(--brand-ink); text-decoration: none; }
+.languages { display: flex; gap: 10px; font-weight: 400; }
+.waButton { display: none; }
+@media (min-width: 720px) {
+  .waButton { display: inline-block; background: var(--brand-primary); color: var(--brand-on-primary) !important; padding: 10px 16px; border-radius: 999px; }
+}
+
+.main { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px; box-sizing: border-box; }
+
+.hero { background: var(--brand-primary); color: var(--brand-on-primary); border-radius: 16px; padding: 40px 24px; margin: 8px 0 0; }
+.heroTitle { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 5vw, 48px); line-height: 1.1; margin: 0 0 12px; }
+.heroLead { font-size: 18px; margin: 0 0 24px; max-width: 40ch; }
+.heroButton { display: inline-block; background: var(--brand-accent); color: var(--brand-on-accent); padding: 14px 22px; border-radius: 999px; font-weight: 700; text-decoration: none; }
+.heroButton:hover { filter: brightness(1.05); }
+.askRow { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 16px 0; }
+.askLink { font-weight: 600; color: var(--brand-primary); }
+
+.section { padding: 32px 0; }
+.sectionTitle { font-family: var(--font-display); font-weight: 700; font-size: clamp(24px, 3.5vw, 32px); margin: 0 0 20px; }
+.empty { color: color-mix(in srgb, var(--brand-ink) 70%, transparent); }
+
+.grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 600px) { .grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 960px) { .grid { grid-template-columns: 1fr 1fr 1fr; } }
+.card { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-height: 140px; padding: 20px; border-radius: 12px; text-decoration: none; color: inherit;
+  border: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); background: color-mix(in srgb, var(--brand-surface) 94%, var(--brand-primary)); }
+.card:hover { border-color: var(--brand-primary); }
+.cardTitle { font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1.25; }
+.cardCta { align-self: flex-start; font-weight: 700; font-size: 14px; color: var(--brand-primary); }
+
+.tourHead { margin: 0 0 20px; }
+.crumb { color: var(--brand-primary); text-decoration: none; font-weight: 600; font-size: 14px; }
+.tourImage { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; margin: 16px 0 0; }
+.tourTitle { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 4.5vw, 42px); line-height: 1.15; margin: 8px 0 0; }
+
+.footer { border-top: 1px solid color-mix(in srgb, var(--brand-ink) 12%, transparent); margin-top: 32px; }
+.footerInner { max-width: 1200px; margin: 0 auto; padding: 24px 16px; box-sizing: border-box; font-size: 15px; }
+.footerContact { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.footerContact a { color: var(--brand-primary); }
+.licence { margin: 12px 0 0; font-size: 13px; opacity: 0.75; }
+
+.stickyWa { position: fixed; left: 16px; right: 16px; bottom: 12px; text-align: center; background: var(--brand-primary); color: var(--brand-on-primary); padding: 14px; border-radius: 999px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); }
+@media (min-width: 720px) { .stickyWa { display: none; } }

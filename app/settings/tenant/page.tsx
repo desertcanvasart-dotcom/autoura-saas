@@ -1,4 +1,5 @@
 'use client'
+import SupplierSourcingSetting from '@/components/SupplierSourcingSetting'
 import CompanyDataCard from '@/components/account/CompanyDataCard'
 
 import { TIMEZONES } from '@/lib/timezones'
@@ -536,6 +537,9 @@ export default function TenantSettingsPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+        {/* Where this agency books suppliers from (Supplier Network Phase 3) */}
+        <SupplierSourcingSetting canEdit={isAdmin} />
+
         {/* Message */}
         {message && (
           <div

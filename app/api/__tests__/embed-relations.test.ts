@@ -25,6 +25,14 @@ const TYPES = readFileSync(path.join(ROOT, 'types', 'database.types.ts'), 'utf8'
 
 // Verified exceptions: embeds the Relationships blocks cannot express.
 const ALLOW: Array<{ from: string; embed: string; reason: string }> = [
+  // Migration 440 links Publish tables by COMPOSITE keys — (site_id,
+  // tenant_id) → publish_sites(id, tenant_id), (page_id, site_id, tenant_id)
+  // → publish_pages — so no row can point into another company. The type
+  // generator emits single-column FKs only; PostgREST embeds composite ones.
+  // Probed on production 2026-10-25: both selects answer 200.
+  { from: 'publish_domains', embed: 'publish_sites', reason: 'composite FK (site_id, tenant_id), migration 440; probed 200' },
+  { from: 'publish_page_locales', embed: 'publish_pages', reason: 'composite FK (page_id, site_id, tenant_id), migration 440; probed 200' },
+  { from: 'publish_pages', embed: 'publish_page_locales', reason: 'the same composite FK, read the other way (a page\'s language rows); probed 200 on production 2026-10-25' },
 ]
 
 interface Rel { fkeyName: string; columns: string[]; referencedRelation: string }

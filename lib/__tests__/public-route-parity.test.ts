@@ -26,7 +26,8 @@ describe('customer-facing routes are public in BOTH senses', () => {
   })
 
   it('/share is chrome-free in the client shell', () => {
-    expect(layout).toContain("pathname.startsWith('/share/')")
+    expect(layout).toContain("'/share/'")
+    expect(layout).toContain('TOKEN_PREFIXES.some(p => pathname.startsWith(p))')
   })
 
   it('every marketing route public in one is public in the other', () => {

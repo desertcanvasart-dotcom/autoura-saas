@@ -4,11 +4,22 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { supplierBacking } from '@/lib/bookings/booking-suppliers'
+import CoverLinePicker from '@/components/booking/CoverLinePicker'
+import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
+import LineHistory from '@/components/booking/LineHistory'
+import LineWhenWhere from '@/components/booking/LineWhenWhere'
+import { lineService, lineSupplier } from '@/lib/bookings/service-label'
+import RequestByEmail from '@/components/booking/RequestByEmail'
+import ClientDayMessage from '@/components/booking/ClientDayMessage'
+import {
+  SERVICE_BOOKING_STATUSES, STATUS_LABEL, canTransition, normalizeStatus, type CoveredBy, type ServiceBookingStatus,
+} from '@/lib/bookings/service-booking-states'
 
-// Who has to confirm what for this booking (booking_supplier_status). The
-// list is filled from the itinerary when the booking is made; "Sync from
-// itinerary" adds anything new. Mark each row as it is chased and confirmed —
-// "Not needed" takes it out of the count (e.g. a ticket bought at the gate).
+// The booking's service bookings (booking_supplier_status): one row per
+// service line, filled from the itinerary when the booking is made; "Sync
+// from itinerary" adds anything new. Move each line on as it is requested,
+// accepted and assigned — the list offers only the moves a line may make;
+// "Not needed" takes it out of the count.
 // Confirming a row with a cost records it as a pending expense (what the trip
 // owes that supplier); the Expense column links to it.
 
@@ -18,26 +29,39 @@ interface SupplierRow {
   supplier_name: string
   service_date: string | null
   service_description: string | null
+  pickup_location: string | null
+  dropoff_location: string | null
   quoted_cost: number | null
   confirmed_cost: number | null
   status: string
+  resource_kind: CoveredBy | null
+  service_time: string | null
+  assigned_vehicle_plate: string | null
+  assigned_guide_name: string | null
+  driver_note: string | null
+  reply_deadline: string | null
+  requested_at: string | null
+  supplier_day_off?: boolean
+  /** When the supplier last opened the request or their page; null = not yet; absent = nothing sent. */
+  seen?: string | null
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
 }
 
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'no_response', label: 'No response' },
-  { value: 'cancelled', label: 'Not needed' },
-]
+// The line's status, then only the moves it may make (service-booking-states).
+function statusChoices(status: string, coveredBy: CoveredBy): ServiceBookingStatus[] {
+  const current = normalizeStatus(status)
+  return [current, ...SERVICE_BOOKING_STATUSES.filter(s => canTransition(current, s, coveredBy).ok)]
+}
 
 const STATUS_STYLE: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-700',
-  contacted: 'bg-blue-50 text-blue-700',
-  confirmed: 'bg-green-50 text-green-700',
-  no_response: 'bg-amber-50 text-amber-700',
+  requested: 'bg-blue-50 text-blue-700',
+  accepted: 'bg-green-50 text-green-700',
+  assigned: 'bg-green-50 text-green-700',
+  done: 'bg-green-100 text-green-800',
+  declined: 'bg-red-50 text-red-700',
+  expired: 'bg-amber-50 text-amber-700',
   cancelled: 'bg-gray-50 text-gray-400 line-through',
 }
 
@@ -56,11 +80,14 @@ export default function BookingSuppliersPanel({
   hasItinerary,
   canEdit,
   notify,
+  focusLineId,
 }: {
   bookingId: string
   currency: string
   hasItinerary: boolean
   canEdit: boolean
+  /** The line a bell item points at (?line=): highlighted and scrolled to. */
+  focusLineId?: string | null
   notify: (type: 'success' | 'error' | 'info', message: string) => void
 }) {
   const [rows, setRows] = useState<SupplierRow[]>([])
@@ -83,6 +110,11 @@ export default function BookingSuppliersPanel({
   }, [bookingId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!focusLineId || rows.length === 0) return
+    document.getElementById(`service-line-${focusLineId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focusLineId, rows.length])
 
   const sync = async () => {
     setSyncing(true)
@@ -132,7 +164,7 @@ export default function BookingSuppliersPanel({
             {backing.backed && <CheckCircle2 className="w-4 h-4" />}
             {backing.total === 0
               ? 'No suppliers listed yet'
-              : `${backing.confirmed} of ${backing.total} confirmed`}
+              : `${backing.confirmed} of ${backing.total} covered`}
           </p>
         </div>
         {hasItinerary && canEdit && (
@@ -146,6 +178,12 @@ export default function BookingSuppliersPanel({
           </button>
         )}
       </div>
+
+      {canEdit && rows.length > 0 && (
+        <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2">
+          <ClientDayMessage bookingId={bookingId} notify={notify} refreshKey={rows.length} />
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-gray-500">Loading…</p>
@@ -164,16 +202,60 @@ export default function BookingSuppliersPanel({
                 <th className="py-2 pr-3 font-medium text-right">Cost</th>
                 <th className="py-2 pr-3 font-medium">Status</th>
                 <th className="py-2 pr-3 font-medium">Confirmation no.</th>
-                <th className="py-2 font-medium" title="What the agency owes this supplier, recorded when the supplier is confirmed">Expense</th>
+                <th className="py-2 font-medium" title="What the agency owes this supplier, recorded when the supplier accepts">Expense</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.id} className="border-b border-gray-100 last:border-0">
+                <tr key={r.id} id={`service-line-${r.id}`} className={`border-b border-gray-100 last:border-0 ${r.id === focusLineId ? 'bg-amber-50' : ''}`}>
                   <td className="py-2 pr-3 whitespace-nowrap text-gray-600">
                     {r.service_date ? new Date(`${r.service_date}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}
+                    {r.service_time && <div className="text-xs text-gray-400">{r.service_time.slice(0, 5)}</div>}
                   </td>
-                  <td className="py-2 pr-3 text-gray-900">{r.supplier_name}</td>
+                  <td className="py-2 pr-3 text-gray-900">
+                    {lineSupplier(r) ?? <span className="text-gray-400 italic">{['accepted', 'assigned', 'done'].includes(normalizeStatus(r.status)) ? 'Supplier not recorded' : 'No supplier yet'}</span>}
+                    {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-medium">Your team</span>}
+                    {r.assigned_vehicle_plate && <span className="ml-1.5 text-xs text-gray-500">{r.assigned_vehicle_plate}</span>}
+                    <div className="text-xs text-gray-500">{lineService(r)}</div>
+                    {(r.pickup_location || r.dropoff_location) && (
+                      <div className="text-xs text-gray-500">{[r.pickup_location && `From ${r.pickup_location}`, r.dropoff_location && `to ${r.dropoff_location}`].filter(Boolean).join(' ')}</div>
+                    )}
+                    {r.assigned_guide_name && r.resource_kind !== 'own' && <div className="text-xs text-gray-600">Guide: {r.assigned_guide_name}</div>}
+                    {r.driver_note && <div className="text-xs text-gray-600">Driver: {r.driver_note}</div>}
+                    {r.supplier_day_off && normalizeStatus(r.status) !== 'cancelled' && (
+                      <div className="text-xs text-amber-700">⚠ This supplier marked this day off</div>
+                    )}
+                    {normalizeStatus(r.status) === 'requested' && r.reply_deadline && (
+                      <div className={`text-xs ${new Date(r.reply_deadline) < new Date() ? 'text-amber-700' : 'text-gray-500'}`}>
+                        Answer by {new Date(r.reply_deadline).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {r.seen !== undefined && (
+                          <span className="ml-1.5 text-gray-400">· {r.seen ? `seen ${new Date(r.seen).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'not opened yet'}</span>
+                        )}
+                      </div>
+                    )}
+                    {canEdit && (
+                      <div className="mt-0.5 flex flex-wrap items-center gap-3">
+                        <CoverLinePicker bookingId={bookingId} lineId={r.id} currency={currency} onSaved={load} notify={notify} />
+                        {r.resource_kind !== 'own' && lineSupplier(r) && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
+                          <>
+                            <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                            <RequestByEmail bookingId={bookingId} lineId={r.id} supplierName={lineSupplier(r) ?? 'the supplier'} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                          </>
+                        )}
+                        {!lineSupplier(r) && normalizeStatus(r.status) === 'pending' && (
+                          <span className="text-xs text-gray-400">Choose who covers it, then ask them</span>
+                        )}
+                        <LineWhenWhere key={`${r.id}:${r.service_time ?? ''}:${r.pickup_location ?? ''}:${r.dropoff_location ?? ''}`} bookingId={bookingId} line={r} onSaved={load} notify={notify} />
+                        {r.resource_kind !== 'own' && normalizeStatus(r.status) === 'cancelled' && r.requested_at && (
+                          <>
+                            <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={false} notice="cancelled" onSent={load} notify={notify} />
+                            <RequestByEmail bookingId={bookingId} lineId={r.id} supplierName={lineSupplier(r) ?? 'the supplier'} requested={false} notice="cancelled" onSent={load} notify={notify} />
+                          </>
+                        )}
+                        <LineHistory bookingId={bookingId} lineId={r.id} />
+                      </div>
+                    )}
+                  </td>
                   <td className="py-2 pr-3 text-gray-500 capitalize">{r.supplier_type}</td>
                   <td className="py-2 pr-3 text-right text-gray-700 whitespace-nowrap">
                     {canEdit ? (
@@ -182,8 +264,8 @@ export default function BookingSuppliersPanel({
                       <span className="inline-flex items-center gap-1">
                         <span className="text-xs text-gray-400">{currency}</span>
                         <input
-                          key={`${r.id}:${r.confirmed_cost ?? ''}`}
-                          aria-label={`Confirmed cost for ${r.supplier_name}`}
+                          key={`${r.id}:${r.confirmed_cost ?? ''}:${r.quoted_cost ?? ''}:${r.supplier_name}`}
+                          aria-label={`Confirmed cost for ${lineService(r)}`}
                           type="number"
                           step="0.01"
                           min="0"
@@ -206,20 +288,22 @@ export default function BookingSuppliersPanel({
                   </td>
                   <td className="py-2 pr-3">
                     <select
-                      aria-label={`Status of ${r.supplier_name}`}
-                      value={r.status}
+                      aria-label={`Status of ${lineService(r)}`}
+                      value={normalizeStatus(r.status)}
                       disabled={!canEdit || savingId === r.id}
                       onChange={e => update(r, { status: e.target.value })}
                       // ! — globals.css gives every <select> width:100% and wide
                       // padding outside Tailwind's layers, crushing this pill.
-                      className={`!w-32 !px-2 !py-1 rounded-md text-xs font-medium !border-0 ${STATUS_STYLE[r.status] ?? ''}`}
+                      className={`!w-32 !px-2 !py-1 rounded-md text-xs font-medium !border-0 ${STATUS_STYLE[normalizeStatus(r.status)] ?? ''}`}
                     >
-                      {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {statusChoices(r.status, r.resource_kind ?? 'supplier').map(s => (
+                        <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                      ))}
                     </select>
                   </td>
                   <td className="py-2 pr-3">
                     <input
-                      aria-label={`Confirmation number for ${r.supplier_name}`}
+                      aria-label={`Confirmation number for ${lineService(r)}`}
                       defaultValue={r.confirmation_number ?? ''}
                       disabled={!canEdit}
                       onBlur={e => {
