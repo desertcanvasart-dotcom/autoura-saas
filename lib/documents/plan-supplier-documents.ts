@@ -48,6 +48,7 @@
 // and the Alexandria guide of ITN-S-2026-8987 shared one "Cairo Guide
 // Services" assignment.
 
+import { notesWithFacts, answerParts, type ServiceLineFacts } from '@/lib/documents/service-line-facts'
 import type { Database, Json } from '@/types/database.types'
 import { transportCrew } from './transport-crew'
 import { docMappingFor, noDocumentReason, serviceCity, PlaceNames, entranceLineName, unassignedDocKey, type ServiceMapping } from './group-services'
@@ -120,6 +121,8 @@ export interface PlanInput {
   guides?: PlanGuide[]
   /** Only these types; null = every type. */
   documentTypes: string[] | null
+  /** The booking's service line for each itinerary service, by its id (lib/documents/service-line-facts). */
+  serviceLines?: Record<string, ServiceLineFacts>
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -289,9 +292,34 @@ export function staleSupplierDocuments(days: PlanDay[], existing: PlanInput['exi
   })
 }
 
+/**
+ * A transport voucher with ONE service line: its pickup time and place go in
+ * the voucher's own fields (several lines keep theirs on each line), and the
+ * driver of the day fills the driver field when the trip named none.
+ */
+function transportFields(
+  services: Parameters<typeof transportCrew>[0],
+  facts: Array<ServiceLineFacts | undefined>,
+): Record<string, string | null> {
+  const crew = transportCrew(services)
+  const known = facts.filter((f): f is ServiceLineFacts => !!f)
+  const out: Record<string, string | null> = { ...crew }
+  if (facts.length === 1 && known.length === 1) {
+    const f = known[0]
+    if (f.service_time?.trim()) out.pickup_time = f.service_time.trim().slice(0, 5)
+    if (f.pickup_location?.trim()) out.pickup_location = f.pickup_location.trim()
+    if (f.dropoff_location?.trim()) out.dropoff_location = f.dropoff_location.trim()
+  }
+  const drivers = [...new Set(known.filter(f => answerParts(f).length > 0).map(f => f.driver_note?.trim()).filter((d): d is string => !!d))]
+  if (!crew.driver_name && drivers.length) out.driver_name = drivers.join(', ').slice(0, 255)
+  return out
+}
+
 export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[] {
   const { tenantId, itinerary, days, suppliers, documentTypes } = input
   const guides = input.guides ?? []
+  const lineFacts = input.serviceLines ?? {}
+  const factsOf = (s: Record<string, unknown>) => (typeof s.id === 'string' ? lineFacts[s.id] : undefined)
   const groups = new Map<string, Group>()
   const places = new PlaceNames()
 
@@ -383,7 +411,7 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
         date: s.date,
         day_number: s.day_number,
         city: s.city,
-        notes: s.notes,
+        notes: notesWithFacts(s.notes as string | null | undefined, factsOf(s)),
         total_cost: s.total_cost,
       })) as Json,
       city: supplier || group.guide ? Array.from(group.cities).join(', ') : group.city,
@@ -399,7 +427,7 @@ export function planSupplierDocuments(input: PlanInput): SupplierDocumentInsert[
       status: 'draft',
       sync_key: key,
       // The vehicle and driver the trip's transport lines name (migration 402).
-      ...(group.docType === 'transport_voucher' ? transportCrew(group.services as Parameters<typeof transportCrew>[0]) : {}),
+      ...(group.docType === 'transport_voucher' ? transportFields(group.services, group.services.map(factsOf)) : {}),
     })
   }
   for (const row of rows) row.synced_hash = documentHash(row)
