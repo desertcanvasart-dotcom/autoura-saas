@@ -82,9 +82,17 @@ describe('one writer of a service booking\'s status', () => {
       return /from\('booking_supplier_status'\)[\s\S]{0,40}\.update\(/.test(src) && /status\b/.test(src)
     }).map(f => path.relative(root, f))
     // The route updates only cost / confirmation number; the status goes through the transition.
-    expect(writers.sort()).toEqual(['app/api/bookings/[id]/suppliers/route.ts', 'lib/bookings/service-booking-transition.ts'])
+    expect(writers.sort()).toEqual([
+      'app/api/bookings/[id]/suppliers/[lineId]/cover/route.ts',
+      'app/api/bookings/[id]/suppliers/route.ts',
+      'lib/bookings/service-booking-transition.ts',
+    ])
     const route = fs.readFileSync(path.join(root, 'app/api/bookings/[id]/suppliers/route.ts'), 'utf8')
     expect(route).not.toMatch(/updates\.status\s*=/)
+    // Who covers a line changes the supplier or the assignment; the status only through the transition.
+    const cover = fs.readFileSync(path.join(root, 'app/api/bookings/[id]/suppliers/[lineId]/cover/route.ts'), 'utf8')
+    expect(cover).not.toMatch(/from\('booking_supplier_status'\)\.update\(\{[^}]*\bstatus:/)
+    expect(cover).toContain("transitionServiceBooking(supabase, tenant_id, {")
   })
 })
 

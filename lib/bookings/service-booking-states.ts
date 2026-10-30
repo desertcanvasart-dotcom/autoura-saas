@@ -63,8 +63,8 @@ const NEXT: Record<ServiceBookingStatus, readonly ServiceBookingStatus[]> = {
   accepted: ['assigned', 'cancelled', 'pending'],
   assigned: ['done', 'cancelled', 'pending'],
   done: [],
-  declined: ['pending', 'requested', 'cancelled'],
-  expired: ['pending', 'requested', 'accepted', 'cancelled'],
+  declined: ['pending', 'requested', 'assigned', 'cancelled'],
+  expired: ['pending', 'requested', 'accepted', 'assigned', 'cancelled'],
   cancelled: ['pending'],
 }
 

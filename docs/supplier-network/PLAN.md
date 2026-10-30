@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–2 done (migs 446/447); supplier-from-rate next.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–3 done (migs 446/447); request + one-tap reply link next.
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -94,7 +94,9 @@ suppliers by request + one-tap reply — and see every line's status in one plac
    rows + new states + `reply_deadline` + `cost_snapshot`; `service_booking_events` table; create on
    booking confirmation (hook in `lib/bookings/create-booking-on-confirm.ts` /
    `booking-on-confirm.ts`); backfill existing rows. Keep tips/water/fees excluded (existing rule).
-3. **Supplier field on itinerary lines** (~0.5–1 wk) — pick supplier (or own car/guide) per
+3. **Supplier field on itinerary lines** (~0.5–1 wk) — *done 2026-10-30: supplier read from the pricing
+   rate (#725); "Who covers it" per line — own team/cars assigned directly with a clash warning, or a
+   supplier with the cost from its own rate for the same service (else a gap)* — pick supplier (or own car/guide) per
    transfer/guide/meal/hotel line; cost from that supplier's rate row (rates engine already
    reads `supplier_id`-bearing rate sheets).
 4. **Request + one-tap reply** (~1.5–2 wks) — extend the `staff_links` pattern to a
