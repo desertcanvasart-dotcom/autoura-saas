@@ -46,7 +46,7 @@ export async function noteForTeam(
       type: 'whatsapp_new_message',
       title,
       message,
-      link: '/whatsapp-inbox',
+      link: '/inbox?channel=whatsapp',
     })
   } catch (e) {
     console.error('WhatsApp AI team note failed:', (e as Error).message)

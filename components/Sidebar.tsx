@@ -39,7 +39,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const inboxUnread = useInboxUnreadCount(works ? user?.id : null, { notify: !pathname.startsWith('/inbox') })
   const team = useTeamBadges(works, {
     notify: {
-      whatsapp: !pathname.startsWith('/whatsapp-inbox'),
+      whatsapp: !pathname.startsWith('/inbox'),
       concierge: !pathname.startsWith('/concierge-briefs'),
     },
   })

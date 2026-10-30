@@ -94,7 +94,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       success: true,
       sent: false,
       requiresManualSend: true,
-      open_url: conversationId ? `/conversations?id=${conversationId}` : null,
+      open_url: conversationId ? `/inbox?channel=all&id=${conversationId}` : null,
       message: conversationId
         ? 'Draft approved. Open the conversation to send it — the reply is filled in for you.'
         : 'Draft approved. Open the conversation in Conversations to send the email reply.',

@@ -38,7 +38,7 @@ describe('the cache store', () => {
 
 describe('the inbox', () => {
   it('caches per user and company', () => {
-    const page = readFileSync(path.join(root, 'app/inbox/page.tsx'), 'utf8')
+    const page = readFileSync(path.join(root, 'app/inbox/_views/EmailView.tsx'), 'utf8')
     expect(page).toContain('useEmailCache(cacheOwnerKey(user?.id, tenant?.id))')
   })
 })

@@ -588,7 +588,7 @@ async function processInboundWhatsAppMessage({
         type: 'whatsapp_new_message',
         title: `New WhatsApp message from ${clientName || senderName || phoneNumber}`,
         message: bellSnippet(body) || (mediaUrl ? '📎 Attachment' : ''),
-        link: '/whatsapp-inbox',
+        link: '/inbox?channel=whatsapp',
       })
     } catch (e) {
       console.error('WhatsApp bell notification failed:', (e as Error).message)

@@ -287,7 +287,7 @@ export function buildAwaitingReplyItems(
       clientName: c.contact_name || c.contact_email || 'A customer',
       startDate: null,
       detail: { waitingSince: waiting, lastInboundAt: c.last_inbound_at ?? null, hours: Math.floor(hours) },
-      href: `/conversations?conversation=${c.id}`,
+      href: `/inbox?channel=all&id=${c.id}`,
     })
   }
   return items.sort((a, z) => Number(z.detail.hours ?? 0) - Number(a.detail.hours ?? 0))
