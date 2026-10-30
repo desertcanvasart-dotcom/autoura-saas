@@ -37,10 +37,12 @@ beforeAll(async () => {
       service_type text, service_name text not null, description text,
       quantity integer default 1, unit_cost numeric(10,2), total_cost numeric(10,2),
       is_included boolean default true, client_price numeric default 0,
-      rate_table text, rate_id uuid);`)
+      rate_table text, rate_id uuid,
+      supplier_currency varchar(3) default 'EUR', supplier_cost_original numeric, exchange_rate_used numeric);`)
   await db.exec(mig('385_itinerary_services_one_day_link.sql'))
   await db.exec(mig('391_pricing_grid_day_components_atomic_save.sql'))
   await db.exec(mig('405_itinerary_day_block_code.sql'))
+  await db.exec(mig('455_grid_records_supplier_currency.sql'))
   await db.query(`insert into itineraries values ($1, $2)`, [IT, T])
 }, 60_000) // booting PGlite under a full parallel run can exceed the 10 s default
 
@@ -132,6 +134,20 @@ describe('save_pricing_grid_days', () => {
     const codes = (await db.query<{ block_code: string | null }>(
       `select block_code from itinerary_days where itinerary_id = $1 order by day_number`, [IT])).rows
     expect(codes.map(r => r.block_code)).toEqual(['CAI-ARR', null, null])
+  })
+
+  it('a priced line keeps the supplier’s own currency, amount and rate (455); a line without them keeps the default', async () => {
+    await save([day(1, {}, [
+      svc('Guide', { unit_cost: 60, total_cost: 60, supplier_currency: 'EGP', supplier_cost_original: 3000, exchange_rate_used: 0.02 }),
+      svc('Custom'),
+    ])])
+    const rows = (await db.query<Record<string, unknown>>(
+      `select service_name, supplier_currency, supplier_cost_original::float8 as o, exchange_rate_used::float8 as r
+         from itinerary_services where itinerary_id = $1 order by service_name`, [IT])).rows
+    expect(rows).toEqual([
+      { service_name: 'Custom', supplier_currency: 'EUR', o: null, r: null },
+      { service_name: 'Guide', supplier_currency: 'EGP', o: 3000, r: 0.02 },
+    ])
   })
 
   it('an itinerary the caller cannot see is refused, not created', async () => {
