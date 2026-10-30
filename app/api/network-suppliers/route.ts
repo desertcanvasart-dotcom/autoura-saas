@@ -29,12 +29,18 @@ export async function GET(request: NextRequest) {
   const q = { kind: sp.get('kind'), city: sp.get('city'), language: sp.get('language'), text: sp.get('q') }
   const found = (data ?? []).map(toPublicProfile).filter(p => matchesSearch(p, q))
 
+  // Already on this agency's list: added from the network, or connected by
+  // their own sign-in (an approved claim on one of this agency's suppliers).
   const ids = found.map(p => p.account_id)
-  const { data: mine } = ids.length
-    ? await supabase.from('suppliers').select('id, network_account_id').eq('tenant_id', tenant_id).in('network_account_id', ids)
-    : { data: [] }
-  return NextResponse.json({
-    success: true,
-    data: found.map(p => ({ ...p, my_supplier_id: (mine ?? []).find(m => m.network_account_id === p.account_id)?.id ?? null })),
-  })
+  const [{ data: copies }, { data: connected }] = ids.length
+    ? await Promise.all([
+      supabase.from('suppliers').select('id, network_account_id').eq('tenant_id', tenant_id).in('network_account_id', ids),
+      supabase.from('supplier_account_links').select('supplier_id, account_id').eq('tenant_id', tenant_id).eq('status', 'approved').in('account_id', ids),
+    ])
+    : [{ data: [] }, { data: [] }]
+  const mineFor = (accountId: string) =>
+    (copies ?? []).find(m => m.network_account_id === accountId)?.id
+    ?? (connected ?? []).find(l => l.account_id === accountId)?.supplier_id
+    ?? null
+  return NextResponse.json({ success: true, data: found.map(p => ({ ...p, my_supplier_id: mineFor(p.account_id) })) })
 }
