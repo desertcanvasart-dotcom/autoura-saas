@@ -1,6 +1,5 @@
 {
   "app/accounts-receivable/page.tsx": 1,
-  "app/analytics/page.tsx": 2,
   "app/api/ai/parse-supplier-invoice/route.ts": 2,
   "app/api/pricing-grid/parse/route.ts": 17,
   "app/api/tours/browse/route.ts": 3,
@@ -26,6 +25,7 @@
   "app/quotes/b2c/[id]/edit/page.tsx": 1,
   "app/rates/activities/activity-rates-content.tsx": 1,
   "app/rates/cruises/page.tsx": 1,
+  "app/reports/_views/AnalyticsView.tsx": 2,
   "app/restaurants/restaurants-content.tsx": 17,
   "app/settings/billing/invoices/page.tsx": 1,
   "app/tours/[code]/page.tsx": 1,
