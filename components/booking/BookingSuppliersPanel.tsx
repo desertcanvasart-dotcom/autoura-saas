@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
-import { supplierBacking } from '@/lib/bookings/booking-suppliers'
+import { supplierBacking, supplierCostCurrency } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
 import LineHistory from '@/components/booking/LineHistory'
@@ -30,6 +30,8 @@ interface SupplierRow {
   service_date: string | null
   service_description: string | null
   pickup_location: string | null
+  /** Currency of quoted/confirmed cost (the supplier's own); null = the booking's. */
+  cost_currency?: string | null
   dropoff_location: string | null
   quoted_cost: number | null
   confirmed_cost: number | null
@@ -235,7 +237,7 @@ export default function BookingSuppliersPanel({
                     )}
                     {canEdit && (
                       <div className="mt-0.5 flex flex-wrap items-center gap-3">
-                        <CoverLinePicker bookingId={bookingId} lineId={r.id} currency={currency} onSaved={load} notify={notify} />
+                        <CoverLinePicker bookingId={bookingId} lineId={r.id} currency={supplierCostCurrency(r, currency)} onSaved={load} notify={notify} />
                         {r.resource_kind !== 'own' && lineSupplier(r) && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
                           <>
                             <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
@@ -262,7 +264,7 @@ export default function BookingSuppliersPanel({
                       // The cost the supplier confirmed (defaults to the quote);
                       // it is what the expense records.
                       <span className="inline-flex items-center gap-1">
-                        <span className="text-xs text-gray-400">{currency}</span>
+                        <span className="text-xs text-gray-400">{supplierCostCurrency(r, currency)}</span>
                         <input
                           key={`${r.id}:${r.confirmed_cost ?? ''}:${r.quoted_cost ?? ''}:${r.supplier_name}`}
                           aria-label={`Confirmed cost for ${lineService(r)}`}
@@ -281,7 +283,7 @@ export default function BookingSuppliersPanel({
                           className="!w-24 !px-2 !py-1 !text-xs text-right border border-gray-200 rounded-md"
                         />
                       </span>
-                    ) : (r.confirmed_cost ?? r.quoted_cost) != null ? `${currency} ${Number(r.confirmed_cost ?? r.quoted_cost).toFixed(2)}` : '—'}
+                    ) : (r.confirmed_cost ?? r.quoted_cost) != null ? `${supplierCostCurrency(r, currency)} ${Number(r.confirmed_cost ?? r.quoted_cost).toFixed(2)}` : '—'}
                     {r.confirmed_cost != null && r.quoted_cost != null && Number(r.confirmed_cost) !== Number(r.quoted_cost) && (
                       <div className="text-[10px] text-gray-400">quoted {Number(r.quoted_cost).toFixed(2)}</div>
                     )}

@@ -423,3 +423,31 @@ describe('453: the shared network — profiles found only when listed and verifi
     await expect(db.exec(`INSERT INTO suppliers (tenant_id, name, network_account_id) VALUES ('${tenant}', 'Copy 2', '${a}')`)).rejects.toThrow(/unique|duplicate/)
   })
 })
+
+describe('454: service lines in the supplier’s own currency', () => {
+  it('an untouched line priced in EGP on a EUR trip becomes EGP; an edited, accepted or same-currency line does not', async () => {
+    const trip = ((await db.query(`INSERT INTO itineraries (tenant_id, itinerary_code, client_name, start_date, end_date, status, currency)
+      VALUES ('${tenant}', 'ITN-454', 'Test', DATE '2027-03-01', DATE '2027-03-02', 'confirmed', 'EUR') RETURNING id`)).rows[0] as { id: string }).id
+    const day = ((await db.query(`INSERT INTO itinerary_days (itinerary_id, day_number, date) VALUES ('${trip}', 1, DATE '2027-03-01') RETURNING id`)).rows[0] as { id: string }).id
+    const svc = async (name: string, cur: string, original: number, rate: number, total: number) => ((await db.query(`INSERT INTO itinerary_services
+      (itinerary_id, day_id, service_type, service_name, quantity, supplier_currency, supplier_cost_original, exchange_rate_used, total_cost)
+      VALUES ('${trip}', '${day}', 'guide', '${name}', 1, '${cur}', ${original}, ${rate}, ${total}) RETURNING id`)).rows[0] as { id: string }).id
+    const booking = ((await db.query(`INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date, total_days, num_travelers, total_amount, balance_due, status, itinerary_id)
+      VALUES ('${tenant}', 'BK-454', 'Trip', DATE '2027-03-01', DATE '2027-03-02', 2, 2, 1000, 1000, 'pending_deposit', '${trip}') RETURNING id`)).rows[0] as { id: string }).id
+    const line = async (service: string, status: string, quoted: number) => ((await db.query(`INSERT INTO booking_supplier_status
+      (tenant_id, booking_id, supplier_type, supplier_name, status, quoted_cost, itinerary_service_id)
+      VALUES ('${tenant}', '${booking}', 'guide', '', '${status}', ${quoted}, '${service}') RETURNING id`)).rows[0] as { id: string }).id
+    const egp = await svc('Guide Giza', 'EGP', 3000, 0.02, 60)
+    const eur = await svc('Guide Luxor', 'EUR', 50, 1, 50)
+    const untouched = await line(egp, 'pending', 60)
+    const edited = await line(egp, 'pending', 75)
+    const accepted = await line(egp, 'accepted', 60)
+    const same = await line(eur, 'pending', 50)
+    await db.exec(readFileSync(path.join(MIGRATIONS_DIR, '454_service_line_own_currency.sql'), 'utf8'))
+    const row = async (id: string) => (await db.query(`SELECT cost_currency, quoted_cost::float AS q FROM booking_supplier_status WHERE id = '${id}'`)).rows[0]
+    expect(await row(untouched)).toEqual({ cost_currency: 'EGP', q: 3000 })
+    expect(await row(edited)).toEqual({ cost_currency: null, q: 75 })
+    expect(await row(accepted)).toEqual({ cost_currency: null, q: 60 })
+    expect(await row(same)).toEqual({ cost_currency: null, q: 50 })
+  })
+})
