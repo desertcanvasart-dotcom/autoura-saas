@@ -10,7 +10,7 @@ import { Loader2, UserCheck } from 'lucide-react'
 // agreed). Options come from /api/bookings/[id]/suppliers/[lineId]/cover.
 
 interface OwnOption { resource_type: string; resource_id: string; name: string; detail: string | null; day_off?: boolean }
-interface SupplierOption { supplier_id: string; name: string; cost: number | null; no_cost_reason: string | null; preferred?: boolean; day_off?: boolean }
+interface SupplierOption { supplier_id: string; name: string; cost: number | null; no_cost_reason: string | null; preferred?: boolean; day_off?: boolean; other?: boolean }
 interface Options { can_change: boolean; own: OwnOption[]; suppliers: SupplierOption[]; compares_rates: boolean }
 
 const OWN_KIND: Record<string, string> = {
@@ -91,8 +91,8 @@ export default function CoverLinePicker({
             <p className="text-xs text-gray-600">Move the line back to <b>To arrange</b> first to change who covers it.</p>
           ) : options.own.length === 0 && options.suppliers.length === 0 ? (
             <p className="text-xs text-gray-600">
-              Nobody to offer: no own people or cars for this kind of service
-              {options.compares_rates ? ', and no other supplier has a rate for it.' : '.'}
+              Nobody to offer: no own people or cars, and no supplier of this kind in your supplier book.
+              Add one under CRM → Suppliers.
             </p>
           ) : (
             <>
@@ -112,11 +112,20 @@ export default function CoverLinePicker({
                     ))}
                   </optgroup>
                 )}
-                {options.suppliers.length > 0 && (
-                  <optgroup label="Request from a supplier">
-                    {options.suppliers.map(s => (
+                {options.suppliers.some(s => !s.other) && (
+                  <optgroup label="Suppliers with a rate for this">
+                    {options.suppliers.filter(s => !s.other).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
                         {s.preferred ? '★ ' : ''}{s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}{s.day_off ? ' · ⚠ day off' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {options.suppliers.some(s => s.other) && (
+                  <optgroup label="Other suppliers of this kind (no rate — enter what they agree)">
+                    {options.suppliers.filter(s => s.other).map(s => (
+                      <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
+                        {s.name}{s.day_off ? ' · ⚠ day off' : ''}
                       </option>
                     ))}
                   </optgroup>

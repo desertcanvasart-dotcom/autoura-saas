@@ -31,11 +31,13 @@ describe('which lines need a supplier', () => {
       svc({ id: 'e', service_type: 'transportation', supplier_id: 's1', supplier_name: 'Cairo Transport', service_name: 'Giza → Hotel', total_cost: 10, day_number: 3 }),
     ]
     const lines = supplierLinesFromServices(services, '2026-11-01', 2)
-    expect(lines.map(l => [l.itinerary_service_id, l.service_date, l.supplier_name, l.quoted_cost])).toEqual([
-      ['b', '2026-11-01', 'full_service CAI', 11.83],
-      ['a', '2026-11-01', 'airport_transfer sedan Cairo', 94.67],
-      ['d', '2026-11-03', 'Cairo Transport', 40],
-      ['e', '2026-11-03', 'Cairo Transport', 10],
+    // No supplier yet: the supplier stays empty and the service is the
+    // description — never the service name in the supplier's place (2026-10-30).
+    expect(lines.map(l => [l.itinerary_service_id, l.service_date, l.supplier_name, l.service_description, l.quoted_cost])).toEqual([
+      ['b', '2026-11-01', '', 'full_service CAI', 11.83],
+      ['a', '2026-11-01', '', 'airport_transfer sedan Cairo', 94.67],
+      ['d', '2026-11-03', 'Cairo Transport', 'Hotel → Giza', 40],
+      ['e', '2026-11-03', 'Cairo Transport', 'Giza → Hotel', 10],
     ])
     expect(lines[1]).toMatchObject({ service_time: '14:30:00', pickup_location: 'CAI T2', pax: 2 })
     expect(lines[2].service_description).toBe('Hotel → Giza')

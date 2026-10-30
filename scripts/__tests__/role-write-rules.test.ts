@@ -338,3 +338,25 @@ describe('450: supplier accounts are never tenant users', () => {
     }
   })
 })
+
+describe('451: lines never borrow the service name as a supplier', () => {
+  it('moves the service into the description and leaves own cars/guides and real suppliers alone', async () => {
+    const booking = ((await db.query(`
+      INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date, total_days, num_travelers, total_amount, balance_due, status)
+      VALUES ('${tenant}', 'BK-451', 'Trip', DATE '2027-01-01', DATE '2027-01-05', 5, 2, 1000, 1000, 'pending_deposit') RETURNING id`)).rows[0] as { id: string }).id
+    const svc = '00000000-0000-0000-0000-000000000451'
+    const ins = (name: string, kind: string, desc: string | null) => db.query(`
+      INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status, resource_kind, service_description)
+      VALUES ('${tenant}', '${booking}', 'transport', '${name}', 'pending', '${kind}', ${desc ? `'${desc}'` : 'NULL'}) RETURNING id`)
+    const borrowed = ((await ins('day_tour sedan Cairo', 'supplier', null)).rows[0] as { id: string }).id
+    const own = ((await ins('Toyota Hiace', 'own', null)).rows[0] as { id: string }).id
+    // itinerary_service_id is what marks a line built from the itinerary; set without the FK check.
+    await db.exec(`ALTER TABLE booking_supplier_status DISABLE TRIGGER ALL;
+      UPDATE booking_supplier_status SET itinerary_service_id = '${svc}' WHERE id IN ('${borrowed}', '${own}');
+      ALTER TABLE booking_supplier_status ENABLE TRIGGER ALL;`)
+    await db.exec(readFileSync(path.join(MIGRATIONS_DIR, '451_service_lines_no_borrowed_supplier.sql'), 'utf8'))
+    const row = async (id: string) => (await db.query(`SELECT supplier_name, service_description FROM booking_supplier_status WHERE id = '${id}'`)).rows[0]
+    expect(await row(borrowed)).toEqual({ supplier_name: '', service_description: 'day_tour sedan Cairo' })
+    expect(await row(own)).toEqual({ supplier_name: 'Toyota Hiace', service_description: null })
+  })
+})

@@ -119,8 +119,10 @@ export function supplierLinesFromServices(
       itinerary_service_id: s.id || null,
       supplier_id: s.supplier_id || null,
       supplier_type: type,
-      supplier_name: (s.supplier_name || s.service_name || 'Unknown').trim(),
-      service_description: s.notes || (s.supplier_name && s.service_name ? s.service_name : null),
+      // No supplier yet = no name: the service goes in the description, never
+      // into the supplier's place (lib/bookings/service-label).
+      supplier_name: (s.supplier_name || '').trim(),
+      service_description: s.notes || s.service_name || null,
       service_date: serviceDate(s.day_number, s.day_date, tripStart),
       service_time: s.pickup_time || null,
       pickup_location: s.pickup_location || null,

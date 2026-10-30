@@ -117,6 +117,21 @@ export async function POST(
       const updates: Record<string, unknown> = {}
       if (body.confirmation_number !== undefined) updates.confirmation_number = body.confirmation_number
       if (body.confirmation_notes !== undefined) updates.confirmation_notes = body.confirmation_notes
+      // The office sets when and where (they go into the request, the voucher
+      // and the client's day message).
+      if (body.service_time !== undefined) {
+        const t = typeof body.service_time === 'string' ? body.service_time.trim() : ''
+        if (t && !/^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/.test(t)) {
+          return NextResponse.json({ success: false, error: 'Time must look like 09:30' }, { status: 400 })
+        }
+        updates.service_time = t || null
+      }
+      for (const f of ['pickup_location', 'dropoff_location'] as const) {
+        if (body[f] !== undefined) {
+          const v = typeof body[f] === 'string' ? body[f].trim().replace(/\s+/g, ' ').slice(0, 255) : ''
+          updates[f] = v || null
+        }
+      }
       if (body.confirmed_cost !== undefined) {
         const cost = body.confirmed_cost === null || body.confirmed_cost === '' ? null : Number(body.confirmed_cost)
         if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {

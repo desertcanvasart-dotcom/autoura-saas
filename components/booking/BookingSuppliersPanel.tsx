@@ -7,6 +7,8 @@ import { supplierBacking } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
 import LineHistory from '@/components/booking/LineHistory'
+import LineWhenWhere from '@/components/booking/LineWhenWhere'
+import { lineService, lineSupplier } from '@/lib/bookings/service-label'
 import RequestByEmail from '@/components/booking/RequestByEmail'
 import ClientDayMessage from '@/components/booking/ClientDayMessage'
 import {
@@ -27,6 +29,8 @@ interface SupplierRow {
   supplier_name: string
   service_date: string | null
   service_description: string | null
+  pickup_location: string | null
+  dropoff_location: string | null
   quoted_cost: number | null
   confirmed_cost: number | null
   status: string
@@ -209,10 +213,13 @@ export default function BookingSuppliersPanel({
                     {r.service_time && <div className="text-xs text-gray-400">{r.service_time.slice(0, 5)}</div>}
                   </td>
                   <td className="py-2 pr-3 text-gray-900">
-                    {r.supplier_name}
+                    {lineSupplier(r) ?? <span className="text-gray-400 italic">No supplier yet</span>}
                     {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-medium">Your team</span>}
                     {r.assigned_vehicle_plate && <span className="ml-1.5 text-xs text-gray-500">{r.assigned_vehicle_plate}</span>}
-                    {r.service_description && <div className="text-xs text-gray-500">{r.service_description}</div>}
+                    <div className="text-xs text-gray-500">{lineService(r)}</div>
+                    {(r.pickup_location || r.dropoff_location) && (
+                      <div className="text-xs text-gray-500">{[r.pickup_location && `From ${r.pickup_location}`, r.dropoff_location && `to ${r.dropoff_location}`].filter(Boolean).join(' ')}</div>
+                    )}
                     {r.assigned_guide_name && r.resource_kind !== 'own' && <div className="text-xs text-gray-600">Guide: {r.assigned_guide_name}</div>}
                     {r.driver_note && <div className="text-xs text-gray-600">Driver: {r.driver_note}</div>}
                     {r.supplier_day_off && normalizeStatus(r.status) !== 'cancelled' && (
@@ -229,12 +236,16 @@ export default function BookingSuppliersPanel({
                     {canEdit && (
                       <div className="mt-0.5 flex flex-wrap items-center gap-3">
                         <CoverLinePicker bookingId={bookingId} lineId={r.id} currency={currency} onSaved={load} notify={notify} />
-                        {r.resource_kind !== 'own' && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
-                          <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                        {r.resource_kind !== 'own' && lineSupplier(r) && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
+                          <>
+                            <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                            <RequestByEmail bookingId={bookingId} lineId={r.id} supplierName={lineSupplier(r) ?? 'the supplier'} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                          </>
                         )}
-                        {r.resource_kind !== 'own' && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
-                          <RequestByEmail bookingId={bookingId} lineId={r.id} supplierName={r.supplier_name} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                        {!lineSupplier(r) && normalizeStatus(r.status) === 'pending' && (
+                          <span className="text-xs text-gray-400">Choose who covers it, then ask them</span>
                         )}
+                        <LineWhenWhere key={`${r.id}:${r.service_time ?? ''}:${r.pickup_location ?? ''}:${r.dropoff_location ?? ''}`} bookingId={bookingId} line={r} onSaved={load} notify={notify} />
                         {r.resource_kind !== 'own' && normalizeStatus(r.status) === 'cancelled' && r.requested_at && (
                           <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={false} notice="cancelled" onSent={load} notify={notify} />
                         )}
@@ -251,7 +262,7 @@ export default function BookingSuppliersPanel({
                         <span className="text-xs text-gray-400">{currency}</span>
                         <input
                           key={`${r.id}:${r.confirmed_cost ?? ''}`}
-                          aria-label={`Confirmed cost for ${r.supplier_name}`}
+                          aria-label={`Confirmed cost for ${lineService(r)}`}
                           type="number"
                           step="0.01"
                           min="0"
@@ -274,7 +285,7 @@ export default function BookingSuppliersPanel({
                   </td>
                   <td className="py-2 pr-3">
                     <select
-                      aria-label={`Status of ${r.supplier_name}`}
+                      aria-label={`Status of ${lineService(r)}`}
                       value={normalizeStatus(r.status)}
                       disabled={!canEdit || savingId === r.id}
                       onChange={e => update(r, { status: e.target.value })}
@@ -289,7 +300,7 @@ export default function BookingSuppliersPanel({
                   </td>
                   <td className="py-2 pr-3">
                     <input
-                      aria-label={`Confirmation number for ${r.supplier_name}`}
+                      aria-label={`Confirmation number for ${lineService(r)}`}
                       defaultValue={r.confirmation_number ?? ''}
                       disabled={!canEdit}
                       onBlur={e => {

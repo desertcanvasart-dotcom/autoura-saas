@@ -11,6 +11,7 @@
 // covered yet still shows its time and service, never a made-up car.
 // No prices, no supplier names (the client deals with the agency).
 
+import { lineService } from '@/lib/bookings/service-label'
 import { isCovered, isCancelled } from '@/lib/bookings/service-booking-states'
 
 export interface DayLine {
@@ -52,7 +53,6 @@ function dayName(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
 }
 
-const SERVICE_WORD: Record<string, string> = { transport: 'Transfer', guide: 'Guide', restaurant: 'Meal', hotel: 'Hotel', activity_provider: 'Activity' }
 
 export function buildClientDayMessage(m: {
   clientName?: string | null
@@ -65,7 +65,7 @@ export function buildClientDayMessage(m: {
   const first = clean(m.clientName).split(/\s+/)[0] || 'there'
   const out: string[] = [`Hello ${first},`, '', m.isTomorrow ? `Here are your details for tomorrow, ${dayName(m.date)}:` : `Here are your details for ${dayName(m.date)}:`]
   for (const l of m.lines) {
-    const what = clean(l.service_description) || SERVICE_WORD[clean(l.supplier_type)] || 'Service'
+    const what = lineService(l)
     const time = clean(l.service_time).slice(0, 5)
     out.push('', `${time ? `🕘 ${time} · ` : '• '}${what}`)
     if (clean(l.pickup_location)) out.push(`📍 Pickup: ${clean(l.pickup_location)}`)

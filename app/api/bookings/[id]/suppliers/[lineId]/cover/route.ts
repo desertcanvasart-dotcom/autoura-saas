@@ -9,6 +9,7 @@ import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events
 import { transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
 import { computeConflicts } from '@/lib/itinerary-resource-conflicts'
 import { offOn } from '@/lib/supplier-days-off'
+import { SUPPLIER_KINDS_FOR_LINE } from '@/lib/bookings/service-label'
 
 // ============================================
 // Who covers this service line (lib/bookings/cover-options)
@@ -76,12 +77,33 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
   // suppliers, so an own guide's resource_id is a supplier id too.
   const off = offOn((daysOff ?? []) as Array<{ supplier_id: string; day: string }>, line.service_date)
 
+  // Every other supplier of this kind in the agency's book, with no cost (a
+  // gap the office fills with what they agree) — without these, a line whose
+  // rate names no supplier offered nobody at all (2026-10-30 click-through).
+  const kinds = SUPPLIER_KINDS_FOR_LINE[line.supplier_type] ?? [line.supplier_type]
+  const { data: sameKind } = await supabase.from('suppliers').select('id, name, company_name, supplier_type, types, is_active')
+    .eq('tenant_id', tenant_id).limit(500)
+  const priced = new Set(supplierOptions.map(o => o.supplier_id))
+  const otherSuppliers = (sameKind ?? [])
+    .filter(s => s.is_active !== false && !priced.has(s.id as string))
+    .filter(s => kinds.includes(String(s.supplier_type ?? '')) || ((s.types as string[] | null) ?? []).some(t => kinds.includes(t)))
+    .map(s => ({
+      supplier_id: s.id as string,
+      name: ((s.name || s.company_name) as string | null) ?? 'Supplier',
+      cost: null,
+      no_cost_reason: 'no rate for this service — enter what they agree',
+      preferred: false,
+      other: true,
+      day_off: off.has(s.id as string),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   return NextResponse.json({
     success: true,
     data: {
       can_change: CHANGEABLE.includes(normalizeStatus(line.status)),
       own: own.map(o => ({ ...o, day_off: o.resource_type === 'guide' && off.has(o.resource_id) })),
-      suppliers: supplierOptions.map(o => ({ ...o, day_off: off.has(o.supplier_id) })),
+      suppliers: [...supplierOptions.map(o => ({ ...o, day_off: off.has(o.supplier_id) })), ...otherSuppliers],
       compares_rates: !!(rateTable && SAME_SERVICE_KEYS[rateTable]),
     },
   })

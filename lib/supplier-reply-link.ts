@@ -13,6 +13,7 @@
 // service they are asked for, and nothing else of the trip — no other
 // suppliers, no client price, no client contact details.
 
+import { humanService, lineService, lineSupplier } from '@/lib/bookings/service-label'
 import { generateShareToken, isValidShareToken, str } from '@/lib/itinerary-share'
 import { normalizeStatus, type ServiceBookingStatus } from '@/lib/bookings/service-booking-states'
 
@@ -67,10 +68,10 @@ export function toSupplierView(
   booking: Record<string, unknown>,
   line: Record<string, unknown>,
 ): SupplierView {
-  const service = [str(line.service_description), str(line.supplier_type)].find(Boolean) ?? 'Service'
+  const service = lineService({ service_description: str(line.service_description), supplier_type: str(line.supplier_type) })
   return {
     operatorName: str(tenant.company_name) ?? 'Your client',
-    supplierName: str(line.supplier_name) ?? 'there',
+    supplierName: lineSupplier({ supplier_name: str(line.supplier_name) }) ?? '',
     service,
     serviceDate: str(line.service_date),
     serviceTime: str(line.service_time)?.slice(0, 5) ?? null,
@@ -158,7 +159,7 @@ export function buildServiceRequestMessage(m: RequestMessageInput): string {
   const first = m.supplierName?.trim().split(/\s+/)[0] || 'there'
   const lines: string[] = [`Hello ${first},`, '']
   lines.push(m.agency?.trim() ? `Booking request from ${m.agency.trim()}:` : 'Booking request:')
-  lines.push(`🧾 ${m.service.trim()}`)
+  lines.push(`🧾 ${humanService(m.service) ?? m.service.trim()}`)
   if (m.serviceDate) lines.push(`📅 ${day(m.serviceDate)}${m.serviceTime ? ` at ${m.serviceTime.slice(0, 5)}` : ''}`)
   if (m.pickup?.trim()) lines.push(`📍 Pickup: ${m.pickup.trim()}`)
   if (m.dropoff?.trim()) lines.push(`🏁 Drop-off: ${m.dropoff.trim()}`)
@@ -184,7 +185,7 @@ export function buildServiceCancelMessage(m: {
   return [
     `Hello ${first},`,
     '',
-    `The booking request${from} for ${m.service.trim()}${when} is no longer needed — please release it.`,
+    `The booking request${from} for ${humanService(m.service) ?? m.service.trim()}${when} is no longer needed — please release it.`,
     'Thank you, and sorry for the change.',
   ].join('\n')
 }
@@ -198,7 +199,7 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 /** Subject: what and when, so the supplier can find it in their inbox. */
 export function requestEmailSubject(service: string, serviceDate: string | null | undefined, reminder: boolean): string {
   const when = serviceDate ? ` — ${day(serviceDate)}` : ''
-  return `${reminder ? 'Reminder: ' : ''}Booking request: ${service.trim()}${when}`
+  return `${reminder ? 'Reminder: ' : ''}Booking request: ${humanService(service) ?? service.trim()}${when}`
 }
 
 /**

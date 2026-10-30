@@ -33,10 +33,14 @@ export default function ClientShell({
   // decides ACCESS, this one decides CHROME) — a route usually needs both.
   // /pricing was missing here until 2026-07-29: the public pricing page
   // rendered the operator sidebar for logged-in visitors.
-  // Token pages: held by a traveller (/share) or a no-login staff member
-  // (/staff). No sidebar, no analytics, no first-touch capture — and no
-  // notification-polling nav 401ing in their console.
-  const isTokenPage = pathname.startsWith('/share/') || pathname.startsWith('/staff/')
+  // Token pages: held by a traveller (/share, /portal), a no-login staff
+  // member (/staff) or a supplier (/reply, /supplier, and their sign-in and
+  // home). No sidebar, no support chat, no analytics, no first-touch capture —
+  // and no notification-polling nav 401ing in their console. Found missing
+  // for the supplier pages in the 2026-10-30 click-through.
+  const TOKEN_PREFIXES = ['/share/', '/staff/', '/portal/', '/reply/', '/supplier/']
+  const TOKEN_PAGES = ['/supplier-login', '/supplier-home']
+  const isTokenPage = TOKEN_PREFIXES.some(p => pathname.startsWith(p)) || TOKEN_PAGES.includes(pathname)
   const isPublicPage =
     publicPages.includes(pathname) ||
     pathname.startsWith('/docs') ||
