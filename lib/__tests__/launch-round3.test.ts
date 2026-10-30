@@ -271,9 +271,9 @@ describe('round 3 — first run', () => {
   })
 
   it('no "Nile" in the navigation and onboarding', () => {
-    expect(read('components/Sidebar.tsx')).not.toContain('Nile Cruises')
+    expect(read('lib/nav/config.ts')).not.toContain('Nile Cruises')
     expect(read('app/onboarding/steps/BusinessStep.tsx')).not.toContain('Nile Cruises')
-    expect(read('app/templates/page.tsx')).not.toContain("language: 'ar'")
+    expect(read('app/settings/message-templates/page.tsx')).not.toContain("language: 'ar'")
   })
 })
 

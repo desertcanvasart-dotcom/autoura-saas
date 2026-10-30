@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { chunkText, embedBatch, EMBEDDING_MODEL, toPgVector } from '@/lib/embeddings'
 
 type KbSourceType = 'kb_faq' | 'kb_policy' | 'kb_tour' | 'kb_custom'
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest) {
   if (auth.error || !auth.supabase || !auth.tenant_id) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: auth.status })
   }
+  const denied = roleDenied(auth.role, 'manage')
+  if (denied) return denied
   const { supabase, tenant_id } = auth
 
   const body = await request.json().catch(() => ({}))

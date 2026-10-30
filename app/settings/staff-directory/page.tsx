@@ -345,26 +345,16 @@ export default function TeamMembersPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
       </div>
     )
   }
 
   return (
-    <div className="p-6 space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            👥
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Team Members</h1>
-            <p className="text-sm text-gray-500">Manage your team for task assignments</p>
-          </div>
-        </div>
-
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl space-y-5">
+      {/* Toolbar */}
+      <div className="flex items-center justify-end">
         <button
           onClick={openAddModal}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"

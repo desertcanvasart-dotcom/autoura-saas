@@ -51,7 +51,7 @@ describe("a company's today", () => {
   })
 
   it('can be set in Settings → Organization', () => {
-    const page = src('app/settings/tenant/page.tsx')
+    const page = src('app/settings/company/page.tsx')
     expect(page).toContain('Company timezone')
     expect(page).toContain('timezone: companyTimezone || null')
   })

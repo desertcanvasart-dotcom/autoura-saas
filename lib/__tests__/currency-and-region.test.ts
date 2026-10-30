@@ -9,7 +9,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
 
 describe('a company works in its own currency', () => {
   it('Settings → Organization can set it, for every supported currency', () => {
-    const src = read('app/settings/tenant/page.tsx')
+    const src = read('app/settings/company/page.tsx')
     expect(src).toContain('id="agency-currency"')
     expect(src).toContain('default_currency: agencyCurrency')
   })

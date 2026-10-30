@@ -495,23 +495,20 @@ export default function TemplatesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Message Templates</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {filteredTemplates.length} of {templates.length} templates • Quick-send via Email, WhatsApp, or SMS
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <p className="text-sm text-gray-500">
+          {filteredTemplates.length} of {templates.length} templates
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => setShowAnalytics(!showAnalytics)}

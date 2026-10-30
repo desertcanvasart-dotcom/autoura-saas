@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 
 // GET - Get single template
 export async function GET(
@@ -45,6 +46,8 @@ export async function PUT(
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase } = authResult
     if (!supabase) {
@@ -123,6 +126,8 @@ export async function DELETE(
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { supabase } = authResult
     if (!supabase) {

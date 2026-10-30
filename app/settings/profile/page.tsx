@@ -15,8 +15,7 @@ import {
   MapPin, 
   Lock,
   Camera,
-  Save,
-  ArrowLeft
+  Save
 } from 'lucide-react'
 
 // ============================================
@@ -249,29 +248,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      {/* CLEAN HEADER */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">Profile Settings</h1>
-              <p className="text-xs text-gray-500 mt-0.5">Manage your account and preferences</p>
-            </div>
-            <Link 
-              href="/" 
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to Dashboard
-            </Link>
-          </div>
-        </div>
-      </header>
-
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
       {/* Main Content */}
-      <div className="p-6">
-        <div className="max-w-4xl mx-auto space-y-4">
+      <div>
+        <div className="space-y-4">
           
           {/* PROFILE CARD */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">

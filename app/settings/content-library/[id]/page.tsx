@@ -737,7 +737,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
       })
 
       if (res.ok) {
-        router.push('/content-library')
+        router.push('/settings/content-library')
       } else {
         const error = await res.json()
         showToast('error', error.message || 'Error saving content')
@@ -775,7 +775,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
-              href="/content-library"
+              href="/settings/content-library"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />

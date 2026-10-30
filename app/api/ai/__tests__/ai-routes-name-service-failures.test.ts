@@ -17,7 +17,7 @@ vi.mock('@/lib/ai/anthropic-client', async (importOriginal) => {
 })
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', supabase: {}, user: { id: 'u1' } }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', role: 'admin', supabase: {}, user: { id: 'u1' } }),
 }))
 
 vi.mock('@/lib/embeddings', () => ({

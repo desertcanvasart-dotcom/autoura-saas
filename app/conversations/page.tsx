@@ -236,7 +236,7 @@ export default function ConversationsPage() {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-120px)] overflow-hidden">
+      <div className="flex h-[calc(100vh_-_120px_-_var(--app-chrome))] overflow-hidden">
         {/* Left Panel - Conversation List */}
         <div className="w-96 min-h-0 bg-white border-r border-gray-200 flex flex-col">
           {/* Search & Filters */}

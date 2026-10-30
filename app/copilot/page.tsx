@@ -35,6 +35,12 @@ export default function CopilotPage() {
 
   useEffect(() => { fetchThreads() }, [fetchThreads])
 
+  // The top bar's Copilot panel opens a thread here with ?thread=<id>.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('thread')
+    if (id) { setSelectedId(id); fetchDetail(id) }
+  }, [fetchDetail])
+
   useEffect(() => {
     fetch('/api/copilot/settings').then(r => r.json()).then(d => {
       if (d?.settings?.tone) setTone(d.settings.tone)
@@ -58,7 +64,7 @@ export default function CopilotPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-1rem)]">
+    <div className="flex flex-col h-[calc(100vh_-_1rem_-_var(--app-chrome))]">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-3">

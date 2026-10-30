@@ -169,7 +169,7 @@ describe('the screen only loads what a browser can hold', () => {
   })
 
   it('the page takes its alias helpers from those two, never from the server-side module', async () => {
-    const fromPricing = imports(await read('app/settings/attraction-aliases/page.tsx')).filter(i => i.startsWith('@/lib/pricing/'))
+    const fromPricing = imports(await read('app/settings/attraction-names/page.tsx')).filter(i => i.startsWith('@/lib/pricing/'))
     expect(fromPricing.sort()).toEqual(['@/lib/pricing/alias-admin-access', '@/lib/pricing/alias-shared'])
   })
 })

@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
-import Link from 'next/link'
 import {
-  ArrowLeft,
   FileText,
   Download,
   ExternalLink,
@@ -126,8 +124,8 @@ export default function BillingInvoicesPage() {
   // Only show access denied AFTER we've confirmed the user's role is loaded
   if (tenantMember && !isAdmin) {
     return (
-      <div className="p-6">
-        <div className="max-w-6xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
+        <div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div>
@@ -143,29 +141,11 @@ export default function BillingInvoicesPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
+      <div className="space-y-6">
         {/* Header */}
         <div>
-          <Link
-            href="/settings/billing"
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Billing
-          </Link>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                <FileText className="w-7 h-7 text-blue-600" />
-                Invoice History
-              </h1>
-              <p className="text-gray-600 mt-1">
-                View and download your billing invoices
-              </p>
-            </div>
-          </div>
+          <h2 className="text-base font-semibold text-gray-900">Invoice history</h2>
         </div>
 
         {/* Filter Tabs */}

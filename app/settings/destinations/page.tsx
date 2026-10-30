@@ -10,9 +10,7 @@
 // Writes go through /api/destination-catalog/manage (admin-gated).
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import {
-  Globe2,
   Plus,
   Star,
   ChevronDown,
@@ -124,19 +122,11 @@ export default function DestinationSettingsPage() {
   const selected = catalog.filter(d => d.selected)
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <Link href="/settings" className="text-sm text-gray-500 hover:text-gray-700">← Settings</Link>
-        <div className="flex items-center gap-3 mt-2">
-          <Globe2 className="w-6 h-6 text-[#647C47]" />
-          <h1 className="text-2xl font-semibold text-gray-900">Destinations</h1>
-        </div>
-        <p className="text-sm text-gray-500 mt-1">
-          The countries your agency operates, and the cities you sell. Every city dropdown
-          follows this list. (The default destination and each destination&rsquo;s brief are kept
-          here but not used anywhere yet.)
-        </p>
-      </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <p className="mb-6 text-xs text-gray-500">
+        The default destination and each destination&rsquo;s brief are kept here but not used
+        anywhere yet.
+      </p>
 
       {notice && (
         <div className={`mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm ${

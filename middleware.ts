@@ -87,7 +87,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // sent its manager or member to "unauthorized", because the /settings
   // rule above caught them first. The longest matching route wins (below).
   '/settings/email-signatures': ['admin', 'manager', 'member'],
-  '/settings/copilot-analytics': ['admin', 'manager'],
   '/settings/seasons': ['admin', 'manager'],
   // Your own profile, password and notifications, and your own Gmail
   // (connected per person): everyone with a login. The Inbox sends members
@@ -97,10 +96,20 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/settings/email': ['admin', 'manager', 'member'],
   // Team Members (managers) links here to manage departments.
   '/settings/departments': ['admin', 'manager'],
-  '/users': ['admin'],
+  // The Settings area (lib/nav/config.ts SETTINGS_NAV). Anything under
+  // /settings without its own entry is admin-only (the rule above).
+  '/settings/notifications': ['admin', 'manager', 'member', 'viewer'],
+  '/settings/team': ['admin'],
+  // The staff directory (guides, drivers, office staff — not logins).
+  '/settings/staff-directory': ['admin', 'manager'],
+  // Everyone uses templates; the API lets only managers change them.
+  '/settings/message-templates': ['admin', 'manager', 'member'],
+  '/settings/content-library': ['admin', 'manager'],
+  '/settings/writing-rules': ['admin', 'manager'],
+  '/settings/ai-prompts': ['admin', 'manager'],
+  '/settings/copilot-knowledge': ['admin', 'manager'],
   
   // Admin and Manager
-  '/team-members': ['admin', 'manager'],
   '/financial-reports': ['admin', 'manager'],
   '/profit-loss': ['admin', 'manager'],
   '/accounts-receivable': ['admin', 'manager'],
@@ -116,7 +125,11 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // entry, any signed-in role (viewers too) opened them by URL — and the
   // Resources page could delete suppliers.
   '/departures': ['admin', 'manager'],
+  // The capacity calendar: how many groups a day the operation takes on.
+  '/departures/capacity': ['admin'],
   '/suppliers': ['admin', 'manager'],
+  // The supplier network search (no entry until 2026-10-30: open by URL).
+  '/network-suppliers': ['admin', 'manager'],
   '/resources': ['admin', 'manager'],
   '/airport-staff': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],
@@ -140,9 +153,7 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // approve and publish (lib/publish/admin-route.ts).
   '/publish': ['admin', 'manager', 'member'],
   '/copilot': ['admin', 'manager', 'member'],
-  '/copilot-knowledge': ['admin', 'manager', 'member'],
-  '/templates': ['admin', 'manager', 'member'],
-  '/content-library': ['admin', 'manager'],
+  '/copilot-analytics': ['admin', 'manager'],
   // Receipts, invoices and contracts open from Payments and Itineraries.
   '/documents': ['admin', 'manager', 'member'],
   '/whatsapp-parser': ['admin', 'manager', 'member'],

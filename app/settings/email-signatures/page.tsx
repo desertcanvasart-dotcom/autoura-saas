@@ -57,17 +57,8 @@ export default function EmailSignaturesPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <div className="flex items-start justify-between mb-6 gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <PenLine className="w-5 h-5 text-[#647C47]" />
-            <h1 className="text-2xl font-semibold text-gray-900">Email Signatures</h1>
-          </div>
-          <p className="text-sm text-gray-500">
-            Your personal signatures. The default one auto-appears in the reply composer.
-          </p>
-        </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <div className="flex items-center justify-end mb-6 gap-4">
         <button
           onClick={() => setShowNew(true)}
           className="flex items-center gap-2 bg-[#647C47] text-white px-4 py-2 rounded-lg hover:bg-[#566b3c] text-sm flex-shrink-0"

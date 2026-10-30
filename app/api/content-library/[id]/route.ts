@@ -5,6 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { gateRole } from '@/lib/api-role-gate'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -89,6 +90,8 @@ export async function PUT(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const body = await request.json()
     const {
@@ -240,6 +243,8 @@ export async function PATCH(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const body = await request.json()
     
@@ -291,6 +296,8 @@ export async function DELETE(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     // Variations are deleted via CASCADE
     const { error } = await supabase

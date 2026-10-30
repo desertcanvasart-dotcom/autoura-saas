@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  Building2,
   Plus,
   Pencil,
   Trash2,
@@ -226,7 +225,7 @@ export default function DepartmentsSettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center gap-2 text-gray-500">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl flex items-center gap-2 text-gray-500">
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading departments…
       </div>
@@ -234,19 +233,8 @@ export default function DepartmentsSettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-[#647C47]" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Departments</h1>
-            <p className="text-sm text-gray-500">
-              Group staff by the work they handle, and route generated tasks to them
-            </p>
-          </div>
-        </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <div className="flex items-center justify-end mb-6">
         <button
           onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
@@ -262,7 +250,7 @@ export default function DepartmentsSettingsPage() {
           Service types decide which department a generated task goes to. When an itinerary
           generates tasks, each one is routed to the department that handles its service type —
           so a service type no department covers produces an unassigned task.{' '}
-          <Link href="/team-members" className="underline font-medium">
+          <Link href="/settings/staff-directory" className="underline font-medium">
             Assign staff to departments
           </Link>
           .
@@ -312,7 +300,7 @@ export default function DepartmentsSettingsPage() {
                     underline) so the hover is discoverable, and clicking
                     jumps to the team list pre-filtered to this department. */}
                 <Link
-                  href={`/team-members?department=${dept.id}`}
+                  href={`/settings/staff-directory?department=${dept.id}`}
                   className="relative group inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 underline decoration-dotted underline-offset-2"
                 >
                   <Users className="w-3 h-3" />

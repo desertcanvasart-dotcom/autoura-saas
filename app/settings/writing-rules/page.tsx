@@ -8,9 +8,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
-import Link from 'next/link'
 import {
-  ArrowLeft,
   Plus,
   Edit,
   Trash2,
@@ -248,25 +246,14 @@ export default function WritingRulesPage() {
   }, {} as Record<string, WritingRule[]>)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/content-library"
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Writing Rules</h1>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {rules.length} rules defining your content style
-                </p>
-              </div>
-            </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      {/* Toolbar */}
+      <div>
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-gray-500">
+              {rules.length} rules defining your content style
+            </p>
             <button
               onClick={handleNew}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] transition-colors"
@@ -278,7 +265,7 @@ export default function WritingRulesPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="pt-6">
         {/* Messages */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">

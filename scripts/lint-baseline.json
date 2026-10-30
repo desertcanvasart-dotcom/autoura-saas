@@ -1,7 +1,7 @@
 {
   "totals": {
-    "errors": 1379,
-    "warnings": 481
+    "errors": 1375,
+    "warnings": 475
   },
   "rules": {
     "(no rule — parse or config error)": {
@@ -10,10 +10,10 @@
     },
     "@next/next/no-img-element": {
       "errors": 0,
-      "warnings": 12
+      "warnings": 11
     },
     "@typescript-eslint/no-explicit-any": {
-      "errors": 1265,
+      "errors": 1261,
       "warnings": 0
     },
     "@typescript-eslint/no-require-imports": {
@@ -30,7 +30,7 @@
     },
     "@typescript-eslint/no-unused-vars": {
       "errors": 0,
-      "warnings": 384
+      "warnings": 381
     },
     "import/no-anonymous-default-export": {
       "errors": 0,
@@ -46,7 +46,7 @@
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 75
+      "warnings": 73
     },
     "react/no-unescaped-entities": {
       "errors": 87,

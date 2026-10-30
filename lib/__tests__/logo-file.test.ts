@@ -19,7 +19,7 @@ describe('company logo files', () => {
   })
 
   it('both upload screens use it', () => {
-    for (const f of ['app/settings/tenant/page.tsx', 'app/onboarding/steps/BrandingStep.tsx']) {
+    for (const f of ['app/settings/company/page.tsx', 'app/onboarding/steps/BrandingStep.tsx']) {
       const src = readFileSync(join(process.cwd(), f), 'utf8')
       expect(src, f).toContain('logoFileProblem(file)')
       expect(src, f).toContain('accept={LOGO_ACCEPT}')

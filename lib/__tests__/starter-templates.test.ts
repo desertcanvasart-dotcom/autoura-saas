@@ -42,6 +42,7 @@ vi.mock('@/lib/supabase-server', () => ({
   requireAuth: async () => ({
     error: null,
     tenant_id: 't1',
+    role: 'admin',
     supabase: {
       from: () => {
         const q: any = {

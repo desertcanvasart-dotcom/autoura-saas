@@ -19,7 +19,7 @@ const STAR = /\.select\(\s*['"`]\*['"`]/g
 // The count on 2026-10-18, after the unused /api/resources/vehicles/[id]
 // route was removed. Lower this — never raise it — as star-selects are
 // replaced with explicit column lists.
-const BASELINE = 252
+const BASELINE = 251
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { whatsappModel } from '@/lib/ai/models'
 import { requireAuth } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { chunkText, embedBatch, EMBEDDING_MODEL, toPgVector } from '@/lib/embeddings'
 import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
 
@@ -83,6 +84,8 @@ export async function POST(request: NextRequest) {
   if (auth.error || !auth.supabase || !auth.tenant_id) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: auth.status })
   }
+  const denied = roleDenied(auth.role, 'manage')
+  if (denied) return denied
   const { supabase, tenant_id } = auth
 
   const body = await request.json().catch(() => ({}))

@@ -88,7 +88,7 @@ describe('settings pages that said one thing and did another', () => {
 
   it('an invitation is resent in one request, and a failed email says so', () => {
     expect(src('app/api/invitations/route.ts')).toMatch(/existingInvitation && body\.resend === true/)
-    const page = src('app/users/page.tsx')
+    const page = src('app/settings/team/page.tsx')
     expect(page).toMatch(/resend: true/)
     expect(page).toMatch(/data\.emailSent === false/)
     expect(page).toMatch(/invitableRoles\.map/)
@@ -102,7 +102,7 @@ describe('settings pages that said one thing and did another', () => {
   })
 
   it('only edited exchange rates are saved, each checked', () => {
-    expect(src('app/settings/page.tsx')).toMatch(/exchangeRates\.filter\(r => editedRates\.has/)
+    expect(src('components/settings/LegacySettingsTabs.tsx')).toMatch(/exchangeRates\.filter\(r => editedRates\.has/)
     expect(src('app/api/exchange-rates/route.ts')).toMatch(/Some rates could not be saved/)
   })
 
@@ -111,7 +111,7 @@ describe('settings pages that said one thing and did another', () => {
   })
 
   it('a logo that fails to upload stops the save', () => {
-    expect(src('app/settings/tenant/page.tsx')).toMatch(/The logo could not be uploaded, so nothing was saved/)
+    expect(src('app/settings/company/page.tsx')).toMatch(/The logo could not be uploaded, so nothing was saved/)
   })
 })
 

@@ -10,7 +10,7 @@ import path from 'path'
 // ============================================================================
 
 const src = fs.readFileSync(
-  path.join(process.cwd(), 'components/Sidebar.tsx'),
+  path.join(process.cwd(), 'components/nav/TopBar.tsx'),
   'utf8'
 )
 
@@ -40,6 +40,6 @@ describe('the build tag never reaches a production tenant', () => {
   })
 
   it('does not render an empty tag when there is nothing to show', () => {
-    expect(code).toContain('(tenant || APP_LABEL)')
+    expect(code).toContain('{APP_LABEL && (')
   })
 })

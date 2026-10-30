@@ -1291,7 +1291,7 @@ function PricingGridContent() {
                   <li key={`${m.dayNumber}-${m.kind}-${i}`}>Day {m.dayNumber}: {m.name} <span className="text-amber-600">({m.kind})</span></li>
                 ))}
               </ul>
-              <Link href="/content-library" className="inline-block mt-1.5 text-amber-900 underline">Add them in the Content Library</Link>
+              <Link href="/settings/content-library" className="inline-block mt-1.5 text-amber-900 underline">Add them in the Content Library</Link>
             </details>
           )}
 

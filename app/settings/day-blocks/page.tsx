@@ -167,16 +167,7 @@ export default function DayBlocksPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-5">
-      <div>
-        <Link href="/settings" className="text-sm text-gray-500 hover:text-gray-700">← Settings</Link>
-        <h1 className="text-xl font-semibold text-gray-900 mt-1">Day blocks</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Your standard days, kept once: what each includes and where its night is. Export the sheet, edit it in
-          Excel or Google Sheets, and import it back &mdash; you see what changes before anything is saved.
-        </p>
-      </div>
-
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         {canWrite ? (
           <>
@@ -255,7 +246,7 @@ export default function DayBlocksPage() {
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>
                 {unpriced} block(s) name an attraction that is not on your entrance fees, so it would price as nothing. Fix the
-                name in the sheet, or say which fee it means in <Link href="/settings/attraction-aliases" className="underline">Attraction names</Link>.
+                name in the sheet, or say which fee it means in <Link href="/settings/attraction-names" className="underline">Attraction names</Link>.
               </span>
             </div>
           )}

@@ -10,7 +10,6 @@ import SendingDomainCard from '@/components/settings/SendingDomainCard'
 import { TemplateEditor } from '@/components/email/RichTextEditor'
 import { 
   Mail, 
-  ArrowLeft, 
   Check, 
   AlertCircle, 
   Loader2,
@@ -228,29 +227,10 @@ function EmailSettingsContent() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Link
-                href="/settings/profile"
-                className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 mb-2"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Back to Settings
-              </Link>
-              <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Mail className="w-5 h-5 text-primary-600" />
-                Email Settings
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5">Manage your email connection and templates</p>
-            </div>
-          </div>
-        </div>
-        
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <div>
         {/* Tabs */}
-        <div className="px-6 flex gap-6 border-t border-gray-100">
+        <div className="flex gap-6 border-b border-gray-200">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -266,10 +246,10 @@ function EmailSettingsContent() {
             </button>
           ))}
         </div>
-      </header>
+      </div>
 
-      <div className="p-6">
-        <div className="max-w-3xl mx-auto space-y-4">
+      <div className="pt-6">
+        <div className="max-w-3xl space-y-4">
           
           {/* Message */}
           {message && (
@@ -607,7 +587,7 @@ function TemplateModal({
 export default function EmailSettingsPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
+      <div className="px-4 sm:px-6 lg:px-8 py-12 max-w-5xl flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </div>
     }>

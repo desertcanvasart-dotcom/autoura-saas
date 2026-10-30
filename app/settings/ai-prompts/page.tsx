@@ -109,15 +109,9 @@ function PromptsContent() {
   })).filter(g => g.prompts.length > 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[#647C47]" /> AI Prompt Templates
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage prompts used for AI content generation</p>
-          </div>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+      <div>
+        <div className="flex items-center justify-end">
           <button
             onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setShowForm(true) }}
             className="btn-primary text-sm px-4 py-2 rounded-lg flex items-center gap-2"
@@ -125,9 +119,9 @@ function PromptsContent() {
             <Plus className="w-4 h-4" /> New Template
           </button>
         </div>
-      </header>
+      </div>
 
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="pt-6">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
         ) : prompts.length === 0 ? (

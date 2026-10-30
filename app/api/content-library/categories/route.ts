@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { gateRole, roleDenied } from '@/lib/api-role-gate'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -95,6 +96,8 @@ export async function POST(request: NextRequest) {
     if (auth.error !== null) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
+    const denied = roleDenied(auth.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = auth
     if (!supabase || !tenant_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -156,6 +159,8 @@ export async function PATCH(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const body = await request.json()
     const { id, ...updates } = body
@@ -199,6 +204,8 @@ export async function DELETE(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

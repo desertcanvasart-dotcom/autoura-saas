@@ -5,6 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { gateRole } from '@/lib/api-role-gate'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -99,6 +100,8 @@ export async function POST(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const body = await request.json()
     const { tier, title, description, highlights, inclusions, internal_notes } = body
@@ -185,6 +188,8 @@ export async function PUT(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const body = await request.json()
     const { variations } = body
@@ -302,6 +307,8 @@ export async function PATCH(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const body = await request.json()
     const { tier, variation_id, ...updates } = body
@@ -369,6 +376,8 @@ export async function DELETE(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const denied = await gateRole('manage')
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier')
