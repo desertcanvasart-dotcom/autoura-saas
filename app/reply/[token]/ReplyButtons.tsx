@@ -4,7 +4,8 @@ import { useState } from 'react'
 import type { SupplierView } from '@/lib/supplier-reply-link'
 
 // Accept / Decline / name the car or guide. Big buttons: this is opened on a
-// phone from a WhatsApp message. Answers go to /api/reply/[token].
+// phone from a WhatsApp message. Answers go to /api/reply/[token], or — on
+// the supplier's own page (449) — to that line's endpoint.
 
 const SAID: Record<string, string> = {
   accepted: 'You accepted — thank you.',
@@ -13,7 +14,7 @@ const SAID: Record<string, string> = {
   done: 'This service is done. Thank you.',
 }
 
-export default function ReplyButtons({ token, view }: { token: string; view: SupplierView }) {
+export default function ReplyButtons({ token, view, endpoint }: { token: string; view: SupplierView; endpoint?: string }) {
   const [status, setStatus] = useState(view.status)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +29,7 @@ export default function ReplyButtons({ token, view }: { token: string; view: Sup
   const send = async (body: Record<string, unknown>) => {
     setBusy(true); setError(null)
     try {
-      const res = await fetch(`/api/reply/${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const res = await fetch(endpoint ?? `/api/reply/${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.success) { setError(data.error || 'Could not save — please try again'); return }
       setStatus(data.status); setNaming(false); setDeclining(false)

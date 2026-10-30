@@ -249,3 +249,36 @@ describe('448: a supplier reply link', () => {
     expect(await count(`SELECT count(*) AS n FROM service_booking_links WHERE service_booking_id = '${line}'`)).toBe(0)
   })
 })
+
+describe('449: a supplier\'s own page and their days off', () => {
+  let supplier: string
+
+  beforeAll(async () => {
+    supplier = ((await db.query(`
+      INSERT INTO suppliers (tenant_id, name) VALUES ('${tenant}', 'Giza Cars') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  const link = (token: string) => `INSERT INTO supplier_portal_links (tenant_id, supplier_id, token) VALUES ('${tenant}', '${supplier}', '${token}')`
+  const off = (day: string, by = 'supplier') => `INSERT INTO supplier_unavailable_days (tenant_id, supplier_id, day, marked_by) VALUES ('${tenant}', '${supplier}', DATE '${day}', '${by}')`
+
+  it('the team makes the link; a viewer cannot; one active link per supplier', async () => {
+    expect(await as(people.viewer, link('p-viewer'))).toMatch(/row-level security/)
+    expect(await as(people.owner, link('p-1'))).toBeNull()
+    expect(await as(people.owner, link('p-2'))).toMatch(/unique|duplicate/)
+    expect(await as(people.owner, `UPDATE supplier_portal_links SET revoked_at = NOW() WHERE token = 'p-1'`)).toBeNull()
+    expect(await as(people.owner, link('p-2'))).toBeNull()
+  })
+
+  it('a day off once per day; only supplier or office marks it; a viewer cannot', async () => {
+    expect(await as(people.owner, off('2027-02-01'))).toBeNull()
+    expect(await as(people.owner, off('2027-02-01', 'office'))).toMatch(/unique|duplicate/)
+    expect(await as(people.owner, off('2027-02-02', 'someone'))).toMatch(/check constraint/)
+    expect(await as(people.viewer, off('2027-02-03'))).toMatch(/row-level security/)
+  })
+
+  it('both go with their supplier', async () => {
+    await db.exec(`DELETE FROM suppliers WHERE id = '${supplier}'`)
+    expect(await count(`SELECT count(*) AS n FROM supplier_portal_links WHERE supplier_id = '${supplier}'`)).toBe(0)
+    expect(await count(`SELECT count(*) AS n FROM supplier_unavailable_days WHERE supplier_id = '${supplier}'`)).toBe(0)
+  })
+})

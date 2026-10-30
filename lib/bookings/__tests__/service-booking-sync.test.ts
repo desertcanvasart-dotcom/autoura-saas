@@ -85,8 +85,8 @@ describe('one writer of a service booking\'s status', () => {
     expect(writers.sort()).toEqual([
       'app/api/bookings/[id]/suppliers/[lineId]/cover/route.ts',
       'app/api/bookings/[id]/suppliers/route.ts',
-      'app/api/reply/[token]/route.ts',
       'lib/bookings/service-booking-transition.ts',
+      'lib/bookings/supplier-answer.ts',
     ])
     const route = fs.readFileSync(path.join(root, 'app/api/bookings/[id]/suppliers/route.ts'), 'utf8')
     expect(route).not.toMatch(/updates\.status\s*=/)
@@ -94,10 +94,14 @@ describe('one writer of a service booking\'s status', () => {
     const cover = fs.readFileSync(path.join(root, 'app/api/bookings/[id]/suppliers/[lineId]/cover/route.ts'), 'utf8')
     expect(cover).not.toMatch(/from\('booking_supplier_status'\)\.update\(\{[^}]*\bstatus:/)
     expect(cover).toContain("transitionServiceBooking(supabase, tenant_id, {")
-    // The supplier's link saves the car or guide; the status only through the transition.
-    const reply = fs.readFileSync(path.join(root, 'app/api/reply/[token]/route.ts'), 'utf8')
-    expect(reply).not.toMatch(/from\('booking_supplier_status'\)\.update\(\{[^}]*\bstatus:/)
-    expect(reply).toContain('transitionServiceBooking(db, link.tenant_id, {')
+    // A supplier's answer (reply link or their own page) saves the car or
+    // guide; the status only through the transition.
+    const answer = fs.readFileSync(path.join(root, 'lib/bookings/supplier-answer.ts'), 'utf8')
+    expect(answer).not.toMatch(/from\('booking_supplier_status'\)\.update\(\{[^}]*\bstatus:/)
+    expect(answer).toContain('transitionServiceBooking(db, tenantId, {')
+    for (const route of ['app/api/reply/[token]/route.ts', 'app/api/supplier-page/[token]/lines/[lineId]/route.ts']) {
+      expect(fs.readFileSync(path.join(root, route), 'utf8'), route).toContain('applySupplierAnswer(')
+    }
   })
 })
 

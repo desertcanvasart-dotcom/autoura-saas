@@ -80,6 +80,7 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // Supplier reply links (448): the supplier has no session; the route checks
   // the token's shape, then needs an unrevoked, unexpired service_booking_links row.
   '/api/reply/': ['isValidReplyToken', 'revoked_at', 'isLinkLive'],
+  '/api/supplier-page/': ['isValidSupplierPageToken', 'revoked_at', 'supplier_id'],
   // Traveller report from the share page — the traveller has no session by
   // design; the secret share token in the path IS the credential. The handler
   // validates its shape and looks up an unrevoked itinerary_shares row by it.
