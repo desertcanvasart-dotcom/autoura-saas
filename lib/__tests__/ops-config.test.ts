@@ -28,6 +28,7 @@ describe('operations', () => {
       'mail-alerts': 'mail-alerts', 'scheduled-send': 'scheduled-send', 'publish-sync': 'publish-sync',
       'service-booking-deadlines': 'service-booking-deadlines',
       'service-booking-done': 'service-booking-done',
+      'client-day-reminders': 'client-day-reminders',
     }
     for (const job of JOB_NAMES) expect(ops, job).toContain(`/api/cron/${endpoint[job]}`)
     expect(ops).toContain('## Backups and restore')

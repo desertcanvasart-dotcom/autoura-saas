@@ -143,4 +143,11 @@ const servicesDone = await run(
   (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} line(s) failed: ${p.failures.join('; ')}` : null)
 )
 
-process.exit(invoices && tasks && purge && closed && servicesDone ? 0 : 1)
+// The client's day details: a morning bell for each booking with services tomorrow.
+const clientDays = await run(
+  'client-day-reminders',
+  '/api/cron/client-day-reminders',
+  (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} reminder(s) failed: ${p.failures.join('; ')}` : null)
+)
+
+process.exit(invoices && tasks && purge && closed && servicesDone && clientDays ? 0 : 1)

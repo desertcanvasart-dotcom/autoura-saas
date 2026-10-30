@@ -7,6 +7,7 @@ import { supplierBacking } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
 import LineHistory from '@/components/booking/LineHistory'
+import ClientDayMessage from '@/components/booking/ClientDayMessage'
 import {
   SERVICE_BOOKING_STATUSES, STATUS_LABEL, canTransition, normalizeStatus, type CoveredBy, type ServiceBookingStatus,
 } from '@/lib/bookings/service-booking-states'
@@ -169,6 +170,12 @@ export default function BookingSuppliersPanel({
           </button>
         )}
       </div>
+
+      {canEdit && rows.length > 0 && (
+        <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2">
+          <ClientDayMessage bookingId={bookingId} notify={notify} refreshKey={rows.length} />
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-gray-500">Loading…</p>

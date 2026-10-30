@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–6 built (migs 446–448); the client "your car tomorrow" message next.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · **Phase 1 BUILT** (migs 446–448): steps 1–6 + the client "your car tomorrow" message. Left: email request (optional).
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
