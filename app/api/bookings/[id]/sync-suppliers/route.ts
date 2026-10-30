@@ -21,11 +21,13 @@ export async function POST(
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const denied = roleDenied(authResult.role, 'manage')
     if (denied) return denied
-    const { supabase, tenant_id } = authResult
+    const { supabase, tenant_id, user } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const { id: bookingId } = await params
-    const result = await syncBookingSuppliers(supabase, tenant_id, bookingId)
+    const result = await syncBookingSuppliers(supabase, tenant_id, bookingId, {
+      actor: 'operator', actorUserId: user?.id ?? null, actorLabel: user?.email ?? null,
+    })
     if (!result.ok) {
       const status = result.error === 'Booking not found' ? 404 : 500
       return NextResponse.json({ success: false, error: result.error }, { status })
@@ -34,7 +36,7 @@ export async function POST(
       .from('booking_supplier_status')
       .select('id')
       .eq('booking_id', bookingId)
-      .eq('status', 'confirmed')
+      .in('status', ['accepted', 'assigned', 'done'])
     let expensesAdded = 0
     for (const row of confirmed || []) {
       const r = await syncSupplierExpense(supabase, tenant_id, row.id as string)
@@ -43,8 +45,9 @@ export async function POST(
     }
 
     const parts = [
-      result.added ? `Added ${result.added} supplier${result.added === 1 ? '' : 's'} from the itinerary` : 'Every supplier is already listed',
-      expensesAdded ? `recorded ${expensesAdded} expense${expensesAdded === 1 ? '' : 's'} for confirmed suppliers` : '',
+      result.added ? `Listed ${result.added} service${result.added === 1 ? '' : 's'} from the itinerary` : 'Every service is already listed',
+      result.replaced ? `replaced ${result.replaced} older row${result.replaced === 1 ? '' : 's'}` : '',
+      expensesAdded ? `recorded ${expensesAdded} expense${expensesAdded === 1 ? '' : 's'} for accepted services` : '',
     ].filter(Boolean)
     return NextResponse.json({
       success: true,
