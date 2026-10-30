@@ -18,6 +18,7 @@
 //     suppliers confirmed" is the claim that made the sibling add this rule).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { supplierOwnMoney, type OwnCurrencyLine } from '@/lib/supplier-own-currency'
 import { isCancelled, isCovered } from '@/lib/bookings/service-booking-states'
 import { eventRow } from '@/lib/bookings/service-booking-events'
 
@@ -54,7 +55,7 @@ export function supplierTypeFor(serviceType: string | null | undefined): string 
   return t in map ? map[t] : null
 }
 
-export interface ServiceForSupplier {
+export interface ServiceForSupplier extends OwnCurrencyLine {
   id?: string | null
   supplier_id?: string | null
   supplier_name?: string | null
@@ -84,6 +85,16 @@ export interface SupplierLine {
   dropoff_location: string | null
   pax: number | null
   quoted_cost: number | null
+  /** Currency of quoted_cost (the supplier's own, lib/supplier-own-currency); null = the booking's. */
+  cost_currency: string | null
+}
+
+/** The currency a line's quoted and confirmed cost are in: its own, else the booking's. */
+export function supplierCostCurrency(
+  row: { cost_currency?: string | null },
+  bookingCurrency: string | null | undefined,
+): string {
+  return String(row.cost_currency || bookingCurrency || 'EUR').trim().toUpperCase()
 }
 
 export function serviceDate(dayNumber: number, dayDate: string | null | undefined, tripStart: string | null | undefined): string | null {
@@ -103,18 +114,28 @@ export function supplierKey(l: { supplier_id?: string | null; supplier_name?: st
     : `name:${(l.supplier_name ?? '').trim().toLowerCase()}|${l.supplier_type ?? ''}|${date}`
 }
 
-/** The booking's service bookings implied by its itinerary: one per line that needs a supplier. */
+/**
+ * The booking's service bookings implied by its itinerary: one per line that
+ * needs a supplier. The cost is in the supplier's OWN currency (EGP for a
+ * guide, USD for a Nile cruise…) when the line was priced in one with the
+ * rate it was converted at — what the supplier is paid
+ * (lib/supplier-own-currency); otherwise the line's total_cost in the trip's
+ * currency (`tripCurrency`), and cost_currency null = the booking's.
+ */
 export function supplierLinesFromServices(
   services: ServiceForSupplier[],
   tripStart: string | null | undefined,
   pax: number | null = null,
+  tripCurrency: string | null = null,
 ): SupplierLine[] {
+  const trip = String(tripCurrency ?? '').trim().toUpperCase()
   const lines: SupplierLine[] = []
   for (const s of services) {
     // The grid saves a cruise as 'accommodation'; its slot tag says cruise.
     const isGridCruise = String(s.description ?? '').startsWith('[pricing-grid:cruise]')
     const type = isGridCruise ? 'cruise' : supplierTypeFor(s.service_type)
     if (!type) continue
+    const money = trip ? supplierOwnMoney([s], trip) : null
     lines.push({
       itinerary_service_id: s.id || null,
       supplier_id: s.supplier_id || null,
@@ -128,7 +149,8 @@ export function supplierLinesFromServices(
       pickup_location: s.pickup_location || null,
       dropoff_location: s.dropoff_location || null,
       pax: pax && pax > 0 ? pax : null,
-      quoted_cost: Number(s.total_cost) || null,
+      quoted_cost: money?.own ? money.total : (Number(s.total_cost) || null),
+      cost_currency: money?.own ? money.currency : null,
     })
   }
   return lines.sort((a, b) =>
@@ -242,7 +264,7 @@ export async function syncBookingSuppliers(
   const [{ data: days }, { data: services }, { data: existing }] = await Promise.all([
     db.from('itinerary_days').select('id, day_number, date').eq('itinerary_id', booking.itinerary_id),
     db.from('itinerary_services')
-      .select('id, supplier_id, supplier_name, service_name, service_type, description, notes, total_cost, pickup_time, pickup_location, dropoff_location, rate_table, rate_id, itinerary_day_id, day_id')
+      .select('id, supplier_id, supplier_name, service_name, service_type, description, notes, total_cost, quantity, supplier_currency, supplier_cost_original, exchange_rate_used, pickup_time, pickup_location, dropoff_location, rate_table, rate_id, itinerary_day_id, day_id')
       .eq('itinerary_id', booking.itinerary_id),
     db.from('booking_supplier_status')
       .select('id, itinerary_service_id, supplier_id, supplier_name, supplier_type, service_date, status, confirmation_number, confirmed_cost')
@@ -265,6 +287,9 @@ export async function syncBookingSuppliers(
   }
 
   const pax = Number(booking.num_travelers) || null
+  // The currency the services' total_cost is in: the trip's.
+  const { data: trip } = await db.from('itineraries').select('currency').eq('id', booking.itinerary_id).maybeSingle()
+  const tripCurrency = (trip?.currency as string | null) ?? null
   const rateSupplier = await suppliersFromRates(db, tenantId, rows)
   const earlierKey = new Map(
     supplierLinesFromServices(rows, booking.start_date as string | null, pax)
@@ -272,7 +297,7 @@ export async function syncBookingSuppliers(
       .map(l => [l.itinerary_service_id as string, supplierKey(l)]),
   )
   const plan = planLineSync(
-    supplierLinesFromServices(withSupplierFromRate(rows, rateSupplier), booking.start_date as string | null, pax),
+    supplierLinesFromServices(withSupplierFromRate(rows, rateSupplier), booking.start_date as string | null, pax, tripCurrency),
     (existing ?? []).map(r => ({ ...r, has_expense: withExpense.has(r.id as string) }) as ExistingServiceRow),
     earlierKey,
   )

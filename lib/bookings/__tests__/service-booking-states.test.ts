@@ -79,8 +79,8 @@ describe('the booking and the expense read the new states', () => {
 
   it('an assigned or done line keeps its expense; a declined one has none', () => {
     const row = { status: 'assigned', confirmed_cost: 50, quoted_cost: null, service_date: '2027-01-02' }
-    expect(planSupplierExpense(row, null, '2026-10-30')).toEqual({ action: 'create', amount: 50, expense_date: '2027-01-02' })
-    expect(planSupplierExpense({ ...row, status: 'done' }, { status: 'pending', amount: 50, expense_date: '2027-01-02' }, '2026-10-30'))
+    expect(planSupplierExpense(row, null, '2026-10-30')).toEqual({ action: 'create', amount: 50, currency: 'EUR', expense_date: '2027-01-02' })
+    expect(planSupplierExpense({ ...row, status: 'done' }, { status: 'pending', amount: 50, expense_date: '2027-01-02', currency: 'EUR' }, '2026-10-30'))
       .toEqual({ action: 'none' })
     expect(planSupplierExpense({ ...row, status: 'declined' }, { status: 'pending', amount: 50, expense_date: '2027-01-02' }, '2026-10-30'))
       .toEqual({ action: 'remove' })

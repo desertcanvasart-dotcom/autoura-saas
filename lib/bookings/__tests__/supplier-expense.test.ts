@@ -65,7 +65,20 @@ describe('planSupplierExpense', () => {
   const today = '2026-10-05'
   it('creates on confirmation, with the service date', () => {
     expect(planSupplierExpense({ status: 'confirmed', confirmed_cost: null, quoted_cost: 50, service_date: '2026-11-01' }, null, today))
-      .toEqual({ action: 'create', amount: 50, expense_date: '2026-11-01' })
+      .toEqual({ action: 'create', amount: 50, currency: 'EUR', expense_date: '2026-11-01' })
+  })
+  it("creates in the line's own currency, else the booking's", () => {
+    expect(planSupplierExpense({ status: 'accepted', confirmed_cost: null, quoted_cost: 3000, service_date: '2026-11-01', cost_currency: 'egp' }, null, today, 'JPY'))
+      .toEqual({ action: 'create', amount: 3000, currency: 'EGP', expense_date: '2026-11-01' })
+    expect(planSupplierExpense({ status: 'accepted', confirmed_cost: null, quoted_cost: 50, service_date: null, cost_currency: null }, null, today, 'jpy'))
+      .toMatchObject({ action: 'create', currency: 'JPY', expense_date: today })
+  })
+  it('a pending expense follows its line to another currency — never one someone approved', () => {
+    const row = { status: 'accepted', confirmed_cost: null, quoted_cost: 3000, service_date: '2026-11-01', cost_currency: 'EGP' }
+    expect(planSupplierExpense(row, { status: 'pending', amount: 3000, expense_date: '2026-11-01', currency: 'EGP' }, today, 'JPY').action).toBe('none')
+    expect(planSupplierExpense(row, { status: 'pending', amount: 3000, expense_date: '2026-11-01', currency: 'JPY' }, today, 'JPY'))
+      .toEqual({ action: 'update', amount: 3000, currency: 'EGP', expense_date: '2026-11-01' })
+    expect(planSupplierExpense(row, { status: 'approved', amount: 99, expense_date: today, currency: 'JPY' }, today, 'JPY').action).toBe('kept')
   })
   it('does nothing before confirmation or without a cost', () => {
     expect(planSupplierExpense({ status: 'contacted', confirmed_cost: null, quoted_cost: 50, service_date: null }, null, today).action).toBe('none')

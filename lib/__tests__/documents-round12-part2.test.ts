@@ -8,7 +8,6 @@ import { roundLinesToTotal, formatTotals } from '@/lib/currency-totals'
 import { computeAddTravellerReprice } from '@/lib/reprice-add-traveller'
 import { manifestCost } from '@/lib/bookings/extra-supplier-cost'
 import { totalWithBookingExtras } from '@/lib/itinerary-client-total'
-import type { ExchangeRate } from '@/lib/currency'
 
 // ============================================
 // Documents audit, round 12 — part 2: money and the documents customers see
@@ -138,23 +137,14 @@ describe('yen in documents', () => {
 })
 
 describe('a confirmed extra’s supplier cost', () => {
-  const rates: ExchangeRate[] = [
-    { base_currency: 'EUR', target_currency: 'EGP', rate: 50, is_active: true } as ExchangeRate,
-    { base_currency: 'EUR', target_currency: 'JPY', rate: 160, is_active: true } as ExchangeRate,
-  ]
-  it('goes onto the manifest in the booking currency', () => {
-    expect(manifestCost({ supplier_cost: 150, supplier_currency: 'EGP' }, 'JPY', rates)).toEqual({
-      quotedCost: 480, note: ' (supplier cost EGP 150)',
-    })
+  it('goes onto the manifest in the currency the supplier is paid in, not converted', () => {
+    expect(manifestCost({ supplier_cost: 150, supplier_currency: 'EGP' }, 'JPY')).toEqual({ quotedCost: 150, costCurrency: 'EGP' })
+    expect(manifestCost({ supplier_cost: 150, supplier_currency: 'egp' }, 'USD')).toEqual({ quotedCost: 150, costCurrency: 'EGP' })
   })
-  it('with no rate, is left for a person — not stated as ¥150', () => {
-    const r = manifestCost({ supplier_cost: 150, supplier_currency: 'EGP' }, 'USD', [])
-    expect(r.quotedCost).toBeNull()
-    expect(r.note).toContain('no USD rate')
-  })
-  it('in the booking currency, stays as it is', () => {
-    expect(manifestCost({ supplier_cost: 150, supplier_currency: 'jpy' }, 'JPY', [])).toEqual({ quotedCost: 150, note: '' })
-    expect(manifestCost({ supplier_cost: null }, 'JPY', [])).toEqual({ quotedCost: null, note: '' })
+  it('in the booking currency, stays as it is (null = the booking’s)', () => {
+    expect(manifestCost({ supplier_cost: 150, supplier_currency: 'jpy' }, 'JPY')).toEqual({ quotedCost: 150, costCurrency: null })
+    expect(manifestCost({ supplier_cost: 150 }, 'JPY')).toEqual({ quotedCost: 150, costCurrency: null })
+    expect(manifestCost({ supplier_cost: null }, 'JPY')).toEqual({ quotedCost: null, costCurrency: null })
   })
 })
 

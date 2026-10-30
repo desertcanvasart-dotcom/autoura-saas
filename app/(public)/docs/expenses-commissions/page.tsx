@@ -58,6 +58,12 @@ export default function ExpensesCommissionsPage() {
           <li><strong>Export CSV</strong> &mdash; the list as it is filtered, ready for Excel (non-Latin text included).</li>
           <li><strong>The expense page</strong> &mdash; click an expense for its details, its trip, and the link to its receipt; <strong>Edit</strong> opens the form.</li>
         </ul>
+        <p className="text-gray-600 mt-3">
+          When a supplier accepts a service on a booking&rsquo;s <strong>Suppliers</strong> tab, its expense is added for you, in the
+          currency that supplier is paid in &mdash; its own when its itinerary line was priced in it (EGP for a guide,
+          USD for a Nile cruise), otherwise the trip&rsquo;s. While Pending it follows the supplier&rsquo;s cost, currency
+          and date; once Approved, Paid or Rejected it is left alone.
+        </p>
       </section>
 
       {/* Roles */}
