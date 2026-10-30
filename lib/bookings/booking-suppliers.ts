@@ -15,9 +15,11 @@
 //   * a row marked cancelled = "not needed" and does not count;
 //   * BACKED = at least one row still needed, and every one confirmed — an
 //     empty list is not backing ("all zero suppliers confirmed" is the claim
-//     that made the sibling add this rule).
+//     that made the sibling add this rule). Since 446 "confirmed" is any
+//     covered state: accepted, assigned or done (service-booking-states).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isCancelled, isCovered } from '@/lib/bookings/service-booking-states'
 
 export type SupplierRowStatus = 'pending' | 'contacted' | 'confirmed' | 'no_response' | 'cancelled'
 
@@ -29,8 +31,8 @@ export interface SupplierBacking {
 }
 
 export function supplierBacking(rows: { status: string | null }[] | null | undefined): SupplierBacking {
-  const needed = (rows ?? []).filter(r => r.status !== 'cancelled')
-  const confirmed = needed.filter(r => r.status === 'confirmed').length
+  const needed = (rows ?? []).filter(r => !isCancelled(r.status))
+  const confirmed = needed.filter(r => isCovered(r.status)).length
   return { total: needed.length, confirmed, backed: needed.length > 0 && confirmed === needed.length }
 }
 

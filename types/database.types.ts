@@ -2068,6 +2068,22 @@ export interface Database {
           confirmed_at: string | null
           created_at: string | null
           updated_at: string | null
+          itinerary_service_id: string | null
+          service_time: string | null
+          pickup_location: string | null
+          dropoff_location: string | null
+          pax: number | null
+          cost_currency: string | null
+          reply_deadline: string | null
+          requested_at: string | null
+          assigned_at: string | null
+          resource_kind: string
+          itinerary_resource_id: string | null
+          assigned_vehicle_id: string | null
+          assigned_vehicle_plate: string | null
+          assigned_guide_name: string | null
+          assigned_guide_phone: string | null
+          driver_note: string | null
         }
         Insert: {
           id?: string
@@ -2089,6 +2105,22 @@ export interface Database {
           confirmed_at?: string | null
           created_at?: string | null
           updated_at?: string | null
+          itinerary_service_id?: string | null
+          service_time?: string | null
+          pickup_location?: string | null
+          dropoff_location?: string | null
+          pax?: number | null
+          cost_currency?: string | null
+          reply_deadline?: string | null
+          requested_at?: string | null
+          assigned_at?: string | null
+          resource_kind?: string
+          itinerary_resource_id?: string | null
+          assigned_vehicle_id?: string | null
+          assigned_vehicle_plate?: string | null
+          assigned_guide_name?: string | null
+          assigned_guide_phone?: string | null
+          driver_note?: string | null
         }
         Update: {
           id?: string
@@ -2110,6 +2142,22 @@ export interface Database {
           confirmed_at?: string | null
           created_at?: string | null
           updated_at?: string | null
+          itinerary_service_id?: string | null
+          service_time?: string | null
+          pickup_location?: string | null
+          dropoff_location?: string | null
+          pax?: number | null
+          cost_currency?: string | null
+          reply_deadline?: string | null
+          requested_at?: string | null
+          assigned_at?: string | null
+          resource_kind?: string
+          itinerary_resource_id?: string | null
+          assigned_vehicle_id?: string | null
+          assigned_vehicle_plate?: string | null
+          assigned_guide_name?: string | null
+          assigned_guide_phone?: string | null
+          driver_note?: string | null
         }
         Relationships: [
           {
@@ -2124,6 +2172,27 @@ export interface Database {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_supplier_status_itinerary_service_id_fkey"
+            columns: ["itinerary_service_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_supplier_status_itinerary_resource_id_fkey"
+            columns: ["itinerary_resource_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_supplier_status_assigned_vehicle_id_fkey"
+            columns: ["assigned_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]
@@ -8882,6 +8951,76 @@ export interface Database {
           applied_at?: string
         }
         Relationships: []
+      }
+      service_booking_events: {
+        Row: {
+          id: string
+          tenant_id: string
+          booking_id: string
+          service_booking_id: string
+          occurred_at: string
+          actor_kind: string
+          actor_user_id: string | null
+          actor_label: string | null
+          channel: string
+          from_status: string | null
+          to_status: string | null
+          note: string | null
+          details: Json
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          booking_id: string
+          service_booking_id: string
+          occurred_at?: string
+          actor_kind: string
+          actor_user_id?: string | null
+          actor_label?: string | null
+          channel: string
+          from_status?: string | null
+          to_status?: string | null
+          note?: string | null
+          details?: Json
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          booking_id?: string
+          service_booking_id?: string
+          occurred_at?: string
+          actor_kind?: string
+          actor_user_id?: string | null
+          actor_label?: string | null
+          channel?: string
+          from_status?: string | null
+          to_status?: string | null
+          note?: string | null
+          details?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_booking_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_booking_events_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_booking_events_service_booking_id_fkey"
+            columns: ["service_booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking_supplier_status"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sleeping_train_rates: {
         Row: {

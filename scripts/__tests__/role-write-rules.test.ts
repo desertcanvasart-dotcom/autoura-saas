@@ -164,3 +164,49 @@ describe('425: the team role rules hold in the database', () => {
     expect(await as(people.manager, invite('manager'))).toMatch(/below your own|row-level security/)
   })
 })
+
+describe('446: a service booking\'s history is append-only', () => {
+  let line: string
+  let booking: string
+
+  beforeAll(async () => {
+    booking = ((await db.query(`
+      INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date,
+                            total_days, num_travelers, total_amount, balance_due, status)
+      VALUES ('${tenant}', 'BK-446', 'Trip', DATE '2027-01-01', DATE '2027-01-05', 5, 2, 1000, 1000, 'pending_deposit')
+      RETURNING id`)).rows[0] as { id: string }).id
+    line = ((await db.query(`
+      INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status)
+      VALUES ('${tenant}', '${booking}', 'transport', 'Nile Cars', 'pending') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  const event = (to: string) => `INSERT INTO service_booking_events
+    (tenant_id, booking_id, service_booking_id, actor_kind, channel, from_status, to_status)
+    VALUES ('${tenant}', '${booking}', '${line}', 'operator', 'app', 'pending', '${to}')`
+
+  it('the team adds events; a viewer cannot', async () => {
+    expect(await as(people.owner, event('requested'))).toBeNull()
+    expect(await as(people.viewer, event('accepted'))).toMatch(/row-level security/)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(1)
+  })
+
+  it('nobody edits an event — not even the service role — and a signed-in user cannot delete one', async () => {
+    await expect(db.exec(`UPDATE service_booking_events SET to_status = 'done' WHERE service_booking_id = '${line}'`))
+      .rejects.toThrow(/append-only/)
+    await as(people.owner, `DELETE FROM service_booking_events WHERE service_booking_id = '${line}'`)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(1)
+  })
+
+  it('takes the new states and still the old words, nothing else', async () => {
+    for (const s of ['requested', 'accepted', 'assigned', 'done', 'declined', 'expired', 'contacted', 'confirmed', 'no_response']) {
+      expect(await as(people.owner, `UPDATE booking_supplier_status SET status = '${s}' WHERE id = '${line}'`), s).toBeNull()
+    }
+    expect(await as(people.owner, `UPDATE booking_supplier_status SET status = 'maybe' WHERE id = '${line}'`)).toMatch(/check constraint/)
+    expect(await as(people.owner, `UPDATE booking_supplier_status SET resource_kind = 'friend' WHERE id = '${line}'`)).toMatch(/check constraint/)
+  })
+
+  it('the events go with their line', async () => {
+    await db.exec(`DELETE FROM booking_supplier_status WHERE id = '${line}'`)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(0)
+  })
+})

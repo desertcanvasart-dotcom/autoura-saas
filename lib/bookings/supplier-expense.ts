@@ -6,7 +6,8 @@
 // showed ~100% margin and owed nobody. Now a booking's supplier row
 // (booking_supplier_status) that is CONFIRMED with a cost becomes a pending
 // expense: supplier, category, amount (the confirmed cost, else the quoted
-// one), the service date, the trip and booking.
+// one), the service date, the trip and booking. Since 446 "confirmed" is any
+// covered state: accepted, assigned or done.
 //
 // The expense follows its row only while it is still PENDING:
 //   * cost or date changes → the expense is updated;
@@ -18,6 +19,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-numbering'
+import { isCovered } from '@/lib/bookings/service-booking-states'
 
 export interface SupplierRowForExpense {
   id: string
@@ -84,7 +86,7 @@ export function planSupplierExpense(
   today: string,
 ): ExpensePlan {
   if (existing && existing.status !== 'pending') return { action: 'kept' }
-  const amount = row.status === 'confirmed' ? supplierRowCost(row) : null
+  const amount = isCovered(row.status) ? supplierRowCost(row) : null
   if (amount === null) return existing ? { action: 'remove' } : { action: 'none' }
   const expense_date = (row.service_date ?? '').slice(0, 10) || today
   if (!existing) return { action: 'create', amount, expense_date }

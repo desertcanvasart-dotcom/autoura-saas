@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { syncSupplierExpense } from '@/lib/bookings/supplier-expense'
 import { roleDenied } from '@/lib/api-role-gate'
-
-const SUPPLIER_STATUSES = ['pending', 'contacted', 'confirmed', 'no_response', 'cancelled']
+import { STORED_STATUSES, isCovered } from '@/lib/bookings/service-booking-states'
+import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
 
 // GET - List suppliers for a booking
 export async function GET(
@@ -61,23 +61,28 @@ export async function POST(
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const denied = roleDenied(authResult.role, 'manage')
     if (denied) return denied
-    const { supabase, tenant_id } = authResult
+    const { supabase, tenant_id, user } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const { id } = await params
     const body = await request.json()
+    const actor = { tenantId: tenant_id, bookingId: id, actor: 'operator' as const, channel: 'app' as const, actorUserId: user?.id ?? null, actorLabel: user?.email ?? null }
 
     // Update existing supplier
     if (body.id) {
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      let fromStatus: string | null = null
       if (body.status !== undefined) {
-        if (!SUPPLIER_STATUSES.includes(body.status)) {
-          return NextResponse.json({ success: false, error: `status must be one of: ${SUPPLIER_STATUSES.join(', ')}` }, { status: 400 })
+        if (!STORED_STATUSES.includes(body.status)) {
+          return NextResponse.json({ success: false, error: `status must be one of: ${STORED_STATUSES.join(', ')}` }, { status: 400 })
         }
+        const { data: before } = await supabase
+          .from('booking_supplier_status').select('status').eq('id', body.id).eq('booking_id', id).maybeSingle()
+        fromStatus = before?.status ?? null
         updates.status = body.status
-        // Leaving 'confirmed' clears the stamp; the booking's own status is
-        // the operator's call (checked against these rows when it moves on).
-        if (body.status !== 'confirmed') updates.confirmed_at = null
+        // Leaving a covered state clears the stamp; the booking's own status
+        // is the operator's call (checked against these rows when it moves on).
+        if (!isCovered(body.status)) updates.confirmed_at = null
       }
       if (body.confirmation_number !== undefined) updates.confirmation_number = body.confirmation_number
       if (body.confirmation_notes !== undefined) updates.confirmation_notes = body.confirmation_notes
@@ -88,7 +93,7 @@ export async function POST(
         }
         updates.confirmed_cost = cost
       }
-      if (body.status === 'confirmed' && !body.confirmed_at) {
+      if (body.status !== undefined && isCovered(body.status) && !isCovered(fromStatus)) {
         updates.confirmed_at = new Date().toISOString()
       }
 
@@ -101,6 +106,13 @@ export async function POST(
         .single()
 
       if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+
+      // Every status change is in the line's history (446). The save stands
+      // even if the event cannot be written; the log says so.
+      if (body.status !== undefined && body.status !== fromStatus) {
+        const logged = await recordServiceBookingEvent(supabase, { ...actor, serviceBookingId: data.id, fromStatus, toStatus: body.status })
+        if (!logged.ok) console.error('[bookings/suppliers] event:', logged.error)
+      }
 
       // Confirmed with a cost → the trip owes this supplier: keep its expense
       // in step (lib/bookings/supplier-expense). The status save stands even
@@ -138,6 +150,8 @@ export async function POST(
       .single()
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    const logged = await recordServiceBookingEvent(supabase, { ...actor, serviceBookingId: data.id, toStatus: 'pending', note: 'Added by hand' })
+    if (!logged.ok) console.error('[bookings/suppliers] event:', logged.error)
     return NextResponse.json({ success: true, data }, { status: 201 })
   } catch (error) {
     console.error('Suppliers POST error:', error)
