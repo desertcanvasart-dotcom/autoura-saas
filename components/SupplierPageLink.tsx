@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Link2, MessageCircle } from 'lucide-react'
+import DaysOffEditor from '@/components/DaysOffEditor'
 
 // The supplier's own page (migration 449): one standing link listing every
 // request and job from this agency. Send it from the office's own WhatsApp
@@ -60,6 +61,10 @@ export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: 
         )}
       </div>
       {note && <p className="mt-1 text-xs text-gray-600">{note}</p>}
+      <details className="mt-2">
+        <summary className="text-xs font-medium text-gray-700 cursor-pointer">Days off</summary>
+        <div className="mt-2"><DaysOffEditor url={`/api/suppliers/${supplierId}/days-off`} who="office" canEdit={canEdit} /></div>
+      </details>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { normalizeStatus } from '@/lib/bookings/service-booking-states'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
 import { transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
 import { computeConflicts } from '@/lib/itinerary-resource-conflicts'
+import { offOn } from '@/lib/supplier-days-off'
 
 // ============================================
 // Who covers this service line (lib/bookings/cover-options)
@@ -64,17 +65,23 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
   if (!found) return NextResponse.json({ success: false, error: 'Service booking not found' }, { status: 404 })
   const { line, rateTable, rateId } = found
 
-  const [own, supplierOptions] = await Promise.all([
+  const [own, supplierOptions, { data: daysOff }] = await Promise.all([
     ownOptions(supabase, tenant_id, ownResourceTypes(line.supplier_type, rateTable)),
     supplierAlternatives(supabase, tenant_id, line, rateTable, rateId),
+    line.service_date
+      ? supabase.from('supplier_unavailable_days').select('supplier_id, day').eq('tenant_id', tenant_id).eq('day', line.service_date)
+      : Promise.resolve({ data: [] as Array<{ supplier_id: string; day: string }> }),
   ])
+  // Days off are a warning, never a block (lib/supplier-days-off). Guides are
+  // suppliers, so an own guide's resource_id is a supplier id too.
+  const off = offOn((daysOff ?? []) as Array<{ supplier_id: string; day: string }>, line.service_date)
 
   return NextResponse.json({
     success: true,
     data: {
       can_change: CHANGEABLE.includes(normalizeStatus(line.status)),
-      own,
-      suppliers: supplierOptions,
+      own: own.map(o => ({ ...o, day_off: o.resource_type === 'guide' && off.has(o.resource_id) })),
+      suppliers: supplierOptions.map(o => ({ ...o, day_off: off.has(o.supplier_id) })),
       compares_rates: !!(rateTable && SAME_SERVICE_KEYS[rateTable]),
     },
   })
