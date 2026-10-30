@@ -30,7 +30,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     <div className="flex flex-col lg:flex-row min-h-full">
       <nav
         aria-label="Settings"
-        className="lg:w-64 shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-gray-200 lg:sticky lg:top-0 lg:h-[calc(100vh-3.5rem)] overflow-y-auto px-3 py-4 [scrollbar-width:thin] [scrollbar-color:#d1d5db_transparent]"
+        className="lg:w-64 shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-gray-200 lg:sticky lg:top-0 lg:h-[calc(100vh_-_var(--app-chrome))] overflow-y-auto px-3 py-4 [scrollbar-width:thin] [scrollbar-color:#d1d5db_transparent]"
       >
         <Link href={backHref} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900">
           <ChevronLeft size={16} strokeWidth={1.7} aria-hidden /> Back to app

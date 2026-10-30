@@ -92,7 +92,7 @@ export default function ClientShell({
                 {!isSettingsPage && (
                   <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
                 )}
-                <main className="flex-1 min-w-0 overflow-y-auto">
+                <main className="app-main flex-1 min-w-0 overflow-y-auto">
                   <ClosureBanner />
                   {children}
                 </main>
