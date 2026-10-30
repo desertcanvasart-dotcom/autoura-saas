@@ -282,3 +282,59 @@ describe('449: a supplier\'s own page and their days off', () => {
     expect(await count(`SELECT count(*) AS n FROM supplier_unavailable_days WHERE supplier_id = '${supplier}'`)).toBe(0)
   })
 })
+
+describe('450: supplier accounts are never tenant users', () => {
+  let supplier: string
+  let account: string
+
+  /** Count rows as a signed-in user, through RLS. */
+  const countAs = (userId: string, sql: string) => db.transaction(async tx => {
+    await tx.exec(`SET LOCAL ROLE authenticated; SELECT set_config('test.uid', '${userId}', true);`)
+    const r = await tx.query(sql)
+    return Number((r.rows[0] as { n: number }).n)
+  })
+
+  beforeAll(async () => {
+    supplier = ((await db.query(`INSERT INTO suppliers (tenant_id, name) VALUES ('${tenant}', 'Aswan Boats') RETURNING id`)).rows[0] as { id: string }).id
+    account = ((await db.query(`INSERT INTO supplier_accounts (phone) VALUES ('201001234567') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  it('accounts, codes and sessions: nobody signed in sees or writes them — not even the owner', async () => {
+    expect(await as(people.owner, `INSERT INTO supplier_accounts (phone) VALUES ('201009999999')`)).toMatch(/row-level security/)
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_accounts`)).toBe(0)
+    await db.exec(`INSERT INTO supplier_sessions (account_id, token_hash, expires_at) VALUES ('${account}', 'h1', NOW() + interval '1 day')`)
+    await db.exec(`INSERT INTO supplier_login_codes (account_id, code_hash, channel, sent_to, expires_at) VALUES ('${account}', 'c1', 'email', 'a@b.c', NOW() + interval '10 minutes')`)
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_sessions`)).toBe(0)
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_login_codes`)).toBe(0)
+  })
+
+  it('a phone is international digits, once', async () => {
+    await expect(db.exec(`INSERT INTO supplier_accounts (phone) VALUES ('+201001234567')`)).rejects.toThrow(/check constraint/)
+    await expect(db.exec(`INSERT INTO supplier_accounts (phone) VALUES ('201001234567')`)).rejects.toThrow(/unique|duplicate/)
+  })
+
+  it('the agency sees and decides its claims but never creates one; a viewer cannot decide', async () => {
+    const claim = `INSERT INTO supplier_account_links (account_id, tenant_id, supplier_id) VALUES ('${account}', '${tenant}', '${supplier}')`
+    expect(await as(people.owner, claim)).toMatch(/row-level security/)
+    await db.exec(claim)
+    expect(await countAs(people.manager, `SELECT count(*) AS n FROM supplier_account_links WHERE supplier_id = '${supplier}'`)).toBe(1)
+    await as(people.viewer, `UPDATE supplier_account_links SET status = 'approved' WHERE supplier_id = '${supplier}'`)
+    expect(await count(`SELECT count(*) AS n FROM supplier_account_links WHERE supplier_id = '${supplier}' AND status = 'approved'`)).toBe(0)
+    expect(await as(people.owner, `UPDATE supplier_account_links SET status = 'approved' WHERE supplier_id = '${supplier}'`)).toBeNull()
+    expect(await as(people.owner, `UPDATE supplier_account_links SET status = 'maybe' WHERE supplier_id = '${supplier}'`)).toMatch(/check constraint/)
+  })
+
+  it('a supplier record is approved for one account only', async () => {
+    const other = ((await db.query(`INSERT INTO supplier_accounts (phone) VALUES ('201007654321') RETURNING id`)).rows[0] as { id: string }).id
+    await expect(db.exec(`INSERT INTO supplier_account_links (account_id, tenant_id, supplier_id, status) VALUES ('${other}', '${tenant}', '${supplier}', 'approved')`))
+      .rejects.toThrow(/unique|duplicate/)
+    await db.exec(`INSERT INTO supplier_account_links (account_id, tenant_id, supplier_id) VALUES ('${other}', '${tenant}', '${supplier}')`)
+  })
+
+  it('removing the account removes its claims, codes and sessions', async () => {
+    await db.exec(`DELETE FROM supplier_accounts WHERE id = '${account}'`)
+    for (const t of ['supplier_account_links', 'supplier_login_codes', 'supplier_sessions']) {
+      expect(await count(`SELECT count(*) AS n FROM ${t} WHERE account_id = '${account}'`), t).toBe(0)
+    }
+  })
+})
