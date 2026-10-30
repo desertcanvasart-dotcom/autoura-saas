@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 176
+ * Tables: 178
  */
 
 export type Json =
@@ -9847,6 +9847,103 @@ export interface Database {
           },
         ]
       }
+      supplier_network_documents: {
+        Row: {
+          id: string
+          account_id: string
+          kind: string
+          title: string
+          storage_path: string
+          mime_type: string | null
+          size_bytes: number | null
+          uploaded_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          kind: string
+          title: string
+          storage_path: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          uploaded_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          kind?: string
+          title?: string
+          storage_path?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_network_documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_network_profiles: {
+        Row: {
+          account_id: string
+          display_name: string
+          kinds: string[]
+          cities: string[]
+          languages: string[]
+          about: string | null
+          listed: boolean
+          verification_status: string
+          verification_note: string | null
+          verified_at: string | null
+          verified_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          display_name: string
+          kinds?: string[]
+          cities?: string[]
+          languages?: string[]
+          about?: string | null
+          listed?: boolean
+          verification_status?: string
+          verification_note?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          display_name?: string
+          kinds?: string[]
+          cities?: string[]
+          languages?: string[]
+          about?: string | null
+          listed?: boolean
+          verification_status?: string
+          verification_note?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_network_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "supplier_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_portal_links: {
         Row: {
           id: string
@@ -10085,6 +10182,7 @@ export interface Database {
           status: string | null
           tenant_id: string
           types: string[]
+          network_account_id: string | null
         }
         Insert: {
           id?: string
@@ -10123,6 +10221,7 @@ export interface Database {
           status?: string | null
           tenant_id: string
           types: string[]
+          network_account_id?: string | null
         }
         Update: {
           id?: string
@@ -10161,6 +10260,7 @@ export interface Database {
           status?: string | null
           tenant_id?: string
           types?: string[]
+          network_account_id?: string | null
         }
         Relationships: [
           {
@@ -11067,6 +11167,7 @@ export interface Database {
           contract_governing_law: string | null
           whatsapp_number: string | null
           default_max_groups_per_day: number | null
+          supplier_sourcing: string
         }
         Insert: {
           id?: string
@@ -11108,6 +11209,7 @@ export interface Database {
           contract_governing_law?: string | null
           whatsapp_number?: string | null
           default_max_groups_per_day?: number | null
+          supplier_sourcing?: string
         }
         Update: {
           id?: string
@@ -11149,6 +11251,7 @@ export interface Database {
           contract_governing_law?: string | null
           whatsapp_number?: string | null
           default_max_groups_per_day?: number | null
+          supplier_sourcing?: string
         }
         Relationships: []
       }

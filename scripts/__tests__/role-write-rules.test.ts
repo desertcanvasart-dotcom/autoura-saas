@@ -360,3 +360,43 @@ describe('451: lines never borrow the service name as a supplier', () => {
     expect(await row(own)).toEqual({ supplier_name: 'Toyota Hiace', service_description: null })
   })
 })
+
+describe('453: the shared network — profiles found only when listed and verified', () => {
+  const countAs = (userId: string, sql: string) => db.transaction(async tx => {
+    await tx.exec(`SET LOCAL ROLE authenticated; SELECT set_config('test.uid', '${userId}', true);`)
+    const r = await tx.query(sql)
+    return Number((r.rows[0] as { n: number }).n)
+  })
+  let a: string, b: string, c: string
+
+  beforeAll(async () => {
+    const acc = async (phone: string) => ((await db.query(`INSERT INTO supplier_accounts (phone) VALUES ('${phone}') RETURNING id`)).rows[0] as { id: string }).id
+    a = await acc('201000000453'); b = await acc('201000000454'); c = await acc('201000000455')
+    await db.exec(`INSERT INTO supplier_network_profiles (account_id, display_name, listed, verification_status) VALUES
+      ('${a}', 'Listed and verified', true, 'verified'),
+      ('${b}', 'Verified, not listed', false, 'verified'),
+      ('${c}', 'Listed, pending', true, 'pending')`)
+    await db.exec(`INSERT INTO supplier_network_documents (account_id, kind, title, storage_path) VALUES ('${a}', 'licence', 'Licence', 'k/licence.pdf')`)
+  })
+
+  it('an agency user finds only listed AND verified profiles, and writes none', async () => {
+    expect(await countAs(people.viewer, `SELECT count(*) AS n FROM supplier_network_profiles`)).toBe(1)
+    expect(await as(people.owner, `INSERT INTO supplier_network_profiles (account_id, display_name) VALUES ('${a}', 'Hijack')`)).toMatch(/row-level security|duplicate/)
+    await as(people.owner, `UPDATE supplier_network_profiles SET verification_status = 'verified', listed = true WHERE account_id = '${c}'`)
+    expect(await count(`SELECT count(*) AS n FROM supplier_network_profiles WHERE account_id = '${c}' AND verification_status = 'pending'`)).toBe(1)
+  })
+
+  it('papers are invisible to every signed-in user', async () => {
+    expect(await countAs(people.owner, `SELECT count(*) AS n FROM supplier_network_documents`)).toBe(0)
+  })
+
+  it('sourcing is own by default and only own / network / both', async () => {
+    expect(await count(`SELECT count(*) AS n FROM tenants WHERE id = '${tenant}' AND supplier_sourcing = 'own'`)).toBe(1)
+    await expect(db.exec(`UPDATE tenants SET supplier_sourcing = 'everything' WHERE id = '${tenant}'`)).rejects.toThrow(/check constraint/)
+  })
+
+  it('one copy of a network supplier per agency', async () => {
+    await db.exec(`INSERT INTO suppliers (tenant_id, name, network_account_id) VALUES ('${tenant}', 'Copy 1', '${a}')`)
+    await expect(db.exec(`INSERT INTO suppliers (tenant_id, name, network_account_id) VALUES ('${tenant}', 'Copy 2', '${a}')`)).rejects.toThrow(/unique|duplicate/)
+  })
+})
