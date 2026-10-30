@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 172
+ * Tables: 176
  */
 
 export type Json =
@@ -9322,6 +9322,88 @@ export interface Database {
         }
         Relationships: []
       }
+      supplier_account_links: {
+        Row: {
+          id: string
+          account_id: string
+          tenant_id: string
+          supplier_id: string
+          status: string
+          requested_at: string
+          decided_by: string | null
+          decided_at: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          tenant_id: string
+          supplier_id: string
+          status?: string
+          requested_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          tenant_id?: string
+          supplier_id?: string
+          status?: string
+          requested_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_account_links_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_account_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_account_links_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_accounts: {
+        Row: {
+          id: string
+          phone: string
+          display_name: string | null
+          created_at: string
+          last_login_at: string | null
+          disabled_at: string | null
+        }
+        Insert: {
+          id?: string
+          phone: string
+          display_name?: string | null
+          created_at?: string
+          last_login_at?: string | null
+          disabled_at?: string | null
+        }
+        Update: {
+          id?: string
+          phone?: string
+          display_name?: string | null
+          created_at?: string
+          last_login_at?: string | null
+          disabled_at?: string | null
+        }
+        Relationships: []
+      }
       supplier_contracts: {
         Row: {
           id: string
@@ -9721,6 +9803,50 @@ export interface Database {
           },
         ]
       }
+      supplier_login_codes: {
+        Row: {
+          id: string
+          account_id: string
+          code_hash: string
+          channel: string
+          sent_to: string
+          created_at: string
+          expires_at: string
+          attempts: number
+          used_at: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          code_hash: string
+          channel: string
+          sent_to: string
+          created_at?: string
+          expires_at: string
+          attempts?: number
+          used_at?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          code_hash?: string
+          channel?: string
+          sent_to?: string
+          created_at?: string
+          expires_at?: string
+          attempts?: number
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_login_codes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_portal_links: {
         Row: {
           id: string
@@ -9834,6 +9960,44 @@ export interface Database {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_sessions: {
+        Row: {
+          id: string
+          account_id: string
+          token_hash: string
+          created_at: string
+          expires_at: string
+          last_seen_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          token_hash: string
+          created_at?: string
+          expires_at: string
+          last_seen_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          token_hash?: string
+          created_at?: string
+          expires_at?: string
+          last_seen_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_accounts"
             referencedColumns: ["id"]
           },
         ]
