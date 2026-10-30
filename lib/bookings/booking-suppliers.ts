@@ -66,6 +66,8 @@ export interface ServiceForSupplier {
   pickup_time?: string | null
   pickup_location?: string | null
   dropoff_location?: string | null
+  rate_table?: string | null
+  rate_id?: string | null
   day_number: number
   day_date?: string | null
 }
@@ -131,6 +133,36 @@ export function supplierLinesFromServices(
     (a.service_date ?? '').localeCompare(b.service_date ?? '') || (a.service_time ?? '').localeCompare(b.service_time ?? ''))
 }
 
+// ============================================
+// The supplier is the one whose rate priced the line
+// ============================================
+// The engine prices a line from a rate row (itinerary_services.rate_table +
+// rate_id) and the rate sheets carry supplier_id — but the line itself was
+// saved without it, so a service booking showed only the service's name.
+// The supplier is read from that rate row: a fact, never a guess. A line with
+// no pin, or a rate row naming no supplier, stays as it is (no supplier yet).
+
+/** Rate sheets that name a supplier (each has a supplier_id column). */
+export const SUPPLIER_RATE_TABLES = [
+  'accommodation_rates', 'activity_rates', 'airport_staff_rates', 'flight_rates', 'guide_rates',
+  'hotel_staff_rates', 'meal_rates', 'nile_cruises', 'sleeping_train_rates', 'train_rates', 'transportation_rates',
+] as const
+
+export const rateKey = (table: string, id: string) => `${table}:${id}`
+
+/** Pure: each line without a supplier takes the one its rate row names. */
+export function withSupplierFromRate(
+  services: ServiceForSupplier[],
+  rateSupplier: Map<string, { id: string; name: string }>,
+): ServiceForSupplier[] {
+  return services.map(s => {
+    if (s.supplier_id || !s.rate_table || !s.rate_id) return s
+    const found = rateSupplier.get(rateKey(s.rate_table, s.rate_id))
+    if (!found) return s
+    return { ...s, supplier_id: found.id, supplier_name: found.name }
+  })
+}
+
 export interface ExistingServiceRow {
   id: string
   itinerary_service_id: string | null
@@ -154,9 +186,20 @@ export interface ExistingServiceRow {
  *     added again;
  *   * a pre-446 row matching nothing in the itinerary (added by hand) stays.
  */
-export function planLineSync(lines: SupplierLine[], existing: ExistingServiceRow[]): { add: SupplierLine[]; replace: string[] } {
+export function planLineSync(
+  lines: SupplierLine[],
+  existing: ExistingServiceRow[],
+  /** Per itinerary line, the key its pre-446 row was grouped under when that differs (named by service, before its supplier was known). */
+  earlierKey: Map<string, string> = new Map(),
+): { add: SupplierLine[]; replace: string[] } {
+  const keysOf = (l: SupplierLine) => {
+    const k = [supplierKey(l)]
+    const e = l.itinerary_service_id ? earlierKey.get(l.itinerary_service_id) : undefined
+    if (e && e !== k[0]) k.push(e)
+    return k
+  }
   const haveLine = new Set(existing.map(r => r.itinerary_service_id).filter(Boolean) as string[])
-  const lineKeys = new Set(lines.map(supplierKey))
+  const lineKeys = new Set(lines.flatMap(keysOf))
   const replace: string[] = []
   const coveredKeys = new Set<string>()
   for (const r of existing) {
@@ -169,7 +212,7 @@ export function planLineSync(lines: SupplierLine[], existing: ExistingServiceRow
     else coveredKeys.add(key)
   }
   const add = lines.filter(l =>
-    !(l.itinerary_service_id && haveLine.has(l.itinerary_service_id)) && !coveredKeys.has(supplierKey(l)))
+    !(l.itinerary_service_id && haveLine.has(l.itinerary_service_id)) && !keysOf(l).some(k => coveredKeys.has(k)))
   return { add, replace }
 }
 
@@ -197,7 +240,7 @@ export async function syncBookingSuppliers(
   const [{ data: days }, { data: services }, { data: existing }] = await Promise.all([
     db.from('itinerary_days').select('id, day_number, date').eq('itinerary_id', booking.itinerary_id),
     db.from('itinerary_services')
-      .select('id, supplier_id, supplier_name, service_name, service_type, description, notes, total_cost, pickup_time, pickup_location, dropoff_location, itinerary_day_id, day_id')
+      .select('id, supplier_id, supplier_name, service_name, service_type, description, notes, total_cost, pickup_time, pickup_location, dropoff_location, rate_table, rate_id, itinerary_day_id, day_id')
       .eq('itinerary_id', booking.itinerary_id),
     db.from('booking_supplier_status')
       .select('id, itinerary_service_id, supplier_id, supplier_name, supplier_type, service_date, status, confirmation_number, confirmed_cost')
@@ -219,9 +262,17 @@ export async function syncBookingSuppliers(
     for (const e of expenses ?? []) withExpense.add(e.booking_supplier_status_id as string)
   }
 
+  const pax = Number(booking.num_travelers) || null
+  const rateSupplier = await suppliersFromRates(db, tenantId, rows)
+  const earlierKey = new Map(
+    supplierLinesFromServices(rows, booking.start_date as string | null, pax)
+      .filter(l => l.itinerary_service_id)
+      .map(l => [l.itinerary_service_id as string, supplierKey(l)]),
+  )
   const plan = planLineSync(
-    supplierLinesFromServices(rows, booking.start_date as string | null, Number(booking.num_travelers) || null),
+    supplierLinesFromServices(withSupplierFromRate(rows, rateSupplier), booking.start_date as string | null, pax),
     (existing ?? []).map(r => ({ ...r, has_expense: withExpense.has(r.id as string) }) as ExistingServiceRow),
+    earlierKey,
   )
 
   if (plan.replace.length) {
@@ -241,4 +292,41 @@ export async function syncBookingSuppliers(
   })))
   if (evErr) console.error('[booking-suppliers] events:', evErr.message)
   return { ok: true, added: plan.add.length, replaced: plan.replace.length }
+}
+
+/** The supplier each pinned rate row names (rate table + id → supplier), this company's suppliers only. */
+async function suppliersFromRates(
+  db: SupabaseClient,
+  tenantId: string,
+  services: ServiceForSupplier[],
+): Promise<Map<string, { id: string; name: string }>> {
+  const out = new Map<string, { id: string; name: string }>()
+  const idsByTable = new Map<string, Set<string>>()
+  for (const s of services) {
+    if (s.supplier_id || !s.rate_id || !(SUPPLIER_RATE_TABLES as readonly string[]).includes(s.rate_table ?? '')) continue
+    if (!idsByTable.has(s.rate_table as string)) idsByTable.set(s.rate_table as string, new Set())
+    idsByTable.get(s.rate_table as string)!.add(s.rate_id)
+  }
+  if (idsByTable.size === 0) return out
+
+  const supplierOfRate = new Map<string, string>()
+  await Promise.all([...idsByTable].map(async ([table, ids]) => {
+    const { data, error } = await db.from(table).select('id, supplier_id').in('id', [...ids])
+    if (error) { console.error('[booking-suppliers] rate suppliers', table, error.message); return }
+    for (const r of (data ?? []) as Array<{ id: string; supplier_id: string | null }>) {
+      if (r.supplier_id) supplierOfRate.set(rateKey(table, r.id), r.supplier_id)
+    }
+  }))
+  if (supplierOfRate.size === 0) return out
+
+  const { data: suppliers } = await db.from('suppliers')
+    .select('id, name, company_name')
+    .in('id', [...new Set(supplierOfRate.values())])
+    .eq('tenant_id', tenantId)
+  const byId = new Map((suppliers ?? []).map(sp => [sp.id as string, ((sp.name || sp.company_name) as string | null)?.trim() || null]))
+  for (const [key, supplierId] of supplierOfRate) {
+    const name = byId.get(supplierId)
+    if (name) out.set(key, { id: supplierId, name })
+  }
+  return out
 }

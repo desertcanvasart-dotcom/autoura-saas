@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { planLineSync, type ExistingServiceRow, type SupplierLine } from '@/lib/bookings/booking-suppliers'
+import {
+  SUPPLIER_RATE_TABLES, planLineSync, rateKey, withSupplierFromRate, type ExistingServiceRow, type SupplierLine,
+} from '@/lib/bookings/booking-suppliers'
 import { serviceStart, transitionStamps } from '@/lib/bookings/service-booking-transition'
 
 const line = (o: Partial<SupplierLine>): SupplierLine => ({
@@ -83,5 +85,37 @@ describe('one writer of a service booking\'s status', () => {
     expect(writers.sort()).toEqual(['app/api/bookings/[id]/suppliers/route.ts', 'lib/bookings/service-booking-transition.ts'])
     const route = fs.readFileSync(path.join(root, 'app/api/bookings/[id]/suppliers/route.ts'), 'utf8')
     expect(route).not.toMatch(/updates\.status\s*=/)
+  })
+})
+
+describe('the supplier comes from the rate that priced the line', () => {
+  const rates = new Map([[rateKey('guide_rates', 'g1'), { id: 'sup-amr', name: 'Amr Guiding' }]])
+
+  it('a pinned line takes its rate row\'s supplier; others stay as they are', () => {
+    const out = withSupplierFromRate([
+      { id: 'a', day_number: 1, service_type: 'guide', service_name: 'Guide Giza', rate_table: 'guide_rates', rate_id: 'g1' },
+      { id: 'b', day_number: 1, service_type: 'guide', service_name: 'Guide Saqqara', rate_table: 'guide_rates', rate_id: 'g2' },
+      { id: 'c', day_number: 1, service_type: 'guide', supplier_id: 'own', supplier_name: 'Chosen', rate_table: 'guide_rates', rate_id: 'g1' },
+    ], rates)
+    expect(out.map(s => [s.supplier_id ?? null, s.supplier_name ?? null])).toEqual([
+      ['sup-amr', 'Amr Guiding'], [null, null], ['own', 'Chosen'],
+    ])
+  })
+
+  it('every listed rate sheet really has a supplier_id column (generated types)', () => {
+    const types = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'types', 'database.types.ts'), 'utf8')
+    for (const t of SUPPLIER_RATE_TABLES) {
+      const row = new RegExp(`^ {6}${t}: \\{\\n {8}Row: \\{\\n([\\s\\S]*?)\\n {8}\\}`, 'm').exec(types)
+      expect(row?.[1], t).toMatch(/^ {10}supplier_id: string \| null$/m)
+    }
+  })
+
+  it('an untouched old row named by the service is still replaced once the supplier is known', () => {
+    const named = line({ itinerary_service_id: 'a', supplier_id: 'sup-amr', supplier_name: 'Amr Guiding', supplier_type: 'guide' })
+    const before = old({ id: 'r1', supplier_name: 'Guide Giza', supplier_type: 'guide' })
+    const earlier = new Map([['a', 'name:guide giza|guide|2027-01-02']])
+    expect(planLineSync([named], [before], earlier)).toEqual({ add: [named], replace: ['r1'] })
+    // …and one someone worked on still covers it.
+    expect(planLineSync([named], [{ ...before, status: 'accepted' }], earlier)).toEqual({ add: [], replace: [] })
   })
 })
