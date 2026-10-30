@@ -7,6 +7,7 @@ import { supplierFromToken } from '@/lib/supplier-session'
 import { loadSupplierAgency } from '@/lib/supplier-page-data'
 import SupplierAgencyView from '@/components/supplier/SupplierAgencyView'
 import SignOutButton from './SignOutButton'
+import NetworkJoin from './NetworkJoin'
 
 // The signed-in supplier's inbox (Phase 2B): every agency that CONFIRMED the
 // sign-in, side by side, each with its own requests, jobs, days off and what
@@ -86,6 +87,7 @@ export default async function SupplierHomePage() {
           </section>
         ))}
         {agencies.length === 0 && waiting.length === 0 && <p className="text-sm text-gray-500">No agencies yet.</p>}
+        <NetworkJoin />
         {waiting.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Other agencies</h2>
