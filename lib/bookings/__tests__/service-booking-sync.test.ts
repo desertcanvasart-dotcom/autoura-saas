@@ -85,6 +85,7 @@ describe('one writer of a service booking\'s status', () => {
     expect(writers.sort()).toEqual([
       'app/api/bookings/[id]/suppliers/[lineId]/cover/route.ts',
       'app/api/bookings/[id]/suppliers/route.ts',
+      'app/api/reply/[token]/route.ts',
       'lib/bookings/service-booking-transition.ts',
     ])
     const route = fs.readFileSync(path.join(root, 'app/api/bookings/[id]/suppliers/route.ts'), 'utf8')
@@ -93,6 +94,10 @@ describe('one writer of a service booking\'s status', () => {
     const cover = fs.readFileSync(path.join(root, 'app/api/bookings/[id]/suppliers/[lineId]/cover/route.ts'), 'utf8')
     expect(cover).not.toMatch(/from\('booking_supplier_status'\)\.update\(\{[^}]*\bstatus:/)
     expect(cover).toContain("transitionServiceBooking(supabase, tenant_id, {")
+    // The supplier's link saves the car or guide; the status only through the transition.
+    const reply = fs.readFileSync(path.join(root, 'app/api/reply/[token]/route.ts'), 'utf8')
+    expect(reply).not.toMatch(/from\('booking_supplier_status'\)\.update\(\{[^}]*\bstatus:/)
+    expect(reply).toContain('transitionServiceBooking(db, link.tenant_id, {')
   })
 })
 

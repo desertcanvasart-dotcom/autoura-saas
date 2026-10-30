@@ -168,6 +168,13 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     }).eq('id', line.id).eq('booking_id', id).select().single()
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
 
+    // Another supplier now: the previous one's reply link stops working.
+    if (line.supplier_id !== supplierId) {
+      const { error: revokeErr } = await supabase.from('service_booking_links').update({ revoked_at: new Date().toISOString() })
+        .eq('service_booking_id', line.id).is('revoked_at', null)
+      if (revokeErr) console.error('[cover] revoke link:', revokeErr.message)
+    }
+
     const logged = await recordServiceBookingEvent(supabase, {
       tenantId: tenant_id, bookingId: id, serviceBookingId: line.id, actor: 'operator', channel: 'app', ...actor,
       note: `Supplier: ${name}${c.ok ? '' : ` — no cost (${c.reason})`}`,

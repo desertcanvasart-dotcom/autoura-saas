@@ -21,6 +21,9 @@ export const SELF_AUTH_API_PREFIXES = [
   // Staff tap-event endpoint: the token in the path IS the auth (drivers
   // have no login). The route 404s invalid/revoked tokens itself.
   '/api/staff/',
+  // Supplier reply endpoint (448): same shape — the unrevoked, unexpired
+  // reply token in the path IS the auth (suppliers have no login).
+  '/api/reply/',
   // Traveller report endpoint on the share page: same shape — the unrevoked
   // share token in the path IS the auth. The route 404s anything else.
   '/api/share/',
@@ -243,6 +246,10 @@ export async function middleware(request: NextRequest) {
     // page 404s any token that does not resolve to an active staff_link
     // (app/staff/[token]/page.tsx).
     '/staff',
+    // Supplier reply pages (448) — token-gated, service-role lookup, page
+    // 404s any token that does not resolve to a live service_booking_link
+    // (app/reply/[token]/page.tsx).
+    '/reply',
     // Customer portal pages (C1a) — token-gated, service-role lookup, and a
     // confirmation-gate cookie before any booking data renders
     // (app/portal/[token]/page.tsx).

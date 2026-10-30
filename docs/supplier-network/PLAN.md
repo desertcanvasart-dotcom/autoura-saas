@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–3 done (migs 446/447); request + one-tap reply link next.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–4 built (migs 446–448); deadlines & reminders next.
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -99,7 +99,11 @@ suppliers by request + one-tap reply — and see every line's status in one plac
    supplier with the cost from its own rate for the same service (else a gap)* — pick supplier (or own car/guide) per
    transfer/guide/meal/hotel line; cost from that supplier's rate row (rates engine already
    reads `supplier_id`-bearing rate sheets).
-4. **Request + one-tap reply** (~1.5–2 wks) — extend the `staff_links` pattern to a
+4. **Request + one-tap reply** (~1.5–2 wks) — *built 2026-10-30 (mig 448): "Ask on WhatsApp" per line
+   (wa.me, message pre-typed, "Did you send it?" → Requested with its deadline; again = reminder);
+   `/reply/<token>` page: Accept / Decline / name the car (plate) or guide + driver note; bell to the
+   office on every answer; link revoked when the line is not needed or the supplier changes. Email
+   not done yet* — extend the `staff_links` pattern to a
    **supplier reply link** per service booking (token = credential, revocable, expires after the
    service date): Accept / Decline / name the car (plate) or guide (+ optional driver note).
    Message built like `buildAssignmentMessage`, sent by **wa.me from the operator's WhatsApp**

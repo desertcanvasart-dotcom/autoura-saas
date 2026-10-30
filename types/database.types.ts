@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 169
+ * Tables: 170
  */
 
 export type Json =
@@ -9015,6 +9015,67 @@ export interface Database {
           },
           {
             foreignKeyName: "service_booking_events_service_booking_id_fkey"
+            columns: ["service_booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking_supplier_status"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_booking_links: {
+        Row: {
+          id: string
+          tenant_id: string
+          booking_id: string
+          service_booking_id: string
+          token: string
+          created_by: string | null
+          created_at: string
+          expires_at: string | null
+          last_opened_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          booking_id: string
+          service_booking_id: string
+          token: string
+          created_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          last_opened_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          booking_id?: string
+          service_booking_id?: string
+          token?: string
+          created_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          last_opened_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_booking_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_booking_links_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_booking_links_service_booking_id_fkey"
             columns: ["service_booking_id"]
             isOneToOne: false
             referencedRelation: "booking_supplier_status"
