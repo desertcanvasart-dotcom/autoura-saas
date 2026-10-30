@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · step 1 (data model, migration 446) in progress.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–2 done (migs 446/447); supplier-from-rate next.
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -53,10 +53,16 @@ drift pattern this codebase has paid for repeatedly.
 | Email | Resend, company from-name, reply-to | |
 | Crons | Railway cron services (mail-alerts, gmail-sync, publish-sync…) | for reminders/deadlines |
 
-**Known debt to settle in Phase 1:** two "who is assigned" systems coexist — `itinerary_resources`
-(the real module) and the older `itineraries.assigned_guide_id / assigned_hotel_id /
-assigned_airport_staff_id / …` columns written by the calendar page and itineraries API. Phase 1
-consolidates on `itinerary_resources` and retires/bridges the `assigned_*` columns.
+**Assignment is already one writer** (re-checked 2026-10-30): migration 289 (Aug 2026) made
+`itinerary_resources` the only writer of "who is assigned"; the old `itineraries.assigned_*` columns
+are derived from it by a trigger and direct writes are refused (`trg_protect_assigned_columns`).
+Production had 0 mismatches on 2026-10-30. The calendar, guides and dashboard read the derived
+columns, which is safe. Step 1 below therefore needed no work.
+
+**Also found 2026-10-30:** booked itinerary lines were priced from rate rows that name a supplier
+(`rate_table` + `rate_id`), but the lines were saved without `supplier_id`, so service bookings showed
+only the service's name. The sync now reads the supplier from that rate row. There are 0 `vehicles`
+rows on production, so own cars must be entered before they can be assigned.
 
 ## 4. Target model (evolve, don't duplicate)
 
@@ -82,10 +88,9 @@ Own resources skip request/accept: assign from calendar → `assigned` directly,
 Goal: operators cover every service line from inside the booking — own cars/guides directly, own
 suppliers by request + one-tap reply — and see every line's status in one place.
 
-1. **Consolidate assignment** (~1 wk) — make `itinerary_resources` the only writer of "who is
-   assigned"; bridge or retire `itineraries.assigned_*` (calendar page + itineraries API). Car is
-   the booked unit for transport (D1).
-2. **Service bookings** (~1.5–2 wks) — migration evolving `booking_supplier_status` to per-line
+1. ~~**Consolidate assignment**~~ — already done by migration 289 (see §3). Car is the booked
+   unit for transport (D1).
+2. **Service bookings** (~1.5–2 wks) — *done: #723 (mig 446) + #724 (mig 447), 2026-10-30* — migration evolving `booking_supplier_status` to per-line
    rows + new states + `reply_deadline` + `cost_snapshot`; `service_booking_events` table; create on
    booking confirmation (hook in `lib/bookings/create-booking-on-confirm.ts` /
    `booking-on-confirm.ts`); backfill existing rows. Keep tips/water/fees excluded (existing rule).
