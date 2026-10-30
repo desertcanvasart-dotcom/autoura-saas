@@ -21,7 +21,7 @@ export default function UnifiedCommunicationsPage() {
   }, [])
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-gray-100">
+    <div className="flex h-[calc(100vh_-_64px_-_var(--app-chrome))] bg-gray-100">
       {/* Conversation List */}
       <div className="w-96 flex-shrink-0 relative">
         <UnifiedConversationList

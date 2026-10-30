@@ -917,7 +917,7 @@ export default function WhatsAppInboxPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-gray-100">
+    <div className="flex h-[calc(100vh_-_64px_-_var(--app-chrome))] bg-gray-100">
       {/* Modals */}
       {conversationToDelete && <DeleteConfirmationModal conversation={conversationToDelete} onConfirm={handleDeleteConversation} onCancel={() => setConversationToDelete(null)} isDeleting={isDeleting} />}
       {showAgentsModal && <AgentsManagementModal agents={agents} onClose={() => setShowAgentsModal(false)} onRefresh={fetchAgents} />}

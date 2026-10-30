@@ -686,3 +686,11 @@ thead.bg-primary-600 th {
   .blog-prose hr { @apply my-10 border-gray-200; }
   .blog-prose p.is-editor-empty:first-child::before { content: attr(data-placeholder); @apply pointer-events-none float-left h-0 text-gray-400; }
 }
+
+/* The app's pages sit under the 3.5rem top bar (and, on a merged page, its
+   tab strip — UrlTabs adds that height to --app-chrome). Pages were written
+   for a full-height main area, so a "screen" inside it is the viewport less
+   that chrome. ClientShell sets the variable on <main class="app-main">. */
+.app-main { --app-chrome: 3.5rem; }
+.app-main .h-screen { height: calc(100vh - var(--app-chrome)); }
+.app-main .min-h-screen { min-height: calc(100vh - var(--app-chrome)); }
