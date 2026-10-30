@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
-import { SAME_SERVICE_KEYS, alternativeCost, ownResourceTypes, rateColumns, type RateRow } from '@/lib/bookings/cover-options'
+import { SAME_SERVICE_KEYS, alternativeCost, ownResourceTypes } from '@/lib/bookings/cover-options'
+import { loadCoverLine, loadSameServiceRates, supplierAlternatives } from '@/lib/bookings/cover-lookup'
 import { normalizeStatus } from '@/lib/bookings/service-booking-states'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
 import { transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
@@ -24,48 +25,6 @@ import { computeConflicts } from '@/lib/itinerary-resource-conflicts'
 type Ctx = { params: Promise<{ id: string; lineId: string }> }
 
 const CHANGEABLE = ['pending', 'declined', 'expired']
-
-interface Line {
-  id: string
-  booking_id: string
-  status: string | null
-  supplier_type: string
-  supplier_id: string | null
-  supplier_name: string
-  service_date: string | null
-  quoted_cost: number | null
-  itinerary_service_id: string | null
-  itinerary_resource_id: string | null
-}
-
-async function loadLine(db: SupabaseClient, bookingId: string, lineId: string) {
-  const { data: line } = await db
-    .from('booking_supplier_status')
-    .select('id, booking_id, status, supplier_type, supplier_id, supplier_name, service_date, quoted_cost, itinerary_service_id, itinerary_resource_id')
-    .eq('id', lineId)
-    .eq('booking_id', bookingId)
-    .maybeSingle()
-  if (!line) return null
-  const { data: svc } = line.itinerary_service_id
-    ? await db.from('itinerary_services').select('rate_table, rate_id').eq('id', line.itinerary_service_id).maybeSingle()
-    : { data: null }
-  return { line: line as Line, rateTable: (svc?.rate_table as string | null) ?? null, rateId: (svc?.rate_id as string | null) ?? null }
-}
-
-/** The pinned rate row and every same-sheet row that could be the same service. */
-async function loadRates(db: SupabaseClient, tenantId: string, table: string | null, rateId: string | null) {
-  if (!table || !rateId || !SAME_SERVICE_KEYS[table]) return { pinned: null, candidates: [] as RateRow[] }
-  const cols = rateColumns(table)
-  const { data: pinned } = await db.from(table).select(cols).eq('id', rateId).maybeSingle()
-  if (!pinned) return { pinned: null, candidates: [] as RateRow[] }
-  let q = db.from(table).select(cols).eq('tenant_id', tenantId).not('supplier_id', 'is', null)
-  for (const k of SAME_SERVICE_KEYS[table]) {
-    const v = (pinned as unknown as Record<string, unknown>)[k]
-    q = v === null || v === undefined ? q.is(k, null) : q.eq(k, v as string)
-  }
-  const { data } = await q
-  return { pinned: pinned as unknown as RateRow, candidates: (data ?? []) as unknown as RateRow[] }
-}
 
 async function ownOptions(db: SupabaseClient, tenantId: string, types: string[]) {
   const out: Array<{ resource_type: string; resource_id: string; name: string; detail: string | null }> = []
@@ -101,23 +60,14 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
   if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
   const { id, lineId } = await params
 
-  const found = await loadLine(supabase, id, lineId)
+  const found = await loadCoverLine(supabase, tenant_id, id, lineId)
   if (!found) return NextResponse.json({ success: false, error: 'Service booking not found' }, { status: 404 })
   const { line, rateTable, rateId } = found
 
-  const [own, rates] = await Promise.all([
+  const [own, supplierOptions] = await Promise.all([
     ownOptions(supabase, tenant_id, ownResourceTypes(line.supplier_type, rateTable)),
-    loadRates(supabase, tenant_id, rateTable, rateId),
+    supplierAlternatives(supabase, tenant_id, line, rateTable, rateId),
   ])
-
-  const supplierIds = [...new Set(rates.candidates.map(r => r.supplier_id).filter(Boolean) as string[])]
-  const { data: suppliers } = supplierIds.length
-    ? await supabase.from('suppliers').select('id, name, company_name').in('id', supplierIds).eq('tenant_id', tenant_id)
-    : { data: [] }
-  const supplierOptions = (suppliers ?? []).map(s => {
-    const c = alternativeCost(rateTable, line.quoted_cost, rates.pinned, rates.candidates, s.id as string, line.service_date)
-    return { supplier_id: s.id as string, name: ((s.name || s.company_name) as string), cost: c.ok ? c.cost : null, no_cost_reason: c.ok ? null : c.reason }
-  }).sort((a, b) => (a.cost ?? Infinity) - (b.cost ?? Infinity) || a.name.localeCompare(b.name))
 
   return NextResponse.json({
     success: true,
@@ -140,7 +90,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   const { id, lineId } = await params
   const body = await request.json().catch(() => ({}))
 
-  const found = await loadLine(supabase, id, lineId)
+  const found = await loadCoverLine(supabase, tenant_id, id, lineId)
   if (!found) return NextResponse.json({ success: false, error: 'Service booking not found' }, { status: 404 })
   const { line, rateTable, rateId } = found
   if (!CHANGEABLE.includes(normalizeStatus(line.status))) {
@@ -152,7 +102,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const supplierId = String(body.supplier_id ?? '')
     const { data: supplier } = await supabase.from('suppliers').select('id, name, company_name').eq('id', supplierId).eq('tenant_id', tenant_id).maybeSingle()
     if (!supplier) return NextResponse.json({ success: false, error: 'Supplier not found' }, { status: 404 })
-    const rates = await loadRates(supabase, tenant_id, rateTable, rateId)
+    const rates = await loadSameServiceRates(supabase, tenant_id, rateTable, rateId)
     const c = alternativeCost(rateTable, line.quoted_cost, rates.pinned, rates.candidates, supplierId, line.service_date)
     const name = ((supplier.name || supplier.company_name) as string).trim()
 

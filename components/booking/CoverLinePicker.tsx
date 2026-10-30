@@ -10,7 +10,7 @@ import { Loader2, UserCheck } from 'lucide-react'
 // agreed). Options come from /api/bookings/[id]/suppliers/[lineId]/cover.
 
 interface OwnOption { resource_type: string; resource_id: string; name: string; detail: string | null }
-interface SupplierOption { supplier_id: string; name: string; cost: number | null; no_cost_reason: string | null }
+interface SupplierOption { supplier_id: string; name: string; cost: number | null; no_cost_reason: string | null; preferred?: boolean }
 interface Options { can_change: boolean; own: OwnOption[]; suppliers: SupplierOption[]; compares_rates: boolean }
 
 const OWN_KIND: Record<string, string> = {
@@ -116,7 +116,7 @@ export default function CoverLinePicker({
                   <optgroup label="Request from a supplier">
                     {options.suppliers.map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
-                        {s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}
+                        {s.preferred ? '★ ' : ''}{s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}
                       </option>
                     ))}
                   </optgroup>

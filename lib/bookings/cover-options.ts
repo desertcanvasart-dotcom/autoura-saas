@@ -47,8 +47,11 @@ const RATE_FIGURES: Record<string, readonly string[]> = {
   airport_staff_rates: ['rate_eur'],
 }
 
+/** Sheets with a preferred star (lib/rates/preferred.ts) among these. */
+const PREFERRED_COLUMN: Record<string, string> = { meal_rates: 'is_preferred' }
+
 export function rateColumns(table: string): string {
-  return ['id', 'supplier_id', 'rate_currency', 'is_active', ...(SAME_SERVICE_KEYS[table] ?? []), ...(RATE_FIGURES[table] ?? [])].join(', ')
+  return ['id', 'supplier_id', 'rate_currency', 'is_active', ...(SAME_SERVICE_KEYS[table] ?? []), ...(RATE_FIGURES[table] ?? []), ...(PREFERRED_COLUMN[table] ? [PREFERRED_COLUMN[table]] : [])].join(', ')
 }
 
 export interface RateRow {
@@ -61,6 +64,7 @@ export interface RateRow {
   rate_valid_from?: string | null
   rate_valid_to?: string | null
   is_active?: boolean | null
+  is_preferred?: boolean | null
   [key: string]: unknown
 }
 

@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–4 built (migs 446–448); deadlines & reminders next.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–5 built (migs 446–448); Services tab, calendar & documents next.
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -111,6 +111,13 @@ suppliers by request + one-tap reply — and see every line's status in one plac
 5. **Deadlines & reminders** (~0.5–1 wk) — cron flags overdue requests; operator gets a bell
    notification with the reminder pre-typed (one tap, D2); after the deadline the line returns to
    the operator with the next preferred supplier suggested.
+   *Built 2026-10-30: `/api/cron/service-booking-deadlines`, every 5 min from the mail-alerts
+   service (no new Railway cron). Halfway to the deadline with no answer → one bell item whose link
+   opens the line (`?tab=suppliers&line=`) with "Remind on WhatsApp" — a popup can't be opened for
+   them, so the one tap is on the line; a reminder the office already sent counts. Past the
+   deadline → No reply, bell names the next supplier (starred first, then cheapest known cost,
+   never the one who didn't answer; no rate = says so). The job never messages a supplier and
+   never changes who covers a line.*
 6. **Services tab + calendar + documents** (~1–1.5 wks) — upgrade `BookingSuppliersPanel` to the
    per-line Services view (status, supplier, car/guide, re-request, cancel); assignments on the
    operations calendar with clash warnings; supplier voucher reflects the service booking; day
