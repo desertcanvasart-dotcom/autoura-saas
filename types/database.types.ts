@@ -9721,6 +9721,54 @@ export interface Database {
           },
         ]
       }
+      supplier_portal_links: {
+        Row: {
+          id: string
+          tenant_id: string
+          supplier_id: string
+          token: string
+          created_by: string | null
+          created_at: string
+          last_opened_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          supplier_id: string
+          token: string
+          created_by?: string | null
+          created_at?: string
+          last_opened_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          supplier_id?: string
+          token?: string
+          created_by?: string | null
+          created_at?: string
+          last_opened_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_portal_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_portal_links_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_properties: {
         Row: {
           id: string
@@ -9783,54 +9831,6 @@ export interface Database {
           },
           {
             foreignKeyName: "supplier_properties_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      supplier_portal_links: {
-        Row: {
-          id: string
-          tenant_id: string
-          supplier_id: string
-          token: string
-          created_by: string | null
-          created_at: string
-          last_opened_at: string | null
-          revoked_at: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          supplier_id: string
-          token: string
-          created_by?: string | null
-          created_at?: string
-          last_opened_at?: string | null
-          revoked_at?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          supplier_id?: string
-          token?: string
-          created_by?: string | null
-          created_at?: string
-          last_opened_at?: string | null
-          revoked_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supplier_portal_links_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supplier_portal_links_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
