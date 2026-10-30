@@ -172,3 +172,16 @@ describe('⌘K jump-to', () => {
     expect(src).not.toMatch(/href=["']\/(?!settings)/)
   })
 })
+
+describe('the Rates menu', () => {
+  it('every category has a table to count, and nothing else', async () => {
+    const { RATE_TABLES } = await import('@/lib/rates/rate-categories')
+    const slugs = RATE_GROUPS.flatMap(g => g.categories.map(c => c.slug)).sort()
+    expect(Object.keys(RATE_TABLES).sort()).toEqual(slugs)
+  })
+
+  it('its summary is for managers and admins, like the sheets', () => {
+    const src = readFileSync(path.join(process.cwd(), 'app/api/rates/summary/route.ts'), 'utf8')
+    expect(src).toContain("roleDenied(auth.role, 'manage')")
+  })
+})
