@@ -27,7 +27,8 @@ describe('supplier sign-in', () => {
   it('signing in claims the matching records as PENDING — never approved', () => {
     expect(verify).toContain('claimRecords(')
     const claims = read('lib/supplier-claims.ts')
-    expect(claims).not.toMatch(/status:\s*'approved'/)
+    const onSignIn = claims.slice(claims.indexOf('export async function claimRecords'), claims.indexOf('export const CLAIM_DECIDERS'))
+    expect(onSignIn).not.toMatch(/status/)
     expect(claims).toContain('ignoreDuplicates: true')
   })
 

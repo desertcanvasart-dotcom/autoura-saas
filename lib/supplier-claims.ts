@@ -41,13 +41,30 @@ export async function recordsForPhone(db: SupabaseClient, phone: string): Promis
     }))
 }
 
-/** On sign-in: a pending claim for every matched record not yet claimed by this account. */
-export async function claimRecords(db: SupabaseClient, accountId: string, records: MatchedRecord[]): Promise<number> {
-  if (records.length === 0) return 0
+/** On sign-in: a pending claim for every matched record not yet claimed by this account. Returns the NEW claims. */
+export async function claimRecords(
+  db: SupabaseClient,
+  accountId: string,
+  records: MatchedRecord[],
+): Promise<Array<{ id: string; tenant_id: string; supplier_id: string }>> {
+  if (records.length === 0) return []
   const { data, error } = await db.from('supplier_account_links').upsert(
     records.map(r => ({ account_id: accountId, tenant_id: r.tenant_id, supplier_id: r.id })),
     { onConflict: 'account_id,supplier_id', ignoreDuplicates: true },
-  ).select('id')
-  if (error) { console.error('[supplier claims]', error.message); return 0 }
-  return (data ?? []).length
+  ).select('id, tenant_id, supplier_id')
+  if (error) { console.error('[supplier claims]', error.message); return [] }
+  return (data ?? []) as Array<{ id: string; tenant_id: string; supplier_id: string }>
+}
+
+/** Who may confirm a claim: an agency's owners and admins (decision §9). */
+export const CLAIM_DECIDERS = ['owner', 'admin']
+
+export type ClaimDecision = 'approve' | 'reject'
+
+/** pending → approved / rejected; approved → rejected (disconnect); rejected → approved (reconnect). */
+export function claimNextStatus(current: string, decision: unknown): { ok: true; status: 'approved' | 'rejected' } | { ok: false; error: string } {
+  if (decision !== 'approve' && decision !== 'reject') return { ok: false, error: 'Choose confirm or not them' }
+  const to = decision === 'approve' ? 'approved' : 'rejected'
+  if (current === to) return { ok: false, error: to === 'approved' ? 'Already connected' : 'Already not connected' }
+  return { ok: true, status: to }
 }
