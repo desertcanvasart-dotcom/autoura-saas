@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 168
+ * Tables: 169
  */
 
 export type Json =
@@ -8981,7 +8981,7 @@ export interface Database {
           from_status?: string | null
           to_status?: string | null
           note?: string | null
-          details?: Json
+          details: Json
         }
         Update: {
           id?: string
