@@ -189,8 +189,8 @@ export const MAIN_NAV: NavSection[] = [
       { label: 'Invoices', href: '/invoices', icon: ReceiptText, roles: ALL, keywords: ['receivables'] },
       { label: 'Payments & receipts', href: '/payments', icon: CreditCard, roles: ALL },
       {
-        label: 'Supplier bills', href: '/supplier-invoices', icon: FileText, roles: AM,
-        match: ['/accounts-payable'], keywords: ['supplier invoices', 'payables'],
+        label: 'Supplier bills', href: '/supplier-bills', icon: FileText, roles: AM,
+        match: ['/supplier-invoices'], keywords: ['supplier invoices', 'payables'],
       },
       { label: 'Expenses', href: '/expenses', icon: Wallet, roles: ALL },
       { label: 'Commissions', href: '/commissions', icon: Percent, roles: AM },
@@ -459,7 +459,7 @@ export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'Network suppliers', href: '/suppliers?tab=network', icon: Globe, roles: AM, hint: 'Suppliers' },
   { label: 'Receivables', href: '/invoices?tab=unpaid', icon: ReceiptText, roles: AM, hint: 'Invoices', keywords: ['unpaid invoices'] },
   { label: 'Receipts', href: '/payments?tab=receipts', icon: ReceiptText, roles: ALL, hint: 'Payments & receipts' },
-  { label: 'Payables', href: '/accounts-payable', icon: FileText, roles: AM, hint: 'Supplier bills', keywords: ['unpaid supplier invoices'] },
+  { label: 'Payables', href: '/supplier-bills?tab=payables', icon: FileText, roles: AM, hint: 'Supplier bills', keywords: ['unpaid supplier invoices'] },
 ]
 
 /** Where Settings' "← Back to app" goes: the last page opened outside it. */

@@ -111,7 +111,7 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   
   // Admin and Manager
   '/profit-loss': ['admin', 'manager'],
-  '/accounts-payable': ['admin', 'manager'],
+  '/supplier-bills': ['admin', 'manager'],
   // Finance pages with no entry were open to any role by URL, viewers too.
   '/commissions': ['admin', 'manager'],
   '/supplier-invoices': ['admin', 'manager'],

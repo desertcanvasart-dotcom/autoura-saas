@@ -69,7 +69,7 @@ export default function SupplierInvoiceDetail() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
-      <button onClick={() => router.push('/supplier-invoices')} className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
+      <button onClick={() => router.push('/supplier-bills')} className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Supplier invoices
       </button>
 

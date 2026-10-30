@@ -72,7 +72,7 @@ describe('the main sidebar', () => {
     expect(activeHref(items, '/rates/check')).toBe('/rates/check')
     expect(activeHref(items, '/rates/hotels')).toBe('/rates')
     expect(activeHref(items, '/airport-staff')).toBe('/suppliers')
-    expect(activeHref(items, '/accounts-payable')).toBe('/supplier-invoices')
+    expect(activeHref(items, '/supplier-invoices/abc')).toBe('/supplier-bills')
     expect(activeHref(items, '/nowhere')).toBeNull()
   })
 })
