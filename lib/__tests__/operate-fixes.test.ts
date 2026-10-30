@@ -27,7 +27,7 @@ describe('2. the Capacity Calendar', () => {
     // A local midnight in Cairo is 22:00 the day before in UTC.
     const d = new Date(2026, 9, 15)
     expect(toLocalDateString(d)).toBe('2026-10-15')
-    const page = src('app/departures/capacity/page.tsx')
+    const page = src('app/departures/_views/CapacityView.tsx')
     expect(page).toContain('const formatDate = (date: Date): string => toLocalDateString(date)')
     expect(page).not.toContain("toISOString().split('T')[0]")
   })
