@@ -5,12 +5,15 @@ import { appRedirectBase } from '@/lib/oauth-config'
 import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
 import {
   assignWhat, buildServiceCancelMessage, buildServiceRequestMessage, generateReplyToken, replyLinkExpiry,
+  requestEmailHtml, requestEmailSubject,
 } from '@/lib/supplier-reply-link'
 import { REPLY_HOURS, REPLY_HOURS_SOON, SOON_HOURS, normalizeStatus } from '@/lib/bookings/service-booking-states'
 import { serviceStart, transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
 import { REMINDER_SENT } from '@/lib/bookings/service-booking-deadlines'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { sendMail } from '@/lib/email-send'
+import { resolveSender } from '@/lib/tenant-email-domain'
 
 // ============================================
 // Ask a supplier for one service line (lib/supplier-reply-link)
@@ -21,6 +24,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // POST { sent: true } → the office says it pressed send: the line becomes
 //                       Requested (with its reply deadline), or — when it was
 //                       already requested — a reminder is noted.
+// POST { channel: 'email' } → the same request (or reminder) sent by email
+//                       now, through Resend, from the company's sender; the
+//                       line becomes Requested once it has gone.
 // POST { notice: 'cancelled' } (+ sent: true) → the same for telling a supplier
 //                       who was asked that the line is no longer needed.
 
@@ -52,7 +58,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 
   const { data: line } = await supabase
     .from('booking_supplier_status')
-    .select('id, status, resource_kind, supplier_id, supplier_name, supplier_type, service_description, service_date, service_time, pickup_location, dropoff_location, pax, contact_phone, requested_at')
+    .select('id, status, resource_kind, supplier_id, supplier_name, supplier_type, service_description, service_date, service_time, pickup_location, dropoff_location, pax, contact_phone, contact_email, requested_at')
     .eq('id', lineId)
     .eq('booking_id', id)
     .maybeSingle()
@@ -127,7 +133,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   const url = `${appRedirectBase(process.env.NEXT_PUBLIC_APP_URL, request.url)}/reply/${token}`
 
   const [{ data: tenant }, { data: booking }] = await Promise.all([
-    supabase.from('tenants').select('company_name, operating_country').eq('id', tenant_id).maybeSingle(),
+    supabase.from('tenants').select('company_name, operating_country, contact_email, email_domain, email_from_local, email_domain_status').eq('id', tenant_id).maybeSingle(),
     supabase.from('bookings').select('itinerary_id').eq('id', id).maybeSingle(),
   ])
   const { data: itinerary } = booking?.itinerary_id
@@ -150,6 +156,35 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     assign: assignWhat(line.supplier_type as string),
     url,
   })
+
+  if (body.channel === 'email') {
+    const { data: supplierRow } = line.supplier_id
+      ? await supabase.from('suppliers').select('email, contact_email').eq('id', line.supplier_id).eq('tenant_id', tenant_id).maybeSingle()
+      : { data: null }
+    const to = ((supplierRow?.email || supplierRow?.contact_email || line.contact_email) as string | null)?.trim()
+    if (!to) return NextResponse.json({ success: false, error: 'No email address for this supplier — add one on the supplier, or use WhatsApp' }, { status: 409 })
+    const reminder = status === 'requested'
+    const sent = await sendMail({
+      to,
+      subject: requestEmailSubject((line.service_description || line.supplier_type) as string, line.service_date as string | null, reminder),
+      html: requestEmailHtml(message, url),
+      from: resolveSender(tenant ?? {}, process.env.RESEND_FROM_EMAIL || '').from,
+      ...(tenant?.contact_email ? { replyTo: tenant.contact_email as string } : {}),
+    })
+    if (!sent.success) {
+      return NextResponse.json({ success: false, error: sent.suppressed ? 'That address bounced before — check it on the supplier' : `Email not sent: ${sent.error ?? 'unknown error'}` }, { status: 502 })
+    }
+    const actor = { actor: 'operator' as const, channel: 'email' as const, actorUserId: user?.id ?? null, actorLabel: user?.email ?? null }
+    if (reminder) {
+      await recordServiceBookingEvent(supabase, { tenantId: tenant_id, bookingId: id, serviceBookingId: line.id, ...actor, note: `Reminder emailed to ${to}`, details: { kind: REMINDER_SENT } })
+      return NextResponse.json({ success: true, reminded: true, emailed: to })
+    }
+    const moved = await transitionServiceBooking(supabase, tenant_id, {
+      id: line.id, bookingId: id, to: 'requested', ...actor, note: `Requested from ${line.supplier_name} by email (${to})`,
+    })
+    if (!moved.ok) return NextResponse.json({ success: false, error: moved.error }, { status: moved.status })
+    return NextResponse.json({ success: true, emailed: to, data: moved.row })
+  }
 
   const phone = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
   return NextResponse.json({
