@@ -186,7 +186,7 @@ export const MAIN_NAV: NavSection[] = [
     key: 'finance',
     title: 'Finance',
     items: [
-      { label: 'Invoices', href: '/invoices', icon: ReceiptText, roles: ALL, match: ['/accounts-receivable'], keywords: ['receivables'] },
+      { label: 'Invoices', href: '/invoices', icon: ReceiptText, roles: ALL, keywords: ['receivables'] },
       { label: 'Payments & receipts', href: '/payments', icon: CreditCard, roles: ALL, match: ['/receipts'] },
       {
         label: 'Supplier bills', href: '/supplier-invoices', icon: FileText, roles: AM,
@@ -457,7 +457,7 @@ export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'Follow-ups', href: '/tasks?type=follow-up', icon: Clock, roles: ALL, hint: 'Tasks', keywords: ['reminders'] },
   { label: 'Capacity calendar', href: '/departures?view=capacity', icon: CalendarRange, roles: A, hint: 'Departures' },
   { label: 'Network suppliers', href: '/suppliers?tab=network', icon: Globe, roles: AM, hint: 'Suppliers' },
-  { label: 'Receivables', href: '/accounts-receivable', icon: ReceiptText, roles: AM, hint: 'Invoices', keywords: ['unpaid invoices'] },
+  { label: 'Receivables', href: '/invoices?tab=unpaid', icon: ReceiptText, roles: AM, hint: 'Invoices', keywords: ['unpaid invoices'] },
   { label: 'Receipts', href: '/receipts', icon: ReceiptText, roles: ALL, hint: 'Payments & receipts' },
   { label: 'Payables', href: '/accounts-payable', icon: FileText, roles: AM, hint: 'Supplier bills', keywords: ['unpaid supplier invoices'] },
 ]

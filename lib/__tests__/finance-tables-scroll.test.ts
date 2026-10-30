@@ -6,7 +6,7 @@ import { join } from 'node:path'
 // columns (amounts, status, actions) with no way to scroll to them.
 const PAGES = [
   'app/invoices/[id]/page.tsx', 'app/invoices/invoices-content.tsx', 'app/payments/page.tsx',
-  'app/receipts/page.tsx', 'app/accounts-receivable/page.tsx', 'app/accounts-payable/page.tsx',
+  'app/receipts/page.tsx', 'app/invoices/_views/ReceivablesView.tsx', 'app/accounts-payable/page.tsx',
   'app/expenses/page.tsx', 'app/reports/_views/FinanceView.tsx', 'app/profit-loss/page.tsx',
   'app/commissions/page.tsx',
 ]
