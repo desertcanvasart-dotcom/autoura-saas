@@ -150,6 +150,8 @@ export interface RequestMessageInput {
   replyHours: number
   assign: AssignWhat
   url: string
+  /** The supplier's own page (449), when the office has sent them one. */
+  pageUrl?: string | null
 }
 
 export function buildServiceRequestMessage(m: RequestMessageInput): string {
@@ -164,6 +166,7 @@ export function buildServiceRequestMessage(m: RequestMessageInput): string {
   if (m.clientName?.trim()) lines.push(`👤 Client: ${m.clientName.trim()}`)
   const name = m.assign === 'car' ? ' You can name the car (plate) there too.' : m.assign === 'guide' ? ' You can name the guide there too.' : ''
   lines.push('', `Please answer within ${m.replyHours} hour${m.replyHours === 1 ? '' : 's'} with one tap on this link (no login).${name}`, m.url)
+  if (m.pageUrl) lines.push('', `All your bookings with us: ${m.pageUrl}`)
   return lines.join('\n')
 }
 

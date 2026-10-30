@@ -78,3 +78,24 @@ describe('what the page and its link can touch', () => {
     expect(mw).toContain("    '/supplier',\n")
   })
 })
+
+describe('the request and the supplier page work together', () => {
+  it('a request mentions their own page when they have one, after the reply link', async () => {
+    const { buildServiceRequestMessage } = await import('@/lib/supplier-reply-link')
+    const base = { service: 'Airport pickup', replyHours: 4, assign: 'car' as const, url: 'https://x/reply/r' }
+    expect(buildServiceRequestMessage(base)).not.toContain('All your bookings')
+    const m = buildServiceRequestMessage({ ...base, pageUrl: 'https://x/supplier/p' })
+    expect(m.endsWith('All your bookings with us: https://x/supplier/p')).toBe(true)
+    expect(m.indexOf('https://x/reply/r')).toBeLessThan(m.indexOf('https://x/supplier/p'))
+  })
+
+  it('the request route looks up only that supplier’s active page at this agency', () => {
+    const route = readFileSync('app/api/bookings/[id]/suppliers/[lineId]/request/route.ts', 'utf8')
+    expect(route).toContain(".from('supplier_portal_links').select('token').eq('tenant_id', tenant_id).eq('supplier_id', line.supplier_id).is('revoked_at', null)")
+  })
+
+  it('a waiting line says whether the supplier has seen it', () => {
+    expect(readFileSync('app/api/bookings/[id]/suppliers/route.ts', 'utf8')).toContain('seen: seenAt(')
+    expect(readFileSync('components/booking/BookingSuppliersPanel.tsx', 'utf8')).toContain("'not opened yet'")
+  })
+})
