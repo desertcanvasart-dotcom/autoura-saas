@@ -147,8 +147,8 @@ One standing link per supplier per agency (`supplier_portal_links`, migration 44
   tenants**; tight RLS; claim profile matched by phone (merge approval per §9).
 - One inbox of requests from every operator that uses them; accept/decline/assign car or guide;
   rates and blocked dates.
-- Riverdesk cruise operators as cruise suppliers — **size after reading Riverdesk's API** (not in
-  this repo; unknown today).
+- ~~Riverdesk cruise operators as cruise suppliers~~ — dropped: no relation with Riverdesk (operator,
+  2026-10-30).
 
 ## 7. Phase 3 — Network discovery (≈ 4–6 weeks + ongoing verification)
 
@@ -206,13 +206,15 @@ Estimate: ≈ 3–5 days inside Phase 3 (setting + picker grouping + engine sour
 - [x] **Client message** "your car tomorrow" (car + plate + driver contact) — **yes** (operator,
       2026-10-30). Sent from the operator's own WhatsApp like the rest (D2); clients never see
       supplier companies or rates. Last PR of Phase 1. *(Phase 1)*
-- [ ] **Duplicate suppliers** — phone number as merge key; who approves a merge? *(Phase 2)*
-- [ ] **Availability** — request-and-confirm only, or live calendars for hotels/cruises? *(Phase 2)*
-- [ ] **Riverdesk** — create bookings directly in Riverdesk, or service bookings Riverdesk users
-      answer? *(Phase 2)*
+- [x] **Duplicate suppliers** — phone number as merge key; **an admin approves every merge** (operator,
+      2026-10-30). *(Phase 2)*
+- [x] **Availability** — **request-and-confirm only; no live calendars for hotels or cruises** (operator,
+      2026-10-30). Days off (2A) stay the only availability signal. *(Phase 2)*
+- [x] **Riverdesk** — **out of scope: no relation with Riverdesk** (operator, 2026-10-30). *(Phase 2)*
 - [ ] **Deployment** — GetAutoura (multi-tenant) only, or also standalone installs? (Standalone
       has no network → Phase 3 is GetAutoura-only.) *(before Phase 3)*
-- [ ] **Link-only vs logins** for suppliers (§6) *(before Phase 2)*
+- [x] **Link-only vs logins** for suppliers (§6) — **link first (2A, built #735–#738); logins (2B) only
+      if needed** (operator, 2026-10-30). *(before Phase 2)*
 - [ ] **D5 detail — per service type?** One sourcing choice for the whole agency, or per service
       type (e.g. own guides, network cars)? *(before Phase 3)*
 - [ ] **D5 detail — "network only" and private suppliers:** may a network-only agency still keep a
