@@ -147,8 +147,30 @@ One standing link per supplier per agency (`supplier_portal_links`, migration 44
   tenants**; tight RLS; claim profile matched by phone (merge approval per §9).
 - One inbox of requests from every operator that uses them; accept/decline/assign car or guide;
   rates and blocked dates.
-- Riverdesk cruise operators as cruise suppliers — **size after reading Riverdesk's API** (not in
-  this repo; unknown today).
+- ~~Riverdesk cruise operators as cruise suppliers~~ — dropped: no relation with Riverdesk (operator,
+  2026-10-30).
+
+**Stage 2B — APPROVED 2026-10-30** (operator: "I approve the 2B"). How it is built:
+
+- **Suppliers are not tenant users.** A supplier account (`supplier_accounts`) never becomes a
+  Supabase auth user and never holds an `authenticated` database role, so no tenant RLS policy can
+  ever match it. Its pages and APIs run with the service role, scoped in code to the agencies that
+  approved it — the same model as the 2A links, with a session instead of a link.
+- **Sign in:** phone number → a 6-digit code → a session cookie (30 days, revocable). The phone is
+  matched against suppliers in every agency (WhatsApp / phone / contact phone, normalised). The code
+  goes to the **email on those supplier records** (Resend works today); a WhatsApp code needs an
+  approved Meta template on the platform number and is added when that template exists. Codes: 10
+  minutes, 5 tries, 3 sends per 15 minutes; only a hash is stored.
+- **Claim = the duplicate merge:** on first sign-in, each matching supplier record in each agency
+  becomes a *pending* link; **that agency's admin approves or rejects** it (decision §9) on the
+  supplier card, with a bell. Until approved, the account sees nothing of that agency.
+- **One inbox:** every approving agency's requests, upcoming jobs, done jobs, what they're owed and
+  days off — the 2A page per agency, side by side, each agency's data kept apart.
+- Rates stay the agency's (white-label rule); availability stays request-and-confirm + days off.
+
+PRs: (1) migration 450 — accounts, agency links, codes, sessions — and the rules; (2) sign-in;
+(3) claim + admin approval; (4) the inbox + answering; (5) polish (sign out, "has an account" on the
+supplier card, 2A page offers sign-in).
 
 ## 7. Phase 3 — Network discovery (≈ 4–6 weeks + ongoing verification)
 
@@ -206,13 +228,15 @@ Estimate: ≈ 3–5 days inside Phase 3 (setting + picker grouping + engine sour
 - [x] **Client message** "your car tomorrow" (car + plate + driver contact) — **yes** (operator,
       2026-10-30). Sent from the operator's own WhatsApp like the rest (D2); clients never see
       supplier companies or rates. Last PR of Phase 1. *(Phase 1)*
-- [ ] **Duplicate suppliers** — phone number as merge key; who approves a merge? *(Phase 2)*
-- [ ] **Availability** — request-and-confirm only, or live calendars for hotels/cruises? *(Phase 2)*
-- [ ] **Riverdesk** — create bookings directly in Riverdesk, or service bookings Riverdesk users
-      answer? *(Phase 2)*
+- [x] **Duplicate suppliers** — phone number as merge key; **an admin approves every merge** (operator,
+      2026-10-30). *(Phase 2)*
+- [x] **Availability** — **request-and-confirm only; no live calendars for hotels or cruises** (operator,
+      2026-10-30). Days off (2A) stay the only availability signal. *(Phase 2)*
+- [x] **Riverdesk** — **out of scope: no relation with Riverdesk** (operator, 2026-10-30). *(Phase 2)*
 - [ ] **Deployment** — GetAutoura (multi-tenant) only, or also standalone installs? (Standalone
       has no network → Phase 3 is GetAutoura-only.) *(before Phase 3)*
-- [ ] **Link-only vs logins** for suppliers (§6) *(before Phase 2)*
+- [x] **Link-only vs logins** for suppliers (§6) — **link first (2A, built #735–#738); logins (2B) only
+      if needed** (operator, 2026-10-30). *(before Phase 2)*
 - [ ] **D5 detail — per service type?** One sourcing choice for the whole agency, or per service
       type (e.g. own guides, network cars)? *(before Phase 3)*
 - [ ] **D5 detail — "network only" and private suppliers:** may a network-only agency still keep a
