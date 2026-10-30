@@ -8,6 +8,7 @@
 //
 // What a trip needs, and how it is grouped: lib/documents/plan-supplier-documents.
 
+import { SERVICE_LINE_FACT_COLUMNS, factsByService } from '@/lib/documents/service-line-facts'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { insertNumbered } from '@/lib/documents/numberer'
 import { NextRequest, NextResponse } from 'next/server'
@@ -97,7 +98,16 @@ async function planForItinerary(
     }] : []
   })
 
-  return syncSupplierDocuments({ tenantId, itinerary, days, suppliers, existing: existing ?? [], guides, documentTypes })
+  // The booking's service line for each of the trip's services: pickup time
+  // and place, and the supplier's car / guide / driver once they accepted.
+  const serviceIds = days.flatMap(d => (d.services ?? []).map(s => s.id).filter(Boolean)) as string[]
+  const { data: lineRows, error: linesError } = serviceIds.length
+    ? await supabase.from('booking_supplier_status').select(SERVICE_LINE_FACT_COLUMNS).in('itinerary_service_id', serviceIds).eq('tenant_id', tenantId)
+    : { data: [], error: null }
+  if (linesError) console.error('[generate-documents] service lines:', linesError.message)
+  const serviceLines = factsByService((lineRows ?? []) as unknown as Parameters<typeof factsByService>[0])
+
+  return syncSupplierDocuments({ tenantId, itinerary, days, suppliers, existing: existing ?? [], guides, documentTypes, serviceLines })
 }
 
 /** The trip and its days with their services, for the caller's tenant. */
