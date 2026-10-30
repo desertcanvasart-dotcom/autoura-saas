@@ -4,12 +4,13 @@ import { roleDenied } from '@/lib/api-role-gate'
 import { appRedirectBase } from '@/lib/oauth-config'
 import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
 import {
-  assignWhat, buildServiceRequestMessage, generateReplyToken, replyLinkExpiry,
+  assignWhat, buildServiceCancelMessage, buildServiceRequestMessage, generateReplyToken, replyLinkExpiry,
 } from '@/lib/supplier-reply-link'
 import { REPLY_HOURS, REPLY_HOURS_SOON, SOON_HOURS, normalizeStatus } from '@/lib/bookings/service-booking-states'
 import { serviceStart, transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
 import { REMINDER_SENT } from '@/lib/bookings/service-booking-deadlines'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ============================================
 // Ask a supplier for one service line (lib/supplier-reply-link)
@@ -20,10 +21,24 @@ import { REMINDER_SENT } from '@/lib/bookings/service-booking-deadlines'
 // POST { sent: true } → the office says it pressed send: the line becomes
 //                       Requested (with its reply deadline), or — when it was
 //                       already requested — a reminder is noted.
+// POST { notice: 'cancelled' } (+ sent: true) → the same for telling a supplier
+//                       who was asked that the line is no longer needed.
 
 type Ctx = { params: Promise<{ id: string; lineId: string }> }
 
 const ASKABLE = ['pending', 'requested', 'declined', 'expired']
+
+/** The supplier's WhatsApp number in international form, or null. */
+async function supplierPhone(db: SupabaseClient, supplierId: string | null, linePhone: string | null, country: string | null) {
+  const { data: supplier } = supplierId
+    ? await db.from('suppliers').select('whatsapp, phone, contact_phone').eq('id', supplierId).maybeSingle()
+    : { data: null }
+  const raw = (supplier?.whatsapp || supplier?.phone || supplier?.contact_phone || linePhone) as string | null
+  return raw ? formatPhoneForWhatsApp(raw, country) : null
+}
+
+const waUrl = (phone: string | null, message: string) =>
+  phone ? generateWhatsAppLink(phone, message) : `https://wa.me/?text=${encodeURIComponent(message)}`
 
 export async function POST(request: NextRequest, { params }: Ctx) {
   const auth = await requireAuth()
@@ -37,7 +52,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 
   const { data: line } = await supabase
     .from('booking_supplier_status')
-    .select('id, status, resource_kind, supplier_id, supplier_name, supplier_type, service_description, service_date, service_time, pickup_location, dropoff_location, pax, contact_phone')
+    .select('id, status, resource_kind, supplier_id, supplier_name, supplier_type, service_description, service_date, service_time, pickup_location, dropoff_location, pax, contact_phone, requested_at')
     .eq('id', lineId)
     .eq('booking_id', id)
     .maybeSingle()
@@ -46,6 +61,31 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     return NextResponse.json({ success: false, error: 'This line is covered by your own team — nothing to request' }, { status: 409 })
   }
   const status = normalizeStatus(line.status)
+
+  if (body.notice === 'cancelled') {
+    if (status !== 'cancelled' || !line.requested_at) {
+      return NextResponse.json({ success: false, error: 'Only a line that was asked and is now Not needed has a supplier to tell' }, { status: 409 })
+    }
+    if (body.sent === true) {
+      await recordServiceBookingEvent(supabase, {
+        tenantId: tenant_id, bookingId: id, serviceBookingId: line.id, actor: 'operator', channel: 'whatsapp',
+        actorUserId: user?.id ?? null, actorLabel: user?.email ?? null,
+        note: 'Told the supplier it is not needed', details: { kind: 'cancel_sent' },
+      })
+      return NextResponse.json({ success: true, told: true })
+    }
+    const { data: tenant } = await supabase.from('tenants').select('company_name, operating_country').eq('id', tenant_id).maybeSingle()
+    const message = buildServiceCancelMessage({
+      supplierName: line.supplier_name as string,
+      agency: tenant?.company_name as string | null,
+      service: (line.service_description || line.supplier_type) as string,
+      serviceDate: line.service_date as string | null,
+      serviceTime: line.service_time as string | null,
+    })
+    const phone = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
+    return NextResponse.json({ success: true, data: { message, phone, whatsapp_url: waUrl(phone, message) } })
+  }
+
   if (!ASKABLE.includes(status)) {
     return NextResponse.json({ success: false, error: 'This line has already been answered' }, { status: 409 })
   }
@@ -86,11 +126,8 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   }
   const url = `${appRedirectBase(process.env.NEXT_PUBLIC_APP_URL, request.url)}/reply/${token}`
 
-  const [{ data: tenant }, { data: supplier }, { data: booking }] = await Promise.all([
+  const [{ data: tenant }, { data: booking }] = await Promise.all([
     supabase.from('tenants').select('company_name, operating_country').eq('id', tenant_id).maybeSingle(),
-    line.supplier_id
-      ? supabase.from('suppliers').select('whatsapp, phone, contact_phone').eq('id', line.supplier_id).maybeSingle()
-      : Promise.resolve({ data: null }),
     supabase.from('bookings').select('itinerary_id').eq('id', id).maybeSingle(),
   ])
   const { data: itinerary } = booking?.itinerary_id
@@ -114,15 +151,14 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     url,
   })
 
-  const rawPhone = (supplier?.whatsapp || supplier?.phone || supplier?.contact_phone || line.contact_phone) as string | null
-  const phone = rawPhone ? formatPhoneForWhatsApp(rawPhone, tenant?.operating_country as string | null) : null
+  const phone = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
   return NextResponse.json({
     success: true,
     data: {
       url,
       message,
       phone,
-      whatsapp_url: phone ? generateWhatsAppLink(phone, message) : `https://wa.me/?text=${encodeURIComponent(message)}`,
+      whatsapp_url: waUrl(phone, message),
       already_requested: status === 'requested',
     },
   })

@@ -7,7 +7,8 @@ import { MessageCircle } from 'lucide-react'
 // message is pre-typed with the supplier's one-tap reply link; WhatsApp opens,
 // the office presses send, then confirms here — only then is the line
 // Requested (and its reply deadline set). A line already requested gets a
-// reminder the same way.
+// reminder the same way. With notice="cancelled" it tells a supplier who was
+// asked that the line is no longer needed.
 
 export default function RequestOnWhatsApp({
   bookingId,
@@ -15,10 +16,12 @@ export default function RequestOnWhatsApp({
   requested,
   onSent,
   notify,
+  notice,
 }: {
   bookingId: string
   lineId: string
   requested: boolean
+  notice?: 'cancelled'
   onSent: () => void
   notify: (type: 'success' | 'error' | 'info', message: string) => void
 }) {
@@ -30,12 +33,12 @@ export default function RequestOnWhatsApp({
   const open = async () => {
     setBusy(true)
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notice ? { notice } : {}) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.success) { notify('error', data.error || 'Could not prepare the message'); return }
       window.open(data.data.whatsapp_url, '_blank', 'noopener')
       if (!data.data.phone) notify('info', 'No WhatsApp number on this supplier — pick the chat in WhatsApp')
-      setLink(data.data.url)
+      setLink(data.data.url ?? null)
       setAsking(true)
     } finally {
       setBusy(false)
@@ -45,10 +48,10 @@ export default function RequestOnWhatsApp({
   const confirm = async () => {
     setBusy(true)
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sent: true }) })
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sent: true, ...(notice ? { notice } : {}) }) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.success) { notify('error', data.error || 'Could not save'); return }
-      notify('success', data.reminded ? 'Reminder noted' : 'Requested — waiting for their answer')
+      notify('success', data.told ? 'Noted — supplier told' : data.reminded ? 'Reminder noted' : 'Requested — waiting for their answer')
       setAsking(false)
       onSent()
     } finally {
@@ -70,7 +73,7 @@ export default function RequestOnWhatsApp({
   }
   return (
     <button type="button" disabled={busy} onClick={open} className="inline-flex items-center gap-1 text-xs text-green-700 hover:underline disabled:opacity-50">
-      <MessageCircle className="w-3.5 h-3.5" /> {requested ? 'Remind on WhatsApp' : 'Ask on WhatsApp'}
+      <MessageCircle className="w-3.5 h-3.5" /> {notice ? 'Tell them it’s not needed' : requested ? 'Remind on WhatsApp' : 'Ask on WhatsApp'}
     </button>
   )
 }

@@ -166,3 +166,22 @@ export function buildServiceRequestMessage(m: RequestMessageInput): string {
   lines.push('', `Please answer within ${m.replyHours} hour${m.replyHours === 1 ? '' : 's'} with one tap on this link (no login).${name}`, m.url)
   return lines.join('\n')
 }
+
+/** The "no longer needed" note for a supplier who was asked — sent from the office's own WhatsApp too. */
+export function buildServiceCancelMessage(m: {
+  supplierName?: string | null
+  agency?: string | null
+  service: string
+  serviceDate?: string | null
+  serviceTime?: string | null
+}): string {
+  const first = m.supplierName?.trim().split(/\s+/)[0] || 'there'
+  const when = m.serviceDate ? ` on ${day(m.serviceDate)}${m.serviceTime ? ` at ${m.serviceTime.slice(0, 5)}` : ''}` : ''
+  const from = m.agency?.trim() ? ` from ${m.agency.trim()}` : ''
+  return [
+    `Hello ${first},`,
+    '',
+    `The booking request${from} for ${m.service.trim()}${when} is no longer needed — please release it.`,
+    'Thank you, and sorry for the change.',
+  ].join('\n')
+}

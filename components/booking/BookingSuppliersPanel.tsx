@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { supplierBacking } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
+import LineHistory from '@/components/booking/LineHistory'
 import {
   SERVICE_BOOKING_STATUSES, STATUS_LABEL, canTransition, normalizeStatus, type CoveredBy, type ServiceBookingStatus,
 } from '@/lib/bookings/service-booking-states'
@@ -33,6 +34,7 @@ interface SupplierRow {
   assigned_guide_name: string | null
   driver_note: string | null
   reply_deadline: string | null
+  requested_at: string | null
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
 }
@@ -213,6 +215,10 @@ export default function BookingSuppliersPanel({
                         {r.resource_kind !== 'own' && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
                           <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
                         )}
+                        {r.resource_kind !== 'own' && normalizeStatus(r.status) === 'cancelled' && r.requested_at && (
+                          <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={false} notice="cancelled" onSent={load} notify={notify} />
+                        )}
+                        <LineHistory bookingId={bookingId} lineId={r.id} />
                       </div>
                     )}
                   </td>
