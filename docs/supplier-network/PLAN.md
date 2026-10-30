@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · **Phase 1 BUILT** (migs 446–448): steps 1–6 + the client "your car tomorrow" message. Email request: PR open 2026-10-30.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · **Phase 1 BUILT** (migs 446–448): steps 1–6 + the client "your car tomorrow" message. Email request #734 merged. **Phase 2A started.**
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -135,6 +135,13 @@ suppliers by request + one-tap reply — and see every line's status in one plac
 
 English UI (D3). Consider first whether a **link-only supplier page** (one token link listing all
 of that supplier's open requests from one operator) covers the need before building logins.
+
+**Stage 2A — APPROVED and started 2026-10-30** (operator: "Yes, start 2A"). Decisions: link first,
+logins (2B) only if 2A shows the need; suppliers see what they are owed; days off WARN, never block.
+One standing link per supplier per agency (`supplier_portal_links`, migration 449) at
+`/supplier/<token>`: To answer · Upcoming (change car/driver) · Done. PRs: (1) the link + page +
+"Supplier's page" on the supplier card; (2) days off (`supplier_unavailable_days`, same migration)
++ warning in Who covers it; (3) what they're owed; (4) polish.
 
 - Supplier sign-in by phone (one-time code sent from WhatsApp/email) — a **new user kind outside
   tenants**; tight RLS; claim profile matched by phone (merge approval per §9).

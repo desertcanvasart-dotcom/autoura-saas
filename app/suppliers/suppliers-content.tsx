@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
 import SupplierDocumentsPanel from '@/components/SupplierDocumentsPanel'
+import SupplierPageLink from '@/components/SupplierPageLink'
+import { useRole } from '@/hooks/useRole'
 import { propertyTypesForRoles } from '@/lib/supplier-properties'
 import { SUPPLIER_CSV_HEADERS, supplierCsvSampleRow } from '@/lib/suppliers/csv-schema'
 import { useVocabulary } from '@/hooks/useVocabulary'
@@ -198,6 +200,7 @@ function MultiSelect({ options, value, onChange, placeholder, labels }: {
 }
 
 export default function SuppliersContent() {
+  const { isViewer } = useRole()
   const { cities: cityOptions } = useDestinationCities()
   const { fmtRate } = useRateRowFormat()
   const router = useRouter()
@@ -1317,6 +1320,7 @@ export default function SuppliersContent() {
             </div>
 
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <div className="mb-4"><SupplierPageLink supplierId={selectedSupplier.id} canEdit={!isViewer} /></div>
               {viewTab === 'details' && (
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-4">

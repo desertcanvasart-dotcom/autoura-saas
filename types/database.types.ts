@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 170
+ * Tables: 172
  */
 
 export type Json =
@@ -9783,6 +9783,99 @@ export interface Database {
           },
           {
             foreignKeyName: "supplier_properties_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_portal_links: {
+        Row: {
+          id: string
+          tenant_id: string
+          supplier_id: string
+          token: string
+          created_by: string | null
+          created_at: string
+          last_opened_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          supplier_id: string
+          token: string
+          created_by?: string | null
+          created_at?: string
+          last_opened_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          supplier_id?: string
+          token?: string
+          created_by?: string | null
+          created_at?: string
+          last_opened_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_portal_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_portal_links_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_unavailable_days: {
+        Row: {
+          id: string
+          tenant_id: string
+          supplier_id: string
+          day: string
+          note: string | null
+          marked_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          supplier_id: string
+          day: string
+          note?: string | null
+          marked_by?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          supplier_id?: string
+          day?: string
+          note?: string | null
+          marked_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_unavailable_days_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_unavailable_days_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
