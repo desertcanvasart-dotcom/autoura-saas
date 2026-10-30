@@ -3,7 +3,7 @@ import { lineService, lineSupplier } from '@/lib/bookings/service-label'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { appRedirectBase } from '@/lib/oauth-config'
-import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
+import { generateWhatsAppLink, whatsappRecipient } from '@/lib/communication-utils'
 import {
   assignWhat, buildServiceCancelMessage, buildServiceRequestMessage, generateReplyToken, replyLinkExpiry,
   requestEmailHtml, requestEmailSubject,
@@ -35,13 +35,12 @@ type Ctx = { params: Promise<{ id: string; lineId: string }> }
 
 const ASKABLE = ['pending', 'requested', 'declined', 'expired']
 
-/** The supplier's WhatsApp number in international form, or null. */
+/** The supplier's WhatsApp number in international form, or none with a warning (lib/communication-utils). */
 async function supplierPhone(db: SupabaseClient, supplierId: string | null, linePhone: string | null, country: string | null) {
   const { data: supplier } = supplierId
     ? await db.from('suppliers').select('whatsapp, phone, contact_phone').eq('id', supplierId).maybeSingle()
     : { data: null }
-  const raw = (supplier?.whatsapp || supplier?.phone || supplier?.contact_phone || linePhone) as string | null
-  return raw ? formatPhoneForWhatsApp(raw, country) : null
+  return whatsappRecipient((supplier?.whatsapp || supplier?.phone || supplier?.contact_phone || linePhone) as string | null, country)
 }
 
 const waUrl = (phone: string | null, message: string) =>
@@ -89,8 +88,8 @@ export async function POST(request: NextRequest, { params }: Ctx) {
       serviceDate: line.service_date as string | null,
       serviceTime: line.service_time as string | null,
     })
-    const phone = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
-    return NextResponse.json({ success: true, data: { message, phone, whatsapp_url: waUrl(phone, message) } })
+    const { phone, warning } = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
+    return NextResponse.json({ success: true, data: { message, phone, phone_warning: warning, whatsapp_url: waUrl(phone, message) } })
   }
 
   if (!line.supplier_id && !lineSupplier(line as { supplier_name: string | null })) {
@@ -197,13 +196,14 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     return NextResponse.json({ success: true, emailed: to, data: moved.row })
   }
 
-  const phone = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
+  const { phone, warning } = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
   return NextResponse.json({
     success: true,
     data: {
       url,
       message,
       phone,
+      phone_warning: warning,
       whatsapp_url: waUrl(phone, message),
       already_requested: status === 'requested',
     },

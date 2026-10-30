@@ -45,7 +45,8 @@ export default function ClientDayMessage({
       if (!res.ok || !data.success) { notify('error', data.error || 'Could not prepare the message'); return }
       if (sent) { notify('success', 'Noted — client told'); setAsking(false); return }
       window.open(data.data.whatsapp_url, '_blank', 'noopener')
-      if (!data.data.phone) notify('info', 'No phone number for this client — pick the chat in WhatsApp')
+      if (data.data.phone_warning) notify('info', data.data.phone_warning)
+      else if (!data.data.phone) notify('info', 'No phone number for this client — pick the chat in WhatsApp')
       setAsking(true)
     } finally {
       setBusy(false)

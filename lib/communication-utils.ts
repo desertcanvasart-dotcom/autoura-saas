@@ -170,3 +170,19 @@ export function formatPhoneForWhatsApp(phone: string, operatingCountry?: string 
   }
   return cleaned.replace(/^\+/, '')
 }
+
+export const NO_COUNTRY_WARNING =
+  'This number has no country code and your agency has no country set — pick the chat in WhatsApp, and set your country in Settings → Company (or save the number as +20…).'
+
+/**
+ * The number for a wa.me link, or none with a warning: a local number (trunk
+ * 0) that no country could complete would open a chat with a number that
+ * does not exist — or the wrong person (2026-10-30: every agency's country
+ * was empty). Better no recipient, and say why.
+ */
+export function whatsappRecipient(raw: string | null | undefined, operatingCountry?: string | null): { phone: string | null; warning: string | null } {
+  if (!raw || !raw.trim()) return { phone: null, warning: null }
+  const phone = formatPhoneForWhatsApp(raw, operatingCountry)
+  if (!/^[0-9]{8,15}$/.test(phone) || phone.startsWith('0')) return { phone: null, warning: NO_COUNTRY_WARNING }
+  return { phone, warning: null }
+}
