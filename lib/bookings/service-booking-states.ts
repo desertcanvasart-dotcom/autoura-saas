@@ -60,7 +60,7 @@ export type CoveredBy = 'own' | 'supplier' | 'network'
 const NEXT: Record<ServiceBookingStatus, readonly ServiceBookingStatus[]> = {
   pending: ['requested', 'assigned', 'cancelled'],
   requested: ['accepted', 'assigned', 'declined', 'expired', 'cancelled', 'pending'],
-  accepted: ['assigned', 'cancelled', 'pending'],
+  accepted: ['assigned', 'done', 'cancelled', 'pending'],
   assigned: ['done', 'cancelled', 'pending'],
   done: [],
   declined: ['pending', 'requested', 'assigned', 'cancelled'],

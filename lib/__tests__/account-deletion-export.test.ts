@@ -154,7 +154,7 @@ describe('closing a company', () => {
   it('the daily runner calls the purge, and a failed purge fails the run', () => {
     const runner = read('scripts/cron-reminders.mjs')
     expect(runner).toContain('/api/cron/purge-closed-companies')
-    expect(runner).toMatch(/invoices && tasks && purge && closed \? 0 : 1/)
+    expect(runner).toMatch(/invoices && tasks && purge && closed && servicesDone \? 0 : 1/)
   })
 })
 

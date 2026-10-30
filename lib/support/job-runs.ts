@@ -28,6 +28,7 @@ export type JobName =
   | 'scheduled-send'
   | 'publish-sync'
   | 'service-booking-deadlines'
+  | 'service-booking-done'
 
 export { STALE_AFTER_HOURS }
 
