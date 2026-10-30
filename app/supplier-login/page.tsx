@@ -4,7 +4,7 @@ import SignInForm from './SignInForm'
 // are not app users; this page and its API are open, and the API answers the
 // same whether or not a number is known.
 
-export const metadata = { title: 'Supplier sign-in · Autoura' }
+export const metadata = { title: 'Supplier sign-in' }
 
 export default function SupplierLoginPage() {
   return (

@@ -261,7 +261,7 @@ export default function BookingSuppliersPanel({
                       <span className="inline-flex items-center gap-1">
                         <span className="text-xs text-gray-400">{currency}</span>
                         <input
-                          key={`${r.id}:${r.confirmed_cost ?? ''}`}
+                          key={`${r.id}:${r.confirmed_cost ?? ''}:${r.quoted_cost ?? ''}:${r.supplier_name}`}
                           aria-label={`Confirmed cost for ${lineService(r)}`}
                           type="number"
                           step="0.01"
