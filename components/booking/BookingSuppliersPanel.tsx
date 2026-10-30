@@ -38,6 +38,8 @@ interface SupplierRow {
   reply_deadline: string | null
   requested_at: string | null
   supplier_day_off?: boolean
+  /** When the supplier last opened the request or their page; null = not yet; absent = nothing sent. */
+  seen?: string | null
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
 }
@@ -219,6 +221,9 @@ export default function BookingSuppliersPanel({
                     {normalizeStatus(r.status) === 'requested' && r.reply_deadline && (
                       <div className={`text-xs ${new Date(r.reply_deadline) < new Date() ? 'text-amber-700' : 'text-gray-500'}`}>
                         Answer by {new Date(r.reply_deadline).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {r.seen !== undefined && (
+                          <span className="ml-1.5 text-gray-400">· {r.seen ? `seen ${new Date(r.seen).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'not opened yet'}</span>
+                        )}
                       </div>
                     )}
                     {canEdit && (

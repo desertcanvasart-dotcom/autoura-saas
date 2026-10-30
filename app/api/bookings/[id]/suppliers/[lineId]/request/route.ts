@@ -140,6 +140,12 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     ? await supabase.from('itineraries').select('client_name').eq('id', booking.itinerary_id).maybeSingle()
     : { data: null }
 
+  // The supplier's own page, when the office has sent them one (449).
+  const { data: page } = line.supplier_id
+    ? await supabase.from('supplier_portal_links').select('token').eq('tenant_id', tenant_id).eq('supplier_id', line.supplier_id).is('revoked_at', null).maybeSingle()
+    : { data: null }
+  const pageUrl = page?.token ? `${appRedirectBase(process.env.NEXT_PUBLIC_APP_URL, request.url)}/supplier/${page.token}` : null
+
   const start = serviceStart(line.service_date as string | null, line.service_time as string | null)
   const soon = start !== null && start.getTime() - Date.now() <= SOON_HOURS * 3_600_000
   const message = buildServiceRequestMessage({
@@ -155,6 +161,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     replyHours: soon ? REPLY_HOURS_SOON : REPLY_HOURS,
     assign: assignWhat(line.supplier_type as string),
     url,
+    pageUrl,
   })
 
   if (body.channel === 'email') {

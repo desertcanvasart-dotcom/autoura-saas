@@ -141,7 +141,7 @@ logins (2B) only if 2A shows the need; suppliers see what they are owed; days of
 One standing link per supplier per agency (`supplier_portal_links`, migration 449) at
 `/supplier/<token>`: To answer · Upcoming (change car/driver) · Done. PRs: (1) the link + page +
 "Supplier's page" on the supplier card; (2) days off (`supplier_unavailable_days`, same migration)
-+ warning in Who covers it; (3) what they're owed; (4) polish.
++ warning in Who covers it; (3) what they're owed; (4) polish. Built 2026-10-30: #735, #736, #737 and the polish PR.
 
 - Supplier sign-in by phone (one-time code sent from WhatsApp/email) — a **new user kind outside
   tenants**; tight RLS; claim profile matched by phone (merge approval per §9).

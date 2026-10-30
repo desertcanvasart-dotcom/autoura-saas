@@ -7,6 +7,15 @@ import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events
 import { transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
 
 // GET - List suppliers for a booking
+function seenAt(link: Map<string, string | null>, page: Map<string, string | null>, lineId: string, supplierId: string | null) {
+  const hasLink = link.has(lineId)
+  const hasPage = !!supplierId && page.has(supplierId)
+  if (!hasLink && !hasPage) return undefined
+  const times = [link.get(lineId), supplierId ? page.get(supplierId) : null].filter((t): t is string => !!t)
+  times.sort()
+  return times.length ? times[times.length - 1] : null
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -52,10 +61,29 @@ export async function GET(
       for (const o of off || []) offKeys.add(`${o.supplier_id}:${String(o.day).slice(0, 10)}`)
     }
 
+    // Has the supplier opened the request, or their own page? (448 / 449)
+    const lineIds = (data || []).map(r => r.id as string)
+    const linkOpened = new Map<string, string | null>()
+    const pageOpened = new Map<string, string | null>()
+    if (lineIds.length) {
+      const { data: links, error: linkErr } = await supabase
+        .from('service_booking_links').select('service_booking_id, last_opened_at').in('service_booking_id', lineIds).is('revoked_at', null)
+      if (linkErr) console.error('Error fetching reply links:', linkErr.message)
+      for (const l of links || []) linkOpened.set(l.service_booking_id as string, (l.last_opened_at as string | null) ?? null)
+    }
+    if (supplierIds.length) {
+      const { data: pages, error: pageErr } = await supabase
+        .from('supplier_portal_links').select('supplier_id, last_opened_at').in('supplier_id', supplierIds).is('revoked_at', null)
+      if (pageErr) console.error('Error fetching supplier pages:', pageErr.message)
+      for (const p of pages || []) pageOpened.set(p.supplier_id as string, (p.last_opened_at as string | null) ?? null)
+    }
+
     return NextResponse.json({
       success: true,
       data: (data || []).map(r => ({
         ...r,
+        // The later of the request link and their page being opened; null = sent, not opened; absent = no link.
+        seen: seenAt(linkOpened, pageOpened, r.id as string, r.supplier_id as string | null),
         expense: expenseByRow.get(r.id as string) ?? null,
         supplier_day_off: !!(r.supplier_id && r.service_date && offKeys.has(`${r.supplier_id}:${String(r.service_date).slice(0, 10)}`)),
       })),
