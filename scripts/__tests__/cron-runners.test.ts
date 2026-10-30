@@ -411,6 +411,7 @@ describe('cron-mail-alerts', { timeout: 30_000 }, () => {
   it('exits 0 on a clean run, and asks with a Bearer secret', async () => {
     const stub = await stubByPath({
       '/api/cron/mail-alerts': { body: JSON.stringify({ success: true, mailboxes: 4, checked: 4, failed: 0, results: [] }) },
+      '/api/cron/service-booking-deadlines': { body: JSON.stringify({ success: true, waiting: 0, nudged: 0, expired: 0, failures: [] }) },
     })
     const res = await run(MAIL_ALERTS, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
     expect(res.code).toBe(0)
@@ -426,11 +427,34 @@ describe('cron-mail-alerts', { timeout: 30_000 }, () => {
           results: [{ email: 'a@x.com', ok: true }, { email: 'b@x.com', ok: false, error: 'invalid_grant' }],
         }),
       },
+      '/api/cron/service-booking-deadlines': { body: JSON.stringify({ success: true, waiting: 0, nudged: 0, expired: 0, failures: [] }) },
     })
     const res = await run(MAIL_ALERTS, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
     expect(res.code).toBe(1)
     expect(res.stderr).toContain('b@x.com')
     expect(res.stderr).toContain('invalid_grant')
+  })
+
+  it('also runs the supplier reply deadlines, and exits 1 when that fails even if mail was fine', async () => {
+    const stub = await stubByPath({
+      '/api/cron/mail-alerts': { body: JSON.stringify({ success: true, mailboxes: 1, checked: 1, failed: 0, results: [] }) },
+      '/api/cron/service-booking-deadlines': { body: JSON.stringify({ success: false, waiting: 3, nudged: 1, expired: 1, failures: ['line-9: boom'] }) },
+    })
+    const res = await run(MAIL_ALERTS, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(stub.hits.some(h => h.startsWith('/api/cron/service-booking-deadlines'))).toBe(true)
+    expect(res.stdout).toContain('3 waiting, 1 reminder(s) suggested, 1 past deadline')
+    expect(res.stderr).toContain('line-9: boom')
+    expect(res.code).toBe(1)
+  })
+
+  it('a failing mail check does not stop the deadlines from running', async () => {
+    const stub = await stubByPath({
+      '/api/cron/mail-alerts': { status: 500, body: JSON.stringify({ error: 'db down' }) },
+      '/api/cron/service-booking-deadlines': { body: JSON.stringify({ success: true, waiting: 0, nudged: 0, expired: 0, failures: [] }) },
+    })
+    const res = await run(MAIL_ALERTS, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(stub.hits.some(h => h.startsWith('/api/cron/service-booking-deadlines'))).toBe(true)
+    expect(res.code).toBe(1)
   })
 
   it('refuses to run without a target or a secret', async () => {

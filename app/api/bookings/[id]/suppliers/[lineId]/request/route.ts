@@ -9,6 +9,7 @@ import {
 import { REPLY_HOURS, REPLY_HOURS_SOON, SOON_HOURS, normalizeStatus } from '@/lib/bookings/service-booking-states'
 import { serviceStart, transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
+import { REMINDER_SENT } from '@/lib/bookings/service-booking-deadlines'
 
 // ============================================
 // Ask a supplier for one service line (lib/supplier-reply-link)
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   if (body.sent === true) {
     const actor = { actor: 'operator' as const, channel: 'whatsapp' as const, actorUserId: user?.id ?? null, actorLabel: user?.email ?? null }
     if (status === 'requested') {
-      await recordServiceBookingEvent(supabase, { tenantId: tenant_id, bookingId: id, serviceBookingId: line.id, ...actor, note: 'Reminder sent' })
+      await recordServiceBookingEvent(supabase, { tenantId: tenant_id, bookingId: id, serviceBookingId: line.id, ...actor, note: 'Reminder sent', details: { kind: REMINDER_SENT } })
       return NextResponse.json({ success: true, reminded: true })
     }
     const moved = await transitionServiceBooking(supabase, tenant_id, {

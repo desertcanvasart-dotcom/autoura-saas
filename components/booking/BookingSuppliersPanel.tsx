@@ -69,11 +69,14 @@ export default function BookingSuppliersPanel({
   hasItinerary,
   canEdit,
   notify,
+  focusLineId,
 }: {
   bookingId: string
   currency: string
   hasItinerary: boolean
   canEdit: boolean
+  /** The line a bell item points at (?line=): highlighted and scrolled to. */
+  focusLineId?: string | null
   notify: (type: 'success' | 'error' | 'info', message: string) => void
 }) {
   const [rows, setRows] = useState<SupplierRow[]>([])
@@ -96,6 +99,11 @@ export default function BookingSuppliersPanel({
   }, [bookingId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!focusLineId || rows.length === 0) return
+    document.getElementById(`service-line-${focusLineId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focusLineId, rows.length])
 
   const sync = async () => {
     setSyncing(true)
@@ -182,7 +190,7 @@ export default function BookingSuppliersPanel({
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.id} className="border-b border-gray-100 last:border-0">
+                <tr key={r.id} id={`service-line-${r.id}`} className={`border-b border-gray-100 last:border-0 ${r.id === focusLineId ? 'bg-amber-50' : ''}`}>
                   <td className="py-2 pr-3 whitespace-nowrap text-gray-600">
                     {r.service_date ? new Date(`${r.service_date}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}
                     {r.service_time && <div className="text-xs text-gray-400">{r.service_time.slice(0, 5)}</div>}
