@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useRole } from '@/hooks/useRole'
 import type { PermissionRole } from '@/lib/roles'
 
@@ -44,6 +44,21 @@ export default function UrlTabs({
   const pathname = usePathname()
   const params = useSearchParams()
   const { visible, current } = useUrlTab(tabs, param)
+
+  // A full-height page inside a tab (an inbox) sizes itself against
+  // --app-chrome (app/globals.css): add the strip's height to it.
+  const stripRef = useRef<HTMLDivElement>(null)
+  const [stripHeight, setStripHeight] = useState(0)
+  useLayoutEffect(() => {
+    const el = stripRef.current
+    if (!el) { setStripHeight(0); return }
+    const measure = () => setStripHeight(el.offsetHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [visible.length])
+
   if (!current) return null
 
   const hrefFor = (key: string) => {
@@ -55,7 +70,7 @@ export default function UrlTabs({
   return (
     <>
       {visible.length > 1 && (
-        <div className="px-4 sm:px-6 pt-4">
+        <div ref={stripRef} className="px-4 sm:px-6 pt-4">
           <div
             role="tablist"
             aria-label={label}
@@ -90,7 +105,11 @@ export default function UrlTabs({
           </div>
         </div>
       )}
-      <div role="tabpanel" aria-label={current.label}>
+      <div
+        role="tabpanel"
+        aria-label={current.label}
+        style={{ '--app-chrome': `calc(3.5rem + ${stripHeight}px)` } as CSSProperties}
+      >
         {current.render()}
       </div>
     </>
