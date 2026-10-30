@@ -42,9 +42,23 @@ export async function GET(
       for (const e of expenses || []) expenseByRow.set(e.booking_supplier_status_id as string, e)
     }
 
+    // Days off the line's supplier marked for that day (a warning — lib/supplier-days-off).
+    const supplierIds = [...new Set((data || []).map(r => r.supplier_id as string | null).filter(Boolean))] as string[]
+    const offKeys = new Set<string>()
+    if (supplierIds.length) {
+      const { data: off, error: offErr } = await supabase
+        .from('supplier_unavailable_days').select('supplier_id, day').in('supplier_id', supplierIds)
+      if (offErr) console.error('Error fetching supplier days off:', offErr.message)
+      for (const o of off || []) offKeys.add(`${o.supplier_id}:${String(o.day).slice(0, 10)}`)
+    }
+
     return NextResponse.json({
       success: true,
-      data: (data || []).map(r => ({ ...r, expense: expenseByRow.get(r.id as string) ?? null })),
+      data: (data || []).map(r => ({
+        ...r,
+        expense: expenseByRow.get(r.id as string) ?? null,
+        supplier_day_off: !!(r.supplier_id && r.service_date && offKeys.has(`${r.supplier_id}:${String(r.service_date).slice(0, 10)}`)),
+      })),
     })
   } catch (error) {
     console.error('Suppliers GET error:', error)

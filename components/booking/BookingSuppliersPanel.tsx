@@ -37,6 +37,7 @@ interface SupplierRow {
   driver_note: string | null
   reply_deadline: string | null
   requested_at: string | null
+  supplier_day_off?: boolean
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
 }
@@ -212,6 +213,9 @@ export default function BookingSuppliersPanel({
                     {r.service_description && <div className="text-xs text-gray-500">{r.service_description}</div>}
                     {r.assigned_guide_name && r.resource_kind !== 'own' && <div className="text-xs text-gray-600">Guide: {r.assigned_guide_name}</div>}
                     {r.driver_note && <div className="text-xs text-gray-600">Driver: {r.driver_note}</div>}
+                    {r.supplier_day_off && normalizeStatus(r.status) !== 'cancelled' && (
+                      <div className="text-xs text-amber-700">⚠ This supplier marked this day off</div>
+                    )}
                     {normalizeStatus(r.status) === 'requested' && r.reply_deadline && (
                       <div className={`text-xs ${new Date(r.reply_deadline) < new Date() ? 'text-amber-700' : 'text-gray-500'}`}>
                         Answer by {new Date(r.reply_deadline).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}

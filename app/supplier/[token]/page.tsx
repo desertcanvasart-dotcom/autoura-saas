@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { isValidSupplierPageToken, portalSections, toPortalLine, type PortalLine, type PortalSourceLine } from '@/lib/supplier-portal'
 import type { SupplierView } from '@/lib/supplier-reply-link'
 import ReplyButtons from '@/app/reply/[token]/ReplyButtons'
+import DaysOffEditor from '@/components/DaysOffEditor'
+import type { DayOff } from '@/lib/supplier-days-off'
 
 // A supplier's own page from one agency (migration 449): no login, the token
 // is the credential (middleware opens /supplier; this page 404s anything that
@@ -41,7 +43,8 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
     .maybeSingle()
   if (!link) notFound()
 
-  const [{ data: tenant }, { data: supplier }, { data: rows }] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10)
+  const [{ data: tenant }, { data: supplier }, { data: rows }, { data: daysOff }] = await Promise.all([
     db.from('tenants').select('company_name').eq('id', link.tenant_id).maybeSingle(),
     db.from('suppliers').select('name, company_name').eq('id', link.supplier_id).eq('tenant_id', link.tenant_id).maybeSingle(),
     db.from('booking_supplier_status').select(COLUMNS)
@@ -49,6 +52,8 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
       .in('status', ['requested', 'accepted', 'assigned', 'done'])
       .neq('resource_kind', 'own')
       .limit(500),
+    db.from('supplier_unavailable_days').select('day, note, marked_by')
+      .eq('tenant_id', link.tenant_id).eq('supplier_id', link.supplier_id).gte('day', today).order('day').limit(200),
   ])
   if (!supplier) notFound()
 
@@ -70,7 +75,6 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
 
   const operatorName = (tenant?.company_name as string | null) ?? 'Your client'
   const supplierName = ((supplier.name || supplier.company_name) as string | null) ?? 'Supplier'
-  const today = new Date().toISOString().slice(0, 10)
   const sections = portalSections(lines.map(l => toPortalLine(l, clientOf(l.booking_id))), today)
 
   const card = (l: PortalLine, answerable: boolean) => (
@@ -110,6 +114,11 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
       <div className="max-w-md mx-auto px-4 py-6 space-y-8">
         {section('To answer', sections.requests, true, 'No requests waiting — thank you.')}
         {section('Upcoming', sections.upcoming, true, 'Nothing booked yet.')}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Days you can’t work</h2>
+          <p className="text-sm text-gray-600">Mark them here and {operatorName} will see it before asking you.</p>
+          <DaysOffEditor url={`/api/supplier-page/${token}/days-off`} who="supplier" initial={(daysOff ?? []) as DayOff[]} />
+        </section>
         {section('Done', sections.done, false, 'Nothing in the last two months.')}
       </div>
     </main>
