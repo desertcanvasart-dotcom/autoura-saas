@@ -173,9 +173,9 @@ Estimate: ≈ 3–5 days inside Phase 3 (setting + picker grouping + engine sour
 
 - [x] **Reply deadline** — **4 h normally, 1 h when the service is within 48 h** (operator, 2026-10-30;
       `replyDeadline` in `lib/bookings/service-booking-states.ts`). *(Phase 1)*
-- [ ] **Client message** "your car tomorrow" (car + plate + driver contact)? Note the client
-      share page already shows confirmed staff ("Who is with you", Aug 2026) — clients never see
-      supplier companies or rates. *(Phase 1)*
+- [x] **Client message** "your car tomorrow" (car + plate + driver contact) — **yes** (operator,
+      2026-10-30). Sent from the operator's own WhatsApp like the rest (D2); clients never see
+      supplier companies or rates. Last PR of Phase 1. *(Phase 1)*
 - [ ] **Duplicate suppliers** — phone number as merge key; who approves a merge? *(Phase 2)*
 - [ ] **Availability** — request-and-confirm only, or live calendars for hotels/cruises? *(Phase 2)*
 - [ ] **Riverdesk** — create bookings directly in Riverdesk, or service bookings Riverdesk users
