@@ -82,6 +82,7 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   '/api/reply/': ['isValidReplyToken', 'revoked_at', 'isLinkLive'],
   '/api/supplier-page/': ['isValidSupplierPageToken', 'revoked_at', 'supplier_id'],
   '/api/supplier-auth/': ['normalizeLoginPhone', 'hashSessionToken'],
+  '/api/supplier-account/': ['supplierFromToken'],
   // Traveller report from the share page — the traveller has no session by
   // design; the secret share token in the path IS the credential. The handler
   // validates its shape and looks up an unrevoked itinerary_shares row by it.

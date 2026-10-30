@@ -30,6 +30,9 @@ export const SELF_AUTH_API_PREFIXES = [
   // Supplier sign-in (450): open by design — a phone + emailed code, or the
   // supplier session cookie checked by hash; suppliers have no app login.
   '/api/supplier-auth/',
+  // The signed-in supplier's inbox (450): the supplier session cookie, checked
+  // by hash, and only agencies that confirmed the account (approved claims).
+  '/api/supplier-account/',
   // Traveller report endpoint on the share page: same shape — the unrevoked
   // share token in the path IS the auth. The route 404s anything else.
   '/api/share/',

@@ -32,3 +32,10 @@ export const supplierCookie = (token: string, maxAgeSeconds: number) => ({
   path: '/',
   maxAge: maxAgeSeconds,
 })
+
+/** The agencies that confirmed this account (approved claims): the only ones it may see. */
+export async function approvedLinks(db: SupabaseClient, accountId: string): Promise<Array<{ id: string; tenant_id: string; supplier_id: string }>> {
+  const { data } = await db.from('supplier_account_links').select('id, tenant_id, supplier_id')
+    .eq('account_id', accountId).eq('status', 'approved')
+  return (data ?? []) as Array<{ id: string; tenant_id: string; supplier_id: string }>
+}

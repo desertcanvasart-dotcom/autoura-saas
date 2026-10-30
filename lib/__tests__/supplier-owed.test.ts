@@ -37,9 +37,9 @@ describe('what a supplier is owed', () => {
   })
 
   it('the page reads only this supplier’s line expenses at this agency, and never the notes', () => {
-    const page = readFileSync('app/supplier/[token]/page.tsx', 'utf8')
+    const page = readFileSync('lib/supplier-page-data.ts', 'utf8')
     const q = page.slice(page.indexOf(".from('expenses')"), page.indexOf('.limit(300)'))
-    expect(q).toContain(".eq('tenant_id', link.tenant_id).eq('supplier_id', link.supplier_id).not('booking_supplier_status_id', 'is', null)")
+    expect(q).toContain(".eq('tenant_id', tenantId).eq('supplier_id', supplierId).not('booking_supplier_status_id', 'is', null)")
     expect(q).not.toMatch(/notes|description|receipt/)
   })
 })
