@@ -5,6 +5,7 @@ import type { SupplierView } from '@/lib/supplier-reply-link'
 import ReplyButtons from '@/app/reply/[token]/ReplyButtons'
 import DaysOffEditor from '@/components/DaysOffEditor'
 import type { DayOff } from '@/lib/supplier-days-off'
+import { OWED_LABEL, owedView, type OwedSource } from '@/lib/supplier-owed'
 
 // A supplier's own page from one agency (migration 449): no login, the token
 // is the credential (middleware opens /supplier; this page 404s anything that
@@ -44,7 +45,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
   if (!link) notFound()
 
   const today = new Date().toISOString().slice(0, 10)
-  const [{ data: tenant }, { data: supplier }, { data: rows }, { data: daysOff }] = await Promise.all([
+  const [{ data: tenant }, { data: supplier }, { data: rows }, { data: daysOff }, { data: expenses }] = await Promise.all([
     db.from('tenants').select('company_name').eq('id', link.tenant_id).maybeSingle(),
     db.from('suppliers').select('name, company_name').eq('id', link.supplier_id).eq('tenant_id', link.tenant_id).maybeSingle(),
     db.from('booking_supplier_status').select(COLUMNS)
@@ -54,6 +55,10 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
       .limit(500),
     db.from('supplier_unavailable_days').select('day, note, marked_by')
       .eq('tenant_id', link.tenant_id).eq('supplier_id', link.supplier_id).gte('day', today).order('day').limit(200),
+    // What they're owed: only expenses made from their service lines (lib/supplier-owed).
+    db.from('expenses').select('id, amount, currency, status, expense_date, payment_date, booking_supplier_status_id')
+      .eq('tenant_id', link.tenant_id).eq('supplier_id', link.supplier_id).not('booking_supplier_status_id', 'is', null)
+      .in('status', ['pending', 'approved', 'paid']).order('expense_date', { ascending: false }).limit(300),
   ])
   if (!supplier) notFound()
 
@@ -75,6 +80,19 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
 
   const operatorName = (tenant?.company_name as string | null) ?? 'Your client'
   const supplierName = ((supplier.name || supplier.company_name) as string | null) ?? 'Supplier'
+  // The service name of each expense's line (their own lines only).
+  const expenseLineIds = [...new Set((expenses ?? []).map(e => e.booking_supplier_status_id as string))]
+  const { data: expenseLines } = expenseLineIds.length
+    ? await db.from('booking_supplier_status').select('id, service_description, supplier_type')
+      .in('id', expenseLineIds).eq('tenant_id', link.tenant_id).eq('supplier_id', link.supplier_id)
+    : { data: [] }
+  const serviceOf = (id: string) => {
+    const l = (expenseLines ?? []).find(x => x.id === id)
+    return l ? ((l.service_description || l.supplier_type) as string | null) : null
+  }
+  const owed = owedView((expenses ?? []) as OwedSource[], serviceOf, today)
+  const money = (amount: number, currency: string) => `${currency} ${amount.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
   const sections = portalSections(lines.map(l => toPortalLine(l, clientOf(l.booking_id))), today)
 
   const card = (l: PortalLine, answerable: boolean) => (
@@ -120,6 +138,31 @@ export default async function SupplierPage({ params }: { params: Promise<{ token
           <DaysOffEditor url={`/api/supplier-page/${token}/days-off`} who="supplier" initial={(daysOff ?? []) as DayOff[]} />
         </section>
         {section('Done', sections.done, false, 'Nothing in the last two months.')}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">What you’re owed</h2>
+          {owed.unpaid.length > 0 && (
+            <p className="rounded-xl bg-white border border-gray-200 px-4 py-3 text-sm text-gray-900">
+              Not yet paid: <span className="font-semibold">{owed.unpaid.map(u => money(u.amount, u.currency)).join(' + ')}</span>
+            </p>
+          )}
+          {owed.items.length === 0 ? <p className="text-sm text-gray-500">Nothing recorded yet.</p> : (
+            <ul className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 text-sm">
+              {owed.items.map(o => (
+                <li key={o.id} className="px-4 py-2.5 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-gray-900 truncate">{o.service}</p>
+                    <p className="text-xs text-gray-500">
+                      {o.date ? new Date(`${o.date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : ''}
+                      {' · '}{OWED_LABEL[o.state]}{o.paidOn ? ` on ${new Date(`${o.paidOn}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}` : ''}
+                    </p>
+                  </div>
+                  <span className={`flex-shrink-0 font-medium ${o.state === 'paid' ? 'text-green-700' : 'text-gray-900'}`}>{money(o.amount, o.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-gray-500">Questions about a payment? Contact {operatorName}.</p>
+        </section>
       </div>
     </main>
   )
