@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
+import { supplierToGuide } from '@/lib/guides/supplier-guide'
 import { sumByCurrency } from '@/lib/currency-totals'
 import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
 import { supplierTypesOrFilter } from '@/lib/suppliers/type-filter'
@@ -73,25 +74,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Map supplier fields to guide format - use contact_phone for phone
-    let guides = (suppliers || []).map((g: any) => ({
-      id: g.id,
-      name: g.name,
-      phone: g.contact_phone || g.whatsapp || g.phone2,
-      email: g.contact_email,
-      city: g.city,
-      languages: g.languages || [],
-      specialties: g.specialties || [],
-      is_active: g.status === 'active',
-      daily_rate: g.daily_rate,
-      hourly_rate: g.hourly_rate,
-      notes: g.notes,
-      contact_phone: g.contact_phone,
-      whatsapp: g.whatsapp,
-      ...g
-    }))
-
-
+    // One mapping for the list and /api/guides/[id] (lib/guides/supplier-guide).
+    let guides = (suppliers || []).map(supplierToGuide)
 
     // If checking availability, filter out guides with conflicting bookings
     if (availability_from && availability_to) {
