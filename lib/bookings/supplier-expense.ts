@@ -104,7 +104,8 @@ const EXPENSE_COLUMNS = 'id, expense_number, status, amount, currency, expense_d
 
 /**
  * Bring the expense for one booking supplier row in line with the row.
- * `db` is the caller's RLS client (expense numbering is per agency).
+ * `db` is the caller's RLS client, or the service role when a supplier
+ * answers by link — expense numbering is scoped to `tenantId` either way.
  */
 export async function syncSupplierExpense(
   db: SupabaseClient,
@@ -179,7 +180,7 @@ export async function syncSupplierExpense(
   const { data, error } = await insertWithUniqueRetry({
     generateRow: async () => ({
       ...base,
-      expense_number: await nextDocumentNumber({ supabase: db, prefix: 'EXP', table: 'expenses', column: 'expense_number' }),
+      expense_number: await nextDocumentNumber({ supabase: db, prefix: 'EXP', table: 'expenses', column: 'expense_number', tenantId }),
     }),
     insert: async (rowToInsert) => await db.from('expenses').insert([rowToInsert]).select(EXPENSE_COLUMNS).single(),
   })

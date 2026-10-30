@@ -99,6 +99,13 @@ export async function transitionServiceBooking(
     }
   }
 
+  // Not needed any more: the supplier's reply link stops working.
+  if (input.to === 'cancelled') {
+    const { error: revokeErr } = await db.from('service_booking_links').update({ revoked_at: new Date().toISOString() })
+      .eq('service_booking_id', input.id).is('revoked_at', null)
+    if (revokeErr) console.error('[service-booking] revoke link:', revokeErr.message)
+  }
+
   const logged = await recordServiceBookingEvent(db, {
     tenantId, bookingId: input.bookingId, serviceBookingId: input.id,
     actor: input.actor, channel: input.channel, actorUserId: input.actorUserId, actorLabel: input.actorLabel,

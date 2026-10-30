@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { supplierBacking } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
+import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
 import {
   SERVICE_BOOKING_STATUSES, STATUS_LABEL, canTransition, normalizeStatus, type CoveredBy, type ServiceBookingStatus,
 } from '@/lib/bookings/service-booking-states'
@@ -29,6 +30,9 @@ interface SupplierRow {
   resource_kind: CoveredBy | null
   service_time: string | null
   assigned_vehicle_plate: string | null
+  assigned_guide_name: string | null
+  driver_note: string | null
+  reply_deadline: string | null
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
 }
@@ -188,7 +192,21 @@ export default function BookingSuppliersPanel({
                     {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-medium">Your team</span>}
                     {r.assigned_vehicle_plate && <span className="ml-1.5 text-xs text-gray-500">{r.assigned_vehicle_plate}</span>}
                     {r.service_description && <div className="text-xs text-gray-500">{r.service_description}</div>}
-                    {canEdit && <div className="mt-0.5"><CoverLinePicker bookingId={bookingId} lineId={r.id} currency={currency} onSaved={load} notify={notify} /></div>}
+                    {r.assigned_guide_name && r.resource_kind !== 'own' && <div className="text-xs text-gray-600">Guide: {r.assigned_guide_name}</div>}
+                    {r.driver_note && <div className="text-xs text-gray-600">Driver: {r.driver_note}</div>}
+                    {normalizeStatus(r.status) === 'requested' && r.reply_deadline && (
+                      <div className={`text-xs ${new Date(r.reply_deadline) < new Date() ? 'text-amber-700' : 'text-gray-500'}`}>
+                        Answer by {new Date(r.reply_deadline).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                    {canEdit && (
+                      <div className="mt-0.5 flex flex-wrap items-center gap-3">
+                        <CoverLinePicker bookingId={bookingId} lineId={r.id} currency={currency} onSaved={load} notify={notify} />
+                        {r.resource_kind !== 'own' && ['pending', 'requested', 'declined', 'expired'].includes(normalizeStatus(r.status)) && (
+                          <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={normalizeStatus(r.status) === 'requested'} onSent={load} notify={notify} />
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 pr-3 text-gray-500 capitalize">{r.supplier_type}</td>
                   <td className="py-2 pr-3 text-right text-gray-700 whitespace-nowrap">

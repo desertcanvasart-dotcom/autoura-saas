@@ -214,3 +214,38 @@ describe('446: a service booking\'s history is append-only', () => {
     expect(await count(`SELECT count(*) AS n FROM service_booking_events WHERE service_booking_id = '${line}'`)).toBe(0)
   })
 })
+
+describe('448: a supplier reply link', () => {
+  let line: string
+  let booking: string
+
+  beforeAll(async () => {
+    booking = ((await db.query(`
+      INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date,
+                            total_days, num_travelers, total_amount, balance_due, status)
+      VALUES ('${tenant}', 'BK-448', 'Trip', DATE '2027-01-01', DATE '2027-01-05', 5, 2, 1000, 1000, 'pending_deposit')
+      RETURNING id`)).rows[0] as { id: string }).id
+    line = ((await db.query(`
+      INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status)
+      VALUES ('${tenant}', '${booking}', 'transport', 'Cairo Cars', 'pending') RETURNING id`)).rows[0] as { id: string }).id
+  })
+
+  const link = (token: string) => `INSERT INTO service_booking_links (tenant_id, booking_id, service_booking_id, token)
+    VALUES ('${tenant}', '${booking}', '${line}', '${token}')`
+
+  it('the team makes one; a viewer cannot', async () => {
+    expect(await as(people.viewer, link('tok-viewer'))).toMatch(/row-level security/)
+    expect(await as(people.owner, link('tok-1'))).toBeNull()
+  })
+
+  it('one active link per line; a revoked one frees the slot', async () => {
+    expect(await as(people.owner, link('tok-2'))).toMatch(/unique|duplicate/)
+    expect(await as(people.owner, `UPDATE service_booking_links SET revoked_at = NOW() WHERE token = 'tok-1'`)).toBeNull()
+    expect(await as(people.owner, link('tok-2'))).toBeNull()
+  })
+
+  it('goes with its line', async () => {
+    await db.exec(`DELETE FROM booking_supplier_status WHERE id = '${line}'`)
+    expect(await count(`SELECT count(*) AS n FROM service_booking_links WHERE service_booking_id = '${line}'`)).toBe(0)
+  })
+})
