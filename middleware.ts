@@ -27,6 +27,9 @@ export const SELF_AUTH_API_PREFIXES = [
   // Supplier page endpoints (449): same shape — the unrevoked supplier-page
   // token in the path IS the auth; the line must be that supplier's.
   '/api/supplier-page/',
+  // Supplier sign-in (450): open by design — a phone + emailed code, or the
+  // supplier session cookie checked by hash; suppliers have no app login.
+  '/api/supplier-auth/',
   // Traveller report endpoint on the share page: same shape — the unrevoked
   // share token in the path IS the auth. The route 404s anything else.
   '/api/share/',
@@ -257,6 +260,10 @@ export async function middleware(request: NextRequest) {
     // 404s any token that does not resolve to an unrevoked supplier_portal_link
     // (app/supplier/[token]/page.tsx).
     '/supplier',
+    // Supplier sign-in and their signed-in home (450): the home checks the
+    // supplier session cookie itself and redirects to sign-in without one.
+    '/supplier-login',
+    '/supplier-home',
     // Customer portal pages (C1a) — token-gated, service-role lookup, and a
     // confirmation-gate cookie before any booking data renders
     // (app/portal/[token]/page.tsx).
