@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–5 built (migs 446–448); Services tab, calendar & documents next.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · steps 1–6 built (migs 446–448); the client "your car tomorrow" message next.
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -127,7 +127,7 @@ suppliers by request + one-tap reply — and see every line's status in one plac
    reminders service; Accepted may now become Done — a restaurant names nobody); (b) line history
    + Not needed on the Suppliers tab; (c) voucher shows plate / guide / time / pickup from the
    service line; (d) supplier-covered lines on the operations calendar. Payables already work: a
-   covered line makes a pending expense, Accounts Payable groups them by supplier.*
+   covered line makes a pending expense, Accounts Payable groups them by supplier. Built: (a) #729, (b) #730, (c) #731, (d) calendar badge "3/5" per trip (amber when an uncovered service is within 2 days) + the trip's supplier lines in the calendar's trip window (`/api/service-bookings/coverage`).*
 
 **Move on when:** operators run most lines through it and suppliers answer by the link.
 
