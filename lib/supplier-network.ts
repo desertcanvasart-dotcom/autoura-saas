@@ -105,3 +105,12 @@ export const VERIFICATION_LABEL: Record<string, string> = {
   verified: 'Verified — agencies can find you',
   rejected: 'Not verified — see the note and send again',
 }
+
+/**
+ * The kinds an agency's copy of a network supplier takes: the profile's kinds
+ * that the agency's own vocabulary has (suppliers.types is checked against it).
+ */
+export function copyTypes(profileKinds: string[], vocabularyKeys: string[]): string[] {
+  const have = new Set(vocabularyKeys)
+  return profileKinds.filter(k => have.has(k))
+}

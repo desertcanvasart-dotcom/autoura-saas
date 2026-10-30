@@ -214,6 +214,7 @@ const navigation: NavSection[] = [
     roles: ['admin', 'manager'],
     items: [
       { label: 'Suppliers', href: '/suppliers', icon: Building },
+      { label: 'Network suppliers', href: '/network-suppliers', icon: Globe },
       { label: 'Rates Hub', href: '/rates', icon: Coins },
       { label: 'Rates Check', href: '/rates/check', icon: ClipboardCheck },
       {
