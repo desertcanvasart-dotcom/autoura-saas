@@ -9,7 +9,7 @@ import ReplyButtons from './ReplyButtons'
 // supplier sees the service they are asked for and nothing else of the trip.
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Booking request · Autoura', robots: { index: false } }
+export const metadata = { title: 'Booking request', robots: { index: false } }
 
 export default async function ReplyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params

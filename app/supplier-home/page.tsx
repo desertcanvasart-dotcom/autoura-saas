@@ -14,7 +14,7 @@ import SignOutButton from './SignOutButton'
 // theirs shown.
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Your bookings · Autoura', robots: { index: false } }
+export const metadata = { title: 'Your bookings', robots: { index: false } }
 
 const WAITING: Record<string, string> = {
   pending: 'Waiting for the agency to confirm it is you',
@@ -41,6 +41,15 @@ export default async function SupplierHomePage() {
   const { data: waitingTenants } = waitingIds.length ? await db.from('tenants').select('id, company_name').in('id', waitingIds) : { data: [] }
   const nameOf = (id: string) => ((waitingTenants ?? []).find(t => t.id === id)?.company_name as string | null) ?? 'An agency'
   const toAnswer = agencies.reduce((n, a) => n + a.data.sections.requests.length, 0)
+
+  // The supplier has now seen these requests: the office's line says "seen …"
+  // (it read only the links before — 2026-10-30 end-to-end test).
+  const shown = agencies.flatMap(a => a.data.sections.requests.map(l => l.id))
+  if (shown.length) {
+    void db.from('service_booking_links').update({ last_opened_at: new Date().toISOString() })
+      .in('service_booking_id', shown).is('revoked_at', null)
+      .then(({ error }) => { if (error) console.error('[supplier inbox] seen stamp:', error.message) })
+  }
 
   return (
     <main className="min-h-screen bg-gray-50">

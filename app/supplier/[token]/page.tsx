@@ -11,7 +11,7 @@ import SupplierAgencyView from '@/components/supplier/SupplierAgencyView'
 // signed-in inbox (lib/supplier-page-data, components/supplier/SupplierAgencyView).
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Your bookings · Autoura', robots: { index: false } }
+export const metadata = { title: 'Your bookings', robots: { index: false } }
 
 export default async function SupplierPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params

@@ -1,6 +1,7 @@
 import type { PortalLine } from '@/lib/supplier-portal'
 import type { SupplierView } from '@/lib/supplier-reply-link'
 import { OWED_LABEL } from '@/lib/supplier-owed'
+import { agencyDateTime } from '@/lib/agency-time'
 import type { SupplierAgencyData } from '@/lib/supplier-page-data'
 import ReplyButtons from '@/app/reply/[token]/ReplyButtons'
 import DaysOffEditor from '@/components/DaysOffEditor'
@@ -51,7 +52,7 @@ export default function SupplierAgencyView({
           {l.guests && <p>Guests: {l.guests}</p>}
           {l.clientName && <p>Client: {l.clientName}</p>}
           {l.status === 'requested' && l.replyBy && (
-            <p className="text-amber-700">Please answer by {new Date(l.replyBy).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+            <p className="text-amber-700">Please answer by {agencyDateTime(l.replyBy, data.timeZone)}</p>
           )}
           {!answerable && (l.plate || l.guideName) && <p>{l.plate ? `Car: ${l.plate}` : `Guide: ${l.guideName}`}{l.driverNote ? ` · Driver: ${l.driverNote}` : ''}</p>}
         </div>

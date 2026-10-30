@@ -13,12 +13,15 @@ import { portalSections, toPortalLine, type PortalSections, type PortalSourceLin
 import type { DayOff } from '@/lib/supplier-days-off'
 import { owedView, type OwedItem, type OwedSource } from '@/lib/supplier-owed'
 import { lineService } from '@/lib/bookings/service-label'
+import { agencyTimeZone } from '@/lib/agency-time'
 
 const COLUMNS = 'id, booking_id, status, supplier_type, service_description, service_date, service_time, pickup_location, dropoff_location, pax, reply_deadline, assigned_vehicle_plate, assigned_guide_name, assigned_guide_phone, driver_note, resource_kind'
 
 export interface SupplierAgencyData {
   operatorName: string
   supplierName: string
+  /** The agency's clock, for deadlines (lib/agency-time). */
+  timeZone: string
   sections: PortalSections
   daysOff: DayOff[]
   owed: { items: OwedItem[]; unpaid: Array<{ currency: string; amount: number }> }
@@ -26,7 +29,7 @@ export interface SupplierAgencyData {
 
 export async function loadSupplierAgency(db: SupabaseClient, tenantId: string, supplierId: string, today: string): Promise<SupplierAgencyData | null> {
   const [{ data: tenant }, { data: supplier }, { data: rows }, { data: daysOff }, { data: expenses }] = await Promise.all([
-    db.from('tenants').select('company_name').eq('id', tenantId).maybeSingle(),
+    db.from('tenants').select('company_name, timezone, operating_country').eq('id', tenantId).maybeSingle(),
     db.from('suppliers').select('name, company_name').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle(),
     db.from('booking_supplier_status').select(COLUMNS)
       .eq('tenant_id', tenantId).eq('supplier_id', supplierId)
@@ -69,6 +72,7 @@ export async function loadSupplierAgency(db: SupabaseClient, tenantId: string, s
   return {
     operatorName: (tenant?.company_name as string | null) ?? 'Your client',
     supplierName: ((supplier.name || supplier.company_name) as string | null) ?? 'Supplier',
+    timeZone: agencyTimeZone(tenant?.timezone as string | null, tenant?.operating_country as string | null),
     sections: portalSections(lines.map(l => toPortalLine(l, clientOf(l.booking_id))), today),
     daysOff: (daysOff ?? []) as DayOff[],
     owed: owedView((expenses ?? []) as OwedSource[], serviceOf, today),
