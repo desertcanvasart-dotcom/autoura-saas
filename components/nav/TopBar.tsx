@@ -69,7 +69,10 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+  // Read after mount: the server has no navigator, and guessing would make
+  // the first client render disagree with the HTML.
+  const [isMac, setIsMac] = useState(false)
+  useEffect(() => { setIsMac(/Mac|iPhone|iPad/.test(navigator.platform)) }, [])
 
   return (
     <header className="h-14 shrink-0 bg-white border-b border-gray-200 flex items-center gap-3 px-3 sm:px-4 z-50 relative">
@@ -86,13 +89,13 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
         </button>
       )}
 
-      <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0 lg:w-[232px] shrink-0">
+      <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0 lg:w-[232px] lg:shrink-0">
         {/* Icon-only mark beside the tenant's own name: this slot is theirs. */}
         <img src="/get-autoura-icon.png" alt="" className="w-7 h-7 object-contain shrink-0" />
         <span className="flex items-center gap-1.5 min-w-0">
           {tenant && <span className="text-[15px] font-semibold text-gray-900 truncate">{tenant.company_name}</span>}
           {APP_LABEL && (
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">{APP_LABEL}</span>
+            <span className="hidden sm:inline text-[10px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">{APP_LABEL}</span>
           )}
         </span>
       </Link>
@@ -110,7 +113,7 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
         </button>
       )}
 
-      <div className="ml-auto flex items-center gap-1 sm:gap-2">
+      <div className="ml-auto flex items-center gap-1 sm:gap-2 shrink-0">
         {variant === 'app' && (
           <>
             <button
@@ -198,7 +201,8 @@ function AccountMenu() {
   }
 
   const name = profile?.full_name || user?.email || 'You'
-  const role = roleLabel(tenantMember?.role)
+  // Nothing until the membership has loaded — never a guessed role.
+  const role = tenantMember ? roleLabel(tenantMember.role) : ''
   const go = (href: string) => { setOpen(false); router.push(href) }
 
   return (

@@ -120,7 +120,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         className={`fixed lg:static top-14 bottom-0 left-0 z-40 w-64 shrink-0 bg-white border-r border-gray-200 flex flex-col
           transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-3 [scrollbar-width:thin] [scrollbar-color:#d1d5db_transparent]">
           {sections.map(section => {
             const isOpen = section.key === currentSection || !collapsed.includes(section.key)
             const folded = !isOpen

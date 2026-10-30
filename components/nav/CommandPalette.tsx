@@ -157,6 +157,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
           <Search size={18} strokeWidth={1.7} className="text-gray-400 shrink-0" aria-hidden />
           <input
             ref={inputRef}
+            autoFocus
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
