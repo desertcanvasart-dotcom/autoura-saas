@@ -4,8 +4,9 @@ import { createAdminClient } from '@/lib/supabase-server'
 import {
   SESSION_DAYS, checkLoginCode, generateSessionToken, hashSessionToken, normalizeLoginPhone, sessionExpiry,
 } from '@/lib/supplier-accounts'
-import { claimRecords, recordsForPhone } from '@/lib/supplier-claims'
+import { CLAIM_DECIDERS, claimRecords, recordsForPhone } from '@/lib/supplier-claims'
 import { supplierCookie } from '@/lib/supplier-session'
+import { notifyTeam } from '@/lib/notifications'
 
 /**
  * Supplier sign-in, step 2 (Phase 2B): phone + code → a session cookie.
@@ -41,7 +42,21 @@ export async function POST(request: NextRequest) {
     })
     if (error) return NextResponse.json({ success: false, error: 'Could not sign you in — please try again' }, { status: 500 })
     await db.from('supplier_accounts').update({ last_login_at: now.toISOString() }).eq('id', account!.id)
-    await claimRecords(db, account!.id, await recordsForPhone(db, parsed.phone))
+    const records = await recordsForPhone(db, parsed.phone)
+    const fresh = await claimRecords(db, account!.id, records)
+    // Each agency's owners and admins are asked to confirm it is them (§9).
+    for (const claim of fresh) {
+      const name = records.find(r => r.id === claim.supplier_id)?.name ?? 'A supplier'
+      void notifyTeam({
+        tenant_id: claim.tenant_id,
+        roles: CLAIM_DECIDERS,
+        dedupe_key: `supplier-claim:${claim.id}`,
+        type: 'supplier',
+        title: `${name} wants to sign in as your supplier`,
+        message: `From +${parsed.phone}. Confirm it is them on the Suppliers page.`,
+        link: '/suppliers',
+      }).catch(e => console.error('[supplier sign-in] notify:', e))
+    }
 
     const res = NextResponse.json({ success: true })
     res.cookies.set(supplierCookie(token, SESSION_DAYS * 86_400))
