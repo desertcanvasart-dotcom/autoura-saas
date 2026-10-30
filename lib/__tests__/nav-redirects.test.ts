@@ -13,7 +13,7 @@ const { MOVED, SETTINGS_TABS, navRedirects } = require('../nav/redirects.js') as
 // would be served twice), and the new one is there.
 
 const appPage = (route: string) =>
-  existsSync(path.join(process.cwd(), 'app', ...route.split('/').filter(Boolean).map(p => (p.startsWith(':') ? '[id]' : p)), 'page.tsx'))
+  existsSync(path.join(process.cwd(), 'app', ...route.split('?')[0].split('/').filter(Boolean).map(p => (p.startsWith(':') ? '[id]' : p)), 'page.tsx'))
 
 describe('old addresses redirect', () => {
   it('each moved page lives at its new address and no longer at its old one', () => {

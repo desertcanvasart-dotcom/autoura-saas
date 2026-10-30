@@ -23,7 +23,7 @@ describe('the pages under /settings', () => {
 
   it('open for the roles the Settings sidebar shows them to; the rest stays admin-only', () => {
     expect(allowed('/settings/email-signatures')).toEqual(['admin', 'manager', 'member'])
-    expect(allowed('/copilot-analytics')).toEqual(['admin', 'manager'])
+    expect(allowed('/reports')).toEqual(['admin', 'manager', 'member', 'viewer'])
     expect(allowed('/settings/seasons')).toEqual(['admin', 'manager'])
     // Personal: your own Gmail (the Inbox sends members here) and your own profile.
     expect(allowed('/settings/email')).toEqual(['admin', 'manager', 'member'])

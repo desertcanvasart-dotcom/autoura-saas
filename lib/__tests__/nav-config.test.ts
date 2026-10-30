@@ -131,6 +131,9 @@ describe('the server agrees with the navigation', () => {
       for (const r of ['member', 'manager'] as PermissionRole[]) {
         if (e.roles.includes(r)) continue
         if (r === 'member' && OPENED_FROM_OTHER_PAGES.has(e.href)) continue
+        // A tab of a merged page (?tab=): the page is open, the tab's own
+        // API refuses the role, and the page does not offer the tab.
+        if (e.href.includes('?')) continue
         expect(g, `${e.href} has no rule but is hidden from ${r}`).not.toBeNull()
         expect(g, `${e.href} open to ${r} by URL`).not.toContain(r)
       }

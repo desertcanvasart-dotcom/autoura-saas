@@ -7,7 +7,7 @@ import { join } from 'node:path'
 const PAGES = [
   'app/invoices/[id]/page.tsx', 'app/invoices/invoices-content.tsx', 'app/payments/page.tsx',
   'app/receipts/page.tsx', 'app/accounts-receivable/page.tsx', 'app/accounts-payable/page.tsx',
-  'app/expenses/page.tsx', 'app/financial-reports/page.tsx', 'app/profit-loss/page.tsx',
+  'app/expenses/page.tsx', 'app/reports/_views/FinanceView.tsx', 'app/profit-loss/page.tsx',
   'app/commissions/page.tsx',
 ]
 
