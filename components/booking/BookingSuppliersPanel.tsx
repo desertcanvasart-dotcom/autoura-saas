@@ -213,7 +213,7 @@ export default function BookingSuppliersPanel({
                     {r.service_time && <div className="text-xs text-gray-400">{r.service_time.slice(0, 5)}</div>}
                   </td>
                   <td className="py-2 pr-3 text-gray-900">
-                    {lineSupplier(r) ?? <span className="text-gray-400 italic">No supplier yet</span>}
+                    {lineSupplier(r) ?? <span className="text-gray-400 italic">{['accepted', 'assigned', 'done'].includes(normalizeStatus(r.status)) ? 'Supplier not recorded' : 'No supplier yet'}</span>}
                     {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-medium">Your team</span>}
                     {r.assigned_vehicle_plate && <span className="ml-1.5 text-xs text-gray-500">{r.assigned_vehicle_plate}</span>}
                     <div className="text-xs text-gray-500">{lineService(r)}</div>
@@ -247,7 +247,10 @@ export default function BookingSuppliersPanel({
                         )}
                         <LineWhenWhere key={`${r.id}:${r.service_time ?? ''}:${r.pickup_location ?? ''}:${r.dropoff_location ?? ''}`} bookingId={bookingId} line={r} onSaved={load} notify={notify} />
                         {r.resource_kind !== 'own' && normalizeStatus(r.status) === 'cancelled' && r.requested_at && (
-                          <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={false} notice="cancelled" onSent={load} notify={notify} />
+                          <>
+                            <RequestOnWhatsApp bookingId={bookingId} lineId={r.id} requested={false} notice="cancelled" onSent={load} notify={notify} />
+                            <RequestByEmail bookingId={bookingId} lineId={r.id} supplierName={lineSupplier(r) ?? 'the supplier'} requested={false} notice="cancelled" onSent={load} notify={notify} />
+                          </>
                         )}
                         <LineHistory bookingId={bookingId} lineId={r.id} />
                       </div>

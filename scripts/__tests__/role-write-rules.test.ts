@@ -361,6 +361,29 @@ describe('451: lines never borrow the service name as a supplier', () => {
   })
 })
 
+describe('452: older lines that borrowed a service name as their supplier', () => {
+  it('moves an exact trip-service name into the description; hotels, own cars and other names untouched', async () => {
+    const trip = ((await db.query(`INSERT INTO itineraries (tenant_id, itinerary_code, client_name, start_date, end_date, status)
+      VALUES ('${tenant}', 'ITN-452', 'Test', DATE '2027-02-01', DATE '2027-02-03', 'confirmed') RETURNING id`)).rows[0] as { id: string }).id
+    const day = ((await db.query(`INSERT INTO itinerary_days (itinerary_id, day_number, date) VALUES ('${trip}', 1, DATE '2027-02-01') RETURNING id`)).rows[0] as { id: string }).id
+    await db.query(`INSERT INTO itinerary_services (itinerary_id, day_id, service_type, service_name) VALUES ('${trip}', '${day}', 'transportation', 'airport_transfer sedan Cairo'), ('${trip}', '${day}', 'accommodation', 'Marriott Mena House | Cairo')`)
+    const booking = ((await db.query(`INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date, total_days, num_travelers, total_amount, balance_due, status, itinerary_id)
+      VALUES ('${tenant}', 'BK-452', 'Trip', DATE '2027-02-01', DATE '2027-02-03', 3, 2, 1000, 1000, 'pending_deposit', '${trip}') RETURNING id`)).rows[0] as { id: string }).id
+    const ins = async (type: string, name: string, kind = 'supplier') => ((await db.query(`INSERT INTO booking_supplier_status (tenant_id, booking_id, supplier_type, supplier_name, status, resource_kind)
+      VALUES ('${tenant}', '${booking}', '${type}', '${name}', 'accepted', '${kind}') RETURNING id`)).rows[0] as { id: string }).id
+    const borrowed = await ins('transport', 'airport_transfer sedan Cairo')
+    const hotel = await ins('hotel', 'Marriott Mena House | Cairo')
+    const realName = await ins('transport', 'Cairo Limo Co')
+    const own = await ins('transport', 'airport_transfer sedan Cairo', 'own')
+    await db.exec(readFileSync(path.join(MIGRATIONS_DIR, '452_older_lines_no_borrowed_supplier.sql'), 'utf8'))
+    const row = async (id: string) => (await db.query(`SELECT supplier_name, service_description FROM booking_supplier_status WHERE id = '${id}'`)).rows[0]
+    expect(await row(borrowed)).toEqual({ supplier_name: '', service_description: 'airport_transfer sedan Cairo' })
+    expect(await row(hotel)).toEqual({ supplier_name: 'Marriott Mena House | Cairo', service_description: null })
+    expect(await row(realName)).toEqual({ supplier_name: 'Cairo Limo Co', service_description: null })
+    expect(await row(own)).toEqual({ supplier_name: 'airport_transfer sedan Cairo', service_description: null })
+  })
+})
+
 describe('453: the shared network — profiles found only when listed and verified', () => {
   const countAs = (userId: string, sql: string) => db.transaction(async tx => {
     await tx.exec(`SET LOCAL ROLE authenticated; SELECT set_config('test.uid', '${userId}', true);`)

@@ -9907,9 +9907,9 @@ export interface Database {
         Insert: {
           account_id: string
           display_name: string
-          kinds?: string[]
-          cities?: string[]
-          languages?: string[]
+          kinds: string[]
+          cities: string[]
+          languages: string[]
           about?: string | null
           listed?: boolean
           verification_status?: string
@@ -9938,7 +9938,7 @@ export interface Database {
           {
             foreignKeyName: "supplier_network_profiles_account_id_fkey"
             columns: ["account_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "supplier_accounts"
             referencedColumns: ["id"]
           },
@@ -10268,6 +10268,13 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suppliers_network_account_id_fkey"
+            columns: ["network_account_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_accounts"
             referencedColumns: ["id"]
           },
         ]

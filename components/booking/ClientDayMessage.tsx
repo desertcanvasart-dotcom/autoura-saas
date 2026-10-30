@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Send } from 'lucide-react'
+import { Mail, Send } from 'lucide-react'
 
 // Send the client a day's details — car, plate, driver, guide, times — from
 // the office's OWN WhatsApp (D2). Pick the day (tomorrow when it has
@@ -53,6 +53,19 @@ export default function ClientDayMessage({
     }
   }
 
+  const email = async () => {
+    if (!window.confirm('Email the client this day’s details now?')) return
+    setBusy(true)
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, channel: 'email' }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) { notify('error', data.error || 'Could not send the email'); return }
+      notify('success', `Emailed to ${data.emailed}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const label = (d: string) => {
     const name = new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
     return d === tomorrow ? `Tomorrow (${name})` : name
@@ -73,6 +86,11 @@ export default function ClientDayMessage({
       ) : (
         <button type="button" disabled={busy || !date} onClick={() => post(false)} className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:underline disabled:opacity-50">
           <Send className="w-3.5 h-3.5" /> On WhatsApp
+        </button>
+      )}
+      {!asking && (
+        <button type="button" disabled={busy || !date} onClick={email} className="inline-flex items-center gap-1 text-xs text-gray-700 hover:underline disabled:opacity-50">
+          <Mail className="w-3.5 h-3.5" /> By email
         </button>
       )}
     </div>

@@ -203,18 +203,25 @@ export function requestEmailSubject(service: string, serviceDate: string | null 
 }
 
 /**
- * The WhatsApp text as an email: every line escaped, the reply link as a
- * button (and printed, for mail clients that hide buttons). No prices.
+ * A pre-typed WhatsApp text as an email: every line escaped, an optional
+ * button (and the link printed again, for mail clients that hide buttons).
+ * No prices are ever in these texts.
  */
-export function requestEmailHtml(message: string, url: string): string {
+export function messageEmailHtml(message: string, button?: { url: string; label: string }): string {
   const body = message
     .split('\n')
-    .filter(l => l.trim() !== url)
+    .filter(l => !button || l.trim() !== button.url)
     .map(l => (l.trim() === '' ? '<br>' : `<div>${esc(l)}</div>`))
     .join('\n')
+  const cta = button
+    ? `\n<p style="margin: 20px 0;"><a href="${esc(button.url)}" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 8px; font-weight: 600;">${esc(button.label)}</a></p>\n<p style="font-size: 12px; color: #6b7280;">Or open: ${esc(button.url)}</p>`
+    : ''
   return `<div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; font-size: 15px; line-height: 1.5; color: #111827; max-width: 560px;">
-${body}
-<p style="margin: 20px 0;"><a href="${esc(url)}" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 8px; font-weight: 600;">Answer here — one tap</a></p>
-<p style="font-size: 12px; color: #6b7280;">Or open: ${esc(url)}</p>
+${body}${cta}
 </div>`
+}
+
+/** The supplier request as an email: the reply link as a one-tap button. */
+export function requestEmailHtml(message: string, url: string): string {
+  return messageEmailHtml(message, { url, label: 'Answer here — one tap' })
 }
