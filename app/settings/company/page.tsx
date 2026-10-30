@@ -267,7 +267,7 @@ export default function TenantSettingsPage() {
     if (!pct(defaultMargin)) problems.push('House margin is a percentage from 0 to 100')
     if (!pct(minMargin)) problems.push('Minimum margin is a percentage from 0 to 100')
     const house = num(defaultMargin), floor = num(minMargin)
-    if (house !== null && floor !== null && floor > house) problems.push('The minimum margin cannot be above the house margin')
+    if (house !== null && floor !== null && floor > house) problems.push('The minimum margin cannot be above the markup (Settings › Pricing defaults)')
     if (!pct(depositPercent)) problems.push('Deposit is a percentage from 0 to 100')
     const due = num(depositDueDays)
     if (due !== null && !(Number.isInteger(due) && due >= 0 && due <= 365)) problems.push('Deposit due days is a whole number from 0 to 365')
@@ -325,7 +325,6 @@ export default function TenantSettingsPage() {
         secondary_color: secondaryColor,
         // Empty field -> NULL -> the resolver falls through to the platform
         // constant. Storing 0 here would silently make every quote at-cost.
-        default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
         // Blank -> NULL -> resolveDepositRule falls back to the defaults.
         deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
         deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
@@ -566,24 +565,14 @@ export default function TenantSettingsPage() {
               />
             </div>
 
+            {/* The markup is set once, in Settings › Pricing defaults (456). */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                House Margin %
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Applies to anyone without a personal margin)</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="200"
-                step="0.5"
-                value={defaultMargin}
-                onChange={(e) => setDefaultMargin(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                placeholder="Not set — uses 25%"
-              />
+              <p className="block text-xs font-medium text-gray-700 mb-1">Markup on supplier cost</p>
+              <p className="px-3 py-1.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg">
+                {defaultMargin.trim() === '' ? 'Not set — uses 25%' : `${defaultMargin}%`}
+              </p>
               <p className="mt-1 text-[10px] text-gray-400">
-                Leave blank to use the platform default. A colleague who clears their own
-                margin falls back to this.
+                Set in <Link href="/settings/pricing" className="underline">Settings › Pricing defaults</Link>.
               </p>
             </div>
 
@@ -603,7 +592,7 @@ export default function TenantSettingsPage() {
                 placeholder="Not set — no warning"
               />
               <p className="mt-1 text-[10px] text-gray-400">
-                On cost, like the house margin. An itinerary whose quoted margin, or profit so far,
+                On cost, like the markup. An itinerary whose quoted margin, or profit so far,
                 is below this shows it under Needs attention. A trip losing money is always shown.
               </p>
             </div>

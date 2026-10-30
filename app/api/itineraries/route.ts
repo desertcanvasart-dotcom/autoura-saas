@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       ...(text('package_type') ? { package_type: text('package_type')! } : {}),
       total_cost: 0,
       // The creator's Settings → Preferences cost mode (auto or manual).
-      cost_mode: await defaultCostMode(supabase, authResult.user?.id),
+      cost_mode: await defaultCostMode(supabase, authResult.tenant_id),
     }
 
     const { data, error } = await supabase
