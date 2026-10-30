@@ -217,7 +217,7 @@ async function loadAllExchangeRates(db: object): Promise<ExchangeRate[]> {
 }
 
 /** The rates this company may use (shared + its own overrides). */
-async function loadExchangeRates(db: object, tenantId: string | null | undefined): Promise<ExchangeRate[]> {
+export async function loadExchangeRates(db: object, tenantId: string | null | undefined): Promise<ExchangeRate[]> {
   return ratesForTenant(await loadAllExchangeRates(db), tenantId)
 }
 

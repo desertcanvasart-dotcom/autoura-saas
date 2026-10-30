@@ -32,6 +32,7 @@ import { repriceGridDays, repriceWarnings } from '@/lib/pricing/grid-reprice'
 import { calculateGrandTotals } from '@/app/pricing-grid/lib/calculator'
 import { repickVehicles } from '@/app/pricing-grid/lib/option-filters'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
+import { recordSupplierCurrency } from '@/lib/pricing/line-supplier-currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from '@/app/pricing-grid/lib/throughout-guide'
 import type { GridConfig, GridDay, RateOption } from '@/app/pricing-grid/types'
 import type { Json, TablesInsert } from '@/types/database.types'
@@ -369,6 +370,13 @@ export async function POST(request: NextRequest) {
         services,
       })
     }
+
+    // Each line priced from a rate row also records what the supplier is paid,
+    // in their own currency, and the rate it was converted at (455).
+    await recordSupplierCurrency(
+      supabase as unknown as Parameters<typeof recordSupplierCurrency>[0], tenant_id, recordCurrency,
+      dayPayload.flatMap(d => d.services as Array<Record<string, unknown>>),
+    )
 
     const { data: saved, error: saveError } = await supabase
       .rpc('save_pricing_grid_days', { p_itinerary_id: itineraryId, p_days: dayPayload as unknown as Json })
