@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { label: 'Tenants', href: '/super-admin/tenants', icon: Building2 },
   { label: 'Users', href: '/super-admin/users', icon: Users },
   { label: 'Support', href: '/super-admin/support', icon: MessageCircle },
+  { label: 'Network suppliers', href: '/super-admin/network', icon: Users },
   { label: 'Concierge Brands', href: '/super-admin/concierge-brands', icon: Waypoints },
   { label: 'Analytics', href: '/super-admin/analytics', icon: BarChart3 },
   { label: 'Blog', href: '/super-admin/blog', icon: Newspaper },
