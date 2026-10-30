@@ -67,7 +67,7 @@ export async function transitionServiceBooking(
 ): Promise<TransitionResult> {
   const { data: row, error: readErr } = await db
     .from('booking_supplier_status')
-    .select('id, status, resource_kind, service_date, service_time')
+    .select('id, status, resource_kind, service_date, service_time, itinerary_resource_id')
     .eq('id', input.id)
     .eq('booking_id', input.bookingId)
     .maybeSingle()
@@ -87,6 +87,17 @@ export async function transitionServiceBooking(
     .maybeSingle()
   if (error) return { ok: false, status: 500, error: error.message }
   if (!updated) return { ok: false, status: 409, error: 'Someone else changed this line just now — reload and try again' }
+
+  // Back to To arrange, or not needed: the direct assignment it made is
+  // cancelled too, so "who is assigned" (itinerary_resources) stays true.
+  if (row.itinerary_resource_id && (input.to === 'pending' || input.to === 'cancelled')) {
+    const { error: resErr } = await db.from('itinerary_resources').update({ status: 'cancelled' }).eq('id', row.itinerary_resource_id as string)
+    if (resErr) console.error('[service-booking] cancel assignment:', resErr.message)
+    else {
+      await db.from('booking_supplier_status').update({ itinerary_resource_id: null, assigned_vehicle_id: null, assigned_vehicle_plate: null, assigned_guide_name: null }).eq('id', input.id)
+      Object.assign(updated, { itinerary_resource_id: null, assigned_vehicle_id: null, assigned_vehicle_plate: null, assigned_guide_name: null })
+    }
+  }
 
   const logged = await recordServiceBookingEvent(db, {
     tenantId, bookingId: input.bookingId, serviceBookingId: input.id,

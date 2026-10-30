@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { supplierBacking } from '@/lib/bookings/booking-suppliers'
+import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import {
   SERVICE_BOOKING_STATUSES, STATUS_LABEL, canTransition, normalizeStatus, type CoveredBy, type ServiceBookingStatus,
 } from '@/lib/bookings/service-booking-states'
@@ -27,6 +28,7 @@ interface SupplierRow {
   status: string
   resource_kind: CoveredBy | null
   service_time: string | null
+  assigned_vehicle_plate: string | null
   confirmation_number: string | null
   expense: { id: string; expense_number: string; status: string } | null
 }
@@ -183,7 +185,10 @@ export default function BookingSuppliersPanel({
                   </td>
                   <td className="py-2 pr-3 text-gray-900">
                     {r.supplier_name}
+                    {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-medium">Your team</span>}
+                    {r.assigned_vehicle_plate && <span className="ml-1.5 text-xs text-gray-500">{r.assigned_vehicle_plate}</span>}
                     {r.service_description && <div className="text-xs text-gray-500">{r.service_description}</div>}
+                    {canEdit && <div className="mt-0.5"><CoverLinePicker bookingId={bookingId} lineId={r.id} currency={currency} onSaved={load} notify={notify} /></div>}
                   </td>
                   <td className="py-2 pr-3 text-gray-500 capitalize">{r.supplier_type}</td>
                   <td className="py-2 pr-3 text-right text-gray-700 whitespace-nowrap">

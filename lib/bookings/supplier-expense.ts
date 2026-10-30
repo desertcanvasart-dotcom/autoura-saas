@@ -33,6 +33,8 @@ export interface SupplierRowForExpense {
   confirmed_cost: number | string | null
   confirmation_number: string | null
   status: string | null
+  /** 'own' = the agency's own people or car: nothing is owed to a supplier. */
+  resource_kind?: string | null
 }
 
 export interface LinkedExpense {
@@ -81,12 +83,12 @@ export type ExpensePlan =
 
 /** Pure: what to do with the row's expense. */
 export function planSupplierExpense(
-  row: Pick<SupplierRowForExpense, 'status' | 'confirmed_cost' | 'quoted_cost' | 'service_date'>,
+  row: Pick<SupplierRowForExpense, 'status' | 'confirmed_cost' | 'quoted_cost' | 'service_date' | 'resource_kind'>,
   existing: Pick<LinkedExpense, 'status' | 'amount' | 'expense_date'> | null,
   today: string,
 ): ExpensePlan {
   if (existing && existing.status !== 'pending') return { action: 'kept' }
-  const amount = isCovered(row.status) ? supplierRowCost(row) : null
+  const amount = isCovered(row.status) && row.resource_kind !== 'own' ? supplierRowCost(row) : null
   if (amount === null) return existing ? { action: 'remove' } : { action: 'none' }
   const expense_date = (row.service_date ?? '').slice(0, 10) || today
   if (!existing) return { action: 'create', amount, expense_date }
@@ -111,7 +113,7 @@ export async function syncSupplierExpense(
 ): Promise<SupplierExpenseResult> {
   const { data: row, error: rowErr } = await db
     .from('booking_supplier_status')
-    .select('id, booking_id, supplier_id, supplier_type, supplier_name, service_description, service_date, quoted_cost, confirmed_cost, confirmation_number, status')
+    .select('id, booking_id, supplier_id, supplier_type, supplier_name, service_description, service_date, quoted_cost, confirmed_cost, confirmation_number, status, resource_kind')
     .eq('id', rowId)
     .maybeSingle()
   if (rowErr || !row) return { ok: false, error: rowErr?.message || 'Supplier row not found' }
