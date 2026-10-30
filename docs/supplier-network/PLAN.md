@@ -180,6 +180,29 @@ missing). Needs each agency's operating country set (Settings → Company): all 
 
 ## 7. Phase 3 — Network discovery (≈ 4–6 weeks + ongoing verification)
 
+**APPROVED 2026-10-30** (operator: after the build gaps, "you have my approval to start the shared
+supply network"). Decisions (operator, 2026-10-30):
+- **Price of a network supplier: agreed per request** — the line shows "no rate — enter what they
+  agree"; the agency may save it as its own private rate. Suppliers publish nothing; nothing is
+  shared between agencies. The pricing engine is unchanged (white-label rule holds).
+- **The Autoura team verifies** a supplier (licence / vehicle papers) before it can be found.
+- **One sourcing setting per agency** (own · network · both), default own.
+- **Own suppliers first** in Who covers it, then a separate Network group; never chosen automatically.
+- GetAutoura only (a standalone install has no network).
+
+**How it is built.** A network supplier is a 2B supplier account that joins the network: a
+profile (display name, kinds of service, cities, languages, a short "about") and papers in a
+private bucket; the Autoura team marks it Verified. An agency (sourcing network/both) searches
+verified profiles and presses **Add to my suppliers**: that creates an ordinary supplier on the
+agency's own book (`suppliers.network_account_id`) already connected to the account (an approved
+`supplier_account_links` row) — so requests, the supplier's inbox and answers work as they do now,
+and the agency's rates and notes on that copy stay its own. Another agency sees only the profile.
+
+PRs: (1) migration 453 — sourcing setting, profiles, papers + bucket, the supplier copy's link —
+and the rules; (2) the supplier joins (profile + papers) from their inbox; (3) the Autoura
+verification queue (super-admin); (4) Settings → Supplier sourcing, the network search, Add to my
+suppliers; (5) Who covers it grouping + polish.
+
 Opt-in, off by default. Search verified network suppliers by city / service / language from the
 itinerary builder; verification of licence and vehicle papers (uses supplier documents storage).
 **Highest-risk part:** records with no owning tenant break the WHITE-LABEL rule ("nothing a tenant
