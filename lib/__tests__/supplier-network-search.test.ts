@@ -43,3 +43,13 @@ describe('the agency side of the network', () => {
     expect(read('components/Sidebar.tsx')).toContain("href: '/network-suppliers'")
   })
 })
+
+describe('a supplier already on the list is never added twice', () => {
+  it('search and add both recognise one connected by their own sign-in, not just a network copy', () => {
+    for (const f of ['app/api/network-suppliers/route.ts', 'app/api/network-suppliers/[accountId]/route.ts']) {
+      const r = readFileSync(f, 'utf8')
+      expect(r, f).toContain("from('supplier_account_links')")
+      expect(r, f).toContain(".eq('status', 'approved')")
+    }
+  })
+})

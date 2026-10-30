@@ -31,8 +31,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .select('account_id, display_name, kinds, cities, languages').eq('account_id', accountId).maybeSingle()
   if (!profile) return NextResponse.json({ success: false, error: 'This supplier is not in the network' }, { status: 404 })
 
-  const { data: existing } = await supabase.from('suppliers').select('id').eq('tenant_id', tenant_id).eq('network_account_id', accountId).maybeSingle()
-  if (existing) return NextResponse.json({ success: true, data: { supplier_id: existing.id, already: true } })
+  // Already on this list — added from the network, or connected by their own sign-in.
+  const [{ data: existing }, { data: connected }] = await Promise.all([
+    supabase.from('suppliers').select('id').eq('tenant_id', tenant_id).eq('network_account_id', accountId).maybeSingle(),
+    supabase.from('supplier_account_links').select('supplier_id').eq('tenant_id', tenant_id).eq('account_id', accountId).eq('status', 'approved').limit(1).maybeSingle(),
+  ])
+  const have = (existing?.id ?? connected?.supplier_id) as string | undefined
+  if (have) return NextResponse.json({ success: true, data: { supplier_id: have, already: true } })
 
   const { data: vocab } = await supabase.from('tenant_vocabularies').select('key').eq('tenant_id', tenant_id).eq('kind', 'supplier_type')
   const types = copyTypes(profile.kinds as string[], (vocab ?? []).map(v => v.key as string))

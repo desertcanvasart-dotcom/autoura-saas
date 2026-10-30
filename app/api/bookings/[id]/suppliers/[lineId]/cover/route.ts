@@ -10,6 +10,7 @@ import { transitionServiceBooking } from '@/lib/bookings/service-booking-transit
 import { computeConflicts } from '@/lib/itinerary-resource-conflicts'
 import { offOn } from '@/lib/supplier-days-off'
 import { SUPPLIER_KINDS_FOR_LINE } from '@/lib/bookings/service-label'
+import { bySourcing, usesNetwork } from '@/lib/supplier-network'
 
 // ============================================
 // Who covers this service line (lib/bookings/cover-options)
@@ -81,8 +82,14 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
   // gap the office fills with what they agree) — without these, a line whose
   // rate names no supplier offered nobody at all (2026-10-30 click-through).
   const kinds = SUPPLIER_KINDS_FOR_LINE[line.supplier_type] ?? [line.supplier_type]
-  const { data: sameKind } = await supabase.from('suppliers').select('id, name, company_name, supplier_type, types, is_active')
-    .eq('tenant_id', tenant_id).limit(500)
+  const [{ data: sameKind }, { data: tenantRow }] = await Promise.all([
+    supabase.from('suppliers').select('id, name, company_name, supplier_type, types, is_active, network_account_id')
+      .eq('tenant_id', tenant_id).limit(500),
+    supabase.from('tenants').select('supplier_sourcing').eq('id', tenant_id).maybeSingle(),
+  ])
+  const sourcing = (tenantRow?.supplier_sourcing as string | null) ?? 'own'
+  // Network copies (added from the shared network) are grouped and filtered by the sourcing setting.
+  const networkIds = new Set((sameKind ?? []).filter(s => s.network_account_id).map(s => s.id as string))
   const priced = new Set(supplierOptions.map(o => o.supplier_id))
   const otherSuppliers = (sameKind ?? [])
     .filter(s => s.is_active !== false && !priced.has(s.id as string))
@@ -94,6 +101,7 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
       no_cost_reason: 'no rate for this service — enter what they agree',
       preferred: false,
       other: true,
+      network: networkIds.has(s.id as string),
       day_off: off.has(s.id as string),
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -103,8 +111,12 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
     data: {
       can_change: CHANGEABLE.includes(normalizeStatus(line.status)),
       own: own.map(o => ({ ...o, day_off: o.resource_type === 'guide' && off.has(o.resource_id) })),
-      suppliers: [...supplierOptions.map(o => ({ ...o, day_off: off.has(o.supplier_id) })), ...otherSuppliers],
+      suppliers: bySourcing([
+        ...supplierOptions.map(o => ({ ...o, network: networkIds.has(o.supplier_id), day_off: off.has(o.supplier_id) })),
+        ...otherSuppliers,
+      ], sourcing),
       compares_rates: !!(rateTable && SAME_SERVICE_KEYS[rateTable]),
+      uses_network: usesNetwork(sourcing),
     },
   })
 }

@@ -203,6 +203,9 @@ and the rules; (2) the supplier joins (profile + papers) from their inbox; (3) t
 verification queue (super-admin); (4) Settings → Supplier sourcing, the network search, Add to my
 suppliers; (5) Who covers it grouping + polish.
 
+*Built 2026-10-30: #748 (migration 453), #749 join, #750 verification, #751 search + add, and the
+Who-covers-it PR (own first, Network group, filtered by the agency's sourcing).*
+
 Opt-in, off by default. Search verified network suppliers by city / service / language from the
 itinerary builder; verification of licence and vehicle papers (uses supplier documents storage).
 **Highest-risk part:** records with no owning tenant break the WHITE-LABEL rule ("nothing a tenant

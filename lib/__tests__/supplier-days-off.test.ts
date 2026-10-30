@@ -26,7 +26,7 @@ describe('days a supplier cannot work', () => {
 describe('a warning, never a block', () => {
   it('Who covers it marks a supplier (or own guide) who is off that day, and still offers them', () => {
     const cover = readFileSync('app/api/bookings/[id]/suppliers/[lineId]/cover/route.ts', 'utf8')
-    expect(cover).toContain("supplierOptions.map(o => ({ ...o, day_off: off.has(o.supplier_id) }))")
+    expect(cover).toContain('day_off: off.has(o.supplier_id)')
     expect(cover).toContain('day_off: off.has(s.id as string)')
     expect(cover).toContain("o.resource_type === 'guide' && off.has(o.resource_id)")
     const picker = readFileSync('components/booking/CoverLinePicker.tsx', 'utf8')
