@@ -7,6 +7,7 @@
 // service lines: how many are covered, and which still need someone —
 // flagged when one of those is within SOON_DAYS. Not needed lines don't count.
 
+import { lineService, lineSupplier } from '@/lib/bookings/service-label'
 import { isCovered, isCancelled, normalizeStatus, STATUS_LABEL, type ServiceBookingStatus } from '@/lib/bookings/service-booking-states'
 
 export const SOON_DAYS = 2
@@ -75,8 +76,8 @@ export function coverageByTrip(
       id: l.id,
       date: l.service_date,
       time: l.service_time ? l.service_time.slice(0, 5) : null,
-      what: (l.service_description || l.supplier_type || 'Service').trim(),
-      supplier: (l.supplier_name || '').trim(),
+      what: lineService(l),
+      supplier: lineSupplier(l) ?? '',
       status,
       label: STATUS_LABEL[status],
       own: l.resource_kind === 'own',

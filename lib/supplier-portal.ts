@@ -8,6 +8,7 @@
 // everything shown goes through toPortalLine — no client price, no client
 // contacts beyond the lead traveller's name, nothing of other suppliers.
 
+import { lineService } from '@/lib/bookings/service-label'
 import { generateShareToken, isValidShareToken } from '@/lib/itinerary-share'
 import { normalizeStatus, type ServiceBookingStatus } from '@/lib/bookings/service-booking-states'
 import { assignWhat, type AssignWhat } from '@/lib/supplier-reply-link'
@@ -61,7 +62,7 @@ export function toPortalLine(l: PortalSourceLine, clientName: string | null): Po
   return {
     id: l.id,
     status: normalizeStatus(l.status),
-    service: s(l.service_description) ?? s(l.supplier_type) ?? 'Service',
+    service: lineService(l),
     date: s(l.service_date)?.slice(0, 10) ?? null,
     time: s(l.service_time)?.slice(0, 5) ?? null,
     pickup: s(l.pickup_location),

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { lineService, lineSupplier } from '@/lib/bookings/service-label'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { appRedirectBase } from '@/lib/oauth-config'
@@ -82,9 +83,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     }
     const { data: tenant } = await supabase.from('tenants').select('company_name, operating_country').eq('id', tenant_id).maybeSingle()
     const message = buildServiceCancelMessage({
-      supplierName: line.supplier_name as string,
+      supplierName: lineSupplier(line as { supplier_name: string | null }),
       agency: tenant?.company_name as string | null,
-      service: (line.service_description || line.supplier_type) as string,
+      service: lineService(line as { service_description: string | null; supplier_type: string | null }),
       serviceDate: line.service_date as string | null,
       serviceTime: line.service_time as string | null,
     })
@@ -92,6 +93,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     return NextResponse.json({ success: true, data: { message, phone, whatsapp_url: waUrl(phone, message) } })
   }
 
+  if (!line.supplier_id && !lineSupplier(line as { supplier_name: string | null })) {
+    return NextResponse.json({ success: false, error: 'Choose who covers this line first (Who covers it)' }, { status: 409 })
+  }
   if (!ASKABLE.includes(status)) {
     return NextResponse.json({ success: false, error: 'This line has already been answered' }, { status: 409 })
   }
@@ -149,9 +153,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   const start = serviceStart(line.service_date as string | null, line.service_time as string | null)
   const soon = start !== null && start.getTime() - Date.now() <= SOON_HOURS * 3_600_000
   const message = buildServiceRequestMessage({
-    supplierName: line.supplier_name as string,
+    supplierName: lineSupplier(line as { supplier_name: string | null }),
     agency: tenant?.company_name as string | null,
-    service: (line.service_description || line.supplier_type) as string,
+    service: lineService(line as { service_description: string | null; supplier_type: string | null }),
     serviceDate: line.service_date as string | null,
     serviceTime: line.service_time as string | null,
     pickup: line.pickup_location as string | null,
@@ -173,7 +177,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const reminder = status === 'requested'
     const sent = await sendMail({
       to,
-      subject: requestEmailSubject((line.service_description || line.supplier_type) as string, line.service_date as string | null, reminder),
+      subject: requestEmailSubject(lineService(line as { service_description: string | null; supplier_type: string | null }), line.service_date as string | null, reminder),
       html: requestEmailHtml(message, url),
       from: resolveSender(tenant ?? {}, process.env.RESEND_FROM_EMAIL || '').from,
       ...(tenant?.contact_email ? { replyTo: tenant.contact_email as string } : {}),

@@ -14,6 +14,7 @@ import { OWED_LABEL, owedView, type OwedSource } from '@/lib/supplier-owed'
 // goes through toPortalLine.
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Your bookings · Autoura', robots: { index: false } }
 
 const COLUMNS = 'id, booking_id, status, supplier_type, service_description, service_date, service_time, pickup_location, dropoff_location, pax, reply_deadline, assigned_vehicle_plate, assigned_guide_name, assigned_guide_phone, driver_note, resource_kind'
 

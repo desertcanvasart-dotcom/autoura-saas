@@ -8,6 +8,7 @@
 // the token may touch; this applies the answer: fields first, then the
 // status through the one writer, as the supplier; then the office's bell.
 
+import { lineService, lineSupplier } from '@/lib/bookings/service-label'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { assignWhat, parseSupplierAction, targetStatus } from '@/lib/supplier-reply-link'
 import { normalizeStatus, type ServiceBookingStatus } from '@/lib/bookings/service-booking-states'
@@ -32,14 +33,15 @@ export async function applySupplierAnswer(
   where: { tenantId: string; bookingId: string; line: AnswerLine; via: 'link' },
   body: unknown,
 ): Promise<AnswerResult> {
-  const { tenantId, bookingId, line } = where
+  const { tenantId, bookingId } = where
+  let line = where.line
   if (normalizeStatus(line.status) === 'cancelled') {
     return { ok: false, status: 409, error: 'This service is no longer needed — thank you' }
   }
   const parsed = parseSupplierAction(body, assignWhat(line.supplier_type))
   if (!parsed.ok) return { ok: false, status: 400, error: parsed.error }
   const answer = parsed.value
-  const who = { actor: 'supplier' as const, channel: where.via, actorLabel: line.supplier_name ?? 'Supplier' }
+  const who = { actor: 'supplier' as const, channel: where.via, actorLabel: lineSupplier(line) ?? 'Supplier' }
 
   if (answer.action === 'assign') {
     const { error } = await db.from('booking_supplier_status').update({
@@ -50,6 +52,17 @@ export async function applySupplierAnswer(
       updated_at: new Date().toISOString(),
     }).eq('id', line.id).eq('tenant_id', tenantId)
     if (error) return { ok: false, status: 500, error: 'Could not save — please try again' }
+  }
+
+  // The office sent the message but never pressed "Did you send it? Yes":
+  // the supplier answering proves it was sent. Record that first, so their
+  // answer is a normal answer, not "already answered" (2026-10-30 click-through).
+  if (normalizeStatus(line.status) === 'pending') {
+    const sent = await transitionServiceBooking(db, tenantId, {
+      id: line.id, bookingId, to: 'requested', ...who, note: 'Opened the request (the office had not marked it sent)',
+    })
+    if (!sent.ok && sent.status !== 409) return { ok: false, status: sent.status, error: 'Could not save — please try again' }
+    line = { ...line, status: 'requested' }
   }
 
   const to = targetStatus(answer)
@@ -75,8 +88,8 @@ export async function applySupplierAnswer(
     tenant_id: tenantId,
     dedupe_key: `service-booking:${line.id}`,
     type: 'service_booking',
-    title: `${line.supplier_name}: ${answer.action === 'decline' ? 'declined' : answer.action === 'assign' ? `named ${named}` : 'accepted'}`,
-    message: String(line.service_description || line.supplier_type),
+    title: `${lineSupplier(line) ?? 'Supplier'}: ${answer.action === 'decline' ? 'declined' : answer.action === 'assign' ? `named ${named}` : 'accepted'}`,
+    message: lineService(line),
     link: `/bookings/${bookingId}?tab=suppliers&line=${line.id}`,
   }).catch(e => console.error('[supplier answer] notify:', e))
 

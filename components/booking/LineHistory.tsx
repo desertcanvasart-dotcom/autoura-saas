@@ -57,7 +57,7 @@ export default function LineHistory({ bookingId, lineId }: { bookingId: string; 
                 <li key={e.id} className="text-xs">
                   <div className="text-gray-400">
                     {new Date(e.occurred_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    {' · '}{e.actor_label || WHO[e.actor_kind]}{BY[e.channel] ? ` ${BY[e.channel]}` : ''}
+                    {' · '}{e.actor_kind === 'system' ? WHO.system : (e.actor_label || WHO[e.actor_kind])}{BY[e.channel] ? ` ${BY[e.channel]}` : ''}
                   </div>
                   <div className="text-gray-800">
                     {e.to_status && e.from_status !== e.to_status && (

@@ -14,6 +14,8 @@
 // line — it only tells the office. Pure rules here; the job is
 // app/api/cron/service-booking-deadlines.
 
+import { lineService, lineSupplier } from '@/lib/bookings/service-label'
+
 export interface WaitingLine {
   id: string
   status: string | null
@@ -97,12 +99,12 @@ function inWords(min: number): string {
 
 interface BellLine { supplier_name: string | null; service_description: string | null; supplier_type: string | null; reply_deadline: string | null }
 
-const what = (l: BellLine) => (l.service_description || l.supplier_type || 'Service').trim()
+const what = (l: BellLine) => lineService(l)
 
 /** Bell text for the halfway nudge. */
 export function reminderBell(line: BellLine, now: Date) {
   return {
-    title: `${line.supplier_name || 'Supplier'} has not answered yet`,
+    title: `${lineSupplier(line) ?? 'Supplier'} has not answered yet`,
     message: `${what(line)} — ${inWords(minutesLeft(line.reply_deadline, now))} left to answer. Send a reminder on WhatsApp.`,
   }
 }
@@ -113,7 +115,7 @@ export function expiredBell(line: BellLine, next: SupplierChoice | null, currenc
     ? `Next to try: ${next.name}${next.cost !== null ? ` (${currency ? `${currency} ` : ''}${next.cost.toFixed(2)})` : ' (no rate — agree the price)'}.`
     : 'Choose who covers it.'
   return {
-    title: `${line.supplier_name || 'Supplier'}: no reply in time`,
+    title: `${lineSupplier(line) ?? 'Supplier'}: no reply in time`,
     message: `${what(line)} — ${nextText}`,
   }
 }

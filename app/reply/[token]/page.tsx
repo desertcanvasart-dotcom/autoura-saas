@@ -9,6 +9,7 @@ import ReplyButtons from './ReplyButtons'
 // supplier sees the service they are asked for and nothing else of the trip.
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Booking request · Autoura', robots: { index: false } }
 
 export default async function ReplyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -53,7 +54,7 @@ export default async function ReplyPage({ params }: { params: Promise<{ token: s
       <header className="bg-gray-900 text-white px-5 py-6">
         <p className="text-xs uppercase tracking-widest text-gray-400">Booking request from {view.operatorName}</p>
         <h1 className="text-xl font-semibold mt-1 text-white">{view.service}</h1>
-        <p className="text-sm text-gray-300 mt-1">For {view.supplierName}</p>
+        {view.supplierName && <p className="text-sm text-gray-300 mt-1">For {view.supplierName}</p>}
       </header>
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
         <dl className="bg-white rounded-xl border border-gray-200 p-4 text-sm grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
