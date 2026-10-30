@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { supplierBacking } from '@/lib/bookings/booking-suppliers'
+import { STATUS_LABEL, normalizeStatus } from '@/lib/bookings/service-booking-states'
 
 // Who has to confirm what for this booking (booking_supplier_status). The
 // list is filled from the itinerary when the booking is made; "Sync from
@@ -39,6 +40,13 @@ const STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-green-50 text-green-700',
   no_response: 'bg-amber-50 text-amber-700',
   cancelled: 'bg-gray-50 text-gray-400 line-through',
+  // Service booking states (446), as the supplier reply link will set them.
+  requested: 'bg-blue-50 text-blue-700',
+  accepted: 'bg-green-50 text-green-700',
+  assigned: 'bg-green-50 text-green-700',
+  done: 'bg-green-100 text-green-800',
+  declined: 'bg-red-50 text-red-700',
+  expired: 'bg-amber-50 text-amber-700',
 }
 
 // The EXPENSE's state (what the agency owes this supplier), not the
@@ -214,6 +222,9 @@ export default function BookingSuppliersPanel({
                       // padding outside Tailwind's layers, crushing this pill.
                       className={`!w-32 !px-2 !py-1 rounded-md text-xs font-medium !border-0 ${STATUS_STYLE[r.status] ?? ''}`}
                     >
+                      {!STATUS_OPTIONS.some(o => o.value === r.status) && (
+                        <option value={r.status}>{STATUS_LABEL[normalizeStatus(r.status)]}</option>
+                      )}
                       {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </td>

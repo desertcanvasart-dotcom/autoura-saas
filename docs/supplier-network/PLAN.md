@@ -1,6 +1,6 @@
 # Supplier Network — Implementation Plan
 
-Status: **PLANNED, NOT STARTED** · written 2026-10-28, D5 added 2026-10-30 · nothing here is built yet.
+Status: **PHASE 1 STARTED 2026-10-30** · written 2026-10-28, D5 added 2026-10-30 · step 1 (data model, migration 446) in progress.
 Source: "Autoura Supplier Network — Structure Brief" (Faris Hussein, 2026-10-28), amended by the
 operator's decisions of the same day (below). Read this whole file before starting; every phase
 lists the existing code it builds on, so nothing is rebuilt beside what already exists.
@@ -171,10 +171,11 @@ Estimate: ≈ 3–5 days inside Phase 3 (setting + picker grouping + engine sour
 
 ## 9. Open decisions (answer before the phase that needs them)
 
-- [ ] **Reply deadline** — e.g. 4 h normally, 1 h when the service is within 48 h? *(Phase 1)*
-- [ ] **Client message** "your car tomorrow" (car + plate + driver contact)? Note the client
-      share page already shows confirmed staff ("Who is with you", Aug 2026) — clients never see
-      supplier companies or rates. *(Phase 1)*
+- [x] **Reply deadline** — **4 h normally, 1 h when the service is within 48 h** (operator, 2026-10-30;
+      `replyDeadline` in `lib/bookings/service-booking-states.ts`). *(Phase 1)*
+- [x] **Client message** "your car tomorrow" (car + plate + driver contact) — **yes** (operator,
+      2026-10-30). Sent from the operator's own WhatsApp like the rest (D2); clients never see
+      supplier companies or rates. Last PR of Phase 1. *(Phase 1)*
 - [ ] **Duplicate suppliers** — phone number as merge key; who approves a merge? *(Phase 2)*
 - [ ] **Availability** — request-and-confirm only, or live calendars for hotels/cruises? *(Phase 2)*
 - [ ] **Riverdesk** — create bookings directly in Riverdesk, or service bookings Riverdesk users
