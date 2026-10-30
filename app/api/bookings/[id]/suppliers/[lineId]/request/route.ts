@@ -6,7 +6,7 @@ import { appRedirectBase } from '@/lib/oauth-config'
 import { generateWhatsAppLink, whatsappRecipient } from '@/lib/communication-utils'
 import {
   assignWhat, buildServiceCancelMessage, buildServiceRequestMessage, generateReplyToken, replyLinkExpiry,
-  requestEmailHtml, requestEmailSubject,
+  messageEmailHtml, requestEmailHtml, requestEmailSubject,
 } from '@/lib/supplier-reply-link'
 import { REPLY_HOURS, REPLY_HOURS_SOON, SOON_HOURS, normalizeStatus } from '@/lib/bookings/service-booking-states'
 import { serviceStart, transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
@@ -43,6 +43,14 @@ async function supplierPhone(db: SupabaseClient, supplierId: string | null, line
   return whatsappRecipient((supplier?.whatsapp || supplier?.phone || supplier?.contact_phone || linePhone) as string | null, country)
 }
 
+/** The supplier's email: on the supplier, else on the line. */
+async function supplierEmail(db: SupabaseClient, tenantId: string, supplierId: string | null, lineEmail: string | null): Promise<string | null> {
+  const { data: s } = supplierId
+    ? await db.from('suppliers').select('email, contact_email').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle()
+    : { data: null }
+  return ((s?.email || s?.contact_email || lineEmail) as string | null)?.trim() || null
+}
+
 const waUrl = (phone: string | null, message: string) =>
   phone ? generateWhatsAppLink(phone, message) : `https://wa.me/?text=${encodeURIComponent(message)}`
 
@@ -72,7 +80,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     if (status !== 'cancelled' || !line.requested_at) {
       return NextResponse.json({ success: false, error: 'Only a line that was asked and is now Not needed has a supplier to tell' }, { status: 409 })
     }
-    if (body.sent === true) {
+    if (body.sent === true && body.channel !== 'email') {
       await recordServiceBookingEvent(supabase, {
         tenantId: tenant_id, bookingId: id, serviceBookingId: line.id, actor: 'operator', channel: 'whatsapp',
         actorUserId: user?.id ?? null, actorLabel: user?.email ?? null,
@@ -80,7 +88,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
       })
       return NextResponse.json({ success: true, told: true })
     }
-    const { data: tenant } = await supabase.from('tenants').select('company_name, operating_country').eq('id', tenant_id).maybeSingle()
+    const { data: tenant } = await supabase.from('tenants').select('company_name, operating_country, contact_email, email_domain, email_from_local, email_domain_status').eq('id', tenant_id).maybeSingle()
     const message = buildServiceCancelMessage({
       supplierName: lineSupplier(line as { supplier_name: string | null }),
       agency: tenant?.company_name as string | null,
@@ -88,6 +96,25 @@ export async function POST(request: NextRequest, { params }: Ctx) {
       serviceDate: line.service_date as string | null,
       serviceTime: line.service_time as string | null,
     })
+    if (body.channel === 'email') {
+      // The same notice by email, sent now (the office pressed it).
+      const to = await supplierEmail(supabase, tenant_id, line.supplier_id as string | null, line.contact_email as string | null)
+      if (!to) return NextResponse.json({ success: false, error: 'No email address for this supplier — add one on the supplier, or use WhatsApp' }, { status: 409 })
+      const sent = await sendMail({
+        to,
+        subject: `No longer needed: ${lineService(line as { service_description: string | null; supplier_type: string | null })}`,
+        html: messageEmailHtml(message),
+        from: resolveSender(tenant ?? {}, process.env.RESEND_FROM_EMAIL || '').from,
+        ...(tenant?.contact_email ? { replyTo: tenant.contact_email as string } : {}),
+      })
+      if (!sent.success) return NextResponse.json({ success: false, error: sent.suppressed ? 'That address bounced before — check it on the supplier' : `Email not sent: ${sent.error ?? 'unknown error'}` }, { status: 502 })
+      await recordServiceBookingEvent(supabase, {
+        tenantId: tenant_id, bookingId: id, serviceBookingId: line.id, actor: 'operator', channel: 'email',
+        actorUserId: user?.id ?? null, actorLabel: user?.email ?? null,
+        note: `Told the supplier it is not needed (emailed ${to})`, details: { kind: 'cancel_sent' },
+      })
+      return NextResponse.json({ success: true, told: true, emailed: to })
+    }
     const { phone, warning } = await supplierPhone(supabase, line.supplier_id as string | null, line.contact_phone as string | null, tenant?.operating_country as string | null)
     return NextResponse.json({ success: true, data: { message, phone, phone_warning: warning, whatsapp_url: waUrl(phone, message) } })
   }
@@ -168,10 +195,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   })
 
   if (body.channel === 'email') {
-    const { data: supplierRow } = line.supplier_id
-      ? await supabase.from('suppliers').select('email, contact_email').eq('id', line.supplier_id).eq('tenant_id', tenant_id).maybeSingle()
-      : { data: null }
-    const to = ((supplierRow?.email || supplierRow?.contact_email || line.contact_email) as string | null)?.trim()
+    const to = await supplierEmail(supabase, tenant_id, line.supplier_id as string | null, line.contact_email as string | null)
     if (!to) return NextResponse.json({ success: false, error: 'No email address for this supplier — add one on the supplier, or use WhatsApp' }, { status: 409 })
     const reminder = status === 'requested'
     const sent = await sendMail({
