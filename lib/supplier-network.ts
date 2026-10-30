@@ -93,6 +93,11 @@ export function matchesSearch(p: PublicProfile, q: { kind?: string | null; city?
   return true
 }
 
+/** What a paper is (supplier_network_documents.kind). */
+export const PAPER_KINDS: Record<string, string> = {
+  licence: 'Licence', vehicle: 'Vehicle papers', insurance: 'Insurance', other: 'Other',
+}
+
 /** Verification states, in words for the supplier. */
 export const VERIFICATION_LABEL: Record<string, string> = {
   unverified: 'Not sent for checking yet',
