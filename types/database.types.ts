@@ -9402,9 +9402,7 @@ export interface Database {
           last_login_at?: string | null
           disabled_at?: string | null
         }
-        Relationships: [
-
-        ]
+        Relationships: []
       }
       supplier_contracts: {
         Row: {
