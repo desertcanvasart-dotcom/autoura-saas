@@ -216,7 +216,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
           <h3 className="text-lg font-bold text-red-800 text-center mb-2">Error Loading Quote</h3>
           <p className="text-sm text-red-600 text-center mb-4">{error}</p>
           <Link
-            href="/quotes/b2b"
+            href="/quotes?tab=b2b"
             className="block w-full px-4 py-2 bg-red-600 text-white rounded-lg font-medium text-center hover:bg-red-700"
           >
             Back to Quotes

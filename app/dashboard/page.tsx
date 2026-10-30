@@ -217,7 +217,7 @@ export default function DashboardPage() {
           title="Quotes awaiting client"
           value={failed('quotes') ? '—' : quotes.awaitingCount}
           icon={FileText}
-          href={staff ? '/quotes/b2c' : null}
+          href={staff ? '/quotes?tab=b2c' : null}
           color="warning"
           subtitle={
             failed('quotes') ? 'Unavailable'

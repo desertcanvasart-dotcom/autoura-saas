@@ -89,7 +89,7 @@ describe('B2C quotes', () => {
   })
   it('a quote with no price does not crash the page', () => {
     expect(src('app/quotes/b2c/[id]/page.tsx')).not.toContain('{quote.selling_price.toLocaleString()}')
-    expect(src('app/quotes/b2c/page.tsx')).not.toContain('{quote.selling_price.toLocaleString()}')
+    expect(src('app/quotes/_views/B2CQuotesView.tsx')).not.toContain('{quote.selling_price.toLocaleString()}')
   })
   it('the day bar knows every currency’s symbol', () => {
     expect(src('app/pricing-grid/components/DayRow.tsx')).toContain('const sym = getCurrencySymbol(config.currency)')
