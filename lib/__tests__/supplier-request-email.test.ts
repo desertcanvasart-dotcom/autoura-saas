@@ -26,13 +26,16 @@ describe('the supplier request by email', () => {
 
   it('the route sends only after a press, from the company sender, and marks Requested only once it has gone', () => {
     const src = readFileSync('app/api/bookings/[id]/suppliers/[lineId]/request/route.ts', 'utf8')
-    const from = src.indexOf("if (body.channel === 'email')")
-    const branch = src.slice(from, src.indexOf('const phone = await supplierPhone(', from))
+    // The request's email branch: after the request message is built (the
+    // "not needed" notice has its own email branch earlier in the file).
+    const from = src.indexOf("if (body.channel === 'email')", src.indexOf('const message = buildServiceRequestMessage'))
+    const branch = src.slice(from, src.indexOf('await supplierPhone(', from))
     // After the request message is built (it needs the reply link), not in the not-needed notice.
     expect(from).toBeGreaterThan(src.indexOf('const message = buildServiceRequestMessage'))
     expect(branch).toContain('resolveSender(')
     expect(branch.indexOf('if (!sent.success)')).toBeLessThan(branch.indexOf("to: 'requested'"))
     expect(branch).toContain("channel: 'email'")
-    expect(branch).toContain(".eq('tenant_id', tenant_id)")
+    expect(branch).toContain('supplierEmail(supabase, tenant_id,')
+    expect(src).toMatch(/async function supplierEmail[\s\S]*?\.eq\('tenant_id', tenantId\)/)
   })
 })

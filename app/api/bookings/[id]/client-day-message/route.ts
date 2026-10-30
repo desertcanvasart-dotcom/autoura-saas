@@ -4,6 +4,9 @@ import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { generateWhatsAppLink, whatsappRecipient } from '@/lib/communication-utils'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
+import { sendMail } from '@/lib/email-send'
+import { resolveSender } from '@/lib/tenant-email-domain'
+import { messageEmailHtml } from '@/lib/supplier-reply-link'
 import {
   CLIENT_TOLD, buildClientDayMessage, linesForDay, serviceDays, tomorrowOf, type DayLine,
 } from '@/lib/bookings/client-day-message'
@@ -58,27 +61,34 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   const lines = linesForDay(all, body.date)
   if (lines.length === 0) return NextResponse.json({ success: false, error: 'No services on that day' }, { status: 404 })
 
-  if (body.sent === true) {
+  // Note it on each of the day's lines (WhatsApp: the office says it sent it; email: it went).
+  const noteSent = async (channel: 'whatsapp' | 'email', note: string) => {
     for (const l of lines) {
       const r = await recordServiceBookingEvent(supabase, {
-        tenantId: tenant_id, bookingId: id, serviceBookingId: l.id, actor: 'operator', channel: 'whatsapp',
+        tenantId: tenant_id, bookingId: id, serviceBookingId: l.id, actor: 'operator', channel,
         actorUserId: user?.id ?? null, actorLabel: user?.email ?? null,
-        note: "Client sent the day's details", details: { kind: CLIENT_TOLD, date: body.date },
+        note, details: { kind: CLIENT_TOLD, date: body.date },
       })
-      if (!r.ok) return NextResponse.json({ success: false, error: r.error }, { status: 500 })
+      if (!r.ok) return r.error
     }
+    return null
+  }
+
+  if (body.sent === true) {
+    const failed = await noteSent('whatsapp', "Client sent the day's details")
+    if (failed) return NextResponse.json({ success: false, error: failed }, { status: 500 })
     return NextResponse.json({ success: true, told: true })
   }
 
   const { data: booking } = await supabase.from('bookings').select('itinerary_id, client_id').eq('id', id).eq('tenant_id', tenant_id).maybeSingle()
   if (!booking) return NextResponse.json({ success: false, error: 'Booking not found' }, { status: 404 })
   const [{ data: tenant }, { data: itinerary }, { data: client }] = await Promise.all([
-    supabase.from('tenants').select('company_name, operating_country').eq('id', tenant_id).maybeSingle(),
+    supabase.from('tenants').select('company_name, operating_country, contact_email, email_domain, email_from_local, email_domain_status').eq('id', tenant_id).maybeSingle(),
     booking.itinerary_id
-      ? supabase.from('itineraries').select('client_name, client_phone').eq('id', booking.itinerary_id).maybeSingle()
+      ? supabase.from('itineraries').select('client_name, client_phone, client_email').eq('id', booking.itinerary_id).maybeSingle()
       : Promise.resolve({ data: null }),
     booking.client_id
-      ? supabase.from('clients').select('full_name, first_name, whatsapp, phone').eq('id', booking.client_id).maybeSingle()
+      ? supabase.from('clients').select('full_name, first_name, whatsapp, phone, email').eq('id', booking.client_id).maybeSingle()
       : Promise.resolve({ data: null }),
   ])
 
@@ -89,6 +99,24 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     lines,
     isTomorrow: body.date === tomorrowOf(new Date()),
   })
+  if (body.channel === 'email') {
+    // The same message by email, sent now (the office pressed it).
+    const to = ((client?.email || itinerary?.client_email) as string | null)?.trim()
+    if (!to) return NextResponse.json({ success: false, error: 'No email for this client — add one on the client, or use WhatsApp' }, { status: 409 })
+    const day = new Date(`${body.date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+    const sent = await sendMail({
+      to,
+      subject: `Your details for ${day}`,
+      html: messageEmailHtml(message),
+      from: resolveSender(tenant ?? {}, process.env.RESEND_FROM_EMAIL || '').from,
+      ...(tenant?.contact_email ? { replyTo: tenant.contact_email as string } : {}),
+    })
+    if (!sent.success) return NextResponse.json({ success: false, error: sent.suppressed ? 'That address bounced before — check it on the client' : `Email not sent: ${sent.error ?? 'unknown error'}` }, { status: 502 })
+    const failed = await noteSent('email', `Client emailed the day's details (${to})`)
+    if (failed) return NextResponse.json({ success: false, error: failed }, { status: 500 })
+    return NextResponse.json({ success: true, told: true, emailed: to })
+  }
+
   const raw = (client?.whatsapp || itinerary?.client_phone || client?.phone) as string | null
   const { phone, warning: phoneWarning } = whatsappRecipient(raw, tenant?.operating_country as string | null)
   return NextResponse.json({
