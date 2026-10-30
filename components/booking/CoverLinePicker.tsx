@@ -10,8 +10,8 @@ import { Loader2, UserCheck } from 'lucide-react'
 // agreed). Options come from /api/bookings/[id]/suppliers/[lineId]/cover.
 
 interface OwnOption { resource_type: string; resource_id: string; name: string; detail: string | null; day_off?: boolean }
-interface SupplierOption { supplier_id: string; name: string; cost: number | null; no_cost_reason: string | null; preferred?: boolean; day_off?: boolean; other?: boolean }
-interface Options { can_change: boolean; own: OwnOption[]; suppliers: SupplierOption[]; compares_rates: boolean }
+interface SupplierOption { supplier_id: string; name: string; cost: number | null; no_cost_reason: string | null; preferred?: boolean; day_off?: boolean; other?: boolean; network?: boolean }
+interface Options { can_change: boolean; own: OwnOption[]; suppliers: SupplierOption[]; compares_rates: boolean; uses_network?: boolean }
 
 const OWN_KIND: Record<string, string> = {
   vehicle: 'Car', driver: 'Driver', guide: 'Guide', airport_staff: 'Airport staff', hotel_staff: 'Hotel staff',
@@ -92,7 +92,7 @@ export default function CoverLinePicker({
           ) : options.own.length === 0 && options.suppliers.length === 0 ? (
             <p className="text-xs text-gray-600">
               Nobody to offer: no own people or cars, and no supplier of this kind in your supplier book.
-              Add one under CRM → Suppliers.
+              Add one under CRM → Suppliers{options.uses_network ? <>, or <a href="/network-suppliers" className="text-blue-700 underline">find one in the network</a></> : null}.
             </p>
           ) : (
             <>
@@ -112,25 +112,37 @@ export default function CoverLinePicker({
                     ))}
                   </optgroup>
                 )}
-                {options.suppliers.some(s => !s.other) && (
+                {options.suppliers.some(s => !s.other && !s.network) && (
                   <optgroup label="Suppliers with a rate for this">
-                    {options.suppliers.filter(s => !s.other).map(s => (
+                    {options.suppliers.filter(s => !s.other && !s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
                         {s.preferred ? '★ ' : ''}{s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}{s.day_off ? ' · ⚠ day off' : ''}
                       </option>
                     ))}
                   </optgroup>
                 )}
-                {options.suppliers.some(s => s.other) && (
+                {options.suppliers.some(s => s.other && !s.network) && (
                   <optgroup label="Other suppliers of this kind (no rate — enter what they agree)">
-                    {options.suppliers.filter(s => s.other).map(s => (
+                    {options.suppliers.filter(s => s.other && !s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
                         {s.name}{s.day_off ? ' · ⚠ day off' : ''}
                       </option>
                     ))}
                   </optgroup>
                 )}
+                {options.suppliers.some(s => s.network) && (
+                  <optgroup label="Network suppliers (verified by Autoura — agree the price)">
+                    {options.suppliers.filter(s => s.network).map(s => (
+                      <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
+                        {s.name}{s.cost !== null ? ` — ${currency} ${s.cost.toFixed(2)}` : ''}{s.day_off ? ' · ⚠ day off' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
+              {options.uses_network && (
+                <a href="/network-suppliers" className="mt-2 block text-xs text-blue-700 hover:underline">Find more in the network →</a>
+              )}
               <div className="mt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setOpen(false)} className="px-2 py-1 text-xs text-gray-600">Cancel</button>
                 <button

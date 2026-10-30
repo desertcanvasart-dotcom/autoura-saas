@@ -114,3 +114,15 @@ export function copyTypes(profileKinds: string[], vocabularyKeys: string[]): str
   const have = new Set(vocabularyKeys)
   return profileKinds.filter(k => have.has(k))
 }
+
+/**
+ * Who covers it, by the agency's sourcing (decision §7: own first, a
+ * separate Network group, never chosen automatically): own → no network
+ * suppliers; network → only network suppliers (own cars, guides and staff
+ * are offered separately and always stay); both → all, own first.
+ */
+export function bySourcing<T extends { network?: boolean }>(options: T[], sourcing: string | null | undefined): T[] {
+  if (sourcing === 'network') return options.filter(o => o.network)
+  if (sourcing === 'both') return [...options.filter(o => !o.network), ...options.filter(o => o.network)]
+  return options.filter(o => !o.network)
+}
