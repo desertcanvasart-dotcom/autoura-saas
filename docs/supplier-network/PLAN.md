@@ -172,6 +172,12 @@ PRs: (1) migration 450 — accounts, agency links, codes, sessions — and the r
 (3) claim + admin approval; (4) the inbox + answering; (5) polish (sign out, "has an account" on the
 supplier card, 2A page offers sign-in).
 
+*Built 2026-10-30: #740 (migration 450), #742 sign-in, #743 admin approval, #744 inbox, and a
+polish PR (WhatsApp never opens a chat with a number missing its country code — it says to set
+the agency's country; the supplier card says whether the supplier can sign in and what is
+missing). Needs each agency's operating country set (Settings → Company): all were empty on
+2026-10-30. Not yet tried end to end with a real supplier.*
+
 ## 7. Phase 3 — Network discovery (≈ 4–6 weeks + ongoing verification)
 
 Opt-in, off by default. Search verified network suppliers by city / service / language from the

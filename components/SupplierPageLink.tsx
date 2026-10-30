@@ -10,13 +10,14 @@ import DaysOffEditor from '@/components/DaysOffEditor'
 
 export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: string; canEdit: boolean }) {
   const [link, setLink] = useState<{ url: string; last_opened_at: string | null } | null>(null)
+  const [signIn, setSignIn] = useState<{ ok: boolean; reason: string | null } | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const url = `/api/suppliers/${supplierId}/portal-link`
 
   useEffect(() => {
     let live = true
-    fetch(url).then(r => r.json()).then(d => { if (live && d.success) setLink(d.data) }).catch(() => {})
+    fetch(url).then(r => r.json()).then(d => { if (live && d.success) { setLink(d.data); setSignIn(d.sign_in ?? null) } }).catch(() => {})
     return () => { live = false }
   }, [url])
 
@@ -28,7 +29,8 @@ export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: 
       if (!res.ok || !d.success) { setNote(d.error || 'Could not make the link'); return }
       setLink({ url: d.data.url, last_opened_at: d.data.last_opened_at })
       window.open(d.data.whatsapp_url, '_blank', 'noopener')
-      if (!d.data.phone) setNote('No WhatsApp number on this supplier — pick the chat in WhatsApp')
+      if (d.data.phone_warning) setNote(d.data.phone_warning)
+      else if (!d.data.phone) setNote('No WhatsApp number on this supplier — pick the chat in WhatsApp')
     } finally { setBusy(false) }
   }
 
@@ -61,6 +63,7 @@ export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: 
         )}
       </div>
       {note && <p className="mt-1 text-xs text-gray-600">{note}</p>}
+      {signIn && !signIn.ok && signIn.reason && <p className="mt-1 text-xs text-amber-700">{signIn.reason}</p>}
       <details className="mt-2">
         <summary className="text-xs font-medium text-gray-700 cursor-pointer">Days off</summary>
         <div className="mt-2"><DaysOffEditor url={`/api/suppliers/${supplierId}/days-off`} who="office" canEdit={canEdit} /></div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
-import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
+import { generateWhatsAppLink, whatsappRecipient } from '@/lib/communication-utils'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
 import {
   CLIENT_TOLD, buildClientDayMessage, linesForDay, serviceDays, tomorrowOf, type DayLine,
@@ -90,9 +90,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     isTomorrow: body.date === tomorrowOf(new Date()),
   })
   const raw = (client?.whatsapp || itinerary?.client_phone || client?.phone) as string | null
-  const phone = raw ? formatPhoneForWhatsApp(raw, tenant?.operating_country as string | null) : null
+  const { phone, warning: phoneWarning } = whatsappRecipient(raw, tenant?.operating_country as string | null)
   return NextResponse.json({
     success: true,
-    data: { message, phone, whatsapp_url: phone ? generateWhatsAppLink(phone, message) : `https://wa.me/?text=${encodeURIComponent(message)}` },
+    data: { message, phone, phone_warning: phoneWarning, whatsapp_url: phone ? generateWhatsAppLink(phone, message) : `https://wa.me/?text=${encodeURIComponent(message)}` },
   })
 }

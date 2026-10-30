@@ -121,3 +121,20 @@ export function sessionExpiry(now: Date): string {
 export function isSessionLive(s: { expires_at: string; revoked_at: string | null } | null, now: Date): boolean {
   return !!s && !s.revoked_at && Date.parse(s.expires_at) > now.getTime()
 }
+
+/**
+ * Can this supplier sign in (2B)? They need an email on the record (the code
+ * goes there) and a number that reads as international (with the agency's
+ * country for local ones). The office is told what is missing.
+ */
+export function signInReadiness(
+  record: { email?: string | null; contact_email?: string | null; whatsapp?: string | null; phone?: string | null; contact_phone?: string | null },
+  agencyCountry: string | null | undefined,
+): { ok: boolean; reason: string | null } {
+  const numbers = [record.whatsapp, record.phone, record.contact_phone].filter((p): p is string => !!p && !!p.trim())
+  if (numbers.length === 0) return { ok: false, reason: 'No phone number on this supplier — they cannot sign in (their page link still works).' }
+  if (codeEmails([record]).length === 0) return { ok: false, reason: 'No email on this supplier — they cannot sign in yet (the code goes by email). Their page link still works.' }
+  const international = numbers.some(p => /^[0-9]{8,15}$/.test(formatPhoneForWhatsApp(p, agencyCountry)) && !formatPhoneForWhatsApp(p, agencyCountry).startsWith('0'))
+  if (!international) return { ok: false, reason: 'Their number has no country code and your agency has no country set — set it in Settings → Company so they can sign in.' }
+  return { ok: true, reason: null }
+}

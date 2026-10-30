@@ -37,7 +37,8 @@ export default function RequestOnWhatsApp({
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.success) { notify('error', data.error || 'Could not prepare the message'); return }
       window.open(data.data.whatsapp_url, '_blank', 'noopener')
-      if (!data.data.phone) notify('info', 'No WhatsApp number on this supplier — pick the chat in WhatsApp')
+      if (data.data.phone_warning) notify('info', data.data.phone_warning)
+      else if (!data.data.phone) notify('info', 'No WhatsApp number on this supplier — pick the chat in WhatsApp')
       setLink(data.data.url ?? null)
       setAsking(true)
     } finally {
