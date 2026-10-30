@@ -89,7 +89,7 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
         </button>
       )}
 
-      <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0 lg:w-[232px] lg:shrink-0">
+      <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0 sm:shrink-0 lg:w-[232px]">
         {/* Icon-only mark beside the tenant's own name: this slot is theirs. */}
         <img src="/get-autoura-icon.png" alt="" className="w-7 h-7 object-contain shrink-0" />
         <span className="flex items-center gap-1.5 min-w-0">
@@ -104,7 +104,7 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
-          className="hidden sm:flex items-center gap-2 flex-1 max-w-xl h-9 px-3 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500 hover:border-gray-300"
+          className="hidden sm:flex items-center gap-2 flex-1 min-w-0 max-w-xl h-9 px-3 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500 hover:border-gray-300"
           aria-label="Search or jump to"
         >
           <Search size={16} strokeWidth={1.7} aria-hidden />
