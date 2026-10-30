@@ -136,4 +136,11 @@ const closed = await run(
   (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} company deletion(s) failed: ${p.failures.join('; ')}` : null)
 )
 
-process.exit(invoices && tasks && purge && closed ? 0 : 1)
+// Supplier Network step 6: a covered service line whose date has passed is Done.
+const servicesDone = await run(
+  'service-booking-done',
+  '/api/cron/service-booking-done',
+  (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} line(s) failed: ${p.failures.join('; ')}` : null)
+)
+
+process.exit(invoices && tasks && purge && closed && servicesDone ? 0 : 1)

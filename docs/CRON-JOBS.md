@@ -17,7 +17,7 @@ start command that runs once and exits. They do not serve traffic.
 |---|---|---|---|
 | Agent memory | `npm run cron:agent-memory` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
 | Exchange rates | `npm run cron:exchange-rates` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
-| Reminders | `npm run cron:reminders` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` + `GET /api/cron/purge-traveller-documents` + `GET /api/cron/purge-closed-companies` |
+| Reminders | `npm run cron:reminders` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` + `GET /api/cron/purge-traveller-documents` + `GET /api/cron/purge-closed-companies` + `GET /api/cron/service-booking-done` |
 | Gmail sync | `npm run cron:gmail-sync` | `*/10 * * * *` | `GET /api/cron/gmail-sync` |
 | Mail alerts | `npm run cron:mail-alerts` | `*/5 * * * *` | `GET /api/cron/mail-alerts` + `GET /api/cron/service-booking-deadlines` |
 | Scheduled send | `npm run cron:scheduled-send` | `*/5 * * * *` | `GET /api/cron/scheduled-send` |

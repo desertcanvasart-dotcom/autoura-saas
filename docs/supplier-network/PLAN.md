@@ -123,6 +123,11 @@ suppliers by request + one-tap reply — and see every line's status in one plac
    operations calendar with clash warnings; supplier voucher reflects the service booking; day
    becomes `done` after the service date (cron); confirmed lines feed supplier payables
    (`supplier_invoices` / expense — D4).
+   *Split 2026-10-30 into 4 PRs: (a) covered lines → Done after their date (daily, from the
+   reminders service; Accepted may now become Done — a restaurant names nobody); (b) line history
+   + Not needed on the Suppliers tab; (c) voucher shows plate / guide / time / pickup from the
+   service line; (d) supplier-covered lines on the operations calendar. Payables already work: a
+   covered line makes a pending expense, Accounts Payable groups them by supplier.*
 
 **Move on when:** operators run most lines through it and suppliers answer by the link.
 

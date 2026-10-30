@@ -261,6 +261,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     const { url, hits, auth } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: OK_INVOICES },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })
@@ -271,7 +272,8 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     expect(hits).toContain('/api/cron/send-reminders')
     expect(hits).toContain('/api/cron/task-reminders')
     expect(hits).toContain('/api/cron/purge-closed-companies')
-    expect(auth).toEqual(['Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh'])
+    expect(auth).toEqual(['Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh'])
+    expect(hits).toContain('/api/cron/service-booking-done')
     expect(result.stdout).toContain('purge-closed-companies ok')
     expect(result.stdout).toContain('send-reminders ok')
     expect(result.stdout).toContain('task-reminders ok')
@@ -282,6 +284,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     const { url } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'No reminders to send', processed: 0 }) },
       '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'Task reminders sent: 0 due soon, 0 overdue', results: { dueSoon: 0, overdue: 0, errors: [] } }) },
     })
@@ -293,6 +296,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     const { url } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'Processed 4 reminders', sent: 1, failed: 3, skipped: 0 }) },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })
@@ -305,6 +309,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     const { url } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: OK_INVOICES },
       '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'done', results: { dueSoon: 0, overdue: 0, errors: ['Due soon query error: boom'] } }) },
     })
@@ -318,6 +323,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     const { url, hits } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/send-reminders': { status: 500, body: 'kaboom' },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })
@@ -325,6 +331,19 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     expect(result.code).toBe(1)
     expect(hits).toContain('/api/cron/task-reminders')
     expect(result.stdout).toContain('task-reminders ok')
+  })
+
+  it('exits 1 when a service line could not be marked done', async () => {
+    const { url } = await stubByPath({
+      '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
+      '/api/cron/service-booking-done': { body: JSON.stringify({ success: false, done: 2, failures: ['line-1: boom'] }) },
+      '/api/cron/send-reminders': { body: OK_INVOICES },
+      '/api/cron/task-reminders': { body: OK_TASKS },
+    })
+    const result = await run(REMINDERS, { APP_URL: url, CRON_SECRET: 'shh' })
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('line-1: boom')
   })
 
   it('exits 1 rather than running unauthenticated when CRON_SECRET is absent', async () => {
