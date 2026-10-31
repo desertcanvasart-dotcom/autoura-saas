@@ -8,6 +8,8 @@ import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
 import SendingDomainCard from '@/components/settings/SendingDomainCard'
 import { SaveBar, useUnsavedGuard } from '@/components/settings/SettingsUI'
+import UrlTabs, { type UrlTab } from '@/components/nav/UrlTabs'
+import SignaturesView from './_views/SignaturesView'
 import dynamic from 'next/dynamic'
 import { 
   Mail, 
@@ -40,7 +42,7 @@ interface EmailTemplate {
   category: string
 }
 
-function EmailSettingsContent() {
+function EmailSettingsContent({ section }: { section: 'connection' | 'templates' }) {
   const { user } = useAuth()
   const { tenant } = useTenant()
   const { isAdmin } = useRole()
@@ -88,10 +90,9 @@ function EmailSettingsContent() {
     }
   }
   
-  // Signatures are managed at /settings/email-signatures — this page used to
-  // carry a second UI over the same email_signatures table (older editor, no
-  // HTML mode). One signature manager only.
-  const [activeTab, setActiveTab] = useState<'connection' | 'templates'>('connection')
+  // Signatures are their own tab (_views/SignaturesView) — this component
+  // used to carry a second UI over the same email_signatures table (older
+  // editor, no HTML mode). One signature manager only.
   // Addresses that count as the office writing, beyond the connected mailbox
   // and its own domain. One per line, or a whole domain.
   // The draft is officeAddresses; savedOfficeAddresses is what the server
@@ -241,34 +242,9 @@ function EmailSettingsContent() {
     }
   }
 
-  const tabs = [
-    { id: 'connection', label: 'Connection', icon: Mail },
-    { id: 'templates', label: 'Templates', icon: FileText },
-  ]
-
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
-      <div>
-        {/* Tabs */}
-        <div className="flex gap-6 border-b border-gray-200">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 py-3 border-b-2 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="pt-6">
+      <div className="pt-2">
         <div className="max-w-3xl space-y-4">
           
           {/* Message */}
@@ -287,7 +263,7 @@ function EmailSettingsContent() {
           )}
 
           {/* Connection Tab */}
-          {activeTab === 'connection' && (
+          {section === 'connection' && (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
@@ -381,7 +357,7 @@ function EmailSettingsContent() {
           )}
 
           {/* Templates Tab */}
-          {activeTab === 'templates' && (
+          {section === 'templates' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -437,10 +413,10 @@ function EmailSettingsContent() {
             </div>
           )}
 
-          <SendingDomainCard canManage={isAdmin} />
+          {section === 'connection' && <SendingDomainCard canManage={isAdmin} />}
 
           {/* The office addresses above save with the one sticky bar (admins only, like the card). */}
-          {isAdmin && (
+          {section === 'connection' && isAdmin && (
             <SaveBar
               changes={officeChanges}
               saving={savingOffice}
@@ -605,6 +581,14 @@ function TemplateModal({
   )
 }
 
+// Email & signature: the Gmail connection, signatures and templates, each a
+// tab held in ?tab= (the old /settings/email-signatures redirects here).
+const TABS: UrlTab[] = [
+  { key: 'connection', label: 'Connection', roles: ['admin', 'manager', 'member'], render: () => <EmailSettingsContent section="connection" /> },
+  { key: 'signatures', label: 'Signatures', roles: ['admin', 'manager', 'member'], render: () => <SignaturesView /> },
+  { key: 'templates', label: 'Templates', roles: ['admin', 'manager', 'member'], render: () => <EmailSettingsContent section="templates" /> },
+]
+
 export default function EmailSettingsPage() {
   return (
     <Suspense fallback={
@@ -612,7 +596,7 @@ export default function EmailSettingsPage() {
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </div>
     }>
-      <EmailSettingsContent />
+      <UrlTabs tabs={TABS} label="Email & signature" />
     </Suspense>
   )
 }

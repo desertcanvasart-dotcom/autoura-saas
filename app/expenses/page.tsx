@@ -27,33 +27,13 @@ import {
   Filter,
   Hourglass,
   Banknote,
-  UserRound,
-  Car,
-  Hotel,
-  Ship,
-  Bus,
-  PlaneTakeoff,
-  Ticket,
-  UtensilsCrossed,
-  Compass,
-  Plane,
-  ConciergeBell,
-  Luggage,
-  ClipboardList,
-  Milestone,
-  SquareParking,
-  Fuel,
-  Building2,
-  Megaphone,
-  Laptop,
-  Package,
-  type LucideIcon
+  Package
 } from 'lucide-react'
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import ExpenseSupplierPicker from '@/components/expenses/ExpenseSupplierPicker'
-import { EXPENSE_CATEGORIES } from '@/lib/expense-categories'
+import { EXPENSE_CATEGORIES, expenseCategory } from '@/lib/expense-categories'
 import { getCurrencySymbol, SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { csvCell } from '@/lib/finance-export'
@@ -128,31 +108,6 @@ const initialFormData: FormData = {
 
 // One list with the itinerary's Add Expense (lib/expense-categories).
 const CATEGORIES = EXPENSE_CATEGORIES
-
-/** The app's line icon for each category (lib/expense-categories keys). */
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  guide: UserRound,
-  driver: Car,
-  hotel: Hotel,
-  cruise: Ship,
-  transportation: Bus,
-  flights: PlaneTakeoff,
-  entrance: Ticket,
-  meal: UtensilsCrossed,
-  activity: Compass,
-  airport_staff: Plane,
-  hotel_staff: ConciergeBell,
-  ground_handler: Luggage,
-  tipping: Banknote,
-  permits: ClipboardList,
-  toll: Milestone,
-  parking: SquareParking,
-  fuel: Fuel,
-  office: Building2,
-  marketing: Megaphone,
-  software: Laptop,
-  other: Package,
-}
 
 /** Older rows used other words for some categories; they were left out of the breakdown. */
 const LEGACY_CATEGORY: Record<string, string> = { accommodation: 'hotel', meals: 'meal', entrance_fees: 'entrance', tips: 'tipping' }
@@ -437,7 +392,7 @@ export default function ExpensesPage() {
 
 
   const getCategoryIcon = (category: string, className = 'w-4 h-4 text-gray-500') => {
-    const Icon = CATEGORY_ICONS[category] || Package
+    const Icon = expenseCategory(category)?.icon ?? Package
     return <Icon className={className} />
   }
 

@@ -15,7 +15,7 @@ interface Signature {
   updated_at: string
 }
 
-export default function EmailSignaturesPage() {
+export default function SignaturesView() {
   const [signatures, setSignatures] = useState<Signature[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Signature | null>(null)
@@ -61,7 +61,7 @@ export default function EmailSignaturesPage() {
       <div className="flex items-center justify-end mb-6 gap-4">
         <button
           onClick={() => setShowNew(true)}
-          className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-[#566b3c] text-sm flex-shrink-0"
+          className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 text-sm flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
           Add signature
@@ -291,7 +291,7 @@ function SignatureModal({
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-500 text-white text-sm rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-600 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create signature'}
