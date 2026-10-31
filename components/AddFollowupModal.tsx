@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import { useTenant } from '@/app/contexts/TenantContext'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useRole } from '@/hooks/useRole'
 import { X, Clock, AlertCircle, Trash2 } from 'lucide-react'
 
 const supabase = createClient()
@@ -25,13 +27,30 @@ export default function AddFollowupModal({
   editFollowup 
 }: AddFollowupModalProps) {
   const { tenant } = useTenant()
+  const { user } = useAuth()
+  const { role } = useRole()
   const isEditMode = !!editFollowup
+
+  // Who a follow-up is for: a login (client_followups.assigned_to). Staff see
+  // only follow-ups that are theirs or no one's (migration 457), so they may
+  // keep one for themselves or leave it to anyone, not hand it to a colleague.
+  const [people, setPeople] = useState<{ user_id: string; name: string }[]>([])
+  useEffect(() => {
+    if (!isOpen) return
+    fetch('/api/team-members?active=true')
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => setPeople(((j?.data ?? []) as { user_id: string | null; name: string }[])
+        .filter((m): m is { user_id: string; name: string } => !!m.user_id)))
+      .catch(() => setPeople([]))
+  }, [isOpen])
+  const assignable = role === 'member' ? people.filter(p => p.user_id === user?.id) : people
 
   const [formData, setFormData] = useState({
     followup_type: 'call',
     due_date: '',
     priority: 'medium',
-    notes: ''
+    notes: '',
+    assigned_to: ''
   })
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -45,7 +64,8 @@ export default function AddFollowupModal({
         followup_type: editFollowup.followup_type || 'call',
         due_date: editFollowup.due_date || '',
         priority: editFollowup.priority || 'medium',
-        notes: editFollowup.notes || ''
+        notes: editFollowup.notes || '',
+        assigned_to: editFollowup.assigned_to || ''
       })
     } else {
       // Reset form for adding new
@@ -53,10 +73,11 @@ export default function AddFollowupModal({
         followup_type: 'call',
         due_date: '',
         priority: 'medium',
-        notes: ''
+        notes: '',
+        assigned_to: user?.id ?? ''
       })
     }
-  }, [editFollowup, isOpen])
+  }, [editFollowup, isOpen, user?.id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,7 +113,8 @@ export default function AddFollowupModal({
             description: title,
             due_date: formData.due_date,
             priority: formData.priority,
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            assigned_to: formData.assigned_to || null
           })
           .eq('id', editFollowup.id)
 
@@ -112,7 +134,8 @@ export default function AddFollowupModal({
             due_date: formData.due_date,
             priority: formData.priority,
             status: 'pending',
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            assigned_to: formData.assigned_to || null
           })
 
         if (insertError) throw insertError
@@ -123,7 +146,8 @@ export default function AddFollowupModal({
         followup_type: 'call',
         due_date: '',
         priority: 'medium',
-        notes: ''
+        notes: '',
+        assigned_to: user?.id ?? ''
       })
 
       // Success
@@ -262,6 +286,23 @@ export default function AddFollowupModal({
                     only (migration 035), so it failed to save. */}
               </select>
             </div>
+          </div>
+
+          {/* Assigned to */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Assigned to
+            </label>
+            <select
+              value={formData.assigned_to}
+              onChange={(e) => handleChange('assigned_to', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="">Anyone on the team</option>
+              {assignable.map(p => (
+                <option key={p.user_id} value={p.user_id}>{p.user_id === user?.id ? `${p.name} (me)` : p.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Notes */}

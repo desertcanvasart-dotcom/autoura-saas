@@ -42,12 +42,16 @@ import {
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { TaskChecklist, ChecklistSummary } from '@/components/tasks/TaskChecklist'
 import type { ChecklistItem, GenerationSnapshot } from '@/lib/tasks/itinerary-tasks'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useRole } from '@/hooks/useRole'
 
 interface TeamMember {
   id: string
   name: string
   role: string
   email?: string
+  /** The login linked to this directory entry, if any. */
+  user_id?: string | null
 }
 
 interface Client {
@@ -132,6 +136,11 @@ export default function TasksPage() {
   const dialog = useConfirmDialog()
   const [tasks, setTasks] = useState<Task[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  // Staff see only tasks that are theirs or no one's (migration 457), so they
+  // take a task or leave it unassigned; handing one on is a manager's call.
+  const { user } = useAuth()
+  const { role } = useRole()
+  const assignable = role === 'member' ? teamMembers.filter(m => m.user_id && m.user_id === user?.id) : teamMembers
   const [clients, setClients] = useState<Client[]>([])
   const [itineraries, setItineraries] = useState<Itinerary[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -1552,7 +1561,7 @@ export default function TasksPage() {
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">Unassigned</option>
-                  {teamMembers.map(m => (
+                  {assignable.map(m => (
                     <option key={m.id} value={m.id}>
                       {m.name} {m.email ? `(${m.email})` : ''}
                     </option>
