@@ -1,4 +1,4 @@
-import { normalizeHost } from '@/lib/publish/site-data'
+import { normalizeHost } from '@/lib/publish/host'
 import { sendEnquiry, siteForEmbedKey, siteForHost } from '../../../lib/internal-api'
 import { OUTCOME_ANCHOR, backTo, embedLanding, landingFrom, readEnquiryForm, visitorIpOf, type EnquiryOutcome } from '../../../lib/lead-capture'
 

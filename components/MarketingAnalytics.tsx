@@ -136,7 +136,7 @@ export default function MarketingAnalytics() {
         </button>
         <button
           onClick={() => decide('granted')}
-          className="px-3 py-1.5 text-sm text-white bg-[#647C47] rounded-lg hover:bg-[#55683c]"
+          className="px-3 py-1.5 text-sm text-white bg-primary-500 rounded-lg hover:bg-[#55683c]"
         >
           Accept
         </button>

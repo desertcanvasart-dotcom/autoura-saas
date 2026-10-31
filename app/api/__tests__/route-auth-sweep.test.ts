@@ -51,7 +51,8 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   '/api/webhooks/': ['verifyConciergeSignature', 'verifySvix('],
   '/api/integrations/': ['SAWA_SYNC_SECRET'],
   // The Publish site renderer (sites/) → internal page data; bearer secret.
-  '/api/publish/internal/': ['PUBLISH_INTERNAL_SECRET'],
+  // Checked by publishInternalDenied (lib/publish/internal-route.ts).
+  '/api/publish/internal/': ['PUBLISH_INTERNAL_SECRET', 'publishInternalDenied('],
   // Agencies' developers → the data feed; the site's feed key, checked by
   // feedSite (app/api/publish/feed/v1/_auth.ts → lib/publish/feed.ts).
   '/api/publish/feed/': ['feedSite'],

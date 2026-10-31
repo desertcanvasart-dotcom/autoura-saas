@@ -8,7 +8,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy, Ticket, MapPin, Wallet } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -669,7 +669,7 @@ export default function AttractionsContent() {
         <div className="container mx-auto px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-900">Attractions & Entrance Fees</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Attractions & Entrance Fees</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <div className="flex items-center gap-2">
@@ -703,7 +703,7 @@ export default function AttractionsContent() {
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">🎫</span>
+              <Ticket className="w-5 h-5 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <p className="text-xs text-gray-600">Total Attractions</p>
@@ -722,26 +722,26 @@ export default function AttractionsContent() {
           {/* NEW: Standard vs Add-on stats */}
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">📍</span>
+              <MapPin className="w-5 h-5 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <p className="text-xs text-gray-600">Standard</p>
             <p className="text-2xl font-bold text-gray-900">{standardAttractions}</p>
           </div>
 
-          <div className="bg-white p-3 rounded-lg shadow-md border border-orange-200 bg-orange-50">
+          <div className="bg-white p-3 rounded-lg shadow-md border border-amber-200 bg-amber-50">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="text-orange-500 w-5 h-5" />
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-600" />
+              <Sparkles className="text-amber-500 w-5 h-5" />
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
-            <p className="text-xs text-orange-700">Add-ons</p>
-            <p className="text-2xl font-bold text-orange-700">{addonAttractions}</p>
+            <p className="text-xs text-amber-700">Add-ons</p>
+            <p className="text-2xl font-bold text-amber-700">{addonAttractions}</p>
           </div>
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">🏙️</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <Building2 className="w-5 h-5 text-gray-400" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Cities</p>
             <p className="text-2xl font-bold text-gray-900">{cities.length}</p>
@@ -749,7 +749,7 @@ export default function AttractionsContent() {
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">💰</span>
+              <Wallet className="w-5 h-5 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. Rate</p>
@@ -800,7 +800,7 @@ export default function AttractionsContent() {
               onClick={() => setShowAddonsOnly(!showAddonsOnly)}
               className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
                 showAddonsOnly 
-                  ? 'bg-orange-100 border border-orange-400 text-orange-700' 
+                  ? 'bg-amber-100 border border-amber-400 text-amber-700' 
                   : 'bg-white border border-gray-300 text-gray-700'
               }`}
             >
@@ -812,7 +812,7 @@ export default function AttractionsContent() {
           <div className="mt-3 pt-3 border-t border-gray-200">
             <p className="text-xs text-gray-600">
               Showing <span className="font-bold text-gray-900">{filteredAttractions.length}</span> of {attractions.length} attractions
-              {showAddonsOnly && <span className="ml-1 text-orange-600">(add-ons only)</span>}
+              {showAddonsOnly && <span className="ml-1 text-amber-600">(add-ons only)</span>}
             </p>
           </div>
         </div>
@@ -862,7 +862,7 @@ export default function AttractionsContent() {
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Rate</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">
                     <span className="flex items-center justify-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                       Add-on
                     </span>
                   </th>
@@ -874,7 +874,7 @@ export default function AttractionsContent() {
                 {paginatedAttractions.map((attraction, index) => (
                   <tr key={attraction.id} className={`${
                     attraction.is_addon 
-                      ? 'bg-orange-50/50 hover:bg-orange-50' 
+                      ? 'bg-amber-50/50 hover:bg-amber-50' 
                       : index % 2 === 0 ? 'bg-white hover:bg-gray-100' : 'bg-gray-50 hover:bg-gray-100'
                   } transition-colors`}>
                     <td className="w-10 px-4 py-3">
@@ -926,8 +926,8 @@ export default function AttractionsContent() {
                         <button
                           onClick={() => toggleAddonStatus(attraction)}
                           disabled={togglingAddon === attraction.id}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
-                            attraction.is_addon ? 'bg-orange-500' : 'bg-gray-200'
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                            attraction.is_addon ? 'bg-amber-500' : 'bg-gray-200'
                           } ${togglingAddon === attraction.id ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
                           title={attraction.is_addon ? 'Currently excluded from the automatic price — click to include it' : 'Click to exclude from the automatic price (include only when the customer asks)'}
                         >
@@ -941,7 +941,7 @@ export default function AttractionsContent() {
                           type="button"
                           onClick={() => toggleSellable(attraction)}
                           title={attraction.is_sellable_extra ? 'Customers can add this after booking — click to stop offering it' : 'Let customers add this site after booking (a sellable extra)'}
-                          className={`px-2 py-1 text-xs rounded border ${attraction.is_sellable_extra ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}`}
+                          className={`px-2 py-1 text-xs rounded border ${attraction.is_sellable_extra ? 'bg-primary-100 text-primary-700 border-primary-200' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}`}
                         >
                           {attraction.is_sellable_extra ? 'Sellable' : 'Sell as extra'}
                         </button>
@@ -987,7 +987,7 @@ export default function AttractionsContent() {
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center gap-2">
-                        <span className="text-3xl text-gray-400">🎫</span>
+                        <Ticket className="w-8 h-8 text-gray-400" />
                         <p className="text-sm font-medium">No attractions found</p>
                         <button
                           onClick={handleAddNew}
@@ -1235,8 +1235,8 @@ export default function AttractionsContent() {
               </div>
 
               {/* NEW: Add-on Settings */}
-              <div className="mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <h3 className="text-base font-semibold text-orange-800 mb-3 flex items-center gap-2">
+              <div className="mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <h3 className="text-base font-semibold text-amber-800 mb-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   Add-on Settings
                 </h3>
@@ -1247,7 +1247,7 @@ export default function AttractionsContent() {
                       name="is_addon"
                       checked={formData.is_addon}
                       onChange={handleCheckboxChange}
-                      className="w-5 h-5 mt-0.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                      className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
                     />
                     <div>
                       <span className="text-sm font-medium text-gray-900">This is an optional add-on</span>
@@ -1267,7 +1267,7 @@ export default function AttractionsContent() {
                         name="addon_note"
                         value={formData.addon_note}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm bg-white"
+                        className="w-full px-3 py-2 text-sm border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent shadow-sm bg-white"
                         placeholder="e.g., Only include if customer requests pyramid interior"
                       />
                     </div>

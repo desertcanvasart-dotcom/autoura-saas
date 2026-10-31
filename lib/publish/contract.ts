@@ -350,6 +350,9 @@ export const waRefInputSchema = z.object({
   pageId: z.string().uuid().nullable(),
   language: languageCode,
   landingUrl: z.string().url().max(2000).nullable(),
+  /** The visitor's address, for the click limit only (never stored). Optional,
+   *  so a renderer that does not send it yet is still understood. */
+  visitorIp: z.string().max(64).nullable().optional(),
 })
 export type WaRefInput = z.infer<typeof waRefInputSchema>
 

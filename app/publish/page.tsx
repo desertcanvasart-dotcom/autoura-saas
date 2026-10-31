@@ -65,15 +65,15 @@ export default function PublishOverviewPage() {
   }
 
   if (loading && !data) {
-    return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]" /></div>
+    return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>
   }
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><Globe className="h-5 w-5 text-[#647C47]" /></div>
+        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center"><Globe className="h-5 w-5 text-primary-500" /></div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Website</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Website</h1>
           <p className="text-sm text-gray-500">Your tour pages, built from your tours and rates — prices always as they are in Autoura</p>
         </div>
       </div>
@@ -89,11 +89,11 @@ export default function PublishOverviewPage() {
               <p className="text-xs uppercase tracking-wide text-gray-400">Site</p>
               <p className="mt-1 font-medium text-gray-900">{ARCHETYPE[data.site.archetype] ?? data.site.archetype}</p>
               <p className="text-sm text-gray-500">{data.site.status === 'live' ? 'Live' : data.site.status === 'draft' ? 'Not live yet' : 'Suspended'} · {data.site.languages.map(l => l.toUpperCase()).join(' + ')}</p>
-              <Link href="/publish/look" className="mt-2 block text-sm text-[#647C47] hover:underline">Look and feel — theme, colours, fonts →</Link>
-              <Link href="/publish/embed" className="mt-1 block text-sm text-[#647C47] hover:underline">On your own website — show your tours there →</Link>
-              <Link href="/publish/domains" className="mt-1 block text-sm text-[#647C47] hover:underline">Your website&apos;s address — domain, going public →</Link>
-              <Link href="/publish/reviews" className="mt-1 block text-sm text-[#647C47] hover:underline">Google reviews — show your rating and reviews →</Link>
-              {canManage && <a href="/api/publish/export" className="mt-1 block text-sm text-[#647C47] hover:underline">Download the whole website (zip) ↓</a>}
+              <Link href="/publish/look" className="mt-2 block text-sm text-primary-500 hover:underline">Look and feel — theme, colours, fonts →</Link>
+              <Link href="/publish/embed" className="mt-1 block text-sm text-primary-500 hover:underline">On your own website — show your tours there →</Link>
+              <Link href="/publish/domains" className="mt-1 block text-sm text-primary-500 hover:underline">Your website&apos;s address — domain, going public →</Link>
+              <Link href="/publish/reviews" className="mt-1 block text-sm text-primary-500 hover:underline">Google reviews — show your rating and reviews →</Link>
+              {canManage && <a href="/api/publish/export" className="mt-1 block text-sm text-primary-500 hover:underline">Download the whole website (zip) ↓</a>}
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs uppercase tracking-wide text-gray-400">Sync with your records</p>
@@ -108,7 +108,7 @@ export default function PublishOverviewPage() {
                 <ul className="mt-1 space-y-1 text-sm">
                   {data.domains!.map(d => (
                     <li key={d.hostname} className="flex items-center gap-2">
-                      <a href={`https://${d.hostname}`} target="_blank" rel="noreferrer" className="text-[#647C47] hover:underline inline-flex items-center gap-1">{d.hostname}<ExternalLink className="h-3 w-3" /></a>
+                      <a href={`https://${d.hostname}`} target="_blank" rel="noreferrer" className="text-primary-500 hover:underline inline-flex items-center gap-1">{d.hostname}<ExternalLink className="h-3 w-3" /></a>
                       <span className="text-xs text-gray-400">{d.kind === 'test' ? 'test' : d.status === 'active' ? 'live' : d.status.replace('_', ' ')}</span>
                     </li>
                   ))}
@@ -126,7 +126,7 @@ export default function PublishOverviewPage() {
                     <option value="">Add a page for a tour…</option>
                     {data.toursWithoutPage!.map(t => <option key={t.id} value={t.id}>{t.template_name}</option>)}
                   </select>
-                  <button onClick={addPage} disabled={!adding} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+                  <button onClick={addPage} disabled={!adding} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-primary-500 text-white disabled:opacity-40">
                     <Plus className="h-4 w-4" />Add
                   </button>
                 </div>
@@ -143,7 +143,7 @@ export default function PublishOverviewPage() {
                   {data.pages!.filter(p => p.kind === 'tour').map(p => (
                     <tr key={p.id} className="border-t border-gray-100">
                       <td className="px-4 py-2">
-                        <Link href={`/publish/pages/${p.id}`} className="text-gray-900 hover:text-[#647C47] font-medium">{p.tour_templates?.template_name ?? 'A deleted tour'}</Link>
+                        <Link href={`/publish/pages/${p.id}`} className="text-gray-900 hover:text-primary-500 font-medium">{p.tour_templates?.template_name ?? 'A deleted tour'}</Link>
                         {p.tour_templates?.is_active === false && <span className="ml-2 text-xs text-amber-700">tour switched off</span>}
                       </td>
                       {data.site!.languages.map(l => {

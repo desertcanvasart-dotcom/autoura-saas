@@ -81,7 +81,7 @@ const REMINDER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   before_due_7: { label: '7 Days Before', color: 'bg-blue-100 text-blue-700' },
   before_due_3: { label: '3 Days Before', color: 'bg-blue-100 text-blue-700' },
   on_due: { label: 'Due Today', color: 'bg-amber-100 text-amber-700' },
-  overdue_7: { label: '7 Days Overdue', color: 'bg-orange-100 text-orange-700' },
+  overdue_7: { label: '7 Days Overdue', color: 'bg-amber-100 text-amber-700' },
   overdue_14: { label: '14 Days Overdue', color: 'bg-red-100 text-red-700' },
   overdue_30: { label: '30+ Days Overdue', color: 'bg-red-100 text-red-800' },
   manual: { label: 'Manual', color: 'bg-gray-100 text-gray-700' }
@@ -310,7 +310,7 @@ export default function PaymentRemindersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -320,11 +320,11 @@ export default function PaymentRemindersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            🔔
+          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+            <Bell className="w-5 h-5 text-gray-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Payment Reminders</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Payment Reminders</h1>
             <p className="text-sm text-gray-500">Manage automated payment reminder emails</p>
           </div>
         </div>
@@ -451,7 +451,7 @@ export default function PaymentRemindersPage() {
                     type="checkbox"
                     checked={selectedIds.size === activeCount && activeCount > 0}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"
+                    className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                   />
                   <span className="text-sm text-gray-600">Select All Active</span>
                 </label>
@@ -466,7 +466,7 @@ export default function PaymentRemindersPage() {
                 <button
                   onClick={handleSendSelected}
                   disabled={selectedIds.size === 0 || processing}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {processing ? (
                     <>
@@ -532,13 +532,13 @@ export default function PaymentRemindersPage() {
                             checked={selectedIds.has(reminder.invoice_id)}
                             onChange={() => toggleSelect(reminder.invoice_id)}
                             disabled={isPaused}
-                            className="w-4 h-4 rounded border-gray-300 text-[#647C47] focus:ring-[#647C47] disabled:opacity-50"
+                            className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500 disabled:opacity-50"
                           />
                         </td>
                         <td className="px-4 py-3">
                           <Link 
                             href={`/invoices/${reminder.invoice_id}`}
-                            className="text-sm font-medium text-gray-900 hover:text-[#647C47]"
+                            className="text-sm font-medium text-gray-900 hover:text-primary-500"
                           >
                             {reminder.invoice_number}
                           </Link>
@@ -609,11 +609,11 @@ export default function PaymentRemindersPage() {
                             <button
                               onClick={() => handleSendSingle(reminder.invoice_id)}
                               disabled={sendingId === reminder.invoice_id || isPaused}
-                              className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-[#647C47]/10 rounded transition-colors disabled:opacity-50"
+                              className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-500/10 rounded transition-colors disabled:opacity-50"
                               title="Send Reminder"
                             >
                               {sendingId === reminder.invoice_id ? (
-                                <div className="w-4 h-4 border-2 border-[#647C47] border-t-transparent rounded-full animate-spin"></div>
+                                <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
                               ) : (
                                 <Send className="h-4 w-4" />
                               )}
@@ -657,7 +657,7 @@ export default function PaymentRemindersPage() {
               <select
                 value={historyFilter}
                 onChange={(e) => setHistoryFilter(e.target.value as 'all' | 'sent' | 'failed')}
-                className="text-sm border border-gray-200 rounded-md px-3 py-1.5 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="text-sm border border-gray-200 rounded-md px-3 py-1.5 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="all">All Reminders</option>
                 <option value="sent">Sent Only</option>
@@ -670,7 +670,7 @@ export default function PaymentRemindersPage() {
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {historyLoading && reminderHistory.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47] mx-auto mb-3"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-3"></div>
                 <p className="text-gray-500">Loading history...</p>
               </div>
             ) : reminderHistory.length === 0 ? (
@@ -704,7 +704,7 @@ export default function PaymentRemindersPage() {
                           <td className="px-4 py-3">
                             <Link 
                               href={`/invoices/${item.invoice_id}`}
-                              className="text-sm font-medium text-gray-900 hover:text-[#647C47]"
+                              className="text-sm font-medium text-gray-900 hover:text-primary-500"
                             >
                               {item.invoices?.invoice_number || 'N/A'}
                             </Link>
@@ -753,7 +753,7 @@ export default function PaymentRemindersPage() {
                     <button
                       onClick={loadMoreHistory}
                       disabled={historyLoading}
-                      className="px-4 py-2 text-sm font-medium text-[#647C47] hover:bg-[#647C47]/10 rounded-lg transition-colors disabled:opacity-50"
+                      className="px-4 py-2 text-sm font-medium text-primary-500 hover:bg-primary-500/10 rounded-lg transition-colors disabled:opacity-50"
                     >
                       {historyLoading ? 'Loading...' : 'Load More'}
                     </button>

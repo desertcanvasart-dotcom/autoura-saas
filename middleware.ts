@@ -102,6 +102,8 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/settings/team': ['admin'],
   // The staff directory (guides, drivers, office staff — not logins).
   '/settings/staff-directory': ['admin', 'manager'],
+  // Sourcing (admins change it) and supplier sign-in approvals (admins decide).
+  '/settings/supplier-network': ['admin', 'manager'],
   // Everyone uses templates; the API lets only managers change them.
   '/settings/message-templates': ['admin', 'manager', 'member'],
   '/settings/content-library': ['admin', 'manager'],
@@ -111,8 +113,7 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   
   // Admin and Manager
   '/profit-loss': ['admin', 'manager'],
-  '/accounts-receivable': ['admin', 'manager'],
-  '/accounts-payable': ['admin', 'manager'],
+  '/supplier-bills': ['admin', 'manager'],
   // Finance pages with no entry were open to any role by URL, viewers too.
   '/commissions': ['admin', 'manager'],
   '/supplier-invoices': ['admin', 'manager'],
@@ -125,8 +126,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Resources page could delete suppliers.
   '/departures': ['admin', 'manager'],
   '/suppliers': ['admin', 'manager'],
-  // The supplier network search (no entry until 2026-10-30: open by URL).
-  '/network-suppliers': ['admin', 'manager'],
   '/resources': ['admin', 'manager'],
   '/airport-staff': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],
@@ -138,7 +137,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/itineraries': ['admin', 'manager', 'member'],
   '/invoices': ['admin', 'manager', 'member'],
   '/payments': ['admin', 'manager', 'member'],
-  '/receipts': ['admin', 'manager', 'member'],
   '/tasks': ['admin', 'manager', 'member'],
   '/inbox': ['admin', 'manager', 'member'],
   // The rest of the Communicate group, and Documents: the sidebar hides them

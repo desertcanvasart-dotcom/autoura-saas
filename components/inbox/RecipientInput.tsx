@@ -120,7 +120,7 @@ export default function RecipientInput({
                 {s.name ? <span className="text-gray-900">{s.name} </span> : null}
                 <span className="text-gray-500">{s.email}</span>
               </span>
-              <span className="text-[10px] uppercase tracking-wide text-gray-400">{SOURCE_LABEL[s.source]}</span>
+              <span className="text-xs uppercase tracking-wide text-gray-400">{SOURCE_LABEL[s.source]}</span>
             </li>
           ))}
         </ul>

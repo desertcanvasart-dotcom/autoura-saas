@@ -190,8 +190,11 @@ export function refTokenIn(body: string | null | undefined): string | null {
 }
 
 /** A visitor clicked the WhatsApp button: the company's own number and a
- *  fresh reference — or nothing, when the company has no number of its own. */
-export async function createWaRef(db: SupabaseClient, input: WaRefInput): Promise<WaRefResult> {
+ *  fresh reference — or nothing, when the company has no number of its own.
+ *  `reference: false` (a visitor or site over its click limit) answers with
+ *  the number and tour but records nothing: the button still opens WhatsApp,
+ *  only without a reference to track. */
+export async function createWaRef(db: SupabaseClient, input: WaRefInput, opts: { reference?: boolean } = {}): Promise<WaRefResult> {
   const site = await siteOf(db, input.siteId)
   const { data: tenant, error } = await db.from('tenants').select('whatsapp_number').eq('id', site.tenant_id).maybeSingle()
   if (error) throw new Error(`reading the company: ${error.message}`)
@@ -199,6 +202,7 @@ export async function createWaRef(db: SupabaseClient, input: WaRefInput): Promis
   if (!number) return { number: null, token: null, tourName: null }
 
   const page = await pageOf(db, site, input.pageId)
+  if (opts.reference === false) return { number, token: null, tourName: page?.tourName ?? null }
   const { campaign } = attributionOf(input.landingUrl)
   for (let attempt = 0; attempt < 3; attempt++) {
     const token = newRefToken()

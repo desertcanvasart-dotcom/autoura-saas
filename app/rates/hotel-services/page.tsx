@@ -91,7 +91,7 @@ function Pagination({
           <select
             value={itemsPerPage}
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-rose-600 bg-white"
+            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-600 bg-white"
           >
             {ITEMS_PER_PAGE_OPTIONS.map(option => (
               <option key={option} value={option}>{option}</option>
@@ -142,8 +142,8 @@ function Pagination({
                 onClick={() => goToPage(pageNum)}
                 className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
                   currentPage === pageNum
-                    ? 'bg-rose-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-600 hover:bg-primary-700'
                 }`}
               >
                 {pageNum}
@@ -478,7 +478,7 @@ export default function HotelServicesPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-sm text-gray-600">Loading hotel service rates...</p>
         </div>
       </div>
@@ -503,13 +503,13 @@ export default function HotelServicesPage() {
       <header className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ConciergeBell className="w-5 h-5 text-rose-600" />
-            <h1 className="text-xl font-bold text-gray-900">Hotel Services</h1>
-            <div className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+            <ConciergeBell className="w-5 h-5 text-primary-600" />
+            <h1 className="text-2xl font-semibold text-gray-900">Hotel Services</h1>
+            <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
           </div>
           <div className="flex items-center gap-2">
             <BulkRateImportExport tableName="hotel_staff_rates" onImportComplete={fetchRates} />
-            <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium">
+            <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">
               <Plus className="w-4 h-4" /> Add Rate
             </button>
             <Link href="/rates" className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
@@ -532,7 +532,7 @@ export default function HotelServicesPage() {
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Porter Services</p>
-            <p className="text-2xl font-bold text-rose-600">{stats.porter}</p>
+            <p className="text-2xl font-bold text-primary-600">{stats.porter}</p>
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Concierge Services</p>
@@ -553,15 +553,15 @@ export default function HotelServicesPage() {
                 placeholder="Search services, categories, or descriptions..." 
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
-                className="w-full pl-3 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600 focus:border-transparent" 
+                className="w-full pl-3 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" 
               />
             </div>
             <VocabSelect kind="hotel_service_type" value={selectedService} onChange={setSelectedService} placeholder={"All Services"} emptyValue="all"
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600" />
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
             >
               <option value="all">All Categories</option>
               {tierItems.map(t => (
@@ -590,7 +590,7 @@ export default function HotelServicesPage() {
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="text-sm text-rose-600 hover:text-rose-700 hover:underline"
+                className="text-sm text-primary-600 hover:text-primary-700 hover:underline"
               >
                 Clear selection
               </button>
@@ -611,35 +611,35 @@ export default function HotelServicesPage() {
         <div className="bg-white rounded-lg shadow-md border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-rose-50 border-b border-rose-100">
+              <thead className="bg-primary-50 border-b border-primary-100">
                 <tr>
                   <th className="px-4 py-2 text-center w-10">
                     <input
                       type="checkbox"
                       checked={allFilteredSelected}
                       onChange={toggleSelectAll}
-                      className="w-4 h-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500 cursor-pointer"
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
                       aria-label="Select all hotel service rates"
                     />
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-rose-800">Service Type</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-rose-800">Hotel Category</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-rose-800">Rate</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-rose-800">Description</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-rose-800">Status</th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-rose-800">Actions</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-primary-800">Service Type</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-primary-800">Hotel Category</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-primary-800">Rate</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-primary-800">Description</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-primary-800">Status</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-primary-800">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginatedRates.map((rate, idx) => (
-                  <tr key={rate.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-rose-50 transition-colors`}>
+                  <tr key={rate.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-primary-50 transition-colors`}>
                     <td className="px-4 py-3 text-center">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(rate.id)}
                         onChange={() => toggleSelect(rate.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500 cursor-pointer"
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
                         aria-label={`Select rate ${rate.service_code}`}
                       />
                     </td>
@@ -647,8 +647,8 @@ export default function HotelServicesPage() {
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                         rate.service_type === 'concierge' ? 'bg-amber-100 text-amber-800' :
                         rate.service_type === 'full_service' ? 'bg-blue-100 text-blue-800' :
-                        rate.service_type === 'checkin_assist' ? 'bg-purple-100 text-purple-800' :
-                        'bg-rose-100 text-rose-800'
+                        rate.service_type === 'checkin_assist' ? 'bg-primary-100 text-primary-800' :
+                        'bg-primary-100 text-primary-800'
                       }`}>
                         {formatServiceType(rate.service_type)}
                       </span>
@@ -665,13 +665,13 @@ export default function HotelServicesPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
                       {fmtRate(Number(rate.rate_eur), rate, 2)}
-                      <span className="block text-[11px] font-normal text-gray-500">
+                      <span className="block text-xs font-normal text-gray-500">
                         {pricingBasisLabel(toPricingBasis(rate.pricing_type), rate.max_capacity)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[250px] truncate">
                       {rate.description || '-'}
-                      {rate.supplier_name && <span className="block text-[11px] text-gray-400 truncate">via {rate.supplier_name}</span>}
+                      {rate.supplier_name && <span className="block text-xs text-gray-400 truncate">via {rate.supplier_name}</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -684,7 +684,7 @@ export default function HotelServicesPage() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleEdit(rate)}
-                          className="p-1 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded"
+                          className="p-1 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
@@ -712,7 +712,7 @@ export default function HotelServicesPage() {
                     <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                       <ConciergeBell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                       <p className="font-medium">No hotel service rates found</p>
-                      <button onClick={handleAddNew} className="mt-2 text-sm text-rose-600 hover:underline">
+                      <button onClick={handleAddNew} className="mt-2 text-sm text-primary-600 hover:underline">
                         Add your first hotel service rate
                       </button>
                     </td>
@@ -753,7 +753,7 @@ export default function HotelServicesPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Service Type *</label>
                   <VocabSelect kind="hotel_service_type" value={formData.service_type} onChange={v => setFormData(prev => ({ ...prev, service_type: v }))} placeholder={null} name="service_type"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600" />
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Hotel Category *</label>
@@ -761,7 +761,7 @@ export default function HotelServicesPage() {
                     name="hotel_category"
                     value={formData.hotel_category}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
                   >
                     {/* The agency's tiers (Settings → Your vocabulary); 'all' = every hotel. */}
                     <option value="all">All hotels</option>
@@ -775,7 +775,7 @@ export default function HotelServicesPage() {
                   <select
                     value={formData.supplier_id}
                     onChange={e => handleSupplierChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
                   >
                     <option value="">In-house / no supplier</option>
                     {suppliers.map(s => (
@@ -784,7 +784,7 @@ export default function HotelServicesPage() {
                   </select>
                   <p className="text-xs text-gray-400 mt-1">
                     The company you buy this hotel assistance from — any supplier whose type behaves as ground handler.{' '}
-                    <Link href="/suppliers?type=ground_handler" className="text-rose-600 hover:underline">Manage suppliers &rarr;</Link>
+                    <Link href="/suppliers?type=ground_handler" className="text-primary-600 hover:underline">Manage suppliers &rarr;</Link>
                   </p>
                 </div>
               </div>
@@ -801,7 +801,7 @@ export default function HotelServicesPage() {
                     required
                     placeholder="0.00"
                     title="Rate"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
                   />
                   <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                 </div>
@@ -811,7 +811,7 @@ export default function HotelServicesPage() {
                 basis={formData.pricing_type}
                 capacity={formData.max_capacity}
                 onChange={next => setFormData(prev => ({ ...prev, ...next }))}
-                focusRing="focus:ring-rose-600"
+                focusRing="focus:ring-primary-600"
               />
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
@@ -820,7 +820,7 @@ export default function HotelServicesPage() {
                   name="description" 
                   value={formData.description} 
                   onChange={handleChange} 
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600" 
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" 
                   placeholder="e.g., Porter service per stay" 
                 />
               </div>
@@ -831,7 +831,7 @@ export default function HotelServicesPage() {
                   name="service_code" 
                   value={formData.service_code} 
                   onChange={handleChange} 
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600 font-mono" 
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 font-mono" 
                   placeholder="Auto-generated if empty"
                 />
               </div>
@@ -842,7 +842,7 @@ export default function HotelServicesPage() {
                   value={formData.notes} 
                   onChange={handleChange} 
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600" 
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" 
                   placeholder="Internal notes..."
                 />
               </div>
@@ -852,7 +852,7 @@ export default function HotelServicesPage() {
                   name="is_active" 
                   checked={formData.is_active} 
                   onChange={handleCheckbox} 
-                  className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500" 
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500" 
                 />
                 <span className="text-sm text-gray-700">Active</span>
               </label>
@@ -866,7 +866,7 @@ export default function HotelServicesPage() {
                 </button>
                 <button 
                   type="submit" disabled={submitting} 
-                  className="flex-1 px-3 py-2 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium flex items-center justify-center gap-2"
+                  className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />
                   {editingRate ? 'Update' : 'Create'}

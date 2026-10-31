@@ -1,6 +1,6 @@
 'use client'
 
-import { Save, ExternalLink, Loader2 } from 'lucide-react'
+import { Save, ExternalLink, Loader2, AlertTriangle } from 'lucide-react'
 import type { GridTotals, GridConfig } from '../types'
 import { convertAmount } from '../lib/calculator'
 import { getCurrencySymbol } from '@/lib/currency'
@@ -66,7 +66,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
           bed (B-item 3). */}
       {unpricedGuideBedDays.length > 0 && (
         <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
-          ⚠ {unpricedGuideBedDays.length} night{unpricedGuideBedDays.length === 1 ? '' : 's'} without a guide bed rate
+          <AlertTriangle className="inline w-3.5 h-3.5 -mt-0.5 mr-1 text-amber-600" />{unpricedGuideBedDays.length} night{unpricedGuideBedDays.length === 1 ? '' : 's'} without a guide bed rate
           (day{unpricedGuideBedDays.length === 1 ? '' : 's'} {unpricedGuideBedDays.join(', ')}) — the throughout
           guide&rsquo;s bed is NOT in this total. Add &ldquo;Guide Bed / Night&rdquo; to those properties&rsquo; rate periods.
         </div>
@@ -94,7 +94,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
               <a
                 href={viewLink}
                 className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  isB2B ? 'text-purple-600 hover:bg-purple-50' : 'text-blue-600 hover:bg-blue-50'
+                  isB2B ? 'text-primary-600 hover:bg-primary-50' : 'text-blue-600 hover:bg-blue-50'
                 }`}
               >
                 {viewLabel}
@@ -114,7 +114,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
               onClick={onSave}
               disabled={isSaving}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition-colors ${
-                isB2B ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
+                isB2B ? 'bg-primary-600 hover:bg-primary-700' : 'bg-green-600 hover:bg-primary-700'
               } ${priceChanged ? 'ring-2 ring-offset-1 ring-amber-400' : ''}`}
               title={priceChanged ? 'The price has changed since the last save' : undefined}
             >
@@ -126,7 +126,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
       </div>
 
       {/* Context + what the last save did */}
-      <div className="px-4 py-1 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-x-3 text-[11px] text-gray-500">
+      <div className="px-4 py-1 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-x-3 text-xs text-gray-500">
         <span>
           {dayCount} days {'\u00B7'} {pax} pax {'\u00B7'} {config.passport === 'eu' ? 'EU' : 'Non-EU'} {'\u00B7'} {config.tier} {'\u00B7'} {config.clientType.toUpperCase()}
           {savedItineraryCode && <span className="ml-1 font-medium text-green-700">{'\u00B7'} {savedItineraryCode}</span>}
@@ -147,7 +147,7 @@ function SummaryCell({ label, value, symbol, color, strong }: {
 }) {
   return (
     <div>
-      <div className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">{label}</div>
+      <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">{label}</div>
       <div className={`${strong ? 'text-lg' : 'text-sm'} font-bold tabular-nums ${color || 'text-gray-900'}`}>
         {symbol}{value.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>

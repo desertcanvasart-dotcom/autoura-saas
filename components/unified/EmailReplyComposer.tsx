@@ -312,32 +312,32 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
   return (
     <div className="border-t border-gray-200 bg-white">
       {/* Copilot panel */}
-      <div className="bg-gradient-to-b from-purple-50/40 to-white">
+      <div className="bg-gradient-to-b from-primary-50/40 to-white">
         <div className="px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs">
-            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <Sparkles className="w-3.5 h-3.5 text-primary-600" />
             <span className="font-medium text-gray-700">AI Copilot</span>
             {tone && <span className="text-gray-400">· {tone}</span>}
             {retrievedCount > 0 && (
-              <span className="text-purple-600 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5 text-[10px]">
+              <span className="text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5 text-xs">
                 {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
               </span>
             )}
             {fromPregenerate && drafts.length > 0 && (
-              <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-[10px]">
+              <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-xs">
                 ready
               </span>
             )}
           </div>
           <div className="flex items-center gap-1">
             {drafts.length > 0 && (
-              <button onClick={() => generate(true)} disabled={generating} className="flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600 px-2 py-1 rounded disabled:opacity-50" title="Regenerate with different angles">
+              <button onClick={() => generate(true)} disabled={generating} className="flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 px-2 py-1 rounded disabled:opacity-50" title="Regenerate with different angles">
                 <RefreshCw className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
                 Regenerate
               </button>
             )}
             {drafts.length === 0 && (
-              <button onClick={() => generate(false)} disabled={generating} className="flex items-center gap-1.5 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-full hover:bg-purple-700 disabled:opacity-50">
+              <button onClick={() => generate(false)} disabled={generating} className="flex items-center gap-1.5 text-xs bg-primary-600 text-white px-3 py-1.5 rounded-full hover:bg-primary-700 disabled:opacity-50">
                 {generating ? (<><Loader2 className="w-3 h-3 animate-spin" />Thinking...</>) : (<><Sparkles className="w-3 h-3" />Suggest Reply</>)}
               </button>
             )}
@@ -354,17 +354,17 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
         {drafts.length > 0 && (
           <div className="px-4 pb-3 space-y-2">
             {drafts.map((d, idx) => (
-              <div key={d.id} className="rounded-lg border border-purple-100 bg-white p-3">
+              <div key={d.id} className="rounded-lg border border-primary-100 bg-white p-3">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
                     {d.ai_confidence && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
                     )}
-                    {d.ai_flags?.subject && <span className="text-[11px] text-gray-500 truncate">{d.ai_flags.subject}</span>}
+                    {d.ai_flags?.subject && <span className="text-xs text-gray-500 truncate">{d.ai_flags.subject}</span>}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-[#647C47] text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
+                    <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-primary-500 text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
                       <Check className="w-3 h-3" />Use
                     </button>
                     <button onClick={() => dismiss(d.id)} className="p-1 text-gray-400 hover:text-red-500 rounded">
@@ -373,7 +373,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
                   </div>
                 </div>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{d.draft_body}</p>
-                {d.ai_flags?.rationale && <p className="mt-1.5 text-[11px] text-gray-400 italic">{d.ai_flags.rationale}</p>}
+                {d.ai_flags?.rationale && <p className="mt-1.5 text-xs text-gray-400 italic">{d.ai_flags.rationale}</p>}
               </div>
             ))}
           </div>
@@ -395,17 +395,17 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
           <>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 w-14">Cc</span>
-              <input value={cc} onChange={(e) => setCc(e.target.value)} aria-label="Cc" placeholder="Copy to" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+              <input value={cc} onChange={(e) => setCc(e.target.value)} aria-label="Cc" placeholder="Copy to" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 w-14">Bcc</span>
-              <input value={bcc} onChange={(e) => setBcc(e.target.value)} aria-label="Bcc" placeholder="Blind copy" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+              <input value={bcc} onChange={(e) => setBcc(e.target.value)} aria-label="Bcc" placeholder="Blind copy" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
             </div>
           </>
         )}
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 w-14">Subject</span>
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
         </div>
 
         <RichReplyEditor
@@ -419,7 +419,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {attachments.map((a, idx) => (
-              <span key={idx} className="inline-flex items-center gap-1 text-[11px] bg-gray-100 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5">
+              <span key={idx} className="inline-flex items-center gap-1 text-xs bg-gray-100 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5">
                 <Paperclip className="w-3 h-3 text-gray-500" />
                 <span className="truncate max-w-[160px]">{a.filename}</span>
                 <span className="text-gray-400">{formatBytes(a.size)}</span>
@@ -428,7 +428,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
                 </button>
               </span>
             ))}
-            <span className="text-[11px] text-gray-400 self-center">
+            <span className="text-xs text-gray-400 self-center">
               {formatBytes(totalAttachBytes)} total
             </span>
           </div>
@@ -463,7 +463,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
           <button
             onClick={() => send()}
             disabled={!canSend}
-            className="flex items-center gap-1.5 bg-[#647C47] text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-primary-500 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             {sending ? 'Sending…' : 'Send reply'}

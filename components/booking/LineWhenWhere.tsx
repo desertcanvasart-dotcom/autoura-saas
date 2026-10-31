@@ -63,7 +63,7 @@ export default function LineWhenWhere({
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={() => setOpen(false)} className="px-2 py-1 text-gray-600">Cancel</button>
-        <button type="button" disabled={busy} onClick={save} className="px-2.5 py-1 rounded-md bg-blue-600 text-white font-medium disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
+        <button type="button" disabled={busy} onClick={save} className="px-2.5 py-1 rounded-md bg-primary-600 text-white font-medium disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
       </div>
     </div>
   )

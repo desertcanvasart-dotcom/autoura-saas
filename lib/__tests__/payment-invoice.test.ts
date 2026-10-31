@@ -70,7 +70,7 @@ describe('the receipt page', () => {
 
   it('has a real back link, not router.back()', () => {
     expect(page).not.toContain('router.back()')
-    expect(page).toContain('<BackLink fallbackHref="/receipts" fallbackLabel="Receipts" />')
+    expect(page).toContain('<BackLink fallbackHref="/payments?tab=receipts" fallbackLabel="Receipts" />')
   })
 
   it('never links /itineraries/null', () => {

@@ -113,7 +113,7 @@ describe('a cruise night chooses a SHIP', () => {
 
   it('says ship, not hotel, everywhere the operator reads it', () => {
     expect(SOURCE).toContain("'Ship for this night'")
-    expect(SOURCE).toContain('🚢 Named ship')
+    expect(SOURCE).toContain('<Ship className="w-3 h-3 inline -mt-0.5 mr-0.5" />Named ship')
   })
 })
 

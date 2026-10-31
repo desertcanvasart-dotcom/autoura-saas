@@ -95,7 +95,7 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
         <span className="flex items-center gap-1.5 min-w-0">
           {tenant && <span className="text-[15px] font-semibold text-gray-900 truncate">{tenant.company_name}</span>}
           {APP_LABEL && (
-            <span className="hidden sm:inline text-[10px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">{APP_LABEL}</span>
+            <span className="hidden sm:inline text-xs font-semibold uppercase tracking-wide text-gray-400 shrink-0">{APP_LABEL}</span>
           )}
         </span>
       </Link>
@@ -109,7 +109,7 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
         >
           <Search size={16} strokeWidth={1.7} aria-hidden />
           <span className="truncate">Search or jump to… bookings, clients, rate pages, settings</span>
-          <kbd className="ml-auto text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
+          <kbd className="ml-auto text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
         </button>
       )}
 
@@ -220,7 +220,7 @@ function AccountMenu() {
         </span>
         <span className="hidden md:flex flex-col items-start leading-tight text-left">
           <span className="text-[13px] font-medium text-gray-900 max-w-[160px] truncate">{name}</span>
-          <span className="text-[11px] text-gray-500">{role}</span>
+          <span className="text-xs text-gray-500">{role}</span>
         </span>
       </button>
 
@@ -232,7 +232,7 @@ function AccountMenu() {
               {role}{tenant ? ` · ${tenant.company_name}` : ''}
             </p>
             {isSuperAdmin && (
-              <span className="mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px] font-semibold uppercase tracking-wide">
+              <span className="mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-semibold uppercase tracking-wide">
                 <Shield size={11} strokeWidth={1.7} /> Platform staff
               </span>
             )}
@@ -240,7 +240,7 @@ function AccountMenu() {
 
           {companies.length > 1 && (
             <div className="py-1 border-b border-gray-100">
-              <p className="px-4 pt-1 pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Switch company</p>
+              <p className="px-4 pt-1 pb-0.5 text-xs font-semibold uppercase tracking-wider text-gray-400">Switch company</p>
               {companies.map(c => (
                 <button
                   key={c.tenant_id}
@@ -255,7 +255,7 @@ function AccountMenu() {
                   {c.tenant_id === tenant?.id && <Check size={14} strokeWidth={1.7} className="ml-auto text-primary-700" />}
                 </button>
               ))}
-              {switchError && <p className="px-4 pt-1 text-[11px] text-red-600">{switchError}</p>}
+              {switchError && <p className="px-4 pt-1 text-xs text-red-600">{switchError}</p>}
             </div>
           )}
 

@@ -95,10 +95,10 @@ interface Toast {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
-  pending_deposit: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Clock },
+  pending_deposit: { bg: 'bg-amber-100', text: 'text-amber-700', icon: Clock },
   confirmed: { bg: 'bg-blue-100', text: 'text-blue-700', icon: CheckCircle2 },
   paid_full: { bg: 'bg-green-100', text: 'text-green-700', icon: DollarSign },
-  in_progress: { bg: 'bg-purple-100', text: 'text-purple-700', icon: Plane },
+  in_progress: { bg: 'bg-primary-100', text: 'text-primary-700', icon: Plane },
   completed: { bg: 'bg-gray-100', text: 'text-gray-700', icon: PartyPopper },
   cancelled: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle }
 }
@@ -486,7 +486,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             <BackLink fallbackHref="/bookings" fallbackLabel="Bookings" trip={trip} />
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">{booking.booking_number}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">{booking.booking_number}</h1>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bg} ${statusConfig.text} flex items-center gap-1`}>
                   <StatusIcon className="w-4 h-4" />
                   {statusLabel(booking.status)}
@@ -679,7 +679,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   <button
                     onClick={() => resolveChangeRequest(cr.id, 'approve')}
                     disabled={resolvingCR !== null}
-                    className="px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50"
                   >
                     {resolvingCR === cr.id ? '…' : 'Approve'}
                   </button>
@@ -716,7 +716,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {!isViewer && (<>
               <button
                 onClick={() => setShowAddPassenger(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Add Passenger
@@ -725,7 +725,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 onClick={mintPortalLink}
                 disabled={mintingPortal}
                 title="Create (or copy) the traveller portal link — the lead fills in everyone's details and can invite each traveller with a private link"
-                className="px-4 py-2 text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 disabled:opacity-50"
+                className="px-4 py-2 text-primary-500 border border-primary-500/40 rounded-lg hover:bg-primary-500/5 disabled:opacity-50"
               >
                 {mintingPortal ? 'Creating…' : 'Portal link'}
               </button>
@@ -819,7 +819,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     <button
                       type="submit"
                       disabled={saving === 'passenger'}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                     >
                       {saving === 'passenger' ? 'Adding…' : 'Add Passenger'}
                     </button>
@@ -880,7 +880,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {(isAdmin || isManager) && (
               <button
                 onClick={() => setShowAddPayment(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Record Payment
@@ -971,7 +971,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     <button
                       type="submit"
                       disabled={saving === 'payment'}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                     >
                       {saving === 'payment' ? 'Recording…' : 'Record Payment'}
                     </button>
@@ -1064,10 +1064,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                       <li key={doc.id} className="py-2 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm text-gray-800 truncate">
-                            {who} · <span className="uppercase text-[10px] tracking-wide text-gray-400">{doc.kind}</span>
+                            {who} · <span className="uppercase text-xs tracking-wide text-gray-400">{doc.kind}</span>
                             {doc.label ? ` · ${doc.label}` : ''}
                           </p>
-                          <p className="text-[11px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             {doc.original_filename || 'document'} · {(doc.size_bytes / 1024 / 1024).toFixed(1)} MB ·{' '}
                             {new Date(doc.uploaded_at).toLocaleDateString()}
                             {doc.purged_at && ' · purged on schedule'}
@@ -1078,12 +1078,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                             href={doc.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="shrink-0 px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47]/40 rounded-md hover:bg-[#647C47]/5"
+                            className="shrink-0 px-2.5 py-1 text-xs font-medium text-primary-500 border border-primary-500/40 rounded-md hover:bg-primary-500/5"
                           >
                             View
                           </a>
                         ) : (
-                          <span className="shrink-0 text-[11px] text-gray-400">unavailable</span>
+                          <span className="shrink-0 text-xs text-gray-400">unavailable</span>
                         )}
                       </li>
                     )

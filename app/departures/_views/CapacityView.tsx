@@ -18,7 +18,8 @@ import {
   Clock,
   Info,
   Map as MapIcon,
-  Filter
+  Filter,
+  Rocket
 } from 'lucide-react'
 
 // ============================================
@@ -85,14 +86,14 @@ const STATUS_CONFIG = {
   },
   limited: {
     label: 'Limited',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    dotColor: 'bg-yellow-500',
+    color: 'bg-amber-100 text-amber-800 border-amber-200',
+    dotColor: 'bg-amber-500',
     description: 'Some availability remaining'
   },
   busy: {
     label: 'Busy',
-    color: 'bg-orange-100 text-orange-800 border-orange-200',
-    dotColor: 'bg-orange-500',
+    color: 'bg-amber-100 text-amber-800 border-amber-200',
+    dotColor: 'bg-amber-500',
     description: 'Nearly at capacity'
   },
   blackout: {
@@ -116,8 +117,8 @@ const DEPARTURE_STATUS_CONFIG = {
   },
   limited: {
     label: 'Limited',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    dotColor: 'bg-yellow-500'
+    color: 'bg-amber-100 text-amber-800 border-amber-200',
+    dotColor: 'bg-amber-500'
   },
   full: {
     label: 'Full',
@@ -495,11 +496,11 @@ export default function CapacityPage() {
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-[#647C47]" />
+            <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+              <Calendar className="w-5 h-5 text-primary-500" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Capacity Calendar</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Capacity Calendar</h1>
               <p className="text-sm text-gray-500">Manage availability and view tour departures</p>
             </div>
           </div>
@@ -508,7 +509,7 @@ export default function CapacityPage() {
             <button
               onClick={saveChanges}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -560,11 +561,11 @@ export default function CapacityPage() {
                 value={selectedTourId}
                 onChange={(e) => setSelectedTourId(e.target.value)}
                 aria-label="Select tour or itinerary to view"
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] min-w-[250px]"
+                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[250px]"
               >
                 <option value="">Select a tour or itinerary...</option>
                 {itineraries.length > 0 && (
-                  <optgroup label="📋 Itineraries">
+                  <optgroup label="Itineraries">
                     {itineraries.map(itinerary => (
                       <option key={itinerary.id} value={`itinerary:${itinerary.id}`}>
                         {itinerary.trip_name} ({itinerary.itinerary_code}) - {itinerary.client_name}
@@ -573,7 +574,7 @@ export default function CapacityPage() {
                   </optgroup>
                 )}
                 {tourTemplates.length > 0 && (
-                  <optgroup label="🗺️ Tour Templates">
+                  <optgroup label="Tour Templates">
                     {tourTemplates.map(template => (
                       <option key={template.id} value={`template:${template.id}`}>
                         {template.template_name} {template.template_code ? `(${template.template_code})` : ''}
@@ -637,7 +638,7 @@ export default function CapacityPage() {
           <div className="p-4">
             {loading ? (
               <div className="flex items-center justify-center h-80">
-                <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
+                <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
               </div>
             ) : (
               <>
@@ -683,15 +684,15 @@ export default function CapacityPage() {
                           className={`
                             relative p-2 min-h-[70px] rounded-lg border text-left transition-all
                             ${!inCurrentMonth ? 'opacity-40' : ''}
-                            ${today ? 'ring-2 ring-[#647C47]' : ''}
-                            ${selectedDate === dateStr ? 'border-[#647C47] bg-[#647C47]/5' : 'border-gray-200'}
+                            ${today ? 'ring-2 ring-primary-500' : ''}
+                            ${selectedDate === dateStr ? 'border-primary-500 bg-primary-500/5' : 'border-gray-200'}
                             ${hasDepartures ? 'bg-blue-50/50' : ''}
-                            ${inItinerary ? 'bg-purple-50/50' : ''}
-                            hover:border-[#647C47] cursor-pointer
+                            ${inItinerary ? 'bg-primary-50/50' : ''}
+                            hover:border-primary-500 cursor-pointer
                           `}
                         >
                           <div className="flex items-start justify-between">
-                            <span className={`text-sm font-medium ${today ? 'text-[#647C47]' : 'text-gray-700'}`}>
+                            <span className={`text-sm font-medium ${today ? 'text-primary-500' : 'text-gray-700'}`}>
                               {date.getDate()}
                             </span>
                             {hasDepartures && (
@@ -703,22 +704,22 @@ export default function CapacityPage() {
                                   )
                                 })}
                                 {departuresOnDate.length > 2 && (
-                                  <span className="text-[8px] text-gray-500 ml-1">+{departuresOnDate.length - 2}</span>
+                                  <span className="text-xs text-gray-500 ml-1">+{departuresOnDate.length - 2}</span>
                                 )}
                               </div>
                             )}
                             {inItinerary && !hasDepartures && (
-                              <div className="w-2 h-2 rounded-full bg-purple-500" />
+                              <div className="w-2 h-2 rounded-full bg-primary-500" />
                             )}
                           </div>
 
                           {/* Show tour departure info */}
                           {departureStarting && (
                             <div className="mt-1">
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded ${DEPARTURE_STATUS_CONFIG[departureStarting.status].color} block truncate`}>
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${DEPARTURE_STATUS_CONFIG[departureStarting.status].color} block truncate`}>
                                 {departureStarting.tour_code || departureStarting.tour_name.slice(0, 12)}
                               </span>
-                              <div className="flex items-center gap-1 mt-0.5 text-[9px] text-gray-500">
+                              <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500">
                                 <Users className="w-2.5 h-2.5" />
                                 {departureStarting.booked_pax}/{departureStarting.max_pax}
                               </div>
@@ -727,7 +728,7 @@ export default function CapacityPage() {
 
                           {hasDepartures && !departureStarting && (
                             <div className="mt-1">
-                              <span className="text-[9px] text-gray-400 italic">
+                              <span className="text-xs text-gray-400 italic">
                                 in trip
                               </span>
                             </div>
@@ -737,11 +738,11 @@ export default function CapacityPage() {
                           {inItinerary && !hasDepartures && (
                             <div className="mt-1">
                               {isItinStart ? (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 block truncate">
-                                  🚀 Start
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-800 block truncate">
+                                  <Rocket className="inline w-3 h-3 -mt-0.5 mr-1" />Start
                                 </span>
                               ) : (
-                                <span className="text-[9px] text-purple-600">
+                                <span className="text-xs text-primary-600">
                                   Day {itinDayNum}
                                 </span>
                               )}
@@ -770,14 +771,14 @@ export default function CapacityPage() {
                         className={`
                           relative p-2 min-h-[60px] rounded-lg border text-left transition-all
                           ${!inCurrentMonth ? 'opacity-40' : ''}
-                          ${past ? 'opacity-40 cursor-not-allowed' : 'hover:border-[#647C47] cursor-pointer'}
-                          ${today ? 'ring-2 ring-[#647C47]' : ''}
-                          ${selectedDate === dateStr ? 'border-[#647C47] bg-[#647C47]/5' : 'border-gray-200'}
+                          ${past ? 'opacity-40 cursor-not-allowed' : 'hover:border-primary-500 cursor-pointer'}
+                          ${today ? 'ring-2 ring-primary-500' : ''}
+                          ${selectedDate === dateStr ? 'border-primary-500 bg-primary-500/5' : 'border-gray-200'}
                           ${pending ? 'ring-1 ring-amber-400' : ''}
                         `}
                       >
                         <div className="flex items-start justify-between">
-                          <span className={`text-sm font-medium ${today ? 'text-[#647C47]' : 'text-gray-700'}`}>
+                          <span className={`text-sm font-medium ${today ? 'text-primary-500' : 'text-gray-700'}`}>
                             {date.getDate()}
                           </span>
                           <div className={`w-2 h-2 rounded-full ${config.dotColor}`} />
@@ -785,7 +786,7 @@ export default function CapacityPage() {
 
                         {entry && !past && (
                           <div className="mt-1">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${config.color}`}>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${config.color}`}>
                               {config.label}
                             </span>
                           </div>
@@ -832,9 +833,9 @@ export default function CapacityPage() {
         <div className="space-y-4">
           {/* Itinerary Info Panel - Show when itinerary is selected in tours mode */}
           {viewMode === 'tours' && selectedItinerary && (
-            <div className="bg-white border border-purple-200 rounded-xl shadow-sm p-4">
+            <div className="bg-white border border-primary-200 rounded-xl shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-purple-500" />
+                <div className="w-2 h-2 rounded-full bg-primary-500" />
                 <h3 className="text-sm font-semibold text-gray-900">Selected Itinerary</h3>
               </div>
 
@@ -845,11 +846,11 @@ export default function CapacityPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] px-2 py-0.5 rounded ${
+                  <span className={`text-xs px-2 py-0.5 rounded ${
                     selectedItinerary.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                     selectedItinerary.status === 'draft' ? 'bg-gray-100 text-gray-800' :
                     selectedItinerary.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
+                    'bg-amber-100 text-amber-800'
                   }`}>
                     {selectedItinerary.status.charAt(0).toUpperCase() + selectedItinerary.status.slice(1)}
                   </span>
@@ -863,8 +864,8 @@ export default function CapacityPage() {
 
                 {/* Show day info if date selected within itinerary */}
                 {selectedDate && isDateInItinerary(selectedDate) && (
-                  <div className="pt-2 border-t border-purple-100">
-                    <p className="text-xs text-purple-700">
+                  <div className="pt-2 border-t border-primary-100">
+                    <p className="text-xs text-primary-700">
                       <strong>Selected:</strong> Day {getItineraryDayNumber(selectedDate)} of {selectedItinerary.total_days}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
@@ -880,7 +881,7 @@ export default function CapacityPage() {
                 <button
                   type="button"
                   onClick={() => router.push(`/itineraries/${selectedItinerary.id}`)}
-                  className="mt-2 w-full text-xs text-[#647C47] hover:underline text-center"
+                  className="mt-2 w-full text-xs text-primary-500 hover:underline text-center"
                 >
                   View Full Itinerary →
                 </button>
@@ -923,14 +924,14 @@ export default function CapacityPage() {
                                 <p className="text-xs text-gray-500">{dep.tour_code}</p>
                               )}
                             </div>
-                            <span className={`text-[10px] px-2 py-0.5 rounded ${depConfig.color}`}>
+                            <span className={`text-xs px-2 py-0.5 rounded ${depConfig.color}`}>
                               {depConfig.label}
                             </span>
                           </div>
 
                           <div className="text-xs text-gray-600 space-y-1">
                             <p>
-                              {isStart ? '🚀 Starts today' : `Day ${Math.floor((new Date(selectedDate).getTime() - new Date(dep.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} of ${dep.duration_days}`}
+                              {isStart ? <><Rocket className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />Starts today</> : `Day ${Math.floor((new Date(selectedDate).getTime() - new Date(dep.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} of ${dep.duration_days}`}
                             </p>
                             <p>{dep.start_date} → {dep.end_date}</p>
                           </div>
@@ -950,7 +951,7 @@ export default function CapacityPage() {
                               <div
                                 className={`h-full rounded-full transition-all ${
                                   fillPercent >= 100 ? 'bg-red-500' :
-                                  fillPercent >= 80 ? 'bg-yellow-500' : 'bg-green-500'
+                                  fillPercent >= 80 ? 'bg-amber-500' : 'bg-green-500'
                                 }`}
                                 style={{ width: `${Math.min(fillPercent, 100)}%` }}
                               />
@@ -966,7 +967,7 @@ export default function CapacityPage() {
                           <button
                             type="button"
                             onClick={() => router.push(`/departures?id=${dep.id}`)}
-                            className="mt-2 w-full text-xs text-[#647C47] hover:underline text-center"
+                            className="mt-2 w-full text-xs text-primary-500 hover:underline text-center"
                           >
                             View Details →
                           </button>
@@ -1047,7 +1048,7 @@ export default function CapacityPage() {
                     }}
                     min="0"
                     max="20"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
 
@@ -1068,7 +1069,7 @@ export default function CapacityPage() {
                     }}
                     min="0"
                     max={editingEntry.max_groups}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
 
@@ -1087,7 +1088,7 @@ export default function CapacityPage() {
                         updateCapacity(selectedDate, { reason: e.target.value })
                       }}
                       placeholder="e.g., National holiday"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 )}
@@ -1103,7 +1104,7 @@ export default function CapacityPage() {
                     }}
                     rows={2}
                     placeholder="Internal notes..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -1168,13 +1169,13 @@ export default function CapacityPage() {
                     min="0"
                     max="1000"
                     placeholder="No limit"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                   <button
                     type="button"
                     onClick={() => void saveDefault()}
                     disabled={defaultSaving}
-                    className="px-3 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                    className="px-3 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50"
                   >
                     {defaultSaving ? 'Saving…' : 'Save'}
                   </button>

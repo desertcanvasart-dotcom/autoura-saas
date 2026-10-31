@@ -126,11 +126,11 @@ export default function BillingInvoicesPage() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
         <div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-yellow-900">Access Denied</h3>
-              <p className="text-sm text-yellow-700 mt-1">
+              <h3 className="font-semibold text-amber-900">Access Denied</h3>
+              <p className="text-sm text-amber-700 mt-1">
                 Only owners and admins can access invoice information.
               </p>
             </div>
@@ -154,7 +154,7 @@ export default function BillingInvoicesPage() {
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               filter === 'all'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -164,7 +164,7 @@ export default function BillingInvoicesPage() {
             onClick={() => setFilter('paid')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               filter === 'paid'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -174,7 +174,7 @@ export default function BillingInvoicesPage() {
             onClick={() => setFilter('open')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               filter === 'open'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -184,7 +184,7 @@ export default function BillingInvoicesPage() {
             onClick={() => setFilter('void')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               filter === 'void'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -347,8 +347,8 @@ export default function BillingInvoicesPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-purple-600" />
+                <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900">

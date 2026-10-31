@@ -214,12 +214,12 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
     const colors: any = {
       blue: 'bg-blue-100 text-blue-600 border-blue-200',
       green: 'bg-green-100 text-green-600 border-green-200',
-      purple: 'bg-purple-100 text-purple-600 border-purple-200',
+      purple: 'bg-primary-100 text-primary-600 border-primary-200',
       red: 'bg-red-100 text-red-600 border-red-200',
-      yellow: 'bg-yellow-100 text-yellow-600 border-yellow-200',
-      orange: 'bg-orange-100 text-orange-600 border-orange-200',
+      yellow: 'bg-amber-100 text-amber-600 border-amber-200',
+      orange: 'bg-amber-100 text-amber-600 border-amber-200',
       gray: 'bg-gray-100 text-gray-600 border-gray-200',
-      emerald: 'bg-emerald-100 text-emerald-600 border-emerald-200'
+      emerald: 'bg-primary-100 text-primary-600 border-primary-200'
     }
     return colors[color] || colors.gray
   }
@@ -250,8 +250,8 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             filter === 'all'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-primary-700'
           }`}
         >
           All Events
@@ -260,8 +260,8 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
           onClick={() => setFilter('communication')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             filter === 'communication'
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-primary-700'
           }`}
         >
           Communications
@@ -270,8 +270,8 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
           onClick={() => setFilter('booking')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             filter === 'booking'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-primary-700'
           }`}
         >
           Bookings
@@ -280,8 +280,8 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
           onClick={() => setFilter('note')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             filter === 'note'
-              ? 'bg-orange-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-primary-700'
           }`}
         >
           Notes
@@ -290,8 +290,8 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
           onClick={() => setFilter('followup')}
           className={`px-4 py-2 rounded-lg font-medium transition-colors ${
             filter === 'followup'
-              ? 'bg-yellow-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-primary-700'
           }`}
         >
           Follow-ups
@@ -351,7 +351,7 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
                             <div className="text-gray-500">Status</div>
                             <div className={`font-medium capitalize ${
                               event.details.status === 'confirmed' ? 'text-green-600' :
-                              event.details.status === 'completed' ? 'text-emerald-600' :
+                              event.details.status === 'completed' ? 'text-primary-600' :
                               event.details.status === 'cancelled' ? 'text-red-600' :
                               'text-gray-600'
                             }`}>

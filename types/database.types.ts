@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 178
+ * Tables: 179
  */
 
 export type Json =
@@ -4852,6 +4852,47 @@ export interface Database {
           },
         ]
       }
+      exchange_rate_events: {
+        Row: {
+          id: string
+          tenant_id: string
+          currency: string
+          action: string
+          old_rate: number | null
+          new_rate: number | null
+          user_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          currency: string
+          action: string
+          old_rate?: number | null
+          new_rate?: number | null
+          user_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          currency?: string
+          action?: string
+          old_rate?: number | null
+          new_rate?: number | null
+          user_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_rate_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_rate_snapshots: {
         Row: {
           id: string
@@ -4895,6 +4936,8 @@ export interface Database {
           updated_at: string | null
           source: string | null
           api_fetched_at: string | null
+          set_by: string | null
+          set_at: string | null
         }
         Insert: {
           id?: string
@@ -4908,6 +4951,8 @@ export interface Database {
           updated_at?: string | null
           source?: string | null
           api_fetched_at?: string | null
+          set_by?: string | null
+          set_at?: string | null
         }
         Update: {
           id?: string
@@ -4921,6 +4966,8 @@ export interface Database {
           updated_at?: string | null
           source?: string | null
           api_fetched_at?: string | null
+          set_by?: string | null
+          set_at?: string | null
         }
         Relationships: [
           {
@@ -11175,6 +11222,11 @@ export interface Database {
           whatsapp_number: string | null
           default_max_groups_per_day: number | null
           supplier_sourcing: string
+          default_cost_mode: string
+          default_tier: string | null
+          default_quote_currency: string | null
+          conversion_buffer_percent: number
+          currencies_in_use: string[] | null
         }
         Insert: {
           id?: string
@@ -11217,6 +11269,11 @@ export interface Database {
           whatsapp_number?: string | null
           default_max_groups_per_day?: number | null
           supplier_sourcing?: string
+          default_cost_mode?: string
+          default_tier?: string | null
+          default_quote_currency?: string | null
+          conversion_buffer_percent?: number
+          currencies_in_use?: string[] | null
         }
         Update: {
           id?: string
@@ -11259,6 +11316,11 @@ export interface Database {
           whatsapp_number?: string | null
           default_max_groups_per_day?: number | null
           supplier_sourcing?: string
+          default_cost_mode?: string
+          default_tier?: string | null
+          default_quote_currency?: string | null
+          conversion_buffer_percent?: number
+          currencies_in_use?: string[] | null
         }
         Relationships: []
       }

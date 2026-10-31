@@ -237,13 +237,13 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
     info: {
       icon: 'bg-blue-100',
       iconColor: 'text-blue-600',
-      button: 'bg-[#647C47] hover:bg-[#4f6238] focus:ring-[#647C47]/30 text-white',
+      button: 'bg-primary-500 hover:bg-primary-700 focus:ring-primary-500/30 text-white',
       IconComponent: Info,
     },
     success: {
       icon: 'bg-green-100',
       iconColor: 'text-green-600',
-      button: 'bg-[#647C47] hover:bg-[#4f6238] focus:ring-[#647C47]/30 text-white',
+      button: 'bg-primary-500 hover:bg-primary-700 focus:ring-primary-500/30 text-white',
       IconComponent: CheckCircle,
     },
   }
@@ -295,7 +295,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
               <div className="flex items-start gap-4">
                 {/* Icon */}
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${styles.icon}`}>
-                  <IconComponent className={`w-6 h-6 ${isPrompt ? 'text-[#647C47]' : styles.iconColor}`} />
+                  <IconComponent className={`w-6 h-6 ${isPrompt ? 'text-primary-500' : styles.iconColor}`} />
                 </div>
                 
                 {/* Text */}
@@ -325,7 +325,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleInputKeyDown}
                     placeholder={state.placeholder || ''}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
               )}

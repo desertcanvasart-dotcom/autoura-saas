@@ -9,8 +9,8 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { getCurrencySymbol } from '@/lib/currency'
 
 const money = (n: number, c = 'EUR') => `${getCurrencySymbol(c)}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const STATUS_BADGE: Record<string, string> = { received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700', approved: 'bg-indigo-100 text-indigo-700', paid: 'bg-green-100 text-green-700', disputed: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400' }
-const MATCH_BADGE: Record<string, string> = { unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-orange-100 text-orange-700', matched: 'bg-green-100 text-green-700', discrepancy: 'bg-red-100 text-red-700' }
+const STATUS_BADGE: Record<string, string> = { received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700', approved: 'bg-primary-100 text-primary-700', paid: 'bg-green-100 text-green-700', disputed: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400' }
+const MATCH_BADGE: Record<string, string> = { unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-amber-100 text-amber-700', matched: 'bg-green-100 text-green-700', discrepancy: 'bg-red-100 text-red-700' }
 
 export default function SupplierInvoiceDetail() {
   const { id } = useParams<{ id: string }>()
@@ -53,7 +53,7 @@ export default function SupplierInvoiceDetail() {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expenseIds: [...selected] }),
   })).then(() => setShowLink(false))
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 text-[#647C47] animate-spin" /></div>
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 text-primary-500 animate-spin" /></div>
   if (!inv) return <div className="p-6 text-gray-500">Invoice not found.</div>
 
   const matchedExpenses = inv.matched_expenses || []
@@ -69,7 +69,7 @@ export default function SupplierInvoiceDetail() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
-      <button onClick={() => router.push('/supplier-invoices')} className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
+      <button onClick={() => router.push('/supplier-bills')} className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Supplier invoices
       </button>
 
@@ -77,7 +77,7 @@ export default function SupplierInvoiceDetail() {
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">{inv.supplier_name}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{inv.supplier_name}</h1>
             <p className="text-sm text-gray-500">{inv.supplier_invoice_number} · {inv.internal_reference}</p>
             <div className="flex items-center gap-2 mt-2">
               <span className={`px-2 py-0.5 rounded text-xs font-medium ${MATCH_BADGE[inv.match_status] || ''}`}>{inv.match_status}</span>
@@ -106,7 +106,7 @@ export default function SupplierInvoiceDetail() {
             href={inv.document_storage_path ? `/api/supplier-invoices/${id}/document` : inv.document_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline"
+            className="mt-3 inline-flex items-center gap-1 text-sm text-primary-500 hover:underline"
           >
             <FileText className="h-4 w-4" /> {inv.document_filename || 'View document'}
           </a>
@@ -132,7 +132,7 @@ export default function SupplierInvoiceDetail() {
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-gray-800">Matched expenses</h3>
-          {canMatch && <button onClick={openLink} className="text-xs font-medium text-[#647C47] hover:underline inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" /> Link expenses</button>}
+          {canMatch && <button onClick={openLink} className="text-xs font-medium text-primary-500 hover:underline inline-flex items-center gap-1"><Link2 className="h-3.5 w-3.5" /> Link expenses</button>}
         </div>
         {matchedExpenses.length === 0 ? (
           <p className="text-sm text-gray-400">No expenses linked yet.</p>
@@ -172,9 +172,9 @@ export default function SupplierInvoiceDetail() {
         )}
         <div className="ml-auto flex items-center gap-2">
           <button disabled={busy !== null || (!canApprove && inv.match_status !== 'discrepancy' && inv.match_status !== 'partial')} onClick={async () => { const override = inv.match_status !== 'matched'; if (override && !(await dialog.confirm({ message: 'Invoice is not fully matched. Approve with a discrepancy?', variant: 'warning' }))) return; action('approve', () => fetch(`/api/supplier-invoices/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ override }) })) }}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Approve</button>
+            className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Approve</button>
           <button disabled={busy !== null || !canPay} onClick={() => { const entered = prompt('Payment reference (optional):'); if (entered === null) return; const ref = entered || undefined; action('pay', () => fetch(`/api/supplier-invoices/${id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_reference: ref }) })) }}
-            className="px-4 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50 inline-flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Mark paid</button>
+            className="px-4 py-1.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 inline-flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Mark paid</button>
         </div>
       </div>
 
@@ -189,7 +189,7 @@ export default function SupplierInvoiceDetail() {
             <div className="flex-1 overflow-y-auto p-2">
               {expenses.length === 0 ? <p className="text-sm text-gray-400 p-4 text-center">No expenses found.</p> : expenses.map(ex => (
                 <label key={ex.id} className="flex items-center gap-2 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer">
-                  <input type="checkbox" checked={selected.has(ex.id)} onChange={e => { const s = new Set(selected); e.target.checked ? s.add(ex.id) : s.delete(ex.id); setSelected(s) }} className="rounded border-gray-300 text-[#647C47]" />
+                  <input type="checkbox" checked={selected.has(ex.id)} onChange={e => { const s = new Set(selected); e.target.checked ? s.add(ex.id) : s.delete(ex.id); setSelected(s) }} className="rounded border-gray-300 text-primary-500" />
                   <span className="flex-1 text-sm text-gray-700 truncate">{ex.description || ex.expense_number || 'Expense'}</span>
                   <span className="text-sm tabular-nums text-gray-600">{money(ex.amount, ex.currency || inv.currency)}</span>
                 </label>
@@ -197,7 +197,7 @@ export default function SupplierInvoiceDetail() {
             </div>
             <div className="p-3 border-t border-gray-200 flex gap-2">
               <button onClick={() => setShowLink(false)} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={linkSelected} disabled={selected.size === 0 || busy === 'link'} className="flex-1 px-3 py-2 text-sm text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50">Link {selected.size || ''}</button>
+              <button onClick={linkSelected} disabled={selected.size === 0 || busy === 'link'} className="flex-1 px-3 py-2 text-sm text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50">Link {selected.size || ''}</button>
             </div>
           </div>
         </div>

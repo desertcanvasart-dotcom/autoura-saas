@@ -43,7 +43,19 @@ import {
   Download,
   Eye,
   Send,
-  AlertTriangle
+  AlertTriangle,
+  CalendarDays,
+  Bus,
+  Ship,
+  Sailboat,
+  Anchor,
+  Drama,
+  Briefcase,
+  ClipboardList,
+  Lightbulb,
+  Package,
+  Sparkles,
+  type LucideIcon
 } from 'lucide-react'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
@@ -150,20 +162,20 @@ const CITY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   'Giza': { bg: 'bg-olive-100', text: 'text-olive-700', dot: 'bg-olive-500' },
   'Luxor': { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
   'Aswan': { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
-  'Alexandria': { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
-  'Hurghada': { bg: 'bg-pink-100', text: 'text-pink-700', dot: 'bg-pink-500' },
-  'Sharm El Sheikh': { bg: 'bg-cyan-100', text: 'text-cyan-700', dot: 'bg-cyan-500' },
+  'Alexandria': { bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
+  'Hurghada': { bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
+  'Sharm El Sheikh': { bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
   'default': { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-500' }
 }
 
 const PACKAGE_TYPES = [
-  { id: 'day-trips', name: 'Day Trips', icon: '🗓️', desc: 'No accommodation', advanced: false },
-  { id: 'tours-only', name: 'Tours Only', icon: '🚐', desc: 'Client has own hotel', advanced: false },
-  { id: 'land-package', name: 'Land Package', icon: '🏨', desc: 'Tours + Hotels', advanced: false },
-  { id: 'cruise-package', name: 'Cruise', icon: '🛳️', desc: 'Cruise only', advanced: false },
-  { id: 'full-package', name: 'Full Package', icon: '✈️', desc: 'All inclusive + Airport', advanced: true },
-  { id: 'cruise-land', name: 'Cruise + Land', icon: '🚢', desc: 'Cruise and land combo', advanced: true },
-  { id: 'shore-excursions', name: 'Shore Excursions', icon: '⚓', desc: 'Port pickup, time-limited', advanced: true }
+  { id: 'day-trips', name: 'Day Trips', icon: CalendarDays, desc: 'No accommodation', advanced: false },
+  { id: 'tours-only', name: 'Tours Only', icon: Bus, desc: 'Client has own hotel', advanced: false },
+  { id: 'land-package', name: 'Land Package', icon: Hotel, desc: 'Tours + Hotels', advanced: false },
+  { id: 'cruise-package', name: 'Cruise', icon: Ship, desc: 'Cruise only', advanced: false },
+  { id: 'full-package', name: 'Full Package', icon: Plane, desc: 'All inclusive + Airport', advanced: true },
+  { id: 'cruise-land', name: 'Cruise + Land', icon: Sailboat, desc: 'Cruise and land combo', advanced: true },
+  { id: 'shore-excursions', name: 'Shore Excursions', icon: Anchor, desc: 'Port pickup, time-limited', advanced: true }
 ]
 
 
@@ -171,20 +183,20 @@ const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700' },
   { value: 'sent', label: 'Sent', color: 'bg-blue-100 text-blue-700' },
   { value: 'confirmed', label: 'Confirmed', color: 'bg-green-100 text-green-700' },
-  { value: 'completed', label: 'Completed', color: 'bg-purple-100 text-purple-700' },
+  { value: 'completed', label: 'Completed', color: 'bg-primary-100 text-primary-700' },
   { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-700' }
 ]
 
 const SERVICE_TYPES = [
-  { value: 'transportation', label: 'Transportation', icon: '🚗' },
-  { value: 'guide', label: 'Guide', icon: '👨‍🏫' },
-  { value: 'entrance', label: 'Entrance Fee', icon: '🎫' },
-  { value: 'meal', label: 'Meal', icon: '🍽️' },
-  { value: 'accommodation', label: 'Accommodation', icon: '🏨' },
-  { value: 'activity', label: 'Activity', icon: '🎭' },
-  { value: 'tips', label: 'Tips', icon: '💰' },
-  { value: 'supplies', label: 'Supplies', icon: '💧' },
-  { value: 'service_fee', label: 'Service Fee', icon: '💼' },
+  { value: 'transportation', label: 'Transportation' },
+  { value: 'guide', label: 'Guide' },
+  { value: 'entrance', label: 'Entrance Fee' },
+  { value: 'meal', label: 'Meal' },
+  { value: 'accommodation', label: 'Accommodation' },
+  { value: 'activity', label: 'Activity' },
+  { value: 'tips', label: 'Tips' },
+  { value: 'supplies', label: 'Supplies' },
+  { value: 'service_fee', label: 'Service Fee' },
 ]
 
 // ============================================
@@ -194,11 +206,12 @@ const SERVICE_TYPES = [
 const getCityColor = (city: string) => CITY_COLORS[city] || CITY_COLORS['default']
 const generateId = () => `new-${Math.random().toString(36).substr(2, 9)}`
 const getServiceIcon = (type: string | null) => {
-  const icons: Record<string, string> = {
-    accommodation: '🏨', transportation: '🚗', guide: '👨‍🏫', entrance: '🎫',
-    meal: '🍽️', activity: '🎭', service_fee: '💼', tips: '💰', supplies: '💧'
+  const icons: Record<string, LucideIcon> = {
+    accommodation: Hotel, transportation: Car, guide: User, entrance: Ticket,
+    meal: Utensils, activity: Drama, service_fee: Briefcase, tips: Banknote, supplies: Droplets
   }
-  return icons[type ?? ''] || '📋'
+  const Icon = icons[type ?? ''] || ClipboardList
+  return <Icon className="w-5 h-5 text-gray-500" />
 }
 
 // ============================================
@@ -993,7 +1006,7 @@ export default function ItineraryEditorPage() {
           SAVED itinerary — save and it refreshes (migration 382). */}
       {cruiseSailingNotes.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4">
-          <p className="text-sm font-semibold text-amber-800 mb-1">⚠ Check the cruise date</p>
+          <p className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-amber-600" />Check the cruise date</p>
           <ul className="text-xs text-amber-700 space-y-0.5">
             {cruiseSailingNotes.map((n, i) => (
               <li key={i}>• {n}</li>
@@ -1020,7 +1033,7 @@ export default function ItineraryEditorPage() {
               value={itinerary.status || 'draft'}
               onChange={(e) => updateStatus(e.target.value)}
               disabled={updatingStatus}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#647C47] flex-shrink-0 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary-500 flex-shrink-0 ${
                 STATUS_OPTIONS.find(s => s.value === itinerary.status)?.color || 'bg-gray-100 text-gray-700'
               }`}
             >
@@ -1043,14 +1056,14 @@ export default function ItineraryEditorPage() {
                 onClick={repriceFx}
                 disabled={repricingFx}
                 title="Restate supplier costs of foreign-currency lines at today's exchange rates (logged; client price unchanged)"
-                className="px-2.5 py-1 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:text-[#647C47] hover:border-[#647C47]/40 disabled:opacity-50 flex-shrink-0"
+                className="px-2.5 py-1 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:text-primary-500 hover:border-primary-500/40 disabled:opacity-50 flex-shrink-0"
               >
                 {repricingFx ? 'Repricing…' : 'Reprice FX'}
               </button>
             )}
 
             {/* Itinerary Code */}
-            <h1 className="text-lg font-bold text-gray-900 whitespace-nowrap">{itinerary.itinerary_code}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 whitespace-nowrap">{itinerary.itinerary_code}</h1>
 
             {/* Separator */}
             <span className="text-gray-300">|</span>
@@ -1077,7 +1090,7 @@ export default function ItineraryEditorPage() {
             {existingInvoice ? (
               <Link
                 href={fromThisPage(`/invoices/${existingInvoice.id}`)}
-                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center gap-1.5"
               >
                 <Receipt size={14} />
                 {existingInvoice.invoice_number}
@@ -1140,7 +1153,7 @@ export default function ItineraryEditorPage() {
             {/* Contract Link */}
             <Link
               href={fromThisPage(`/documents/contract/${itinerary.id}`)}
-              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center gap-1.5"
             >
               <FileText size={14} />
               Contract
@@ -1157,7 +1170,7 @@ export default function ItineraryEditorPage() {
             <button
               onClick={calculatePricing}
               disabled={calculating || saving}
-              className="px-3 py-1.5 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3 py-1.5 bg-primary-500 text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-1.5 disabled:opacity-50"
             >
               <Calculator size={14} />
               {calculating ? 'Opening…' : 'Price in Grid'}
@@ -1169,15 +1182,15 @@ export default function ItineraryEditorPage() {
       {/* WORKFLOW STATUS BAR */}
       <div className="bg-white rounded-xl p-4 mb-5 shadow-sm flex items-center gap-2">
         <div className="flex items-center gap-2 px-4 py-2 bg-[#e8ede3] rounded-full">
-          <span className="w-6 h-6 bg-[#647C47] rounded-full flex items-center justify-center text-white text-xs font-bold">
+          <span className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
             <Check size={14} />
           </span>
           <span className="text-sm font-semibold text-[#4a5c35]">AI Generated</span>
         </div>
-        <div className="w-10 h-0.5 bg-[#647C47]"></div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-[#f4f7f1] rounded-full border-2 border-[#647C47]">
-          <span className="w-6 h-6 bg-[#647C47] rounded-full flex items-center justify-center text-white text-xs font-bold">2</span>
-          <span className="text-sm font-semibold text-[#647C47]">Edit Content</span>
+        <div className="w-10 h-0.5 bg-primary-500"></div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-[#f4f7f1] rounded-full border-2 border-primary-500">
+          <span className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</span>
+          <span className="text-sm font-semibold text-primary-500">Edit Content</span>
         </div>
         <div className="w-10 h-0.5 bg-gray-200"></div>
         <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
@@ -1197,7 +1210,7 @@ export default function ItineraryEditorPage() {
           <h3 className="text-sm font-semibold text-gray-900">Package Type</h3>
           <button
             onClick={() => setShowAdvancedPackages(!showAdvancedPackages)}
-            className="text-sm text-gray-500 hover:text-[#647C47] flex items-center gap-1"
+            className="text-sm text-gray-500 hover:text-primary-500 flex items-center gap-1"
           >
             {showAdvancedPackages ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             {showAdvancedPackages ? 'Hide' : 'Show'} advanced options
@@ -1211,11 +1224,11 @@ export default function ItineraryEditorPage() {
               onClick={() => setItinerary({ ...itinerary, package_type: pkg.id })}
               className={`p-4 rounded-xl border-2 text-center transition-all ${
                 itinerary.package_type === pkg.id
-                  ? 'border-[#647C47] bg-[#e8ede3]'
+                  ? 'border-primary-500 bg-[#e8ede3]'
                   : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1]'
               }`}
             >
-              <div className="text-2xl mb-1">{pkg.icon}</div>
+              <div className="mb-1 flex justify-center"><pkg.icon className="w-6 h-6 text-primary-600" /></div>
               <div className={`text-sm font-semibold ${itinerary.package_type === pkg.id ? 'text-[#4a5c35]' : 'text-gray-700'}`}>
                 {pkg.name}
               </div>
@@ -1232,11 +1245,11 @@ export default function ItineraryEditorPage() {
                 onClick={() => setItinerary({ ...itinerary, package_type: pkg.id })}
                 className={`p-4 rounded-xl border-2 text-center transition-all ${
                   itinerary.package_type === pkg.id
-                    ? 'border-[#647C47] bg-[#e8ede3]'
+                    ? 'border-primary-500 bg-[#e8ede3]'
                     : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1]'
                 }`}
               >
-                <div className="text-2xl mb-1">{pkg.icon}</div>
+                <div className="mb-1 flex justify-center"><pkg.icon className="w-6 h-6 text-primary-600" /></div>
                 <div className={`text-sm font-semibold ${itinerary.package_type === pkg.id ? 'text-[#4a5c35]' : 'text-gray-700'}`}>
                   {pkg.name}
                 </div>
@@ -1260,14 +1273,14 @@ export default function ItineraryEditorPage() {
               type="text"
               value={itinerary.trip_name}
               onChange={(e) => setItinerary({ ...itinerary, trip_name: e.target.value })}
-              className="w-full px-4 py-3 text-lg font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-[#647C47]"
+              className="w-full px-4 py-3 text-lg font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500"
             />
           </div>
 
           {/* Section Header */}
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-base font-semibold text-gray-900">Itinerary Days</h2>
-            <span className="text-xs text-gray-500">💡 Drag to reorder • Click Edit to expand</span>
+            <span className="text-xs text-gray-500 flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5" />Drag to reorder • Click Edit to expand</span>
           </div>
 
           {/* Where each night is slept, from the booked hotels; and what
@@ -1315,14 +1328,14 @@ export default function ItineraryEditorPage() {
               onDrop={() => handleDrop(day.id)}
               className={`bg-white rounded-xl mb-3 shadow-sm border-2 transition-all ${
                 draggedDay === day.id
-                  ? 'border-dashed border-[#647C47] rotate-1 shadow-lg'
+                  ? 'border-dashed border-primary-500 rotate-1 shadow-lg'
                   : 'border-transparent hover:shadow-md'
               }`}
             >
               {/* Day Header */}
               <div className="p-4 flex items-center gap-3 cursor-grab">
                 <GripVertical className="text-gray-400" size={18} />
-                <div className="w-9 h-9 bg-[#647C47] rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                <div className="w-9 h-9 bg-primary-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                   {day.day_number}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1334,8 +1347,8 @@ export default function ItineraryEditorPage() {
                     placeholder="Day title..."
                   />
                   <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${getCityColor(day.city).bg} ${getCityColor(day.city).text}`}>
-                      📍 {day.city}
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getCityColor(day.city).bg} ${getCityColor(day.city).text}`}>
+                      <MapPin className="w-3 h-3 inline -mt-0.5 mr-0.5" />{day.city}
                     </span>
                     {day.flight_from && <span className="flex items-center gap-1"><Plane size={12} /> from {day.flight_from}</span>}
                     {nightOf(day) && <span className="flex items-center gap-1"><Moon size={12} /> {nightOf(day)}</span>}
@@ -1348,7 +1361,7 @@ export default function ItineraryEditorPage() {
                   onClick={() => toggleDayExpanded(day.id)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     expandedDays.has(day.id)
-                      ? 'bg-[#647C47] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
@@ -1374,7 +1387,7 @@ export default function ItineraryEditorPage() {
                           onClick={() => updateDay(day.id, day.overnight_city ? { city } : { city, overnight_city: city })}
                           className={`px-3 py-2 rounded-md text-sm transition-all ${
                             day.city === city
-                              ? 'bg-[#647C47] text-white'
+                              ? 'bg-primary-500 text-white'
                               : 'bg-white border border-gray-200 text-gray-600 hover:border-[#b8c9a8]'
                           }`}
                         >
@@ -1393,13 +1406,13 @@ export default function ItineraryEditorPage() {
                     </label>
                     {hotelNightCity(day) ? (
                       <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                        <span className="px-3 py-1 rounded-md bg-[#647C47] text-white">{hotelNightCity(day)}</span>
+                        <span className="px-3 py-1 rounded-md bg-primary-500 text-white">{hotelNightCity(day)}</span>
                         <span className="text-gray-600">
                           Set by the hotel booked this night
                           {nightFromBooking(linesOf(day.id), lineCities)?.property ? ` (${nightFromBooking(linesOf(day.id), lineCities)?.property})` : ''}.
                           {day.overnight_city && day.overnight_city !== hotelNightCity(day) ? ` It was saved as ${day.overnight_city}; saving corrects it.` : ''}
                         </span>
-                        <button onClick={calculatePricing} className="text-[#647C47] font-medium hover:underline">
+                        <button onClick={calculatePricing} className="text-primary-500 font-medium hover:underline">
                           Change the hotel in the Grid
                         </button>
                       </div>
@@ -1411,7 +1424,7 @@ export default function ItineraryEditorPage() {
                           onClick={() => updateDay(day.id, { overnight_city: city })}
                           className={`px-3 py-2 rounded-md text-sm transition-all ${
                             day.overnight_city === city
-                              ? 'bg-[#647C47] text-white'
+                              ? 'bg-primary-500 text-white'
                               : 'bg-white border border-gray-200 text-gray-600 hover:border-[#b8c9a8]'
                           }`}
                         >
@@ -1422,7 +1435,7 @@ export default function ItineraryEditorPage() {
                         onClick={() => updateDay(day.id, { overnight_city: null })}
                         className={`px-3 py-2 rounded-md text-sm transition-all ${
                           !day.overnight_city
-                            ? 'bg-[#647C47] text-white'
+                            ? 'bg-primary-500 text-white'
                             : 'bg-white border border-gray-200 text-gray-600 hover:border-[#b8c9a8]'
                         }`}
                       >
@@ -1441,7 +1454,7 @@ export default function ItineraryEditorPage() {
                       value={day.description}
                       onChange={(e) => updateDay(day.id, { description: e.target.value })}
                       rows={3}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#647C47] resize-y"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary-500 resize-y"
                       placeholder="Describe this day..."
                     />
                   </div>
@@ -1470,7 +1483,7 @@ export default function ItineraryEditorPage() {
                           setAttractionCityFilter(day.city)
                           setShowAttractionModal(true)
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-full text-sm text-gray-500 hover:border-[#647C47] hover:text-[#647C47]"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-full text-sm text-gray-500 hover:border-primary-500 hover:text-primary-500"
                       >
                         <Plus size={14} />
                         Add attraction
@@ -1487,11 +1500,11 @@ export default function ItineraryEditorPage() {
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => { addNewService(day.id, day.day_number); setShowServicesSection(true) }}
-                            className="text-xs text-[#647C47] hover:text-[#4a5c35] font-medium flex items-center gap-1"
+                            className="text-xs text-primary-500 hover:text-[#4a5c35] font-medium flex items-center gap-1"
                           >
                             <Plus size={12} /> Add service
                           </button>
-                          <button onClick={calculatePricing} className="text-xs text-[#647C47] hover:text-[#4a5c35] font-medium">
+                          <button onClick={calculatePricing} className="text-xs text-primary-500 hover:text-[#4a5c35] font-medium">
                             Change in Grid
                           </button>
                         </div>
@@ -1531,19 +1544,19 @@ export default function ItineraryEditorPage() {
                     <div className="p-4 bg-gray-50 rounded-lg">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                          <input type="checkbox" checked={day.services.guide} onChange={(e) => updateDayService(day.id, 'guide', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                          <input type="checkbox" checked={day.services.guide} onChange={(e) => updateDayService(day.id, 'guide', e.target.checked)} className="w-4 h-4 accent-primary-500" />
                           <User size={14} /> Guide
                         </label>
                         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                          <input type="checkbox" checked={day.services.lunch} onChange={(e) => updateDayService(day.id, 'lunch', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                          <input type="checkbox" checked={day.services.lunch} onChange={(e) => updateDayService(day.id, 'lunch', e.target.checked)} className="w-4 h-4 accent-primary-500" />
                           <Utensils size={14} /> Lunch
                         </label>
                         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                          <input type="checkbox" checked={day.services.dinner} onChange={(e) => updateDayService(day.id, 'dinner', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                          <input type="checkbox" checked={day.services.dinner} onChange={(e) => updateDayService(day.id, 'dinner', e.target.checked)} className="w-4 h-4 accent-primary-500" />
                           <Wine size={14} /> Dinner
                         </label>
                         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                          <input type="checkbox" checked={day.services.hotel} onChange={(e) => updateDayService(day.id, 'hotel', e.target.checked)} className="w-4 h-4 accent-[#647C47]" disabled={day.day_number === days.length} />
+                          <input type="checkbox" checked={day.services.hotel} onChange={(e) => updateDayService(day.id, 'hotel', e.target.checked)} className="w-4 h-4 accent-primary-500" disabled={day.day_number === days.length} />
                           <Hotel size={14} /> Hotel
                         </label>
                       </div>
@@ -1566,7 +1579,7 @@ export default function ItineraryEditorPage() {
           {/* Add Day Button */}
           <button
             onClick={addNewDay}
-            className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-[#647C47] hover:text-[#647C47] flex items-center justify-center gap-2 mb-5"
+            className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-primary-500 hover:text-primary-500 flex items-center justify-center gap-2 mb-5"
           >
             <Plus size={18} />
             Add Another Day
@@ -1578,7 +1591,7 @@ export default function ItineraryEditorPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <button
               onClick={() => setShowServicesSection(!showServicesSection)}
-              className="w-full px-5 py-4 flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200"
+              className="w-full px-5 py-4 flex items-center justify-between bg-gradient-to-r from-amber-50 to-amber-50 border-b border-amber-200"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
@@ -1614,7 +1627,7 @@ export default function ItineraryEditorPage() {
                       <div key={day.id} className="border border-gray-200 rounded-lg overflow-hidden">
                         <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="w-7 h-7 bg-[#647C47] rounded flex items-center justify-center text-white text-xs font-bold">
+                            <span className="w-7 h-7 bg-primary-500 rounded flex items-center justify-center text-white text-xs font-bold">
                               {day.day_number}
                             </span>
                             <span className="font-medium text-gray-900 text-sm">{day.title}</span>
@@ -1624,7 +1637,7 @@ export default function ItineraryEditorPage() {
                           </div>
                           <button
                             onClick={() => addNewService(day.id, day.day_number)}
-                            className="text-xs text-[#647C47] hover:text-[#4a5c35] font-medium flex items-center gap-1"
+                            className="text-xs text-primary-500 hover:text-[#4a5c35] font-medium flex items-center gap-1"
                           >
                             <Plus size={14} /> Add Service
                           </button>
@@ -1645,11 +1658,11 @@ export default function ItineraryEditorPage() {
                                   <div className="space-y-3">
                                     {/* Row 1: Type and Name */}
                                     <div className="flex items-center gap-2">
-                                      <span className="text-lg w-8">{getServiceIcon(service.service_type)}</span>
+                                      <span className="w-8 flex justify-center">{getServiceIcon(service.service_type)}</span>
                                       <select
                                         value={service.service_type ?? ''}
                                         onChange={(e) => updateService(service.id, { service_type: e.target.value })}
-                                        className="w-36 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                        className="w-36 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary-500"
                                       >
                                         {SERVICE_TYPES.map(t => (
                                           <option key={t.value} value={t.value}>{t.label}</option>
@@ -1659,7 +1672,7 @@ export default function ItineraryEditorPage() {
                                         type="text"
                                         value={service.service_name}
                                         onChange={(e) => updateService(service.id, { service_name: e.target.value })}
-                                        className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                        className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary-500"
                                         placeholder="Service name"
                                       />
                                     </div>
@@ -1667,7 +1680,7 @@ export default function ItineraryEditorPage() {
                                     {/* Row 2: Supplier Selection - Full Width */}
                                     <div className="flex items-center gap-2 pl-10">
                                       <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
-                                        📦 Supplier:
+                                        <Package className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-gray-500" />Supplier:
                                       </label>
                                       <ServiceSupplierSelect
                                         serviceType={service.service_type}
@@ -1675,7 +1688,7 @@ export default function ItineraryEditorPage() {
                                         supplierId={service.supplier_id}
                                         supplierName={service.supplier_name}
                                         onChange={next => updateService(service.id, next)}
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47] bg-white"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary-500 bg-white"
                                       />
                                     </div>
 
@@ -1691,7 +1704,7 @@ export default function ItineraryEditorPage() {
                                             const total = qty * (service.rate_non_eur || service.rate_eur || 0)
                                             updateService(service.id, { quantity: qty, total_cost: total })
                                           }}
-                                          className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:border-[#647C47]"
+                                          className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:border-primary-500"
                                           min="1"
                                         />
                                       </div>
@@ -1708,7 +1721,7 @@ export default function ItineraryEditorPage() {
                                               total_cost: (service.quantity ?? 0) * rate
                                             })
                                           }}
-                                          className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:border-[#647C47]"
+                                          className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:border-primary-500"
                                           step="0.01"
                                           placeholder="0.00"
                                         />
@@ -1719,7 +1732,7 @@ export default function ItineraryEditorPage() {
                                       </div>
                                       <button
                                         onClick={() => setEditingServiceId(null)}
-                                        className="px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 flex items-center gap-1"
+                                        className="px-3 py-1.5 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 flex items-center gap-1"
                                         title="Done editing"
                                       >
                                         <Check size={14} /> Done
@@ -1729,15 +1742,15 @@ export default function ItineraryEditorPage() {
                                 ) : (
                                   // View Mode
                                   <div className="flex items-center gap-3">
-                                    <span className="text-lg">{getServiceIcon(service.service_type)}</span>
+                                    <span className="flex">{getServiceIcon(service.service_type)}</span>
                                     <div className="flex-1">
                                       <p className="text-sm font-medium text-gray-900">{service.service_name}</p>
                                       <p className="text-xs text-gray-500">
                                         <span className="capitalize">{(service.service_type ?? '').replace('_', ' ')}</span>
                                         {(service.quantity ?? 0) > 1 && ` • Qty: ${service.quantity}`}
                                         {service.supplier_name && (
-                                          <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
-                                            📦 {service.supplier_name}
+                                          <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                                            <Package className="w-3 h-3 inline -mt-0.5 mr-0.5" />{service.supplier_name}
                                           </span>
                                         )}
                                       </p>
@@ -1748,7 +1761,7 @@ export default function ItineraryEditorPage() {
                                       </span>
                                       <button
                                         onClick={() => setEditingServiceId(service.id)}
-                                        className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded"
+                                        className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded"
                                         title="Edit"
                                       >
                                         <Edit3 size={14} />
@@ -1842,12 +1855,12 @@ export default function ItineraryEditorPage() {
           {/* Action Box */}
           <div className="bg-[#f4f7f1] rounded-xl p-5 border border-[#b8c9a8]">
             <p className="text-sm text-[#4a5c35] mb-4">
-              ✨ Edit content, then save or price it in the Quote Builder.
+              <Sparkles className="w-4 h-4 inline -mt-0.5 mr-1" />Edit content, then save or price it in the Quote Builder.
             </p>
             <button
               onClick={saveDraft}
               disabled={saving || calculating}
-              className="w-full py-3 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] mb-2.5 flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 bg-primary-500 text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] mb-2.5 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save size={18} />
               {saving ? 'Saving...' : 'Save Changes'}
@@ -1867,8 +1880,8 @@ export default function ItineraryEditorPage() {
 
           {/* Tips */}
           <div className="mt-4 p-4 bg-[#e8ede3] rounded-lg border border-[#b8c9a8]">
-            <h4 className="text-sm font-semibold text-[#4a5c35] mb-2">💡 Tips</h4>
-            <ul className="text-xs text-[#647C47] space-y-1.5 list-disc pl-4">
+            <h4 className="text-sm font-semibold text-[#4a5c35] mb-2 flex items-center gap-1.5"><Lightbulb className="w-4 h-4" />Tips</h4>
+            <ul className="text-xs text-primary-500 space-y-1.5 list-disc pl-4">
               <li>Edit services directly in the pricing section</li>
               <li>Add/remove services for each day</li>
               <li>Changes are saved when you click Save Draft</li>
@@ -1895,7 +1908,7 @@ export default function ItineraryEditorPage() {
                   placeholder="Search attractions..."
                   value={attractionSearch}
                   onChange={(e) => setAttractionSearch(e.target.value)}
-                  className="w-full pl-4 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#647C47]"
+                  className="w-full pl-4 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500"
                 />
               </div>
 
@@ -1903,7 +1916,7 @@ export default function ItineraryEditorPage() {
                 <button
                   onClick={() => setAttractionCityFilter(null)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    !attractionCityFilter ? 'bg-[#647C47] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#647C47]'
+                    !attractionCityFilter ? 'bg-primary-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-500'
                   }`}
                 >
                   All Cities
@@ -1913,7 +1926,7 @@ export default function ItineraryEditorPage() {
                     key={city}
                     onClick={() => setAttractionCityFilter(city)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      attractionCityFilter === city ? 'bg-[#647C47] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#647C47]'
+                      attractionCityFilter === city ? 'bg-primary-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-primary-500'
                     }`}
                   >
                     {city}
@@ -1943,11 +1956,11 @@ export default function ItineraryEditorPage() {
                           {attr.activity_name}
                           {isAdded && <Check size={14} className="inline ml-2 text-green-600" />}
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5">📍 {attr.city}</div>
+                        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><MapPin className="w-3 h-3" />{attr.city}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-semibold text-[#647C47]">{fmtRate(attr.base_rate_eur, attr, 0)} / {fmtRate(attr.base_rate_non_eur, attr, 0)}</div>
-                        <div className="text-[11px] text-gray-500">EUR / non-EUR</div>
+                        <div className="text-sm font-semibold text-primary-500">{fmtRate(attr.base_rate_eur, attr, 0)} / {fmtRate(attr.base_rate_non_eur, attr, 0)}</div>
+                        <div className="text-xs text-gray-500">EUR / non-EUR</div>
                       </div>
                     </div>
                   )

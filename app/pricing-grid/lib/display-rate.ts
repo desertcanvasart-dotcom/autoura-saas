@@ -13,10 +13,15 @@ export type DisplayRate =
   | { ok: true; rate: number | null }   // null: the run currency itself
   | { ok: false; reason: string }
 
-export function displayRate(runCurrency: string, currency: string, rates: ExchangeRate[] | null): DisplayRate {
+// bufferPercent: the company's conversion buffer (Settings › Currencies,
+// migration 456) — prices SHOWN in another currency read that much higher.
+// Display only: the grid prices and saves in the run currency, and the shown
+// figure is never charged.
+export function displayRate(runCurrency: string, currency: string, rates: ExchangeRate[] | null, bufferPercent = 0): DisplayRate {
   if (currency === runCurrency) return { ok: true, rate: null }
   if (!rates) return { ok: false, reason: 'loading' }
   const rate = getExchangeRate(runCurrency, currency, rates)
-  if (rate && Number.isFinite(rate) && rate > 0) return { ok: true, rate }
-  return { ok: false, reason: `No exchange rate from ${runCurrency} to ${currency} — add one in Settings → Exchange Rates. Prices are shown in ${runCurrency}.` }
+  const buffer = Number.isFinite(bufferPercent) && bufferPercent > 0 ? bufferPercent : 0
+  if (rate && Number.isFinite(rate) && rate > 0) return { ok: true, rate: rate * (1 + buffer / 100) }
+  return { ok: false, reason: `No exchange rate from ${runCurrency} to ${currency} — add one in Settings → Currencies & rates. Prices are shown in ${runCurrency}.` }
 }

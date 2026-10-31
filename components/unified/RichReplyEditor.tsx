@@ -65,7 +65,7 @@ export default function RichReplyEditor({ html, onChange, placeholder, minHeight
         data-placeholder={placeholder}
         onInput={(e) => onChange((e.target as HTMLDivElement).innerHTML)}
         onBlur={(e) => onChange((e.target as HTMLDivElement).innerHTML)}
-        className="px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-[#647C47]/30 rounded-b-lg empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 [&_ul]:list-disc [&_ul]:ml-5 [&_ol]:list-decimal [&_ol]:ml-5 [&_a]:text-[#647C47] [&_a]:underline"
+        className="px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-primary-500/30 rounded-b-lg empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 [&_ul]:list-disc [&_ul]:ml-5 [&_ol]:list-decimal [&_ol]:ml-5 [&_a]:text-primary-500 [&_a]:underline"
         style={{ minHeight }}
       />
     </div>

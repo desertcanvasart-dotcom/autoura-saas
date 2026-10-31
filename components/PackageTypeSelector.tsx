@@ -32,10 +32,10 @@ const PACKAGE_TYPE_UI: Record<PackageType, { icon: React.ElementType; color: str
 
   'day-trips': { icon: Sun, color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
   'tours-only': { icon: Map, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
-  'land-package': { icon: Building2, color: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' },
+  'land-package': { icon: Building2, color: 'text-primary-600', bgColor: 'bg-primary-50', borderColor: 'border-primary-200' },
   'full-package': { icon: Package, color: 'text-primary-600', bgColor: 'bg-primary-50', borderColor: 'border-primary-200' },
-  'cruise-land': { icon: Ship, color: 'text-indigo-600', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200' },
-  'shore-excursions': { icon: Anchor, color: 'text-cyan-600', bgColor: 'bg-cyan-50', borderColor: 'border-cyan-200' },
+  'cruise-land': { icon: Ship, color: 'text-primary-600', bgColor: 'bg-primary-50', borderColor: 'border-primary-200' },
+  'shore-excursions': { icon: Anchor, color: 'text-primary-600', bgColor: 'bg-primary-50', borderColor: 'border-primary-200' },
 }
 
 const PACKAGE_TYPES: PackageTypeOption[] = PACKAGE_TYPE_CONFIGS.map(cfg => ({

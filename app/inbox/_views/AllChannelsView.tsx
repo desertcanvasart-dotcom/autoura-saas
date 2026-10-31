@@ -6,6 +6,7 @@ import UnifiedConversationComposer from '@/components/unified/UnifiedConversatio
 import { showToast } from '@/app/contexts/ToastContext'
 import { conversationTitle } from '@/lib/email/contact-name'
 import { syncSummary } from '@/lib/email/sync-summary'
+import { Smartphone, Mail, Luggage, MessageCircle, Star } from 'lucide-react'
 
 interface Message {
   id: string
@@ -177,10 +178,10 @@ export default function ConversationsPage() {
   // Get channel icon
   const getChannelIcon = (channel: string | null) => {
     switch (channel) {
-      case 'whatsapp': return '📱'
-      case 'email': return '✉️'
-      case 'trip': return '🧳'
-      default: return '💬'
+      case 'whatsapp': return <Smartphone className="w-3.5 h-3.5" />
+      case 'email': return <Mail className="w-3.5 h-3.5" />
+      case 'trip': return <Luggage className="w-3.5 h-3.5" />
+      default: return <MessageCircle className="w-3.5 h-3.5" />
     }
   }
 
@@ -201,7 +202,7 @@ export default function ConversationsPage() {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Conversations</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Conversations</h1>
             <p className="text-sm text-gray-500 mt-1">
               Unified view of WhatsApp and Email communications
             </p>
@@ -275,7 +276,7 @@ export default function ConversationsPage() {
           <div className="flex-1 overflow-y-auto">
             {conversations.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                <span className="text-4xl">💬</span>
+                <MessageCircle className="w-10 h-10 mx-auto text-gray-300" />
                 <p className="mt-2 font-medium">No conversations</p>
                 <p className="text-sm">Conversations will appear here when customers message you</p>
               </div>
@@ -313,10 +314,10 @@ export default function ConversationsPage() {
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
                           {conv.contact_phone && (
-                            <span>📱 {conv.contact_phone.slice(-4)}</span>
+                            <span className="inline-flex items-center gap-1"><Smartphone className="w-3 h-3" /> {conv.contact_phone.slice(-4)}</span>
                           )}
                           {conv.contact_email && (
-                            <span className="truncate">✉️ {conv.contact_email}</span>
+                            <span className="inline-flex items-center gap-1 min-w-0"><Mail className="w-3 h-3 shrink-0" /> <span className="truncate">{conv.contact_email}</span></span>
                           )}
                         </div>
                       </div>
@@ -329,7 +330,7 @@ export default function ConversationsPage() {
                         onClick={(e) => toggleStar(conv.id, e)}
                         className="text-lg hover:scale-110 transition-transform"
                       >
-                        {conv.is_starred ? '⭐' : '☆'}
+                        <Star className={`w-5 h-5 ${conv.is_starred ? 'fill-amber-400 text-amber-400' : 'text-gray-400'}`} />
                       </button>
                     </div>
                   </div>
@@ -356,10 +357,10 @@ export default function ConversationsPage() {
                       </h2>
                       <div className="flex items-center gap-3 text-sm text-gray-500">
                         {selectedConversation.contact_phone && (
-                          <span>📱 {selectedConversation.contact_phone}</span>
+                          <span className="inline-flex items-center gap-1"><Smartphone className="w-4 h-4" /> {selectedConversation.contact_phone}</span>
                         )}
                         {selectedConversation.contact_email && (
-                          <span>✉️ {selectedConversation.contact_email}</span>
+                          <span className="inline-flex items-center gap-1"><Mail className="w-4 h-4" /> {selectedConversation.contact_email}</span>
                         )}
                       </div>
                     </div>
@@ -377,7 +378,7 @@ export default function ConversationsPage() {
                       onClick={() => toggleStar(selectedConversation.id, { stopPropagation: () => {} } as React.MouseEvent)}
                       className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     >
-                      {selectedConversation.is_starred ? '⭐' : '☆'}
+                      <Star className={`w-5 h-5 ${selectedConversation.is_starred ? 'fill-amber-400 text-amber-400' : 'text-gray-400'}`} />
                     </button>
                   </div>
                 </div>
@@ -392,7 +393,7 @@ export default function ConversationsPage() {
                   </div>
                 ) : selectedConversation.messages?.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <span className="text-4xl">💬</span>
+                    <MessageCircle className="w-10 h-10 mx-auto text-gray-300" />
                     <p className="mt-2">No messages yet</p>
                     <p className="text-sm">Start the conversation below</p>
                   </div>
@@ -488,7 +489,7 @@ export default function ConversationsPage() {
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500">
               <div className="text-center">
-                <span className="text-6xl">💬</span>
+                <MessageCircle className="w-14 h-14 mx-auto text-gray-300" />
                 <p className="mt-4 text-xl font-medium">Select a conversation</p>
                 <p className="text-sm mt-1">Choose a conversation from the list to view messages</p>
               </div>

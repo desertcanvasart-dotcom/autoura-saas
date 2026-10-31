@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { codeForClaim, codeRecipientsForAgency } from '@/lib/supplier-claims'
 
 // ============================================
 // Suppliers asking to sign in as this agency's supplier (Phase 2B, 450)
@@ -9,7 +10,8 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 // supplier's name and the phone they signed in with. The claims are read
 // through RLS (this agency's only); the phone lives on supplier_accounts,
 // which no signed-in user can read, so it is fetched with the service role
-// for exactly those claims' accounts.
+// for exactly those claims' accounts. So is where the sign-in code went —
+// cut down to this agency's own addresses and a count of the others.
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth()
@@ -28,9 +30,14 @@ export async function GET(request: NextRequest) {
   if (!claims || claims.length === 0) return NextResponse.json({ success: true, data: [] })
 
   const admin = createAdminClient() as unknown as SupabaseClient
-  const [{ data: accounts }, { data: suppliers }] = await Promise.all([
-    admin.from('supplier_accounts').select('id, phone, last_login_at').in('id', [...new Set(claims.map(c => c.account_id as string))]),
-    supabase.from('suppliers').select('id, name, company_name').in('id', [...new Set(claims.map(c => c.supplier_id as string))]).eq('tenant_id', tenant_id),
+  const accountIds = [...new Set(claims.map(c => c.account_id as string))]
+  const [{ data: accounts }, { data: suppliers }, { data: codes }] = await Promise.all([
+    admin.from('supplier_accounts').select('id, phone, last_login_at').in('id', accountIds),
+    supabase.from('suppliers').select('id, name, company_name, email, contact_email').in('id', [...new Set(claims.map(c => c.supplier_id as string))]).eq('tenant_id', tenant_id),
+    // Where each sign-in code went (audit SN-1). Only reduced below to the
+    // addresses on THIS agency's own record plus a count of the rest.
+    admin.from('supplier_login_codes').select('account_id, sent_to, used_at').in('account_id', accountIds)
+      .not('used_at', 'is', null).order('used_at', { ascending: false }).limit(500),
   ])
   return NextResponse.json({
     success: true,
@@ -42,6 +49,10 @@ export async function GET(request: NextRequest) {
         supplier_name: ((sup?.name || sup?.company_name) as string | null) ?? 'Supplier',
         phone: acc?.phone ? `+${acc.phone}` : null,
         last_login_at: acc?.last_login_at ?? null,
+        code_sent_to: codeRecipientsForAgency(
+          codeForClaim((codes ?? []) as Array<{ account_id: string; used_at: string; sent_to: string | null }>, { account_id: c.account_id as string, requested_at: c.requested_at as string })?.sent_to,
+          sup as { email?: string | null; contact_email?: string | null } | undefined,
+        ),
       }
     }),
   })

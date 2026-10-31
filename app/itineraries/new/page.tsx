@@ -5,7 +5,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Check, User, Plane, Users, FileText } from 'lucide-react'
+import { ArrowLeft, Check, User, Plane, Users, FileText, CalendarDays } from 'lucide-react'
 
 export default function NewItineraryPage() {
   const router = useRouter()
@@ -98,12 +98,12 @@ export default function NewItineraryPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Create New Itinerary</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Create New Itinerary</h1>
             <p className="text-gray-600 mt-1">Fill in the details to create a new trip plan</p>
           </div>
           <Link 
             href="/itineraries" 
-            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2"
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to List
@@ -219,7 +219,7 @@ export default function NewItineraryPage() {
               {totalDays > 0 && (
                 <div className="p-4 bg-primary-50 rounded-lg border border-primary-200">
                   <p className="text-primary-900 font-medium">
-                    📅 Trip Duration: <span className="text-2xl font-bold">{totalDays}</span> {totalDays === 1 ? 'day' : 'days'}
+                    <CalendarDays className="inline w-5 h-5 -mt-1 mr-1.5 text-primary-600" />Trip Duration: <span className="text-2xl font-bold">{totalDays}</span> {totalDays === 1 ? 'day' : 'days'}
                   </p>
                 </div>
               )}

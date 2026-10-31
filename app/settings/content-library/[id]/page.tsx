@@ -30,7 +30,9 @@ import {
   Car,
   Ship,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  FileText,
+  Lightbulb
 } from 'lucide-react'
 import { 
   CATEGORY_SCHEMAS, 
@@ -145,7 +147,7 @@ function DynamicListField({ field, value, onChange }: DynamicListFieldProps) {
                 updated[index] = e.target.value
                 onChange(updated)
               }}
-              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             />
             <button
               type="button"
@@ -169,7 +171,7 @@ function DynamicListField({ field, value, onChange }: DynamicListFieldProps) {
                 setNewItem('')
               }
             }}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
           />
           <button
             type="button"
@@ -179,7 +181,7 @@ function DynamicListField({ field, value, onChange }: DynamicListFieldProps) {
                 setNewItem('')
               }
             }}
-            className="p-2 text-[#647C47] hover:bg-[#647C47]/10 rounded-lg transition-colors"
+            className="p-2 text-primary-500 hover:bg-primary-500/10 rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -213,7 +215,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
             value={(value as string) || ''}
             onChange={(e) => handleChange(e.target.value)}
             placeholder={field.placeholder}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
           />
           {field.helpText && (
             <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
@@ -236,7 +238,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
             onChange={(e) => handleChange(e.target.value)}
             placeholder={field.placeholder}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] resize-none"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-none"
           />
           {field.helpText && (
             <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
@@ -260,7 +262,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
             onChange={(e) => handleChange(parseInt(e.target.value) || 0)}
             min={field.min}
             max={field.max}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
           />
         </div>
       )
@@ -275,7 +277,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
           <select
             value={(value as string) || ''}
             onChange={(e) => handleChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] bg-white"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white"
           >
             <option value="">Select...</option>
             {(field.options as string[])?.map((opt) => (
@@ -309,7 +311,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
                   }}
                   className={`px-3 py-1.5 text-sm rounded-lg transition-all whitespace-nowrap ${
                     isSelected 
-                      ? 'bg-[#647C47] text-white shadow-sm' 
+                      ? 'bg-primary-500 text-white shadow-sm' 
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -342,7 +344,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
                   key={opt}
                   className={`flex items-center gap-3 px-3 py-2.5 border rounded-lg cursor-pointer transition-all ${
                     isChecked 
-                      ? 'border-[#647C47] bg-[#647C47]/5 shadow-sm' 
+                      ? 'border-primary-500 bg-primary-500/5 shadow-sm' 
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                 >
@@ -356,7 +358,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
                         handleChange(checkedValues.filter(v => v !== opt))
                       }
                     }}
-                    className="w-4 h-4 text-[#647C47] rounded border-gray-300 focus:ring-[#647C47] flex-shrink-0"
+                    className="w-4 h-4 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
                   />
                   <span className="text-sm text-gray-700 leading-tight">{opt}</span>
                 </label>
@@ -378,7 +380,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
                 className="sr-only"
               />
               <div className={`w-10 h-6 rounded-full transition-colors ${
-                value ? 'bg-[#647C47]' : 'bg-gray-200'
+                value ? 'bg-primary-500' : 'bg-gray-200'
               }`}>
                 <div className={`w-4 h-4 bg-white rounded-full shadow absolute top-1 transition-transform ${
                   value ? 'translate-x-5' : 'translate-x-1'
@@ -401,7 +403,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
             type="time"
             value={(value as string) || ''}
             onChange={(e) => handleChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
           />
         </div>
       )
@@ -485,7 +487,7 @@ function ListInput({ label, items, onChange, placeholder = 'Add item...' }: List
                 updated[index] = e.target.value
                 onChange(updated)
               }}
-              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             />
             <button
               type="button"
@@ -508,12 +510,12 @@ function ListInput({ label, items, onChange, placeholder = 'Add item...' }: List
                 addItem()
               }
             }}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
           />
           <button
             type="button"
             onClick={addItem}
-            className="flex items-center gap-1 px-3 py-2 text-sm text-[#647C47] hover:bg-[#647C47]/10 rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-2 text-sm text-primary-500 hover:bg-primary-500/10 rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add
@@ -761,7 +763,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
   if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#647C47]" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
       </div>
     )
   }
@@ -781,7 +783,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </Link>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">
+              <h1 className="text-2xl font-semibold text-gray-900">
                 {isNew ? 'New Content' : formData.name}
               </h1>
               <p className="text-sm text-gray-500">
@@ -792,7 +794,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#566b3d] transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#566b3d] transition-colors disabled:opacity-50"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -812,7 +814,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
             {/* Basic Information */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center">📄</span>
+                <span className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center"><FileText className="w-4 h-4 text-gray-500" /></span>
                 Basic Information
               </h2>
 
@@ -829,7 +831,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                       category_id: e.target.value,
                       metadata: {} // Reset metadata when category changes
                     }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] bg-white"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white"
                   >
                     <option value="">Select category...</option>
                     {categories.map(cat => (
@@ -848,7 +850,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="e.g., Pyramids of Giza"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                 </div>
 
@@ -859,7 +861,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                     type="text"
                     value={formData.slug}
                     onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                 </div>
 
@@ -871,7 +873,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                     onChange={(e) => setFormData(prev => ({ ...prev, short_description: e.target.value }))}
                     placeholder="Brief summary for listings..."
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] resize-none"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-none"
                   />
                 </div>
 
@@ -884,7 +886,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                       value={formData.location}
                       onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                       placeholder="e.g., Giza, Cairo"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                     />
                   </div>
                 )}
@@ -924,12 +926,12 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                         }
                       }}
                       placeholder="Add tag..."
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                     />
                     <button
                       type="button"
                       onClick={addTag}
-                      className="px-3 py-2 text-[#647C47] hover:bg-[#647C47]/10 rounded-lg transition-colors"
+                      className="px-3 py-2 text-primary-500 hover:bg-primary-500/10 rounded-lg transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -942,10 +944,10 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
             {categorySchema && categorySchema.fields.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-sm font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-[#647C47]/10 rounded flex items-center justify-center">
+                  <span className="w-6 h-6 bg-primary-500/10 rounded flex items-center justify-center">
                     {(() => {
                       const IconComponent = CATEGORY_ICONS[categorySchema.icon] || Landmark
-                      return <IconComponent className="w-4 h-4 text-[#647C47]" />
+                      return <IconComponent className="w-4 h-4 text-primary-500" />
                     })()}
                   </span>
                   {categorySchema.label} Details
@@ -1009,7 +1011,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                         value={currentVariation.title}
                         onChange={(e) => updateVariation('title', e.target.value)}
                         placeholder={`${tierLabel(activeTier)} experience title...`}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                       />
                     </div>
 
@@ -1023,7 +1025,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                         onChange={(e) => updateVariation('description', e.target.value)}
                         placeholder={`How you describe this at the ${tierLabel(activeTier)} tier...`}
                         rows={6}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] resize-none"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-none"
                       />
                       <p className="mt-1 text-xs text-gray-500">
                         {currentVariation.description.length} characters
@@ -1060,7 +1062,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                         onChange={(e) => updateVariation('internal_notes', e.target.value)}
                         placeholder="Notes for your team (not shown in itineraries)..."
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] resize-none bg-amber-50/50"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-none bg-amber-50/50"
                       />
                     </div>
                   </>
@@ -1069,9 +1071,9 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Tips Card */}
-            <div className="mt-6 bg-[#647C47]/5 rounded-xl border border-[#647C47]/20 p-6">
-              <h3 className="text-sm font-semibold text-[#647C47] mb-2">
-                💡 Tier Writing Tips
+            <div className="mt-6 bg-primary-500/5 rounded-xl border border-primary-500/20 p-6">
+              <h3 className="text-sm font-semibold text-primary-500 mb-2 flex items-center gap-1.5">
+                <Lightbulb className="w-4 h-4" /> Tier Writing Tips
               </h3>
               <div className="text-sm text-gray-600 space-y-2">
                 {TIER_TIPS[ladderIndex(tierPosition(allTiers, activeTier), tierItems.length)]}

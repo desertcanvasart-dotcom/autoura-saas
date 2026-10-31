@@ -7,7 +7,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
 import SendingDomainCard from '@/components/settings/SendingDomainCard'
-import { TemplateEditor } from '@/components/email/RichTextEditor'
+import dynamic from 'next/dynamic'
 import { 
   Mail, 
   Check, 
@@ -23,6 +23,13 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+
+// The tiptap editor is only used inside the template modal, so it is fetched
+// when the modal opens rather than in this page's first load.
+const TemplateEditor = dynamic(
+  () => import('@/components/email/RichTextEditor').then(m => m.TemplateEditor),
+  { ssr: false, loading: () => <div className="min-h-[200px] rounded-lg border border-gray-200 bg-gray-50 animate-pulse" /> },
+)
 
 interface EmailTemplate {
   id: string
@@ -399,7 +406,7 @@ function EmailSettingsContent() {
                     <div key={template.id} className="bg-white rounded-lg border border-gray-200 p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded font-medium uppercase">
+                          <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded font-medium uppercase">
                             {template.category}
                           </span>
                           <h4 className="text-sm font-medium text-gray-900 mt-1">{template.name}</h4>
@@ -557,7 +564,7 @@ function TemplateModal({
               onChange={setContent}
               placeholder="Write your template content..."
             />
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               Tip: Use placeholders like {"{{client_name}}"}, {"{{dates}}"}, {"{{total}}"} for dynamic content
             </p>
           </div>

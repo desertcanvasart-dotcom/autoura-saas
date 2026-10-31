@@ -92,7 +92,7 @@ export default function MoveMenu({
           aria-label="Move to"
           className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30`}
         >
-          <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Move to</p>
+          <p className="px-3 pt-1 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Move to</p>
           {currentFolderId && (
             <button
               type="button"
@@ -139,7 +139,7 @@ export default function MoveMenu({
                   aria-label="New folder name"
                   className="w-full h-8 px-2 text-xs border border-gray-200 rounded"
                 />
-                {error && <p className="text-[11px] text-red-600 mt-1">{error}</p>}
+                {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
                 <button
                   type="button"
                   onClick={createAndMove}

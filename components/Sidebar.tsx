@@ -123,7 +123,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <span className="truncate">{item.label}</span>
         {badge !== null && (
           <span
-            className="ml-auto min-w-[22px] px-1.5 py-0.5 rounded-full bg-primary-700 text-white text-[11px] font-semibold leading-none text-center"
+            className="ml-auto min-w-[22px] px-1.5 py-0.5 rounded-full bg-primary-700 text-white text-xs font-semibold leading-none text-center"
             aria-label={`${badge} new`}
           >
             {badge > 99 ? '99+' : badge}
@@ -159,7 +159,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                     type="button"
                     onClick={() => toggle(section.key)}
                     aria-expanded={isOpen}
-                    className="flex items-center w-full px-3 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
+                    className="flex items-center w-full px-3 pt-1 pb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-700"
                   >
                     {section.title}
                     {hasNews && <span className="ml-2 w-2 h-2 rounded-full bg-primary-700" title="Something new inside" />}

@@ -49,15 +49,15 @@ export default function PublishReviewsPage() {
     } catch (e) { showToast('error', e instanceof Error ? e.message : 'Failed') } finally { setBusy(false) }
   }
 
-  if (!state) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]" /></div>
+  if (!state) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
-      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-[#647C47]"><ArrowLeft className="h-4 w-4" />Website</Link>
+      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-primary-500"><ArrowLeft className="h-4 w-4" />Website</Link>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><Star className="h-5 w-5 text-[#647C47]" /></div>
+        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center"><Star className="h-5 w-5 text-primary-500" /></div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Google reviews</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Google reviews</h1>
           <p className="text-sm text-gray-500">Show your Google rating and your latest reviews on your website — exactly as they are on Google.</p>
         </div>
       </div>
@@ -100,14 +100,14 @@ export default function PublishReviewsPage() {
               <div className="flex gap-2">
                 <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} placeholder="Your business name and city, e.g. Sunrise Travel Cairo"
                   className="flex-1 text-sm border border-gray-300 rounded-md px-3 py-2" />
-                <button type="button" disabled={busy || query.trim().length < 3} onClick={search} className="inline-flex items-center gap-1 text-sm px-3 py-2 rounded-md bg-[#647C47] text-white disabled:opacity-40"><Search className="h-4 w-4" />Search</button>
+                <button type="button" disabled={busy || query.trim().length < 3} onClick={search} className="inline-flex items-center gap-1 text-sm px-3 py-2 rounded-md bg-primary-500 text-white disabled:opacity-40"><Search className="h-4 w-4" />Search</button>
               </div>
               {hits.length > 0 && (
                 <ul className="divide-y divide-gray-100 border border-gray-100 rounded">
                   {hits.map(h => (
                     <li key={h.placeId} className="flex items-center justify-between gap-2 p-2">
                       <div className="text-sm"><p className="font-medium">{h.name}</p><p className="text-gray-500">{h.address}</p></div>
-                      <button type="button" disabled={busy} onClick={() => save(h.placeId)} className="text-sm px-3 py-1.5 rounded-md border border-[#647C47] text-[#647C47]">This is us</button>
+                      <button type="button" disabled={busy} onClick={() => save(h.placeId)} className="text-sm px-3 py-1.5 rounded-md border border-primary-500 text-primary-500">This is us</button>
                     </li>
                   ))}
                 </ul>

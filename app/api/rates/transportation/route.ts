@@ -4,6 +4,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 // ============================================
 // TRANSPORTATION RATES API - Full CRUD
@@ -65,32 +66,36 @@ export async function GET(request: NextRequest) {
     // ✅ MULTI-TENANT: RLS policies automatically filter by tenant_id
     // See migration: 007_create_tours_templates_tables.sql
     // Only returns rates belonging to authenticated user's tenant
-    let query = supabase
-      .from('transportation_rates')
-      // No supplier embed: transportation_rates is the one rate table with no
-      // supplier_id column (every other has it), so `supplier:suppliers` and
-      // the supplier_id filter both made PostgREST reject the whole query with
-      // PGRST200/42703 -- the transport-rates list returned nothing at all.
-      // Nothing writes a supplier to this table (not the POST, form, or CSV),
-      // so there is no relationship to embed.
-      .select('*')
-      .order('city')
-      .order('service_type')
-      .order('duration')
-      .order('area')
-      .order('vehicle_type')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('transportation_rates')
+        // No supplier embed: transportation_rates is the one rate table with no
+        // supplier_id column (every other has it), so `supplier:suppliers` and
+        // the supplier_id filter both made PostgREST reject the whole query with
+        // PGRST200/42703 -- the transport-rates list returned nothing at all.
+        // Nothing writes a supplier to this table (not the POST, form, or CSV),
+        // so there is no relationship to embed.
+        .select('*')
+        .order('city')
+        .order('service_type')
+        .order('duration')
+        .order('area')
+        .order('vehicle_type')
 
-    // Apply filters
-    if (city) query = query.ilike('city', `%${city}%`)
-    if (serviceType) query = query.eq('service_type', serviceType)
-    if (duration) query = query.eq('duration', duration)
-    if (area) query = query.eq('area', area)
-    if (vehicleType) query = query.eq('vehicle_type', vehicleType)
-    if (originCity) query = query.ilike('origin_city', `%${originCity}%`)
-    if (destinationCity) query = query.ilike('destination_city', `%${destinationCity}%`)
-    if (activeOnly) query = query.eq('is_active', true)
-
-    const { data, error } = await query
+      // Apply filters
+      if (city) query = query.ilike('city', `%${city}%`)
+      if (serviceType) query = query.eq('service_type', serviceType)
+      if (duration) query = query.eq('duration', duration)
+      if (area) query = query.eq('area', area)
+      if (vehicleType) query = query.eq('vehicle_type', vehicleType)
+      if (originCity) query = query.ilike('origin_city', `%${originCity}%`)
+      if (destinationCity) query = query.ilike('destination_city', `%${destinationCity}%`)
+      if (activeOnly) query = query.eq('is_active', true)
+      return query.order('id').range(from, to)
+    })
 
     if (error) {
       console.error('GET transportation_rates error:', error)

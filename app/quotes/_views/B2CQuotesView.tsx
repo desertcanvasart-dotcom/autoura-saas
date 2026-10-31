@@ -42,10 +42,10 @@ interface B2CQuote {
 const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
   draft: { bg: 'bg-gray-100', text: 'text-gray-700', icon: Clock },
   sent: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Eye },
-  viewed: { bg: 'bg-purple-100', text: 'text-purple-700', icon: Eye },
+  viewed: { bg: 'bg-primary-100', text: 'text-primary-700', icon: Eye },
   accepted: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle },
   rejected: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle },
-  expired: { bg: 'bg-orange-100', text: 'text-orange-700', icon: AlertCircle }
+  expired: { bg: 'bg-amber-100', text: 'text-amber-700', icon: AlertCircle }
 }
 
 export default function B2CQuotesPage() {
@@ -408,14 +408,14 @@ export default function B2CQuotesPage() {
                 <FileText className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">B2C Quotes</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">B2C Quotes</h1>
                 <p className="text-sm text-gray-500">Direct client quotes with margin pricing</p>
               </div>
             </div>
 
             <Link
               href="/pricing-grid?type=b2c"
-              className="h-10 px-4 bg-blue-600 text-white rounded-lg text-sm font-medium whitespace-nowrap hover:bg-blue-700 inline-flex items-center gap-2"
+              className="h-10 px-4 bg-primary-600 text-white rounded-lg text-sm font-medium whitespace-nowrap hover:bg-primary-700 inline-flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />
               New Quote
@@ -989,7 +989,7 @@ export default function B2CQuotesPage() {
                             onClick={() => goToPage(pageNum)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                               currentPage === pageNum
-                                ? 'bg-blue-600 text-white'
+                                ? 'bg-primary-600 text-white'
                                 : 'border border-gray-300 hover:bg-gray-50'
                             }`}
                           >

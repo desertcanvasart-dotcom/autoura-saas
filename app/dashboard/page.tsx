@@ -158,8 +158,8 @@ export default function DashboardPage() {
   return (
     <div className="p-4 lg:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Welcome Back{userName ? `, ${userName}` : ''}! 👋
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Welcome Back{userName ? `, ${userName}` : ''}!
         </h1>
         <p className="text-sm text-gray-600 mt-1">Here’s what needs you today.</p>
       </div>
@@ -261,7 +261,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 {d.balanceDue > 0 && (
-                  <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded shrink-0 ml-3">
+                  <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded shrink-0 ml-3">
                     {money(d.balanceDue, d.currency)} due
                   </span>
                 )}
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-gray-900 truncate">{m.sender || 'Unknown sender'}</p>
                 <p className="text-xs text-gray-500 truncate">{m.snippet}</p>
               </div>
-              <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0 ml-3 mt-0.5">
+              <span className="text-xs uppercase tracking-wide text-gray-400 shrink-0 ml-3 mt-0.5">
                 {m.channel}
               </span>
             </Row>
@@ -413,8 +413,8 @@ function StatCard({
   const dotColors = {
     primary: 'bg-primary-600',
     warning: 'bg-warning',
-    purple: 'bg-purple-600',
-    orange: 'bg-orange-600',
+    purple: 'bg-primary-600',
+    orange: 'bg-amber-600',
   }
   const card = (
       <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 ${href ? 'hover:shadow-md' : ''} transition-shadow h-full min-h-[120px] flex flex-col`}>

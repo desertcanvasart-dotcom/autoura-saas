@@ -62,7 +62,7 @@ const ROLE_OPTIONS = [
 ]
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: 'bg-purple-100 text-purple-700',
+  admin: 'bg-primary-100 text-primary-700',
   manager: 'bg-blue-100 text-blue-700',
   member: 'bg-green-100 text-green-700',
   viewer: 'bg-gray-100 text-gray-600'
@@ -273,7 +273,7 @@ export default function UserManagementPage() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 text-[#647C47] animate-spin" />
+          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
         </div>
       </div>
     )
@@ -287,7 +287,7 @@ export default function UserManagementPage() {
           <button
             type="button"
             onClick={() => setShowInviteModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 transition-colors"
           >
             <UserPlus className="w-4 h-4" />
             Invite User
@@ -335,11 +335,11 @@ export default function UserManagementPage() {
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-primary-600" />
               </div>
               <div>
-                <p className="text-2xl font-semibold text-purple-600">
+                <p className="text-2xl font-semibold text-primary-600">
                   {members.filter(m => m.role === 'admin').length}
                 </p>
                 <p className="text-xs text-gray-500">Admins</p>
@@ -356,7 +356,7 @@ export default function UserManagementPage() {
               onClick={() => setActiveTab('users')}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'users'
-                  ? 'border-[#647C47] text-[#647C47]'
+                  ? 'border-primary-500 text-primary-500'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -367,7 +367,7 @@ export default function UserManagementPage() {
               onClick={() => setActiveTab('invitations')}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'invitations'
-                  ? 'border-[#647C47] text-[#647C47]'
+                  ? 'border-primary-500 text-primary-500'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -383,7 +383,7 @@ export default function UserManagementPage() {
             placeholder={activeTab === 'users' ? 'Search users...' : 'Search invitations...'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -401,9 +401,9 @@ export default function UserManagementPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        member.is_active ? 'bg-[#647C47]/10' : 'bg-gray-100'
+                        member.is_active ? 'bg-primary-500/10' : 'bg-gray-100'
                       }`}>
-                        <span className="text-sm font-medium text-[#647C47]">
+                        <span className="text-sm font-medium text-primary-500">
                           {member.full_name?.charAt(0) || member.email.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -413,7 +413,7 @@ export default function UserManagementPage() {
                             {member.full_name || 'Unnamed'}
                           </h4>
                           {!member.is_active && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 rounded">
+                            <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded">
                               Inactive
                             </span>
                           )}
@@ -548,7 +548,7 @@ export default function UserManagementPage() {
                           <button
                             type="button"
                             onClick={() => resendInvitation(invitation)}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                             title="Resend invitation"
                           >
                             <RefreshCw className="w-4 h-4" />
@@ -597,7 +597,7 @@ export default function UserManagementPage() {
                           <button
                             type="button"
                             onClick={() => resendInvitation(invitation)}
-                            className="px-3 py-1 text-xs font-medium text-[#647C47] hover:bg-[#647C47]/10 rounded transition-colors"
+                            className="px-3 py-1 text-xs font-medium text-primary-500 hover:bg-primary-500/10 rounded transition-colors"
                             title="Resend expired invitation"
                           >
                             Resend
@@ -625,14 +625,14 @@ export default function UserManagementPage() {
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Role Permissions</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="flex items-start gap-3">
-              <Crown className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <Crown className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-gray-900">Owner</p>
                 <p className="text-xs text-gray-500">Full access to all features</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <ShieldCheck className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+              <ShieldCheck className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-gray-900">Administrator</p>
                 <p className="text-xs text-gray-500">Full access to everything</p>
@@ -646,7 +646,7 @@ export default function UserManagementPage() {
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <UserIcon className="w-5 h-5 text-[#647C47] flex-shrink-0 mt-0.5" />
+              <UserIcon className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-gray-900">Member</p>
                 <p className="text-xs text-gray-500">Work on assigned tasks and clients</p>
@@ -690,7 +690,7 @@ export default function UserManagementPage() {
                     type="email"
                     value={inviteForm.email}
                     onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="colleague@example.com"
                     required
                   />
@@ -705,7 +705,7 @@ export default function UserManagementPage() {
                         key={role.value}
                         className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
                           inviteForm.role === role.value
-                            ? 'border-[#647C47] bg-[#647C47]/5'
+                            ? 'border-primary-500 bg-primary-500/5'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
@@ -715,7 +715,7 @@ export default function UserManagementPage() {
                           value={role.value}
                           checked={inviteForm.role === role.value}
                           onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
-                          className="mt-0.5 text-[#647C47] focus:ring-[#647C47]"
+                          className="mt-0.5 text-primary-500 focus:ring-primary-500"
                         />
                         <div>
                           <p className="text-sm font-medium text-gray-900">{role.label}</p>
@@ -754,7 +754,7 @@ export default function UserManagementPage() {
                   <button
                     type="submit"
                     disabled={inviting || !!inviteSuccess}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   >
                     {inviting ? (
                       <>

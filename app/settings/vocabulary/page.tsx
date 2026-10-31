@@ -248,9 +248,9 @@ export default function VocabularySettingsPage() {
               <div key={group}>
                 <button type="button" onClick={() => toggleGroup(group)} aria-expanded={open}
                   className="w-full flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-gray-50 group">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 group-hover:text-gray-600">{group}</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 group-hover:text-gray-600">{group}</span>
                   <span className="flex items-center gap-1.5">
-                    {!open && <span className="text-[10px] text-gray-400">{kinds.length} lists · {groupActive}</span>}
+                    {!open && <span className="text-xs text-gray-400">{kinds.length} lists · {groupActive}</span>}
                     <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? '' : '-rotate-90'}`} />
                   </span>
                 </button>

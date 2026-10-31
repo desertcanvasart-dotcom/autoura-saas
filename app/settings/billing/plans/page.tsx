@@ -110,7 +110,7 @@ export default function BillingPlansPage() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 text-[#647C47] animate-spin" />
+          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
         </div>
       </div>
     )
@@ -147,7 +147,7 @@ export default function BillingPlansPage() {
                 }`}
               >
                 Yearly
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] rounded-full font-semibold">
+                <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full font-semibold">
                   -17%
                 </span>
               </button>
@@ -188,15 +188,15 @@ export default function BillingPlansPage() {
                 key={tierKey}
                 className={`relative bg-white rounded-xl border overflow-hidden transition-all hover:shadow-md ${
                   isCurrentPlan
-                    ? 'border-[#647C47] ring-1 ring-[#647C47]'
+                    ? 'border-primary-500 ring-1 ring-primary-500'
                     : tier.popular
-                      ? 'border-[#647C47]/50'
+                      ? 'border-primary-500/50'
                       : 'border-gray-200'
                 }`}
               >
                 {/* Popular Badge */}
                 {tier.popular && (
-                  <div className="bg-[#647C47] text-white text-center py-1.5 text-xs font-semibold">
+                  <div className="bg-primary-500 text-white text-center py-1.5 text-xs font-semibold">
                     Most Popular
                   </div>
                 )}
@@ -206,14 +206,14 @@ export default function BillingPlansPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        isCurrentPlan ? 'bg-[#647C47]/10' : 'bg-gray-100'
+                        isCurrentPlan ? 'bg-primary-500/10' : 'bg-gray-100'
                       }`}>
-                        <TierIcon className={`w-4 h-4 ${isCurrentPlan ? 'text-[#647C47]' : 'text-gray-600'}`} />
+                        <TierIcon className={`w-4 h-4 ${isCurrentPlan ? 'text-primary-500' : 'text-gray-600'}`} />
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-gray-900">{tier.name}</h3>
                         {isCurrentPlan && (
-                          <span className="text-[10px] font-medium text-[#647C47] bg-[#647C47]/10 px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-medium text-primary-500 bg-primary-500/10 px-1.5 py-0.5 rounded">
                             Current
                           </span>
                         )}
@@ -234,12 +234,12 @@ export default function BillingPlansPage() {
                           <span className="text-xs text-gray-500">/mo</span>
                         </div>
                         {billingCycle === 'yearly' && tier.annualPrice !== null && (
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             Billed {formatPrice(tier.annualPrice)}/year
                           </p>
                         )}
                         {tier.onboardingFeeUsd !== null && (
-                          <p className="text-[11px] text-gray-500 mt-1.5">
+                          <p className="text-xs text-gray-500 mt-1.5">
                             + {formatPrice(tier.onboardingFeeUsd)} one-time onboarding
                           </p>
                         )}
@@ -253,26 +253,26 @@ export default function BillingPlansPage() {
 
                   {/* Limits */}
                   <div className="mb-3">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Includes</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Includes</p>
                     <ul className="space-y-1.5">
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
-                        <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
+                        <Check className="w-3 h-3 text-primary-500 flex-shrink-0" />
                         <span className="font-medium">{formatLimit(tier.limits.users)}</span> users
                       </li>
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
-                        <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
+                        <Check className="w-3 h-3 text-primary-500 flex-shrink-0" />
                         <span className="font-medium">{formatLimit(tier.limits.itinerariesPerYear)}</span> itineraries/yr
                       </li>
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
-                        <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
+                        <Check className="w-3 h-3 text-primary-500 flex-shrink-0" />
                         <span className="font-medium">{formatLimit(tier.limits.aiGenerationsPerMonth)}</span> AI generations/mo
                       </li>
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
-                        <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
+                        <Check className="w-3 h-3 text-primary-500 flex-shrink-0" />
                         <span className="font-medium">{formatLimit(tier.limits.b2bPartners)}</span> B2B partners
                       </li>
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
-                        <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
+                        <Check className="w-3 h-3 text-primary-500 flex-shrink-0" />
                         <span className="font-medium">{formatLimit(tier.limits.brands)}</span> brand{tier.limits.brands === 1 ? '' : 's'}
                       </li>
                     </ul>
@@ -288,7 +288,7 @@ export default function BillingPlansPage() {
                       isCurrentPlan
                         ? 'bg-gray-100 text-gray-500'
                         : isUpgrade
-                          ? 'bg-[#647C47] text-white hover:bg-[#4f613a]'
+                          ? 'bg-primary-500 text-white hover:bg-[#4f613a]'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
@@ -320,8 +320,8 @@ export default function BillingPlansPage() {
         </div>
 
         {/* Trial Notice */}
-        <div className="mt-6 bg-[#647C47]/5 border border-[#647C47]/20 rounded-lg p-3 flex items-center justify-center gap-2">
-          <Check className="w-4 h-4 text-[#647C47]" />
+        <div className="mt-6 bg-primary-500/5 border border-primary-500/20 rounded-lg p-3 flex items-center justify-center gap-2">
+          <Check className="w-4 h-4 text-primary-500" />
           <p className="text-xs font-medium text-gray-700">
             All plans include a {TRIAL_DAYS}-day free trial. No credit card required.
           </p>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { FileText, Hotel, Car, Ship, Users, Building, ArrowRight, FileCheck } from 'lucide-react'
+import { FileText, Hotel, Car, Ship, Users, Building, ArrowRight, FileCheck, Lightbulb } from 'lucide-react'
 
 const DOCUMENT_SECTIONS = [
   {
@@ -13,7 +13,7 @@ const DOCUMENT_SECTIONS = [
             description: 'Travel agreements and booking confirmations',
             href: '/itineraries', 
         icon: FileCheck,
-        color: 'bg-purple-100 text-purple-700'
+        color: 'bg-primary-100 text-primary-700'
       }
     ]
   },
@@ -27,7 +27,7 @@ const DOCUMENT_SECTIONS = [
         description: 'View and manage all vouchers and service orders',
         href: '/documents/supplier',
         icon: Building,
-        color: 'bg-indigo-100 text-indigo-700'
+        color: 'bg-primary-100 text-primary-700'
       },
       {
         name: 'Hotel Vouchers',
@@ -48,7 +48,7 @@ const DOCUMENT_SECTIONS = [
         description: 'Nile cruise booking confirmations',
         href: '/documents/supplier?type=cruise_voucher',
         icon: Ship,
-        color: 'bg-cyan-100 text-cyan-700'
+        color: 'bg-primary-100 text-primary-700'
       },
       // No Activity Vouchers card: this app puts entrance fees and activities
       // on service orders (lib/documents/group-services), so Generate never
@@ -58,14 +58,14 @@ const DOCUMENT_SECTIONS = [
         description: 'Guide briefings and assignments',
         href: '/documents/supplier?type=guide_assignment',
         icon: Users,
-        color: 'bg-pink-100 text-pink-700'
+        color: 'bg-primary-100 text-primary-700'
       },
       {
         name: 'Service Orders',
         description: 'General service instructions',
         href: '/documents/supplier?type=service_order',
         icon: FileText,
-        color: 'bg-purple-100 text-purple-700'
+        color: 'bg-primary-100 text-primary-700'
       }
     ]
   }
@@ -77,7 +77,7 @@ export default function DocumentsPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
-          <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Documents</h1>
           <p className="text-sm text-gray-500">Manage customer contracts and supplier vouchers</p>
         </div>
       </header>
@@ -130,7 +130,7 @@ export default function DocumentsPage() {
 
         {/* Quick Tips */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2">💡 Quick Tips</h3>
+          <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-1.5"><Lightbulb className="w-4 h-4" /> Quick Tips</h3>
           <ul className="text-sm text-blue-700 space-y-1">
             <li>• Generate supplier documents from any itinerary using the "Supplier docs" button</li>
             <li>• Documents are auto-grouped by supplier from your itinerary services</li>

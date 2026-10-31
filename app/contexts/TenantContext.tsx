@@ -32,6 +32,15 @@ interface Tenant {
    * genuinely differ, and one already bills in USD.
    */
   default_currency: string | null
+  /** Pricing defaults and currencies, company-wide (migration 456). */
+  default_cost_mode?: string
+  default_tier?: string | null
+  /** The currency new quotes are SHOWN in; null = default_currency. */
+  default_quote_currency?: string | null
+  /** Added to prices shown in another currency (display only). 0 = off. */
+  conversion_buffer_percent?: number | null
+  /** Currencies quote pickers offer; null = all supported. */
+  currencies_in_use?: string[] | null
   /** C3.4: the currency all stored rates are read in; null = EUR. */
   rates_currency?: string | null
   company_phone: string | null

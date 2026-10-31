@@ -21,7 +21,7 @@ import { createLeadsFromNewConversations, MAX_JUDGED_PER_SYNC } from '@/lib/emai
 
 const OFFICE = officeRule(['info@agency.com'], [])
 
-function db(opts: { clients?: string[]; dismissed?: string[]; insertFails?: boolean } = {}) {
+function db(opts: { clients?: string[]; dismissed?: string[]; insertFails?: boolean; failRead?: 'clients' | 'email_lead_dismissals' | 'lookup' } = {}) {
   const inserted: Array<Record<string, unknown>> = []
   const linked: Array<{ id: string; client_id: string }> = []
   return {
@@ -34,14 +34,14 @@ function db(opts: { clients?: string[]; dismissed?: string[]; insertFails?: bool
         eq: () => chain,
         // Exact, like PostgREST's in.(…): a client stored in another case is
         // not returned.
-        in: async (_col: string, vals: string[]) => ({
+        in: async (_col: string, vals: string[]) => opts.failRead === table ? { data: null, error: { message: 'timeout' } } : ({
           data:
             table === 'clients'
               ? (opts.clients ?? []).filter(e => vals.includes(e)).map(email => ({ email }))
               : (opts.dismissed ?? []).filter(e => vals.includes(e)).map(sender_email => ({ sender_email })),
         }),
         ilike: (_col: string, p: string) => { pattern = p.replace(/\\(.)/g, '$1').toLowerCase(); return chain },
-        limit: async () => ({
+        limit: async () => opts.failRead === 'lookup' ? { data: null, error: { message: 'timeout' } } : ({
           data: (opts.clients ?? []).filter(e => e.toLowerCase() === pattern).map(email => ({ email })),
         }),
         insert: (row: Record<string, unknown>) => {
@@ -171,5 +171,28 @@ describe('a first sync of a full mailbox', () => {
     const created = await createLeadsFromNewConversations({ db: d, tenantId: 't1', office: OFFICE, conversations })
     expect(judged).toHaveLength(MAX_JUDGED_PER_SYNC)
     expect(created).toBe(MAX_JUDGED_PER_SYNC)
+  })
+})
+
+describe('a dedupe read that fails', () => {
+  for (const table of ['clients', 'email_lead_dismissals'] as const) {
+    it(`creates nothing that sync when the ${table} read errors — never treated as "nobody known"`, async () => {
+      const d = db({ failRead: table })
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+      expect(await createLeadsFromNewConversations({ db: d, tenantId: 't1', office: OFFICE, conversations: [conv()] })).toBe(0)
+      expect(judged).toEqual([])
+      expect(d.inserted).toEqual([])
+      expect(err).toHaveBeenCalled()
+      err.mockRestore()
+    })
+  }
+
+  it('skips the sender when the case-insensitive lookup errors', async () => {
+    const d = db({ failRead: 'lookup' })
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await createLeadsFromNewConversations({ db: d, tenantId: 't1', office: OFFICE, conversations: [conv()] })).toBe(0)
+    expect(judged).toEqual([])
+    expect(d.inserted).toEqual([])
+    err.mockRestore()
   })
 })

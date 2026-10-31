@@ -8,7 +8,7 @@ export default function NotFound() {
     <div className="min-h-screen bg-[#F7F7F4] flex items-center justify-center px-4 py-16">
       <div className="max-w-md w-full text-center">
         <BrandMark />
-        <p className="mt-6 text-sm font-semibold text-[#647C47] tracking-wide">404</p>
+        <p className="mt-6 text-sm font-semibold text-primary-500 tracking-wide">404</p>
         <h1 className="mt-1 text-2xl font-bold text-gray-900">We can&apos;t find that page</h1>
         <p className="mt-2 text-gray-600">
           The link may be old, or the page may have moved. Nothing has been lost.

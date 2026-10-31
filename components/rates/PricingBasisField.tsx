@@ -10,7 +10,7 @@ export default function PricingBasisField({
   basis,
   capacity,
   onChange,
-  focusRing = 'focus:ring-sky-600',
+  focusRing = 'focus:ring-primary-600',
 }: {
   basis: PricingBasis
   capacity: number | ''

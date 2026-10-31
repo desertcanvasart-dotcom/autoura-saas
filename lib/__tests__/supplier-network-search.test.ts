@@ -38,9 +38,10 @@ describe('the agency side of the network', () => {
     expect(r).not.toMatch(/from\('[a-z_]*_rates'\)/)
   })
 
-  it('the setting sits on Settings → Company, and the menu links the search', () => {
-    expect(read('app/settings/company/page.tsx')).toContain('<SupplierSourcingSetting canEdit={isAdmin} />')
-    expect(read('lib/nav/config.ts')).toContain("href: '/network-suppliers'")
+  it('the setting sits on Settings › Supplier network, and the menu links the search', () => {
+    expect(read('app/settings/supplier-network/page.tsx')).toContain('<SupplierSourcingSetting canEdit={isAdmin} />')
+    expect(read('app/settings/company/page.tsx')).toContain('href="/settings/supplier-network"')
+    expect(read('lib/nav/config.ts')).toContain("href: '/suppliers?tab=network'")
   })
 })
 

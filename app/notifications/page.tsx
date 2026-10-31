@@ -10,7 +10,16 @@ import {
   ExternalLink,
   ArrowLeft,
   MessageSquare,
-  Loader2
+  Loader2,
+  ClipboardList,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Smartphone,
+  Wallet,
+  PartyPopper,
+  User,
+  Mail
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -114,32 +123,32 @@ export default function NotificationsPage() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'task_assigned': return '📋'
-      case 'task_due_soon': return '⏰'
-      case 'task_overdue': return '🚨'
-      case 'task_completed': return '✅'
-      case 'whatsapp_assigned': return '💬'
-      case 'whatsapp_new_message': return '📱'
-      case 'whatsapp_mention': return '🔔'
-      case 'invoice_paid': return '💰'
-      case 'booking_confirmed': return '🎉'
-      case 'client_created': return '👤'
-      default: return '🔔'
+      case 'task_assigned': return <ClipboardList className="w-5 h-5 text-primary-600" />
+      case 'task_due_soon': return <Clock className="w-5 h-5 text-amber-600" />
+      case 'task_overdue': return <AlertTriangle className="w-5 h-5 text-red-600" />
+      case 'task_completed': return <CheckCircle2 className="w-5 h-5 text-green-600" />
+      case 'whatsapp_assigned': return <MessageSquare className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_new_message': return <Smartphone className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_mention': return <Bell className="w-5 h-5 text-primary-600" />
+      case 'invoice_paid': return <Wallet className="w-5 h-5 text-green-600" />
+      case 'booking_confirmed': return <PartyPopper className="w-5 h-5 text-green-600" />
+      case 'client_created': return <User className="w-5 h-5 text-primary-600" />
+      default: return <Bell className="w-5 h-5 text-primary-600" />
     }
   }
 
   const getNotificationColor = (type: string) => {
     switch (type) {
-      case 'task_assigned': return 'bg-[#647C47]/10 border-l-[#647C47]'
+      case 'task_assigned': return 'bg-primary-500/10 border-l-primary-500'
       case 'task_due_soon': return 'bg-amber-50 border-l-amber-500'
       case 'task_overdue': return 'bg-red-50 border-l-red-500'
       case 'task_completed': return 'bg-green-50 border-l-green-500'
-      case 'whatsapp_assigned': return 'bg-emerald-50 border-l-[#25D366]'
-      case 'whatsapp_new_message': return 'bg-emerald-50 border-l-[#25D366]'
-      case 'whatsapp_mention': return 'bg-emerald-50 border-l-[#25D366]'
+      case 'whatsapp_assigned': return 'bg-primary-50 border-l-[#25D366]'
+      case 'whatsapp_new_message': return 'bg-primary-50 border-l-[#25D366]'
+      case 'whatsapp_mention': return 'bg-primary-50 border-l-[#25D366]'
       case 'invoice_paid': return 'bg-blue-50 border-l-blue-500'
-      case 'booking_confirmed': return 'bg-purple-50 border-l-purple-500'
-      case 'client_created': return 'bg-cyan-50 border-l-cyan-500'
+      case 'booking_confirmed': return 'bg-primary-50 border-l-primary-500'
+      case 'client_created': return 'bg-primary-50 border-l-primary-500'
       default: return 'bg-gray-50 border-l-gray-400'
     }
   }
@@ -194,7 +203,7 @@ export default function NotificationsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 text-[#647C47] animate-spin" />
+        <Loader2 className="h-8 w-8 text-primary-500 animate-spin" />
       </div>
     )
   }
@@ -214,7 +223,7 @@ export default function NotificationsPage() {
             <Bell className="h-5 w-5 text-gray-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Notifications</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Notifications</h1>
             <p className="text-sm text-gray-500">
               {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
             </p>
@@ -224,7 +233,7 @@ export default function NotificationsPage() {
         {unreadCount > 0 && (
           <button
             onClick={markAllAsRead}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#647C47] border border-[#647C47] rounded-lg hover:bg-[#647C47]/10 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-500 border border-primary-500 rounded-lg hover:bg-primary-500/10 transition-colors"
           >
             <CheckCheck className="h-4 w-4" />
             Mark All Read
@@ -240,7 +249,7 @@ export default function NotificationsPage() {
             placeholder="Search notifications..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -248,7 +257,7 @@ export default function NotificationsPage() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as 'all' | 'unread')}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="all">All</option>
             <option value="unread">Unread Only</option>
@@ -257,21 +266,21 @@ export default function NotificationsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="">All Types</option>
             <optgroup label="WhatsApp">
-              <option value="whatsapp_assigned">💬 Chat Assigned</option>
-              <option value="whatsapp_new_message">📱 New Message</option>
+              <option value="whatsapp_assigned">Chat Assigned</option>
+              <option value="whatsapp_new_message">New Message</option>
             </optgroup>
             <optgroup label="Tasks">
-              <option value="task_assigned">📋 Task Assigned</option>
-              <option value="task_due_soon">⏰ Due Soon</option>
-              <option value="task_overdue">🚨 Overdue</option>
-              <option value="task_completed">✅ Completed</option>
+              <option value="task_assigned">Task Assigned</option>
+              <option value="task_due_soon">Due Soon</option>
+              <option value="task_overdue">Overdue</option>
+              <option value="task_completed">Completed</option>
             </optgroup>
             {types.filter(t => !t.startsWith('whatsapp_') && !t.startsWith('task_')).map(type => (
-              <option key={type} value={type}>{getNotificationIcon(type)} {getTypeLabel(type)}</option>
+              <option key={type} value={type}>{getTypeLabel(type)}</option>
             ))}
           </select>
         </div>
@@ -285,7 +294,7 @@ export default function NotificationsPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-3">
           <p className="text-xs text-gray-500">Unread</p>
-          <p className="text-xl font-semibold text-[#647C47]">{unreadCount}</p>
+          <p className="text-xl font-semibold text-primary-500">{unreadCount}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-3">
           <div className="flex items-center gap-1">
@@ -309,7 +318,7 @@ export default function NotificationsPage() {
             {(searchTerm || typeFilter) && (
               <button 
                 onClick={() => { setSearchTerm(''); setTypeFilter(''); }}
-                className="mt-2 text-sm text-[#647C47] hover:underline"
+                className="mt-2 text-sm text-primary-500 hover:underline"
               >
                 Clear filters
               </button>
@@ -325,7 +334,7 @@ export default function NotificationsPage() {
             >
               <div className="flex items-start gap-4">
                 {/* Icon */}
-                <span className="text-2xl flex-shrink-0">
+                <span className="flex-shrink-0 mt-0.5">
                   {getNotificationIcon(notification.type)}
                 </span>
 
@@ -336,7 +345,7 @@ export default function NotificationsPage() {
                       <p className={`text-sm ${!notification.is_read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
                         {notification.title}
                       </p>
-                      <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded mt-1 ${
+                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded mt-1 ${
                         notification.type.startsWith('whatsapp_') 
                           ? 'bg-[#25D366]/20 text-[#128C7E]' 
                           : 'bg-white/80 text-gray-600'
@@ -362,7 +371,7 @@ export default function NotificationsPage() {
                         className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors ${
                           notification.type.startsWith('whatsapp_')
                             ? 'bg-[#25D366] hover:bg-[#128C7E]'
-                            : 'bg-[#647C47] hover:bg-[#4f6238]'
+                            : 'bg-primary-500 hover:bg-primary-700'
                         }`}
                       >
                         {notification.type.startsWith('whatsapp_') ? 'Open Chat' : 'View'} 
@@ -389,8 +398,8 @@ export default function NotificationsPage() {
                     </button>
 
                     {notification.email_sent && (
-                      <span className="text-[10px] text-gray-400">
-                        ✉️ Email sent
+                      <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+                        <Mail className="w-3 h-3" />Email sent
                       </span>
                     )}
                   </div>

@@ -242,12 +242,12 @@ export default function RecordPaymentPage() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Record Payment</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Record Payment</h1>
             <p className="text-sm text-gray-600 mt-1">Add a new payment transaction</p>
           </div>
           <Link
             href="/payments"
-            className="bg-gray-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2"
+            className="bg-primary-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Payments
@@ -387,7 +387,7 @@ export default function RecordPaymentPage() {
                         </div>
                         <div>
                           <span className="text-gray-600">Balance Due:</span>
-                          <p className="font-bold text-orange-600">
+                          <p className="font-bold text-amber-600">
                             {getCurrencySymbol(selectedInvoice.currency)}{Number(selectedInvoice.balance_due).toFixed(2)}
                           </p>
                         </div>
@@ -409,7 +409,7 @@ export default function RecordPaymentPage() {
                         </div>
                         <div>
                           <span className="text-gray-600">Balance Due:</span>
-                          <p className="font-bold text-orange-600">
+                          <p className="font-bold text-amber-600">
                             {getCurrencySymbol(selectedItinerary.currency || 'EUR')}{(selectedItinerary.total_cost - (selectedItinerary.total_paid || 0)).toFixed(2)}
                           </p>
                         </div>

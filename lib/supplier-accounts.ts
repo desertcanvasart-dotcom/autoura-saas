@@ -70,18 +70,32 @@ export function canSendCode(recentSentAt: string[], now: Date): boolean {
 
 export type CodeCheck = { ok: true } | { ok: false; error: string; spend: boolean }
 
-/** Check a typed code against the latest code row. `spend` = count this try. */
-export function checkLoginCode(
-  row: { code_hash: string; expires_at: string; attempts: number; used_at: string | null } | null,
-  typed: unknown,
-  accountId: string,
-  now: Date,
-): CodeCheck {
+type CodeRow = { code_hash: string; expires_at: string; attempts: number; used_at: string | null }
+
+/**
+ * May this try be compared at all? Everything checkLoginCode checks except the
+ * code itself: the route takes the try (counts it) between the two, so
+ * parallel guesses can't all slip in under the cap.
+ */
+export function canTryCode(row: CodeRow | null, typed: unknown, now: Date): CodeCheck {
   if (!row || row.used_at) return { ok: false, error: 'Ask for a new code', spend: false }
   if (Date.parse(row.expires_at) < now.getTime()) return { ok: false, error: 'That code has expired — ask for a new one', spend: false }
   if (row.attempts >= CODE_MAX_ATTEMPTS) return { ok: false, error: 'Too many tries — ask for a new code', spend: false }
   const code = typeof typed === 'string' ? typed.replace(/\s/g, '') : ''
   if (!/^[0-9]{6}$/.test(code)) return { ok: false, error: 'Type the 6-digit code', spend: false }
+  return { ok: true }
+}
+
+/** Check a typed code against the latest code row. `spend` = count this try. */
+export function checkLoginCode(
+  row: CodeRow | null,
+  typed: unknown,
+  accountId: string,
+  now: Date,
+): CodeCheck {
+  const allowed = canTryCode(row, typed, now)
+  if (!allowed.ok || !row) return allowed.ok ? { ok: false, error: 'Ask for a new code', spend: false } : allowed
+  const code = (typed as string).replace(/\s/g, '')
   const a = Buffer.from(hashLoginCode(code, accountId), 'hex')
   const b = Buffer.from(row.code_hash, 'hex')
   if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, error: 'That code is not right', spend: true }

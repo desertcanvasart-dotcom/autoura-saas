@@ -18,22 +18,22 @@ import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'fr', name: 'French', flag: '🇫🇷' },
-  { code: 'de', name: 'German', flag: '🇩🇪' },
-  { code: 'it', name: 'Italian', flag: '🇮🇹' },
-  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
-  { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
-  { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
-  { code: 'nl', name: 'Dutch', flag: '🇳🇱' },
-  { code: 'pl', name: 'Polish', flag: '🇵🇱' },
-  { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
-  { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
-  { code: 'th', name: 'Thai', flag: '🇹🇭' },
-  { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+  { code: 'en', name: 'English' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'pl', name: 'Polish' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'th', name: 'Thai' },
+  { code: 'ko', name: 'Korean' },
 ]
 
 // Alias for backward compatibility
@@ -122,7 +122,7 @@ function AgentAvatar({ agent, size = 'sm' }: { agent: SalesAgent | null; size?: 
   }
 
   const initials = agent.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500']
+  const colors = ['bg-primary-600', 'bg-blue-500', 'bg-amber-500', 'bg-green-600', 'bg-gray-500', 'bg-primary-400']
   const colorIndex = agent.name.charCodeAt(0) % colors.length
 
   return (
@@ -244,7 +244,7 @@ function ActivityPanel({
     switch (type) {
       case 'claimed': return <UserPlus className="w-3.5 h-3.5 text-green-500" />
       case 'assigned': return <UserCheck className="w-3.5 h-3.5 text-blue-500" />
-      case 'auto_assigned': return <Users className="w-3.5 h-3.5 text-purple-500" />
+      case 'auto_assigned': return <Users className="w-3.5 h-3.5 text-primary-500" />
       case 'transferred': return <ArrowRight className="w-3.5 h-3.5 text-amber-500" />
       case 'unassigned': return <UserX className="w-3.5 h-3.5 text-gray-400" />
       case 'replied': return <MessageSquare className="w-3.5 h-3.5 text-green-500" />
@@ -563,7 +563,7 @@ export default function WhatsAppInboxPage() {
   const [translatingMessageIds, setTranslatingMessageIds] = useState<Set<string>>(new Set())
   const [showOriginalMap, setShowOriginalMap] = useState<Record<string, boolean>>({})
 
-  const getLanguageInfo = (code: string) => QUICK_LANGUAGES.find(l => l.code === code) || { code, name: code, flag: '🌐' }
+  const getLanguageInfo = (code: string) => QUICK_LANGUAGES.find(l => l.code === code) || { code, name: code }
 
   // Fetch agents
   const fetchAgents = useCallback(async () => {
@@ -926,7 +926,7 @@ export default function WhatsAppInboxPage() {
       <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-gray-900">WhatsApp Inbox</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">WhatsApp Inbox</h1>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowAgentsModal(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Manage Agents">
                 <Users className="w-4 h-4" />
@@ -1089,8 +1089,8 @@ export default function WhatsAppInboxPage() {
                           {isInbound && translationEnabled && (
                             <div className="flex items-center gap-2 mb-1 pb-1 border-b border-gray-200">
                               {isTranslatingThis ? <span className="flex items-center gap-1 text-xs text-blue-500"><Loader2 className="w-3 h-3 animate-spin" />Translating...</span>
-                                : hasTranslation ? <button type="button" onClick={() => setShowOriginalMap(p => ({ ...p, [msg.id]: !p[msg.id] }))} className="text-xs text-blue-600 hover:text-blue-700">{showOriginal ? `${getLanguageInfo(agentLanguage).flag} Show ${getLanguageInfo(agentLanguage).name}` : '🌐 Show Original'}</button>
-                                : <button onClick={() => handleTranslateMessage(msg.id, msg.message_body)} className="text-xs text-blue-600 hover:text-blue-700">🌐 Translate</button>}
+                                : hasTranslation ? <button type="button" onClick={() => setShowOriginalMap(p => ({ ...p, [msg.id]: !p[msg.id] }))} className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><Languages className="w-3 h-3" />{showOriginal ? `Show ${getLanguageInfo(agentLanguage).name}` : 'Show Original'}</button>
+                                : <button onClick={() => handleTranslateMessage(msg.id, msg.message_body)} className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><Languages className="w-3 h-3" />Translate</button>}
                             </div>
                           )}
                           <p className="text-sm text-gray-900 whitespace-pre-wrap">{isInbound && hasTranslation && !showOriginal ? incomingTranslations[msg.id] : msg.message_body}</p>
@@ -1119,15 +1119,15 @@ export default function WhatsAppInboxPage() {
                     <>
                       {/* Outgoing: Send to customer in this language */}
                       <div className="relative">
-                        <div className="text-[10px] text-gray-400 mb-0.5">Send in:</div>
+                        <div className="text-xs text-gray-400 mb-0.5">Send in:</div>
                         <button onClick={() => { setShowLanguageSelector(!showLanguageSelector); setShowAgentLanguageSelector(false) }} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-                          <span>{getLanguageInfo(customerLanguage).flag}</span><span>{getLanguageInfo(customerLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
+                          <span>{getLanguageInfo(customerLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
                         </button>
                         {showLanguageSelector && (
                           <div className="absolute bottom-full left-0 mb-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
                             {SUPPORTED_LANGUAGES.map(lang => (
                               <button key={lang.code} onClick={() => { setCustomerLanguage(lang.code); setShowLanguageSelector(false); setTranslatedMessage('') }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${customerLanguage === lang.code ? 'bg-blue-50 text-blue-700' : ''}`}>
-                                <span>{lang.flag}</span><span>{lang.name}</span>{customerLanguage === lang.code && <Check className="w-4 h-4 ml-auto" />}
+                                <span>{lang.name}</span>{customerLanguage === lang.code && <Check className="w-4 h-4 ml-auto" />}
                               </button>
                             ))}
                           </div>
@@ -1135,15 +1135,15 @@ export default function WhatsAppInboxPage() {
                       </div>
                       {/* Incoming: Read messages in this language */}
                       <div className="relative">
-                        <div className="text-[10px] text-gray-400 mb-0.5">Read in:</div>
+                        <div className="text-xs text-gray-400 mb-0.5">Read in:</div>
                         <button onClick={() => { setShowAgentLanguageSelector(!showAgentLanguageSelector); setShowLanguageSelector(false) }} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-green-300 rounded-lg text-sm hover:bg-gray-50">
-                          <span>{getLanguageInfo(agentLanguage).flag}</span><span>{getLanguageInfo(agentLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
+                          <span>{getLanguageInfo(agentLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
                         </button>
                         {showAgentLanguageSelector && (
                           <div className="absolute bottom-full left-0 mb-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
                             {SUPPORTED_LANGUAGES.map(lang => (
                               <button key={lang.code} onClick={() => { setAgentLanguage(lang.code); setShowAgentLanguageSelector(false); setIncomingTranslations({}) }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${agentLanguage === lang.code ? 'bg-green-50 text-green-700' : ''}`}>
-                                <span>{lang.flag}</span><span>{lang.name}</span>{agentLanguage === lang.code && <Check className="w-4 h-4 ml-auto" />}
+                                <span>{lang.name}</span>{agentLanguage === lang.code && <Check className="w-4 h-4 ml-auto" />}
                               </button>
                             ))}
                           </div>
@@ -1162,7 +1162,7 @@ export default function WhatsAppInboxPage() {
               </div>
               {translationEnabled && translatedMessage && !isTranslating && (
                 <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs text-blue-600 font-medium mb-1">{getLanguageInfo(customerLanguage).flag} Will send:</p>
+                  <p className="text-xs text-blue-600 font-medium mb-1">Will send:</p>
                   <p className="text-sm text-gray-700">{translatedMessage}</p>
                 </div>
               )}

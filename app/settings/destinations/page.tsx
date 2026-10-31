@@ -175,7 +175,7 @@ export default function DestinationSettingsPage() {
                         d.selected ? `${d.name} removed` : `${d.name} selected`
                       )
                     }
-                    className="h-4 w-4 rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"
+                    className="h-4 w-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                   />
                   <button
                     className="flex items-center gap-2 min-w-0 text-left flex-1"
@@ -187,14 +187,14 @@ export default function DestinationSettingsPage() {
                     <span className="text-xs text-gray-400">· {d.cities.length} {d.cities.length === 1 ? 'city' : 'cities'}</span>
                   </button>
                   {d.is_default ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-[#647C47]/10 text-[#4a5c35] border border-[#647C47]/30">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-primary-500/10 text-[#4a5c35] border border-primary-500/30">
                       <Star className="w-3 h-3 fill-current" /> Default
                     </span>
                   ) : d.selected && isAdmin ? (
                     <button
                       onClick={() => act(`def-${d.id}`, { action: 'set_default', catalog_id: d.id }, `${d.name} is now the default`)}
                       disabled={busy !== null}
-                      className="text-xs text-gray-500 hover:text-[#647C47] border border-gray-200 rounded px-2 py-0.5"
+                      className="text-xs text-gray-500 hover:text-primary-500 border border-gray-200 rounded px-2 py-0.5"
                     >
                       Make default
                     </button>
@@ -212,13 +212,13 @@ export default function DestinationSettingsPage() {
                         </p>
                         {isAdmin && d.selected && d.all_cities.length > 0 && (
                           <span className="text-xs text-gray-400">
-                            <button onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: null }, 'Every city')} disabled={busy !== null} className="hover:text-[#647C47]">All</button>
+                            <button onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: null }, 'Every city')} disabled={busy !== null} className="hover:text-primary-500">All</button>
                             {' · '}
                             <button onClick={() => {
                               // It replaces the whole selection with the first city: ask when that drops a choice.
                               if (d.cities.length > 1 && d.cities.length < d.all_cities.length && !window.confirm(`Keep only ${d.all_cities[0].name}? Your other ${d.cities.length - 1} chosen cities will be unticked.`)) return
                               act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: [d.all_cities[0].id] }, 'Pick the cities you sell')
-                            }} disabled={busy !== null} className="hover:text-[#647C47]">Just one</button>
+                            }} disabled={busy !== null} className="hover:text-primary-500">Just one</button>
                           </span>
                         )}
                       </div>
@@ -240,7 +240,7 @@ export default function DestinationSettingsPage() {
                                 disabled={busy !== null || (on && d.cities.length === 1)}
                                 title={on && d.cities.length === 1 ? 'Keep at least one city' : on ? 'Stop offering' : 'Offer this city'}
                                 onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: next })}
-                                className={`px-2 py-0.5 rounded-full text-xs border transition-colors disabled:opacity-60 ${on ? 'bg-[#647C47] text-white border-[#647C47]' : 'bg-white text-gray-500 border-gray-300 hover:border-[#647C47] hover:text-[#647C47]'}`}
+                                className={`px-2 py-0.5 rounded-full text-xs border transition-colors disabled:opacity-60 ${on ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-500 border-gray-300 hover:border-primary-500 hover:text-primary-500'}`}
                               >
                                 {c.name}
                               </button>
@@ -263,7 +263,7 @@ export default function DestinationSettingsPage() {
                           <button
                             onClick={() => addCity(d)}
                             disabled={busy !== null || !(cityForms[d.id] ?? '').trim()}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-sm text-white bg-[#647C47] rounded-md hover:bg-[#4f6238] disabled:opacity-50"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-sm text-white bg-primary-500 rounded-md hover:bg-primary-700 disabled:opacity-50"
                           >
                             {busy === `city-${d.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                             Add city
@@ -292,7 +292,7 @@ export default function DestinationSettingsPage() {
                           <button
                             onClick={() => saveBrief(d)}
                             disabled={busy !== null}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50"
                           >
                             {busy === `voice-${d.id}` && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                             Save brief
@@ -335,7 +335,7 @@ export default function DestinationSettingsPage() {
               <button
                 onClick={addCountry}
                 disabled={busy !== null || !countryForm.country_code.trim() || !countryForm.name.trim()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 {busy === 'add-country' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                 Add country
@@ -350,7 +350,7 @@ export default function DestinationSettingsPage() {
           ) : (
             <button
               onClick={() => setShowAddCountry(true)}
-              className="inline-flex items-center gap-1.5 text-sm text-[#647C47] hover:text-[#4f6238]"
+              className="inline-flex items-center gap-1.5 text-sm text-primary-500 hover:text-primary-700"
             >
               <Plus className="w-4 h-4" /> Add a country that isn&apos;t listed
             </button>

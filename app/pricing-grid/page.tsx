@@ -169,7 +169,8 @@ function PricingGridContent() {
     isInitialLoad.current = false
   }, [])
 
-  // Load user preferences as defaults (tier, margin, currency) on first load
+  // The company's pricing defaults (Settings › Pricing defaults and
+  // Currencies, migration 456) start a fresh grid: tier, markup, currency.
   const hasLoadedPrefs = useRef(false)
   useEffect(() => {
     if (hasLoadedPrefs.current) return
@@ -182,7 +183,7 @@ function PricingGridContent() {
 
     const loadPrefs = async () => {
       try {
-        const res = await fetch('/api/user-preferences')
+        const res = await fetch('/api/settings/pricing')
         const data = await res.json()
         if (data.success && data.data) {
           const prefs = data.data
@@ -190,11 +191,11 @@ function PricingGridContent() {
             ...prev,
             tier: prefs.default_tier || prev.tier,
             marginPercent: prefs.default_margin_percent ?? prev.marginPercent,
-            currency: prefs.default_currency || prev.currency,
+            currency: prefs.default_quote_currency || prev.currency,
           }))
         }
       } catch (err) {
-        console.error('Failed to load user preferences:', err)
+        console.error('Failed to load the pricing defaults:', err)
       }
     }
     loadPrefs()
@@ -303,14 +304,15 @@ function PricingGridContent() {
       .catch(() => setFxRates([]))
   }, [])
   useEffect(() => {
-    const shown = displayRate(runCurrency, config.currency, fxRates)
+    const buffer = Number((tenant as { conversion_buffer_percent?: number | null } | null)?.conversion_buffer_percent ?? 0)
+    const shown = displayRate(runCurrency, config.currency, fxRates, buffer)
     if (shown.ok) {
       if (config.exchangeRate !== shown.rate) setConfig(prev => ({ ...prev, exchangeRate: shown.rate }))
     } else if (shown.reason !== 'loading') {
       showToast('error', shown.reason)
       setConfig(prev => ({ ...prev, currency: runCurrency, exchangeRate: null }))
     }
-  }, [config.currency, config.exchangeRate, runCurrency, fxRates])
+  }, [config.currency, config.exchangeRate, runCurrency, fxRates, tenant])
 
   // --- URL Params: Auto-load conversation from inbox redirect ---
   const searchParams = useSearchParams()
@@ -820,7 +822,7 @@ function PricingGridContent() {
         }
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
-          setSaveMessage('✨ AI-suggested itinerary based on inquiry — review and adjust as needed')
+          setSaveMessage('AI-suggested itinerary based on inquiry — review and adjust as needed')
         }
         // Apply AI-extracted metadata to config (URL params take precedence)
         const meta = data.metadata
@@ -1213,16 +1215,16 @@ function PricingGridContent() {
                 onClick={() => writeDescriptions('fill')}
                 disabled={writing !== null}
                 title="Write the days that have no description, from your Content Library and Writing Rules"
-                className="px-2.5 py-1 text-[11px] font-medium text-[#556B2F] hover:bg-[#556B2F]/10 rounded-md transition-colors disabled:opacity-50"
+                className="px-2.5 py-1 text-xs font-medium text-[#556B2F] hover:bg-[#556B2F]/10 rounded-md transition-colors disabled:opacity-50"
               >
                 {writing === 'all' ? 'Writing…' : 'Write descriptions'}
               </button>
               <span className="text-gray-300">|</span>
-              <button onClick={expandAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+              <button onClick={expandAll} className="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
                 Expand All
               </button>
               <span className="text-gray-300">|</span>
-              <button onClick={collapseAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+              <button onClick={collapseAll} className="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
                 Collapse All
               </button>
             </div>
@@ -1305,7 +1307,7 @@ function PricingGridContent() {
                     key={day.id}
                     type="button"
                     onClick={() => jumpToDay(day.id)}
-                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition-colors ${
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${
                       day.isExpanded
                         ? 'bg-[#556B2F] text-white border-[#556B2F]'
                         : 'bg-white text-gray-700 border-gray-200 hover:border-[#556B2F]'

@@ -91,17 +91,17 @@ interface Itinerary {
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
     hotel: { label: 'Hotel', icon: Building, color: 'text-blue-600 bg-blue-50' },
-    shopping: { label: 'Shopping', icon: Store, color: 'text-pink-600 bg-pink-50' },
-    restaurant: { label: 'Restaurant', icon: UtensilsCrossed, color: 'text-orange-600 bg-orange-50' },
-    transport: { label: 'Transport', icon: Car, color: 'text-purple-600 bg-purple-50' },
-    cruise: { label: 'Cruise', icon: Ship, color: 'text-cyan-600 bg-cyan-50' },
+    shopping: { label: 'Shopping', icon: Store, color: 'text-primary-600 bg-primary-50' },
+    restaurant: { label: 'Restaurant', icon: UtensilsCrossed, color: 'text-amber-600 bg-amber-50' },
+    transport: { label: 'Transport', icon: Car, color: 'text-primary-600 bg-primary-50' },
+    cruise: { label: 'Cruise', icon: Ship, color: 'text-primary-600 bg-primary-50' },
     attraction: { label: 'Attraction', icon: Receipt, color: 'text-amber-600 bg-amber-50' },
-    optional_tour: { label: 'Optional Tour', icon: MapPin, color: 'text-teal-600 bg-teal-50' },
-    activity: { label: 'Activity', icon: Sparkles, color: 'text-rose-600 bg-rose-50' },
-    show: { label: 'Show/Event', icon: Ticket, color: 'text-violet-600 bg-violet-50' },
+    optional_tour: { label: 'Optional Tour', icon: MapPin, color: 'text-primary-600 bg-primary-50' },
+    activity: { label: 'Activity', icon: Sparkles, color: 'text-primary-600 bg-primary-50' },
+    show: { label: 'Show/Event', icon: Ticket, color: 'text-primary-600 bg-primary-50' },
     spa: { label: 'Spa/Wellness', icon: Heart, color: 'text-red-600 bg-red-50' },
-    agent_referral: { label: 'Agent Referral', icon: Users, color: 'text-indigo-600 bg-indigo-50' },
-    partner: { label: 'Partner', icon: Handshake, color: 'text-emerald-600 bg-emerald-50' },
+    agent_referral: { label: 'Agent Referral', icon: Users, color: 'text-primary-600 bg-primary-50' },
+    partner: { label: 'Partner', icon: Handshake, color: 'text-primary-600 bg-primary-50' },
     other: { label: 'Other', icon: MoreHorizontal, color: 'text-gray-600 bg-gray-50' }
   }
 
@@ -344,7 +344,7 @@ export default function CommissionsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -354,17 +354,17 @@ export default function CommissionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 rounded-lg">
-            <Handshake className="h-5 w-5 text-emerald-600" />
+          <div className="p-2 bg-primary-50 rounded-lg">
+            <Handshake className="h-5 w-5 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Commission Tracking</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Commission Tracking</h1>
             <p className="text-sm text-gray-500">Track commissions from hotels, shops, and partners</p>
           </div>
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
         >
           <Plus className="h-4 w-4" />
           Add Commission
@@ -397,17 +397,17 @@ export default function CommissionsPage() {
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-orange-500" />
+              <Clock className="h-4 w-4 text-amber-500" />
               <span className="text-xs text-gray-500">Pending Out</span>
             </div>
-            <p className="text-xl font-bold text-orange-600">{formatTotals(summary.pending_payable)}</p>
+            <p className="text-xl font-bold text-amber-600">{formatTotals(summary.pending_payable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <Check className="h-4 w-4 text-emerald-500" />
+              <Check className="h-4 w-4 text-primary-500" />
               <span className="text-xs text-gray-500">Received</span>
             </div>
-            <p className="text-xl font-bold text-emerald-600">{formatTotals(summary.received)}</p>
+            <p className="text-xl font-bold text-primary-600">{formatTotals(summary.received)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
@@ -418,7 +418,7 @@ export default function CommissionsPage() {
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="h-4 w-4 text-purple-500" />
+              <DollarSign className="h-4 w-4 text-primary-500" />
               <span className="text-xs text-gray-500">Net</span>
             </div>
             <p className={`text-xl font-bold ${Object.values(summary.net_commission).every(v => v >= 0) ? 'text-green-600' : 'text-red-600'}`}>
@@ -436,7 +436,7 @@ export default function CommissionsPage() {
             placeholder="Search commissions..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -444,7 +444,7 @@ export default function CommissionsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white cursor-pointer"
           >
             <option value="">All Types</option>
             <option value="receivable">Receivable</option>
@@ -457,7 +457,7 @@ export default function CommissionsPage() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white cursor-pointer"
           >
             <option value="">All Categories</option>
             {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
@@ -471,7 +471,7 @@ export default function CommissionsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white cursor-pointer"
           >
             <option value="">All Status</option>
             <option value="pending">Pending</option>
@@ -510,7 +510,7 @@ export default function CommissionsPage() {
                     <p className="text-sm text-gray-500">No commissions found</p>
                     <button
                       onClick={openAddModal}
-                      className="mt-3 text-sm text-[#647C47] hover:underline font-medium"
+                      className="mt-3 text-sm text-primary-500 hover:underline font-medium"
                     >
                       Add your first commission
                     </button>
@@ -698,12 +698,12 @@ export default function CommissionsPage() {
                         onClick={() => setFormData(prev => ({ ...prev, category: key }))}
                         className={`p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
                           formData.category === key
-                            ? 'border-[#647C47] bg-[#647C47]/5'
+                            ? 'border-primary-500 bg-primary-500/5'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <Icon className={`h-4 w-4 ${formData.category === key ? 'text-[#647C47]' : 'text-gray-400'}`} />
-                        <span className={`text-sm ${formData.category === key ? 'text-[#647C47] font-medium' : 'text-gray-600'}`}>
+                        <Icon className={`h-4 w-4 ${formData.category === key ? 'text-primary-500' : 'text-gray-400'}`} />
+                        <span className={`text-sm ${formData.category === key ? 'text-primary-500 font-medium' : 'text-gray-600'}`}>
                           {config.label}
                         </span>
                       </button>
@@ -719,7 +719,7 @@ export default function CommissionsPage() {
                   <select
                     value={formData.supplier_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, supplier_id: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     <option value="">Select Supplier</option>
                     {suppliers.map(s => (
@@ -734,7 +734,7 @@ export default function CommissionsPage() {
                     value={formData.source_name}
                     onChange={(e) => setFormData(prev => ({ ...prev, source_name: e.target.value }))}
                     placeholder="e.g., Khan El Khalili Shop"
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -745,7 +745,7 @@ export default function CommissionsPage() {
                 <select
                   value={formData.itinerary_id}
                   onChange={(e) => setFormData(prev => ({ ...prev, itinerary_id: e.target.value }))}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">No Itinerary Link</option>
                   {itineraries.map(it => (
@@ -765,7 +765,7 @@ export default function CommissionsPage() {
                     placeholder="0.00"
                     step="0.01"
                     min="0"
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Sale/booking amount</p>
                 </div>
@@ -779,7 +779,7 @@ export default function CommissionsPage() {
                     step="0.5"
                     min="0"
                     max="100"
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -787,7 +787,7 @@ export default function CommissionsPage() {
                   <select
                     value={formData.currency}
                     onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -802,7 +802,7 @@ export default function CommissionsPage() {
                     step="0.01"
                     min="0"
                     required
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -815,7 +815,7 @@ export default function CommissionsPage() {
                     type="date"
                     value={formData.transaction_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, transaction_date: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -824,7 +824,7 @@ export default function CommissionsPage() {
                     type="date"
                     value={formData.due_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -832,7 +832,7 @@ export default function CommissionsPage() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     <option value="pending">Pending</option>
                     <option value="invoiced">Invoiced</option>
@@ -852,7 +852,7 @@ export default function CommissionsPage() {
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="e.g., 10% commission on guest purchases"
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -864,7 +864,7 @@ export default function CommissionsPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   placeholder="Additional notes..."
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] resize-none"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                 />
               </div>
 
@@ -880,7 +880,7 @@ export default function CommissionsPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+                  className="px-5 py-2.5 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editingId ? 'Update Commission' : 'Add Commission'}
                 </button>

@@ -30,7 +30,23 @@ import {
   ExternalLink,
   Calculator,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  Gem,
+  Sparkles,
+  Crown,
+  Lock,
+  Car,
+  UserRound,
+  Ticket,
+  UtensilsCrossed,
+  Hotel,
+  Ship,
+  Plane,
+  ClipboardList,
+  Coffee,
+  Moon,
+  type LucideIcon
 } from 'lucide-react'
 
 interface TourDetail {
@@ -202,19 +218,19 @@ export default function TourDetailPage() {
   }
 
   const getTierStyle = (tier: string) => {
-    const styles: Record<string, { bg: string; text: string; icon: string }> = {
-      budget: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', icon: '💰' },
-      standard: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: '💎' },
-      deluxe: { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-700', icon: '✨' },
-      luxury: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: '👑' }
+    const styles: Record<string, { bg: string; text: string; icon: LucideIcon }> = {
+      budget: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: Wallet },
+      standard: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: Gem },
+      deluxe: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: Sparkles },
+      luxury: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: Crown }
     }
     return styles[tier] || styles.standard
   }
 
   const getGroupTypeStyle = (type: string) => {
     return type === 'private' 
-      ? { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-700', icon: '🔒', label: 'Private' }
-      : { bg: 'bg-sky-50 border-sky-200', text: 'text-sky-700', icon: '👥', label: 'Shared' }
+      ? { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-700', icon: Lock, label: 'Private' }
+      : { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: Users, label: 'Shared' }
   }
 
   const getSeasonBadge = (season: string) => {
@@ -227,17 +243,18 @@ export default function TourDetailPage() {
   }
 
   const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      transportation: '🚗',
-      guide: '👨‍🏫',
-      activity: '🎫',
-      meal: '🍽️',
-      accommodation: '🏨',
-      cruise: '🚢',
-      entrance: '🎟️',
-      transfer: '✈️'
+    const icons: Record<string, LucideIcon> = {
+      transportation: Car,
+      guide: UserRound,
+      activity: Ticket,
+      meal: UtensilsCrossed,
+      accommodation: Hotel,
+      cruise: Ship,
+      entrance: Ticket,
+      transfer: Plane
     }
-    return icons[category] || '📋'
+    const Icon = icons[category] || ClipboardList
+    return <Icon className="w-4 h-4 text-gray-500" />
   }
 
   if (loading) {
@@ -245,7 +262,7 @@ export default function TourDetailPage() {
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 text-[#647C47] animate-spin mx-auto mb-3" />
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin mx-auto mb-3" />
             <p className="text-gray-500 text-sm">Loading tour details...</p>
           </div>
         </div>
@@ -286,19 +303,19 @@ export default function TourDetailPage() {
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">{tour.template_name}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{tour.template_name}</h1>
             <p className="text-sm text-gray-500">{tour.destination_name} • {tour.duration_days} {tour.duration_days === 1 ? 'day' : 'days'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {tour.tier && (
-            <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${tierStyle.bg} ${tierStyle.text}`}>
-              {tierStyle.icon} {tour.tier.charAt(0).toUpperCase() + tour.tier.slice(1)}
+            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${tierStyle.bg} ${tierStyle.text}`}>
+              <tierStyle.icon className="w-3.5 h-3.5" /> {tour.tier.charAt(0).toUpperCase() + tour.tier.slice(1)}
             </span>
           )}
           {tour.group_type && (
-            <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${groupStyle.bg} ${groupStyle.text}`}>
-              {groupStyle.icon} {groupStyle.label}
+            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${groupStyle.bg} ${groupStyle.text}`}>
+              <groupStyle.icon className="w-3.5 h-3.5" /> {groupStyle.label}
             </span>
           )}
         </div>
@@ -308,8 +325,8 @@ export default function TourDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Calendar className="h-4 w-4 text-[#647C47]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <Calendar className="h-4 w-4 text-primary-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Duration</p>
           <p className="text-lg font-semibold text-gray-900">
@@ -318,7 +335,7 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Users className="h-4 w-4 text-[#647C47]" />
+            <Users className="h-4 w-4 text-primary-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Group Size</p>
@@ -330,15 +347,15 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Tag className="h-4 w-4 text-[#647C47]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <Tag className="h-4 w-4 text-primary-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Category</p>
           <p className="text-lg font-semibold text-gray-900 truncate">{tour.category_name || 'Uncategorized'}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Globe className="h-4 w-4 text-[#647C47]" />
+            <Globe className="h-4 w-4 text-primary-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Languages</p>
@@ -348,11 +365,11 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[#647C47]">{sym}</span>
+            <span className="text-primary-500">{sym}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">From</p>
-          <p className="text-lg font-semibold text-[#647C47]">
+          <p className="text-lg font-semibold text-primary-500">
             {pricingLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : pricing ? (
@@ -383,7 +400,7 @@ export default function TourDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {tour.highlights.map((highlight, idx) => (
                     <div key={idx} className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-[#647C47] mt-0.5 flex-shrink-0" />
+                      <Check className="h-4 w-4 text-primary-500 mt-0.5 flex-shrink-0" />
                       <span className="text-sm text-gray-600">{highlight}</span>
                     </div>
                   ))}
@@ -396,7 +413,7 @@ export default function TourDetailPage() {
           {tour.daily_itinerary && tour.daily_itinerary.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-[#647C47]" />
+                <Calendar className="h-5 w-5 text-primary-500" />
                 Daily Itinerary
               </h2>
               <div className="space-y-3">
@@ -410,8 +427,8 @@ export default function TourDetailPage() {
                       className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-                          <span className="text-sm font-bold text-[#647C47]">{day.day_number}</span>
+                        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+                          <span className="text-sm font-bold text-primary-500">{day.day_number}</span>
                         </div>
                         <div className="text-left">
                           <p className="text-sm font-medium text-gray-900">{day.day_title}</p>
@@ -420,9 +437,9 @@ export default function TourDetailPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400">
-                          {day.breakfast_included && <span>🍳</span>}
-                          {day.lunch_included && <span>🍽️</span>}
-                          {day.dinner_included && <span>🌙</span>}
+                          {day.breakfast_included && <Coffee className="w-3.5 h-3.5" />}
+                          {day.lunch_included && <UtensilsCrossed className="w-3.5 h-3.5" />}
+                          {day.dinner_included && <Moon className="w-3.5 h-3.5" />}
                         </div>
                         {expandedDays.includes(day.day_number) ? (
                           <ChevronUp className="h-4 w-4 text-gray-400" />
@@ -433,20 +450,20 @@ export default function TourDetailPage() {
                     </button>
                     {expandedDays.includes(day.day_number) && (
                       <div className="px-4 pb-4 pt-0">
-                        <div className="pl-13 ml-[52px] border-l-2 border-[#647C47]/20 pl-4">
+                        <div className="pl-13 ml-[52px] border-l-2 border-primary-500/20 pl-4">
                           <p className="text-sm text-gray-600">{day.day_description}</p>
                           <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
                             {day.breakfast_included && (
-                              <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded">🍳 Breakfast</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded"><Coffee className="w-3.5 h-3.5" /> Breakfast</span>
                             )}
                             {day.lunch_included && (
-                              <span className="px-2 py-1 bg-orange-50 text-orange-700 rounded">🍽️ Lunch</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded"><UtensilsCrossed className="w-3.5 h-3.5" /> Lunch</span>
                             )}
                             {day.dinner_included && (
-                              <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded">🌙 Dinner</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 text-primary-700 rounded"><Moon className="w-3.5 h-3.5" /> Dinner</span>
                             )}
                             {day.overnight_city && (
-                              <span className="px-2 py-1 bg-slate-50 text-slate-700 rounded">🏨 {day.overnight_city}</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-700 rounded"><Hotel className="w-3.5 h-3.5" /> {day.overnight_city}</span>
                             )}
                           </div>
                         </div>
@@ -503,15 +520,15 @@ export default function TourDetailPage() {
           {tour.optional_extras && tour.optional_extras.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="w-6 h-6 bg-[#647C47]/10 rounded-full flex items-center justify-center">
-                  <Plus className="h-3.5 w-3.5 text-[#647C47]" />
+                <div className="w-6 h-6 bg-primary-500/10 rounded-full flex items-center justify-center">
+                  <Plus className="h-3.5 w-3.5 text-primary-500" />
                 </div>
                 Optional Extras
               </h3>
               <ul className="space-y-2">
                 {tour.optional_extras.map((item, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
-                    <Plus className="h-4 w-4 text-[#647C47] mt-0.5 flex-shrink-0" />
+                    <Plus className="h-4 w-4 text-primary-500 mt-0.5 flex-shrink-0" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -547,7 +564,7 @@ export default function TourDetailPage() {
           ) : (
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-[#647C47]" />
+              <Calculator className="h-5 w-5 text-primary-500" />
               Calculate Your Price
             </h3>
             
@@ -559,7 +576,7 @@ export default function TourDetailPage() {
               <select
                 value={selectedPax}
                 onChange={(e) => setSelectedPax(Number(e.target.value))}
-                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white"
+                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
               >
                 {/* The variation's ceiling when it states one; otherwise a
                     plain picker range, which claims nothing about the tour. */}
@@ -581,7 +598,7 @@ export default function TourDetailPage() {
                 value={travelDate}
                 onChange={(e) => setTravelDate(e.target.value)}
                 min={todayLocal()}
-                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none"
+                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
               />
             </div>
 
@@ -593,7 +610,7 @@ export default function TourDetailPage() {
               <select
                 value={isEurPassport ? 'eur' : 'non-eur'}
                 onChange={(e) => setIsEurPassport(e.target.value === 'eur')}
-                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white"
+                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
               >
                 <option value="eur">European Passport</option>
                 <option value="non-eur">Non-European Passport</option>
@@ -604,7 +621,7 @@ export default function TourDetailPage() {
             {/* Pricing Result */}
             {pricingLoading ? (
               <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-4 flex items-center justify-center">
-                <Loader2 className="w-5 h-5 animate-spin text-[#647C47] mr-2" />
+                <Loader2 className="w-5 h-5 animate-spin text-primary-500 mr-2" />
                 <span className="text-sm text-gray-600">Calculating...</span>
               </div>
             ) : pricingError ? (
@@ -616,17 +633,17 @@ export default function TourDetailPage() {
               </div>
             ) : pricing ? (
               <>
-                <div className="bg-[#647C47]/5 border border-[#647C47]/20 p-4 rounded-lg mb-4">
+                <div className="bg-primary-500/5 border border-primary-500/20 p-4 rounded-lg mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-gray-500">Price per person</p>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${getSeasonBadge(pricing.season)}`}>
                       {pricing.season.charAt(0).toUpperCase() + pricing.season.slice(1)} Season
                     </span>
                   </div>
-                  <p className="text-3xl font-bold text-[#647C47]">
+                  <p className="text-3xl font-bold text-primary-500">
                     {sym}{pricing.price_per_person.toFixed(0)}
                   </p>
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#647C47]/20">
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary-500/20">
                     <span className="text-sm text-gray-600">Total for {selectedPax} {selectedPax === 1 ? 'person' : 'people'}</span>
                     <span className="text-lg font-semibold text-gray-900">{sym}{pricing.selling_price.toFixed(0)}</span>
                   </div>
@@ -733,7 +750,11 @@ export default function TourDetailPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Type</span>
                 <span className="text-gray-900">
-                  {tour.group_type === 'private' ? '🔒 Private' : tour.group_type === 'shared' ? '👥 Shared' : '—'}
+                  {tour.group_type === 'private' ? (
+                    <span className="inline-flex items-center gap-1"><Lock className="w-4 h-4 text-gray-500" /> Private</span>
+                  ) : tour.group_type === 'shared' ? (
+                    <span className="inline-flex items-center gap-1"><Users className="w-4 h-4 text-gray-500" /> Shared</span>
+                  ) : '—'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -748,7 +769,7 @@ export default function TourDetailPage() {
           </div>
 
           {/* Contact Card */}
-          <div className="bg-[#647C47]/5 border border-[#647C47]/20 rounded-lg p-6">
+          <div className="bg-primary-500/5 border border-primary-500/20 rounded-lg p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Need Help?</h3>
             <p className="text-xs text-gray-500 mb-4">
               Contact us for custom arrangements or questions
@@ -757,19 +778,19 @@ export default function TourDetailPage() {
                 company's contact details on every tenant's public tour pages. */}
             <div className="space-y-2 text-sm">
               {operator?.contact_email && (
-                <a href={`mailto:${operator.contact_email}`} className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                <a href={`mailto:${operator.contact_email}`} className="flex items-center gap-2 text-gray-600 hover:text-primary-500">
                   <Mail className="h-4 w-4" />
                   {operator.contact_email}
                 </a>
               )}
               {operator?.company_phone && (
-                <a href={`tel:${operator.company_phone.replace(/\s+/g, '')}`} className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                <a href={`tel:${operator.company_phone.replace(/\s+/g, '')}`} className="flex items-center gap-2 text-gray-600 hover:text-primary-500">
                   <Phone className="h-4 w-4" />
                   {operator.company_phone}
                 </a>
               )}
               {operator?.company_website && (
-                <a href={operator.company_website.startsWith('http') ? operator.company_website : `https://${operator.company_website}`} target="_blank" className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                <a href={operator.company_website.startsWith('http') ? operator.company_website : `https://${operator.company_website}`} target="_blank" className="flex items-center gap-2 text-gray-600 hover:text-primary-500">
                   <ExternalLink className="h-4 w-4" />
                   {operator.company_website}
                 </a>

@@ -11,6 +11,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 // GET - Fetch all attractions
 export async function GET(request: NextRequest) {
@@ -37,28 +38,32 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active_only') === 'true'
     const addonsOnly = searchParams.get('addons_only') === 'true'
     
-    let query = supabase
-      .from('entrance_fees')
-      .select('*')
-      .order('attraction_name', { ascending: true })
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('entrance_fees')
+        .select('*')
+        .order('attraction_name', { ascending: true })
     
-    if (city) {
-      query = query.eq('city', city)
-    }
+      if (city) {
+        query = query.eq('city', city)
+      }
     
-    if (category) {
-      query = query.eq('category', category)
-    }
+      if (category) {
+        query = query.eq('category', category)
+      }
     
-    if (activeOnly) {
-      query = query.eq('is_active', true)
-    }
+      if (activeOnly) {
+        query = query.eq('is_active', true)
+      }
     
-    if (addonsOnly) {
-      query = query.eq('is_addon', true)
-    }
-    
-    const { data, error } = await query
+      if (addonsOnly) {
+        query = query.eq('is_addon', true)
+      }
+      return query.order('id').range(from, to)
+    })
     
     if (error) {
       console.error('[Attractions API] Error fetching:', error)

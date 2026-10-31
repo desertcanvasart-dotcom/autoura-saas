@@ -88,17 +88,17 @@ export default function PublishDomainsPage() {
     }
   }
 
-  if (!data) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]" /></div>
+  if (!data) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>
   const live = data.site.status === 'live'
   const mainReady = data.domains.some(d => d.kind === 'primary' && d.status === 'active')
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
-      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-[#647C47]"><ArrowLeft className="h-4 w-4" />Website</Link>
+      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-primary-500"><ArrowLeft className="h-4 w-4" />Website</Link>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><Globe2 className="h-5 w-5 text-[#647C47]" /></div>
+        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center"><Globe2 className="h-5 w-5 text-primary-500" /></div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Your website&apos;s address</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Your website&apos;s address</h1>
           <p className="text-sm text-gray-500">Connect your own domain, such as tours.youragency.com, or take a free address. Secure (https) automatically.</p>
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function PublishDomainsPage() {
         {canManage && (
           <button type="button" disabled={busy !== null || (!live && !mainReady)}
             onClick={() => run('live', () => call('/api/publish/site/live', { method: 'POST', body: JSON.stringify({ live: !live }) }), live ? 'Back to draft' : 'Your website is public')}
-            className={`text-sm px-3 py-1.5 rounded-md disabled:opacity-40 ${live ? 'border border-gray-300' : 'bg-[#647C47] text-white'}`}>
+            className={`text-sm px-3 py-1.5 rounded-md disabled:opacity-40 ${live ? 'border border-gray-300' : 'bg-primary-500 text-white'}`}>
             {live ? 'Take it back to draft' : 'Make the website public'}
           </button>
         )}
@@ -165,7 +165,7 @@ export default function PublishDomainsPage() {
               <div className="flex flex-wrap gap-2">
                 <input value={hostname} onChange={e => setHostname(e.target.value)} placeholder="tours.youragency.com" className="text-sm border border-gray-300 rounded-md px-3 py-2 w-72 font-mono" />
                 <button type="button" disabled={busy !== null || !hostname.trim()} onClick={() => run('add', () => call('/api/publish/domains', { method: 'POST', body: JSON.stringify({ hostname }) }), 'Added — now add the DNS records shown').then(() => setHostname(''))}
-                  className="text-sm px-3 py-2 rounded-md bg-[#647C47] text-white disabled:opacity-40">{busy === 'add' ? 'Connecting…' : 'Connect'}</button>
+                  className="text-sm px-3 py-2 rounded-md bg-primary-500 text-white disabled:opacity-40">{busy === 'add' ? 'Connecting…' : 'Connect'}</button>
               </div>
             </>
           ) : <p className="text-sm text-gray-500">Not switched on yet for your company — contact Autoura.</p>}
@@ -180,7 +180,7 @@ export default function PublishDomainsPage() {
             <input value={label} onChange={e => setLabel(e.target.value.toLowerCase())} placeholder="youragency" className="text-sm border border-gray-300 rounded-md px-3 py-2 w-48 font-mono" />
             <span className="text-sm font-mono text-gray-600">.{data.freeBase}</span>
             <button type="button" disabled={busy !== null || label.trim().length < 3} onClick={() => run('free', () => call('/api/publish/domains', { method: 'POST', body: JSON.stringify({ freeLabel: label }) }), 'Your free address is ready').then(() => setLabel(''))}
-              className="text-sm px-3 py-2 rounded-md border border-[#647C47] text-[#647C47] disabled:opacity-40">Take this address</button>
+              className="text-sm px-3 py-2 rounded-md border border-primary-500 text-primary-500 disabled:opacity-40">Take this address</button>
           </div>
         </section>
       )}

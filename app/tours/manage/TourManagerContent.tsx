@@ -40,7 +40,18 @@ import {
   Layers,
   MapPin,
   Calculator,
-  Loader2
+  Loader2,
+  Landmark,
+  Moon,
+  Timer,
+  Bus,
+  CornerUpLeft,
+  Ship,
+  Hotel,
+  Utensils,
+  Lock,
+  Sparkles,
+  Lightbulb
 } from 'lucide-react'
 
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -384,7 +395,7 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
             key={index} 
             className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-200"
           >
-            🏛️ {attraction}
+            <Landmark className="w-3 h-3" />{attraction}
             <button 
               type="button" 
               onClick={() => onRemove(index)} 
@@ -820,11 +831,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               {destinationCities.map(c => <option key={c} value={c} />)}
             </datalist>
             {namesSeveralPlaces(dayCity) ? (
-              <p className="text-[11px] text-red-600 mt-1" role="alert">
+              <p className="text-xs text-red-600 mt-1" role="alert">
                 {severalPlacesReason(dayCity)}. Choose one to save this day.
               </p>
             ) : (
-              <p className="text-[11px] text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Left blank, pricing reads the title — and a day it cannot place is a gap, not Cairo.
               </p>
             )}
@@ -843,11 +854,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               <option value="in_transit">In the air (overnight flight) — nothing is sold this day</option>
             </select>
             {dayNight === 'in_transit' && (
-              <p className="mt-1 text-xs text-sky-700">
+              <p className="mt-1 text-xs text-primary-700">
                 The whole day is the flight out: no hotel, vehicle, guide, meal or airport help is priced on it, whatever else the day says. The arrival — its transfer and meet &amp; greet — moves to the next day on the ground.
               </p>
             )}
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               Say it here and the words in the title stop deciding it.
             </p>
           </div>
@@ -869,7 +880,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               placeholder="Where they stay tonight — e.g. Cairo, for a day in Alexandria"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
             />
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               {dayTripFromCity.trim() && dayCity.trim() && dayTripFromCity.trim().toLowerCase() !== dayCity.trim().toLowerCase()
                 ? `Out from ${dayTripFromCity.trim()} to ${dayCity.trim()} and back the same day: priced at the Intercity Day Trip rate, with the night in ${dayTripFromCity.trim()}.`
                 : 'Leave blank when the party sleeps in this day’s city.'}
@@ -891,7 +902,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             <option value="day_tour">Full day (8 hours)</option>
             <option value="long_day_tour">Long day (12 hours)</option>
           </select>
-          <p className="text-[11px] text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             The transport for the day is priced from the matching route.
           </p>
         </div>
@@ -903,7 +914,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/60">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <span className="text-xs font-medium text-gray-700">
-              Transport this day{dayTransportLines ? <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px]">Changed on this day</span> : <span className="ml-2 text-[10px] text-gray-500">automatic</span>}
+              Transport this day{dayTransportLines ? <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-xs">Changed on this day</span> : <span className="ml-2 text-xs text-gray-500">automatic</span>}
             </span>
             <div className="flex gap-2">
               <button type="button" onClick={() => setDayTransportLines(prev => [...(prev ?? (transportPreview ?? []).map(l => ({ service_type: l.serviceType, ...(l.route ? { from: l.route.from, to: l.route.to } : { city: l.city }) }))), { service_type: transportTypeItems[0]?.key ?? 'day_tour', city: dayCity.trim() || undefined }])}
@@ -915,7 +926,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
           </div>
           {dayTransportLines ? (
             <div className="mt-2 space-y-1">
-              {dayTransportLines.length === 0 && <p className="text-[11px] text-gray-500">No transport this day.</p>}
+              {dayTransportLines.length === 0 && <p className="text-xs text-gray-500">No transport this day.</p>}
               {dayTransportLines.map((line, n) => {
                 const shown = transportPreview?.[n]
                 return (
@@ -943,8 +954,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             </div>
           ) : (
             <div className="mt-2 space-y-1">
-              {transportPreview === null && <p className="text-[11px] text-gray-500">Working out this day’s transport…</p>}
-              {transportPreview?.length === 0 && <p className="text-[11px] text-gray-500">No transport this day, by the rules.</p>}
+              {transportPreview === null && <p className="text-xs text-gray-500">Working out this day’s transport…</p>}
+              {transportPreview?.length === 0 && <p className="text-xs text-gray-500">No transport this day, by the rules.</p>}
               {transportPreview?.map((l, n) => (
                 <div key={n} className="flex items-center gap-2 text-xs">
                   <span className="text-gray-700">{transportTypeLabel(l.serviceType) || l.label}</span>
@@ -952,7 +963,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   <span className={l.cost != null ? 'text-gray-700' : 'text-red-600'}>{l.cost != null ? `${l.cost.toFixed(2)} (${l.vehicleType}${l.rateName ? `, ${l.rateName}` : ''})` : `No rate — ${l.reason}`}</span>
                 </div>
               ))}
-              <p className="text-[11px] text-gray-500">Decided by the rules from the day’s city, sightseeing and travel. Add or change a line to set it yourself.</p>
+              <p className="text-xs text-gray-500">Decided by the rules from the day’s city, sightseeing and travel. Add or change a line to set it yourself.</p>
             </div>
           )}
         </div>
@@ -964,12 +975,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             <span className="text-xs text-gray-500">Road transfers:</span>
             {([['', 'As usual'], ['on', 'On'], ['off', 'Off']] as const).map(([value, label]) => (
               <button key={label} type="button" onClick={() => setDayRoad(value)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${dayRoad === value ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${dayRoad === value ? 'bg-primary-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
                 {label}
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">{roadSentence}</p>
+          <p className="text-xs text-gray-500 mt-1">{roadSentence}</p>
         </div>
 
         {(dayNight === 'cruise' || cruiseAssistDefaults.disembark) && (
@@ -982,7 +993,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 {label}
               </label>
             ))}
-            <p className="text-[11px] text-gray-500">Priced from your hotel check-in / check-out assistance rates. Ticked by itself on the first night aboard and the first day ashore; untick to leave it out.</p>
+            <p className="text-xs text-gray-500">Priced from your hotel check-in / check-out assistance rates. Ticked by itself on the first night aboard and the first day ashore; untick to leave it out.</p>
           </div>
         )}
 
@@ -998,7 +1009,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
           />
           <span>
             Local transfer this day
-            <span className="block text-[11px] text-gray-500">
+            <span className="block text-xs text-gray-500">
               Somewhere else in town that is not sightseeing — the sound &amp; light show, the
               market, an evening out. Dinner at a restaurant already adds its own transfer.
             </span>
@@ -1038,13 +1049,13 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                       ))}
                     </select>
                     {options.length === 0 && (
-                      <span className="text-[11px] text-amber-700 shrink-0">none on file</span>
+                      <span className="text-xs text-amber-700 shrink-0">none on file</span>
                     )}
                   </div>
                 )
               })}
             </div>
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               A named hotel is priced exactly. If it is later switched off or deleted, the quote
               shows a gap rather than quietly using a different one.
             </p>
@@ -1136,7 +1147,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
           {/* Attractions that arrived as WORDS (a days sheet, the AI builder).
               The picker cannot show them, so say they are there — and kept. */}
           {dayAttractions.length === 0 && editingDayIndex !== null && wordedAttractions(itinerary[editingDayIndex] as unknown as Record<string, unknown>).length > 0 && (
-            <p className="text-[11px] text-gray-500 mt-1.5">
+            <p className="text-xs text-gray-500 mt-1.5">
               This day already names, in words: <span className="text-gray-700">{wordedAttractions(itinerary[editingDayIndex] as unknown as Record<string, unknown>).join(', ')}</span>.
               They are kept as they are, and priced by name. Pick from the list only to replace them with exact fees.
             </p>
@@ -1146,7 +1157,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               follows from its attractions, so a day that names none and says
               nothing was priced as a free day without anyone deciding that. */}
           {isDayTour && (
-            <p className="text-[11px] text-gray-500 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               This is a day tour: its guide, vehicle and tips are always included in the price, and it has no night.
               Pick the attractions above so their entrance fees are priced too.
             </p>
@@ -1161,7 +1172,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             />
             <span>
               No guided sightseeing on this day
-              <span className="block text-[11px] text-gray-500">
+              <span className="block text-xs text-gray-500">
                 An arrival or departure day, a day at leisure, a day of travel. Without this tick or an attraction,
                 pricing cannot tell a free day from a day nobody finished describing — and records a gap.
               </span>
@@ -1206,12 +1217,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             </div>
           )}
           {activityOptions.length === 0 && (
-            <p className="text-[11px] text-gray-500 mt-1.5">
+            <p className="text-xs text-gray-500 mt-1.5">
               No activities yet. Add them in Rates → Activities &amp; Add-ons (e.g. the Philae motorboat), then they appear here.
             </p>
           )}
           {dayActivities.length > 0 && dayNight === 'cruise' && (
-            <p className="text-[11px] text-amber-700 mt-1.5">
+            <p className="text-xs text-amber-700 mt-1.5">
               This is a cruise night — activities here are treated as included in the cruise sightseeing package and are not charged again.
             </p>
           )}
@@ -1232,7 +1243,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 onClick={() => { setDayTransportType(value as typeof dayTransportType); setDayTransportRateId(''); if (!value) { setDayLegFrom(''); setDayLegTo('') } if (value !== 'flight') setDayLegAssist({}) }}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   dayTransportType === value
-                    ? 'bg-green-600 text-white border-green-600'
+                    ? 'bg-primary-600 text-white border-green-600'
                     : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                 }`}
               >
@@ -1256,7 +1267,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
-              <p className="text-[11px] text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 {dayTransportType === 'sleeping_train'
                   ? 'Board tonight, wake in the next day\u2019s city \u2014 no hotel bed this night.'
                   : 'The leg runs from the previous day\u2019s city to this one; several matching rates become a pick-the-exact-one hole unless named here.'}
@@ -1283,7 +1294,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 />
               </div>
               {!usualLeg.from && !dayLegFrom.trim() && dayTransportType !== 'sleeping_train' && (
-                <p className="text-[11px] text-amber-700 mt-1">
+                <p className="text-xs text-amber-700 mt-1">
                   This is the first day, so there is no previous city to leave from \u2014 without a From, no ticket is priced. Type where the flight leaves from (Cairo for a connection after landing).
                 </p>
               )}
@@ -1308,7 +1319,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                     />
                     {`Arrival assistance${legToCode ? ` at ${legToCode}` : ''}`}
                   </label>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     {isArrivalDayForm
                       ? 'On the arrival day both are on unless you untick them: the party is met where the international flight lands, and again where the connection lands.'
                       : 'Off unless you tick them \u2014 a flight in the middle of a trip is priced as its ticket alone, as before.'}
@@ -1347,7 +1358,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{day.description}</p>
                 )}
                 <p className="text-xs text-gray-500 mt-0.5">
-                  📍 {day.city || <span className="italic">city not stated — read from the title</span>}
+                  <MapPin className="w-3 h-3 inline -mt-0.5 mr-0.5" />{day.city || <span className="italic">city not stated — read from the title</span>}
                   {isDayTour && dayTourNamesNoAttractions(day as unknown as Record<string, unknown>) && (
                     <span className="block font-medium text-red-600">
                       This day {DAY_TOUR_NO_ATTRACTIONS}. Press Edit and pick them.
@@ -1363,7 +1374,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                       — more than one place, so this day cannot be priced. Press Edit and choose one.
                     </span>
                   )}
-                  {' · 🌙 '}
+                  {' · '}<Moon className="w-3 h-3 inline -mt-0.5 mr-0.5" />
                   {day.in_transit === true
                     ? 'In the air — nothing sold'
                     : day.accommodation_type === 'cruise'
@@ -1375,19 +1386,19 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                     : <span className="italic">night not stated — read from the title</span>}
                 </p>
                 {day.sightseeing_length && day.sightseeing_length !== 'day_tour' && (
-                  <p className="text-xs text-teal-700 mt-0.5">
-                    ⏱️ {day.sightseeing_length === 'half_day' ? 'Half day (4 hours)' : 'Long day (12 hours)'}
+                  <p className="text-xs text-primary-700 mt-0.5">
+                    <Timer className="w-3 h-3 inline -mt-0.5 mr-0.5" />{day.sightseeing_length === 'half_day' ? 'Half day (4 hours)' : 'Long day (12 hours)'}
                   </p>
                 )}
                 {day.city_transfer && (
-                  <p className="text-xs text-purple-700 mt-0.5">🚐 Local transfer</p>
+                  <p className="text-xs text-primary-700 mt-0.5"><Bus className="w-3 h-3 inline -mt-0.5 mr-0.5" />Local transfer</p>
                 )}
                 {day.day_trip_from && (
-                  <p className="text-xs text-teal-700 mt-0.5">↩️ Day trip from {day.day_trip_from} — the night is there</p>
+                  <p className="text-xs text-primary-700 mt-0.5"><CornerUpLeft className="w-3 h-3 inline -mt-0.5 mr-0.5" />Day trip from {day.day_trip_from} — the night is there</p>
                 )}
                 {day.property_by_tier && Object.values(day.property_by_tier).some(Boolean) && (
-                  <p className="text-xs text-indigo-700 mt-0.5">
-                    {day.accommodation_type === 'cruise' ? '🚢 Named ship' : '🏨 Named hotel'} for{' '}
+                  <p className="text-xs text-primary-700 mt-0.5">
+                    {day.accommodation_type === 'cruise' ? <><Ship className="w-3 h-3 inline -mt-0.5 mr-0.5" />Named ship</> : <><Hotel className="w-3 h-3 inline -mt-0.5 mr-0.5" />Named hotel</>} for{' '}
                     {Object.values(day.property_by_tier).filter(Boolean).length} tier
                     {Object.values(day.property_by_tier).filter(Boolean).length === 1 ? '' : 's'}
                   </p>
@@ -1398,7 +1409,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   </p>
                 )}
                 {day.transport_type && (
-                  <p className="text-xs text-sky-700 mt-0.5">
+                  <p className="text-xs text-primary-700 mt-0.5">
                     Travel: {day.transport_type === 'sleeping_train' ? 'Sleeping train' : day.transport_type === 'train' ? 'Day train' : 'Flight'}
                     {day.transport_rate_id ? ' (named rate)' : ' (auto by route)'}
                     {(day.leg_from || day.leg_to) && ` · ${day.leg_from || '…'} → ${day.leg_to || '…'}`}
@@ -1412,7 +1423,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   const m = readDayMeals(day.meals)
                   return (
                     <p className="text-xs text-blue-600 mt-1">
-                      🍽️ {MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k], day.accommodation_type)}`).join(' · ')}
+                      <Utensils className="w-3 h-3 inline -mt-0.5 mr-0.5" />{MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k], day.accommodation_type)}`).join(' · ')}
                     </p>
                   )
                 })()}
@@ -1573,7 +1584,7 @@ function EditVariationModal({ variation, tierLabel, onClose, onSaved, showToast 
           </button>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-            <button type="button" onClick={save} disabled={busy} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60">Save</button>
+            <button type="button" onClick={save} disabled={busy} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">Save</button>
           </div>
         </div>
       </div>
@@ -1725,7 +1736,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
                               onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
                               className="w-4 h-4 text-green-600"
                             />
-                            <span className="text-sm text-gray-700">🔒 Private</span>
+                            <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Lock className="w-4 h-4 text-gray-500" />Private</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -1735,7 +1746,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
                               onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
                               className="w-4 h-4 text-green-600"
                             />
-                            <span className="text-sm text-gray-700">👥 Shared</span>
+                            <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Users className="w-4 h-4 text-gray-500" />Shared</span>
                           </label>
                         </div>
                         <div className="mt-2 text-xs text-gray-500">
@@ -1765,7 +1776,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
             <button
               onClick={handleCreate}
               disabled={saving || chosenTiers.length === 0}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>
@@ -2601,11 +2612,11 @@ export default function TourManagerContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Map className="w-5 h-5 text-green-600" />
-              <h1 className="text-xl font-bold text-gray-900">Tour Programs Manager</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Tour Programs Manager</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+              <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium">
                 <Plus className="w-4 h-4" />
                 Add Template
               </button>
@@ -2707,7 +2718,7 @@ export default function TourManagerContent() {
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <Layers className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Variations</p>
             <p className="text-2xl font-bold text-gray-900">{totalVariations}</p>
@@ -2869,7 +2880,7 @@ export default function TourManagerContent() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {(template.variations?.length || 0) > 0 ? (
-                            <span className="text-sm font-medium text-purple-600">{template.variations?.length || 0}</span>
+                            <span className="text-sm font-medium text-primary-600">{template.variations?.length || 0}</span>
                           ) : (
                             <button
                               onClick={(e) => { e.stopPropagation(); setAddVariationTemplate(template) }}
@@ -2891,7 +2902,7 @@ export default function TourManagerContent() {
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => editDays(template)}
-                              className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                              className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
                               title="Edit days"
                             >
                               <Calendar className="w-4 h-4" />
@@ -2925,7 +2936,7 @@ export default function TourManagerContent() {
                         <tr className="bg-gray-50">
                           <td colSpan={7} className="px-8 py-3">
                             <div className="flex items-center gap-2 mb-2">
-                              <Layers className="w-4 h-4 text-purple-600" />
+                              <Layers className="w-4 h-4 text-primary-600" />
                               <span className="text-sm font-medium text-gray-700">Variations</span>
                               <button
                                 onClick={() => setAddVariationTemplate(template)}
@@ -2936,7 +2947,7 @@ export default function TourManagerContent() {
                               </button>
                               <button
                                 onClick={() => editDays(template)}
-                                className="ml-2 text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
+                                className="ml-2 text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
                               >
                                 <Calendar className="w-3 h-3" />
                                 Edit Days
@@ -2977,7 +2988,7 @@ export default function TourManagerContent() {
                                             not find where options are authored otherwise. */}
                                         <Link
                                           href={`/tours/variations/${variation.id}/options`}
-                                          className="inline-flex items-center px-2 py-1 text-xs font-semibold text-[#647C47] border border-[#b8c9a8] hover:bg-[#e8ede3] rounded transition-colors whitespace-nowrap"
+                                          className="inline-flex items-center px-2 py-1 text-xs font-semibold text-primary-500 border border-[#b8c9a8] hover:bg-[#e8ede3] rounded transition-colors whitespace-nowrap"
                                           title="Options and upgrades this programme sells"
                                           onClick={(e) => e.stopPropagation()}
                                         >
@@ -3010,7 +3021,7 @@ export default function TourManagerContent() {
                       <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                         <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-sm font-medium">No tour templates found</p>
-                        <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                           Create Your First Template
                         </button>
                       </td>
@@ -3062,7 +3073,7 @@ export default function TourManagerContent() {
                         source of truth. */}
                     {(template.itinerary?.length ?? 0) > 0 && (
                       <div className="flex items-start gap-2 text-gray-600">
-                        <span className="w-4 text-center flex-shrink-0">🍽️</span>
+                        <Utensils className="w-4 h-4 flex-shrink-0 mt-0.5" />
                         <span className="text-xs leading-5">
                           {summarizeMeals(template.itinerary).join(' · ') || 'No meals provided on any day'}
                         </span>
@@ -3100,7 +3111,7 @@ export default function TourManagerContent() {
                 <div className="flex border-t border-gray-200 divide-x divide-gray-200">
                   <button
                     onClick={() => editDays(template)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-primary-600 hover:bg-primary-50 transition-colors"
                   >
                     <Calendar className="w-4 h-4" />Days
                   </button>
@@ -3129,7 +3140,7 @@ export default function TourManagerContent() {
               <div className="col-span-full bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
                 <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-500">No tour templates found</p>
-                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                   Create Your First Template
                 </button>
               </div>
@@ -3157,7 +3168,7 @@ export default function TourManagerContent() {
                   </div>
                   <div className="hidden md:flex items-center gap-1">
                     {(template.variations?.length || 0) > 0 ? (
-                      <span className="text-xs text-purple-600 font-medium">{template.variations?.length || 0} var</span>
+                      <span className="text-xs text-primary-600 font-medium">{template.variations?.length || 0} var</span>
                     ) : (
                       <button
                         onClick={() => setAddVariationTemplate(template)}
@@ -3170,7 +3181,7 @@ export default function TourManagerContent() {
                   {template.is_featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
                 </div>
                 <div className="flex items-center gap-1 ml-4">
-                  <button onClick={() => editDays(template)} className="p-1 text-gray-400 hover:text-purple-600 transition-colors">
+                  <button onClick={() => editDays(template)} className="p-1 text-gray-400 hover:text-primary-600 transition-colors">
                     <Calendar className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleEdit(template)} className="p-1 text-gray-400 hover:text-green-600 transition-colors">
@@ -3189,7 +3200,7 @@ export default function TourManagerContent() {
               <div className="p-12 text-center">
                 <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-500">No tour templates found</p>
-                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                   Create Your First Template
                 </button>
               </div>
@@ -3433,7 +3444,7 @@ export default function TourManagerContent() {
                         onChange={handleCheckboxChange}
                         className="w-4 h-4 text-green-600 border-gray-300 rounded"
                       />
-                      <span className="text-xs text-gray-700">⭐ Featured Tour</span>
+                      <span className="text-xs text-gray-700 inline-flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500" />Featured Tour</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -3475,7 +3486,7 @@ export default function TourManagerContent() {
                     <div className="flex flex-wrap gap-2">
                       {formData.highlights.map((h, i) => (
                         <span key={i} className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs border border-amber-200">
-                          ✨ {h}
+                          <Sparkles className="w-3 h-3" />{h}
                           <button type="button" onClick={() => removeHighlight(i)} className="text-amber-500 hover:text-amber-700">
                             <X className="w-3 h-3" />
                           </button>
@@ -3621,7 +3632,7 @@ export default function TourManagerContent() {
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-blue-800">
-                      <strong>💡 Tip:</strong> Select the pricing tiers you want to offer. The days themselves are on the Details tab; edit them later with the calendar button on the tour list.
+                      <Lightbulb className="w-4 h-4 inline -mt-0.5 mr-1" /><strong>Tip:</strong> Select the pricing tiers you want to offer. The days themselves are on the Details tab; edit them later with the calendar button on the tour list.
                     </p>
                   </div>
 
@@ -3663,7 +3674,7 @@ export default function TourManagerContent() {
                                       onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
                                       className="w-4 h-4 text-green-600"
                                     />
-                                    <span className="text-sm text-gray-700">🔒 Private</span>
+                                    <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Lock className="w-4 h-4 text-gray-500" />Private</span>
                                   </label>
                                   <label className="flex items-center gap-2 cursor-pointer">
                                     <input
@@ -3673,7 +3684,7 @@ export default function TourManagerContent() {
                                       onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
                                       className="w-4 h-4 text-green-600"
                                     />
-                                    <span className="text-sm text-gray-700">👥 Shared</span>
+                                    <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Users className="w-4 h-4 text-gray-500" />Shared</span>
                                   </label>
                                 </div>
                                 <div className="mt-2 text-xs text-gray-500">
@@ -3720,7 +3731,7 @@ export default function TourManagerContent() {
                   <button
                     type="button"
                     onClick={() => setActiveTab(activeTab === 'basic' ? 'details' : 'variations')}
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                    className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
                   >
                     Next →
                   </button>
@@ -3728,7 +3739,7 @@ export default function TourManagerContent() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Check className="w-4 h-4" />
                     {submitting

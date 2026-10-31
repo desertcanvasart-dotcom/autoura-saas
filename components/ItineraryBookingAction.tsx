@@ -83,7 +83,7 @@ export default function ItineraryBookingAction({
     ) : (
       <Link
         href={toBooking(booking.id)}
-        className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 bg-teal-600 text-white hover:bg-teal-700 transition-colors flex-shrink-0 ${className}`}
+        className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 bg-primary-600 text-white hover:bg-primary-700 transition-colors flex-shrink-0 ${className}`}
       >
         <BookOpen className="w-4 h-4" />
         Go to Booking {booking.booking_number}
@@ -159,7 +159,7 @@ export default function ItineraryBookingAction({
       type="button"
       onClick={run}
       disabled={working}
-      className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 bg-teal-600 text-white hover:bg-teal-700 transition-colors disabled:opacity-50 flex-shrink-0 ${className}`}
+      className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50 flex-shrink-0 ${className}`}
     >
       {working ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
       {isConfirmed ? 'Create Booking' : 'Convert to Booking'}

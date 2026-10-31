@@ -8,7 +8,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Ticket, Plus, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, Users, AlertTriangle, CheckCircle, XCircle, Info, Ship, PersonStanding, Banknote, TrendingDown } from 'lucide-react'
+import { Ticket, Plus, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, Users, AlertTriangle, CheckCircle, XCircle, Info, Ship, PersonStanding, Banknote, TrendingDown, Lightbulb } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -496,7 +496,7 @@ export default function ActivityRatesContent() {
     const colour =
       key === 'per_unit' ? 'bg-blue-100 text-blue-700' :
       key === 'flat' ? 'bg-amber-100 text-amber-700' :
-      key === 'tiered' ? 'bg-purple-100 text-purple-700' :
+      key === 'tiered' ? 'bg-primary-100 text-primary-700' :
       'bg-green-100 text-green-700'
     return <span className={`px-2 py-0.5 ${colour} rounded text-xs font-medium`}>{pricingTypeLabel(key)}</span>
   }
@@ -563,10 +563,10 @@ export default function ActivityRatesContent() {
               <button
                 onClick={() => setNotification(null)}
                 className={`px-6 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
-                  notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                  notification.type === 'success' ? 'bg-primary-600 hover:bg-primary-700' :
                   notification.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
                   notification.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' :
-                  'bg-blue-600 hover:bg-blue-700'
+                  'bg-blue-600 hover:bg-primary-700'
                 }`}
               >
                 Got it
@@ -671,13 +671,13 @@ export default function ActivityRatesContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <Ticket className="w-6 h-6 text-purple-600" />
+          <div className="p-2 bg-primary-100 rounded-lg">
+            <Ticket className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Activities & Add-ons
-              <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+              <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
             </h1>
             <p className="text-sm text-gray-600">Manage pricing for tours, activities, and optional add-ons</p>
           </div>
@@ -693,7 +693,7 @@ export default function ActivityRatesContent() {
           </button>
           <Link
             href="/suppliers?type=activity_provider"
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50"
           >
             <Users className="w-4 h-4" />
             Suppliers
@@ -746,7 +746,7 @@ export default function ActivityRatesContent() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <TrendingDown className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{tieredRates}</p>
           <p className="text-xs text-gray-600">Tiered</p>
@@ -754,7 +754,7 @@ export default function ActivityRatesContent() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-600"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{uniqueCities}</p>
           <p className="text-xs text-gray-600">Cities</p>
@@ -930,7 +930,7 @@ export default function ActivityRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Ticket className="w-4 h-4 text-purple-500" />
+                        <Ticket className="w-4 h-4 text-primary-500" />
                         <div>
                           <span className="text-sm font-semibold text-gray-900">{rate.activity_name}</span>
                           <p className="text-xs text-gray-500">{rate.service_code}</p>
@@ -939,7 +939,7 @@ export default function ActivityRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       {rate.activity_category ? (
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                        <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs font-medium">
                           <VocabLabel kind="activity_category" value={rate.activity_category} />
                         </span>
                       ) : (
@@ -1011,7 +1011,7 @@ export default function ActivityRatesContent() {
                       className="w-4 h-4 text-primary-600 border-gray-300 rounded"
                       aria-label={`Select ${rate.activity_name} rate`}
                     />
-                    <Ticket className="w-5 h-5 text-purple-500" />
+                    <Ticket className="w-5 h-5 text-primary-500" />
                     <span className="font-semibold text-gray-900">{rate.activity_name}</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1024,7 +1024,7 @@ export default function ActivityRatesContent() {
                 <div className="flex items-center gap-2 mb-2">
                   {getPricingTypeBadge(rate.pricing_type)}
                   {rate.activity_category && (
-                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                    <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs font-medium">
                       <VocabLabel kind="activity_category" value={rate.activity_category} />
                     </span>
                   )}
@@ -1088,12 +1088,12 @@ export default function ActivityRatesContent() {
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded"
                     aria-label={`Select ${rate.activity_name} rate`}
                   />
-                  <Ticket className="w-4 h-4 text-purple-500" />
+                  <Ticket className="w-4 h-4 text-primary-500" />
                   <span className="font-medium text-gray-900">{rate.activity_name}</span>
                   <span className="text-sm text-gray-500">{rate.city || '—'}</span>
                   {getPricingTypeBadge(rate.pricing_type)}
                   {rate.activity_category && (
-                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                    <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs">
                       {rate.activity_category}
                     </span>
                   )}
@@ -1207,7 +1207,7 @@ export default function ActivityRatesContent() {
               {/* Basic Info */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">1</span>
                   Activity Details
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1355,7 +1355,7 @@ export default function ActivityRatesContent() {
                       </div>
                     </div>
                     <p className="text-xs text-blue-600">
-                      💡 Example: Felucca ride costs {rateSymbol}25/boat and can hold 1-6 passengers
+                      <Lightbulb className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />Example: Felucca ride costs {rateSymbol}25/boat and can hold 1-6 passengers
                     </p>
                   </div>
                 )}
@@ -1393,8 +1393,8 @@ export default function ActivityRatesContent() {
                     <p className="text-xs text-gray-400 mt-1">Entered and shown in the rate&rsquo;s own currency</p>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                     {formData.pricing_type === 'tiered' && (
-                      <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
-                        <p className="text-xs font-medium text-purple-800 flex items-center gap-2 mb-2">
+                      <div className="mt-3 bg-primary-50 border border-primary-200 rounded-lg p-3">
+                        <p className="text-xs font-medium text-primary-800 flex items-center gap-2 mb-2">
                           <TrendingDown className="w-4 h-4" />
                           Group-size bands — per-person rate by pax count
                         </p>
@@ -1403,8 +1403,8 @@ export default function ActivityRatesContent() {
                           onChange={setTiers}
                           currencyLabel={rateCode}
                         />
-                        <p className="text-xs text-purple-600 mt-2">
-                          💡 Example: 1–4 pax at a higher per-person rate, 5–12 pax at a lower one. The matching band&apos;s rate is used at quote time.
+                        <p className="text-xs text-primary-600 mt-2">
+                          <Lightbulb className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />Example: 1–4 pax at a higher per-person rate, 5–12 pax at a lower one. The matching band&apos;s rate is used at quote time.
                         </p>
                       </div>
                     )}
@@ -1415,7 +1415,7 @@ export default function ActivityRatesContent() {
               {/* Link to Supplier */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">4</span>
+                  <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-bold">4</span>
                   Link to Supplier (Optional)
                 </h3>
                 <select
@@ -1436,7 +1436,7 @@ export default function ActivityRatesContent() {
               {/* Validity */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">5</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">5</span>
                   Validity Period
                 </h3>
                 <div className="grid grid-cols-2 gap-3">

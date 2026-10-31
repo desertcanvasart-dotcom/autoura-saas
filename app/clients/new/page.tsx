@@ -162,7 +162,7 @@ export default function NewClientPage() {
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Back to Clients
               </Link>
-              <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
                 <User className="w-5 h-5 text-primary-600" />
                 Add New Client
               </h1>
@@ -189,7 +189,7 @@ export default function NewClientPage() {
                     >
                       {step.num}
                     </div>
-                    <span className={`text-[10px] mt-1.5 ${currentStep >= step.num ? 'text-primary-600 font-medium' : 'text-gray-400'}`}>
+                    <span className={`text-xs mt-1.5 ${currentStep >= step.num ? 'text-primary-600 font-medium' : 'text-gray-400'}`}>
                       {step.label}
                     </span>
                   </button>
@@ -643,14 +643,14 @@ export default function NewClientPage() {
               </div>
 
               <div className="pt-3 border-t border-gray-100">
-                <label className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-yellow-50 transition-colors">
+                <label className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-amber-50 transition-colors">
                   <input
                     type="checkbox"
                     checked={formData.vip_status}
                     onChange={(e) => handleInputChange('vip_status', e.target.checked)}
-                    className="w-3.5 h-3.5 text-yellow-500 rounded border-gray-300"
+                    className="w-3.5 h-3.5 text-amber-500 rounded border-gray-300"
                   />
-                  <Star className="w-4 h-4 text-yellow-500" />
+                  <Star className="w-4 h-4 text-amber-500" />
                   <span className="text-xs font-medium text-gray-700">Mark as VIP Client</span>
                 </label>
               </div>
@@ -738,7 +738,7 @@ export default function NewClientPage() {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm disabled:opacity-50"
             >
               {loading ? (
                 <>

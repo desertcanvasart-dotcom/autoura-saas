@@ -31,7 +31,7 @@ export default function UnifiedCommunicationsPage() {
         />
         <button
           onClick={() => setShowCompose(true)}
-          className="absolute bottom-5 right-5 w-12 h-12 bg-[#647C47] text-white rounded-full shadow-lg hover:bg-[#566b3c] transition-all flex items-center justify-center z-10"
+          className="absolute bottom-5 right-5 w-12 h-12 bg-primary-500 text-white rounded-full shadow-lg hover:bg-[#566b3c] transition-all flex items-center justify-center z-10"
           title="Compose Email"
         >
           <PenSquare className="w-5 h-5" />

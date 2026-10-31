@@ -19,7 +19,29 @@ import {
   ExternalLink,
   Wallet,
   X,
-  MapPin
+  MapPin,
+  UserRound,
+  Car,
+  Hotel,
+  Bus,
+  Ticket,
+  Utensils,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Ship,
+  PlaneTakeoff,
+  PartyPopper,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Building2,
+  Megaphone,
+  Laptop,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -57,28 +79,28 @@ interface Itinerary {
   end_date: string
 }
 
-const CATEGORIES: Record<string, { label: string; icon: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫' },
-  driver: { label: 'Driver', icon: '🚗' },
-  hotel: { label: 'Hotel/Accommodation', icon: '🏨' },
-  transportation: { label: 'Transportation', icon: '🚐' },
-  entrance: { label: 'Entrance Fees', icon: '🎫' },
-  meal: { label: 'Meals', icon: '🍽️' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  cruise: { label: 'Cruise', icon: '🚢' },
-  flights: { label: 'Flights', icon: '🛫' },
-  activity: { label: 'Activities & Tours', icon: '🎈' },
-  tipping: { label: 'Tipping', icon: '💵' },
-  permits: { label: 'Permits/Permissions', icon: '📋' },
-  toll: { label: 'Toll Fees', icon: '🛣️' },
-  parking: { label: 'Parking', icon: '🅿️' },
-  fuel: { label: 'Fuel', icon: '⛽' },
-  office: { label: 'Office Expenses', icon: '🏢' },
-  marketing: { label: 'Marketing', icon: '📢' },
-  software: { label: 'Software/Subscriptions', icon: '💻' },
-  other: { label: 'Other', icon: '📦' }
+const CATEGORIES: Record<string, { label: string; icon: LucideIcon }> = {
+  guide: { label: 'Tour Guide', icon: UserRound },
+  driver: { label: 'Driver', icon: Car },
+  hotel: { label: 'Hotel/Accommodation', icon: Hotel },
+  transportation: { label: 'Transportation', icon: Bus },
+  entrance: { label: 'Entrance Fees', icon: Ticket },
+  meal: { label: 'Meals', icon: Utensils },
+  airport_staff: { label: 'Airport Staff', icon: Plane },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell },
+  ground_handler: { label: 'Ground Handler', icon: Luggage },
+  cruise: { label: 'Cruise', icon: Ship },
+  flights: { label: 'Flights', icon: PlaneTakeoff },
+  activity: { label: 'Activities & Tours', icon: PartyPopper },
+  tipping: { label: 'Tipping', icon: Banknote },
+  permits: { label: 'Permits/Permissions', icon: ClipboardList },
+  toll: { label: 'Toll Fees', icon: Milestone },
+  parking: { label: 'Parking', icon: SquareParking },
+  fuel: { label: 'Fuel', icon: Fuel },
+  office: { label: 'Office Expenses', icon: Building2 },
+  marketing: { label: 'Marketing', icon: Megaphone },
+  software: { label: 'Software/Subscriptions', icon: Laptop },
+  other: { label: 'Other', icon: Package }
 }
 
 const SUPPLIER_TYPES: Record<string, string> = {
@@ -104,7 +126,7 @@ const PAYMENT_METHODS: Record<string, string> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  pending: { label: 'Pending', color: 'text-yellow-700', bg: 'bg-yellow-100', icon: Clock },
+  pending: { label: 'Pending', color: 'text-amber-700', bg: 'bg-amber-100', icon: Clock },
   approved: { label: 'Approved', color: 'text-blue-700', bg: 'bg-blue-100', icon: CheckCircle },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100', icon: AlertCircle }
@@ -212,7 +234,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -221,14 +243,14 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">Expense not found</p>
-        <Link href="/expenses" className="text-[#647C47] hover:underline mt-2 inline-block">
+        <Link href="/expenses" className="text-primary-500 hover:underline mt-2 inline-block">
           Back to Expenses
         </Link>
       </div>
     )
   }
 
-  const category = CATEGORIES[expense.category] || { label: expense.category, icon: '📦' }
+  const category = CATEGORIES[expense.category] || { label: expense.category, icon: Package }
   const statusConfig = STATUS_CONFIG[expense.status] || STATUS_CONFIG.pending
   const StatusIcon = statusConfig.icon
 
@@ -244,12 +266,12 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-              {category.icon}
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+              <category.icon className="w-6 h-6 text-gray-600" />
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold text-gray-900">{expense.expense_number}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">{expense.expense_number}</h1>
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
                   <StatusIcon className="h-3.5 w-3.5" />
                   {statusConfig.label}
@@ -334,7 +356,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Category</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">{category.icon}</span>
+                  <category.icon className="w-5 h-5 text-gray-500" />
                   <span className="text-sm font-medium text-gray-900">{category.label}</span>
                 </div>
               </div>
@@ -391,8 +413,8 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
                 href={`/itineraries/${itinerary.id}`}
                 className="flex items-start gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-                  <MapPin className="h-5 w-5 text-[#647C47]" />
+                <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+                  <MapPin className="h-5 w-5 text-primary-500" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{itinerary.itinerary_code}</p>

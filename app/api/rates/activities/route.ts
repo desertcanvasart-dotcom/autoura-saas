@@ -5,6 +5,7 @@ import { roleDenied } from '@/lib/api-role-gate'
 import type { TablesInsert } from '@/types/database.types'
 import { sanitizeTiers } from '@/lib/rates/activity-tiers'
 import type { Json } from '@/types/database.types'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,18 +32,22 @@ export async function GET(request: NextRequest) {
     const pricingType = searchParams.get('pricing_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabase
-      .from('activity_rates')
-      .select('*')
-      .order('activity_name')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('activity_rates')
+        .select('*')
+        .order('activity_name')
 
-    if (supplierId) query = query.eq('supplier_id', supplierId)
-    if (city) query = query.eq('city', city)
-    if (category) query = query.eq('activity_category', category)
-    if (pricingType) query = query.eq('pricing_type', pricingType)
-    if (activeOnly) query = query.eq('is_active', true)
-
-    const { data, error } = await query
+      if (supplierId) query = query.eq('supplier_id', supplierId)
+      if (city) query = query.eq('city', city)
+      if (category) query = query.eq('activity_category', category)
+      if (pricingType) query = query.eq('pricing_type', pricingType)
+      if (activeOnly) query = query.eq('is_active', true)
+      return query.order('id').range(from, to)
+    })
 
     if (error) {
       console.error('GET activity_rates error:', error)

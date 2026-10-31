@@ -17,7 +17,23 @@ import {
   ExternalLink,
   Plus,
   Handshake,
-  AlertTriangle
+  AlertTriangle,
+  UserRound,
+  Car,
+  Hotel,
+  Bus,
+  Ticket,
+  UtensilsCrossed,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 
 interface TripPnL {
@@ -98,34 +114,34 @@ function fmtDay(day: string | null | undefined): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { timeZone: 'UTC' })
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫', color: 'bg-blue-100 text-blue-700' },
-  driver: { label: 'Driver', icon: '🚗', color: 'bg-purple-100 text-purple-700' },
-  hotel: { label: 'Hotel', icon: '🏨', color: 'bg-indigo-100 text-indigo-700' },
-  transportation: { label: 'Transportation', icon: '🚐', color: 'bg-cyan-100 text-cyan-700' },
-  entrance: { label: 'Entrance Fees', icon: '🎫', color: 'bg-pink-100 text-pink-700' },
-  meal: { label: 'Meals', icon: '🍽️', color: 'bg-orange-100 text-orange-700' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️', color: 'bg-sky-100 text-sky-700' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️', color: 'bg-violet-100 text-violet-700' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳', color: 'bg-teal-100 text-teal-700' },
-  tipping: { label: 'Tipping', icon: '💵', color: 'bg-green-100 text-green-700' },
-  permits: { label: 'Permits', icon: '📋', color: 'bg-amber-100 text-amber-700' },
-  toll: { label: 'Toll Fees', icon: '🛣️', color: 'bg-stone-100 text-stone-700' },
-  parking: { label: 'Parking', icon: '🅿️', color: 'bg-slate-100 text-slate-700' },
-  fuel: { label: 'Fuel', icon: '⛽', color: 'bg-red-100 text-red-700' },
-  other: { label: 'Other', icon: '📦', color: 'bg-gray-100 text-gray-700' }
+const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon; color: string }> = {
+  guide: { label: 'Tour Guide', icon: UserRound, color: 'bg-blue-100 text-blue-700' },
+  driver: { label: 'Driver', icon: Car, color: 'bg-primary-100 text-primary-700' },
+  hotel: { label: 'Hotel', icon: Hotel, color: 'bg-primary-100 text-primary-700' },
+  transportation: { label: 'Transportation', icon: Bus, color: 'bg-primary-100 text-primary-700' },
+  entrance: { label: 'Entrance Fees', icon: Ticket, color: 'bg-primary-100 text-primary-700' },
+  meal: { label: 'Meals', icon: UtensilsCrossed, color: 'bg-amber-100 text-amber-700' },
+  airport_staff: { label: 'Airport Staff', icon: Plane, color: 'bg-primary-100 text-primary-700' },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell, color: 'bg-primary-100 text-primary-700' },
+  ground_handler: { label: 'Ground Handler', icon: Luggage, color: 'bg-primary-100 text-primary-700' },
+  tipping: { label: 'Tipping', icon: Banknote, color: 'bg-green-100 text-green-700' },
+  permits: { label: 'Permits', icon: ClipboardList, color: 'bg-amber-100 text-amber-700' },
+  toll: { label: 'Toll Fees', icon: Milestone, color: 'bg-stone-100 text-stone-700' },
+  parking: { label: 'Parking', icon: SquareParking, color: 'bg-slate-100 text-slate-700' },
+  fuel: { label: 'Fuel', icon: Fuel, color: 'bg-red-100 text-red-700' },
+  other: { label: 'Other', icon: Package, color: 'bg-gray-100 text-gray-700' }
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-600', bg: 'bg-blue-100' },
   confirmed: { label: 'Confirmed', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: 'Completed', color: 'text-purple-600', bg: 'bg-purple-100' },
+  completed: { label: 'Completed', color: 'text-primary-600', bg: 'bg-primary-100' },
   cancelled: { label: 'Cancelled', color: 'text-red-600', bg: 'bg-red-100' },
-  pending: { label: 'Pending', color: 'text-yellow-600', bg: 'bg-yellow-100' },
+  pending: { label: 'Pending', color: 'text-amber-600', bg: 'bg-amber-100' },
   approved: { label: 'Approved', color: 'text-blue-600', bg: 'bg-blue-100' },
   paid: { label: 'Paid', color: 'text-green-600', bg: 'bg-green-100' },
-  partial: { label: 'Partial', color: 'text-orange-600', bg: 'bg-orange-100' }
+  partial: { label: 'Partial', color: 'text-amber-600', bg: 'bg-amber-100' }
 }
 
 export default function TripPnLDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -182,15 +198,15 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
 
   const getMarginColor = (margin: number) => {
     if (margin >= 30) return 'text-green-600 bg-green-100'
-    if (margin >= 15) return 'text-yellow-600 bg-yellow-100'
-    if (margin >= 0) return 'text-orange-600 bg-orange-100'
+    if (margin >= 15) return 'text-amber-600 bg-amber-100'
+    if (margin >= 0) return 'text-amber-600 bg-amber-100'
     return 'text-red-600 bg-red-100'
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -199,7 +215,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">{loadError || 'Trip not found'}</p>
-        <Link href="/profit-loss" className="text-[#647C47] hover:underline mt-2 inline-block">
+        <Link href="/profit-loss" className="text-primary-500 hover:underline mt-2 inline-block">
           Back to Profit & Loss
         </Link>
       </div>
@@ -226,7 +242,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">{pnlData.itinerary_code}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">{pnlData.itinerary_code}</h1>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[pnlData.status]?.bg || 'bg-gray-100'} ${STATUS_CONFIG[pnlData.status]?.color || 'text-gray-600'}`}>
                 {STATUS_CONFIG[pnlData.status]?.label || pnlData.status}
               </span>
@@ -245,7 +261,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
           </Link>
           <Link
             href={`/expenses?itineraryId=${pnlData.itinerary_id}`}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Expense
@@ -416,7 +432,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-gray-500">No expenses recorded</p>
               <Link
                 href={`/expenses?itineraryId=${pnlData.itinerary_id}`}
-                className="text-sm text-[#647C47] hover:underline mt-2 inline-block"
+                className="text-sm text-primary-500 hover:underline mt-2 inline-block"
               >
                 Add expenses
               </Link>
@@ -430,7 +446,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                   <div key={category}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <div className="flex items-center gap-2">
-                        <span>{config.icon}</span>
+                        <config.icon className="w-4 h-4 text-gray-500" />
                         <span className="text-gray-700">{config.label}</span>
                       </div>
                       <span className="font-medium text-gray-900">
@@ -439,7 +455,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-[#647C47] rounded-full transition-all"
+                        className="h-full bg-primary-500 rounded-full transition-all"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -457,7 +473,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
             <h3 className="text-sm font-semibold text-gray-900">Expenses</h3>
             <Link
               href={`/expenses?itineraryId=${pnlData.itinerary_id}`}
-              className="text-xs text-[#647C47] hover:underline"
+              className="text-xs text-primary-500 hover:underline"
             >
               View all
             </Link>
@@ -479,7 +495,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-lg">{config.icon}</span>
+                      <config.icon className="w-5 h-5 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium text-gray-900">{expense.expense_number}</p>
                         <p className="text-xs text-gray-500">
@@ -514,7 +530,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-gray-500">No invoices created</p>
               <Link
                 href={`/itineraries/${pnlData.itinerary_id}`}
-                className="text-sm text-[#647C47] hover:underline mt-2 inline-block"
+                className="text-sm text-primary-500 hover:underline mt-2 inline-block"
               >
                 Create invoice
               </Link>

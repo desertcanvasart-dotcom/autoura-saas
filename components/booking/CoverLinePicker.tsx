@@ -92,7 +92,7 @@ export default function CoverLinePicker({
           ) : options.own.length === 0 && options.suppliers.length === 0 ? (
             <p className="text-xs text-gray-600">
               Nobody to offer: no own people or cars, and no supplier of this kind in your supplier book.
-              Add one under CRM → Suppliers{options.uses_network ? <>, or <a href="/network-suppliers" className="text-blue-700 underline">find one in the network</a></> : null}.
+              Add one under CRM → Suppliers{options.uses_network ? <>, or <a href="/suppliers?tab=network" className="text-blue-700 underline">find one in the network</a></> : null}.
             </p>
           ) : (
             <>
@@ -107,7 +107,7 @@ export default function CoverLinePicker({
                   <optgroup label="Assign directly (your team and cars)">
                     {options.own.map(o => (
                       <option key={`${o.resource_type}:${o.resource_id}`} value={`own|${o.resource_type}|${o.resource_id}`}>
-                        {OWN_KIND[o.resource_type] ?? o.resource_type}: {o.name}{o.detail ? ` · ${o.detail}` : ''}{o.day_off ? ' · ⚠ day off' : ''}
+                        {OWN_KIND[o.resource_type] ?? o.resource_type}: {o.name}{o.detail ? ` · ${o.detail}` : ''}{o.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -116,7 +116,7 @@ export default function CoverLinePicker({
                   <optgroup label="Suppliers with a rate for this">
                     {options.suppliers.filter(s => !s.other && !s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
-                        {s.preferred ? '★ ' : ''}{s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}{s.day_off ? ' · ⚠ day off' : ''}
+                        {s.preferred ? '★ ' : ''}{s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}{s.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -125,7 +125,7 @@ export default function CoverLinePicker({
                   <optgroup label="Other suppliers of this kind (no rate — enter what they agree)">
                     {options.suppliers.filter(s => s.other && !s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
-                        {s.name}{s.day_off ? ' · ⚠ day off' : ''}
+                        {s.name}{s.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -134,14 +134,14 @@ export default function CoverLinePicker({
                   <optgroup label="Network suppliers (verified by Autoura — agree the price)">
                     {options.suppliers.filter(s => s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
-                        {s.name}{s.cost !== null ? ` — ${currency} ${s.cost.toFixed(2)}` : ''}{s.day_off ? ' · ⚠ day off' : ''}
+                        {s.name}{s.cost !== null ? ` — ${currency} ${s.cost.toFixed(2)}` : ''}{s.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>
                 )}
               </select>
               {options.uses_network && (
-                <a href="/network-suppliers" className="mt-2 block text-xs text-blue-700 hover:underline">Find more in the network →</a>
+                <a href="/suppliers?tab=network" className="mt-2 block text-xs text-blue-700 hover:underline">Find more in the network →</a>
               )}
               <div className="mt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setOpen(false)} className="px-2 py-1 text-xs text-gray-600">Cancel</button>
@@ -149,7 +149,7 @@ export default function CoverLinePicker({
                   type="button"
                   onClick={save}
                   disabled={!choice || busy}
-                  className="px-2.5 py-1 text-xs font-medium rounded-md bg-blue-600 text-white disabled:opacity-50"
+                  className="px-2.5 py-1 text-xs font-medium rounded-md bg-primary-600 text-white disabled:opacity-50"
                 >
                   {busy ? 'Saving…' : 'Save'}
                 </button>

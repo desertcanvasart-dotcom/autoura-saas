@@ -62,7 +62,7 @@ export default function ActivityTiersEditor({
         <button
           type="button"
           onClick={() => onChange([...tiers, emptyTier(tiers[tiers.length - 1])])}
-          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-md hover:bg-[#4f6238]"
+          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-md hover:bg-primary-700"
         >
           <Plus className="w-3.5 h-3.5" /> Add band
         </button>
@@ -77,7 +77,7 @@ export default function ActivityTiersEditor({
           {tiers.map((t, i) => (
             <div key={i} className="flex flex-wrap items-end gap-2">
               <div>
-                <label className="block text-[11px] text-gray-500 mb-1">From pax</label>
+                <label className="block text-xs text-gray-500 mb-1">From pax</label>
                 <input
                   type="number" min="1"
                   value={t.min_pax}
@@ -86,7 +86,7 @@ export default function ActivityTiersEditor({
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-gray-500 mb-1">To pax</label>
+                <label className="block text-xs text-gray-500 mb-1">To pax</label>
                 <input
                   type="number" min="1"
                   value={t.max_pax}
@@ -95,7 +95,7 @@ export default function ActivityTiersEditor({
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-gray-500 mb-1">
+                <label className="block text-xs text-gray-500 mb-1">
                   Rate/pax{currencyLabel ? ` (${currencyLabel})` : ''}
                 </label>
                 <input
@@ -106,7 +106,7 @@ export default function ActivityTiersEditor({
                 />
               </div>
               <div className="flex-1 min-w-[120px]">
-                <label className="block text-[11px] text-gray-500 mb-1">Label (optional)</label>
+                <label className="block text-xs text-gray-500 mb-1">Label (optional)</label>
                 <input
                   value={t.label ?? ''}
                   onChange={e => update(i, { label: e.target.value || null })}

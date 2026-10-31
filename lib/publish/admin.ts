@@ -36,7 +36,7 @@ import { placeReviews, reviewsSettingsOf, searchPlaces } from './reviews'
 import { feedOf, hashFeedKey, newFeedKey } from './feed'
 import type { DnsRecord, DomainProvider, DomainState } from './domains/provider'
 import { railwayConfigFromEnv, railwayProvider } from './domains/railway'
-import { normalizeHost } from './site-data'
+import { normalizeHost } from './host'
 import { createRevalidator } from './sync/revalidate'
 
 type Db = {
@@ -781,7 +781,7 @@ export async function saveLook(db: Db, actor: Actor, input: { archetype: unknown
 export const PUBLISH_MEDIA_BUCKET = 'publish-media'
 // The bucket's own limits (migration 440): JPEG, PNG, WebP or AVIF, up to 10 MB.
 const MEDIA_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif' }
-const MEDIA_MAX_BYTES = 10 * 1024 * 1024
+export const MEDIA_MAX_BYTES = 10 * 1024 * 1024
 
 /** A photo in this company's own folder of the website bucket. */
 export function isOwnMedia(url: string, tenantId: string): boolean {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { Map as MapIcon, Target, ClipboardList, Tag, Wallet, Star, CalendarDays, Users, Search } from 'lucide-react'
 import { loadPricesInBatches, type PriceState, type StartingFrom } from '@/lib/tours/price-loader'
 import { getCurrencySymbol } from '@/lib/currency'
 import { useTierConfigs } from '@/components/vocabulary'
@@ -141,14 +142,14 @@ export default function ToursBrowsePage() {
     return c ? `${c.bgColor} ${c.textColor} border ${c.borderColor}` : 'bg-gray-50 text-gray-700 border border-gray-200'
   }
 
-  const getTierIcon = (tier: string) => tierConfigs[tier]?.icon || '📋'
+  const getTierIcon = (tier: string) => tierConfigs[tier]?.icon || ''
 
   if (loading) {
     return (
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-[#647C47] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
             <p className="text-gray-500 text-sm">Loading tours...</p>
           </div>
         </div>
@@ -178,17 +179,17 @@ export default function ToursBrowsePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            🗺️
+          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+            <MapIcon className="w-5 h-5 text-gray-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Tour Inventory</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Tour Inventory</h1>
             <p className="text-sm text-gray-500">Browse available tours and pricing</p>
           </div>
         </div>
         <Link 
           href="/tours/manage"
-          className="px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] transition-colors font-medium"
+          className="px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] transition-colors font-medium"
         >
           Manage Tours
         </Link>
@@ -198,15 +199,15 @@ export default function ToursBrowsePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">🎯</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <Target className="w-5 h-5 text-gray-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Tour Packages</p>
           <p className="text-2xl font-semibold text-gray-900">{tours.length}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">📋</span>
+            <ClipboardList className="w-5 h-5 text-gray-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
           {/* This tile used to count a flag (uses_day_builder). Every tour with
@@ -216,7 +217,7 @@ export default function ToursBrowsePage() {
             {priced.length}
             <span className="text-sm font-normal text-gray-400"> of {tours.length}</span>
           </p>
-          {stillPricing > 0 && <p className="text-[11px] text-gray-400 mt-0.5">pricing {stillPricing} more…</p>}
+          {stillPricing > 0 && <p className="text-xs text-gray-400 mt-0.5">pricing {stillPricing} more…</p>}
         </div>
         {/* Optional-metadata tiles appear once the data exists — headline
             "Categories 0" / "Starting From —" above a populated list reads
@@ -226,8 +227,8 @@ export default function ToursBrowsePage() {
         {uniqueCategories.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🏷️</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+              <Tag className="w-5 h-5 text-gray-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Categories</p>
             <p className="text-2xl font-semibold text-gray-900">{uniqueCategories.length}</p>
@@ -236,7 +237,7 @@ export default function ToursBrowsePage() {
         {pricedComplete.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💰</span>
+              <Wallet className="w-5 h-5 text-gray-500" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Starting From</p>
@@ -255,13 +256,13 @@ export default function ToursBrowsePage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name, description, or city..."
-            className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none"
+            className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
         </div>
         <select
           value={filterTier}
           onChange={(e) => setFilterTier(e.target.value)}
-          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white min-w-[150px]"
+          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white min-w-[150px]"
         >
           <option value="all">All Tiers</option>
           {tierEntries.map(t => (
@@ -271,7 +272,7 @@ export default function ToursBrowsePage() {
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
-          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white min-w-[180px]"
+          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white min-w-[180px]"
         >
           <option value="all">All Categories</option>
           {uniqueCategories.map(cat => (
@@ -291,7 +292,7 @@ export default function ToursBrowsePage() {
             setFilterTier('all')
             setFilterCategory('all')
           }}
-          className="text-sm text-[#647C47] hover:text-[#4a5c35] font-medium"
+          className="text-sm text-primary-500 hover:text-[#4a5c35] font-medium"
         >
           Clear Filters
         </button>
@@ -302,14 +303,14 @@ export default function ToursBrowsePage() {
         {filteredTours.map((tour) => (
           <div 
             key={tour.id} 
-            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-[#647C47] transition-colors"
+            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-primary-500 transition-colors"
           >
             {/* Card Header */}
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-start justify-between gap-2 mb-1">
                 <h3 className="text-sm font-semibold text-gray-900 leading-tight">{tour.template_name}</h3>
                 {tour.is_featured && (
-                  <span className="text-amber-500 text-xs">⭐</span>
+                  <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
                 )}
               </div>
               <p className="text-xs text-gray-500">
@@ -340,16 +341,16 @@ export default function ToursBrowsePage() {
               {/* Tour Details */}
               <div className="space-y-2 text-sm text-gray-600 mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">📅</span>
+                  <CalendarDays className="w-4 h-4 text-gray-400" />
                   <span>{tour.duration_days} {tour.duration_days === 1 ? 'day' : 'days'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">👥</span>
+                  <Users className="w-4 h-4 text-gray-400" />
                   <span>{tour.min_pax || 1}-{tour.max_pax || 15} passengers</span>
                 </div>
                 {tour.theme_name && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">🏷️</span>
+                    <Tag className="w-4 h-4 text-gray-400" />
                     <span className="text-gray-500 text-xs">{tour.theme_name}</span>
                   </div>
                 )}
@@ -357,7 +358,7 @@ export default function ToursBrowsePage() {
                     every card. The exception is what is worth saying. */}
                 {tour.day_count === 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">📋</span>
+                    <ClipboardList className="w-4 h-4 text-gray-400" />
                     <span className="text-amber-700 text-xs font-medium">No day-by-day programme yet — add its days in Tour Manager to price it</span>
                   </div>
                 )}
@@ -373,7 +374,7 @@ export default function ToursBrowsePage() {
               {/* Price & Action */}
               <div className="flex items-end justify-between pt-3 border-t border-gray-100">
                 <div>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Starting from</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Starting from</p>
                   {/* No price is said plainly. It used to read as a euro sign
                       followed by N/A, and before that the card showed a
                       made-up duration x 150 estimate. */}
@@ -391,11 +392,11 @@ export default function ToursBrowsePage() {
                     )
                     return (
                       <>
-                        <p className="text-xl font-semibold text-[#647C47]">
+                        <p className="text-xl font-semibold text-primary-500">
                           {price.starting_from ? `${sym}${price.starting_from.toLocaleString()}` : 'Price on request'}
                         </p>
                         {price.starting_from && (
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             per person{price.starting_from_tier ? ` • ${price.starting_from_tier}` : ''}
                           </p>
                         )}
@@ -403,7 +404,7 @@ export default function ToursBrowsePage() {
                             of this tour's services still have no rate, so the
                             figure is lower than the finished tour will be. */}
                         {price.starting_from != null && !price.complete && (
-                          <span className="inline-block mt-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                          <span className="inline-block mt-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                             Incomplete · {price.gaps} {price.gaps === 1 ? 'service' : 'services'} without a rate
                           </span>
                         )}
@@ -418,7 +419,7 @@ export default function ToursBrowsePage() {
                     const tier = p.status === 'done' ? p.starting_from_tier : null
                     return (tier && tour.variation_code_by_tier?.[tier]) || tour.default_variation_code || tour.id
                   })()}`}
-                  className="bg-[#647C47] text-white px-4 py-2 rounded-lg hover:bg-[#4a5c35] transition-colors text-xs font-medium"
+                  className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-[#4a5c35] transition-colors text-xs font-medium"
                 >
                   View Details
                 </Link>
@@ -427,8 +428,8 @@ export default function ToursBrowsePage() {
 
             {/* Card Footer */}
             <div className="bg-gray-50 px-4 py-2 border-t border-gray-100 flex items-center justify-between">
-              <p className="text-[10px] text-gray-400 font-mono uppercase">{tour.template_code}</p>
-              <p className="text-[10px] text-gray-400">
+              <p className="text-xs text-gray-400 font-mono uppercase">{tour.template_code}</p>
+              <p className="text-xs text-gray-400">
                 {tour.variations_count || 0} variation{tour.variations_count !== 1 ? 's' : ''}
               </p>
             </div>
@@ -439,12 +440,12 @@ export default function ToursBrowsePage() {
       {/* Empty State */}
       {filteredTours.length === 0 && (
         <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
-          <div className="text-4xl mb-3">🔍</div>
+          <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <h3 className="text-sm font-medium text-gray-900 mb-1">No tours found</h3>
           <p className="text-xs text-gray-500 mb-4">Try adjusting your filters or search terms</p>
           <Link 
             href="/tours/manage"
-            className="text-sm text-[#647C47] hover:text-[#4a5c35] font-medium"
+            className="text-sm text-primary-500 hover:text-[#4a5c35] font-medium"
           >
             Create a new tour →
           </Link>

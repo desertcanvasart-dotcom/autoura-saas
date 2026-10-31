@@ -14,7 +14,11 @@ import {
   Target,
   Zap,
   UserPlus,
-  AlertCircle
+  AlertCircle,
+  TrendingDown,
+  ArrowRight,
+  Lightbulb,
+  Sparkles
 } from 'lucide-react'
 import { 
   LineChart, 
@@ -310,7 +314,7 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Analytics Dashboard</h1>
           <p className="text-sm text-gray-600 mt-1">Business performance and insights</p>
         </div>
         
@@ -413,7 +417,7 @@ export default function AnalyticsPage() {
 
       {/* Revenue Forecast Summary Card */}
       {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.nextPeriod > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-gradient-to-r from-blue-50 to-primary-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
@@ -651,7 +655,7 @@ export default function AnalyticsPage() {
                 >
                   {pipelineData[stage.key as keyof typeof pipelineData]}
                 </div>
-                <p className="text-[11px] text-gray-600 font-medium truncate">{stage.label}</p>
+                <p className="text-xs text-gray-600 font-medium truncate">{stage.label}</p>
               </div>
               {index < pipelineStages.length - 1 && (
                 <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0 mx-0.5" />
@@ -664,7 +668,7 @@ export default function AnalyticsPage() {
       {/* Highlights of the Month */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Zap className="w-5 h-5 text-yellow-500" />
+          <Zap className="w-5 h-5 text-amber-500" />
           <h3 className="text-base font-semibold text-gray-900">Highlights</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -704,16 +708,16 @@ export default function AnalyticsPage() {
             <h3 className="text-base font-semibold text-gray-900">Revenue Trend & Forecast</h3>
             {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.confidence > 0 && (
               <div className="flex items-center gap-2 text-xs">
-                <span className={`px-2 py-0.5 rounded-full ${
+                <span className={`px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
                   displayData.revenue.forecastSummary.trend === 'up'
                     ? 'bg-green-100 text-green-700'
                     : displayData.revenue.forecastSummary.trend === 'down'
                     ? 'bg-red-100 text-red-700'
                     : 'bg-gray-100 text-gray-700'
                 }`}>
-                  {displayData.revenue.forecastSummary.trend === 'up' && '📈 Trending Up'}
-                  {displayData.revenue.forecastSummary.trend === 'down' && '📉 Trending Down'}
-                  {displayData.revenue.forecastSummary.trend === 'stable' && '➡️ Stable'}
+                  {displayData.revenue.forecastSummary.trend === 'up' && <><TrendingUp className="w-3 h-3" />Trending Up</>}
+                  {displayData.revenue.forecastSummary.trend === 'down' && <><TrendingDown className="w-3 h-3" />Trending Down</>}
+                  {displayData.revenue.forecastSummary.trend === 'stable' && <><ArrowRight className="w-3 h-3" />Stable</>}
                 </span>
                 <span className="text-gray-500">
                   {displayData.revenue.forecastSummary.confidence}% confidence
@@ -804,11 +808,11 @@ export default function AnalyticsPage() {
           </ResponsiveContainer>
           <div className="mt-2 space-y-1">
             <div className="p-2 bg-green-50 rounded text-xs text-gray-700">
-              💡 {insights.revenueInsight}
+              <Lightbulb className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-amber-600" />{insights.revenueInsight}
             </div>
             {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.nextPeriod > 0 && (
               <div className="p-2 bg-blue-50 rounded text-xs text-gray-700">
-                🔮 Forecasted next period revenue: <span className="font-semibold">{formatCurrency(displayData.revenue.forecastSummary.nextPeriod)}</span>
+                <Sparkles className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-primary-600" />Forecasted next period revenue: <span className="font-semibold">{formatCurrency(displayData.revenue.forecastSummary.nextPeriod)}</span>
               </div>
             )}
           </div>
@@ -865,8 +869,8 @@ export default function AnalyticsPage() {
                   />
                 </BarChart>
               </ResponsiveContainer>
-              <div className="mt-2 p-2 bg-purple-50 rounded text-xs text-gray-700">
-                💡 {filteredDestinations[0].name} leads with {filteredDestinations[0].bookings} bookings ({formatCurrency(filteredDestinations[0].revenue)})
+              <div className="mt-2 p-2 bg-primary-50 rounded text-xs text-gray-700">
+                <Lightbulb className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-amber-600" />{filteredDestinations[0].name} leads with {filteredDestinations[0].bookings} bookings ({formatCurrency(filteredDestinations[0].revenue)})
               </div>
             </>
           ) : (
@@ -967,8 +971,8 @@ export default function AnalyticsPage() {
             </div>
           </div>
           
-          <div className="mt-3 p-2 bg-orange-50 rounded text-xs text-gray-700">
-            💡 {insights.bookingInsight}
+          <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-gray-700">
+            <Lightbulb className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-amber-600" />{insights.bookingInsight}
           </div>
         </div>
 
@@ -1033,9 +1037,9 @@ export default function AnalyticsPage() {
             <p className="text-xs text-gray-500 mt-1">See schedule</p>
           </Link>
           
-          <Link href="/clients" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-purple-300 transition-all text-left group">
+          <Link href="/clients" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-primary-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
-              <Users className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+              <Users className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.bookings }} />
             </div>
             <p className="text-sm font-medium text-gray-900">Client Insights</p>
@@ -1056,11 +1060,3 @@ export default function AnalyticsPage() {
   )
 }
 
-// Helper component for ArrowRight
-function ArrowRight({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  )
-}

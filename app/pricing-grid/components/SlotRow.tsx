@@ -101,7 +101,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                     value={cityFilter}
                     onChange={(e) => setCityFilter(e.target.value)}
                     aria-label="City"
-                    className="px-1.5 py-0.5 text-[11px] border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
+                    className="px-1.5 py-0.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
                   >
                     <option value="">This day&rsquo;s cities</option>
                     <option value="*">All cities</option>
@@ -113,7 +113,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                       value={facetFilters[f.field] ?? ''}
                       onChange={(e) => setFacetFilters(prev => ({ ...prev, [f.field]: e.target.value }))}
                       aria-label={FACET_LABEL[f.field]}
-                      className="px-1.5 py-0.5 text-[11px] border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      className="px-1.5 py-0.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-300"
                     >
                       <option value="">Any {FACET_LABEL[f.field]}</option>
                       {f.values.map(v => <option key={v} value={v}>{f.field === 'service_type' ? humanize(v) : v}</option>)}
@@ -125,17 +125,17 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search…"
                     aria-label="Search"
-                    className="flex-1 min-w-[8rem] px-1.5 py-0.5 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                    className="flex-1 min-w-[8rem] px-1.5 py-0.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
                   />
                 </div>
                 {isRoute && (
-                  <div className="px-2 py-1 text-[10px] text-gray-400 border-b border-gray-50">
+                  <div className="px-2 py-1 text-xs text-gray-400 border-b border-gray-50">
                     Each route once, at the vehicle for {pax} pax — the vehicle follows the group size.
                   </div>
                 )}
                 <div className="max-h-[280px] overflow-y-auto">
                   {dropdownOptions.length === 0 && (
-                    <div className="text-[11px] text-gray-400 px-2 py-2">No matching options — try All cities</div>
+                    <div className="text-xs text-gray-400 px-2 py-2">No matching options — try All cities</div>
                   )}
                   {dropdownOptions.slice(0, 100).map(opt => {
                     const isSelected = isChosen(opt)
@@ -145,7 +145,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                     return (
                       <label
                         key={opt.id}
-                        className={`flex items-start gap-2 px-2 py-1 text-[11px] cursor-pointer hover:bg-blue-50 ${
+                        className={`flex items-start gap-2 px-2 py-1 text-xs cursor-pointer hover:bg-blue-50 ${
                           isSelected ? 'bg-blue-50/70 font-medium' : ''
                         }`}
                       >
@@ -158,7 +158,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                         <span className="flex-1 min-w-0">
                           <span className="block truncate" title={opt.name}>{isRoute ? routeLabel(opt.name) : opt.name}</span>
                           {(vehicle || kind || where || (!multi && opt.details)) && (
-                            <span className="block truncate text-[10px] text-gray-400 font-normal">
+                            <span className="block truncate text-xs text-gray-400 font-normal">
                               {[vehicle, kind, !multi ? opt.details : null, where].filter(Boolean).join(' · ')}
                             </span>
                           )}
@@ -168,7 +168,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                     )
                   })}
                   {dropdownOptions.length > 100 && (
-                    <div className="text-[11px] text-gray-400 px-2 py-1 border-t border-gray-100">
+                    <div className="text-xs text-gray-400 px-2 py-1 border-t border-gray-100">
                       +{dropdownOptions.length - 100} more — narrow by city, type or search
                     </div>
                   )}
@@ -186,7 +186,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
       {/* Label */}
       <div className="w-[140px] min-w-[140px] flex items-center gap-1.5 px-3 py-1.5 border-r border-gray-50">
         <span className="text-sm opacity-70">{definition.icon}</span>
-        <span className={`text-[11px] font-medium ${hasValue ? 'text-gray-700' : 'text-gray-400'}`}>
+        <span className={`text-xs font-medium ${hasValue ? 'text-gray-700' : 'text-gray-400'}`}>
           {definition.label}
         </span>
       </div>
@@ -211,33 +211,33 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
               <div className="space-y-0.5">
                 {selected && (
                   <span
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-blue-50 text-blue-700 rounded cursor-pointer hover:bg-red-50 hover:text-red-600 transition-colors"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-blue-50 text-blue-700 rounded cursor-pointer hover:bg-red-50 hover:text-red-600 transition-colors"
                     onClick={() => selectSingle(null)}
                     title={`${selected.name} — click to remove`}
                   >
                     {selected.name.length > 60 ? selected.name.substring(0, 60) + '…' : selected.name}
                     {' '}{money(selected[rateKey])}
-                    <span className="font-bold ml-0.5 text-[10px]">×</span>
+                    <span className="font-bold ml-0.5 text-xs">×</span>
                   </span>
                 )}
                 {allPool.length > 0 && (
                   <button
                     type="button"
                     onClick={() => { setIsDropdownOpen(!isDropdownOpen); setSearch('') }}
-                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                   >
                     {isDropdownOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     {selected ? `Change (${dayPool.length} here)` : `Select… (${dayPool.length} here)`}
                   </button>
                 )}
                 {allPool.length === 0 && !selected && (
-                  <span className="text-[11px] text-gray-300 px-1 italic">No options</span>
+                  <span className="text-xs text-gray-300 px-1 italic">No options</span>
                 )}
                 {onApplyToAllDays && selected && (
                   <button
                     type="button"
                     onClick={onApplyToAllDays}
-                    className="ml-1 text-[11px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                    className="ml-1 text-xs text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                     title="Put this on every day of the trip"
                   >
                     Apply to all days
@@ -280,7 +280,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                 <button
                   type="button"
                   onClick={onApplyToAllDays}
-                  className="shrink-0 text-[11px] text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                  className="shrink-0 text-xs text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                   title="Put this on every day of the trip"
                 >
                   Apply to all days
@@ -297,7 +297,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                 {value.selectedItems.map(item => (
                   <span
                     key={item.rateId}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-blue-50 text-blue-700 rounded cursor-pointer hover:bg-red-50 hover:text-red-600 transition-colors"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-blue-50 text-blue-700 rounded cursor-pointer hover:bg-red-50 hover:text-red-600 transition-colors"
                     onClick={() => onChange({ ...value, selectedItems: value.selectedItems.filter(i => i.rateId !== item.rateId) })}
                     title={`${item.name} — click to remove`}
                   >
@@ -310,7 +310,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                     {item.pricingBasis === 'per_unit' && (
                       <span className="opacity-70">/unit{item.unitCapacity ? ` of ${item.unitCapacity}` : ''}</span>
                     )}
-                    <span className="font-bold ml-0.5 text-[10px]">×</span>
+                    <span className="font-bold ml-0.5 text-xs">×</span>
                   </span>
                 ))}
               </div>
@@ -320,14 +320,14 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
               <button
                 type="button"
                 onClick={() => { setIsDropdownOpen(!isDropdownOpen); setSearch('') }}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
               >
                 {isDropdownOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 {value.selectedItems.length === 0 ? 'Select...' : `Change (${unselectedCount} more)`}
               </button>
             )}
             {options.length === 0 && value.selectedItems.length === 0 && (
-              <span className="text-[11px] text-gray-300 px-1 italic">No options for this city</span>
+              <span className="text-xs text-gray-300 px-1 italic">No options for this city</span>
             )}
 
             {isDropdownOpen && (

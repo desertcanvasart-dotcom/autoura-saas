@@ -72,7 +72,7 @@ export default function RatesCheckPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Rates check</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Rates check</h1>
         <p className="text-sm text-gray-600 mt-1">
           Rates that look saved under the wrong category. The pricing grid and the itinerary parser go by a
           hotel&apos;s tier and a transport rate&apos;s type, so these give the wrong hotel or the wrong transport

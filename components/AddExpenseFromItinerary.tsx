@@ -127,7 +127,7 @@ export default function AddExpenseFromItinerary({
       {!hideTrigger && (
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-[#647C47] hover:text-[#647C47] transition-colors"
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-primary-500 hover:text-primary-500 transition-colors"
         >
           <Receipt className="h-4 w-4" />
           Add Expense
@@ -163,11 +163,11 @@ export default function AddExpenseFromItinerary({
                     // A new category lists other suppliers: the one picked for the old one goes.
                     onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value, supplier_id: null, supplier_name: '', supplier_type: '' }))}
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
                   >
                     <option value="">Select Category</option>
                     {TRIP_EXPENSE_CATEGORIES.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
                     ))}
                   </select>
                 </div>
@@ -179,7 +179,7 @@ export default function AddExpenseFromItinerary({
                     <select
                       value={formData.currency}
                       onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                      className="w-20 px-2 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                      className="w-20 px-2 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     >
                       {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
@@ -190,7 +190,7 @@ export default function AddExpenseFromItinerary({
                       step="0.01"
                       min="0"
                       required
-                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -204,7 +204,7 @@ export default function AddExpenseFromItinerary({
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="e.g., Guide fee for Pyramids tour"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -218,7 +218,7 @@ export default function AddExpenseFromItinerary({
                   value={formData.expense_date}
                   onChange={(e) => setFormData(prev => ({ ...prev, expense_date: e.target.value }))}
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -237,7 +237,7 @@ export default function AddExpenseFromItinerary({
                 <select
                   value={formData.payment_method}
                   onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">Select Method</option>
                   {PAYMENT_METHODS.map(method => (
@@ -254,7 +254,7 @@ export default function AddExpenseFromItinerary({
                   value={formData.receipt_url}
                   onChange={(e) => setFormData(prev => ({ ...prev, receipt_url: e.target.value }))}
                   placeholder="https://drive.google.com/..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -266,7 +266,7 @@ export default function AddExpenseFromItinerary({
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   placeholder="Additional notes..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] resize-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                 />
               </div>
 
@@ -282,7 +282,7 @@ export default function AddExpenseFromItinerary({
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                 >
                   {saving ? 'Saving...' : 'Add Expense'}
                 </button>

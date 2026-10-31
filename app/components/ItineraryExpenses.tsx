@@ -7,7 +7,26 @@ import {
   ChevronUp,
   Trash2,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  UserRound,
+  Car,
+  Hotel,
+  Bus,
+  Ticket,
+  UtensilsCrossed,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Ship,
+  PlaneTakeoff,
+  Compass,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import Link from 'next/link'
@@ -43,29 +62,29 @@ interface ItineraryExpensesProps {
   refreshTrigger?: number
 }
 
-const CATEGORY_CONFIG: Record<string, { icon: string; label: string }> = {
-  guide: { icon: '👨‍🏫', label: 'Tour Guide' },
-  driver: { icon: '🚗', label: 'Driver' },
-  hotel: { icon: '🏨', label: 'Hotel/Accommodation' },
-  transportation: { icon: '🚐', label: 'Transportation' },
-  entrance: { icon: '🎫', label: 'Entrance Fees' },
-  meal: { icon: '🍽️', label: 'Meals' },
-  airport_staff: { icon: '✈️', label: 'Airport Staff' },
-  hotel_staff: { icon: '🛎️', label: 'Hotel Staff' },
-  ground_handler: { icon: '🧳', label: 'Ground Handler' },
-  cruise: { icon: '🚢', label: 'Cruise' },
-  flights: { icon: '🛫', label: 'Flights' },
-  activity: { icon: '🎈', label: 'Activities & Tours' },
-  tipping: { icon: '💵', label: 'Tipping' },
-  permits: { icon: '📋', label: 'Permits/Permissions' },
-  toll: { icon: '🛣️', label: 'Toll Fees' },
-  parking: { icon: '🅿️', label: 'Parking' },
-  fuel: { icon: '⛽', label: 'Fuel' },
-  other: { icon: '📦', label: 'Other' }
+const CATEGORY_CONFIG: Record<string, { icon: LucideIcon; label: string }> = {
+  guide: { icon: UserRound, label: 'Tour Guide' },
+  driver: { icon: Car, label: 'Driver' },
+  hotel: { icon: Hotel, label: 'Hotel/Accommodation' },
+  transportation: { icon: Bus, label: 'Transportation' },
+  entrance: { icon: Ticket, label: 'Entrance Fees' },
+  meal: { icon: UtensilsCrossed, label: 'Meals' },
+  airport_staff: { icon: Plane, label: 'Airport Staff' },
+  hotel_staff: { icon: ConciergeBell, label: 'Hotel Staff' },
+  ground_handler: { icon: Luggage, label: 'Ground Handler' },
+  cruise: { icon: Ship, label: 'Cruise' },
+  flights: { icon: PlaneTakeoff, label: 'Flights' },
+  activity: { icon: Compass, label: 'Activities & Tours' },
+  tipping: { icon: Banknote, label: 'Tipping' },
+  permits: { icon: ClipboardList, label: 'Permits/Permissions' },
+  toll: { icon: Milestone, label: 'Toll Fees' },
+  parking: { icon: SquareParking, label: 'Parking' },
+  fuel: { icon: Fuel, label: 'Fuel' },
+  other: { icon: Package, label: 'Other' }
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: 'Pending', color: 'text-yellow-700', bg: 'bg-yellow-100' },
+  pending: { label: 'Pending', color: 'text-amber-700', bg: 'bg-amber-100' },
   approved: { label: 'Approved', color: 'text-blue-700', bg: 'bg-blue-100' },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100' },
   rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100' }
@@ -186,7 +205,7 @@ export default function ItineraryExpenses({
               return (
                 <div key={expense.id} className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50">
                   {/* Category icon */}
-                  <span className="text-xl flex-shrink-0">{cat.icon}</span>
+                  <cat.icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
 
                   {/* Main info */}
                   <div className="flex-1 min-w-0">
@@ -194,7 +213,7 @@ export default function ItineraryExpenses({
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {expense.description || cat.label}
                       </p>
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${status.bg} ${status.color}`}>
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${status.bg} ${status.color}`}>
                         {status.label}
                       </span>
                     </div>
@@ -232,7 +251,7 @@ export default function ItineraryExpenses({
                       {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     {expense.currency !== currency && (
-                      <p className="text-[10px] text-gray-400">{expense.currency}</p>
+                      <p className="text-xs text-gray-400">{expense.currency}</p>
                     )}
                   </div>
 
@@ -240,7 +259,7 @@ export default function ItineraryExpenses({
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Link
                       href={`/expenses/${expense.id}`}
-                      className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                       title="View details"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
@@ -279,7 +298,7 @@ export default function ItineraryExpenses({
                       {getCurrencySymbol(curr)}{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   ))}
-                  <p className="text-[10px] text-amber-600 mt-0.5">(converted at approximate rates)</p>
+                  <p className="text-xs text-amber-600 mt-0.5">(converted at approximate rates)</p>
                 </div>
               )}
             </div>

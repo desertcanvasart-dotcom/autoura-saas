@@ -12,11 +12,11 @@ const money = (n: number, c = 'EUR') => `${getCurrencySymbol(c)}${Number(n || 0)
 
 const STATUS_BADGE: Record<string, string> = {
   received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700',
-  approved: 'bg-indigo-100 text-indigo-700', paid: 'bg-green-100 text-green-700',
+  approved: 'bg-primary-100 text-primary-700', paid: 'bg-green-100 text-green-700',
   disputed: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400',
 }
 const MATCH_BADGE: Record<string, string> = {
-  unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-orange-100 text-orange-700',
+  unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-amber-100 text-amber-700',
   matched: 'bg-green-100 text-green-700', discrepancy: 'bg-red-100 text-red-700',
 }
 
@@ -112,12 +112,12 @@ export default function SupplierInvoicesPage() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center"><Receipt className="h-5 w-5 text-gray-500" /></div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Supplier Invoices</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Supplier Invoices</h1>
             <p className="text-sm text-gray-500">Accounts payable — match, approve, and pay supplier bills</p>
           </div>
         </div>
         <button onClick={() => { setForm(blank()); setParseNote(null); setParsedFile(null); setShowModal(true) }}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238]">
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700">
           <Plus className="h-4 w-4" /> New Invoice
         </button>
       </div>
@@ -127,7 +127,7 @@ export default function SupplierInvoicesPage() {
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <Stat label="Total" value={String(summary.total)} sub={formatTotals(summary.total_amount)} />
           <Stat label="Unmatched" value={String(summary.unmatched)} accent="text-amber-600" />
-          <Stat label="Approved" value={String(summary.approved)} accent="text-indigo-600" />
+          <Stat label="Approved" value={String(summary.approved)} accent="text-primary-600" />
           <Stat label="Paid" value={String(summary.paid)} accent="text-green-600" />
           <Stat label="Disputed" value={String(summary.disputed)} accent="text-red-600" />
         </div>
@@ -137,7 +137,7 @@ export default function SupplierInvoicesPage() {
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search supplier..."
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]" />
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
           <option value="">All statuses</option>{['received', 'matched', 'approved', 'paid', 'disputed', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
@@ -149,7 +149,7 @@ export default function SupplierInvoicesPage() {
 
       {/* List */}
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 text-[#647C47] animate-spin" /></div>
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 text-primary-500 animate-spin" /></div>
       ) : invoices.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-500">
           <Receipt className="h-10 w-10 mx-auto mb-2 text-gray-300" /> No supplier invoices yet.
@@ -184,8 +184,8 @@ export default function SupplierInvoicesPage() {
             </div>
             <form onSubmit={onSave} className="p-4 space-y-3">
               {/* AI parse */}
-              <label className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-[#647C47] text-sm text-gray-600">
-                {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-[#647C47]" />}
+              <label className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-primary-500 text-sm text-gray-600">
+                {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary-500" />}
                 {parsing ? 'Reading invoice…' : 'Upload a PDF/image to auto-extract'}
                 <input type="file" accept="application/pdf,image/*" className="hidden" disabled={parsing}
                   onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onParse(f) }} />
@@ -207,7 +207,7 @@ export default function SupplierInvoicesPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50">{saving ? 'Saving…' : 'Create'}</button>
+                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50">{saving ? 'Saving…' : 'Create'}</button>
               </div>
             </form>
           </div>
@@ -217,7 +217,7 @@ export default function SupplierInvoicesPage() {
   )
 }
 
-const inp = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]'
+const inp = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500'
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>{children}</div>
 }
@@ -226,7 +226,7 @@ function Stat({ label, value, sub, accent }: { label: string; value: string; sub
     <div className="bg-white border border-gray-200 rounded-lg p-3">
       <p className="text-xs text-gray-500">{label}</p>
       <p className={`text-xl font-semibold ${accent || 'text-gray-900'}`}>{value}</p>
-      {sub && <p className="text-[11px] text-gray-400">{sub}</p>}
+      {sub && <p className="text-xs text-gray-400">{sub}</p>}
     </div>
   )
 }

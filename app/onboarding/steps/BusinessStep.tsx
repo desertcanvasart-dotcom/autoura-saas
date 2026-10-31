@@ -2,7 +2,7 @@
 
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 import { useState, useEffect } from 'react'
-import { ArrowRight, ArrowLeft, Building2, DollarSign, Package } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Building2, DollarSign, Package, Map as MapIcon, Bus, Ship, Plane, Drama, type LucideIcon } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface BusinessStepProps {
@@ -14,29 +14,24 @@ interface BusinessStepProps {
 
 // Every currency the app supports (lib/currency) — four were offered, so a
 // Moroccan or Jordanian company started in EUR with no way out.
-const FLAGS: Record<string, string> = {
-  EUR: '🇪🇺', USD: '🇺🇸', GBP: '🇬🇧', EGP: '🇪🇬', AED: '🇦🇪', SAR: '🇸🇦',
-  JOD: '🇯🇴', MAD: '🇲🇦', TND: '🇹🇳', KES: '🇰🇪', TZS: '🇹🇿', ZAR: '🇿🇦',
-}
 const CURRENCIES = SUPPORTED_CURRENCIES.map(c => ({
   value: c,
   label: `${c} (${getCurrencySymbol(c)})`,
-  flag: FLAGS[c] ?? '💱',
 }))
 
 const LANGUAGES = [
-  { value: 'en', label: 'English', flag: '🇬🇧', note: null },
-  { value: 'fr', label: 'Français', flag: '🇫🇷', note: 'coming soon' },
-  { value: 'es', label: 'Español', flag: '🇪🇸', note: 'coming soon' }
+  { value: 'en', label: 'English', note: null },
+  { value: 'fr', label: 'Français', note: 'coming soon' },
+  { value: 'es', label: 'Español', note: 'coming soon' }
 ]
 
-const SERVICES = [
-  { value: 'tours', label: 'Multi-Day Tours', icon: '🗺️' },
-  { value: 'day-trips', label: 'Day Trips', icon: '🚌' },
-  { value: 'packages', label: 'Travel Packages', icon: '📦' },
-  { value: 'cruises', label: 'Cruises', icon: '🚢' },
-  { value: 'transfers', label: 'Airport Transfers', icon: '✈️' },
-  { value: 'experiences', label: 'Activities & Experiences', icon: '🎭' }
+const SERVICES: Array<{ value: string; label: string; icon: LucideIcon }> = [
+  { value: 'tours', label: 'Multi-Day Tours', icon: MapIcon },
+  { value: 'day-trips', label: 'Day Trips', icon: Bus },
+  { value: 'packages', label: 'Travel Packages', icon: Package },
+  { value: 'cruises', label: 'Cruises', icon: Ship },
+  { value: 'transfers', label: 'Airport Transfers', icon: Plane },
+  { value: 'experiences', label: 'Activities & Experiences', icon: Drama }
 ]
 
 export default function BusinessStep({ onNext, onBack, currentStep, tenant }: BusinessStepProps) {
@@ -127,7 +122,6 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-2xl mb-1">{curr.flag}</div>
                   <div className="font-medium text-sm text-gray-900">
                     {curr.label}
                   </div>
@@ -152,7 +146,6 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-2xl mb-1">{lang.flag}</div>
                   <div className="font-medium text-sm text-gray-900">{lang.label}</div>
                   {lang.note && (
                     <div className="text-xs text-gray-500 mt-0.5">{lang.note}</div>
@@ -182,7 +175,7 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl">{service.icon}</div>
+                    <service.icon className="w-5 h-5 text-primary-600" />
                     <div className="font-medium text-gray-900">
                       {service.label}
                     </div>

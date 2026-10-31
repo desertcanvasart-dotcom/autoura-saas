@@ -1,5 +1,4 @@
 'use client'
-import SupplierSourcingSetting from '@/components/SupplierSourcingSetting'
 import CompanyDataCard from '@/components/account/CompanyDataCard'
 
 import { TIMEZONES } from '@/lib/timezones'
@@ -267,7 +266,7 @@ export default function TenantSettingsPage() {
     if (!pct(defaultMargin)) problems.push('House margin is a percentage from 0 to 100')
     if (!pct(minMargin)) problems.push('Minimum margin is a percentage from 0 to 100')
     const house = num(defaultMargin), floor = num(minMargin)
-    if (house !== null && floor !== null && floor > house) problems.push('The minimum margin cannot be above the house margin')
+    if (house !== null && floor !== null && floor > house) problems.push('The minimum margin cannot be above the markup (Settings › Pricing defaults)')
     if (!pct(depositPercent)) problems.push('Deposit is a percentage from 0 to 100')
     const due = num(depositDueDays)
     if (due !== null && !(Number.isInteger(due) && due >= 0 && due <= 365)) problems.push('Deposit due days is a whole number from 0 to 365')
@@ -325,7 +324,6 @@ export default function TenantSettingsPage() {
         secondary_color: secondaryColor,
         // Empty field -> NULL -> the resolver falls through to the platform
         // constant. Storing 0 here would silently make every quote at-cost.
-        default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
         // Blank -> NULL -> resolveDepositRule falls back to the defaults.
         deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
         deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
@@ -451,7 +449,7 @@ export default function TenantSettingsPage() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 text-[#647C47] animate-spin" />
+          <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
         </div>
       </div>
     )
@@ -462,11 +460,11 @@ export default function TenantSettingsPage() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-semibold text-yellow-900">Access Denied</h3>
-              <p className="text-xs text-yellow-700 mt-0.5">
+              <h3 className="text-sm font-semibold text-amber-900">Access Denied</h3>
+              <p className="text-xs text-amber-700 mt-0.5">
                 Only owners and admins can access tenant settings.
               </p>
             </div>
@@ -483,7 +481,7 @@ export default function TenantSettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving || uploading || !companyName}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {uploading ? (
                 <>
@@ -505,8 +503,11 @@ export default function TenantSettingsPage() {
       </div>
 
       <div className="space-y-4">
-        {/* Where this agency books suppliers from (Supplier Network Phase 3) */}
-        <SupplierSourcingSetting canEdit={isAdmin} />
+        {/* Where this agency books suppliers from lives in Settings › Supplier network. */}
+        <p className="text-sm text-gray-600">
+          Where you book suppliers from — your own list, the Autoura network, or both — is in{' '}
+          <Link href="/settings/supplier-network" className="text-primary-700 underline">Settings › Supplier network</Link>.
+        </p>
 
         {/* Message */}
         {message && (
@@ -548,7 +549,7 @@ export default function TenantSettingsPage() {
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Your Company Name"
               />
             </div>
@@ -561,36 +562,26 @@ export default function TenantSettingsPage() {
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="contact@company.com"
               />
             </div>
 
+            {/* The markup is set once, in Settings › Pricing defaults (456). */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                House Margin %
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Applies to anyone without a personal margin)</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="200"
-                step="0.5"
-                value={defaultMargin}
-                onChange={(e) => setDefaultMargin(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                placeholder="Not set — uses 25%"
-              />
-              <p className="mt-1 text-[10px] text-gray-400">
-                Leave blank to use the platform default. A colleague who clears their own
-                margin falls back to this.
+              <p className="block text-xs font-medium text-gray-700 mb-1">Markup on supplier cost</p>
+              <p className="px-3 py-1.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg">
+                {defaultMargin.trim() === '' ? 'Not set — uses 25%' : `${defaultMargin}%`}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                Set in <Link href="/settings/pricing" className="underline">Settings › Pricing defaults</Link>.
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Minimum Margin %
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Warn below this)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(Warn below this)</span>
               </label>
               <input
                 type="number"
@@ -599,11 +590,11 @@ export default function TenantSettingsPage() {
                 step="0.5"
                 value={minMargin}
                 onChange={(e) => setMinMargin(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Not set — no warning"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
-                On cost, like the house margin. An itinerary whose quoted margin, or profit so far,
+              <p className="mt-1 text-xs text-gray-400">
+                On cost, like the markup. An itinerary whose quoted margin, or profit so far,
                 is below this shows it under Needs attention. A trip losing money is always shown.
               </p>
             </div>
@@ -611,7 +602,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Deposit %
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(New bookings)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(New bookings)</span>
               </label>
               <input
                 type="number"
@@ -620,10 +611,10 @@ export default function TenantSettingsPage() {
                 step="1"
                 value={depositPercent}
                 onChange={(e) => setDepositPercent(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Not set — uses 30%"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Applied when a confirmed itinerary creates its booking.
               </p>
             </div>
@@ -639,10 +630,10 @@ export default function TenantSettingsPage() {
                 step="1"
                 value={depositDueDays}
                 onChange={(e) => setDepositDueDays(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Not set — uses 7"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Days from booking creation until the deposit deadline.
               </p>
             </div>
@@ -657,7 +648,7 @@ export default function TenantSettingsPage() {
                 value={companyTimezone}
                 onChange={(e) => setCompanyTimezone(e.target.value)}
                 disabled={!isAdmin}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white disabled:bg-gray-50"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white disabled:bg-gray-50"
               >
                 <option value="">Not set (UTC)</option>
                 {TIMEZONES.filter(tz => tz.value !== 'UTC').map(tz => (
@@ -667,7 +658,7 @@ export default function TenantSettingsPage() {
                   <option value={companyTimezone}>{companyTimezone}</option>
                 )}
               </select>
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 What &ldquo;today&rdquo; means for due dates, reminders and emails sent by the system.
               </p>
             </div>
@@ -677,7 +668,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Country you operate in
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(Contracts)</span>
               </label>
               <input
                 type="text"
@@ -685,10 +676,10 @@ export default function TenantSettingsPage() {
                 value={operatingCountry}
                 onChange={(e) => setOperatingCountry(e.target.value)}
                 disabled={!isAdmin}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-50"
                 placeholder="e.g. Egypt"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Contracts say the balance is paid on arrival here, and that clients need visas for travel here.
                 Blank: no country is named.
               </p>
@@ -696,7 +687,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Governing law
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(Contracts)</span>
               </label>
               <input
                 type="text"
@@ -704,10 +695,10 @@ export default function TenantSettingsPage() {
                 value={governingLaw}
                 onChange={(e) => setGoverningLaw(e.target.value)}
                 disabled={!isAdmin}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-50"
                 placeholder="e.g. Egyptian law"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Disputes go to arbitration under this law. Blank: the law of the country you are registered in.
               </p>
             </div>
@@ -722,14 +713,14 @@ export default function TenantSettingsPage() {
               value={agencyCurrency}
               onChange={(e) => setAgencyCurrency(e.target.value)}
               disabled={!isAdmin}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               {!agencyCurrency && <option value="">Choose…</option>}
               {SUPPORTED_CURRENCIES.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <p className="mt-1.5 text-[11px] text-gray-500">
+            <p className="mt-1.5 text-xs text-gray-500">
               Your company&apos;s own currency: invoices, commissions, the P&amp;L and new quotes
               start in it. Documents already issued keep their currency.
             </p>
@@ -743,14 +734,14 @@ export default function TenantSettingsPage() {
               value={ratesCurrency}
               onChange={(e) => setRatesCurrency(e.target.value)}
               disabled={!isAdmin}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               <option value="">EUR (default)</option>
               {SUPPORTED_CURRENCIES.filter(c => c !== 'EUR').map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <p className="mt-1.5 text-[11px] text-gray-500">
+            <p className="mt-1.5 text-xs text-gray-500">
               The currency all your stored rates are read in and pricing runs in. Individual
               rates entered in another currency (the per-rate selector) are converted into
               this one automatically. Changing this does NOT convert existing numbers — it
@@ -768,7 +759,7 @@ export default function TenantSettingsPage() {
                 <Users className="w-4 h-4 text-gray-600" />
                 <h2 className="text-sm font-semibold text-gray-900">Limits</h2>
               </div>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Plan controlled</span>
+              <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Plan controlled</span>
             </div>
 
             <p className="text-xs text-gray-600">
@@ -777,7 +768,7 @@ export default function TenantSettingsPage() {
             </p>
             <Link
               href="/settings/billing/usage"
-              className="mt-3 inline-flex items-center gap-1 text-xs text-[#647C47] hover:text-[#4f613a] font-medium"
+              className="mt-3 inline-flex items-center gap-1 text-xs text-primary-500 hover:text-[#4f613a] font-medium"
             >
               <FileText className="w-3 h-3" />
               View limits and usage
@@ -785,7 +776,7 @@ export default function TenantSettingsPage() {
 
             <Link
               href="/settings/billing/plans"
-              className="mt-3 inline-flex items-center gap-1 text-xs text-[#647C47] hover:text-[#4f613a] font-medium"
+              className="mt-3 inline-flex items-center gap-1 text-xs text-primary-500 hover:text-[#4f613a] font-medium"
             >
               <FileText className="w-3 h-3" />
               Upgrade plan for higher limits
@@ -801,7 +792,7 @@ export default function TenantSettingsPage() {
               <h2 className="text-sm font-semibold text-gray-900">Team Activity</h2>
             </div>
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded ${
+              className={`text-xs px-1.5 py-0.5 rounded ${
                 activityEnabled ? 'text-green-700 bg-green-50' : 'text-gray-400 bg-gray-100'
               }`}
             >
@@ -821,7 +812,7 @@ export default function TenantSettingsPage() {
               checked={activityEnabled || activityEnableRequested}
               onChange={(e) => handleActivityToggle(e.target.checked)}
               disabled={activitySaving}
-              className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+              className="w-3.5 h-3.5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
             />
             <span className="text-xs text-gray-700">
               {activitySaving && !activityEnableRequested
@@ -837,7 +828,7 @@ export default function TenantSettingsPage() {
                   type="checkbox"
                   checked={activityInformedConfirmed}
                   onChange={(e) => setActivityInformedConfirmed(e.target.checked)}
-                  className="mt-0.5 w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                  className="mt-0.5 w-3.5 h-3.5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <span className="text-xs text-gray-700">
                   My team has been informed that activity summaries will be visible
@@ -847,7 +838,7 @@ export default function TenantSettingsPage() {
                 type="button"
                 onClick={() => saveActivitySummary(true)}
                 disabled={!activityInformedConfirmed || activitySaving}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {activitySaving ? (
                   <>
@@ -861,7 +852,7 @@ export default function TenantSettingsPage() {
             </div>
           )}
 
-          <p className="mt-3 text-[11px] text-gray-400">
+          <p className="mt-3 text-xs text-gray-400">
             Activity reflects work inside Autoura only. Phone calls, meetings, and off-app
             work are not captured.
           </p>
@@ -879,7 +870,7 @@ export default function TenantSettingsPage() {
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Company Logo
             </label>
-            <p className="text-[10px] text-gray-400 mb-2">
+            <p className="text-xs text-gray-400 mb-2">
               Recommended: Square image (500x500px), PNG or JPEG. Max 2MB
             </p>
 
@@ -918,7 +909,7 @@ export default function TenantSettingsPage() {
                       {logoFile?.name || 'Current logo'}
                     </p>
                     {logoFile && (
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-gray-500">
                         {(logoFile.size / 1024).toFixed(1)} KB
                       </p>
                     )}
@@ -952,7 +943,7 @@ export default function TenantSettingsPage() {
                   type="text"
                   value={primaryColor}
                   onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] font-mono"
+                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 font-mono"
                   placeholder="#647C47"
                 />
               </div>
@@ -973,7 +964,7 @@ export default function TenantSettingsPage() {
                   type="text"
                   value={secondaryColor}
                   onChange={(e) => setSecondaryColor(e.target.value)}
-                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] font-mono"
+                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 font-mono"
                   placeholder="#10B981"
                 />
               </div>
@@ -982,7 +973,7 @@ export default function TenantSettingsPage() {
 
           {/* Color Preview */}
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Preview</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Preview</p>
             <div className="flex items-center gap-2">
               <div
                 className="w-8 h-8 rounded-lg shadow-sm"
@@ -1005,7 +996,7 @@ export default function TenantSettingsPage() {
             <FileText className="w-4 h-4 text-gray-600" />
             <h2 className="text-sm font-semibold text-gray-900">Document header &amp; footer</h2>
           </div>
-          <p className="text-[11px] text-gray-500 mb-3">
+          <p className="text-xs text-gray-500 mb-3">
             Printed on the documents you send suppliers (vouchers, service orders). The header shows your logo, company name and tagline; the footer shows the details below. Leave a field blank to leave it off.
           </p>
 
@@ -1023,7 +1014,7 @@ export default function TenantSettingsPage() {
                   type="text"
                   value={value}
                   onChange={(e) => set(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                   placeholder={placeholder}
                 />
               </div>
@@ -1034,21 +1025,21 @@ export default function TenantSettingsPage() {
                 value={companyAddress}
                 onChange={(e) => setCompanyAddress(e.target.value)}
                 rows={2}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Street, city, country"
               />
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Footer note
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(bank details, a legal note — printed at the bottom of every page)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(bank details, a legal note — printed at the bottom of every page)</span>
               </label>
               <textarea
                 value={footerText}
                 onChange={(e) => setFooterText(e.target.value)}
                 rows={2}
                 maxLength={400}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="e.g. Bank: CIB · IBAN EG00 0000 0000 0000 0000 0000 000"
               />
             </div>
@@ -1056,7 +1047,7 @@ export default function TenantSettingsPage() {
 
           {/* Live preview of exactly what the footer will print */}
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Footer preview</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Footer preview</p>
             <DocumentFooter
               company={identityFromTenant({
                 company_name: companyName, contact_email: contactEmail, company_phone: companyPhone,

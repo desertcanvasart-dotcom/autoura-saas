@@ -270,7 +270,7 @@ export default function TranslationPanel({
 
   // Full panel mode
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg overflow-hidden">
+    <div className="bg-gradient-to-r from-blue-50 to-primary-50 border border-blue-200 rounded-lg overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 flex items-center justify-between border-b border-blue-200 bg-white/50">
         <div className="flex items-center gap-3">

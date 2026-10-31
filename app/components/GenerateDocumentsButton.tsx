@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, ChevronDown, Loader2, Check, AlertCircle } from 'lucide-react'
+import { FileText, ChevronDown, Loader2, Check, AlertCircle, Hotel, Car, UserRound, ClipboardList, Ship, Eye } from 'lucide-react'
 import { withReturnTo } from '@/lib/nav/return-to'
 
 interface GenerateDocumentsButtonProps {
@@ -15,12 +15,12 @@ interface GenerateDocumentsButtonProps {
 }
 
 const DOCUMENT_TYPES = [
-  { value: 'all', label: 'Generate All', icon: '📄' },
-  { value: 'hotel_voucher', label: 'Hotel Vouchers', icon: '🏨' },
-  { value: 'transport_voucher', label: 'Transport Vouchers', icon: '🚗' },
-  { value: 'guide_assignment', label: 'Guide Assignments', icon: '👨‍🏫' },
-  { value: 'service_order', label: 'Service Orders (Meals & Entrance)', icon: '📋' },
-  { value: 'cruise_voucher', label: 'Cruise Vouchers', icon: '🚢' },
+  { value: 'all', label: 'Generate All', icon: FileText },
+  { value: 'hotel_voucher', label: 'Hotel Vouchers', icon: Hotel },
+  { value: 'transport_voucher', label: 'Transport Vouchers', icon: Car },
+  { value: 'guide_assignment', label: 'Guide Assignments', icon: UserRound },
+  { value: 'service_order', label: 'Service Orders (Meals & Entrance)', icon: ClipboardList },
+  { value: 'cruise_voucher', label: 'Cruise Vouchers', icon: Ship },
 ]
 
 export default function GenerateDocumentsButton({ itineraryId, itineraryCode, label = 'Documents', quiet = false }: GenerateDocumentsButtonProps) {
@@ -117,7 +117,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
             : quiet
               ? 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-primary-600 text-white hover:bg-primary-700'
         }`}
       >
         {generating ? (
@@ -142,7 +142,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
             onClick={viewDocuments}
             className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 border-b border-gray-100"
           >
-            <span>👁️</span>
+            <Eye className="w-4 h-4 text-gray-500" />
             <span>View Documents</span>
           </button>
 
@@ -162,7 +162,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
                   : 'text-gray-700'
               }`}
             >
-              <span>{type.icon}</span>
+              <type.icon className="w-4 h-4 text-gray-500" />
               <span>{type.label}</span>
             </button>
           ))}

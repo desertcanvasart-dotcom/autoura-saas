@@ -91,7 +91,7 @@ export default function UnifiedConversationComposer({ conversation, userId, onSe
           <button
             onClick={() => setChannel('email')}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-              channel === 'email' ? 'bg-[#647C47] text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              channel === 'email' ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
             }`}
           >
             <Mail className="w-3 h-3" />
@@ -108,9 +108,9 @@ export default function UnifiedConversationComposer({ conversation, userId, onSe
             <div className="flex items-center gap-3 px-4 py-3">
               <button
                 onClick={() => setEmailOpen(true)}
-                className="flex-1 flex items-center gap-2 px-4 py-2.5 text-sm text-left text-gray-500 border border-gray-200 rounded-lg hover:border-[#647C47] hover:text-gray-700 transition-colors"
+                className="flex-1 flex items-center gap-2 px-4 py-2.5 text-sm text-left text-gray-500 border border-gray-200 rounded-lg hover:border-primary-500 hover:text-gray-700 transition-colors"
               >
-                <Reply className="w-4 h-4 text-[#647C47]" />
+                <Reply className="w-4 h-4 text-primary-500" />
                 Reply to {conversation.contact_email}…
               </button>
             </div>
@@ -301,14 +301,14 @@ function WhatsAppCompose({
       />
 
       {drafts.length > 0 && (
-        <div className="px-4 pb-3 space-y-2 bg-gradient-to-b from-purple-50/40 to-white">
+        <div className="px-4 pb-3 space-y-2 bg-gradient-to-b from-primary-50/40 to-white">
           {drafts.map((d, idx) => (
-            <div key={d.id} className="rounded-lg border border-purple-100 bg-white p-3">
+            <div key={d.id} className="rounded-lg border border-primary-100 bg-white p-3">
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
                   {d.ai_confidence && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -321,7 +321,7 @@ function WhatsAppCompose({
                 </div>
               </div>
               <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{d.draft_body}</p>
-              {d.ai_flags?.rationale && <p className="mt-1.5 text-[11px] text-gray-400 italic">{d.ai_flags.rationale}</p>}
+              {d.ai_flags?.rationale && <p className="mt-1.5 text-xs text-gray-400 italic">{d.ai_flags.rationale}</p>}
             </div>
           ))}
         </div>
@@ -579,19 +579,19 @@ function EmailCompose({
       />
 
       {drafts.length > 0 && (
-        <div className="px-4 pb-3 space-y-2 bg-gradient-to-b from-purple-50/40 to-white">
+        <div className="px-4 pb-3 space-y-2 bg-gradient-to-b from-primary-50/40 to-white">
           {drafts.map((d, idx) => (
-            <div key={d.id} className="rounded-lg border border-purple-100 bg-white p-3">
+            <div key={d.id} className="rounded-lg border border-primary-100 bg-white p-3">
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
                   {d.ai_confidence && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
                   )}
-                  {d.ai_flags?.subject && <span className="text-[11px] text-gray-500 truncate">{d.ai_flags.subject}</span>}
+                  {d.ai_flags?.subject && <span className="text-xs text-gray-500 truncate">{d.ai_flags.subject}</span>}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-[#647C47] text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
+                  <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-primary-500 text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
                     <Check className="w-3 h-3" /> Use
                   </button>
                   <button onClick={() => dismiss(d.id)} className="p-1 text-gray-400 hover:text-red-500 rounded">
@@ -600,7 +600,7 @@ function EmailCompose({
                 </div>
               </div>
               <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{d.draft_body}</p>
-              {d.ai_flags?.rationale && <p className="mt-1.5 text-[11px] text-gray-400 italic">{d.ai_flags.rationale}</p>}
+              {d.ai_flags?.rationale && <p className="mt-1.5 text-xs text-gray-400 italic">{d.ai_flags.rationale}</p>}
             </div>
           ))}
         </div>
@@ -613,7 +613,7 @@ function EmailCompose({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 w-14">Subject</span>
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
         </div>
 
         <RichReplyEditor html={bodyHtml} onChange={setBodyHtml} placeholder="Write your email…" minHeight={180} />
@@ -621,7 +621,7 @@ function EmailCompose({
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {attachments.map((a, idx) => (
-              <span key={idx} className="inline-flex items-center gap-1 text-[11px] bg-gray-100 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5">
+              <span key={idx} className="inline-flex items-center gap-1 text-xs bg-gray-100 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5">
                 <Paperclip className="w-3 h-3 text-gray-500" />
                 <span className="truncate max-w-[160px]">{a.filename}</span>
                 <span className="text-gray-400">{formatBytes(a.size)}</span>
@@ -630,7 +630,7 @@ function EmailCompose({
                 </button>
               </span>
             ))}
-            <span className="text-[11px] text-gray-400 self-center">{formatBytes(totalAttachBytes)} total</span>
+            <span className="text-xs text-gray-400 self-center">{formatBytes(totalAttachBytes)} total</span>
           </div>
         )}
 
@@ -659,7 +659,7 @@ function EmailCompose({
           <button
             onClick={send}
             disabled={!canSend}
-            className="flex items-center gap-1.5 bg-[#647C47] text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-primary-500 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             {sending ? 'Sending…' : 'Send reply'}
@@ -687,29 +687,29 @@ function CopilotHeader({
   panelError: string | null
 }) {
   return (
-    <div className="bg-gradient-to-b from-purple-50/40 to-white">
+    <div className="bg-gradient-to-b from-primary-50/40 to-white">
       <div className="px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs">
-          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+          <Sparkles className="w-3.5 h-3.5 text-primary-600" />
           <span className="font-medium text-gray-700">AI Copilot</span>
           {tone && <span className="text-gray-400">· {tone}</span>}
           {retrievedCount > 0 && (
-            <span className="text-purple-600 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5 text-[10px]">
+            <span className="text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5 text-xs">
               {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
             </span>
           )}
           {fromPregenerate && (
-            <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-[10px]">ready</span>
+            <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-xs">ready</span>
           )}
         </div>
         <div className="flex items-center gap-1">
           {hasDrafts && (
-            <button onClick={onRegenerate} disabled={generating} className="flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600 px-2 py-1 rounded disabled:opacity-50">
+            <button onClick={onRegenerate} disabled={generating} className="flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 px-2 py-1 rounded disabled:opacity-50">
               <RefreshCw className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} /> Regenerate
             </button>
           )}
           {!hasDrafts && (
-            <button onClick={onGenerate} disabled={generating} className="flex items-center gap-1.5 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-full hover:bg-purple-700 disabled:opacity-50">
+            <button onClick={onGenerate} disabled={generating} className="flex items-center gap-1.5 text-xs bg-primary-600 text-white px-3 py-1.5 rounded-full hover:bg-primary-700 disabled:opacity-50">
               {generating ? (<><Loader2 className="w-3 h-3 animate-spin" />Thinking…</>) : (<><Sparkles className="w-3 h-3" />Suggest Reply</>)}
             </button>
           )}

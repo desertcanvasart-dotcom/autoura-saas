@@ -15,6 +15,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PagePayload } from './contract'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { narrativeText, paragraphs } from '../../sites/themes/blocks/narrative'
 import { formatPrice, formatWeekdays } from '../../sites/themes/blocks/format'
 
@@ -133,6 +134,12 @@ export async function standaloneHtml(
 
 // ---------- the export ----------
 
+/** The company has no website: said to the person as it is (404). Any other
+ *  failure is a 500 whose detail stays in the server log. */
+export class NoSiteToExport extends Error {
+  constructor() { super('This company has no website yet.') }
+}
+
 export async function buildSiteExport(db: SupabaseClient, tenantId: string, deps: ExportDeps): Promise<{ zip: Uint8Array; filename: string; counts: Record<string, number> }> {
   const read = async <T>(what: string, q: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> => {
     const { data, error } = await q
@@ -141,7 +148,7 @@ export async function buildSiteExport(db: SupabaseClient, tenantId: string, deps
   }
   const site = await read<Row | null>('the site', db.from('publish_sites')
     .select('id, archetype, status, languages, brand, settings, tenants(company_name)').eq('tenant_id', tenantId).maybeSingle())
-  if (!site) throw new Error('This company has no website yet.')
+  if (!site) throw new NoSiteToExport()
   const siteId = site.id as string
   const languages = site.languages as string[]
   const companyName = ((site.tenants as { company_name?: string } | null)?.company_name ?? 'website')
@@ -152,9 +159,11 @@ export async function buildSiteExport(db: SupabaseClient, tenantId: string, deps
     read<Row[]>('redirects', db.from('publish_redirects').select('from_path, to_path, status_code').eq('site_id', siteId)),
     read<Row[]>('pages', db.from('publish_page_locales').select('language, slug, is_published, publish_pages(kind, tour_template_id)').eq('site_id', siteId)),
     read<Row[]>('media', db.from('publish_media').select('storage_path, width, height, alt, is_placeholder').eq('site_id', siteId)),
-    read<Row[]>('enquiries', db.from('publish_enquiries')
+    // Every enquiry, not PostgREST's first 1,000 (newest first; id breaks ties
+    // so no row falls between two pages).
+    read<Row[]>('enquiries', fetchAllPages<Row, { message: string }>((from, to) => db.from('publish_enquiries')
       .select('created_at, source, language, landing_url, campaign, utm, dates, travellers, message, tour_templates(template_name), clients(first_name, last_name, email, phone)')
-      .eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+      .eq('tenant_id', tenantId).order('created_at', { ascending: false }).order('id').range(from, to))),
   ])
 
   // Where the pages are served from: the live main address, else a test one.

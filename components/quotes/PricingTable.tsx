@@ -39,14 +39,14 @@ export default function PricingTable({
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+      <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <Users className="w-5 h-5" />
               Multi-Pax Pricing Table
             </h3>
-            <p className="text-sm text-purple-100 mt-1">
+            <p className="text-sm text-primary-100 mt-1">
               {tourLeaderIncluded ? 'Tour Leader +1 Included' : 'Standard Pricing'}
             </p>
           </div>
@@ -55,7 +55,7 @@ export default function PricingTable({
               <TrendingDown className="w-5 h-5" />
               <span className="text-2xl font-bold">{priceDropPercent}%</span>
             </div>
-            <div className="text-xs text-purple-100">savings at {lastPax} pax</div>
+            <div className="text-xs text-primary-100">savings at {lastPax} pax</div>
           </div>
         </div>
       </div>
@@ -73,21 +73,21 @@ export default function PricingTable({
                 key={pax}
                 className={`rounded-lg border-2 p-4 text-center transition-all ${
                   isHighlighted
-                    ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-500 ring-offset-2'
-                    : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                    ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500 ring-offset-2'
+                    : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50'
                 }`}
               >
                 {/* Pax Count */}
                 <div className="flex items-center justify-center gap-1 mb-2">
-                  <Users className={`w-4 h-4 ${isHighlighted ? 'text-purple-600' : 'text-gray-400'}`} />
-                  <span className={`text-2xl font-bold ${isHighlighted ? 'text-purple-700' : 'text-gray-900'}`}>
+                  <Users className={`w-4 h-4 ${isHighlighted ? 'text-primary-600' : 'text-gray-400'}`} />
+                  <span className={`text-2xl font-bold ${isHighlighted ? 'text-primary-700' : 'text-gray-900'}`}>
                     {pax}
                   </span>
                 </div>
 
                 {/* Tour Leader Indicator */}
                 {tourLeaderIncluded && (
-                  <div className="text-[10px] text-purple-600 font-medium mb-2">
+                  <div className="text-xs text-primary-600 font-medium mb-2">
                     +1 TL = {effectivePax} total
                   </div>
                 )}
@@ -95,15 +95,15 @@ export default function PricingTable({
                 {/* Per Person Price */}
                 <div className="mb-3">
                   <div className="text-xs text-gray-500 mb-1">Per Person</div>
-                  <div className={`text-lg font-bold ${isHighlighted ? 'text-purple-700' : 'text-gray-900'}`}>
+                  <div className={`text-lg font-bold ${isHighlighted ? 'text-primary-700' : 'text-gray-900'}`}>
                     {currency} {pricing.pp.toLocaleString()}
                   </div>
                 </div>
 
                 {/* Total Price */}
-                <div className={`pt-3 border-t ${isHighlighted ? 'border-purple-200' : 'border-gray-200'}`}>
+                <div className={`pt-3 border-t ${isHighlighted ? 'border-primary-200' : 'border-gray-200'}`}>
                   <div className="text-xs text-gray-500 mb-1">Total</div>
-                  <div className={`text-sm font-semibold ${isHighlighted ? 'text-purple-600' : 'text-gray-700'}`}>
+                  <div className={`text-sm font-semibold ${isHighlighted ? 'text-primary-600' : 'text-gray-700'}`}>
                     {currency} {pricing.total.toLocaleString()}
                   </div>
                 </div>
@@ -138,8 +138,8 @@ export default function PricingTable({
 
         {/* Note about tour leader */}
         {tourLeaderIncluded && (
-          <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-            <p className="text-xs text-purple-700">
+          <div className="mt-4 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+            <p className="text-xs text-primary-700">
               <strong>Tour Leader (+1):</strong> All prices include one complimentary tour leader. The cost is distributed across paying passengers.
             </p>
           </div>

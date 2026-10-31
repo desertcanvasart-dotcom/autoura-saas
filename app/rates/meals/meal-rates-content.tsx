@@ -545,10 +545,10 @@ export default function MealRatesContent() {
               <button
                 onClick={() => setNotification(null)}
                 className={`px-6 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
-                  notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                  notification.type === 'success' ? 'bg-primary-600 hover:bg-primary-700' :
                   notification.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
                   notification.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' :
-                  'bg-blue-600 hover:bg-blue-700'
+                  'bg-blue-600 hover:bg-primary-700'
                 }`}
               >
                 Got it
@@ -653,13 +653,13 @@ export default function MealRatesContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-100 rounded-lg">
-            <Utensils className="w-6 h-6 text-orange-600" />
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <Utensils className="w-6 h-6 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Meal Rates
-              <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+              <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
             </h1>
             <p className="text-sm text-gray-600">Manage restaurant and meal pricing</p>
           </div>
@@ -675,7 +675,7 @@ export default function MealRatesContent() {
           </button>
           <Link
             href="/suppliers?type=restaurant"
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50"
           >
             <Utensils className="w-4 h-4" />
             Restaurants
@@ -704,7 +704,7 @@ export default function MealRatesContent() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-600"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{linkedRates}</p>
           <p className="text-xs text-gray-600">Linked</p>
@@ -720,7 +720,7 @@ export default function MealRatesContent() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{uniqueCities}</p>
           <p className="text-xs text-gray-600">Cities</p>
@@ -896,7 +896,7 @@ export default function MealRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Utensils className="w-4 h-4 text-orange-500" />
+                        <Utensils className="w-4 h-4 text-amber-500" />
                         <div>
                           <span className="text-sm font-semibold text-gray-900">{rate.restaurant_name}</span>
                           <p className="text-xs text-gray-500">{rate.service_code}</p>
@@ -905,7 +905,7 @@ export default function MealRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       {rate.meal_type ? (
-                        <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
                           <VocabLabel kind="meal_type" value={rate.meal_type} />
                         </span>
                       ) : (
@@ -974,7 +974,7 @@ export default function MealRatesContent() {
                       className="w-4 h-4 text-primary-600 border-gray-300 rounded"
                       aria-label={`Select ${rate.restaurant_name} rate`}
                     />
-                    <Utensils className="w-5 h-5 text-orange-500" />
+                    <Utensils className="w-5 h-5 text-amber-500" />
                     <span className="font-semibold text-gray-900">{rate.restaurant_name}</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -986,7 +986,7 @@ export default function MealRatesContent() {
 
                 <div className="flex items-center gap-2 mb-2">
                   {rate.meal_type && (
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
                       <VocabLabel kind="meal_type" value={rate.meal_type} />
                     </span>
                   )}
@@ -1044,11 +1044,11 @@ export default function MealRatesContent() {
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded"
                     aria-label={`Select ${rate.restaurant_name} rate`}
                   />
-                  <Utensils className="w-4 h-4 text-orange-500" />
+                  <Utensils className="w-4 h-4 text-amber-500" />
                   <span className="font-medium text-gray-900">{rate.restaurant_name}</span>
                   <span className="text-sm text-gray-500">{rate.city || '—'}</span>
                   {rate.meal_type && (
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
                       <VocabLabel kind="meal_type" value={rate.meal_type} />
                     </span>
                   )}
@@ -1173,7 +1173,7 @@ export default function MealRatesContent() {
               {/* Basic Info */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-bold">1</span>
                   Restaurant & Meal Details
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1330,7 +1330,7 @@ export default function MealRatesContent() {
               {/* Validity */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">4</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">4</span>
                   Validity Period
                 </h3>
                 <div className="grid grid-cols-2 gap-3">

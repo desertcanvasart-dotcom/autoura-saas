@@ -64,9 +64,9 @@ describe('the main sidebar', () => {
   it('Communicate holds the Inbox and each channel; every finance list has its own link', () => {
     const comm = mainNavFor('member').find(s => s.key === 'communicate')!.items.map(i => i.label)
     expect(comm).toEqual(['Inbox', 'Email', 'WhatsApp', 'Leads', 'Copilot', 'Message templates'])
-    for (const h of ['/accounts-receivable', '/receipts', '/accounts-payable', '/supplier-invoices']) expect(linksFor('admin')).toContain(h)
-    expect(linksFor('member')).toContain('/receipts')
-    expect(linksFor('member')).not.toContain('/accounts-receivable')
+    for (const h of ['/invoices?tab=unpaid', '/payments?tab=receipts', '/supplier-bills?tab=payables', '/supplier-bills']) expect(linksFor('admin')).toContain(h)
+    expect(linksFor('member')).toContain('/payments?tab=receipts')
+    expect(linksFor('member')).not.toContain('/invoices?tab=unpaid')
   })
 
   it('the only setup pages in it are Message templates and Team', () => {
@@ -85,8 +85,17 @@ describe('the main sidebar', () => {
     expect(activeHref(items, '/rates/check')).toBe('/rates/check')
     expect(activeHref(items, '/rates/hotels')).toBe('/rates/hotels')
     expect(activeHref(items, '/rates')).toBe('/rates')
-    expect(activeHref(items, '/network-suppliers')).toBe('/suppliers')
-    expect(activeHref(items, '/accounts-payable')).toBe('/accounts-payable')
+    expect(activeHref(items, '/airport-staff')).toBe('/suppliers')
+    expect(activeHref(items, '/suppliers')).toBe('/suppliers')
+    expect(activeHref(items, '/suppliers', 'tab=network')).toBe('/suppliers?tab=network')
+    expect(activeHref(items, '/suppliers', 'supplier=abc&tab=documents')).toBe('/suppliers')
+    expect(activeHref(items, '/supplier-bills')).toBe('/supplier-bills')
+    expect(activeHref(items, '/supplier-bills', 'tab=payables')).toBe('/supplier-bills?tab=payables')
+    expect(activeHref(items, '/supplier-invoices/abc')).toBe('/supplier-bills')
+    expect(activeHref(items, '/invoices')).toBe('/invoices')
+    expect(activeHref(items, '/invoices', 'tab=unpaid')).toBe('/invoices?tab=unpaid')
+    expect(activeHref(items, '/payments')).toBe('/payments')
+    expect(activeHref(items, '/payments', 'tab=receipts')).toBe('/payments?tab=receipts')
     expect(activeHref(items, '/nowhere')).toBeNull()
   })
 
@@ -192,5 +201,18 @@ describe('⌘K jump-to', () => {
     const src = readFileSync(path.join(process.cwd(), 'components/Sidebar.tsx'), 'utf8')
     expect(src).toContain('mainNavFor(role)')
     expect(src).not.toMatch(/href=["']\/(?!settings)/)
+  })
+})
+
+describe('the Rates menu', () => {
+  it('every category has a table to count, and nothing else', async () => {
+    const { RATE_TABLES } = await import('@/lib/rates/rate-categories')
+    const slugs = RATE_GROUPS.flatMap(g => g.categories.map(c => c.slug)).sort()
+    expect(Object.keys(RATE_TABLES).sort()).toEqual(slugs)
+  })
+
+  it('its summary is for managers and admins, like the sheets', () => {
+    const src = readFileSync(path.join(process.cwd(), 'app/api/rates/summary/route.ts'), 'utf8')
+    expect(src).toContain("roleDenied(auth.role, 'manage')")
   })
 })

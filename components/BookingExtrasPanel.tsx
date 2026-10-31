@@ -43,7 +43,7 @@ type Payload = {
 const STATUS_STYLE: Record<Extra['status'], string> = {
   requested: 'bg-amber-100 text-amber-800',
   offered: 'bg-blue-100 text-blue-800',
-  accepted: 'bg-indigo-100 text-indigo-800',
+  accepted: 'bg-primary-100 text-primary-800',
   confirmed: 'bg-[#e8ede3] text-[#4a5c35]',
   declined: 'bg-gray-100 text-gray-600',
   withdrawn: 'bg-gray-100 text-gray-600',
@@ -129,7 +129,7 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-[#647C47]" />
+          <Sparkles className="w-4 h-4 text-primary-500" />
           Extras and upgrades
           {data.confirmed_total ? (
             <span className="text-sm font-normal text-gray-500">— {money(data.confirmed_total, currency)} sold</span>
@@ -137,7 +137,7 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
         </h3>
 {canAct && (
         <button type="button" onClick={() => { setAdding(v => !v); setError(null) }}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47] rounded-lg hover:bg-[#e8ede3]">
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-500 border border-primary-500 rounded-lg hover:bg-[#e8ede3]">
           <Plus className="w-3.5 h-3.5" /> Add
         </button>
         )}
@@ -173,12 +173,12 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
           <div key={e.id} className="py-2.5 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm text-gray-900 flex items-center gap-1.5 flex-wrap">
-                {e.kind === 'upgrade' && <ArrowUpRight className="w-3.5 h-3.5 text-[#647C47] flex-shrink-0" />}
+                {e.kind === 'upgrade' && <ArrowUpRight className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />}
                 <span className="font-medium">{e.title}</span>
                 {e.quantity > 1 && <span className="text-gray-500">× {e.quantity}</span>}
-                <span className={`text-[11px] px-1.5 py-0.5 rounded ${STATUS_STYLE[e.status]}`}>{STATUS_LABEL[e.status]}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_STYLE[e.status]}`}>{STATUS_LABEL[e.status]}</span>
                 {e.requested_via === 'portal' && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">from the portal</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-800">from the portal</span>
                 )}
               </p>
               {e.description && <p className="text-xs text-gray-600 mt-0.5">{e.description}</p>}
@@ -196,7 +196,7 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
               )}
               {canConfirm && (e.status === 'offered' || e.status === 'accepted') && (
                 <button type="button" onClick={() => act(e, 'confirm')} disabled={busy === e.id}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-40">
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-40">
                   <Check className="w-3.5 h-3.5" /> Confirm
                 </button>
               )}
@@ -234,7 +234,7 @@ function PriceButton({ currency, disabled, onPrice }: { currency: string; disabl
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} disabled={disabled}
-        className="px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47] rounded-lg hover:bg-[#e8ede3] disabled:opacity-40">
+        className="px-2.5 py-1 text-xs font-medium text-primary-500 border border-primary-500 rounded-lg hover:bg-[#e8ede3] disabled:opacity-40">
         Price it
       </button>
     )
@@ -246,7 +246,7 @@ function PriceButton({ currency, disabled, onPrice }: { currency: string; disabl
         className="w-24 px-2 py-1 text-xs border border-gray-300 rounded-lg" />
       <button type="button" disabled={disabled || price === ''}
         onClick={() => { onPrice(price, currency); setOpen(false); setPrice('') }}
-        className="px-2 py-1 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-40">
+        className="px-2 py-1 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-40">
         Save
       </button>
       <button type="button" onClick={() => setOpen(false)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
@@ -279,7 +279,7 @@ type CatalogGroup = { source: string; label: string; items: CatalogItem[] }
 function AddExtra(props: { bookingId: string; currency: string; onDone: () => void; onError: (msg: string | null) => void }) {
   const [mode, setMode] = useState<'catalog' | 'manual'>('catalog')
   const tab = (active: boolean) =>
-    `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border ${active ? 'bg-[#647C47] text-white border-[#647C47]' : 'bg-white text-gray-700 border-gray-300'}`
+    `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border ${active ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-700 border-gray-300'}`
   return (
     <div className="bg-gray-50 rounded-lg p-3 mb-3">
       <div className="flex gap-2 mb-3">
@@ -344,7 +344,7 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
     return (
       <p className="text-sm text-gray-500">
         Nothing in the catalogue for this trip yet — mark options on the programme&rsquo;s variations, flag an attraction as a sellable extra, or add extras under Sell → Extras.{' '}
-        <button type="button" onClick={onTypeInstead} className="text-[#647C47] underline">Type one in instead.</button>
+        <button type="button" onClick={onTypeInstead} className="text-primary-500 underline">Type one in instead.</button>
       </p>
     )
   }
@@ -352,14 +352,14 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
     <div className="space-y-3">
       {groups.map(g => (
         <div key={g.source}>
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{g.label}</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{g.label}</p>
           <div className="divide-y bg-white rounded-lg border">
             {g.items.map(item => (
               <div key={item.source_id} className="p-2.5 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">{item.title}</p>
                   {item.subtitle && <p className="text-xs text-gray-600">{item.subtitle}</p>}
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     {item.unit_price == null ? item.price_note : `${money(item.unit_price, currency)} · ${item.price_note}`}
                     {item.unit === 'per_person' && numTravelers > 1 && ` · × ${numTravelers} travellers`}
                     {item.supplier_cost != null && ` · we pay ${money(item.supplier_cost, item.supplier_currency || currency)}`}
@@ -373,7 +373,7 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
                   )}
                   {busy === item.source_id && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
                   <button type="button" onClick={() => add(item, 'addon')} disabled={busy === item.source_id}
-                    className="px-2.5 py-1 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-40">Add</button>
+                    className="px-2.5 py-1 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-40">Add</button>
                   <button type="button" onClick={() => add(item, 'upgrade')} disabled={busy === item.source_id}
                     title="Add as an upgrade — the price is the difference, not the new price"
                     className="px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">As upgrade</button>
@@ -383,7 +383,7 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
           </div>
         </div>
       ))}
-      <p className="text-[11px] text-gray-500">Adding it changes nothing the customer owes — it becomes an offer. Confirm does that, once they have agreed.</p>
+      <p className="text-xs text-gray-500">Adding it changes nothing the customer owes — it becomes an offer. Confirm does that, once they have agreed.</p>
     </div>
   )
 }
@@ -419,7 +419,7 @@ function AddExtraForm({ bookingId, currency, onDone, onError }: { bookingId: str
       <div className="flex gap-2">
         {(['addon', 'upgrade'] as const).map(k => (
           <button key={k} type="button" onClick={() => setKind(k)}
-            className={`px-2.5 py-1 text-xs font-medium rounded-lg border ${kind === k ? 'bg-[#647C47] text-white border-[#647C47]' : 'bg-white text-gray-700 border-gray-300'}`}>
+            className={`px-2.5 py-1 text-xs font-medium rounded-lg border ${kind === k ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-700 border-gray-300'}`}>
             {k === 'addon' ? 'Add-on' : 'Upgrade'}
           </button>
         ))}
@@ -438,9 +438,9 @@ function AddExtraForm({ bookingId, currency, onDone, onError }: { bookingId: str
           <input type="number" min="0" step="0.01" value={supplierCost} onChange={e => setSupplierCost(e.target.value)} placeholder="optional" className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg" />
         </label>
       </div>
-      <p className="text-[11px] text-gray-500">Adding it changes nothing the customer owes. Confirm does that, once they have agreed.</p>
+      <p className="text-xs text-gray-500">Adding it changes nothing the customer owes. Confirm does that, once they have agreed.</p>
       <button type="submit" disabled={busy || !title.trim()}
-        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-40">
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-40">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add
       </button>
     </form>

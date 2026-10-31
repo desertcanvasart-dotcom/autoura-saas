@@ -183,7 +183,7 @@ export default function B2BPartnersPage() {
   if (authLoading || tenantLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#647C47] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -201,11 +201,11 @@ export default function B2BPartnersPage() {
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <XCircle className="w-8 h-8 text-red-600" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">You don't have permission to manage B2B partners.</p>
           <button
             onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35]"
           >
             Return to Dashboard
           </button>
@@ -217,7 +217,7 @@ export default function B2BPartnersPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#647C47] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -244,15 +244,15 @@ export default function B2BPartnersPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-[#647C47]" />
+          <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-primary-500" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">B2B Partners</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">B2B Partners</h1>
             <p className="text-sm text-gray-500">Manage partner accounts and pricing</p>
           </div>
         </div>
-        <button onClick={handleAddNew} className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium text-sm">
+        <button onClick={handleAddNew} className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] font-medium text-sm">
           <Plus className="w-4 h-4" /> Add Partner
         </button>
       </div>
@@ -273,7 +273,7 @@ export default function B2BPartnersPage() {
         </div>
         <div className="bg-white rounded-lg border p-4">
           <p className="text-xs text-gray-500 mb-1">Avg Margin</p>
-          <p className="text-2xl font-bold text-[#647C47]">
+          <p className="text-2xl font-bold text-primary-500">
             {partners.length > 0 ? (partners.reduce((sum, p) => sum + (Number(p.default_margin_percent) || 0), 0) / partners.length).toFixed(1) : 0}%
           </p>
         </div>
@@ -282,7 +282,7 @@ export default function B2BPartnersPage() {
       {/* Search */}
       <div className="bg-white rounded-lg border p-4 mb-6 flex gap-4">
         <div className="flex-1 relative">
-          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search partners..." className="w-full pl-4 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none" />
+          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search partners..." className="w-full pl-4 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
         </div>
         <button onClick={() => setShowInactive(!showInactive)} className={`px-4 py-2 text-sm rounded-lg font-medium ${showInactive ? 'bg-gray-100 border text-gray-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
           {showInactive ? 'Show All' : 'Active Only'}
@@ -315,7 +315,7 @@ export default function B2BPartnersPage() {
                 </td>
                 <td className="px-4 py-3 text-center text-sm">{partner.country || '-'}</td>
                 <td className="px-4 py-3 text-center">
-                  <span className="px-2 py-1 bg-[#647C47]/10 text-[#647C47] rounded text-sm font-medium">{partner.default_margin_percent}%</span>
+                  <span className="px-2 py-1 bg-primary-500/10 text-primary-500 rounded text-sm font-medium">{partner.default_margin_percent}%</span>
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${partner.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -324,7 +324,7 @@ export default function B2BPartnersPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => handleEdit(partner)} aria-label={`Edit ${partner.company_name}`} className="p-1.5 hover:bg-[#647C47]/10 rounded"><Edit className="w-4 h-4 text-gray-500" /></button>
+                    <button onClick={() => handleEdit(partner)} aria-label={`Edit ${partner.company_name}`} className="p-1.5 hover:bg-primary-500/10 rounded"><Edit className="w-4 h-4 text-gray-500" /></button>
                     <button onClick={() => handleDelete(partner)} aria-label={`Delete ${partner.company_name}`} className="p-1.5 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4 text-gray-500" /></button>
                   </div>
                 </td>
@@ -349,7 +349,7 @@ export default function B2BPartnersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Company Name *</label>
-                  <input type="text" value={formData.company_name} onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} required className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none" />
+                  <input type="text" value={formData.company_name} onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} required className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Partner Code</label>
@@ -399,14 +399,14 @@ export default function B2BPartnersPage() {
                 </div>
                 <div className="col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="w-4 h-4 text-[#647C47] rounded" />
+                    <input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="w-4 h-4 text-primary-500 rounded" />
                     <span className="text-sm">Partner is active</span>
                   </label>
                 </div>
               </div>
               <div className="flex gap-3 pt-4 border-t">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50 font-medium">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium flex items-center justify-center gap-2">
+                <button type="submit" className="flex-1 px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] font-medium flex items-center justify-center gap-2">
                   <Check className="w-4 h-4" /> {editingPartner ? 'Update' : 'Create'}
                 </button>
               </div>
