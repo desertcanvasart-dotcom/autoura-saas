@@ -11,6 +11,7 @@ import {
   mainNavFor,
   settingsNavFor,
   activeHref,
+  sectionItems,
   settingsEntryFor,
 } from '@/lib/nav/config'
 import { jumpEntriesFor, rankJump } from '@/components/nav/CommandPalette'
@@ -38,42 +39,63 @@ function pageExists(href: string): boolean {
 }
 
 const everyEntry = [
-  ...MAIN_NAV.flatMap(s => s.items),
+  ...MAIN_NAV.flatMap(sectionItems),
   SETTINGS_LINK,
   ...SETTINGS_NAV.flatMap(g => g.items),
   ...JUMP_ONLY_PAGES,
 ]
 
 describe('the main sidebar', () => {
-  it('admin sees about 27 links, manager no more, staff about 14 (brief mockups 01–03)', () => {
-    const count = (r: PermissionRole) => mainNavFor(r).flatMap(s => s.items).length + 1 // + Settings
-    expect(count('admin')).toBeGreaterThanOrEqual(26)
-    expect(count('admin')).toBeLessThanOrEqual(30)
-    expect(count('manager')).toBeLessThanOrEqual(count('admin'))
-    expect(count('member')).toBeGreaterThanOrEqual(12)
-    expect(count('member')).toBeLessThanOrEqual(16)
+  // The menu the operator approved on 2026-10-31: the first cut (27 links)
+  // hid pages used every day, so Communicate, every rate sheet (folded under
+  // its group) and each finance list are back in the sidebar.
+  const linksFor = (r: PermissionRole) => mainNavFor(r).flatMap(sectionItems).map(i => i.href)
+
+  it('managers and admins see every rate sheet, folded under its group; staff see none', () => {
+    const suppliers = mainNavFor('admin').find(s => s.key === 'suppliers')!
+    expect(suppliers.groups?.map(g => g.title)).toEqual(RATE_GROUPS.map(g => g.title))
+    for (const g of RATE_GROUPS) for (const c of g.categories) {
+      expect(linksFor('admin')).toContain(`/rates/${c.slug}`)
+      expect(linksFor('manager')).toContain(`/rates/${c.slug}`)
+      expect(linksFor('member')).not.toContain(`/rates/${c.slug}`)
+    }
   })
 
-  it('holds no rate category and no setup page', () => {
-    const hrefs = MAIN_NAV.flatMap(s => s.items.map(i => i.href))
-    for (const g of RATE_GROUPS) for (const c of g.categories) expect(hrefs).not.toContain(`/rates/${c.slug}`)
-    expect(hrefs.filter(h => h.startsWith('/settings'))).toEqual([])
+  it('Communicate holds the Inbox and each channel; every finance list has its own link', () => {
+    const comm = mainNavFor('member').find(s => s.key === 'communicate')!.items.map(i => i.label)
+    expect(comm).toEqual(['Inbox', 'Email', 'WhatsApp', 'Leads', 'Copilot', 'Message templates'])
+    for (const h of ['/accounts-receivable', '/receipts', '/accounts-payable', '/supplier-invoices']) expect(linksFor('admin')).toContain(h)
+    expect(linksFor('member')).toContain('/receipts')
+    expect(linksFor('member')).not.toContain('/accounts-receivable')
+  })
+
+  it('the only setup pages in it are Message templates and Team', () => {
+    expect(linksFor('admin').filter(h => h.startsWith('/settings')).sort()).toEqual(['/settings/message-templates', '/settings/staff-directory'])
   })
 
   it('an empty section is dropped for a role', () => {
-    for (const r of ROLES) for (const s of mainNavFor(r)) expect(s.items.length).toBeGreaterThan(0)
+    for (const r of ROLES) for (const s of mainNavFor(r)) expect(sectionItems(s).length).toBeGreaterThan(0)
     expect(mainNavFor('member').map(s => s.key)).not.toContain('suppliers')
   })
 
   it('the longest matching link is the current page', () => {
-    const items = MAIN_NAV.flatMap(s => s.items)
+    const items = MAIN_NAV.flatMap(sectionItems)
     expect(activeHref(items, '/tours/manage/abc')).toBe('/tours/manage')
     expect(activeHref(items, '/tours/123')).toBe('/tours')
     expect(activeHref(items, '/rates/check')).toBe('/rates/check')
-    expect(activeHref(items, '/rates/hotels')).toBe('/rates')
+    expect(activeHref(items, '/rates/hotels')).toBe('/rates/hotels')
+    expect(activeHref(items, '/rates')).toBe('/rates')
     expect(activeHref(items, '/network-suppliers')).toBe('/suppliers')
-    expect(activeHref(items, '/accounts-payable')).toBe('/supplier-invoices')
+    expect(activeHref(items, '/accounts-payable')).toBe('/accounts-payable')
     expect(activeHref(items, '/nowhere')).toBeNull()
+  })
+
+  it('links sharing a page are told apart by the query', () => {
+    const items = MAIN_NAV.flatMap(sectionItems)
+    expect(activeHref(items, '/inbox', '')).toBe('/inbox?channel=all')
+    expect(activeHref(items, '/inbox', 'channel=all')).toBe('/inbox?channel=all')
+    expect(activeHref(items, '/inbox', 'channel=email')).toBe('/inbox?channel=email')
+    expect(activeHref(items, '/inbox', 'channel=whatsapp&id=3')).toBe('/inbox?channel=whatsapp')
   })
 })
 
