@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,44 +26,46 @@ export async function GET(request: NextRequest) {
     const start_date_from = searchParams.get('start_date_from')
     const start_date_to = searchParams.get('start_date_to')
 
-    // Build query
-    let query = adminClient
-      .from('bookings')
-      .select(`
-        *,
-        itineraries (
-          id,
-          itinerary_code,
-          trip_name,
-          client_name
-        ),
-        clients (
-          id,
-          full_name,
-          email,
-          phone,
-          whatsapp
-        ),
-        b2b_partners (
-          id,
-          company_name,
-          email
-        )
-      `)
-      .eq('tenant_id', tenant_id)
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so an agency past 1000 bookings lost its oldest ones.
+    const { data: bookings, error } = await fetchAllPages((from, to) => {
+      // Build query
+      let query = adminClient
+        .from('bookings')
+        .select(`
+          *,
+          itineraries (
+            id,
+            itinerary_code,
+            trip_name,
+            client_name
+          ),
+          clients (
+            id,
+            full_name,
+            email,
+            phone,
+            whatsapp
+          ),
+          b2b_partners (
+            id,
+            company_name,
+            email
+          )
+        `)
+        .eq('tenant_id', tenant_id)
 
-    // Apply filters
-    if (status) query = query.eq('status', status)
-    if (client_id) query = query.eq('client_id', client_id)
-    if (partner_id) query = query.eq('partner_id', partner_id)
-    if (quote_type) query = query.eq('quote_type', quote_type)
-    if (start_date_from) query = query.gte('start_date', start_date_from)
-    if (start_date_to) query = query.lte('start_date', start_date_to)
+      // Apply filters
+      if (status) query = query.eq('status', status)
+      if (client_id) query = query.eq('client_id', client_id)
+      if (partner_id) query = query.eq('partner_id', partner_id)
+      if (quote_type) query = query.eq('quote_type', quote_type)
+      if (start_date_from) query = query.gte('start_date', start_date_from)
+      if (start_date_to) query = query.lte('start_date', start_date_to)
 
-    // Order by booking date descending
-    query = query.order('booking_date', { ascending: false })
-
-    const { data: bookings, error } = await query
+      // Order by booking date descending; `id` last keeps paging stable
+      return query.order('booking_date', { ascending: false }).order('id').range(from, to)
+    })
 
     if (error) {
       console.error('❌ Error fetching bookings:', error)

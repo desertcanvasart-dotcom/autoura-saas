@@ -14,6 +14,22 @@ interface Claim {
   phone: string | null
   status: 'pending' | 'approved' | 'rejected'
   requested_at: string
+  /** Where their sign-in code went: the addresses on YOUR record, and how many others. */
+  code_sent_to?: { yours: string[]; others: number } | null
+}
+
+/** "Code sent to a@b.com and 1 other address" — the others belong to records you can't see. */
+function CodeSentTo({ sent }: { sent: Claim['code_sent_to'] }) {
+  if (!sent) return <span className="block text-xs text-gray-600">We can’t tell which email their code went to.</span>
+  const { yours, others } = sent
+  const otherText = others > 0 ? `${others} other address${others === 1 ? '' : 'es'} not on your record` : ''
+  return (
+    <span className={`block text-xs ${others > 0 ? 'text-red-700' : 'text-gray-600'}`}>
+      Code sent to {yours.length > 0 ? <b>{yours.join(', ')}</b> : null}
+      {yours.length > 0 && others > 0 ? ' and ' : ''}{otherText}.
+      {' '}Only approve if you recognise this email{others > 0 ? ' — another address got the code too, so check with the supplier first' : ''}.
+    </span>
+  )
 }
 
 export function useClaims(query: string) {
@@ -33,12 +49,16 @@ export async function decideClaim(id: string, decision: 'approve' | 'reject'): P
   return res.ok && d.success ? null : (d.error || 'Could not save')
 }
 
-/** On the Suppliers page: the waiting requests, with Confirm / Not them for admins. */
-export default function SupplierSignInRequests({ isAdmin }: { isAdmin: boolean }) {
+/**
+ * The waiting requests, with Confirm / Not them for admins. On Suppliers it
+ * shows only when there are some; Settings › Supplier network passes
+ * `emptyText` so an empty list says so.
+ */
+export default function SupplierSignInRequests({ isAdmin, emptyText }: { isAdmin: boolean; emptyText?: string }) {
   const { claims, load } = useClaims('status=pending')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  if (claims.length === 0) return null
+  if (claims.length === 0) return emptyText ? <p className="text-sm text-gray-500">{emptyText}</p> : null
 
   const decide = async (id: string, decision: 'approve' | 'reject') => {
     setBusy(id); setError(null)
@@ -50,11 +70,13 @@ export default function SupplierSignInRequests({ isAdmin }: { isAdmin: boolean }
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
       <p className="font-medium text-amber-900 flex items-center gap-1.5"><KeyRound className="w-4 h-4" /> Suppliers asking to sign in ({claims.length})</p>
-      <p className="text-xs text-amber-800 mt-0.5">They used the phone number on your supplier record. Confirm only if it is really them — they will then see your requests and jobs for them.</p>
+      <p className="text-xs text-amber-800 mt-0.5">They used the phone number on your supplier record and the code sent by email. Confirm only if it is really them — they will then see your requests and jobs for them.</p>
       <ul className="mt-2 divide-y divide-amber-100">
         {claims.map(c => (
           <li key={c.id} className="py-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-gray-900"><b>{c.supplier_name}</b> <span className="text-gray-600">· {c.phone ?? 'phone hidden'} · {new Date(c.requested_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span></span>
+            <span className="text-gray-900"><b>{c.supplier_name}</b> <span className="text-gray-600">· {c.phone ?? 'phone hidden'} · {new Date(c.requested_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+              <CodeSentTo sent={c.code_sent_to} />
+            </span>
             {isAdmin ? (
               <span className="flex gap-2">
                 <button type="button" disabled={busy === c.id} onClick={() => decide(c.id, 'approve')} className="px-2.5 py-1 rounded-md bg-primary-600 text-white text-xs font-medium disabled:opacity-50">Confirm it’s them</button>

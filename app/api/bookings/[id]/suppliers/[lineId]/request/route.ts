@@ -5,7 +5,7 @@ import { roleDenied } from '@/lib/api-role-gate'
 import { appRedirectBase } from '@/lib/oauth-config'
 import { generateWhatsAppLink, whatsappRecipient } from '@/lib/communication-utils'
 import {
-  assignWhat, buildServiceCancelMessage, buildServiceRequestMessage, generateReplyToken, replyLinkExpiry,
+  assignWhat, buildServiceCancelMessage, buildServiceRequestMessage, generateReplyToken, refreshedLinkExpiry, replyLinkExpiry,
   messageEmailHtml, requestEmailHtml, requestEmailSubject,
 } from '@/lib/supplier-reply-link'
 import { REPLY_HOURS, REPLY_HOURS_SOON, SOON_HOURS, normalizeStatus } from '@/lib/bookings/service-booking-states'
@@ -142,8 +142,19 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   // The link: one active per line (uq_service_booking_links_active).
   let token: string | null = null
   const { data: existing } = await supabase
-    .from('service_booking_links').select('token').eq('service_booking_id', line.id).is('revoked_at', null).maybeSingle()
+    .from('service_booking_links').select('token, expires_at').eq('service_booking_id', line.id).is('revoked_at', null).maybeSingle()
   token = (existing?.token as string | undefined) ?? null
+  if (existing && token) {
+    // Re-asking: the link's expiry follows the line's date now, as a fresh
+    // link's would — an expired link or one made before the line had a date
+    // is refreshed rather than re-sent dead or never-expiring (audit SN-7).
+    const expires_at = refreshedLinkExpiry(existing.expires_at as string | null, line.service_date as string | null)
+    if (expires_at !== undefined) {
+      const { error } = await supabase.from('service_booking_links').update({ expires_at })
+        .eq('service_booking_id', line.id).eq('token', token).is('revoked_at', null)
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+  }
   if (!token) {
     const fresh = generateReplyToken()
     const { error } = await supabase.from('service_booking_links').insert({

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET() {
   try {
@@ -18,11 +19,18 @@ export async function GET() {
       )
     }
 
-    const { data, error } = await supabase
-      .from('tipping_rates')
-      .select('*')
-      .order('role_type')
-      .order('context')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) =>
+      supabase
+        .from('tipping_rates')
+        .select('*')
+        .order('role_type')
+        .order('context')
+        .order('id')
+        .range(from, to),
+    )
 
     if (error) throw error
 

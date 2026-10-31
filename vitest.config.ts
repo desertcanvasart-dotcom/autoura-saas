@@ -17,6 +17,13 @@ export default defineConfig({
     ],
     // Determinism is part of what we assert; keep timers/dates real but stable.
     clearMocks: true,
+    // About 16 files boot PGlite (Postgres compiled to WASM, run in memory) in
+    // beforeAll, and a few import @react-email/render / @react-pdf/renderer
+    // at collection. Alone each boots in 1–3 s, but under a full parallel run
+    // every worker compiles WASM at once and a boot can pass vitest's default
+    // 10 s hookTimeout — a red run with no bug in it. Hooks get 60 s; a real
+    // hang still fails, just later. Test bodies keep the default timeout.
+    hookTimeout: 60_000,
   },
   resolve: {
     alias: {

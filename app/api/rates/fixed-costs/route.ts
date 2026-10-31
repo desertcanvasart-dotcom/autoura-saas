@@ -3,6 +3,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { clearFixedCostsCache } from '@/lib/fixed-costs'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 // GET - List fixed daily costs
 export async function GET() {
@@ -12,10 +13,17 @@ export async function GET() {
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
-    const { data, error } = await supabase
-      .from('fixed_daily_costs')
-      .select('*')
-      .order('cost_type')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) =>
+      supabase
+        .from('fixed_daily_costs')
+        .select('*')
+        .order('cost_type')
+        .order('id')
+        .range(from, to),
+    )
 
     if (error) {
       // Table may not exist

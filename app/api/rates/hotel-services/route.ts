@@ -4,6 +4,7 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
 import { cleanPricingBasisFields } from '@/lib/pricing/pricing-basis'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET() {
   try {
@@ -19,11 +20,18 @@ export async function GET() {
       )
     }
 
-    const { data, error } = await supabase
-      .from('hotel_staff_rates')
-      .select('*')
-      .order('service_type')
-      .order('hotel_category')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) =>
+      supabase
+        .from('hotel_staff_rates')
+        .select('*')
+        .order('service_type')
+        .order('hotel_category')
+        .order('id')
+        .range(from, to),
+    )
 
     if (error) throw error
 

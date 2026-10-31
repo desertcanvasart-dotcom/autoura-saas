@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
-import { buildSiteExport } from '@/lib/publish/export'
+import { buildSiteExport, NoSiteToExport } from '@/lib/publish/export'
 import { loadPagePayload } from '@/lib/publish/site-data'
 
 // ============================================
@@ -46,6 +46,8 @@ export async function GET() {
       },
     })
   } catch (e) {
-    return NextResponse.json({ success: false, error: e instanceof Error ? e.message : 'The export failed' }, { status: 500 })
+    if (e instanceof NoSiteToExport) return NextResponse.json({ success: false, error: e.message }, { status: 404 })
+    console.error('[publish export]', e)
+    return NextResponse.json({ success: false, error: 'The export failed' }, { status: 500 })
   }
 }

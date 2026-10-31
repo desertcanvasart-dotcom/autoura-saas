@@ -32,7 +32,9 @@ describe('an admin confirms a supplier sign-in (§9)', () => {
   it('the list shows this agency’s claims only; the phone is read with the service role for exactly those accounts', () => {
     const list = read('app/api/supplier-claims/route.ts')
     expect(list).toContain(".eq('tenant_id', tenant_id)")
-    expect(list).toContain(".in('id', [...new Set(claims.map(c => c.account_id as string))])")
+    expect(list).toContain('const accountIds = [...new Set(claims.map(c => c.account_id as string))]')
+    expect(list).toContain(".in('id', accountIds)")
+    expect(list).toContain(".in('account_id', accountIds)")
     expect(list).not.toMatch(/from\('supplier_accounts'\)[^\n]*\.select\('[^']*(token|code)/)
   })
 

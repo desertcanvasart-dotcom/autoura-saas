@@ -40,48 +40,48 @@ export async function GET(
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    // Each row's expense (made when it was confirmed), for the panel's link.
-    const ids = (data || []).map(r => r.id as string)
+    const rows = data || []
+    const ids = rows.map(r => r.id as string)
+    const supplierIds = [...new Set(rows.map(r => r.supplier_id as string | null).filter(Boolean))] as string[]
+    // Only the days this booking's supplier lines fall on (not every day off ever).
+    const days = rows.filter(r => r.supplier_id && r.service_date).map(r => String(r.service_date).slice(0, 10)).sort()
+    const none = Promise.resolve({ data: [] as never[], error: null })
+
+    const [expenses, off, links, pages] = await Promise.all([
+      // Each row's expense (made when it was confirmed), for the panel's link.
+      ids.length
+        ? supabase.from('expenses').select('id, expense_number, status, amount, currency, booking_supplier_status_id').in('booking_supplier_status_id', ids)
+        : none,
+      // Days off the line's supplier marked for that day (a warning — lib/supplier-days-off).
+      supplierIds.length && days.length
+        ? supabase.from('supplier_unavailable_days').select('supplier_id, day').in('supplier_id', supplierIds)
+          .gte('day', days[0]).lte('day', days[days.length - 1])
+        : none,
+      // Has the supplier opened the request, or their own page? (448 / 449)
+      ids.length
+        ? supabase.from('service_booking_links').select('service_booking_id, last_opened_at').in('service_booking_id', ids).is('revoked_at', null)
+        : none,
+      supplierIds.length
+        ? supabase.from('supplier_portal_links').select('supplier_id, last_opened_at').in('supplier_id', supplierIds).is('revoked_at', null)
+        : none,
+    ])
+    if (expenses.error) console.error('Error fetching supplier expenses:', expenses.error.message)
+    if (off.error) console.error('Error fetching supplier days off:', off.error.message)
+    if (links.error) console.error('Error fetching reply links:', links.error.message)
+    if (pages.error) console.error('Error fetching supplier pages:', pages.error.message)
+
     const expenseByRow = new Map<string, unknown>()
-    if (ids.length) {
-      const { data: expenses, error: expErr } = await supabase
-        .from('expenses')
-        .select('id, expense_number, status, amount, currency, booking_supplier_status_id')
-        .in('booking_supplier_status_id', ids)
-      if (expErr) console.error('Error fetching supplier expenses:', expErr.message)
-      for (const e of expenses || []) expenseByRow.set(e.booking_supplier_status_id as string, e)
-    }
-
-    // Days off the line's supplier marked for that day (a warning — lib/supplier-days-off).
-    const supplierIds = [...new Set((data || []).map(r => r.supplier_id as string | null).filter(Boolean))] as string[]
+    for (const e of expenses.data || []) expenseByRow.set(e.booking_supplier_status_id as string, e)
     const offKeys = new Set<string>()
-    if (supplierIds.length) {
-      const { data: off, error: offErr } = await supabase
-        .from('supplier_unavailable_days').select('supplier_id, day').in('supplier_id', supplierIds)
-      if (offErr) console.error('Error fetching supplier days off:', offErr.message)
-      for (const o of off || []) offKeys.add(`${o.supplier_id}:${String(o.day).slice(0, 10)}`)
-    }
-
-    // Has the supplier opened the request, or their own page? (448 / 449)
-    const lineIds = (data || []).map(r => r.id as string)
+    for (const o of off.data || []) offKeys.add(`${o.supplier_id}:${String(o.day).slice(0, 10)}`)
     const linkOpened = new Map<string, string | null>()
+    for (const l of links.data || []) linkOpened.set(l.service_booking_id as string, (l.last_opened_at as string | null) ?? null)
     const pageOpened = new Map<string, string | null>()
-    if (lineIds.length) {
-      const { data: links, error: linkErr } = await supabase
-        .from('service_booking_links').select('service_booking_id, last_opened_at').in('service_booking_id', lineIds).is('revoked_at', null)
-      if (linkErr) console.error('Error fetching reply links:', linkErr.message)
-      for (const l of links || []) linkOpened.set(l.service_booking_id as string, (l.last_opened_at as string | null) ?? null)
-    }
-    if (supplierIds.length) {
-      const { data: pages, error: pageErr } = await supabase
-        .from('supplier_portal_links').select('supplier_id, last_opened_at').in('supplier_id', supplierIds).is('revoked_at', null)
-      if (pageErr) console.error('Error fetching supplier pages:', pageErr.message)
-      for (const p of pages || []) pageOpened.set(p.supplier_id as string, (p.last_opened_at as string | null) ?? null)
-    }
+    for (const p of pages.data || []) pageOpened.set(p.supplier_id as string, (p.last_opened_at as string | null) ?? null)
 
     return NextResponse.json({
       success: true,
-      data: (data || []).map(r => ({
+      data: rows.map(r => ({
         ...r,
         // The later of the request link and their page being opened; null = sent, not opened; absent = no link.
         seen: seenAt(linkOpened, pageOpened, r.id as string, r.supplier_id as string | null),

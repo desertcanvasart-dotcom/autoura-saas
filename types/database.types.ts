@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 178
+ * Tables: 179
  */
 
 export type Json =
@@ -4852,36 +4852,6 @@ export interface Database {
           },
         ]
       }
-      exchange_rate_snapshots: {
-        Row: {
-          id: string
-          base_currency: string
-          target_currency: string
-          rate: number
-          source: string
-          captured_at: string
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          base_currency: string
-          target_currency: string
-          rate: number
-          source?: string
-          captured_at?: string
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          base_currency?: string
-          target_currency?: string
-          rate?: number
-          source?: string
-          captured_at?: string
-          created_at?: string | null
-        }
-        Relationships: []
-      }
       exchange_rate_events: {
         Row: {
           id: string
@@ -4922,6 +4892,36 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
+      }
+      exchange_rate_snapshots: {
+        Row: {
+          id: string
+          base_currency: string
+          target_currency: string
+          rate: number
+          source: string
+          captured_at: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          base_currency: string
+          target_currency: string
+          rate: number
+          source?: string
+          captured_at?: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          base_currency?: string
+          target_currency?: string
+          rate?: number
+          source?: string
+          captured_at?: string
+          created_at?: string | null
+        }
+        Relationships: []
       }
       exchange_rates: {
         Row: {

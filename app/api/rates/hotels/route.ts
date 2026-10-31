@@ -6,6 +6,7 @@ import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { validateRatePayload } from '@/lib/rate-validation'
 import type { TablesInsert } from '@/types/database.types'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,20 +35,24 @@ export async function GET(request: NextRequest) {
     // ✅ MULTI-TENANT: RLS policies automatically filter by tenant_id
     // See migration: 013_accommodation_rates_rls.sql
     // Only returns rates belonging to authenticated user's tenant
-    let query = supabase
-      .from('accommodation_rates')
-      .select(`
-        *,
-        supplier:suppliers(id, name, city, contact_phone, contact_email)
-      `)
-      .order('property_name')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('accommodation_rates')
+        .select(`
+          *,
+          supplier:suppliers(id, name, city, contact_phone, contact_email)
+        `)
+        .order('property_name')
 
-    if (supplierId) query = query.eq('supplier_id', supplierId)
-    if (city) query = query.eq('city', city)
-    if (tier) query = query.eq('tier', tier)
-    if (activeOnly) query = query.eq('is_active', true)
-
-    const { data, error } = await query
+      if (supplierId) query = query.eq('supplier_id', supplierId)
+      if (city) query = query.eq('city', city)
+      if (tier) query = query.eq('tier', tier)
+      if (activeOnly) query = query.eq('is_active', true)
+      return query.order('id').range(from, to)
+    })
 
     if (error) {
       console.error('GET accommodation_rates error:', error)

@@ -70,7 +70,7 @@ describe('a supplier answering before the office pressed Yes', () => {
   it('counts: the request is marked sent first, then the answer', () => {
     const a = read('lib/bookings/supplier-answer.ts')
     expect(a).toContain("if (normalizeStatus(line.status) === 'pending')")
-    expect(a.indexOf("to: 'requested'")).toBeLessThan(a.indexOf('const to = targetStatus(answer)'))
+    expect(a.indexOf("to: 'requested'")).toBeLessThan(a.indexOf('transitionServiceBooking(db, tenantId, { id: line.id, bookingId, to, ...who, note })'))
   })
 })
 

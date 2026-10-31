@@ -9,7 +9,8 @@
 // itself stays cached and static.
 
 import type { SiteResolution, WaRefResult } from '@/lib/publish/contract'
-import { normalizeHost } from '@/lib/publish/site-data'
+import { clientIpFromHeaders } from '@/lib/client-ip'
+import { normalizeHost } from '@/lib/publish/host'
 import { t } from '../i18n/strings'
 
 export type EnquiryOutcome = 'sent' | 'slow_down' | 'invalid' | 'failed'
@@ -102,17 +103,19 @@ export function readEnquiryForm(form: FormData, ctx: {
   }
 }
 
-/** The visitor's address as the edge proxy saw it (first hop). */
+/** The visitor's address, for the app's rate limits: the hop the platform's
+ *  edge appended to X-Forwarded-For — never the first entry, which the
+ *  visitor can write themselves (lib/client-ip.ts, as the app reads it). */
 export function visitorIpOf(headers: Headers): string | null {
-  const first = headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-  return first || headers.get('x-real-ip') || null
+  return clientIpFromHeaders(headers)
 }
 
 /** wa.me with the message pre-written: the tour, and the reference that
- *  links the conversation back to this page. */
+ *  links the conversation back to this page — or no reference, when the app
+ *  made none (a visitor or site over its click limit). */
 export function whatsAppLink(ref: WaRefResult, language: string): string | null {
-  if (!ref.number || !ref.token) return null
+  if (!ref.number) return null
   const intro = ref.tourName ? `${t(language, 'waInterestedIn')} ${ref.tourName}.` : t(language, 'waHello')
-  const text = `${intro}\n\nRef: ${ref.token}`
+  const text = ref.token ? `${intro}\n\nRef: ${ref.token}` : intro
   return `https://wa.me/${ref.number.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`
 }

@@ -1,5 +1,4 @@
 'use client'
-import SupplierSourcingSetting from '@/components/SupplierSourcingSetting'
 import CompanyDataCard from '@/components/account/CompanyDataCard'
 
 import { TIMEZONES } from '@/lib/timezones'
@@ -504,8 +503,11 @@ export default function TenantSettingsPage() {
       </div>
 
       <div className="space-y-4">
-        {/* Where this agency books suppliers from (Supplier Network Phase 3) */}
-        <SupplierSourcingSetting canEdit={isAdmin} />
+        {/* Where this agency books suppliers from lives in Settings › Supplier network. */}
+        <p className="text-sm text-gray-600">
+          Where you book suppliers from — your own list, the Autoura network, or both — is in{' '}
+          <Link href="/settings/supplier-network" className="text-primary-700 underline">Settings › Supplier network</Link>.
+        </p>
 
         {/* Message */}
         {message && (

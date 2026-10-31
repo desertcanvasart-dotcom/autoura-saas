@@ -1,4 +1,4 @@
-import { normalizeHost } from '@/lib/publish/site-data'
+import { normalizeHost } from '@/lib/publish/host'
 import { resolveBrand } from '@/lib/publish/brand'
 import { siteForHost } from '../../lib/internal-api'
 import { iconSvg } from '../../lib/icon'

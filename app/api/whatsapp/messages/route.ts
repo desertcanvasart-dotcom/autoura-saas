@@ -4,6 +4,7 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { indexWhatsAppReply } from '@/lib/copilot-indexer'
 import { sendWhatsAppMessage, conversationPhoneNumber } from '@/lib/whatsapp'
 import { conversationPhoneKeys } from '@/lib/whatsapp-phone'
+import { clampedIntParam, MAX_LIST_LIMIT } from '@/lib/http/list-params'
 
 // GET /api/whatsapp/messages - Get messages for a conversation
 export async function GET(request: NextRequest) {
@@ -20,7 +21,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const conversationId = searchParams.get('conversation_id')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    // Clamped and NaN-safe (lib/http/list-params).
+    const limit = clampedIntParam(searchParams.get('limit'), { fallback: 50, max: MAX_LIST_LIMIT })
     const before = searchParams.get('before') // For pagination
 
     if (!conversationId) {

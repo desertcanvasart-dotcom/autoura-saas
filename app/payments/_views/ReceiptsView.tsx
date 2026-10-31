@@ -1,6 +1,6 @@
 'use client'
 
-import { receiptNumberFor } from '@/lib/receipt-pdf-generator'
+import { receiptNumberFor } from '@/lib/receipt-number'
 import { browserPdfFontFor } from '@/lib/pdf/jspdf-font-browser'
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'

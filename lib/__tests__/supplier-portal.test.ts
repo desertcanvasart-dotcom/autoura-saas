@@ -69,7 +69,7 @@ describe('what the page and its link can touch', () => {
 
   it('the office makes, sends and switches off links — managers only, its own suppliers', () => {
     const office = readFileSync('app/api/suppliers/[id]/portal-link/route.ts', 'utf8')
-    expect(office.match(/roleDenied\(auth\.role, 'manage'\)/g)?.length).toBe(2)
+    expect(office.match(/roleDenied\(auth\.role, 'manage'\)/g)?.length).toBe(3)
     expect(office).toContain(".eq('id', id).eq('tenant_id', tenant_id)")
   })
 
