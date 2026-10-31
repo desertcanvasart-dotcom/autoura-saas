@@ -43,6 +43,7 @@ import {
 } from '@/lib/pricing/ticket-legs'
 import type { RateSource, PricingHole } from './pricing-types'
 import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
+import { fetchEveryRow } from '@/lib/db/fetch-all-pages'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
 import { presetTierFor, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
@@ -2284,12 +2285,14 @@ export async function getTippingRates(
   scope: CatalogScope,
   _tier?: ServiceTier
 ): Promise<TippingRateResolver | null> {
+  // Read OUTSIDE the try: no rows is "no tips", but a failed read is an
+  // error, never quietly a trip without tips. Every row, not the first 1000.
+  const rawTippingRates = await fetchEveryRow('tipping_rates', () => getSupabaseAdmin()
+    .from('tipping_rates')
+    .select('*')
+    .or(catalogOrExpr(scope))
+    .eq('is_active', true))
   try {
-    const { data: rawTippingRates } = await getSupabaseAdmin()
-      .from('tipping_rates')
-      .select('*')
-      .or(catalogOrExpr(scope))
-      .eq('is_active', true)
     const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (!rates || rates.length === 0) {
@@ -2339,12 +2342,14 @@ function tipLineName(tip: TipLine): string {
  * the per-day ones. [] when there are none (never a gap — see tipping.ts).
  */
 export async function loadTippingRows(scope: CatalogScope): Promise<TippingRow[]> {
+  // Read OUTSIDE the try: no rows is [] (never a gap), but a failed read
+  // throws — it is not a trip without tips. Every row, not the first 1000.
+  const data = await fetchEveryRow('tipping_rates', () => getSupabaseAdmin()
+    .from('tipping_rates')
+    .select('id, tenant_id, role_type, context, rate_unit, rate_eur, rate_currency, city')
+    .or(catalogOrExpr(scope))
+    .eq('is_active', true))
   try {
-    const { data } = await getSupabaseAdmin()
-      .from('tipping_rates')
-      .select('id, tenant_id, role_type, context, rate_unit, rate_eur, rate_currency, city')
-      .or(catalogOrExpr(scope))
-      .eq('is_active', true)
     const rows = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
     return (rows ?? []) as TippingRow[]
   } catch {
@@ -2409,11 +2414,13 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
 }
 
 async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<string, TransportRate>> {
-  const { data: rawAllRates } = await getSupabaseAdmin()
+  // Every row (not PostgREST's first 1000); a failed read throws rather than
+  // leaving an empty cache that would price every transfer as "no rate".
+  const rawAllRates = await fetchEveryRow('transportation_rates', () => getSupabaseAdmin()
     .from('transportation_rates')
     .select('*')
     .or(catalogOrExpr(scope))
-    .eq('is_active', true)
+    .eq('is_active', true))
   const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
   const cache = new Map<string, TransportRate>()

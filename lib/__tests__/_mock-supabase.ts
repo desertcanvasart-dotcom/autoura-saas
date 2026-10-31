@@ -12,6 +12,12 @@ type Row = Record<string, any>
 export type MockTables = Record<string, Row[]>
 
 let currentTables: MockTables = {}
+let maxRows: number | null = null
+
+/** Cap every response at n rows, as PostgREST's max-rows does (null = off). */
+export function setMockMaxRows(n: number | null): void {
+  maxRows = n
+}
 
 /** Install the dataset the next engine call will read from. */
 export function setMockTables(tables: MockTables): void {
@@ -119,6 +125,15 @@ function makeQuery(rows: Row[], table?: string) {
       filtered = filtered.slice(0, n)
       return builder
     },
+    range(from: number, to: number) {
+      filtered = filtered.slice(from, to + 1)
+      return builder
+    },
+    // PostgREST's max-rows, when a test opts in (setMockMaxRows): any one
+    // response stops there, silently, as the real one does.
+    _capped() {
+      return maxRows == null ? filtered : filtered.slice(0, maxRows)
+    },
     single() {
       applyPending()
       return Promise.resolve(
@@ -134,7 +149,7 @@ function makeQuery(rows: Row[], table?: string) {
     // Make the builder awaitable: `await query` -> { data: rows[], error: null }
     then(onFulfilled: any, onRejected: any) {
       applyPending()
-      return Promise.resolve({ data: filtered, error: null }).then(
+      return Promise.resolve({ data: builder._capped(), error: null }).then(
         onFulfilled,
         onRejected
       )

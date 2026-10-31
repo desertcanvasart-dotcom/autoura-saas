@@ -17,6 +17,7 @@ import { pricingBasisLabel, toPricingBasis } from '@/lib/pricing/pricing-basis'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { packageVehicles, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
+import { fetchEveryRow } from '@/lib/db/fetch-all-pages'
 
 // The caller's RLS-scoped client (requireAuth's).
 type GridRatesClient = any
@@ -58,38 +59,42 @@ export async function loadGridRates(
   // The trip's start date: a hotel is priced from the period covering it.
   const startDate = opts.startDate && /^\d{4}-\d{2}-\d{2}$/.test(opts.startDate) ? opts.startDate : null
 
-  // Fetch all rate tables in parallel
+  // Fetch all rate tables in parallel — every row, not the first 1000
+  // (PostgREST's silent cap). A failed read throws (RowReadError) instead of
+  // reading as "no rates": every caller answers it with an error, never an
+  // empty grid. The filters are today's, unchanged; none of these reads has
+  // an order, so a table under 1000 rows comes back exactly as before.
   const [
-    { data: rawTransportRates },
-    { data: rawGuideRates },
-    { data: rawAirportRates },
-    { data: rawHotelServiceRates },
-    { data: rawTippingRates },
-    { data: rawActivityRates },
-    { data: rawAccommodationRates },
-    { data: rawEntranceFees },
-    { data: rawMealRates },
-    { data: rawCruiseRates },
-    { data: rawCruiseTransportPkgs },
-    { data: rawFlightRates },
-    { data: rawFixedCosts },
+    rawTransportRates,
+    rawGuideRates,
+    rawAirportRates,
+    rawHotelServiceRates,
+    rawTippingRates,
+    rawActivityRates,
+    rawAccommodationRates,
+    rawEntranceFees,
+    rawMealRates,
+    rawCruiseRates,
+    rawCruiseTransportPkgs,
+    rawFlightRates,
+    rawFixedCosts,
   ] = await Promise.all([
-    supabase.from('transportation_rates').select('*').eq('is_active', true),
-    supabase.from('guide_rates').select('*').eq('is_active', true),
-    supabase.from('airport_staff_rates').select('*').eq('is_active', true),
-    supabase.from('hotel_staff_rates').select('*').eq('is_active', true),
-    supabase.from('tipping_rates').select('*').eq('is_active', true),
-    supabase.from('activity_rates').select('*').eq('is_active', true),
-    supabase.from('accommodation_rates').select('*').eq('is_active', true).eq('tier', tier),
-    supabase.from('entrance_fees').select('*').eq('is_active', true),
-    supabase.from('meal_rates').select('*').eq('is_active', true),
-    supabase.from('nile_cruises').select('*').eq('is_active', true).eq('tier', tier),
-    supabase.from('b2b_transport_packages').select('*').eq('is_active', true),
-    supabase.from('flight_rates').select('*').eq('is_active', true),
+    fetchEveryRow('transportation_rates', () => supabase.from('transportation_rates').select('*').eq('is_active', true)),
+    fetchEveryRow('guide_rates', () => supabase.from('guide_rates').select('*').eq('is_active', true)),
+    fetchEveryRow('airport_staff_rates', () => supabase.from('airport_staff_rates').select('*').eq('is_active', true)),
+    fetchEveryRow('hotel_staff_rates', () => supabase.from('hotel_staff_rates').select('*').eq('is_active', true)),
+    fetchEveryRow('tipping_rates', () => supabase.from('tipping_rates').select('*').eq('is_active', true)),
+    fetchEveryRow('activity_rates', () => supabase.from('activity_rates').select('*').eq('is_active', true)),
+    fetchEveryRow('accommodation_rates', () => supabase.from('accommodation_rates').select('*').eq('is_active', true).eq('tier', tier)),
+    fetchEveryRow('entrance_fees', () => supabase.from('entrance_fees').select('*').eq('is_active', true)),
+    fetchEveryRow('meal_rates', () => supabase.from('meal_rates').select('*').eq('is_active', true)),
+    fetchEveryRow('nile_cruises', () => supabase.from('nile_cruises').select('*').eq('is_active', true).eq('tier', tier)),
+    fetchEveryRow('b2b_transport_packages', () => supabase.from('b2b_transport_packages').select('*').eq('is_active', true)),
+    fetchEveryRow('flight_rates', () => supabase.from('flight_rates').select('*').eq('is_active', true)),
     // Water is priced from the company's "Water Bottle" fixed cost (Rates →
     // Fixed costs), the same rate the pricing engine uses — the grid used a
     // hardcoded 0.50 of its own. rate_currency lets normalizeRateRows convert it.
-    supabase.from('fixed_daily_costs').select('cost_type, cost_per_person_per_day, rate_currency, tenant_id').eq('is_active', true),
+    fetchEveryRow('fixed_daily_costs', () => supabase.from('fixed_daily_costs').select('cost_type, cost_per_person_per_day, rate_currency, tenant_id').eq('is_active', true)),
   ])
 
   // Per-rate currency (P3): rows priced in a contract currency are
