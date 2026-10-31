@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { captureFirstTouch } from '@/lib/marketing-attribution'
 import Sidebar from "@/components/Sidebar"
@@ -90,7 +90,11 @@ export default function ClientShell({
               />
               <div className="flex flex-1 min-h-0">
                 {!isSettingsPage && (
-                  <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
+                  // The sidebar reads the query (?channel= picks Email or
+                  // WhatsApp); useSearchParams needs a Suspense boundary.
+                  <Suspense fallback={<div className="hidden lg:block w-64 shrink-0 bg-white border-r border-gray-200" />}>
+                    <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
+                  </Suspense>
                 )}
                 <main className="app-main flex-1 min-w-0 overflow-y-auto">
                   <ClosureBanner />
