@@ -56,6 +56,36 @@ export async function claimRecords(
   return (data ?? []) as Array<{ id: string; tenant_id: string; supplier_id: string }>
 }
 
+/**
+ * Where the sign-in code behind a claim went, as one agency may see it (audit
+ * SN-1). The code goes to every email any agency typed on a record with this
+ * phone, so another agency could have typed its OWN address and signed in.
+ * The approving agency is shown only the addresses that are on its own
+ * record, and a count of the rest — never another agency's addresses or name.
+ * `sentTo` is supplier_login_codes.sent_to (comma-separated).
+ */
+export function codeRecipientsForAgency(
+  sentTo: string | null | undefined,
+  ownRecord: { email?: string | null; contact_email?: string | null } | null | undefined,
+): { yours: string[]; others: number } | null {
+  if (!sentTo) return null
+  const sent = [...new Set(sentTo.split(',').map(e => e.trim().toLowerCase()).filter(Boolean))]
+  if (sent.length === 0) return null
+  const own = new Set([ownRecord?.email, ownRecord?.contact_email].map(e => (e ?? '').trim().toLowerCase()).filter(Boolean))
+  const yours = sent.filter(e => own.has(e))
+  return { yours, others: sent.length - yours.length }
+}
+
+/** The used code that made a claim: the latest one used by the time it was asked for (else the latest). */
+export function codeForClaim<T extends { account_id: string; used_at: string }>(
+  codes: T[],
+  claim: { account_id: string; requested_at: string },
+): T | null {
+  const mine = codes.filter(c => c.account_id === claim.account_id).sort((a, b) => Date.parse(b.used_at) - Date.parse(a.used_at))
+  const by = Date.parse(claim.requested_at) + 60_000
+  return mine.find(c => Date.parse(c.used_at) <= by) ?? mine[0] ?? null
+}
+
 /** Who may confirm a claim: an agency's owners and admins (decision §9). */
 export const CLAIM_DECIDERS = ['owner', 'admin']
 

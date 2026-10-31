@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase-server'
 import { isValidReplyToken, isLinkLive } from '@/lib/supplier-reply-link'
 import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
+import { supplierLinkLimited } from '@/lib/supplier-rate-limits'
 
 /**
  * The supplier's tap (lib/supplier-reply-link). Token-authenticated — the
@@ -14,6 +15,8 @@ import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
+    const limited = await supplierLinkLimited(request)
+    if (limited) return limited
     const { token } = await params
     if (!isValidReplyToken(token)) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
     const db = createAdminClient() as unknown as SupabaseClient

@@ -7,8 +7,8 @@ describe('supplier sign-in', () => {
   const code = read('app/api/supplier-auth/code/route.ts')
   const verify = read('app/api/supplier-auth/verify/route.ts')
 
-  it('never says whether a phone is known: the same answer for unknown, no email, or sent', () => {
-    expect(code.match(/return NextResponse\.json\(SAME_ANSWER\)/g)?.length).toBe(3)
+  it('never says whether a phone is known: the same answer for unknown, no email, over the cap, or sent', () => {
+    expect(code.match(/return NextResponse\.json\(SAME_ANSWER\)/g)?.length).toBe(4)
     expect(code).not.toMatch(/not found|unknown number|no supplier/i)
   })
 
@@ -20,7 +20,7 @@ describe('supplier sign-in', () => {
   })
 
   it('a wrong code counts a try; a right one is spent once, even if two requests race', () => {
-    expect(verify).toContain('attempts: row.attempts + 1')
+    expect(verify).toContain('attempts: live!.attempts + 1')
     expect(verify).toContain(".update({ used_at: now.toISOString() }).eq('id', row!.id).is('used_at', null)")
   })
 
