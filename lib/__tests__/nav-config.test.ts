@@ -64,8 +64,8 @@ describe('the main sidebar', () => {
   it('Communicate holds the Inbox and each channel; every finance list has its own link', () => {
     const comm = mainNavFor('member').find(s => s.key === 'communicate')!.items.map(i => i.label)
     expect(comm).toEqual(['Inbox', 'Email', 'WhatsApp', 'Leads', 'Copilot', 'Message templates'])
-    for (const h of ['/invoices?tab=unpaid', '/receipts', '/accounts-payable', '/supplier-invoices']) expect(linksFor('admin')).toContain(h)
-    expect(linksFor('member')).toContain('/receipts')
+    for (const h of ['/invoices?tab=unpaid', '/payments?tab=receipts', '/accounts-payable', '/supplier-invoices']) expect(linksFor('admin')).toContain(h)
+    expect(linksFor('member')).toContain('/payments?tab=receipts')
     expect(linksFor('member')).not.toContain('/invoices?tab=unpaid')
   })
 
@@ -92,6 +92,8 @@ describe('the main sidebar', () => {
     expect(activeHref(items, '/accounts-payable')).toBe('/accounts-payable')
     expect(activeHref(items, '/invoices')).toBe('/invoices')
     expect(activeHref(items, '/invoices', 'tab=unpaid')).toBe('/invoices?tab=unpaid')
+    expect(activeHref(items, '/payments')).toBe('/payments')
+    expect(activeHref(items, '/payments', 'tab=receipts')).toBe('/payments?tab=receipts')
     expect(activeHref(items, '/nowhere')).toBeNull()
   })
 

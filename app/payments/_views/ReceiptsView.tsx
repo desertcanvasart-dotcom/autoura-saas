@@ -148,7 +148,7 @@ export default function ReceiptsPage() {
     // For itinerary payments, go to the receipt page
     // For invoice payments, go to the invoice page
     if (payment.source === 'itinerary') {
-      router.push(withReturnTo(`/documents/receipt/${payment.id}`, '/receipts'))
+      router.push(withReturnTo(`/documents/receipt/${payment.id}`, '/payments?tab=receipts'))
     } else {
       router.push(`/invoices/${payment.source_id}`)
     }

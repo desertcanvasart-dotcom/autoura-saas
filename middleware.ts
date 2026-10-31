@@ -137,7 +137,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/itineraries': ['admin', 'manager', 'member'],
   '/invoices': ['admin', 'manager', 'member'],
   '/payments': ['admin', 'manager', 'member'],
-  '/receipts': ['admin', 'manager', 'member'],
   '/tasks': ['admin', 'manager', 'member'],
   '/inbox': ['admin', 'manager', 'member'],
   // The rest of the Communicate group, and Documents: the sidebar hides them

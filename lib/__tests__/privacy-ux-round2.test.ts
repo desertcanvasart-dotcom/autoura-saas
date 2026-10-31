@@ -58,7 +58,7 @@ describe('a list that fails to load says so', () => {
   it.each([
     'app/clients/page.tsx',
     'app/itineraries/page.tsx',
-    'app/payments/page.tsx',
+    'app/payments/_views/PaymentsView.tsx',
     'app/suppliers/suppliers-content.tsx',
   ])('%s shows LoadError instead of the empty state', (file) => {
     const src = read(file)

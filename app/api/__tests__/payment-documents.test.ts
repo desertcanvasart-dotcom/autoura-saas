@@ -74,7 +74,7 @@ describe('receipts are for money received', () => {
   it('the payment page links a receipt only for a completed payment, and the receipts list only those', () => {
     const detail = readFileSync(join(process.cwd(), 'app/payments/[id]/page.tsx'), 'utf8')
     expect(detail).toMatch(/payment\.payment_status === 'completed' && \(\s*<Link\s+href=\{withReturnTo\(`\/documents\/receipt\//)
-    const list = readFileSync(join(process.cwd(), 'app/receipts/page.tsx'), 'utf8')
+    const list = readFileSync(join(process.cwd(), 'app/payments/_views/ReceiptsView.tsx'), 'utf8')
     expect(list).toContain("itineraryPayments.filter((p: any) => p.status === 'completed')")
   })
 })

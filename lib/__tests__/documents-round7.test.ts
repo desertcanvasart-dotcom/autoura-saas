@@ -48,7 +48,7 @@ describe('WhatsApp invoice', () => {
 
 describe('the font check sees the letterhead', () => {
   it('passes the company identity, not only its name', () => {
-    for (const f of ['app/invoices/[id]/page.tsx', 'app/receipts/page.tsx', 'app/documents/receipt/[id]/page.tsx', 'app/documents/invoice/[id]/page.tsx', 'app/documents/contract/[id]/page.tsx', 'app/itineraries/[id]/page.tsx']) {
+    for (const f of ['app/invoices/[id]/page.tsx', 'app/payments/_views/ReceiptsView.tsx', 'app/documents/receipt/[id]/page.tsx', 'app/documents/invoice/[id]/page.tsx', 'app/documents/contract/[id]/page.tsx', 'app/itineraries/[id]/page.tsx']) {
       expect(src(f), f).not.toMatch(/browserPdfFontFor\([^)]*tenant\?\.company_name\)/)
     }
   })

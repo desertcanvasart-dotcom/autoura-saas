@@ -289,7 +289,8 @@ export const MAIN_NAV: NavSection[] = [
       // The Unpaid tab of Invoices (was /accounts-receivable).
       { label: 'Receivables', href: '/invoices?tab=unpaid', icon: Wallet, roles: AM, keywords: ['unpaid invoices'] },
       { label: 'Payments', href: '/payments', icon: CreditCard, roles: ALL },
-      { label: 'Receipts', href: '/receipts', icon: Receipt, roles: ALL },
+      // The Receipts tab of Payments (was /receipts).
+      { label: 'Receipts', href: '/payments?tab=receipts', icon: Receipt, roles: ALL },
       { label: 'Supplier bills', href: '/supplier-invoices', icon: FileText, roles: AM, keywords: ['supplier invoices'] },
       { label: 'Payables', href: '/accounts-payable', icon: HandCoins, roles: AM, keywords: ['unpaid costs'] },
       { label: 'Expenses', href: '/expenses', icon: Wallet, roles: ALL },
