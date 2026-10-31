@@ -7,7 +7,7 @@ import { currentTenantId, type MembershipDb } from '@/lib/current-membership'
 // This route used to also read/write a per-user `user_settings.email_settings`
 // blob (signature, auto-reply). Those were dead settings: no send path ever
 // read the signature (signatures live in email_signatures, managed at
-// /settings/email-signatures) and no auto-reply engine ever consumed the
+// /settings/email?tab=signatures) and no auto-reply engine ever consumed the
 // toggle — the UI promised behavior that did not exist. The PUT and the dead
 // fields were removed 2026-07-29 along with the tab's controls.
 
