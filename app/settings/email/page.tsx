@@ -7,6 +7,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
 import SendingDomainCard from '@/components/settings/SendingDomainCard'
+import { SaveBar, useUnsavedGuard } from '@/components/settings/SettingsUI'
 import dynamic from 'next/dynamic'
 import { 
   Mail, 
@@ -55,12 +56,17 @@ function EmailSettingsContent() {
     try {
       const res = await fetch('/api/admin/tenant/settings')
       const data = await res.json()
-      if (data.success) setOfficeAddresses((data.settings?.office_email_addresses ?? []).join('\n'))
+      if (data.success) {
+        const text = (data.settings?.office_email_addresses ?? []).join('\n')
+        setSavedOfficeAddresses(text)
+        setOfficeAddresses(text)
+      }
     } catch {}
   }
 
   const saveOfficeAddresses = async () => {
     setSavingOffice(true)
+    setOfficeError(null)
     try {
       const entries = officeAddresses.split('\n').map(v => v.trim()).filter(Boolean)
       const res = await fetch('/api/admin/tenant/settings', {
@@ -69,13 +75,14 @@ function EmailSettingsContent() {
         body: JSON.stringify({ office_email_addresses: entries }),
       })
       const data = await res.json()
-      setMessage(
-        data.success
-          ? { type: 'success', text: 'Saved. Mail from these addresses now counts as ours.' }
-          : { type: 'error', text: data.error || 'Could not save the addresses' }
-      )
+      if (data.success) {
+        setSavedOfficeAddresses(entries.join('\n'))
+        setOfficeAddresses(entries.join('\n'))
+      } else {
+        setOfficeError(data.error || 'Could not save the addresses')
+      }
     } catch (e) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Could not save the addresses' })
+      setOfficeError(e instanceof Error ? e.message : 'Could not save the addresses')
     } finally {
       setSavingOffice(false)
     }
@@ -87,8 +94,14 @@ function EmailSettingsContent() {
   const [activeTab, setActiveTab] = useState<'connection' | 'templates'>('connection')
   // Addresses that count as the office writing, beyond the connected mailbox
   // and its own domain. One per line, or a whole domain.
+  // The draft is officeAddresses; savedOfficeAddresses is what the server
+  // holds. They save with the one sticky bar.
   const [officeAddresses, setOfficeAddresses] = useState('')
+  const [savedOfficeAddresses, setSavedOfficeAddresses] = useState('')
   const [savingOffice, setSavingOffice] = useState(false)
+  const [officeError, setOfficeError] = useState<string | null>(null)
+  const officeChanges = isAdmin && officeAddresses !== savedOfficeAddresses ? 1 : 0
+  useUnsavedGuard(officeChanges > 0)
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null)
@@ -359,19 +372,9 @@ function EmailSettingsContent() {
                   placeholder={'hello@another-domain.com\npartner-office.com'}
                   className="mt-2 w-full text-sm border border-gray-300 rounded-lg px-3 py-2 font-mono"
                 />
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    onClick={saveOfficeAddresses}
-                    disabled={savingOffice}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
-                  >
-                    {savingOffice ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                    Save addresses
-                  </button>
-                  <span className="text-xs text-gray-500">
-                    Used to tell our reply from a customer&rsquo;s message.
-                  </span>
-                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Used to tell our reply from a customer&rsquo;s message.
+                </p>
               </div>
               )}
             </div>
@@ -435,6 +438,17 @@ function EmailSettingsContent() {
           )}
 
           <SendingDomainCard canManage={isAdmin} />
+
+          {/* The office addresses above save with the one sticky bar (admins only, like the card). */}
+          {isAdmin && (
+            <SaveBar
+              changes={officeChanges}
+              saving={savingOffice}
+              error={officeError}
+              onDiscard={() => { setOfficeAddresses(savedOfficeAddresses); setOfficeError(null) }}
+              onSave={saveOfficeAddresses}
+            />
+          )}
         </div>
       </div>
 

@@ -2,12 +2,11 @@
 import CompanyDataCard from '@/components/account/CompanyDataCard'
 
 import { TIMEZONES } from '@/lib/timezones'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import {
-  Save,
   AlertCircle,
   CheckCircle2,
   Palette,
@@ -27,6 +26,7 @@ import { identityFromTenant } from '@/lib/company-identity'
 import { DocumentFooter } from '@/components/documents/Letterhead'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { LOGO_ACCEPT, logoFileProblem } from '@/lib/logo-file'
+import { SaveBar, useUnsavedGuard } from '@/components/settings/SettingsUI'
 
 const supabase = createClient()
 
@@ -34,6 +34,41 @@ const LETTERHEAD_LABELS: Record<string, string> = {
   tagline: 'Tagline', company_phone: 'Phone', company_website: 'Website', company_address: 'Address',
   license_number: 'Tourism license no.', tax_number: 'Tax / registration no.', document_footer_text: 'Footer note',
 }
+
+type TenantRow = NonNullable<ReturnType<typeof useTenant>['tenant']>
+const blankIfNull = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v))
+
+/**
+ * The form's fields as the stored tenant row fills them — the baseline the
+ * sticky save bar compares against, and what Discard puts back.
+ */
+function formFromTenant(tenant: TenantRow) {
+  const t = tenant as { deposit_percent?: number | null; deposit_due_days?: number | null; rates_currency?: string | null }
+  return {
+    companyName: tenant.company_name,
+    contactEmail: tenant.contact_email || '',
+    tagline: tenant.tagline || '',
+    companyPhone: tenant.company_phone || '',
+    companyWebsite: tenant.company_website || '',
+    companyAddress: tenant.company_address || '',
+    licenseNumber: tenant.license_number || '',
+    taxNumber: tenant.tax_number || '',
+    footerText: tenant.document_footer_text || '',
+    primaryColor: tenant.primary_color || '#647C47',
+    secondaryColor: tenant.secondary_color || '#2d3b2d',
+    // `blankIfNull` not `|| ''`: a stored 0 must show as 0, not as blank.
+    defaultMargin: blankIfNull(tenant.default_margin_percent),
+    minMargin: blankIfNull(tenant.min_margin_percent),
+    depositPercent: blankIfNull(t.deposit_percent),
+    depositDueDays: blankIfNull(t.deposit_due_days),
+    ratesCurrency: t.rates_currency || '',
+    agencyCurrency: tenant.default_currency || '',
+    operatingCountry: tenant.operating_country || '',
+    companyTimezone: tenant.timezone || '',
+    governingLaw: tenant.contract_governing_law || '',
+  }
+}
+type CompanyForm = ReturnType<typeof formFromTenant>
 
 /** PostgREST / Postgres saying one of `columns` does not exist on the table. */
 function isMissingColumnError(err: { code?: string; message?: string }, columns: string[]): boolean {
@@ -102,47 +137,70 @@ export default function TenantSettingsPage() {
   // a currency it did not list left the company in EUR for good.
   const [agencyCurrency, setAgencyCurrency] = useState('')
   const [saving, setSaving] = useState(false)
+  // Messages from the Team Activity control and the logo picker; the main
+  // save reports into the sticky bar (saveError).
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Put the form back to the stored tenant row (on load, after a save's
+  // refetch, and on Discard).
+  const resetForm = (t: TenantRow) => {
+    const f = formFromTenant(t)
+    setCompanyName(f.companyName)
+    setContactEmail(f.contactEmail)
+    setTagline(f.tagline)
+    setCompanyPhone(f.companyPhone)
+    setCompanyWebsite(f.companyWebsite)
+    setCompanyAddress(f.companyAddress)
+    setLicenseNumber(f.licenseNumber)
+    setTaxNumber(f.taxNumber)
+    setFooterText(f.footerText)
+    setLogoUrl(t.logo_url || null)
+    setLogoPreview(t.logo_url || null)
+    setLogoFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    setPrimaryColor(f.primaryColor)
+    setSecondaryColor(f.secondaryColor)
+    setDefaultMargin(f.defaultMargin)
+    setMinMargin(f.minMargin)
+    setDepositPercent(f.depositPercent)
+    setDepositDueDays(f.depositDueDays)
+    setRatesCurrency(f.ratesCurrency)
+    setAgencyCurrency(f.agencyCurrency)
+    setOperatingCountry(f.operatingCountry)
+    setCompanyTimezone(f.companyTimezone)
+    setGoverningLaw(f.governingLaw)
+  }
 
   // Load tenant and features data
   useEffect(() => {
-    if (tenant) {
-      setCompanyName(tenant.company_name)
-      setContactEmail(tenant.contact_email || '')
-      setTagline(tenant.tagline || '')
-      setCompanyPhone(tenant.company_phone || '')
-      setCompanyWebsite(tenant.company_website || '')
-      setCompanyAddress(tenant.company_address || '')
-      setLicenseNumber(tenant.license_number || '')
-      setTaxNumber(tenant.tax_number || '')
-      setFooterText(tenant.document_footer_text || '')
-      setLogoUrl(tenant.logo_url || null)
-      setLogoPreview(tenant.logo_url || null)
-      setPrimaryColor(tenant.primary_color || '#647C47')
-      setSecondaryColor(tenant.secondary_color || '#2d3b2d')
-      // `?? ''` not `|| ''`: a stored 0 must show as 0, not as blank.
-      setDefaultMargin(
-        tenant.default_margin_percent === null || tenant.default_margin_percent === undefined
-          ? ''
-          : String(tenant.default_margin_percent)
-      )
-      const mm = tenant.min_margin_percent
-      setMinMargin(mm === null || mm === undefined ? '' : String(mm))
-      const t = tenant as { deposit_percent?: number | null; deposit_due_days?: number | null }
-      setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
-      setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
-      setRatesCurrency((tenant as { rates_currency?: string | null }).rates_currency || '')
-      setAgencyCurrency(tenant.default_currency || '')
-      setOperatingCountry(tenant.operating_country || '')
-      setCompanyTimezone(tenant.timezone || '')
-      setGoverningLaw(tenant.contract_governing_law || '')
-    }
+    if (tenant) resetForm(tenant)
 
     if (features) {
       // column lands with migration 267; types regen follows
       setActivityEnabled((features as any)?.activity_summary_enabled === true)
     }
   }, [tenant, features])
+
+  // Unsaved changes: each field that differs from the stored row, plus a new
+  // or removed logo.
+  const changes = useMemo(() => {
+    if (!tenant) return 0
+    const stored = formFromTenant(tenant)
+    const draft: CompanyForm = {
+      companyName, contactEmail, tagline, companyPhone, companyWebsite, companyAddress, licenseNumber,
+      taxNumber, footerText, primaryColor, secondaryColor, defaultMargin, minMargin, depositPercent,
+      depositDueDays, ratesCurrency, agencyCurrency, operatingCountry, companyTimezone, governingLaw,
+    }
+    const fields = (Object.keys(stored) as (keyof CompanyForm)[]).filter(k => stored[k] !== draft[k]).length
+    const logoChanged = logoFile !== null || logoUrl !== (tenant.logo_url || null)
+    return fields + (logoChanged ? 1 : 0)
+  }, [
+    tenant, companyName, contactEmail, tagline, companyPhone, companyWebsite, companyAddress, licenseNumber,
+    taxNumber, footerText, primaryColor, secondaryColor, defaultMargin, minMargin, depositPercent,
+    depositDueDays, ratesCurrency, agencyCurrency, operatingCountry, companyTimezone, governingLaw, logoFile, logoUrl,
+  ])
+  useUnsavedGuard(isAdmin && changes > 0)
 
   const saveActivitySummary = async (enabled: boolean) => {
     setActivitySaving(true)
@@ -256,13 +314,14 @@ export default function TenantSettingsPage() {
   const handleSave = async () => {
     if (!tenant || !features || !isAdmin) return
 
-    setMessage(null)
+    setSaveError(null)
 
     // Checked here: this page writes the row directly, and the boxes' min and
     // max were never enforced — a -5% house margin or a 999% deposit saved.
     const num = (v: string) => (v.trim() === '' ? null : Number(v))
     const pct = (v: string) => { const n = num(v); return n === null || (Number.isFinite(n) && n >= 0 && n <= 100) }
     const problems: string[] = []
+    if (!companyName) problems.push('Company name is required')
     if (!pct(defaultMargin)) problems.push('House margin is a percentage from 0 to 100')
     if (!pct(minMargin)) problems.push('Minimum margin is a percentage from 0 to 100')
     const house = num(defaultMargin), floor = num(minMargin)
@@ -274,7 +333,7 @@ export default function TenantSettingsPage() {
       if (c && !/^#[0-9a-fA-F]{6}$/.test(c)) problems.push(`${label} must be a hex colour like #647C47`)
     }
     if (problems.length) {
-      setMessage({ type: 'error', text: problems.join('. ') + '.' })
+      setSaveError(problems.join('. ') + '.')
       return
     }
     // The rates currency reinterprets every stored rate: confirm it.
@@ -296,7 +355,7 @@ export default function TenantSettingsPage() {
       if (logoFile) {
         const uploaded = await uploadLogo()
         if (!uploaded) {
-          setMessage({ type: 'error', text: 'The logo could not be uploaded, so nothing was saved. Try a smaller PNG or JPG.' })
+          setSaveError('The logo could not be uploaded, so nothing was saved. Try a smaller PNG or JPG.')
           return
         }
         finalLogoUrl = uploaded
@@ -408,37 +467,32 @@ export default function TenantSettingsPage() {
       await refetchTenant()
 
       if (contractTermsMissing) {
-        setMessage({
-          type: 'error',
-          text: 'Saved — except the contract country and governing law: the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
-        })
+        setSaveError(
+          'Saved — except the contract country and governing law: the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
+        )
         return
       }
       if (minMarginMissing) {
-        setMessage({
-          type: 'error',
-          text: 'Saved — except the minimum margin: the database has not been updated for it yet. Run the database migration (npm run migrate), then save again.',
-        })
+        setSaveError(
+          'Saved — except the minimum margin: the database has not been updated for it yet. Run the database migration (npm run migrate), then save again.',
+        )
         return
       }
       if (letterheadMissing) {
-        setMessage({
-          type: 'error',
-          text: 'Saved — except the document header & footer fields (tagline, phone, website, address, licence, tax, footer note): the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
-        })
+        setSaveError(
+          'Saved — except the document header & footer fields (tagline, phone, website, address, licence, tax, footer note): the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
+        )
         return
       }
       if (notKept.length > 0) {
-        setMessage({ type: 'error', text: `Saved, but these fields were not kept by the database: ${notKept.join(', ')}.` })
+        setSaveError(`Saved, but these fields were not kept by the database: ${notKept.join(', ')}.`)
         return
       }
       // Refetch tenant data
       await refetchTenant()
-
-      setMessage({ type: 'success', text: 'Settings saved successfully!' })
     } catch (error: any) {
       console.error('Error saving settings:', error)
-      setMessage({ type: 'error', text: error.message || 'Failed to save settings' })
+      setSaveError(error.message || 'Failed to save settings')
     } finally {
       setSaving(false)
     }
@@ -476,32 +530,6 @@ export default function TenantSettingsPage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
-      {/* Toolbar */}
-      <div className="flex items-center justify-end mb-4">
-            <button
-              onClick={handleSave}
-              disabled={saving || uploading || !companyName}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {uploading ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Uploading...
-                </>
-              ) : saving ? (
-                <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-3 h-3" />
-                  Save Changes
-                </>
-              )}
-            </button>
-      </div>
-
       <div className="space-y-4">
         {/* Where this agency books suppliers from lives in Settings › Supplier network. */}
         <p className="text-sm text-gray-600">
@@ -1064,6 +1092,19 @@ export default function TenantSettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Everything above saves together with the one sticky bar (the logo
+          uploads as part of it); Team Activity keeps its own confirm-and-enable
+          control because it notifies the team. */}
+      {isAdmin && (
+        <SaveBar
+          changes={changes}
+          saving={saving || uploading}
+          error={saveError}
+          onDiscard={() => { resetForm(tenant); setSaveError(null) }}
+          onSave={handleSave}
+        />
+      )}
     </div>
   )
 }
