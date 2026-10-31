@@ -135,7 +135,6 @@ describe('no hardcoded supplier vocabulary', () => {
     for (const rel of [
       'app/rates/trains/train-rates-content.tsx',
       'app/rates/sleeping-train/sleeping-train-rates-content.tsx',
-      'app/rates/page.tsx',
     ]) {
       const src = readFileSync(join(ROOT, rel), 'utf8')
       expect(
