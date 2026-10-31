@@ -367,6 +367,13 @@ export const SETTINGS_NAV: SettingsGroup[] = [
         description: 'The people work is assigned to: office staff, guides and drivers, with or without a login.',
       },
       {
+        // Where the agency books suppliers from, and suppliers waiting to have
+        // their sign-in confirmed (operator, 2026-10-31: it was hard to find).
+        label: 'Supplier network', href: '/settings/supplier-network', icon: Network, roles: AM,
+        keywords: ['supplier sourcing', 'network suppliers', 'supplier sign-in'],
+        description: 'Where you book suppliers from, and suppliers waiting to have their sign-in confirmed.',
+      },
+      {
         label: 'Billing & plan', href: '/settings/billing', icon: CreditCard, roles: A, adminOnly: true,
         keywords: ['subscription', 'invoices', 'plan'],
         description: 'Your plan, usage and invoices from Autoura.',
