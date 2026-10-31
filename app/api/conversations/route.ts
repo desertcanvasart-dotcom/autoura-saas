@@ -5,6 +5,7 @@ import { orIlikeContains } from '@/lib/postgrest-search'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { waitingSince } from '@/lib/email/automated-senders'
+import { clampedIntParam, MAX_LIST_LIMIT } from '@/lib/http/list-params'
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,8 +18,10 @@ export async function GET(request: NextRequest) {
     const assignedTo = searchParams.get('assigned_to')
     const channel = searchParams.get('channel') // 'whatsapp', 'email', 'all'
     const starred = searchParams.get('starred')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    // Clamped and NaN-safe (lib/http/list-params): an unbounded limit was cut
+    // to 1000 rows by PostgREST while totalPages used the number asked for.
+    const page = clampedIntParam(searchParams.get('page'), { fallback: 1, max: Number.MAX_SAFE_INTEGER })
+    const limit = clampedIntParam(searchParams.get('limit'), { fallback: 50, max: MAX_LIST_LIMIT })
     const offset = (page - 1) * limit
 
     // Build query

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { propertyFromService, propertyRateStatus, type PropertyRateStatus, type RatePin } from '@/lib/itineraries/overnight-property'
 
 export async function GET(
@@ -33,12 +34,17 @@ export async function GET(
 
     // Every hotel and ship name in THIS agency's rates (RLS scopes the read),
     // for the "no longer in your rates" warning on a night whose property was
-    // deleted or switched off after the itinerary was priced. Small tables.
+    // deleted or switched off after the itinerary was priced. Every page:
+    // a plain select stops at 1000 rows, and a hotel past that read as
+    // "no longer in your rates". The names are matched too (not only pinned
+    // ids), so the whole catalogue is read, not just the pinned rows.
     // A catalogue that failed to load says nothing about its properties: the
     // status is withheld for that kind, never reported as "not in your rates".
     const [{ data: hotelRows, error: hotelError }, { data: shipRows, error: shipError }] = await Promise.all([
-      supabase.from('accommodation_rates').select('id, property_name, city, is_active'),
-      supabase.from('nile_cruises').select('id, ship_name, is_active'),
+      fetchAllPages((from, to) =>
+        supabase.from('accommodation_rates').select('id, property_name, city, is_active').order('id').range(from, to)),
+      fetchAllPages((from, to) =>
+        supabase.from('nile_cruises').select('id, ship_name, is_active').order('id').range(from, to)),
     ])
     if (hotelError || shipError) console.warn('[days-api] rates catalogue partly unavailable; overnight status withheld', hotelError?.message ?? shipError?.message)
     const loadedFor = { hotel: !hotelError, cruise: !shipError }
@@ -47,32 +53,41 @@ export async function GET(
       ships: (shipRows ?? []).map(r => ({ id: r.id, name: r.ship_name, active: r.is_active })),
     }
 
-    // Fetch services for each day
-    const daysWithServices = await Promise.all(
-      (days || []).map(async (day) => {
-        const { data: services, error: servicesError } = await supabase
-          .from('itinerary_services')
-          .select('*')
-          .eq('itinerary_day_id', day.id)
-          .order('created_at', { ascending: true })
+    // Every day's services in one read, grouped by day in memory (was one
+    // query per day). Same order as before: oldest line first. A failed read
+    // fails the request — it used to show the day with no services at all.
+    const dayIds = (days || []).map(day => day.id)
+    const { data: allServices, error: servicesError } = dayIds.length === 0
+      ? { data: [], error: null }
+      : await fetchAllPages((from, to) =>
+          supabase
+            .from('itinerary_services')
+            .select('*')
+            .in('itinerary_day_id', dayIds)
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to))
+    if (servicesError) throw servicesError
 
-        if (servicesError) {
-          console.error('Error fetching services for day:', servicesError)
-        }
+    const servicesByDay = new Map<string, typeof allServices>()
+    for (const service of allServices) {
+      const key = String(service.itinerary_day_id)
+      const list = servicesByDay.get(key)
+      if (list) list.push(service)
+      else servicesByDay.set(key, [service])
+    }
 
-        return {
-          ...day,
-          // Staff-only: whether the night's hotel or ship is still in Rates.
-          services: (services || []).map(service => ({
-            ...service,
-            property_rate_status: ((): PropertyRateStatus | null => {
-              const property = propertyFromService(service as never)
-              return property && loadedFor[property.kind] ? propertyRateStatus(property, catalog, service as RatePin) : null
-            })(),
-          }))
-        }
-      })
-    )
+    const daysWithServices = (days || []).map(day => ({
+      ...day,
+      // Staff-only: whether the night's hotel or ship is still in Rates.
+      services: (servicesByDay.get(String(day.id)) || []).map(service => ({
+        ...service,
+        property_rate_status: ((): PropertyRateStatus | null => {
+          const property = propertyFromService(service as never)
+          return property && loadedFor[property.kind] ? propertyRateStatus(property, catalog, service as RatePin) : null
+        })(),
+      })),
+    }))
 
     return NextResponse.json({
       success: true,

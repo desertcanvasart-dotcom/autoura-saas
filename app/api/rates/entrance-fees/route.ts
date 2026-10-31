@@ -3,6 +3,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 // ============================================
 // ENTRANCE FEES API
@@ -27,27 +28,34 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category')
     const isAddon = searchParams.get('is_addon')
     const activeOnly = searchParams.get('active_only')
-    const limit = searchParams.get('limit')
+    // An optional cap on the row count (a picker asking for a few); a
+    // missing or unreadable value means every row.
+    const askedLimit = parseInt(searchParams.get('limit') || '', 10)
+    const limit = Number.isFinite(askedLimit) && askedLimit > 0 ? askedLimit : null
     const search = searchParams.get('search')
 
-    let query = (createAdminClient() as any)
-      .from('entrance_fees')
-      .select('*')
-      // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
-      .eq('tenant_id', authResult.tenant_id)
-      .order('city', { ascending: true })
-      .order('attraction_name', { ascending: true })
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages<Record<string, unknown>, { message: string }>((from, to) => {
+      if (limit !== null && from >= limit) return Promise.resolve({ data: [], error: null })
+      let query = (createAdminClient() as any)
+        .from('entrance_fees')
+        .select('*')
+        // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
+        .eq('tenant_id', authResult.tenant_id)
+        .order('city', { ascending: true })
+        .order('attraction_name', { ascending: true })
 
-    // Apply filters
-    if (city) query = query.eq('city', city)
-    if (category) query = query.eq('category', category)
-    if (isAddon === 'true') query = query.eq('is_addon', true)
-    if (isAddon === 'false') query = query.eq('is_addon', false)
-    if (activeOnly === 'true') query = query.eq('is_active', true)
-    if (search) query = query.ilike('attraction_name', `%${search}%`)
-    if (limit) query = query.limit(parseInt(limit))
-
-    const { data, error } = await query
+      // Apply filters
+      if (city) query = query.eq('city', city)
+      if (category) query = query.eq('category', category)
+      if (isAddon === 'true') query = query.eq('is_addon', true)
+      if (isAddon === 'false') query = query.eq('is_addon', false)
+      if (activeOnly === 'true') query = query.eq('is_active', true)
+      if (search) query = query.ilike('attraction_name', `%${search}%`)
+      return query.order('id').range(from, limit !== null ? Math.min(to, limit - 1) : to)
+    })
 
     if (error) {
       console.error('GET entrance_fees error:', error)

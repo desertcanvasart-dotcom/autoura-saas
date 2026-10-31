@@ -7,6 +7,7 @@ import { validateRatePayload } from '@/lib/rate-validation'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
 import { cruiseLengthsToStore } from '@/lib/rates/cruise-ppd'
 import { sanitizeSailingDays } from '@/lib/rates/cruise-sailing'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,23 +33,27 @@ export async function GET(request: NextRequest) {
     const route = searchParams.get('route')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabase
-      .from('nile_cruises')
-      .select(`
-        *,
-        supplier:supplier_id (id, name, city, contact_phone, contact_email, star_rating)
-      `)
-      .order('ship_name')
-      .order('cabin_type')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('nile_cruises')
+        .select(`
+          *,
+          supplier:supplier_id (id, name, city, contact_phone, contact_email, star_rating)
+        `)
+        .order('ship_name')
+        .order('cabin_type')
 
-    if (supplierId) query = query.eq('supplier_id', supplierId)
-    if (shipName) query = query.ilike('ship_name', `%${shipName}%`)
-    // Column is route_name; `route` does not exist, so any request carrying
-    // the route filter 400'd on a nonexistent column.
-    if (route) query = query.eq('route_name', route)
-    if (activeOnly) query = query.eq('is_active', true)
-
-    const { data, error } = await query
+      if (supplierId) query = query.eq('supplier_id', supplierId)
+      if (shipName) query = query.ilike('ship_name', `%${shipName}%`)
+      // Column is route_name; `route` does not exist, so any request carrying
+      // the route filter 400'd on a nonexistent column.
+      if (route) query = query.eq('route_name', route)
+      if (activeOnly) query = query.eq('is_active', true)
+      return query.order('id').range(from, to)
+    })
 
     if (error) throw error
 
