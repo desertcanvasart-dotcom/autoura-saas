@@ -40,3 +40,50 @@ export async function fetchAllPages<T, E = unknown>(
   }
   return { data: rows, error: null }
 }
+
+/** A read that failed — never to be taken for "there are no rows". */
+export class RowReadError extends Error {
+  constructor(public readonly table: string, public readonly readError: unknown) {
+    const detail = (readError as { message?: string } | null)?.message ?? String(readError)
+    super(`Could not read ${table}: ${detail}`)
+    this.name = 'RowReadError'
+  }
+}
+
+/** The slice of a PostgREST filter builder this needs (single-use, so built per page). */
+interface PagedQuery {
+  range(from: number, to: number): PromiseLike<{ data: unknown; error: unknown }>
+  order(column: string, opts?: { ascending?: boolean }): PagedQuery
+}
+
+/**
+ * Every row of an UNORDERED read, in the order it reads today, and an error
+ * thrown (RowReadError) rather than handed back as an empty list.
+ *
+ * `build()` makes a fresh query with the caller's filters and no order. The
+ * first page is that same query, so a table under one page comes back
+ * exactly as the plain select returned it. Only a full first page — the
+ * point where a plain select silently stopped — is read again in pages
+ * ordered by `tiebreak` (a unique column), because an unordered read is not
+ * stable across .range() pages and a row could fall between two of them.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchEveryRow<T = any>(
+  table: string,
+  build: () => PagedQuery,
+  opts: { pageSize?: number; tiebreak?: string } = {},
+): Promise<T[]> {
+  const size = Math.max(1, Math.floor(opts.pageSize ?? DEFAULT_PAGE_SIZE))
+  const first = await build().range(0, size - 1)
+  if (first.error) throw new RowReadError(table, first.error)
+  const firstRows = (first.data ?? []) as T[]
+  if (firstRows.length < size) return firstRows
+
+  const tiebreak = opts.tiebreak ?? 'id'
+  const { data, error } = await fetchAllPages<T>(
+    (from, to) => build().order(tiebreak, { ascending: true }).range(from, to) as PromiseLike<PageResult<T, unknown>>,
+    size,
+  )
+  if (error) throw new RowReadError(table, error)
+  return data
+}
