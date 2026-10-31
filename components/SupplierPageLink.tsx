@@ -9,7 +9,7 @@ import DaysOffEditor from '@/components/DaysOffEditor'
 // (D2), copy it, or switch it off (then send a new one).
 
 export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: string; canEdit: boolean }) {
-  const [link, setLink] = useState<{ url: string; last_opened_at: string | null } | null>(null)
+  const [link, setLink] = useState<{ url: string | null; last_opened_at: string | null } | null>(null)
   const [signIn, setSignIn] = useState<{ ok: boolean; reason: string | null } | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -55,8 +55,8 @@ export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: 
             <MessageCircle className="w-3.5 h-3.5" /> {link ? 'Send again on WhatsApp' : 'Send on WhatsApp'}
           </button>
         )}
-        {link && (
-          <button type="button" onClick={() => { void navigator.clipboard?.writeText(link.url); setNote('Link copied') }} className="text-xs text-blue-700 hover:underline">Copy link</button>
+        {link?.url && (
+          <button type="button" onClick={() => { void navigator.clipboard?.writeText(link.url ?? ''); setNote('Link copied') }} className="text-xs text-blue-700 hover:underline">Copy link</button>
         )}
         {link && canEdit && (
           <button type="button" disabled={busy} onClick={stop} className="text-xs text-red-700 hover:underline disabled:opacity-50">Switch off</button>

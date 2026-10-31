@@ -137,6 +137,25 @@ export const RATE_LIMITS = {
     limit: 10,         // invites
     windowMs: 3600000, // per hour
   },
+  // Supplier sign-in (lib/supplier-rate-limits): counted BEFORE the phone is
+  // looked up, so a known and an unknown number hit the same wall.
+  supplierCodePhone: {
+    limit: 3,          // code requests for one phone (= CODE_MAX_SENDS, so this wall comes first)
+    windowMs: 900000,  // per 15 minutes
+  },
+  supplierVerifyPhone: {
+    limit: 10,         // code tries for one phone (two codes' worth)
+    windowMs: 900000,  // per 15 minutes
+  },
+  supplierSignInIp: {
+    limit: 30,         // code requests or tries from one address
+    windowMs: 900000,  // per 15 minutes
+  },
+  // A supplier's taps on a reply link or their own page, per address.
+  supplierLink: {
+    limit: 30,         // taps
+    windowMs: 60000,   // per minute
+  },
 }
 
 // ============================================

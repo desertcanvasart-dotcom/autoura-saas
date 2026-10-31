@@ -10,7 +10,8 @@ import { signInReadiness } from '@/lib/supplier-accounts'
 // ============================================
 // A supplier's own page link (lib/supplier-portal, migration 449)
 // ============================================
-// GET    → the active link, if any (and when it was last opened).
+// GET    → the active link, if any (and when it was last opened); the URL
+//          itself only for managers and up.
 // POST   → make it (or reuse the active one) and the WhatsApp text that sends
 //          it from the office's own phone (D2).
 // DELETE → switch it off (the supplier's URL stops working); POST makes a new one.
@@ -36,9 +37,14 @@ export async function GET(request: NextRequest, { params }: Ctx) {
     supabase.from('suppliers').select('email, contact_email, whatsapp, phone, contact_phone').eq('id', id).eq('tenant_id', tenant_id).maybeSingle(),
     supabase.from('tenants').select('operating_country').eq('id', tenant_id).maybeSingle(),
   ])
+  // The URL IS the supplier's key — whoever holds it can accept, decline and
+  // name cars as them. Only the roles that may make or send it (the same
+  // writer check as POST / DELETE) get it back; everyone else sees only
+  // whether a link exists and when it was opened (audit SN-6).
+  const mayHoldLink = !roleDenied(auth.role, 'manage')
   return NextResponse.json({
     success: true,
-    data: link ? { url: pageUrl(request, link.token as string), created_at: link.created_at, last_opened_at: link.last_opened_at } : null,
+    data: link ? { url: mayHoldLink ? pageUrl(request, link.token as string) : null, created_at: link.created_at, last_opened_at: link.last_opened_at } : null,
     sign_in: supplier ? signInReadiness(supplier, tenant?.operating_country as string | null) : null,
   })
 }
