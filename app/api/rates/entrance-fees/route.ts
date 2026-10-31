@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Every page: PostgREST stops a plain select at 1000 rows without an
     // error, so rows past that could not be found to edit or deactivate.
     // `id` last keeps the paging stable between pages.
-    const { data, error } = await fetchAllPages((from, to) => {
+    const { data, error } = await fetchAllPages<Record<string, unknown>, { message: string }>((from, to) => {
       if (limit !== null && from >= limit) return Promise.resolve({ data: [], error: null })
       let query = (createAdminClient() as any)
         .from('entrance_fees')
