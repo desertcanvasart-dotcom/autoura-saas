@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MessageCircle, Send, Check, AlertCircle, Settings, Phone, Zap, Bot, Sparkles, Loader2 } from 'lucide-react'
+import { MessageCircle, Send, Check, AlertCircle, Settings, Phone, Zap, Bot, Sparkles, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 // /api/whatsapp/status — the page read /api/whatsapp/test, which only
 // answers POST, so it always showed "Configuration Incomplete".
@@ -184,24 +184,27 @@ export default function WhatsAppSettingsPage() {
           </div>
 
           <div className="space-y-0">
-            {[
-              ['Provider', config?.provider === 'meta' ? 'Meta Cloud API' : 'Twilio'],
-              ['Credentials', config?.has_credentials ? '✅ Set' : '❌ Missing'],
+            {([
+              ['Provider', config?.provider === 'meta' ? 'Meta Cloud API' : 'Twilio', null],
+              ['Credentials', config?.has_credentials ? 'Set' : 'Missing', config?.has_credentials ? 'ok' : 'bad'],
               [
                 'Your WhatsApp number',
                 config?.whatsapp_number
                   ? `${config.whatsapp_number} ${config.own_number ? '(your own)' : '(shared platform number)'}`
-                  : '❌ Not set',
+                  : 'Not set',
+                config?.whatsapp_number ? null : 'bad',
               ],
-            ].map(([key, value]) => (
+            ] as Array<[string, string, 'ok' | 'bad' | null]>).map(([key, value, tone]) => (
               <div key={key} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
                 <span className="text-xs text-gray-600 font-medium">{key}</span>
                 <span className={`
-                  text-xs px-2 py-0.5 rounded
-                  ${value.includes('✅') ? 'bg-green-50 text-green-700' : ''}
-                  ${value.includes('❌') ? 'bg-red-50 text-red-700' : ''}
-                  ${!value.includes('✅') && !value.includes('❌') ? 'text-gray-700' : ''}
+                  inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded
+                  ${tone === 'ok' ? 'bg-green-50 text-green-700' : ''}
+                  ${tone === 'bad' ? 'bg-red-50 text-red-700' : ''}
+                  ${tone === null ? 'text-gray-700' : ''}
                 `}>
+                  {tone === 'ok' && <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />}
+                  {tone === 'bad' && <XCircle className="w-3.5 h-3.5 text-red-600" />}
                   {value}
                 </span>
               </div>

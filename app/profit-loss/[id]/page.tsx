@@ -17,7 +17,23 @@ import {
   ExternalLink,
   Plus,
   Handshake,
-  AlertTriangle
+  AlertTriangle,
+  UserRound,
+  Car,
+  Hotel,
+  Bus,
+  Ticket,
+  UtensilsCrossed,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 
 interface TripPnL {
@@ -98,22 +114,22 @@ function fmtDay(day: string | null | undefined): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { timeZone: 'UTC' })
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫', color: 'bg-blue-100 text-blue-700' },
-  driver: { label: 'Driver', icon: '🚗', color: 'bg-primary-100 text-primary-700' },
-  hotel: { label: 'Hotel', icon: '🏨', color: 'bg-primary-100 text-primary-700' },
-  transportation: { label: 'Transportation', icon: '🚐', color: 'bg-primary-100 text-primary-700' },
-  entrance: { label: 'Entrance Fees', icon: '🎫', color: 'bg-primary-100 text-primary-700' },
-  meal: { label: 'Meals', icon: '🍽️', color: 'bg-amber-100 text-amber-700' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️', color: 'bg-primary-100 text-primary-700' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️', color: 'bg-primary-100 text-primary-700' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳', color: 'bg-primary-100 text-primary-700' },
-  tipping: { label: 'Tipping', icon: '💵', color: 'bg-green-100 text-green-700' },
-  permits: { label: 'Permits', icon: '📋', color: 'bg-amber-100 text-amber-700' },
-  toll: { label: 'Toll Fees', icon: '🛣️', color: 'bg-stone-100 text-stone-700' },
-  parking: { label: 'Parking', icon: '🅿️', color: 'bg-slate-100 text-slate-700' },
-  fuel: { label: 'Fuel', icon: '⛽', color: 'bg-red-100 text-red-700' },
-  other: { label: 'Other', icon: '📦', color: 'bg-gray-100 text-gray-700' }
+const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon; color: string }> = {
+  guide: { label: 'Tour Guide', icon: UserRound, color: 'bg-blue-100 text-blue-700' },
+  driver: { label: 'Driver', icon: Car, color: 'bg-primary-100 text-primary-700' },
+  hotel: { label: 'Hotel', icon: Hotel, color: 'bg-primary-100 text-primary-700' },
+  transportation: { label: 'Transportation', icon: Bus, color: 'bg-primary-100 text-primary-700' },
+  entrance: { label: 'Entrance Fees', icon: Ticket, color: 'bg-primary-100 text-primary-700' },
+  meal: { label: 'Meals', icon: UtensilsCrossed, color: 'bg-amber-100 text-amber-700' },
+  airport_staff: { label: 'Airport Staff', icon: Plane, color: 'bg-primary-100 text-primary-700' },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell, color: 'bg-primary-100 text-primary-700' },
+  ground_handler: { label: 'Ground Handler', icon: Luggage, color: 'bg-primary-100 text-primary-700' },
+  tipping: { label: 'Tipping', icon: Banknote, color: 'bg-green-100 text-green-700' },
+  permits: { label: 'Permits', icon: ClipboardList, color: 'bg-amber-100 text-amber-700' },
+  toll: { label: 'Toll Fees', icon: Milestone, color: 'bg-stone-100 text-stone-700' },
+  parking: { label: 'Parking', icon: SquareParking, color: 'bg-slate-100 text-slate-700' },
+  fuel: { label: 'Fuel', icon: Fuel, color: 'bg-red-100 text-red-700' },
+  other: { label: 'Other', icon: Package, color: 'bg-gray-100 text-gray-700' }
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -430,7 +446,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                   <div key={category}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <div className="flex items-center gap-2">
-                        <span>{config.icon}</span>
+                        <config.icon className="w-4 h-4 text-gray-500" />
                         <span className="text-gray-700">{config.label}</span>
                       </div>
                       <span className="font-medium text-gray-900">
@@ -479,7 +495,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-lg">{config.icon}</span>
+                      <config.icon className="w-5 h-5 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium text-gray-900">{expense.expense_number}</p>
                         <p className="text-xs text-gray-500">

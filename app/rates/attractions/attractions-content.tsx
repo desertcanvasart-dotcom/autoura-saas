@@ -8,7 +8,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy, Ticket, MapPin, Wallet } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -703,7 +703,7 @@ export default function AttractionsContent() {
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">🎫</span>
+              <Ticket className="w-5 h-5 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <p className="text-xs text-gray-600">Total Attractions</p>
@@ -722,7 +722,7 @@ export default function AttractionsContent() {
           {/* NEW: Standard vs Add-on stats */}
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">📍</span>
+              <MapPin className="w-5 h-5 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <p className="text-xs text-gray-600">Standard</p>
@@ -740,7 +740,7 @@ export default function AttractionsContent() {
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">🏙️</span>
+              <Building2 className="w-5 h-5 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Cities</p>
@@ -749,7 +749,7 @@ export default function AttractionsContent() {
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">💰</span>
+              <Wallet className="w-5 h-5 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. Rate</p>
@@ -987,7 +987,7 @@ export default function AttractionsContent() {
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center gap-2">
-                        <span className="text-3xl text-gray-400">🎫</span>
+                        <Ticket className="w-8 h-8 text-gray-400" />
                         <p className="text-sm font-medium">No attractions found</p>
                         <button
                           onClick={handleAddNew}

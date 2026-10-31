@@ -24,7 +24,8 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
-  GripVertical
+  GripVertical,
+  XCircle
 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -407,7 +408,7 @@ export default function WritingRulesPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {rule.examples.bad && rule.examples.bad.length > 0 && (
                                     <div>
-                                      <h4 className="text-xs font-medium text-red-600 mb-2">❌ Avoid</h4>
+                                      <h4 className="flex items-center gap-1 text-xs font-medium text-red-600 mb-2"><XCircle className="w-3.5 h-3.5" /> Avoid</h4>
                                       <div className="space-y-1">
                                         {rule.examples.bad.map((ex, i) => (
                                           <p key={i} className="text-sm text-gray-600 bg-red-50 px-3 py-2 rounded-lg">
@@ -419,7 +420,7 @@ export default function WritingRulesPage() {
                                   )}
                                   {rule.examples.good && rule.examples.good.length > 0 && (
                                     <div>
-                                      <h4 className="text-xs font-medium text-primary-600 mb-2">✓ Better</h4>
+                                      <h4 className="flex items-center gap-1 text-xs font-medium text-primary-600 mb-2"><CheckCircle2 className="w-3.5 h-3.5" /> Better</h4>
                                       <div className="space-y-1">
                                         {rule.examples.good.map((ex, i) => (
                                           <p key={i} className="text-sm text-gray-600 bg-primary-50 px-3 py-2 rounded-lg">
@@ -581,7 +582,7 @@ export default function WritingRulesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Bad Examples */}
                 <div>
-                  <label className="block text-sm font-medium text-red-600 mb-2">❌ Bad Examples</label>
+                  <label className="flex items-center gap-1 text-sm font-medium text-red-600 mb-2"><XCircle className="w-4 h-4" /> Bad Examples</label>
                   <div className="space-y-2">
                     {formData.examples.bad.map((ex, i) => (
                       <div key={i} className="flex gap-2">
@@ -611,7 +612,7 @@ export default function WritingRulesPage() {
 
                 {/* Good Examples */}
                 <div>
-                  <label className="block text-sm font-medium text-primary-600 mb-2">✓ Good Examples</label>
+                  <label className="flex items-center gap-1 text-sm font-medium text-primary-600 mb-2"><CheckCircle2 className="w-4 h-4" /> Good Examples</label>
                   <div className="space-y-2">
                     {formData.examples.good.map((ex, i) => (
                       <div key={i} className="flex gap-2">

@@ -18,7 +18,8 @@ import {
   Clock,
   Info,
   Map as MapIcon,
-  Filter
+  Filter,
+  Rocket
 } from 'lucide-react'
 
 // ============================================
@@ -564,7 +565,7 @@ export default function CapacityPage() {
               >
                 <option value="">Select a tour or itinerary...</option>
                 {itineraries.length > 0 && (
-                  <optgroup label="📋 Itineraries">
+                  <optgroup label="Itineraries">
                     {itineraries.map(itinerary => (
                       <option key={itinerary.id} value={`itinerary:${itinerary.id}`}>
                         {itinerary.trip_name} ({itinerary.itinerary_code}) - {itinerary.client_name}
@@ -573,7 +574,7 @@ export default function CapacityPage() {
                   </optgroup>
                 )}
                 {tourTemplates.length > 0 && (
-                  <optgroup label="🗺️ Tour Templates">
+                  <optgroup label="Tour Templates">
                     {tourTemplates.map(template => (
                       <option key={template.id} value={`template:${template.id}`}>
                         {template.template_name} {template.template_code ? `(${template.template_code})` : ''}
@@ -738,7 +739,7 @@ export default function CapacityPage() {
                             <div className="mt-1">
                               {isItinStart ? (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-800 block truncate">
-                                  🚀 Start
+                                  <Rocket className="inline w-3 h-3 -mt-0.5 mr-1" />Start
                                 </span>
                               ) : (
                                 <span className="text-xs text-primary-600">
@@ -930,7 +931,7 @@ export default function CapacityPage() {
 
                           <div className="text-xs text-gray-600 space-y-1">
                             <p>
-                              {isStart ? '🚀 Starts today' : `Day ${Math.floor((new Date(selectedDate).getTime() - new Date(dep.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} of ${dep.duration_days}`}
+                              {isStart ? <><Rocket className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />Starts today</> : `Day ${Math.floor((new Date(selectedDate).getTime() - new Date(dep.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} of ${dep.duration_days}`}
                             </p>
                             <p>{dep.start_date} → {dep.end_date}</p>
                           </div>

@@ -7,7 +7,17 @@ import type { TripPnL } from '@/lib/trip-pnl'
 import { 
   TrendingUp,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Car,
+  UserRound,
+  Ticket,
+  UtensilsCrossed,
+  Hotel,
+  Banknote,
+  Droplets,
+  Drama,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 
 interface Service {
@@ -45,16 +55,16 @@ interface PLBreakdown {
   count: number
 }
 
-const SERVICE_ICONS: Record<string, string> = {
-  transportation: '🚗',
-  guide: '👨‍🏫',
-  entrance: '🎫',
-  meal: '🍽️',
-  accommodation: '🏨',
-  tips: '💵',
-  supplies: '💧',
-  activity: '🎭',
-  other: '📦'
+const SERVICE_ICONS: Record<string, LucideIcon> = {
+  transportation: Car,
+  guide: UserRound,
+  entrance: Ticket,
+  meal: UtensilsCrossed,
+  accommodation: Hotel,
+  tips: Banknote,
+  supplies: Droplets,
+  activity: Drama,
+  other: Package
 }
 
 export default function ItineraryPL({ 
@@ -241,13 +251,13 @@ export default function ItineraryPL({
             <h4 className="text-sm font-semibold text-gray-900 mb-4">Breakdown by Service Type</h4>
             <div className="space-y-3">
               {breakdown.map((item) => {
-                const icon = SERVICE_ICONS[item.service_type] || SERVICE_ICONS.other
+                const Icon = SERVICE_ICONS[item.service_type] || SERVICE_ICONS.other
                 const marginWidth = Math.min(Math.max(item.margin_percent, 0), 50) * 2
                 return (
                   <div key={item.service_type} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{icon}</span>
+                        <Icon className="w-5 h-5 text-gray-500" />
                         <span className="text-sm font-medium text-gray-900 capitalize">{item.service_type.replace('_', ' ')}</span>
                         <span className="text-xs text-gray-400">({item.count} items)</span>
                       </div>

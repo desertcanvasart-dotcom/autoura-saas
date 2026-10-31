@@ -40,7 +40,18 @@ import {
   Layers,
   MapPin,
   Calculator,
-  Loader2
+  Loader2,
+  Landmark,
+  Moon,
+  Timer,
+  Bus,
+  CornerUpLeft,
+  Ship,
+  Hotel,
+  Utensils,
+  Lock,
+  Sparkles,
+  Lightbulb
 } from 'lucide-react'
 
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -384,7 +395,7 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
             key={index} 
             className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-200"
           >
-            🏛️ {attraction}
+            <Landmark className="w-3 h-3" />{attraction}
             <button 
               type="button" 
               onClick={() => onRemove(index)} 
@@ -1347,7 +1358,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{day.description}</p>
                 )}
                 <p className="text-xs text-gray-500 mt-0.5">
-                  📍 {day.city || <span className="italic">city not stated — read from the title</span>}
+                  <MapPin className="w-3 h-3 inline -mt-0.5 mr-0.5" />{day.city || <span className="italic">city not stated — read from the title</span>}
                   {isDayTour && dayTourNamesNoAttractions(day as unknown as Record<string, unknown>) && (
                     <span className="block font-medium text-red-600">
                       This day {DAY_TOUR_NO_ATTRACTIONS}. Press Edit and pick them.
@@ -1363,7 +1374,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                       — more than one place, so this day cannot be priced. Press Edit and choose one.
                     </span>
                   )}
-                  {' · 🌙 '}
+                  {' · '}<Moon className="w-3 h-3 inline -mt-0.5 mr-0.5" />
                   {day.in_transit === true
                     ? 'In the air — nothing sold'
                     : day.accommodation_type === 'cruise'
@@ -1376,18 +1387,18 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 </p>
                 {day.sightseeing_length && day.sightseeing_length !== 'day_tour' && (
                   <p className="text-xs text-primary-700 mt-0.5">
-                    ⏱️ {day.sightseeing_length === 'half_day' ? 'Half day (4 hours)' : 'Long day (12 hours)'}
+                    <Timer className="w-3 h-3 inline -mt-0.5 mr-0.5" />{day.sightseeing_length === 'half_day' ? 'Half day (4 hours)' : 'Long day (12 hours)'}
                   </p>
                 )}
                 {day.city_transfer && (
-                  <p className="text-xs text-primary-700 mt-0.5">🚐 Local transfer</p>
+                  <p className="text-xs text-primary-700 mt-0.5"><Bus className="w-3 h-3 inline -mt-0.5 mr-0.5" />Local transfer</p>
                 )}
                 {day.day_trip_from && (
-                  <p className="text-xs text-primary-700 mt-0.5">↩️ Day trip from {day.day_trip_from} — the night is there</p>
+                  <p className="text-xs text-primary-700 mt-0.5"><CornerUpLeft className="w-3 h-3 inline -mt-0.5 mr-0.5" />Day trip from {day.day_trip_from} — the night is there</p>
                 )}
                 {day.property_by_tier && Object.values(day.property_by_tier).some(Boolean) && (
                   <p className="text-xs text-primary-700 mt-0.5">
-                    {day.accommodation_type === 'cruise' ? '🚢 Named ship' : '🏨 Named hotel'} for{' '}
+                    {day.accommodation_type === 'cruise' ? <><Ship className="w-3 h-3 inline -mt-0.5 mr-0.5" />Named ship</> : <><Hotel className="w-3 h-3 inline -mt-0.5 mr-0.5" />Named hotel</>} for{' '}
                     {Object.values(day.property_by_tier).filter(Boolean).length} tier
                     {Object.values(day.property_by_tier).filter(Boolean).length === 1 ? '' : 's'}
                   </p>
@@ -1412,7 +1423,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   const m = readDayMeals(day.meals)
                   return (
                     <p className="text-xs text-blue-600 mt-1">
-                      🍽️ {MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k], day.accommodation_type)}`).join(' · ')}
+                      <Utensils className="w-3 h-3 inline -mt-0.5 mr-0.5" />{MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k], day.accommodation_type)}`).join(' · ')}
                     </p>
                   )
                 })()}
@@ -1725,7 +1736,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
                               onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
                               className="w-4 h-4 text-green-600"
                             />
-                            <span className="text-sm text-gray-700">🔒 Private</span>
+                            <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Lock className="w-4 h-4 text-gray-500" />Private</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -1735,7 +1746,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
                               onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
                               className="w-4 h-4 text-green-600"
                             />
-                            <span className="text-sm text-gray-700">👥 Shared</span>
+                            <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Users className="w-4 h-4 text-gray-500" />Shared</span>
                           </label>
                         </div>
                         <div className="mt-2 text-xs text-gray-500">
@@ -3062,7 +3073,7 @@ export default function TourManagerContent() {
                         source of truth. */}
                     {(template.itinerary?.length ?? 0) > 0 && (
                       <div className="flex items-start gap-2 text-gray-600">
-                        <span className="w-4 text-center flex-shrink-0">🍽️</span>
+                        <Utensils className="w-4 h-4 flex-shrink-0 mt-0.5" />
                         <span className="text-xs leading-5">
                           {summarizeMeals(template.itinerary).join(' · ') || 'No meals provided on any day'}
                         </span>
@@ -3433,7 +3444,7 @@ export default function TourManagerContent() {
                         onChange={handleCheckboxChange}
                         className="w-4 h-4 text-green-600 border-gray-300 rounded"
                       />
-                      <span className="text-xs text-gray-700">⭐ Featured Tour</span>
+                      <span className="text-xs text-gray-700 inline-flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500" />Featured Tour</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -3475,7 +3486,7 @@ export default function TourManagerContent() {
                     <div className="flex flex-wrap gap-2">
                       {formData.highlights.map((h, i) => (
                         <span key={i} className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs border border-amber-200">
-                          ✨ {h}
+                          <Sparkles className="w-3 h-3" />{h}
                           <button type="button" onClick={() => removeHighlight(i)} className="text-amber-500 hover:text-amber-700">
                             <X className="w-3 h-3" />
                           </button>
@@ -3621,7 +3632,7 @@ export default function TourManagerContent() {
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-blue-800">
-                      <strong>💡 Tip:</strong> Select the pricing tiers you want to offer. The days themselves are on the Details tab; edit them later with the calendar button on the tour list.
+                      <Lightbulb className="w-4 h-4 inline -mt-0.5 mr-1" /><strong>Tip:</strong> Select the pricing tiers you want to offer. The days themselves are on the Details tab; edit them later with the calendar button on the tour list.
                     </p>
                   </div>
 
@@ -3663,7 +3674,7 @@ export default function TourManagerContent() {
                                       onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
                                       className="w-4 h-4 text-green-600"
                                     />
-                                    <span className="text-sm text-gray-700">🔒 Private</span>
+                                    <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Lock className="w-4 h-4 text-gray-500" />Private</span>
                                   </label>
                                   <label className="flex items-center gap-2 cursor-pointer">
                                     <input
@@ -3673,7 +3684,7 @@ export default function TourManagerContent() {
                                       onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
                                       className="w-4 h-4 text-green-600"
                                     />
-                                    <span className="text-sm text-gray-700">👥 Shared</span>
+                                    <span className="text-sm text-gray-700 inline-flex items-center gap-1"><Users className="w-4 h-4 text-gray-500" />Shared</span>
                                   </label>
                                 </div>
                                 <div className="mt-2 text-xs text-gray-500">

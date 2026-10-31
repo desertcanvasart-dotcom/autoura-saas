@@ -334,7 +334,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         throw new Error(data.error || 'Failed to send invoice')
       }
       
-      showToast('success', 'Invoice sent via WhatsApp! ✅')
+      showToast('success', 'Invoice sent via WhatsApp!')
       fetchInvoice()
     } catch (error: any) {
       console.error('Error sending WhatsApp:', error)

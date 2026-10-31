@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Bell, Check, X, ExternalLink, Loader2, Trash2 } from 'lucide-react'
+import { Bell, Check, X, ExternalLink, Loader2, Trash2, Mail, ConciergeBell, ClipboardList, AlarmClock, AlertTriangle, CheckCircle2, MessageCircle, Smartphone, AtSign, Wallet, PartyPopper } from 'lucide-react'
 import { NOTIFICATIONS_REFRESH_EVENT } from '@/lib/use-inbox-unread'
 import PushToggle from '@/components/PushToggle'
 
@@ -176,18 +176,18 @@ export default function NotificationBell() {
   // Get icon based on notification type
   const getIcon = (type: string) => {
     switch (type) {
-      case 'new_email': return '✉️'
-      case 'concierge_lead': return '🛎️'
-      case 'task_assigned': return '📋'
-      case 'task_due_soon': return '⏰'
-      case 'task_overdue': return '🚨'
-      case 'task_completed': return '✅'
-      case 'whatsapp_assigned': return '💬'
-      case 'whatsapp_new_message': return '📱'
-      case 'whatsapp_mention': return '🔔'
-      case 'invoice_paid': return '💰'
-      case 'booking_confirmed': return '🎉'
-      default: return '🔔'
+      case 'new_email': return <Mail className="w-5 h-5 text-primary-600" />
+      case 'concierge_lead': return <ConciergeBell className="w-5 h-5 text-primary-600" />
+      case 'task_assigned': return <ClipboardList className="w-5 h-5 text-primary-600" />
+      case 'task_due_soon': return <AlarmClock className="w-5 h-5 text-amber-600" />
+      case 'task_overdue': return <AlertTriangle className="w-5 h-5 text-red-600" />
+      case 'task_completed': return <CheckCircle2 className="w-5 h-5 text-green-600" />
+      case 'whatsapp_assigned': return <MessageCircle className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_new_message': return <Smartphone className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_mention': return <AtSign className="w-5 h-5 text-primary-600" />
+      case 'invoice_paid': return <Wallet className="w-5 h-5 text-green-600" />
+      case 'booking_confirmed': return <PartyPopper className="w-5 h-5 text-green-600" />
+      default: return <Bell className="w-5 h-5 text-primary-600" />
     }
   }
 

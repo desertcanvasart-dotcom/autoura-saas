@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, MapPin, Radio, Undo2 } from 'lucide-react'
+import { Loader2, MapPin, Radio, Undo2, Lock } from 'lucide-react'
 
 // ============================================
 // TRIP TIMELINE — the office view of trip_events (the live log)
@@ -283,7 +283,7 @@ export default function TripTimeline({ itineraryId, startDate, endDate, today, p
                         </p>
                         {e.note && (
                           <p className="text-xs text-gray-500 mt-0.5 bg-gray-50 border border-gray-100 rounded px-2 py-1 inline-block">
-                            🔒 {e.note}
+                            <Lock className="w-3 h-3 inline -mt-0.5 mr-1" />{e.note}
                           </p>
                         )}
                       </div>

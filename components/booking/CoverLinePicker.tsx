@@ -107,7 +107,7 @@ export default function CoverLinePicker({
                   <optgroup label="Assign directly (your team and cars)">
                     {options.own.map(o => (
                       <option key={`${o.resource_type}:${o.resource_id}`} value={`own|${o.resource_type}|${o.resource_id}`}>
-                        {OWN_KIND[o.resource_type] ?? o.resource_type}: {o.name}{o.detail ? ` · ${o.detail}` : ''}{o.day_off ? ' · ⚠ day off' : ''}
+                        {OWN_KIND[o.resource_type] ?? o.resource_type}: {o.name}{o.detail ? ` · ${o.detail}` : ''}{o.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -116,7 +116,7 @@ export default function CoverLinePicker({
                   <optgroup label="Suppliers with a rate for this">
                     {options.suppliers.filter(s => !s.other && !s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
-                        {s.preferred ? '★ ' : ''}{s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}{s.day_off ? ' · ⚠ day off' : ''}
+                        {s.preferred ? '★ ' : ''}{s.name} — {s.cost !== null ? `${currency} ${s.cost.toFixed(2)}` : 'no rate'}{s.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -125,7 +125,7 @@ export default function CoverLinePicker({
                   <optgroup label="Other suppliers of this kind (no rate — enter what they agree)">
                     {options.suppliers.filter(s => s.other && !s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
-                        {s.name}{s.day_off ? ' · ⚠ day off' : ''}
+                        {s.name}{s.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -134,7 +134,7 @@ export default function CoverLinePicker({
                   <optgroup label="Network suppliers (verified by Autoura — agree the price)">
                     {options.suppliers.filter(s => s.network).map(s => (
                       <option key={s.supplier_id} value={`supplier|${s.supplier_id}`}>
-                        {s.name}{s.cost !== null ? ` — ${currency} ${s.cost.toFixed(2)}` : ''}{s.day_off ? ' · ⚠ day off' : ''}
+                        {s.name}{s.cost !== null ? ` — ${currency} ${s.cost.toFixed(2)}` : ''}{s.day_off ? ' · day off' : ''}
                       </option>
                     ))}
                   </optgroup>

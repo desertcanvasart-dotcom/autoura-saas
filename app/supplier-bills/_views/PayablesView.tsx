@@ -24,7 +24,27 @@ import {
   CheckCircle,
   CreditCard,
   TrendingDown,
-  Users
+  Users,
+  UserRound,
+  Car,
+  Hotel,
+  UtensilsCrossed,
+  Bus,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Landmark,
+  Package,
+  Ticket,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  HandCoins,
+  Hourglass,
+  AlarmClock,
+  type LucideIcon
 } from 'lucide-react'
 
 interface AgingBucket {
@@ -85,35 +105,35 @@ interface Summary {
 // of mixed-currency money is not a number.
 const nonZero = (t: CurrencyTotals) => Object.values(t).some(v => v !== 0)
 
-const SUPPLIER_TYPES: Record<string, { label: string; icon: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫' },
-  driver: { label: 'Driver', icon: '🚗' },
-  hotel: { label: 'Hotel', icon: '🏨' },
-  restaurant: { label: 'Restaurant', icon: '🍽️' },
-  transport_company: { label: 'Transport Company', icon: '🚐' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  government: { label: 'Government', icon: '🏛️' },
-  other: { label: 'Other', icon: '📦' }
+const SUPPLIER_TYPES: Record<string, { label: string; icon: LucideIcon }> = {
+  guide: { label: 'Tour Guide', icon: UserRound },
+  driver: { label: 'Driver', icon: Car },
+  hotel: { label: 'Hotel', icon: Hotel },
+  restaurant: { label: 'Restaurant', icon: UtensilsCrossed },
+  transport_company: { label: 'Transport Company', icon: Bus },
+  airport_staff: { label: 'Airport Staff', icon: Plane },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell },
+  ground_handler: { label: 'Ground Handler', icon: Luggage },
+  government: { label: 'Government', icon: Landmark },
+  other: { label: 'Other', icon: Package }
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫' },
-  driver: { label: 'Driver', icon: '🚗' },
-  hotel: { label: 'Hotel', icon: '🏨' },
-  transportation: { label: 'Transportation', icon: '🚐' },
-  entrance: { label: 'Entrance Fees', icon: '🎫' },
-  meal: { label: 'Meals', icon: '🍽️' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  tipping: { label: 'Tipping', icon: '💵' },
-  permits: { label: 'Permits', icon: '📋' },
-  toll: { label: 'Toll Fees', icon: '🛣️' },
-  parking: { label: 'Parking', icon: '🅿️' },
-  fuel: { label: 'Fuel', icon: '⛽' },
-  other: { label: 'Other', icon: '📦' }
+const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
+  guide: { label: 'Tour Guide', icon: UserRound },
+  driver: { label: 'Driver', icon: Car },
+  hotel: { label: 'Hotel', icon: Hotel },
+  transportation: { label: 'Transportation', icon: Bus },
+  entrance: { label: 'Entrance Fees', icon: Ticket },
+  meal: { label: 'Meals', icon: UtensilsCrossed },
+  airport_staff: { label: 'Airport Staff', icon: Plane },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell },
+  ground_handler: { label: 'Ground Handler', icon: Luggage },
+  tipping: { label: 'Tipping', icon: Banknote },
+  permits: { label: 'Permits', icon: ClipboardList },
+  toll: { label: 'Toll Fees', icon: Milestone },
+  parking: { label: 'Parking', icon: SquareParking },
+  fuel: { label: 'Fuel', icon: Fuel },
+  other: { label: 'Other', icon: Package }
 }
 
 const ITEMS_PER_PAGE = 15
@@ -337,7 +357,7 @@ export default function AccountsPayablePage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            💸
+            <HandCoins className="w-5 h-5 text-gray-500" />
           </div>
           <div>
             <div className="flex items-center gap-3">
@@ -365,7 +385,7 @@ export default function AccountsPayablePage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💰</span>
+              <Wallet className="w-5 h-5 text-red-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Total Payable</p>
@@ -375,7 +395,7 @@ export default function AccountsPayablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⏳</span>
+              <Hourglass className="w-5 h-5 text-amber-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Pending Approval</p>
@@ -385,7 +405,7 @@ export default function AccountsPayablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
+              <CheckCircle className="w-5 h-5 text-blue-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Approved to Pay</p>
@@ -395,7 +415,7 @@ export default function AccountsPayablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
+              <CheckCircle className="w-5 h-5 text-green-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Not due yet</p>
@@ -405,7 +425,7 @@ export default function AccountsPayablePage() {
           {/* The cards add up to the total: 1-30 days was missing. */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⏳</span>
+              <Hourglass className="w-5 h-5 text-amber-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">1-30 days overdue</p>
@@ -414,7 +434,7 @@ export default function AccountsPayablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⏰</span>
+              <AlarmClock className="w-5 h-5 text-amber-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">31-60 days overdue</p>
@@ -423,7 +443,7 @@ export default function AccountsPayablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🚨</span>
+              <AlertTriangle className="w-5 h-5 text-red-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">60+ days overdue</p>
@@ -583,7 +603,7 @@ export default function AccountsPayablePage() {
               >
                 <option value="">All Types</option>
                 {Object.entries(SUPPLIER_TYPES).map(([key, val]) => (
-                  <option key={key} value={key}>{val.icon} {val.label}</option>
+                  <option key={key} value={key}>{val.label}</option>
                 ))}
               </select>
             </div>
@@ -622,7 +642,7 @@ export default function AccountsPayablePage() {
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
-                        {typeConfig.icon}
+                        <typeConfig.icon className="w-5 h-5 text-gray-500" />
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-semibold text-gray-900">{supplier.supplier_name}</p>
@@ -673,7 +693,7 @@ export default function AccountsPayablePage() {
                           return (
                             <div key={expense.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                               <div className="flex items-center gap-3">
-                                <span className="text-lg">{catConfig.icon}</span>
+                                <catConfig.icon className="w-5 h-5 text-gray-500" />
                                 <div>
                                   <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                     {expense.expense_number}
@@ -768,7 +788,7 @@ export default function AccountsPayablePage() {
                       <tr key={expense.id} className={`hover:bg-gray-50 ${expense.is_overdue ? 'bg-amber-50/50' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span>{catConfig.icon}</span>
+                            <catConfig.icon className="w-4 h-4 text-gray-500" />
                             <div>
                               <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                 {expense.expense_number}
@@ -873,7 +893,7 @@ export default function AccountsPayablePage() {
                       <tr key={expense.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span>{catConfig.icon}</span>
+                            <catConfig.icon className="w-4 h-4 text-gray-500" />
                             <div>
                               <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                 {expense.expense_number}

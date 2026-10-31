@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { Map as MapIcon, Target, ClipboardList, Tag, Wallet, Star, CalendarDays, Users, Search } from 'lucide-react'
 import { loadPricesInBatches, type PriceState, type StartingFrom } from '@/lib/tours/price-loader'
 import { getCurrencySymbol } from '@/lib/currency'
 import { useTierConfigs } from '@/components/vocabulary'
@@ -141,7 +142,7 @@ export default function ToursBrowsePage() {
     return c ? `${c.bgColor} ${c.textColor} border ${c.borderColor}` : 'bg-gray-50 text-gray-700 border border-gray-200'
   }
 
-  const getTierIcon = (tier: string) => tierConfigs[tier]?.icon || '📋'
+  const getTierIcon = (tier: string) => tierConfigs[tier]?.icon || ''
 
   if (loading) {
     return (
@@ -178,8 +179,8 @@ export default function ToursBrowsePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            🗺️
+          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+            <MapIcon className="w-5 h-5 text-gray-600" />
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Tour Inventory</h1>
@@ -198,7 +199,7 @@ export default function ToursBrowsePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">🎯</span>
+            <Target className="w-5 h-5 text-gray-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Tour Packages</p>
@@ -206,7 +207,7 @@ export default function ToursBrowsePage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">📋</span>
+            <ClipboardList className="w-5 h-5 text-gray-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
           {/* This tile used to count a flag (uses_day_builder). Every tour with
@@ -226,7 +227,7 @@ export default function ToursBrowsePage() {
         {uniqueCategories.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🏷️</span>
+              <Tag className="w-5 h-5 text-gray-500" />
               <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Categories</p>
@@ -236,7 +237,7 @@ export default function ToursBrowsePage() {
         {pricedComplete.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💰</span>
+              <Wallet className="w-5 h-5 text-gray-500" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Starting From</p>
@@ -309,7 +310,7 @@ export default function ToursBrowsePage() {
               <div className="flex items-start justify-between gap-2 mb-1">
                 <h3 className="text-sm font-semibold text-gray-900 leading-tight">{tour.template_name}</h3>
                 {tour.is_featured && (
-                  <span className="text-amber-500 text-xs">⭐</span>
+                  <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
                 )}
               </div>
               <p className="text-xs text-gray-500">
@@ -340,16 +341,16 @@ export default function ToursBrowsePage() {
               {/* Tour Details */}
               <div className="space-y-2 text-sm text-gray-600 mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">📅</span>
+                  <CalendarDays className="w-4 h-4 text-gray-400" />
                   <span>{tour.duration_days} {tour.duration_days === 1 ? 'day' : 'days'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">👥</span>
+                  <Users className="w-4 h-4 text-gray-400" />
                   <span>{tour.min_pax || 1}-{tour.max_pax || 15} passengers</span>
                 </div>
                 {tour.theme_name && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">🏷️</span>
+                    <Tag className="w-4 h-4 text-gray-400" />
                     <span className="text-gray-500 text-xs">{tour.theme_name}</span>
                   </div>
                 )}
@@ -357,7 +358,7 @@ export default function ToursBrowsePage() {
                     every card. The exception is what is worth saying. */}
                 {tour.day_count === 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">📋</span>
+                    <ClipboardList className="w-4 h-4 text-gray-400" />
                     <span className="text-amber-700 text-xs font-medium">No day-by-day programme yet — add its days in Tour Manager to price it</span>
                   </div>
                 )}
@@ -439,7 +440,7 @@ export default function ToursBrowsePage() {
       {/* Empty State */}
       {filteredTours.length === 0 && (
         <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
-          <div className="text-4xl mb-3">🔍</div>
+          <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <h3 className="text-sm font-medium text-gray-900 mb-1">No tours found</h3>
           <p className="text-xs text-gray-500 mb-4">Try adjusting your filters or search terms</p>
           <Link 

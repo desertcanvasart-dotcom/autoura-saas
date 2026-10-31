@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, MessageCircle } from 'lucide-react'
+import { Loader2, MessageCircle, AlertTriangle } from 'lucide-react'
 
 // ============================================
 // TRAVELLER CHAT — the office side of the trip thread
@@ -140,7 +140,7 @@ export default function TravellerChat({ itineraryId }: { itineraryId: string }) 
                   <p className={`mt-1 text-xs ${m.direction === 'outbound' ? 'text-white/70' : 'text-gray-500'}`}>
                     {m.sender_name ? `${m.sender_name} · ` : ''}{fmtTime(m.created_at)}
                     {m.direction === 'inbound' && m.notify_outcome && NOTIFY_PROBLEM[m.notify_outcome] && (
-                      <span className="ml-1 text-amber-600" title={NOTIFY_PROBLEM[m.notify_outcome]}>⚠ not notified</span>
+                      <span className="ml-1 text-amber-600" title={NOTIFY_PROBLEM[m.notify_outcome]}><AlertTriangle className="inline w-3 h-3 -mt-0.5 mr-0.5" />not notified</span>
                     )}
                   </p>
                 </div>

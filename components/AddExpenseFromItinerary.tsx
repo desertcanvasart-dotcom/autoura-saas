@@ -167,7 +167,7 @@ export default function AddExpenseFromItinerary({
                   >
                     <option value="">Select Category</option>
                     {TRIP_EXPENSE_CATEGORIES.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
                     ))}
                   </select>
                 </div>

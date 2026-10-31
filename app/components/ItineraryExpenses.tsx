@@ -7,7 +7,26 @@ import {
   ChevronUp,
   Trash2,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  UserRound,
+  Car,
+  Hotel,
+  Bus,
+  Ticket,
+  UtensilsCrossed,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Ship,
+  PlaneTakeoff,
+  Compass,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import Link from 'next/link'
@@ -43,25 +62,25 @@ interface ItineraryExpensesProps {
   refreshTrigger?: number
 }
 
-const CATEGORY_CONFIG: Record<string, { icon: string; label: string }> = {
-  guide: { icon: '👨‍🏫', label: 'Tour Guide' },
-  driver: { icon: '🚗', label: 'Driver' },
-  hotel: { icon: '🏨', label: 'Hotel/Accommodation' },
-  transportation: { icon: '🚐', label: 'Transportation' },
-  entrance: { icon: '🎫', label: 'Entrance Fees' },
-  meal: { icon: '🍽️', label: 'Meals' },
-  airport_staff: { icon: '✈️', label: 'Airport Staff' },
-  hotel_staff: { icon: '🛎️', label: 'Hotel Staff' },
-  ground_handler: { icon: '🧳', label: 'Ground Handler' },
-  cruise: { icon: '🚢', label: 'Cruise' },
-  flights: { icon: '🛫', label: 'Flights' },
-  activity: { icon: '🎈', label: 'Activities & Tours' },
-  tipping: { icon: '💵', label: 'Tipping' },
-  permits: { icon: '📋', label: 'Permits/Permissions' },
-  toll: { icon: '🛣️', label: 'Toll Fees' },
-  parking: { icon: '🅿️', label: 'Parking' },
-  fuel: { icon: '⛽', label: 'Fuel' },
-  other: { icon: '📦', label: 'Other' }
+const CATEGORY_CONFIG: Record<string, { icon: LucideIcon; label: string }> = {
+  guide: { icon: UserRound, label: 'Tour Guide' },
+  driver: { icon: Car, label: 'Driver' },
+  hotel: { icon: Hotel, label: 'Hotel/Accommodation' },
+  transportation: { icon: Bus, label: 'Transportation' },
+  entrance: { icon: Ticket, label: 'Entrance Fees' },
+  meal: { icon: UtensilsCrossed, label: 'Meals' },
+  airport_staff: { icon: Plane, label: 'Airport Staff' },
+  hotel_staff: { icon: ConciergeBell, label: 'Hotel Staff' },
+  ground_handler: { icon: Luggage, label: 'Ground Handler' },
+  cruise: { icon: Ship, label: 'Cruise' },
+  flights: { icon: PlaneTakeoff, label: 'Flights' },
+  activity: { icon: Compass, label: 'Activities & Tours' },
+  tipping: { icon: Banknote, label: 'Tipping' },
+  permits: { icon: ClipboardList, label: 'Permits/Permissions' },
+  toll: { icon: Milestone, label: 'Toll Fees' },
+  parking: { icon: SquareParking, label: 'Parking' },
+  fuel: { icon: Fuel, label: 'Fuel' },
+  other: { icon: Package, label: 'Other' }
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -186,7 +205,7 @@ export default function ItineraryExpenses({
               return (
                 <div key={expense.id} className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50">
                   {/* Category icon */}
-                  <span className="text-xl flex-shrink-0">{cat.icon}</span>
+                  <cat.icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
 
                   {/* Main info */}
                   <div className="flex-1 min-w-0">

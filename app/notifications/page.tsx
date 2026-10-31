@@ -10,7 +10,16 @@ import {
   ExternalLink,
   ArrowLeft,
   MessageSquare,
-  Loader2
+  Loader2,
+  ClipboardList,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Smartphone,
+  Wallet,
+  PartyPopper,
+  User,
+  Mail
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -114,17 +123,17 @@ export default function NotificationsPage() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'task_assigned': return '📋'
-      case 'task_due_soon': return '⏰'
-      case 'task_overdue': return '🚨'
-      case 'task_completed': return '✅'
-      case 'whatsapp_assigned': return '💬'
-      case 'whatsapp_new_message': return '📱'
-      case 'whatsapp_mention': return '🔔'
-      case 'invoice_paid': return '💰'
-      case 'booking_confirmed': return '🎉'
-      case 'client_created': return '👤'
-      default: return '🔔'
+      case 'task_assigned': return <ClipboardList className="w-5 h-5 text-primary-600" />
+      case 'task_due_soon': return <Clock className="w-5 h-5 text-amber-600" />
+      case 'task_overdue': return <AlertTriangle className="w-5 h-5 text-red-600" />
+      case 'task_completed': return <CheckCircle2 className="w-5 h-5 text-green-600" />
+      case 'whatsapp_assigned': return <MessageSquare className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_new_message': return <Smartphone className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_mention': return <Bell className="w-5 h-5 text-primary-600" />
+      case 'invoice_paid': return <Wallet className="w-5 h-5 text-green-600" />
+      case 'booking_confirmed': return <PartyPopper className="w-5 h-5 text-green-600" />
+      case 'client_created': return <User className="w-5 h-5 text-primary-600" />
+      default: return <Bell className="w-5 h-5 text-primary-600" />
     }
   }
 
@@ -261,17 +270,17 @@ export default function NotificationsPage() {
           >
             <option value="">All Types</option>
             <optgroup label="WhatsApp">
-              <option value="whatsapp_assigned">💬 Chat Assigned</option>
-              <option value="whatsapp_new_message">📱 New Message</option>
+              <option value="whatsapp_assigned">Chat Assigned</option>
+              <option value="whatsapp_new_message">New Message</option>
             </optgroup>
             <optgroup label="Tasks">
-              <option value="task_assigned">📋 Task Assigned</option>
-              <option value="task_due_soon">⏰ Due Soon</option>
-              <option value="task_overdue">🚨 Overdue</option>
-              <option value="task_completed">✅ Completed</option>
+              <option value="task_assigned">Task Assigned</option>
+              <option value="task_due_soon">Due Soon</option>
+              <option value="task_overdue">Overdue</option>
+              <option value="task_completed">Completed</option>
             </optgroup>
             {types.filter(t => !t.startsWith('whatsapp_') && !t.startsWith('task_')).map(type => (
-              <option key={type} value={type}>{getNotificationIcon(type)} {getTypeLabel(type)}</option>
+              <option key={type} value={type}>{getTypeLabel(type)}</option>
             ))}
           </select>
         </div>
@@ -325,7 +334,7 @@ export default function NotificationsPage() {
             >
               <div className="flex items-start gap-4">
                 {/* Icon */}
-                <span className="text-2xl flex-shrink-0">
+                <span className="flex-shrink-0 mt-0.5">
                   {getNotificationIcon(notification.type)}
                 </span>
 
@@ -389,8 +398,8 @@ export default function NotificationsPage() {
                     </button>
 
                     {notification.email_sent && (
-                      <span className="text-xs text-gray-400">
-                        ✉️ Email sent
+                      <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+                        <Mail className="w-3 h-3" />Email sent
                       </span>
                     )}
                   </div>

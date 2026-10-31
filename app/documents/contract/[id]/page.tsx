@@ -339,7 +339,7 @@ export default function ContractPage() {
                 clientPhone={itinerary.client_phone}
                 clientName={itinerary.client_name}
                 onSuccess={() => {
-                  showToast('success', 'Contract sent via WhatsApp! ✅')
+                  showToast('success', 'Contract sent via WhatsApp!')
                 }}
               />
             )}

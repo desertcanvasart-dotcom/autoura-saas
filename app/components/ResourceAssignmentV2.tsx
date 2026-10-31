@@ -151,7 +151,7 @@ const RESOURCE_TYPES = [
     apiEndpoint: '/api/resources/hotels/assignable',
     nameField: 'name',
     phoneField: 'phone',
-    displayField: (r: any) => `${r.name}${r.city ? ` - ${r.city}` : ''}${r.star_rating ? ` ⭐${r.star_rating}` : ''}`,
+    displayField: (r: any) => `${r.name}${r.city ? ` - ${r.city}` : ''}${r.star_rating ? ` ★${r.star_rating}` : ''}`,
     canNotify: false,
     filterType: 'city',
     cityField: 'city'

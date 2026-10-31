@@ -18,7 +18,7 @@ export default function CompleteStep({ onComplete, tenant }: CompleteStepProps) 
 
         {/* Title */}
         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-4">
-          You're All Set! 🎉
+          You're All Set!
         </h1>
 
         <p className="text-lg text-gray-600 text-center mb-8">

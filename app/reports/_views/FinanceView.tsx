@@ -17,7 +17,28 @@ import {
   FileText,
   Building,
   Percent,
-  AlertTriangle
+  AlertTriangle,
+  UserRound,
+  Car,
+  Hotel,
+  Bus,
+  Ticket,
+  Utensils,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Building2,
+  Laptop,
+  Megaphone,
+  Package,
+  CheckCircle2,
+  Target,
+  type LucideIcon
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -128,25 +149,25 @@ interface YearOverYear {
   expense_change_percent: number
 }
 
-const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫' },
-  driver: { label: 'Driver', icon: '🚗' },
-  hotel: { label: 'Hotel', icon: '🏨' },
-  transportation: { label: 'Transportation', icon: '🚐' },
-  entrance: { label: 'Entrance Fees', icon: '🎫' },
-  meal: { label: 'Meals', icon: '🍽️' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  tipping: { label: 'Tipping', icon: '💵' },
-  permits: { label: 'Permits', icon: '📋' },
-  toll: { label: 'Toll Fees', icon: '🛣️' },
-  parking: { label: 'Parking', icon: '🅿️' },
-  fuel: { label: 'Fuel', icon: '⛽' },
-  office: { label: 'Office', icon: '🏢' },
-  software: { label: 'Software', icon: '💻' },
-  marketing: { label: 'Marketing', icon: '📣' },
-  other: { label: 'Other', icon: '📦' }
+const CATEGORY_LABELS: Record<string, { label: string; icon: LucideIcon }> = {
+  guide: { label: 'Tour Guide', icon: UserRound },
+  driver: { label: 'Driver', icon: Car },
+  hotel: { label: 'Hotel', icon: Hotel },
+  transportation: { label: 'Transportation', icon: Bus },
+  entrance: { label: 'Entrance Fees', icon: Ticket },
+  meal: { label: 'Meals', icon: Utensils },
+  airport_staff: { label: 'Airport Staff', icon: Plane },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell },
+  ground_handler: { label: 'Ground Handler', icon: Luggage },
+  tipping: { label: 'Tipping', icon: Banknote },
+  permits: { label: 'Permits', icon: ClipboardList },
+  toll: { label: 'Toll Fees', icon: Milestone },
+  parking: { label: 'Parking', icon: SquareParking },
+  fuel: { label: 'Fuel', icon: Fuel },
+  office: { label: 'Office', icon: Building2 },
+  software: { label: 'Software', icon: Laptop },
+  marketing: { label: 'Marketing', icon: Megaphone },
+  other: { label: 'Other', icon: Package }
 }
 
 export default function FinancialReportsPage() {
@@ -256,8 +277,8 @@ export default function FinancialReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            📊
+          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+            <BarChart3 className="w-5 h-5 text-gray-600" />
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Financial Reports</h1>
@@ -341,7 +362,7 @@ export default function FinancialReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💰</span>
+                <Wallet className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
@@ -356,7 +377,7 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💸</span>
+                <Receipt className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
@@ -371,7 +392,7 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📈</span>
+                <TrendingUp className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Gross Profit</p>
@@ -383,7 +404,7 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">✅</span>
+                <CheckCircle2 className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Collected</p>
@@ -393,7 +414,7 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🎯</span>
+                <Target className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Trips</p>
@@ -403,7 +424,7 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📄</span>
+                <FileText className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Invoices</p>
@@ -711,7 +732,7 @@ export default function FinancialReportsPage() {
                   <div key={cat.category}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <div className="flex items-center gap-2">
-                        <span>{config.icon}</span>
+                        <config.icon className="w-4 h-4 text-gray-500" />
                         <span className="text-gray-700">{config.label}</span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -764,7 +785,7 @@ export default function FinancialReportsPage() {
                 const config = CATEGORY_LABELS[type.type] || CATEGORY_LABELS.other
                 return (
                   <div key={type.type} className="p-4 bg-gray-50 rounded-lg text-center">
-                    <span className="text-2xl">{config.icon}</span>
+                    <config.icon className="w-6 h-6 text-gray-500 mx-auto" />
                     <p className="text-xs text-gray-500 mt-2">{config.label}</p>
                     <p className="text-lg font-semibold text-gray-900 mt-1">{formatAmount(type.amount)}</p>
                     <p className="text-xs text-gray-400">{type.count} payments</p>
@@ -819,7 +840,7 @@ export default function FinancialReportsPage() {
                         <tr key={idx} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <span>{config.icon}</span>
+                              <config.icon className="w-4 h-4 text-gray-500" />
                               <span className="text-sm font-medium text-gray-900">{recipient.name}</span>
                             </div>
                           </td>

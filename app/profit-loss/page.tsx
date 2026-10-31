@@ -18,7 +18,11 @@ import {
   BarChart3,
   PieChart,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Target,
+  Wallet,
+  Handshake,
+  CheckCircle2
 } from 'lucide-react'
 
 interface FxSummary {
@@ -277,7 +281,7 @@ export default function ProfitLossPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            📊
+            <BarChart3 className="w-5 h-5 text-gray-500" />
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Profit & Loss</h1>
@@ -296,7 +300,7 @@ export default function ProfitLossPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🎯</span>
+                <Target className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Trips</p>
@@ -305,7 +309,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💰</span>
+                <Wallet className="w-5 h-5 text-blue-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
@@ -316,7 +320,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💸</span>
+                <Receipt className="w-5 h-5 text-red-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
@@ -327,7 +331,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🤝</span>
+                <Handshake className="w-5 h-5 text-amber-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Net Commission</p>
@@ -352,7 +356,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📈</span>
+                <TrendingUp className="w-5 h-5 text-green-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Gross Profit</p>
@@ -363,7 +367,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📊</span>
+                <PieChart className="w-5 h-5 text-primary-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Avg Margin</p>
@@ -372,7 +376,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">✅</span>
+                <CheckCircle2 className="w-5 h-5 text-primary-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Profitable</p>
@@ -381,7 +385,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">⚠️</span>
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Loss-Making</p>

@@ -29,7 +29,8 @@ import {
   Clock,
   CheckCircle2,
   Package,
-  Handshake
+  Handshake,
+  Languages
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -64,16 +65,16 @@ interface Template {
 }
 
 const LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'ar', name: 'Arabic', flag: '🇪🇬' },
-  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'fr', name: 'French', flag: '🇫🇷' },
-  { code: 'de', name: 'German', flag: '🇩🇪' },
-  { code: 'it', name: 'Italian', flag: '🇮🇹' },
-  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
-  { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
-  { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
+  { code: 'en', name: 'English' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
 ]
 
 interface Placeholder {
@@ -758,8 +759,8 @@ export default function TemplatesPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   {template.language && (
-                    <span className="text-sm" title={LANGUAGES.find(l => l.code === template.language)?.name || template.language}>
-                      {LANGUAGES.find(l => l.code === template.language)?.flag || template.language}
+                    <span className="text-xs font-medium text-gray-500 uppercase" title={LANGUAGES.find(l => l.code === template.language)?.name || template.language}>
+                      {template.language}
                     </span>
                   )}
                   <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${getChannelColor(template.channel)}`}>
@@ -952,7 +953,7 @@ export default function TemplatesPage() {
                   >
                     {LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
-                        {lang.flag} {lang.name}
+                        {lang.name}
                       </option>
                     ))}
                   </select>
@@ -1264,7 +1265,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
 
   // Get language info helper
   const getLanguageInfo = (code: string) => {
-    return LANGUAGES.find(l => l.code === code) || { code, name: code, flag: '🌐' }
+    return LANGUAGES.find(l => l.code === code) || { code, name: code }
   }
 
   const getRecipientLabel = () => {
@@ -1748,7 +1749,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                           }`}
                         >
-                          <span className="text-lg">{langInfo.flag}</span>
+                          <Languages className="w-4 h-4" />
                           <span className="text-sm">{langInfo.name}</span>
                         </button>
                       )
@@ -1939,7 +1940,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 <label className="block text-sm font-medium text-gray-700">Preview</label>
                 {languageVariants.length > 1 && (
                   <span className="text-xs text-gray-500 flex items-center gap-1">
-                    {getLanguageInfo(activeTemplate.language || 'en').flag} {getLanguageInfo(activeTemplate.language || 'en').name}
+                    <Languages className="w-3 h-3" />{getLanguageInfo(activeTemplate.language || 'en').name}
                   </span>
                 )}
               </div>

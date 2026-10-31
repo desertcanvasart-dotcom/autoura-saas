@@ -822,7 +822,7 @@ function PricingGridContent() {
         }
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
-          setSaveMessage('✨ AI-suggested itinerary based on inquiry — review and adjust as needed')
+          setSaveMessage('AI-suggested itinerary based on inquiry — review and adjust as needed')
         }
         // Apply AI-extracted metadata to config (URL params take precedence)
         const meta = data.metadata

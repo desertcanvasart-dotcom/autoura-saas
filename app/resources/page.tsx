@@ -6,6 +6,7 @@ import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { useEffect, useState } from 'react'
 import { todayLocal } from '@/lib/today'
 import Link from 'next/link'
+import { AlertTriangle, Download, Wallet, Target, User, Hotel, Eye, UserRound, Car, Utensils, Plane, ConciergeBell, Phone, Star } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -267,7 +268,7 @@ export default function ResourcesPage() {
         <div className="bg-white rounded-lg p-5 max-w-md w-full mx-4 shadow-lg">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-white border-2 border-red-600 rounded-full flex items-center justify-center">
-              <span className="text-red-600 text-xl">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900">Delete Resource?</h3>
@@ -315,7 +316,7 @@ export default function ResourcesPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="w-12 h-12 bg-white border-2 border-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
-            <span className="text-red-500 text-xl">⚠️</span>
+            <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
           <h2 className="text-lg font-bold text-gray-900 mb-2">Something went wrong</h2>
           <p className="text-sm text-red-600 mb-4">{error || 'Failed to load resources'}</p>
@@ -442,14 +443,14 @@ export default function ResourcesPage() {
                 onClick={exportToCSV}
                 className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-1.5"
               >
-                <span className="text-gray-400">📊</span>
+                <Download className="w-4 h-4 text-gray-400" />
                 Export
               </button>
               <Link 
                 href="/rates"
                 className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-1.5"
               >
-                <span className="text-gray-400">💰</span>
+                <Wallet className="w-4 h-4 text-gray-400" />
                 Rates
               </Link>
               <Link 
@@ -470,7 +471,7 @@ export default function ResourcesPage() {
           {/* Total Resources Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400">🎯</span>
+              <Target className="w-4 h-4 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <p className="text-xs text-gray-600">Total Resources</p>
@@ -480,7 +481,7 @@ export default function ResourcesPage() {
           {/* Guides & Vehicles Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400">👤</span>
+              <User className="w-4 h-4 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
             </div>
             <p className="text-xs text-gray-600">Guides & Vehicles</p>
@@ -490,7 +491,7 @@ export default function ResourcesPage() {
           {/* Hotels & Restaurants Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400">🏨</span>
+              <Hotel className="w-4 h-4 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Hotels & Restaurants</p>
@@ -500,7 +501,7 @@ export default function ResourcesPage() {
           {/* Current View Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400">👁️</span>
+              <Eye className="w-4 h-4 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <p className="text-xs text-gray-600 capitalize">{activeTab} Results</p>
@@ -605,7 +606,7 @@ export default function ResourcesPage() {
                   : 'text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <span className="text-gray-400">👨‍🏫</span>
+              <UserRound className="w-4 h-4 text-gray-400" />
               Guides ({filteredResources.guides.length})
             </button>
             <button
@@ -616,7 +617,7 @@ export default function ResourcesPage() {
                   : 'text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <span className="text-gray-400">🚗</span>
+              <Car className="w-4 h-4 text-gray-400" />
               Vehicles ({filteredResources.vehicles.length})
             </button>
             <button
@@ -627,7 +628,7 @@ export default function ResourcesPage() {
                   : 'text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <span className="text-gray-400">🏨</span>
+              <Hotel className="w-4 h-4 text-gray-400" />
               Hotels ({filteredResources.hotels.length})
             </button>
             <button
@@ -638,7 +639,7 @@ export default function ResourcesPage() {
                   : 'text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <span className="text-gray-400">🍽️</span>
+              <Utensils className="w-4 h-4 text-gray-400" />
               Restaurants ({filteredResources.restaurants.length})
             </button>
             <button
@@ -649,7 +650,7 @@ export default function ResourcesPage() {
                   : 'text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <span className="text-gray-400">✈️</span>
+              <Plane className="w-4 h-4 text-gray-400" />
               Airport Staff ({filteredResources.airportStaff.length})
             </button>
             <button
@@ -660,7 +661,7 @@ export default function ResourcesPage() {
                   : 'text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <span className="text-gray-400">🛎️</span>
+              <ConciergeBell className="w-4 h-4 text-gray-400" />
               Hotel Staff ({filteredResources.hotelStaff.length})
             </button>
           </div>
@@ -707,7 +708,7 @@ export default function ResourcesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-xs">
-                          {guide.phone && <p className="text-gray-700">📞 {guide.phone}</p>}
+                          {guide.phone && <p className="text-gray-700 flex items-center gap-1"><Phone className="w-3 h-3 text-gray-400" />{guide.phone}</p>}
                           {guide.email && <p className="text-gray-500">{guide.email}</p>}
                         </div>
                       </td>
@@ -755,7 +756,7 @@ export default function ResourcesPage() {
                     <tr>
                       <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
-                          <span className="text-3xl text-gray-400">👨‍🏫</span>
+                          <UserRound className="w-8 h-8 text-gray-400" />
                           <p className="text-sm font-medium">No guides found</p>
                           <Link 
                             href="/suppliers?type=guide"
@@ -794,7 +795,7 @@ export default function ResourcesPage() {
                       <td className="px-4 py-3 text-xs text-gray-700">{vehicle.vehicle_types?.length ? vehicle.vehicle_types.join(', ') : '-'}</td>
                       <td className="px-4 py-3">
                         <div className="text-xs">
-                          {vehicle.phone && <p className="text-gray-700">📞 {vehicle.phone}</p>}
+                          {vehicle.phone && <p className="text-gray-700 flex items-center gap-1"><Phone className="w-3 h-3 text-gray-400" />{vehicle.phone}</p>}
                           {vehicle.email && <p className="text-gray-700">{vehicle.email}</p>}
                         </div>
                       </td>
@@ -823,7 +824,7 @@ export default function ResourcesPage() {
                     <tr>
                       <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
-                          <span className="text-3xl text-gray-400">🚗</span>
+                          <Car className="w-8 h-8 text-gray-400" />
                           <p className="text-sm font-medium">No transport suppliers found</p>
                         </div>
                       </td>
@@ -852,7 +853,9 @@ export default function ResourcesPage() {
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{hotel.name}</td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-amber-500 text-xs">
-                          {'⭐'.repeat(hotel.star_rating || 0)}
+                          {Array.from({ length: hotel.star_rating || 0 }, (_, i) => (
+                            <Star key={i} className="w-3 h-3 inline fill-current" />
+                          ))}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -884,7 +887,7 @@ export default function ResourcesPage() {
                     <tr>
                       <td colSpan={4} className="px-4 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
-                          <span className="text-3xl text-gray-400">🏨</span>
+                          <Hotel className="w-8 h-8 text-gray-400" />
                           <p className="text-sm font-medium">No hotels found</p>
                         </div>
                       </td>
@@ -926,7 +929,7 @@ export default function ResourcesPage() {
                       <td className="px-4 py-3">
                         <div className="text-xs">
                           {restaurant.contact_person && <p className="font-medium text-gray-700">{restaurant.contact_person}</p>}
-                          {restaurant.phone && <p className="text-gray-700">📞 {restaurant.phone}</p>}
+                          {restaurant.phone && <p className="text-gray-700 flex items-center gap-1"><Phone className="w-3 h-3 text-gray-400" />{restaurant.phone}</p>}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -960,7 +963,7 @@ export default function ResourcesPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
-                          <span className="text-3xl text-gray-400">🍽️</span>
+                          <Utensils className="w-8 h-8 text-gray-400" />
                           <p className="text-sm font-medium">No restaurants found</p>
                         </div>
                       </td>
@@ -1000,7 +1003,7 @@ export default function ResourcesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-xs">
-                          <p className="text-gray-700">📞 {staff.phone}</p>
+                          <p className="text-gray-700 flex items-center gap-1"><Phone className="w-3 h-3 text-gray-400" />{staff.phone}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -1048,7 +1051,7 @@ export default function ResourcesPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
-                          <span className="text-3xl text-gray-400">✈️</span>
+                          <Plane className="w-8 h-8 text-gray-400" />
                           <p className="text-sm font-medium">No airport staff found</p>
                         </div>
                       </td>
@@ -1093,7 +1096,7 @@ export default function ResourcesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-xs">
-                          <p className="text-gray-700">📞 {staff.phone}</p>
+                          <p className="text-gray-700 flex items-center gap-1"><Phone className="w-3 h-3 text-gray-400" />{staff.phone}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -1136,7 +1139,7 @@ export default function ResourcesPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
-                          <span className="text-3xl text-gray-400">🛎️</span>
+                          <ConciergeBell className="w-8 h-8 text-gray-400" />
                           <p className="text-sm font-medium">No hotel staff found</p>
                         </div>
                       </td>

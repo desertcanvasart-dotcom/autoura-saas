@@ -24,7 +24,30 @@ import {
   List,
   Grid3X3,
   Calendar,
-  Filter
+  Filter,
+  Hourglass,
+  Banknote,
+  UserRound,
+  Car,
+  Hotel,
+  Ship,
+  Bus,
+  PlaneTakeoff,
+  Ticket,
+  UtensilsCrossed,
+  Compass,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Building2,
+  Megaphone,
+  Laptop,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -105,6 +128,31 @@ const initialFormData: FormData = {
 
 // One list with the itinerary's Add Expense (lib/expense-categories).
 const CATEGORIES = EXPENSE_CATEGORIES
+
+/** The app's line icon for each category (lib/expense-categories keys). */
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  guide: UserRound,
+  driver: Car,
+  hotel: Hotel,
+  cruise: Ship,
+  transportation: Bus,
+  flights: PlaneTakeoff,
+  entrance: Ticket,
+  meal: UtensilsCrossed,
+  activity: Compass,
+  airport_staff: Plane,
+  hotel_staff: ConciergeBell,
+  ground_handler: Luggage,
+  tipping: Banknote,
+  permits: ClipboardList,
+  toll: Milestone,
+  parking: SquareParking,
+  fuel: Fuel,
+  office: Building2,
+  marketing: Megaphone,
+  software: Laptop,
+  other: Package,
+}
 
 /** Older rows used other words for some categories; they were left out of the breakdown. */
 const LEGACY_CATEGORY: Record<string, string> = { accommodation: 'hotel', meals: 'meal', entrance_fees: 'entrance', tips: 'tipping' }
@@ -388,9 +436,9 @@ export default function ExpensesPage() {
   }
 
 
-  const getCategoryIcon = (category: string) => {
-    const cat = CATEGORIES.find(c => c.value === category)
-    return cat?.icon || '📦'
+  const getCategoryIcon = (category: string, className = 'w-4 h-4 text-gray-500') => {
+    const Icon = CATEGORY_ICONS[category] || Package
+    return <Icon className={className} />
   }
 
   const getCategoryLabel = (category: string) => {
@@ -449,7 +497,7 @@ export default function ExpensesPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            💰
+            <Wallet className="w-5 h-5 text-gray-500" />
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
@@ -478,7 +526,7 @@ export default function ExpensesPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">📊</span>
+            <BarChart3 className="w-5 h-5 text-gray-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
@@ -486,7 +534,7 @@ export default function ExpensesPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">⏳</span>
+            <Hourglass className="w-5 h-5 text-amber-600" />
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Pending</p>
@@ -494,7 +542,7 @@ export default function ExpensesPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">✅</span>
+            <CheckCircle className="w-5 h-5 text-blue-600" />
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Approved</p>
@@ -502,7 +550,7 @@ export default function ExpensesPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">💸</span>
+            <Banknote className="w-5 h-5 text-green-600" />
             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Paid</p>
@@ -602,7 +650,7 @@ export default function ExpensesPage() {
               >
                 <option value="">All Categories</option>
                 {CATEGORIES.map(cat => (
-                  <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
                 ))}
               </select>
             </div>
@@ -661,7 +709,7 @@ export default function ExpensesPage() {
                   <div key={cat.value}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <div className="flex items-center gap-2">
-                        <span>{cat.icon}</span>
+                        {getCategoryIcon(cat.value)}
                         <span className="text-gray-700">{cat.label}</span>
                       </div>
                       <span className="font-medium text-gray-900">{formatTotals(cat.total)}</span>
@@ -730,7 +778,7 @@ export default function ExpensesPage() {
               <div key={expense.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-primary-500 transition-colors">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">{getCategoryIcon(expense.category)}</span>
+                    {getCategoryIcon(expense.category, 'w-5 h-5 text-gray-500')}
                     <div>
                       <p className="text-sm font-medium text-gray-900">{expense.expense_number}</p>
                       <p className="text-xs text-gray-500">{getCategoryLabel(expense.category)}</p>
@@ -825,7 +873,7 @@ export default function ExpensesPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span>{getCategoryIcon(expense.category)}</span>
+                            {getCategoryIcon(expense.category)}
                             <span className="text-sm text-gray-700">{getCategoryLabel(expense.category)}</span>
                           </div>
                         </td>
@@ -993,7 +1041,7 @@ export default function ExpensesPage() {
                   >
                     <option value="">Select Category</option>
                     {CATEGORIES.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
                     ))}
                   </select>
                 </div>

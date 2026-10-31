@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { supplierBacking, supplierCostCurrency } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
@@ -225,7 +225,7 @@ export default function BookingSuppliersPanel({
                     {r.assigned_guide_name && r.resource_kind !== 'own' && <div className="text-xs text-gray-600">Guide: {r.assigned_guide_name}</div>}
                     {r.driver_note && <div className="text-xs text-gray-600">Driver: {r.driver_note}</div>}
                     {r.supplier_day_off && normalizeStatus(r.status) !== 'cancelled' && (
-                      <div className="text-xs text-amber-700">⚠ This supplier marked this day off</div>
+                      <div className="flex items-center gap-1 text-xs text-amber-700"><AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> This supplier marked this day off</div>
                     )}
                     {normalizeStatus(r.status) === 'requested' && r.reply_deadline && (
                       <div className={`text-xs ${new Date(r.reply_deadline) < new Date() ? 'text-amber-700' : 'text-gray-500'}`}>

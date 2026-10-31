@@ -1,6 +1,6 @@
 'use client'
 
-import { Save, ExternalLink, Loader2 } from 'lucide-react'
+import { Save, ExternalLink, Loader2, AlertTriangle } from 'lucide-react'
 import type { GridTotals, GridConfig } from '../types'
 import { convertAmount } from '../lib/calculator'
 import { getCurrencySymbol } from '@/lib/currency'
@@ -66,7 +66,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
           bed (B-item 3). */}
       {unpricedGuideBedDays.length > 0 && (
         <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
-          ⚠ {unpricedGuideBedDays.length} night{unpricedGuideBedDays.length === 1 ? '' : 's'} without a guide bed rate
+          <AlertTriangle className="inline w-3.5 h-3.5 -mt-0.5 mr-1 text-amber-600" />{unpricedGuideBedDays.length} night{unpricedGuideBedDays.length === 1 ? '' : 's'} without a guide bed rate
           (day{unpricedGuideBedDays.length === 1 ? '' : 's'} {unpricedGuideBedDays.join(', ')}) — the throughout
           guide&rsquo;s bed is NOT in this total. Add &ldquo;Guide Bed / Night&rdquo; to those properties&rsquo; rate periods.
         </div>

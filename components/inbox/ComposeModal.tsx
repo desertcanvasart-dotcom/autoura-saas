@@ -6,7 +6,7 @@ import RichTextEditor from '@/components/email/RichTextEditor'
 import { replacePlaceholders, getPlaceholders } from '@/lib/template-placeholders'
 import {
   X, AlertCircle, File, Minus, Image, FileText, FileImage, FileArchive, Signature,
-  Users, Building2, Loader2, Paperclip, Send, Clock, ChevronDown,
+  Users, Building2, Loader2, Paperclip, Send, Clock, ChevronDown, User, Hotel, ClipboardList,
 } from 'lucide-react'
 import { sanitizeEmailHtml } from '@/lib/sanitize-html'
 import {
@@ -748,10 +748,10 @@ export default function ComposeModal({
           return (
             <div key={category}>
               <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 sticky top-0">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {category === 'customer' && '👤 Customer Templates'}
-                  {category === 'partner' && '🏨 Partner Templates'}
-                  {category === 'internal' && '📋 Internal Templates'}
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider inline-flex items-center gap-1.5">
+                  {category === 'customer' && <><User className="w-3.5 h-3.5" />Customer Templates</>}
+                  {category === 'partner' && <><Hotel className="w-3.5 h-3.5" />Partner Templates</>}
+                  {category === 'internal' && <><ClipboardList className="w-3.5 h-3.5" />Internal Templates</>}
                 </span>
               </div>
               {categoryTemplates.map((template) => (
@@ -1165,10 +1165,10 @@ export default function ComposeModal({
                          className="w-full h-11 px-3 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white"
                            >
                         <option value="">-- Select type --</option>
-                        <option value="hotel">🏨 Hotels</option>
-                        <option value="guide">🧭 Tour Guides</option>
-                        <option value="restaurant">🍽️ Restaurants</option>
-                        <option value="airport_staff">✈️ Airport Staff</option>
+                        <option value="hotel">Hotels</option>
+                        <option value="guide">Tour Guides</option>
+                        <option value="restaurant">Restaurants</option>
+                        <option value="airport_staff">Airport Staff</option>
                       </select>
                     </div>
 

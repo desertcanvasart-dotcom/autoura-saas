@@ -24,7 +24,12 @@ import {
   ChevronDown,
   AlertCircle,
   CheckCircle2,
-  Star
+  Star,
+  Wallet,
+  BarChart3,
+  User,
+  Wine,
+  HandCoins
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
@@ -637,7 +642,7 @@ export default function RestaurantsContent() {
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400">💰</span>
+              <Wallet className="w-4 h-4 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">With Rates</p>
@@ -646,7 +651,7 @@ export default function RestaurantsContent() {
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400">📊</span>
+              <BarChart3 className="w-4 h-4 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. Lunch Rate</p>
@@ -897,7 +902,7 @@ export default function RestaurantsContent() {
                     </div>
                     {restaurant.contact_person && (
                       <div className="flex items-center gap-2 text-gray-600">
-                        <span className="w-4 h-4 text-center">👤</span>
+                        <User className="w-4 h-4" />
                         <span>{restaurant.contact_person}</span>
                       </div>
                     )}
@@ -926,8 +931,8 @@ export default function RestaurantsContent() {
                       </div>
                     </div>
                     <div className="flex items-center justify-center gap-3 mt-2 text-xs text-gray-500">
-                      {restaurant.drinks_included && <span className="text-green-600">🍷 Drinks incl.</span>}
-                      {restaurant.tip_included && <span className="text-blue-600">💰 Tip incl.</span>}
+                      {restaurant.drinks_included && <span className="text-green-600 inline-flex items-center gap-1"><Wine className="w-3 h-3" />Drinks incl.</span>}
+                      {restaurant.tip_included && <span className="text-blue-600 inline-flex items-center gap-1"><HandCoins className="w-3 h-3" />Tip incl.</span>}
                     </div>
                   </div>
                 </div>
@@ -1059,12 +1064,12 @@ export default function RestaurantsContent() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">Restaurant Type *</label>
                     <select name="restaurant_type" value={formData.restaurant_type} onChange={handleChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm">
-                      <option value="local">🍽️ Local Restaurant</option>
-                      <option value="fine_dining">✨ Fine Dining</option>
-                      <option value="casual">🍕 Casual Dining</option>
-                      <option value="buffet">🍱 Buffet</option>
-                      <option value="cafe">☕ Café</option>
-                      <option value="fast_food">🍔 Fast Food</option>
+                      <option value="local">Local Restaurant</option>
+                      <option value="fine_dining">Fine Dining</option>
+                      <option value="casual">Casual Dining</option>
+                      <option value="buffet">Buffet</option>
+                      <option value="cafe">Café</option>
+                      <option value="fast_food">Fast Food</option>
                     </select>
                   </div>
                   <div>

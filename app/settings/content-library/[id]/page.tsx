@@ -30,7 +30,9 @@ import {
   Car,
   Ship,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  FileText,
+  Lightbulb
 } from 'lucide-react'
 import { 
   CATEGORY_SCHEMAS, 
@@ -812,7 +814,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
             {/* Basic Information */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center">📄</span>
+                <span className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center"><FileText className="w-4 h-4 text-gray-500" /></span>
                 Basic Information
               </h2>
 
@@ -1070,8 +1072,8 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
 
             {/* Tips Card */}
             <div className="mt-6 bg-primary-500/5 rounded-xl border border-primary-500/20 p-6">
-              <h3 className="text-sm font-semibold text-primary-500 mb-2">
-                💡 Tier Writing Tips
+              <h3 className="text-sm font-semibold text-primary-500 mb-2 flex items-center gap-1.5">
+                <Lightbulb className="w-4 h-4" /> Tier Writing Tips
               </h3>
               <div className="text-sm text-gray-600 space-y-2">
                 {TIER_TIPS[ladderIndex(tierPosition(allTiers, activeTier), tierItems.length)]}

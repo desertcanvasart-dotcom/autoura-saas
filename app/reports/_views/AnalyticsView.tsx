@@ -14,7 +14,11 @@ import {
   Target,
   Zap,
   UserPlus,
-  AlertCircle
+  AlertCircle,
+  TrendingDown,
+  ArrowRight,
+  Lightbulb,
+  Sparkles
 } from 'lucide-react'
 import { 
   LineChart, 
@@ -704,16 +708,16 @@ export default function AnalyticsPage() {
             <h3 className="text-base font-semibold text-gray-900">Revenue Trend & Forecast</h3>
             {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.confidence > 0 && (
               <div className="flex items-center gap-2 text-xs">
-                <span className={`px-2 py-0.5 rounded-full ${
+                <span className={`px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
                   displayData.revenue.forecastSummary.trend === 'up'
                     ? 'bg-green-100 text-green-700'
                     : displayData.revenue.forecastSummary.trend === 'down'
                     ? 'bg-red-100 text-red-700'
                     : 'bg-gray-100 text-gray-700'
                 }`}>
-                  {displayData.revenue.forecastSummary.trend === 'up' && '📈 Trending Up'}
-                  {displayData.revenue.forecastSummary.trend === 'down' && '📉 Trending Down'}
-                  {displayData.revenue.forecastSummary.trend === 'stable' && '➡️ Stable'}
+                  {displayData.revenue.forecastSummary.trend === 'up' && <><TrendingUp className="w-3 h-3" />Trending Up</>}
+                  {displayData.revenue.forecastSummary.trend === 'down' && <><TrendingDown className="w-3 h-3" />Trending Down</>}
+                  {displayData.revenue.forecastSummary.trend === 'stable' && <><ArrowRight className="w-3 h-3" />Stable</>}
                 </span>
                 <span className="text-gray-500">
                   {displayData.revenue.forecastSummary.confidence}% confidence
@@ -804,11 +808,11 @@ export default function AnalyticsPage() {
           </ResponsiveContainer>
           <div className="mt-2 space-y-1">
             <div className="p-2 bg-green-50 rounded text-xs text-gray-700">
-              💡 {insights.revenueInsight}
+              <Lightbulb className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-amber-600" />{insights.revenueInsight}
             </div>
             {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.nextPeriod > 0 && (
               <div className="p-2 bg-blue-50 rounded text-xs text-gray-700">
-                🔮 Forecasted next period revenue: <span className="font-semibold">{formatCurrency(displayData.revenue.forecastSummary.nextPeriod)}</span>
+                <Sparkles className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-primary-600" />Forecasted next period revenue: <span className="font-semibold">{formatCurrency(displayData.revenue.forecastSummary.nextPeriod)}</span>
               </div>
             )}
           </div>
@@ -866,7 +870,7 @@ export default function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-2 p-2 bg-primary-50 rounded text-xs text-gray-700">
-                💡 {filteredDestinations[0].name} leads with {filteredDestinations[0].bookings} bookings ({formatCurrency(filteredDestinations[0].revenue)})
+                <Lightbulb className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-amber-600" />{filteredDestinations[0].name} leads with {filteredDestinations[0].bookings} bookings ({formatCurrency(filteredDestinations[0].revenue)})
               </div>
             </>
           ) : (
@@ -968,7 +972,7 @@ export default function AnalyticsPage() {
           </div>
           
           <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-gray-700">
-            💡 {insights.bookingInsight}
+            <Lightbulb className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-amber-600" />{insights.bookingInsight}
           </div>
         </div>
 
@@ -1056,11 +1060,3 @@ export default function AnalyticsPage() {
   )
 }
 
-// Helper component for ArrowRight
-function ArrowRight({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  )
-}

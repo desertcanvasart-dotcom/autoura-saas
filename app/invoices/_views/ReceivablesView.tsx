@@ -25,7 +25,11 @@ import {
   Phone,
   ExternalLink,
   TrendingUp,
-  CheckCircle
+  CheckCircle,
+  CreditCard,
+  Wallet,
+  CalendarDays,
+  AlarmClock
 } from 'lucide-react'
 
 interface AgingBucket {
@@ -266,7 +270,7 @@ export default function AccountsReceivablePage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            💳
+            <CreditCard className="w-5 h-5 text-gray-500" />
           </div>
           <div>
             <div className="flex items-center gap-3">
@@ -287,7 +291,7 @@ export default function AccountsReceivablePage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💰</span>
+              <Wallet className="w-5 h-5 text-blue-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Total Outstanding</p>
@@ -297,7 +301,7 @@ export default function AccountsReceivablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Overdue</p>
@@ -307,7 +311,7 @@ export default function AccountsReceivablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
+              <CheckCircle className="w-5 h-5 text-green-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Current</p>
@@ -316,7 +320,7 @@ export default function AccountsReceivablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">📅</span>
+              <CalendarDays className="w-5 h-5 text-amber-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">1-30 Days</p>
@@ -325,7 +329,7 @@ export default function AccountsReceivablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⏰</span>
+              <AlarmClock className="w-5 h-5 text-amber-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">31-60 Days</p>
@@ -334,7 +338,7 @@ export default function AccountsReceivablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🚨</span>
+              <AlertTriangle className="w-5 h-5 text-red-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Over 60 Days</p>

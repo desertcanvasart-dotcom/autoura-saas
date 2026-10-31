@@ -8,7 +8,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Ticket, Plus, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, Users, AlertTriangle, CheckCircle, XCircle, Info, Ship, PersonStanding, Banknote, TrendingDown } from 'lucide-react'
+import { Ticket, Plus, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, Users, AlertTriangle, CheckCircle, XCircle, Info, Ship, PersonStanding, Banknote, TrendingDown, Lightbulb } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -1355,7 +1355,7 @@ export default function ActivityRatesContent() {
                       </div>
                     </div>
                     <p className="text-xs text-blue-600">
-                      💡 Example: Felucca ride costs {rateSymbol}25/boat and can hold 1-6 passengers
+                      <Lightbulb className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />Example: Felucca ride costs {rateSymbol}25/boat and can hold 1-6 passengers
                     </p>
                   </div>
                 )}
@@ -1404,7 +1404,7 @@ export default function ActivityRatesContent() {
                           currencyLabel={rateCode}
                         />
                         <p className="text-xs text-primary-600 mt-2">
-                          💡 Example: 1–4 pax at a higher per-person rate, 5–12 pax at a lower one. The matching band&apos;s rate is used at quote time.
+                          <Lightbulb className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />Example: 1–4 pax at a higher per-person rate, 5–12 pax at a lower one. The matching band&apos;s rate is used at quote time.
                         </p>
                       </div>
                     )}

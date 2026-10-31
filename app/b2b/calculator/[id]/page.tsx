@@ -6,7 +6,7 @@ import { Fragment, useState, useEffect, useMemo } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle } from 'lucide-react'
+import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
@@ -816,8 +816,8 @@ export default function TourPriceCalculator() {
             <>
               {result.complete === false && result.holes && result.holes.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-red-700 mb-1">
-                    ⚠ Incomplete pricing — {result.holes.length} item(s) have no rate
+                  <p className="text-sm font-semibold text-red-700 mb-1 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" /> Incomplete pricing — {result.holes.length} item(s) have no rate
                   </p>
                   <ul className="text-xs text-red-600 space-y-0.5">
                     {result.holes.map((h, i) => (
@@ -834,8 +834,8 @@ export default function TourPriceCalculator() {
                   date. The price is real; the booking may not be. */}
               {result.warnings && result.warnings.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-amber-800 mb-1">
-                    ⚠ Check this — {result.warnings.length} note(s)
+                  <p className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" /> Check this — {result.warnings.length} note(s)
                   </p>
                   <ul className="text-xs text-amber-700 space-y-0.5">
                     {result.warnings.map((w, i) => (

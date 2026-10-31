@@ -30,7 +30,23 @@ import {
   ExternalLink,
   Calculator,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  Gem,
+  Sparkles,
+  Crown,
+  Lock,
+  Car,
+  UserRound,
+  Ticket,
+  UtensilsCrossed,
+  Hotel,
+  Ship,
+  Plane,
+  ClipboardList,
+  Coffee,
+  Moon,
+  type LucideIcon
 } from 'lucide-react'
 
 interface TourDetail {
@@ -202,19 +218,19 @@ export default function TourDetailPage() {
   }
 
   const getTierStyle = (tier: string) => {
-    const styles: Record<string, { bg: string; text: string; icon: string }> = {
-      budget: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: '💰' },
-      standard: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: '💎' },
-      deluxe: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: '✨' },
-      luxury: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: '👑' }
+    const styles: Record<string, { bg: string; text: string; icon: LucideIcon }> = {
+      budget: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: Wallet },
+      standard: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: Gem },
+      deluxe: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: Sparkles },
+      luxury: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: Crown }
     }
     return styles[tier] || styles.standard
   }
 
   const getGroupTypeStyle = (type: string) => {
     return type === 'private' 
-      ? { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-700', icon: '🔒', label: 'Private' }
-      : { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: '👥', label: 'Shared' }
+      ? { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-700', icon: Lock, label: 'Private' }
+      : { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: Users, label: 'Shared' }
   }
 
   const getSeasonBadge = (season: string) => {
@@ -227,17 +243,18 @@ export default function TourDetailPage() {
   }
 
   const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      transportation: '🚗',
-      guide: '👨‍🏫',
-      activity: '🎫',
-      meal: '🍽️',
-      accommodation: '🏨',
-      cruise: '🚢',
-      entrance: '🎟️',
-      transfer: '✈️'
+    const icons: Record<string, LucideIcon> = {
+      transportation: Car,
+      guide: UserRound,
+      activity: Ticket,
+      meal: UtensilsCrossed,
+      accommodation: Hotel,
+      cruise: Ship,
+      entrance: Ticket,
+      transfer: Plane
     }
-    return icons[category] || '📋'
+    const Icon = icons[category] || ClipboardList
+    return <Icon className="w-4 h-4 text-gray-500" />
   }
 
   if (loading) {
@@ -292,13 +309,13 @@ export default function TourDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           {tour.tier && (
-            <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${tierStyle.bg} ${tierStyle.text}`}>
-              {tierStyle.icon} {tour.tier.charAt(0).toUpperCase() + tour.tier.slice(1)}
+            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${tierStyle.bg} ${tierStyle.text}`}>
+              <tierStyle.icon className="w-3.5 h-3.5" /> {tour.tier.charAt(0).toUpperCase() + tour.tier.slice(1)}
             </span>
           )}
           {tour.group_type && (
-            <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${groupStyle.bg} ${groupStyle.text}`}>
-              {groupStyle.icon} {groupStyle.label}
+            <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${groupStyle.bg} ${groupStyle.text}`}>
+              <groupStyle.icon className="w-3.5 h-3.5" /> {groupStyle.label}
             </span>
           )}
         </div>
@@ -420,9 +437,9 @@ export default function TourDetailPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400">
-                          {day.breakfast_included && <span>🍳</span>}
-                          {day.lunch_included && <span>🍽️</span>}
-                          {day.dinner_included && <span>🌙</span>}
+                          {day.breakfast_included && <Coffee className="w-3.5 h-3.5" />}
+                          {day.lunch_included && <UtensilsCrossed className="w-3.5 h-3.5" />}
+                          {day.dinner_included && <Moon className="w-3.5 h-3.5" />}
                         </div>
                         {expandedDays.includes(day.day_number) ? (
                           <ChevronUp className="h-4 w-4 text-gray-400" />
@@ -437,16 +454,16 @@ export default function TourDetailPage() {
                           <p className="text-sm text-gray-600">{day.day_description}</p>
                           <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
                             {day.breakfast_included && (
-                              <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded">🍳 Breakfast</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded"><Coffee className="w-3.5 h-3.5" /> Breakfast</span>
                             )}
                             {day.lunch_included && (
-                              <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded">🍽️ Lunch</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded"><UtensilsCrossed className="w-3.5 h-3.5" /> Lunch</span>
                             )}
                             {day.dinner_included && (
-                              <span className="px-2 py-1 bg-primary-50 text-primary-700 rounded">🌙 Dinner</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 text-primary-700 rounded"><Moon className="w-3.5 h-3.5" /> Dinner</span>
                             )}
                             {day.overnight_city && (
-                              <span className="px-2 py-1 bg-slate-50 text-slate-700 rounded">🏨 {day.overnight_city}</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-700 rounded"><Hotel className="w-3.5 h-3.5" /> {day.overnight_city}</span>
                             )}
                           </div>
                         </div>
@@ -733,7 +750,11 @@ export default function TourDetailPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Type</span>
                 <span className="text-gray-900">
-                  {tour.group_type === 'private' ? '🔒 Private' : tour.group_type === 'shared' ? '👥 Shared' : '—'}
+                  {tour.group_type === 'private' ? (
+                    <span className="inline-flex items-center gap-1"><Lock className="w-4 h-4 text-gray-500" /> Private</span>
+                  ) : tour.group_type === 'shared' ? (
+                    <span className="inline-flex items-center gap-1"><Users className="w-4 h-4 text-gray-500" /> Shared</span>
+                  ) : '—'}
                 </span>
               </div>
               <div className="flex justify-between">

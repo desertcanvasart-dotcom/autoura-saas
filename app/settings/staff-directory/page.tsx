@@ -15,7 +15,14 @@ import {
   XCircle,
   Users,
   KeyRound,
-  Activity
+  Activity,
+  Crown,
+  Briefcase,
+  ClipboardList,
+  Wallet,
+  UserRound,
+  Car,
+  Building2
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -97,13 +104,13 @@ const fmtFocusedTime = (minutes: number) =>
   `~${Math.floor(minutes / 60)}h ${minutes % 60}m`
 
 const ROLES = [
-  { value: 'owner', label: 'Owner', icon: '👑', color: 'bg-primary-100 text-primary-700' },
-  { value: 'manager', label: 'Manager', icon: '💼', color: 'bg-blue-100 text-blue-700' },
-  { value: 'coordinator', label: 'Coordinator', icon: '📋', color: 'bg-green-100 text-green-700' },
-  { value: 'sales', label: 'Sales', icon: '💰', color: 'bg-amber-100 text-amber-700' },
-  { value: 'guide', label: 'Tour Guide', icon: '👨‍🏫', color: 'bg-primary-100 text-primary-700' },
-  { value: 'driver', label: 'Driver', icon: '🚗', color: 'bg-primary-100 text-primary-700' },
-  { value: 'staff', label: 'Staff', icon: '👤', color: 'bg-gray-100 text-gray-700' }
+  { value: 'owner', label: 'Owner', icon: Crown, color: 'bg-primary-100 text-primary-700' },
+  { value: 'manager', label: 'Manager', icon: Briefcase, color: 'bg-blue-100 text-blue-700' },
+  { value: 'coordinator', label: 'Coordinator', icon: ClipboardList, color: 'bg-green-100 text-green-700' },
+  { value: 'sales', label: 'Sales', icon: Wallet, color: 'bg-amber-100 text-amber-700' },
+  { value: 'guide', label: 'Tour Guide', icon: UserRound, color: 'bg-primary-100 text-primary-700' },
+  { value: 'driver', label: 'Driver', icon: Car, color: 'bg-primary-100 text-primary-700' },
+  { value: 'staff', label: 'Staff', icon: User, color: 'bg-gray-100 text-gray-700' }
 ]
 
 export default function TeamMembersPage() {
@@ -378,7 +385,7 @@ export default function TeamMembersPage() {
           return (
             <div key={role.value} className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span>{role.icon}</span>
+                <role.icon className="w-4 h-4 text-gray-500" />
                 <span className="text-xs text-gray-500">{role.label}s</span>
               </div>
               <p className="text-2xl font-semibold text-gray-900">{count}</p>
@@ -406,7 +413,7 @@ export default function TeamMembersPage() {
         >
           <option value="">All Roles</option>
           {ROLES.map(role => (
-            <option key={role.value} value={role.value}>{role.icon} {role.label}</option>
+            <option key={role.value} value={role.value}>{role.label}</option>
           ))}
         </select>
 
@@ -418,7 +425,7 @@ export default function TeamMembersPage() {
           >
             <option value="">All Departments</option>
             {departments.map(d => (
-              <option key={d.id} value={d.id}>🏢 {d.name}</option>
+              <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
         )}
@@ -464,8 +471,8 @@ export default function TeamMembersPage() {
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 shrink-0 bg-gray-100 rounded-full flex items-center justify-center text-base">
-                      {roleConfig.icon}
+                    <div className="w-8 h-8 shrink-0 bg-gray-100 rounded-full flex items-center justify-center">
+                      <roleConfig.icon className="w-4 h-4 text-gray-600" />
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900">{member.name}</h3>
@@ -474,7 +481,7 @@ export default function TeamMembersPage() {
                       </span>
                       {departmentName(member.department_id) && (
                         <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
-                          🏢 {departmentName(member.department_id)}
+                          <Building2 className="w-3 h-3 mr-1" />{departmentName(member.department_id)}
                         </span>
                       )}
                       {member.user_id && (
@@ -626,7 +633,7 @@ export default function TeamMembersPage() {
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   {ROLES.map(role => (
-                    <option key={role.value} value={role.value}>{role.icon} {role.label}</option>
+                    <option key={role.value} value={role.value}>{role.label}</option>
                   ))}
                 </select>
               </div>

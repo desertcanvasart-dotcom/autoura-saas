@@ -5,7 +5,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Check, User, Plane, Users, FileText } from 'lucide-react'
+import { ArrowLeft, Check, User, Plane, Users, FileText, CalendarDays } from 'lucide-react'
 
 export default function NewItineraryPage() {
   const router = useRouter()
@@ -219,7 +219,7 @@ export default function NewItineraryPage() {
               {totalDays > 0 && (
                 <div className="p-4 bg-primary-50 rounded-lg border border-primary-200">
                   <p className="text-primary-900 font-medium">
-                    📅 Trip Duration: <span className="text-2xl font-bold">{totalDays}</span> {totalDays === 1 ? 'day' : 'days'}
+                    <CalendarDays className="inline w-5 h-5 -mt-1 mr-1.5 text-primary-600" />Trip Duration: <span className="text-2xl font-bold">{totalDays}</span> {totalDays === 1 ? 'day' : 'days'}
                   </p>
                 </div>
               )}
