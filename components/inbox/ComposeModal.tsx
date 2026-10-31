@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
-import RichTextEditor from '@/components/email/RichTextEditor'
+import dynamic from 'next/dynamic'
 import { replacePlaceholders, getPlaceholders } from '@/lib/template-placeholders'
 import {
   X, AlertCircle, File, Minus, Image, FileText, FileImage, FileArchive, Signature,
@@ -15,6 +15,13 @@ import {
 import RecipientInput from './RecipientInput'
 import { UNDO_SEND_MS, schedulePresets, toDateTimeLocal, scheduleTimeProblem } from '@/lib/email/scheduled-send'
 import type { Email, Attachment, EmailSignature, EmailTemplate, Client } from './types'
+
+// The tiptap editor is heavy and only needed once the compose window opens,
+// so it is fetched then rather than in the inbox's first load.
+const RichTextEditor = dynamic(() => import('@/components/email/RichTextEditor'), {
+  ssr: false,
+  loading: () => <div className="min-h-[200px] rounded-lg border border-gray-200 bg-gray-50 animate-pulse" />,
+})
 
 export type ComposeMode = 'new' | 'reply' | 'replyAll' | 'forward'
 
