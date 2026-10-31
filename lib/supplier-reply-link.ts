@@ -29,6 +29,22 @@ export function replyLinkExpiry(serviceDate: string | null | undefined): string 
   return d.toISOString()
 }
 
+/**
+ * Asking again on a line that already has a link: the expiry it should carry
+ * now — what a fresh link would get from the line's date today (it may have
+ * moved, or been set since the first ask) — or undefined when it already does.
+ */
+export function refreshedLinkExpiry(
+  current: string | null | undefined,
+  serviceDate: string | null | undefined,
+): string | null | undefined {
+  const want = replyLinkExpiry(serviceDate)
+  const had = current ? new Date(current).getTime() : null
+  const now = want ? new Date(want).getTime() : null
+  if (had === now) return undefined
+  return want
+}
+
 export function isLinkLive(link: { revoked_at?: string | null; expires_at?: string | null }, now: Date): boolean {
   if (link.revoked_at) return false
   if (link.expires_at && new Date(link.expires_at).getTime() < now.getTime()) return false

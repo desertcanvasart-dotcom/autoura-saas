@@ -22,6 +22,8 @@ import {
 
 const CRON_SECRET = process.env.CRON_SECRET
 const MAX_PER_RUN = 500
+/** Ids per `.in()` read — keeps the request URL short. */
+const IN_CHUNK = 100
 
 interface Waiting {
   id: string
@@ -60,15 +62,18 @@ async function getHandler(request: NextRequest) {
   const lines = (data ?? []) as Waiting[]
 
   // Reminders already logged for these lines (the job's nudge, or one the office sent).
+  // Read IN_CHUNK ids at a time: 500 UUIDs in one `.in()` is an ~18 KB URL (audit SN-10).
   const ids = lines.map(l => l.id)
-  const { data: events, error: eventsError } = ids.length
-    ? await db.from('service_booking_events')
+  const events: Array<{ service_booking_id: string; occurred_at: string; details: unknown }> = []
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const { data: page, error: eventsError } = await db.from('service_booking_events')
       .select('service_booking_id, occurred_at, details')
-      .in('service_booking_id', ids)
+      .in('service_booking_id', ids.slice(i, i + IN_CHUNK))
       .in('details->>kind', [REMINDER_DUE, REMINDER_SENT])
-    : { data: [], error: null }
-  if (eventsError) {
-    return NextResponse.json({ success: false, error: `Could not read reminders: ${eventsError.message}` }, { status: 500 })
+    if (eventsError) {
+      return NextResponse.json({ success: false, error: `Could not read reminders: ${eventsError.message}` }, { status: 500 })
+    }
+    events.push(...((page ?? []) as typeof events))
   }
 
   let expired = 0
@@ -97,7 +102,7 @@ async function getHandler(request: NextRequest) {
           tenant_id: line.tenant_id, dedupe_key: `service-booking:${line.id}`, type: 'service_booking',
           ...expiredBell(line, next, line.cost_currency), link,
         })
-      } else if (reminderDue(line, now, remindedSince(events ?? [], line.id, line.requested_at))) {
+      } else if (reminderDue(line, now, remindedSince(events, line.id, line.requested_at))) {
         const logged = await recordServiceBookingEvent(db, {
           tenantId: line.tenant_id, bookingId: line.booking_id, serviceBookingId: line.id,
           actor: 'system', channel: 'system', note: 'No answer yet — reminder suggested', details: { kind: REMINDER_DUE },
