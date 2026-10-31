@@ -291,8 +291,9 @@ export const MAIN_NAV: NavSection[] = [
       { label: 'Payments', href: '/payments', icon: CreditCard, roles: ALL },
       // The Receipts tab of Payments (was /receipts).
       { label: 'Receipts', href: '/payments?tab=receipts', icon: Receipt, roles: ALL },
-      { label: 'Supplier bills', href: '/supplier-invoices', icon: FileText, roles: AM, keywords: ['supplier invoices'] },
-      { label: 'Payables', href: '/accounts-payable', icon: HandCoins, roles: AM, keywords: ['unpaid costs'] },
+      { label: 'Supplier bills', href: '/supplier-bills', icon: FileText, roles: AM, match: ['/supplier-invoices'], keywords: ['supplier invoices'] },
+      // The Payables tab of Supplier bills (was /accounts-payable).
+      { label: 'Payables', href: '/supplier-bills?tab=payables', icon: HandCoins, roles: AM, keywords: ['unpaid costs'] },
       { label: 'Expenses', href: '/expenses', icon: Wallet, roles: ALL },
       { label: 'Commissions', href: '/commissions', icon: Percent, roles: AM },
       { label: 'Profit & loss', href: '/profit-loss', icon: ChartLine, roles: AM, keywords: ['p&l'] },
