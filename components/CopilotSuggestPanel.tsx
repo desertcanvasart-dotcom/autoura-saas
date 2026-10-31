@@ -119,14 +119,14 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
       : 'bg-gray-100 text-gray-600'
 
   return (
-    <div className="border-t border-gray-200 bg-gradient-to-b from-purple-50/40 to-white">
+    <div className="border-t border-gray-200 bg-gradient-to-b from-primary-50/40 to-white">
       <div className="px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs">
-          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+          <Sparkles className="w-3.5 h-3.5 text-primary-600" />
           <span className="font-medium text-gray-700">AI Copilot</span>
           {tone && <span className="text-gray-400">· {tone}</span>}
           {retrievedCount > 0 && (
-            <span className="text-purple-600 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5 text-[10px]">
+            <span className="text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5 text-[10px]">
               {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
             </span>
           )}
@@ -141,7 +141,7 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
             <button
               onClick={() => generate(true)}
               disabled={loading || disabled}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600 px-2 py-1 rounded disabled:opacity-50"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 px-2 py-1 rounded disabled:opacity-50"
               title="Regenerate with different angles"
             >
               <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
@@ -152,7 +152,7 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
             <button
               onClick={() => generate(false)}
               disabled={loading || disabled}
-              className="flex items-center gap-1.5 text-xs bg-purple-600 text-white px-3 py-1.5 rounded-full hover:bg-purple-700 disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs bg-primary-600 text-white px-3 py-1.5 rounded-full hover:bg-primary-700 disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -188,7 +188,7 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
           {drafts.map((d, idx) => (
             <div
               key={d.id}
-              className="rounded-lg border border-purple-100 bg-white p-3 hover:border-purple-300 transition-colors"
+              className="rounded-lg border border-primary-100 bg-white p-3 hover:border-primary-300 transition-colors"
             >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">

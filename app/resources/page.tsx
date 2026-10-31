@@ -491,7 +491,7 @@ export default function ResourcesPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-gray-400">🏨</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Hotels & Restaurants</p>
             <p className="text-2xl font-bold text-gray-900">{resources.hotels.length + resources.restaurants.length}</p>
@@ -501,7 +501,7 @@ export default function ResourcesPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-gray-400">👁️</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <p className="text-xs text-gray-600 capitalize">{activeTab} Results</p>
             <p className="text-2xl font-bold text-gray-900">{filteredResources[activeTab].length}</p>
@@ -851,7 +851,7 @@ export default function ResourcesPage() {
                     <tr key={hotel.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-t border-gray-100`}>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{hotel.name}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className="text-yellow-500 text-xs">
+                        <span className="text-amber-500 text-xs">
                           {'⭐'.repeat(hotel.star_rating || 0)}
                         </span>
                       </td>

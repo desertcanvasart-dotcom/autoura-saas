@@ -48,7 +48,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
   sent: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Eye },
   accepted: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle },
   rejected: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle },
-  expired: { bg: 'bg-orange-100', text: 'text-orange-700', icon: AlertCircle }
+  expired: { bg: 'bg-amber-100', text: 'text-amber-700', icon: AlertCircle }
 }
 
 export default function B2BQuotesPage() {
@@ -429,8 +429,8 @@ export default function B2BQuotesPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Building2 className="w-6 h-6 text-purple-600" />
+              <div className="p-2 bg-primary-100 rounded-lg">
+                <Building2 className="w-6 h-6 text-primary-600" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">B2B Quotes</h1>
@@ -440,7 +440,7 @@ export default function B2BQuotesPage() {
 
             <Link
               href="/pricing-grid?type=b2b"
-              className="h-10 px-4 bg-purple-600 text-white rounded-lg text-sm font-medium whitespace-nowrap hover:bg-purple-700 inline-flex items-center gap-2"
+              className="h-10 px-4 bg-primary-600 text-white rounded-lg text-sm font-medium whitespace-nowrap hover:bg-primary-700 inline-flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />
               New Quote
@@ -480,7 +480,7 @@ export default function B2BQuotesPage() {
                   type="checkbox"
                   checked={pageAllSelected}
                   onChange={handleSelectAll}
-                  className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
+                  className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                   aria-label="Select all quotes"
                 />
               </div>
@@ -493,7 +493,7 @@ export default function B2BQuotesPage() {
                 placeholder="Search by quote #, partner, or trip..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-10 px-4 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full h-10 px-4 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
 
@@ -503,7 +503,7 @@ export default function B2BQuotesPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 w-48 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="h-10 w-48 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 aria-label="Filter by status"
               >
                 <option value="all">All Status ({statusCounts.all})</option>
@@ -521,14 +521,14 @@ export default function B2BQuotesPage() {
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               className={`h-10 px-4 border rounded-lg text-sm font-medium whitespace-nowrap shrink-0 inline-flex items-center gap-2 ${
                 activeFiltersCount > 0
-                  ? 'border-purple-500 bg-purple-50 text-purple-700'
+                  ? 'border-primary-500 bg-primary-50 text-primary-700'
                   : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
               Filters
               {activeFiltersCount > 0 && (
-                <span className="px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
+                <span className="px-2 py-0.5 bg-primary-600 text-white text-xs rounded-full">
                   {activeFiltersCount}
                 </span>
               )}
@@ -553,7 +553,7 @@ export default function B2BQuotesPage() {
                       onClick={() => toggleTierFilter(tier)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-colors ${
                         tierFilter.includes(tier)
-                          ? 'border-purple-500 bg-purple-50 text-purple-700'
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -576,7 +576,7 @@ export default function B2BQuotesPage() {
                       onClick={() => toggleCurrencyFilter(currency)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-colors ${
                         currencyFilter.includes(currency)
-                          ? 'border-purple-500 bg-purple-50 text-purple-700'
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -603,7 +603,7 @@ export default function B2BQuotesPage() {
                       onClick={() => setTourLeaderFilter(option.value)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-colors ${
                         tourLeaderFilter === option.value
-                          ? 'border-purple-500 bg-purple-50 text-purple-700'
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -623,7 +623,7 @@ export default function B2BQuotesPage() {
                     type="date"
                     value={createdFrom}
                     onChange={(e) => setCreatedFrom(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     aria-label="Created from date"
                   />
                   <span className="text-gray-500 text-sm">to</span>
@@ -631,7 +631,7 @@ export default function B2BQuotesPage() {
                     type="date"
                     value={createdTo}
                     onChange={(e) => setCreatedTo(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     aria-label="Created to date"
                   />
                 </div>
@@ -647,7 +647,7 @@ export default function B2BQuotesPage() {
                     type="date"
                     value={validFrom}
                     onChange={(e) => setValidFrom(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     aria-label="Valid from date"
                   />
                   <span className="text-gray-500 text-sm">to</span>
@@ -655,7 +655,7 @@ export default function B2BQuotesPage() {
                     type="date"
                     value={validTo}
                     onChange={(e) => setValidTo(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     aria-label="Valid to date"
                   />
                 </div>
@@ -681,12 +681,12 @@ export default function B2BQuotesPage() {
         {activeFiltersCount > 0 && (
           <div className="flex flex-wrap gap-2 mt-4">
             {statusFilter !== 'all' && (
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm">
                 <span>Status: {statusFilter}</span>
                 <button
                   type="button"
                   onClick={() => setStatusFilter('all')}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label={`Remove status filter: ${statusFilter}`}
                 >
                   <X className="w-3 h-3" />
@@ -696,13 +696,13 @@ export default function B2BQuotesPage() {
             {tierFilter.map((tier) => (
               <div
                 key={tier}
-                className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm"
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm"
               >
                 <span>Tier: {tier}</span>
                 <button
                   type="button"
                   onClick={() => toggleTierFilter(tier)}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label={`Remove tier filter: ${tier}`}
                 >
                   <X className="w-3 h-3" />
@@ -712,13 +712,13 @@ export default function B2BQuotesPage() {
             {currencyFilter.map((currency) => (
               <div
                 key={currency}
-                className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm"
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm"
               >
                 <span>Currency: {currency}</span>
                 <button
                   type="button"
                   onClick={() => toggleCurrencyFilter(currency)}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label={`Remove currency filter: ${currency}`}
                 >
                   <X className="w-3 h-3" />
@@ -726,12 +726,12 @@ export default function B2BQuotesPage() {
               </div>
             ))}
             {tourLeaderFilter !== 'all' && (
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm">
                 <span>Tour Leader: {tourLeaderFilter === 'yes' ? 'Included' : 'Not Included'}</span>
                 <button
                   type="button"
                   onClick={() => setTourLeaderFilter('all')}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label="Remove tour leader filter"
                 >
                   <X className="w-3 h-3" />
@@ -739,12 +739,12 @@ export default function B2BQuotesPage() {
               </div>
             )}
             {createdFrom && (
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm">
                 <span>From: {new Date(createdFrom).toLocaleDateString()}</span>
                 <button
                   type="button"
                   onClick={() => setCreatedFrom('')}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label="Remove created from date filter"
                 >
                   <X className="w-3 h-3" />
@@ -752,12 +752,12 @@ export default function B2BQuotesPage() {
               </div>
             )}
             {createdTo && (
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm">
                 <span>To: {new Date(createdTo).toLocaleDateString()}</span>
                 <button
                   type="button"
                   onClick={() => setCreatedTo('')}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label="Remove created to date filter"
                 >
                   <X className="w-3 h-3" />
@@ -765,12 +765,12 @@ export default function B2BQuotesPage() {
               </div>
             )}
             {validFrom && (
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm">
                 <span>Valid from: {new Date(validFrom).toLocaleDateString()}</span>
                 <button
                   type="button"
                   onClick={() => setValidFrom('')}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label="Remove valid from date filter"
                 >
                   <X className="w-3 h-3" />
@@ -778,12 +778,12 @@ export default function B2BQuotesPage() {
               </div>
             )}
             {validTo && (
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg text-sm">
                 <span>Valid to: {new Date(validTo).toLocaleDateString()}</span>
                 <button
                   type="button"
                   onClick={() => setValidTo('')}
-                  className="hover:bg-purple-200 rounded p-0.5"
+                  className="hover:bg-primary-200 rounded p-0.5"
                   aria-label="Remove valid to date filter"
                 >
                   <X className="w-3 h-3" />
@@ -795,19 +795,19 @@ export default function B2BQuotesPage() {
 
         {/* Bulk Actions Bar */}
         {selectedQuotes.size > 0 && (
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mt-4">
+          <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 mt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <Check className="w-5 h-5 text-purple-600" />
-                  <span className="font-medium text-purple-900">
+                  <Check className="w-5 h-5 text-primary-600" />
+                  <span className="font-medium text-primary-900">
                     {selectedQuotes.size} quote{selectedQuotes.size > 1 ? 's' : ''} selected
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedQuotes(new Set())}
-                  className="text-sm text-purple-600 hover:text-purple-700"
+                  className="text-sm text-primary-600 hover:text-primary-700"
                 >
                   Clear selection
                 </button>
@@ -900,7 +900,7 @@ export default function B2BQuotesPage() {
                 <div
                   key={quote.id}
                   className={`bg-white rounded-xl border-2 p-4 transition-all ${
-                    isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200'
+                    isSelected ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
                   }`}
                 >
                   <div className="flex items-center gap-4">
@@ -916,7 +916,7 @@ export default function B2BQuotesPage() {
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleSelectQuote(quote.id)}
-                        className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                        className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500 cursor-pointer"
                         aria-label={`Select quote ${quote.quote_number}`}
                         onClick={(e) => e.stopPropagation()}
                       />
@@ -1017,7 +1017,7 @@ export default function B2BQuotesPage() {
                     <select
                       value={pageSize}
                       onChange={(e) => changePageSize(Number(e.target.value))}
-                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       aria-label="Results per page"
                     >
                       <option value={10}>10</option>
@@ -1060,7 +1060,7 @@ export default function B2BQuotesPage() {
                             onClick={() => goToPage(pageNum)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                               currentPage === pageNum
-                                ? 'bg-purple-600 text-white'
+                                ? 'bg-primary-600 text-white'
                                 : 'border border-gray-300 hover:bg-gray-50'
                             }`}
                           >

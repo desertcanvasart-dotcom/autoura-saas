@@ -147,7 +147,7 @@ export default function BillingPlansPage() {
                 }`}
               >
                 Yearly
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] rounded-full font-semibold">
+                <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 text-[10px] rounded-full font-semibold">
                   -17%
                 </span>
               </button>

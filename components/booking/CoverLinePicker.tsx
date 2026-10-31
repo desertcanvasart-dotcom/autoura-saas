@@ -149,7 +149,7 @@ export default function CoverLinePicker({
                   type="button"
                   onClick={save}
                   disabled={!choice || busy}
-                  className="px-2.5 py-1 text-xs font-medium rounded-md bg-blue-600 text-white disabled:opacity-50"
+                  className="px-2.5 py-1 text-xs font-medium rounded-md bg-primary-600 text-white disabled:opacity-50"
                 >
                   {busy ? 'Saving…' : 'Save'}
                 </button>

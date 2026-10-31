@@ -140,7 +140,7 @@ const PAYMENT_METHODS = [
 ]
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  pending: { label: 'Pending', color: 'text-yellow-700', bg: 'bg-yellow-100', icon: Clock },
+  pending: { label: 'Pending', color: 'text-amber-700', bg: 'bg-amber-100', icon: Clock },
   approved: { label: 'Approved', color: 'text-blue-700', bg: 'bg-blue-100', icon: CheckCircle },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100', icon: AlertCircle }
@@ -487,10 +487,10 @@ export default function ExpensesPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">⏳</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Pending</p>
-          <p className="text-2xl font-semibold text-yellow-600">{formatTotals(pendingExpenses)}</p>
+          <p className="text-2xl font-semibold text-amber-600">{formatTotals(pendingExpenses)}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -707,7 +707,7 @@ export default function ExpensesPage() {
                         className={`h-full rounded-full transition-all ${
                           key === 'paid' ? 'bg-green-500' :
                           key === 'approved' ? 'bg-blue-500' :
-                          key === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
+                          key === 'pending' ? 'bg-amber-500' : 'bg-red-500'
                         }`}
                         style={{ width: `${percentage}%` }}
                       />

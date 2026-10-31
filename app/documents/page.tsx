@@ -13,7 +13,7 @@ const DOCUMENT_SECTIONS = [
             description: 'Travel agreements and booking confirmations',
             href: '/itineraries', 
         icon: FileCheck,
-        color: 'bg-purple-100 text-purple-700'
+        color: 'bg-primary-100 text-primary-700'
       }
     ]
   },
@@ -27,7 +27,7 @@ const DOCUMENT_SECTIONS = [
         description: 'View and manage all vouchers and service orders',
         href: '/documents/supplier',
         icon: Building,
-        color: 'bg-indigo-100 text-indigo-700'
+        color: 'bg-primary-100 text-primary-700'
       },
       {
         name: 'Hotel Vouchers',
@@ -48,7 +48,7 @@ const DOCUMENT_SECTIONS = [
         description: 'Nile cruise booking confirmations',
         href: '/documents/supplier?type=cruise_voucher',
         icon: Ship,
-        color: 'bg-cyan-100 text-cyan-700'
+        color: 'bg-primary-100 text-primary-700'
       },
       // No Activity Vouchers card: this app puts entrance fees and activities
       // on service orders (lib/documents/group-services), so Generate never
@@ -58,14 +58,14 @@ const DOCUMENT_SECTIONS = [
         description: 'Guide briefings and assignments',
         href: '/documents/supplier?type=guide_assignment',
         icon: Users,
-        color: 'bg-pink-100 text-pink-700'
+        color: 'bg-primary-100 text-primary-700'
       },
       {
         name: 'Service Orders',
         description: 'General service instructions',
         href: '/documents/supplier?type=service_order',
         icon: FileText,
-        color: 'bg-purple-100 text-purple-700'
+        color: 'bg-primary-100 text-primary-700'
       }
     ]
   }

@@ -122,7 +122,7 @@ function AgentAvatar({ agent, size = 'sm' }: { agent: SalesAgent | null; size?: 
   }
 
   const initials = agent.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500']
+  const colors = ['bg-primary-600', 'bg-blue-500', 'bg-amber-500', 'bg-green-600', 'bg-gray-500', 'bg-primary-400']
   const colorIndex = agent.name.charCodeAt(0) % colors.length
 
   return (
@@ -244,7 +244,7 @@ function ActivityPanel({
     switch (type) {
       case 'claimed': return <UserPlus className="w-3.5 h-3.5 text-green-500" />
       case 'assigned': return <UserCheck className="w-3.5 h-3.5 text-blue-500" />
-      case 'auto_assigned': return <Users className="w-3.5 h-3.5 text-purple-500" />
+      case 'auto_assigned': return <Users className="w-3.5 h-3.5 text-primary-500" />
       case 'transferred': return <ArrowRight className="w-3.5 h-3.5 text-amber-500" />
       case 'unassigned': return <UserX className="w-3.5 h-3.5 text-gray-400" />
       case 'replied': return <MessageSquare className="w-3.5 h-3.5 text-green-500" />

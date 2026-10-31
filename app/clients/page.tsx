@@ -288,11 +288,11 @@ export default function ClientsPage() {
 
   const getTypeColor = (type: string | null) => {
     switch (type) {
-      case 'individual': return 'bg-purple-100 text-purple-800'
-      case 'family': return 'bg-pink-100 text-pink-800'
-      case 'group': return 'bg-orange-100 text-orange-800'
+      case 'individual': return 'bg-primary-100 text-primary-800'
+      case 'family': return 'bg-primary-100 text-primary-800'
+      case 'group': return 'bg-amber-100 text-amber-800'
       case 'corporate': return 'bg-primary-100 text-primary-800'
-      case 'agent': return 'bg-indigo-100 text-indigo-800'
+      case 'agent': return 'bg-primary-100 text-primary-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
@@ -435,7 +435,7 @@ export default function ClientsPage() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-gray-400" />
-                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               </div>
             </div>
             <p className="text-xs text-gray-600">VIP Clients</p>
@@ -459,7 +459,7 @@ export default function ClientsPage() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-gray-400" />
-                <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
               </div>
             </div>
             <p className="text-xs text-gray-600">Leads</p>
@@ -598,7 +598,7 @@ export default function ClientsPage() {
                       onChange={(e) => handleFilterChange('vipOnly', e.target.checked)}
                       className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                     />
-                    <Star className="w-4 h-4 text-yellow-500" />
+                    <Star className="w-4 h-4 text-amber-500" />
                     <span className="text-sm text-gray-700">VIP Only</span>
                   </label>
                 </div>
@@ -655,7 +655,7 @@ export default function ClientsPage() {
               {hasActiveFilters ? (
                 <button
                   onClick={clearFilters}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 shadow-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 shadow-sm"
                 >
                   <X className="w-4 h-4" />
                   Clear Filters
@@ -719,7 +719,7 @@ export default function ClientsPage() {
                                   {client.full_name}
                                 </Link>
                                 {client.vip_status && (
-                                  <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                  <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                                 )}
                               </div>
                               <div className="text-xs text-gray-500">{client.client_code}</div>

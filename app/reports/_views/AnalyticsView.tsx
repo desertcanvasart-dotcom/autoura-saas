@@ -413,7 +413,7 @@ export default function AnalyticsPage() {
 
       {/* Revenue Forecast Summary Card */}
       {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.nextPeriod > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-gradient-to-r from-blue-50 to-primary-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
@@ -664,7 +664,7 @@ export default function AnalyticsPage() {
       {/* Highlights of the Month */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Zap className="w-5 h-5 text-yellow-500" />
+          <Zap className="w-5 h-5 text-amber-500" />
           <h3 className="text-base font-semibold text-gray-900">Highlights</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -865,7 +865,7 @@ export default function AnalyticsPage() {
                   />
                 </BarChart>
               </ResponsiveContainer>
-              <div className="mt-2 p-2 bg-purple-50 rounded text-xs text-gray-700">
+              <div className="mt-2 p-2 bg-primary-50 rounded text-xs text-gray-700">
                 💡 {filteredDestinations[0].name} leads with {filteredDestinations[0].bookings} bookings ({formatCurrency(filteredDestinations[0].revenue)})
               </div>
             </>
@@ -967,7 +967,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
           
-          <div className="mt-3 p-2 bg-orange-50 rounded text-xs text-gray-700">
+          <div className="mt-3 p-2 bg-amber-50 rounded text-xs text-gray-700">
             💡 {insights.bookingInsight}
           </div>
         </div>
@@ -1033,9 +1033,9 @@ export default function AnalyticsPage() {
             <p className="text-xs text-gray-500 mt-1">See schedule</p>
           </Link>
           
-          <Link href="/clients" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-purple-300 transition-all text-left group">
+          <Link href="/clients" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-primary-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
-              <Users className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+              <Users className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.bookings }} />
             </div>
             <p className="text-sm font-medium text-gray-900">Client Insights</p>

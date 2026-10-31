@@ -149,7 +149,7 @@ export default function EditPaymentPage() {
           </div>
           <Link
             href={`/payments/${params.id}`}
-            className="bg-gray-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2"
+            className="bg-primary-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Payment

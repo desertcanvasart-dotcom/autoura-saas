@@ -673,14 +673,14 @@ export default function TransportationContent() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
             <span className="text-xs text-gray-500">Cities</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueCities}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
             <span className="text-xs text-gray-500">Vehicle Types</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueVehicleTypes}</p>

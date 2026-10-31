@@ -289,7 +289,7 @@ export default function ClientProfilePage() {
           <p className="text-sm text-gray-600 mb-4">The client you're looking for doesn't exist.</p>
           <Link
             href="/clients"
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Clients
@@ -356,14 +356,14 @@ export default function ClientProfilePage() {
                     {client.first_name} {client.last_name}
                   </h1>
                   {client.vip_status && (
-                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
                   )}
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(client.status)}`}>
                     {clientStageLabel(client.status)}
                   </span>
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary-100 text-primary-800">
                     {client.client_type}
                   </span>
                   <span className="px-2 py-0.5 text-xs text-gray-600 bg-gray-100 rounded-full">
@@ -424,7 +424,7 @@ export default function ClientProfilePage() {
                 <div className="text-xs text-gray-600 mt-0.5">Revenue</div>
               </div>
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 text-center">
-                <div className="text-xl font-bold text-purple-600">
+                <div className="text-xl font-bold text-primary-600">
                   {/*
                     DERIVED, not read. clients.average_booking_value is a column
                     nothing has ever written — 0 on every row — so it rendered
@@ -544,9 +544,9 @@ export default function ClientProfilePage() {
 
               {/* Internal Notes */}
               {client.internal_notes && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-yellow-600" />
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
                     Internal Notes
                   </h3>
                   <p className="text-sm text-gray-700">{client.internal_notes}</p>
@@ -576,14 +576,14 @@ export default function ClientProfilePage() {
                     </button>
                   <button 
                    onClick={() => setIsFollowupModalOpen(true)}
-                   className="w-full flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-lg hover:bg-purple-200"
+                   className="w-full flex items-center gap-2 px-3 py-2 bg-primary-100 text-primary-700 text-sm rounded-lg hover:bg-primary-200"
                     >
                   <Clock className="w-4 h-4" />
                   Add Follow-up
                    </button>
                    <button 
                    onClick={() => setIsNoteModalOpen(true)}
-                   className="w-full flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 text-sm rounded-lg hover:bg-orange-100"
+                   className="w-full flex items-center gap-2 px-3 py-2 bg-amber-50 text-amber-700 text-sm rounded-lg hover:bg-amber-100"
                      >
                    <FileText className="w-4 h-4" />
                   Add Note
@@ -691,7 +691,7 @@ export default function ClientProfilePage() {
             setEditingCommunication(null)
             setIsCommunicationModalOpen(true)
       }}
-           className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+           className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
             >
             <Plus className="w-4 h-4" />
               Log Communication
@@ -712,7 +712,7 @@ export default function ClientProfilePage() {
                         <div className={`p-1.5 rounded-lg ${
                           comm.communication_type === 'whatsapp' ? 'bg-green-100' :
                           comm.communication_type === 'email' ? 'bg-blue-100' :
-                          comm.communication_type === 'phone_call' ? 'bg-purple-100' :
+                          comm.communication_type === 'phone_call' ? 'bg-primary-100' :
                           'bg-gray-100'
                         }`}>
                           <MessageSquare className="w-4 h-4" />
@@ -734,7 +734,7 @@ export default function ClientProfilePage() {
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                           comm.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          comm.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          comm.status === 'pending' ? 'bg-amber-100 text-amber-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {comm.status}
@@ -771,7 +771,7 @@ export default function ClientProfilePage() {
               <h2 className="text-xl font-bold">Trips</h2>
               <Link
                href={`/pricing-grid?clientId=${clientId}`}
-               className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+               className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
                >
               <Plus className="w-4 h-4" />
               New Trip
@@ -784,7 +784,7 @@ export default function ClientProfilePage() {
                 <p className="text-sm text-gray-600 mb-3">No trips yet</p>
                 <Link
                 href={`/pricing-grid?clientId=${clientId}`}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
                  >
                 <Plus className="w-4 h-4" />
                Create First Trip
@@ -843,7 +843,7 @@ export default function ClientProfilePage() {
                   setEditingNote(null)
                   setIsNoteModalOpen(true)
                 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
               >
                 <Plus className="w-4 h-4" />
                 Add Note
@@ -864,8 +864,8 @@ export default function ClientProfilePage() {
                         <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                           note.note_type === 'warning' ? 'bg-red-100 text-red-800' :
                           note.note_type === 'compliment' ? 'bg-green-100 text-green-800' :
-                          note.note_type === 'complaint' ? 'bg-orange-100 text-orange-800' :
-                          note.note_type === 'preference' ? 'bg-purple-100 text-purple-800' :
+                          note.note_type === 'complaint' ? 'bg-amber-100 text-amber-800' :
+                          note.note_type === 'preference' ? 'bg-primary-100 text-primary-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {note.note_type}
@@ -908,7 +908,7 @@ export default function ClientProfilePage() {
                   setEditingFollowup(null)
                   setIsFollowupModalOpen(true)
                 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
               >
                 <Plus className="w-4 h-4" />
                 Add Follow-up
@@ -937,7 +937,7 @@ export default function ClientProfilePage() {
                             <h4 className="text-sm font-semibold">{followup.description}</h4>
                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                               followup.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              followup.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              followup.status === 'pending' ? 'bg-amber-100 text-amber-800' :
                               followup.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
                               'bg-red-100 text-red-800'
                             }`}>
@@ -945,7 +945,7 @@ export default function ClientProfilePage() {
                             </span>
                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                               followup.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                              followup.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                              followup.priority === 'high' ? 'bg-amber-100 text-amber-800' :
                               followup.priority === 'normal' ? 'bg-blue-100 text-blue-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>

@@ -60,7 +60,7 @@ export default function CopilotAnalyticsPage() {
       <div className="flex items-start justify-between mb-6 gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="w-5 h-5 text-purple-600" />
+            <BarChart3 className="w-5 h-5 text-primary-600" />
             <h1 className="text-2xl font-semibold text-gray-900">Copilot Analytics</h1>
           </div>
           <p className="text-sm text-gray-500">
@@ -72,7 +72,7 @@ export default function CopilotAnalyticsPage() {
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 text-xs rounded-full border ${period === p ? 'bg-purple-600 text-white border-purple-600' : 'text-gray-600 border-gray-200 hover:border-purple-300'}`}
+              className={`px-3 py-1.5 text-xs rounded-full border ${period === p ? 'bg-primary-600 text-white border-primary-600' : 'text-gray-600 border-gray-200 hover:border-primary-300'}`}
             >
               {p === 'all' ? 'All time' : `Last ${p}`}
             </button>
@@ -236,7 +236,7 @@ function RateCard({ label, value, tooltip }: { label: string; value: number; too
       <div className="text-xs text-gray-500 mb-1.5">{label}</div>
       <div className="text-2xl font-semibold text-gray-800 tabular-nums">{pct}%</div>
       <div className="h-1.5 bg-gray-100 rounded-full mt-2 overflow-hidden">
-        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
+        <div className="h-full bg-primary-500 rounded-full" style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
       </div>
     </div>
   )
@@ -257,7 +257,7 @@ function Card({ title, subtitle, icon, children }: { title: string; subtitle?: s
   )
 }
 
-function MiniBar({ icon, label, value, max, sub, color = 'bg-purple-500' }: { icon?: React.ReactNode; label: string; value: number; max: number; sub?: string; color?: string }) {
+function MiniBar({ icon, label, value, max, sub, color = 'bg-primary-500' }: { icon?: React.ReactNode; label: string; value: number; max: number; sub?: string; color?: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
     <div className="py-1.5">
@@ -288,7 +288,7 @@ function DailyChart({ days }: { days: Array<{ date: string; generated: number; s
         return (
           <div key={d.date} className="flex-1 min-w-0 flex flex-col items-center gap-1 group" title={`${d.date}: ${d.generated} generated, ${d.sent} sent`}>
             <div className="flex-1 w-full flex items-end">
-              <div className="w-full bg-purple-200 rounded-t group-hover:bg-purple-300 relative" style={{ height: `${heightPct}%` }}>
+              <div className="w-full bg-primary-200 rounded-t group-hover:bg-primary-300 relative" style={{ height: `${heightPct}%` }}>
                 <div className="absolute bottom-0 left-0 right-0 bg-green-500 rounded-t" style={{ height: `${sentPct}%` }} />
               </div>
             </div>
@@ -304,6 +304,6 @@ function typeColor(sourceType: string): string {
   if (sourceType.startsWith('kb_faq')) return 'text-blue-600 bg-blue-50 border-blue-200'
   if (sourceType.startsWith('kb_policy')) return 'text-red-600 bg-red-50 border-red-200'
   if (sourceType.startsWith('kb_tour')) return 'text-green-600 bg-green-50 border-green-200'
-  if (sourceType === 'whatsapp_pair') return 'text-purple-600 bg-purple-50 border-purple-200'
+  if (sourceType === 'whatsapp_pair') return 'text-primary-600 bg-primary-50 border-primary-200'
   return 'text-gray-600 bg-gray-50 border-gray-200'
 }

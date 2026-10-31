@@ -150,9 +150,9 @@ const CITY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   'Giza': { bg: 'bg-olive-100', text: 'text-olive-700', dot: 'bg-olive-500' },
   'Luxor': { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
   'Aswan': { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
-  'Alexandria': { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
-  'Hurghada': { bg: 'bg-pink-100', text: 'text-pink-700', dot: 'bg-pink-500' },
-  'Sharm El Sheikh': { bg: 'bg-cyan-100', text: 'text-cyan-700', dot: 'bg-cyan-500' },
+  'Alexandria': { bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
+  'Hurghada': { bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
+  'Sharm El Sheikh': { bg: 'bg-primary-100', text: 'text-primary-700', dot: 'bg-primary-500' },
   'default': { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-500' }
 }
 
@@ -171,7 +171,7 @@ const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700' },
   { value: 'sent', label: 'Sent', color: 'bg-blue-100 text-blue-700' },
   { value: 'confirmed', label: 'Confirmed', color: 'bg-green-100 text-green-700' },
-  { value: 'completed', label: 'Completed', color: 'bg-purple-100 text-purple-700' },
+  { value: 'completed', label: 'Completed', color: 'bg-primary-100 text-primary-700' },
   { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-700' }
 ]
 
@@ -1077,7 +1077,7 @@ export default function ItineraryEditorPage() {
             {existingInvoice ? (
               <Link
                 href={fromThisPage(`/invoices/${existingInvoice.id}`)}
-                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center gap-1.5"
               >
                 <Receipt size={14} />
                 {existingInvoice.invoice_number}
@@ -1140,7 +1140,7 @@ export default function ItineraryEditorPage() {
             {/* Contract Link */}
             <Link
               href={fromThisPage(`/documents/contract/${itinerary.id}`)}
-              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center gap-1.5"
             >
               <FileText size={14} />
               Contract
@@ -1578,7 +1578,7 @@ export default function ItineraryEditorPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <button
               onClick={() => setShowServicesSection(!showServicesSection)}
-              className="w-full px-5 py-4 flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200"
+              className="w-full px-5 py-4 flex items-center justify-between bg-gradient-to-r from-amber-50 to-amber-50 border-b border-amber-200"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
@@ -1719,7 +1719,7 @@ export default function ItineraryEditorPage() {
                                       </div>
                                       <button
                                         onClick={() => setEditingServiceId(null)}
-                                        className="px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 flex items-center gap-1"
+                                        className="px-3 py-1.5 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 flex items-center gap-1"
                                         title="Done editing"
                                       >
                                         <Check size={14} /> Done

@@ -102,7 +102,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-600', bg: 'bg-blue-100' },
   confirmed: { label: 'Confirmed', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: 'Completed', color: 'text-purple-600', bg: 'bg-purple-100' },
+  completed: { label: 'Completed', color: 'text-primary-600', bg: 'bg-primary-100' },
   cancelled: { label: 'Cancelled', color: 'text-red-600', bg: 'bg-red-100' }
 }
 
@@ -235,8 +235,8 @@ export default function ProfitLossPage() {
 
   const getMarginColor = (margin: number) => {
     if (margin >= 30) return 'text-green-600 bg-green-100'
-    if (margin >= 15) return 'text-yellow-600 bg-yellow-100'
-    if (margin >= 0) return 'text-orange-600 bg-orange-100'
+    if (margin >= 15) return 'text-amber-600 bg-amber-100'
+    if (margin >= 0) return 'text-amber-600 bg-amber-100'
     return 'text-red-600 bg-red-100'
   }
 
@@ -364,28 +364,28 @@ export default function ProfitLossPage() {
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">📊</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Avg Margin</p>
-              <p className="text-2xl font-semibold text-purple-600">{summary.average_margin.toFixed(1)}%</p>
+              <p className="text-2xl font-semibold text-primary-600">{summary.average_margin.toFixed(1)}%</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">✅</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Profitable</p>
-              <p className="text-2xl font-semibold text-emerald-600">{summary.profitable_trips}</p>
+              <p className="text-2xl font-semibold text-primary-600">{summary.profitable_trips}</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">⚠️</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Loss-Making</p>
-              <p className="text-2xl font-semibold text-orange-600">{summary.loss_trips}</p>
+              <p className="text-2xl font-semibold text-amber-600">{summary.loss_trips}</p>
             </div>
           </div>
 

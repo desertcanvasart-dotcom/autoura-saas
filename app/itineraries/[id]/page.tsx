@@ -793,7 +793,7 @@ export default function ViewItineraryPage() {
       draft: 'bg-gray-50 text-gray-600 border-gray-200',
       sent: 'bg-primary-50 text-primary-600 border-primary-200',
       confirmed: 'bg-green-50 text-green-600 border-green-200',
-      completed: 'bg-purple-50 text-purple-600 border-purple-200',
+      completed: 'bg-gray-100 text-gray-700 border-gray-200',
       cancelled: 'bg-red-50 text-red-600 border-red-200'
     }
     return styles[status as keyof typeof styles] || styles.draft
@@ -1006,7 +1006,7 @@ export default function ViewItineraryPage() {
                   {itinerary.tier && (
                     <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
                       itinerary.tier === 'luxury' ? 'bg-amber-100 text-amber-700' :
-                      itinerary.tier === 'deluxe' ? 'bg-purple-100 text-purple-700' :
+                      itinerary.tier === 'deluxe' ? 'bg-primary-100 text-primary-700' :
                       itinerary.tier === 'standard' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-700'
                     }`}>
@@ -1194,8 +1194,8 @@ export default function ViewItineraryPage() {
 
       {commissionResult && (
         <div className="container mx-auto px-4 pt-3">
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-md">
-            <p className="text-sm text-emerald-700 font-medium">{commissionResult}</p>
+          <div className="bg-primary-50 border border-primary-200 p-3 rounded-md">
+            <p className="text-sm text-primary-700 font-medium">{commissionResult}</p>
           </div>
         </div>
       )}
@@ -1215,7 +1215,7 @@ export default function ViewItineraryPage() {
                 disabled={!itinerary.client_phone}
                 className={`w-full py-3 rounded-md font-medium flex items-center justify-center gap-2 transition-all text-sm ${
                   itinerary.client_phone
-                    ? 'bg-green-500 text-white hover:bg-green-600'
+                    ? 'bg-primary-600 text-white hover:bg-primary-700'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >

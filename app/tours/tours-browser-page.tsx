@@ -199,7 +199,7 @@ export default function ToursBrowsePage() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">🎯</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Tour Packages</p>
           <p className="text-2xl font-semibold text-gray-900">{tours.length}</p>
@@ -227,7 +227,7 @@ export default function ToursBrowsePage() {
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">🏷️</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Categories</p>
             <p className="text-2xl font-semibold text-gray-900">{uniqueCategories.length}</p>

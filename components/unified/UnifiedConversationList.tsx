@@ -108,7 +108,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
         </div>
         <div className="flex gap-1 mt-2">
           <button onClick={() => setFilter('active')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'active' ? 'bg-[#647C47] text-white' : 'text-gray-500 hover:bg-gray-100'}`}>Active</button>
-          <button onClick={() => setFilter('archived')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'archived' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>
+          <button onClick={() => setFilter('archived')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'archived' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-primary-700'}`}>
             <Archive className="w-3 h-3 inline mr-1" />Archived
           </button>
         </div>

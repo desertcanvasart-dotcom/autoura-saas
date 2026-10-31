@@ -57,7 +57,7 @@ export default function SupplierSignInRequests({ isAdmin }: { isAdmin: boolean }
             <span className="text-gray-900"><b>{c.supplier_name}</b> <span className="text-gray-600">· {c.phone ?? 'phone hidden'} · {new Date(c.requested_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span></span>
             {isAdmin ? (
               <span className="flex gap-2">
-                <button type="button" disabled={busy === c.id} onClick={() => decide(c.id, 'approve')} className="px-2.5 py-1 rounded-md bg-green-600 text-white text-xs font-medium disabled:opacity-50">Confirm it’s them</button>
+                <button type="button" disabled={busy === c.id} onClick={() => decide(c.id, 'approve')} className="px-2.5 py-1 rounded-md bg-primary-600 text-white text-xs font-medium disabled:opacity-50">Confirm it’s them</button>
                 <button type="button" disabled={busy === c.id} onClick={() => decide(c.id, 'reject')} className="px-2.5 py-1 rounded-md border border-gray-300 bg-white text-gray-700 text-xs disabled:opacity-50">Not them</button>
               </span>
             ) : <span className="text-xs text-gray-500">An admin confirms these</span>}

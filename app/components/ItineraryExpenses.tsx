@@ -65,7 +65,7 @@ const CATEGORY_CONFIG: Record<string, { icon: string; label: string }> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: 'Pending', color: 'text-yellow-700', bg: 'bg-yellow-100' },
+  pending: { label: 'Pending', color: 'text-amber-700', bg: 'bg-amber-100' },
   approved: { label: 'Approved', color: 'text-blue-700', bg: 'bg-blue-100' },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100' },
   rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100' }

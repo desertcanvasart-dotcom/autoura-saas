@@ -344,11 +344,11 @@ export default function TransportPackagesPage() {
       <div className="container mx-auto px-4 lg:px-6 py-6 space-y-6">
 
         {/* Where did activity pricing go? */}
-        <div className="flex items-start gap-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
+        <div className="flex items-start gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <p>
             Activity pricing (per-person, per-unit, flat, and tiered volume discounts) is managed under{' '}
-            <Link href="/rates/activities" className="font-semibold underline hover:text-purple-900">Activities &amp; Add-ons</Link>
+            <Link href="/rates/activities" className="font-semibold underline hover:text-primary-900">Activities &amp; Add-ons</Link>
             {' '}— the catalog the whole app prices from.
           </p>
         </div>
@@ -356,7 +356,7 @@ export default function TransportPackagesPage() {
         {/* TRANSPORT PACKAGES SECTION */}
         <div className="bg-white rounded-lg shadow-md border overflow-hidden">
           <div
-            className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-b cursor-pointer"
+            className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-50 to-primary-50 border-b cursor-pointer"
             onClick={() => setExpandedPackages(!expandedPackages)}
           >
             <div className="flex items-center gap-3">
@@ -369,7 +369,7 @@ export default function TransportPackagesPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={(e) => { e.stopPropagation(); handleAddPackage() }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
               >
                 <Plus className="w-4 h-4" />
                 Add Package
@@ -590,7 +590,7 @@ export default function TransportPackagesPage() {
               <button
                 onClick={handleSavePackage}
                 disabled={saving}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {editingPackage ? 'Update Package' : 'Create Package'}

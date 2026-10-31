@@ -473,16 +473,16 @@ export default function TemplatesPage() {
     switch (channel) {
       case 'email': return 'bg-blue-100 text-blue-700'
       case 'whatsapp': return 'bg-green-100 text-green-700'
-      case 'sms': return 'bg-orange-100 text-orange-700'
-      case 'both': return 'bg-purple-100 text-purple-700'
+      case 'sms': return 'bg-amber-100 text-amber-700'
+      case 'both': return 'bg-primary-100 text-primary-700'
       default: return 'bg-gray-100 text-gray-700'
     }
   }
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'customer': return 'bg-emerald-100 text-emerald-700'
-      case 'supplier': return 'bg-cyan-100 text-cyan-700'
+      case 'customer': return 'bg-primary-100 text-primary-700'
+      case 'supplier': return 'bg-primary-100 text-primary-700'
       case 'partner': return 'bg-amber-100 text-amber-700'
       case 'internal': return 'bg-slate-100 text-slate-700'
       default: return 'bg-gray-100 text-gray-700'
@@ -514,7 +514,7 @@ export default function TemplatesPage() {
             onClick={() => setShowAnalytics(!showAnalytics)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
               showAnalytics
-                ? 'bg-purple-50 border-purple-200 text-purple-700'
+                ? 'bg-primary-50 border-primary-200 text-primary-700'
                 : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
@@ -561,7 +561,7 @@ export default function TemplatesPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-purple-600" />
+              <BarChart3 className="w-5 h-5 text-primary-600" />
               Template Analytics
             </h2>
             <span className="text-xs text-gray-500">Last 30 days</span>
@@ -641,19 +641,19 @@ export default function TemplatesPage() {
                   </div>
                   <span className="text-sm font-medium text-green-700">{analytics.channelDistribution.whatsapp}</span>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
+                <div className="flex items-center justify-between p-2 bg-amber-50 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-orange-600" />
+                    <MessageSquare className="w-4 h-4 text-amber-600" />
                     <span className="text-sm text-gray-700">SMS</span>
                   </div>
-                  <span className="text-sm font-medium text-orange-700">{analytics.channelDistribution.sms}</span>
+                  <span className="text-sm font-medium text-amber-700">{analytics.channelDistribution.sms}</span>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                <div className="flex items-center justify-between p-2 bg-primary-50 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    <Sparkles className="w-4 h-4 text-primary-600" />
                     <span className="text-sm text-gray-700">All Channels</span>
                   </div>
-                  <span className="text-sm font-medium text-purple-700">{analytics.channelDistribution.both}</span>
+                  <span className="text-sm font-medium text-primary-700">{analytics.channelDistribution.both}</span>
                 </div>
               </div>
             </div>
@@ -1784,7 +1784,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                       onClick={() => setChannel('sms')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                         channel === 'sms'
-                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          ? 'border-amber-500 bg-amber-50 text-amber-700'
                           : 'border-gray-200 text-gray-600'
                       }`}
                     >
@@ -2016,7 +2016,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 type="button"
                 onClick={handleScheduleSend}
                 disabled={sending || !selectedRecipient || !scheduledFor}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Schedule Send

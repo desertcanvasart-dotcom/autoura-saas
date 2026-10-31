@@ -164,7 +164,7 @@ export function ClientFilters({ onFilterChange }: { onFilterChange: (filters: an
                   onChange={(e) => handleFilterChange('vipOnly', e.target.checked)}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <Star className="w-4 h-4 text-yellow-500" />
+                <Star className="w-4 h-4 text-amber-500" />
                 <span className="text-sm text-gray-700">VIP Only</span>
               </label>
             </div>

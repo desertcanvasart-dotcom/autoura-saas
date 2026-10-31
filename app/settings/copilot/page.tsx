@@ -69,7 +69,7 @@ export default function CopilotSettingsPage() {
       ) : (
         <div className="space-y-4">
           <SettingRow
-            icon={<Zap className="w-5 h-5 text-purple-600" />}
+            icon={<Zap className="w-5 h-5 text-primary-600" />}
             title="Proactive draft pre-generation"
             description="When a new WhatsApp or email message arrives, the copilot drafts replies in the background so they are ready when the agent opens the thread. Drafts still require human review before sending — this is NOT auto-reply."
             value={features.copilot_pregenerate_enabled}
@@ -124,7 +124,7 @@ function SettingRow({
             onChange={(e) => onChange(e.target.checked)}
             className="sr-only peer"
           />
-          <div className={`w-10 h-5 rounded-full transition-colors ${value ? (danger ? 'bg-red-600' : 'bg-purple-600') : 'bg-gray-300'} peer-focus:ring-2 peer-focus:ring-purple-400/40`}>
+          <div className={`w-10 h-5 rounded-full transition-colors ${value ? (danger ? 'bg-red-600' : 'bg-primary-600') : 'bg-gray-300'} peer-focus:ring-2 peer-focus:ring-primary-400/40`}>
             <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform translate-y-0.5 ${value ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
           </div>
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400 ml-2" />}

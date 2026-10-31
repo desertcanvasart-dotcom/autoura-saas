@@ -226,8 +226,8 @@ export default function AccountsPayablePage() {
   const getAgingColor = (bucket: string) => {
     switch (bucket) {
       case 'current': return 'text-green-600 bg-green-100'
-      case '30': return 'text-yellow-600 bg-yellow-100'
-      case '60': return 'text-orange-600 bg-orange-100'
+      case '30': return 'text-amber-600 bg-amber-100'
+      case '60': return 'text-amber-600 bg-amber-100'
       case '90plus': return 'text-red-600 bg-red-100'
       default: return 'text-gray-600 bg-gray-100'
     }
@@ -245,7 +245,7 @@ export default function AccountsPayablePage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100'
+      case 'pending': return 'text-amber-600 bg-amber-100'
       case 'approved': return 'text-blue-600 bg-blue-100'
       case 'paid': return 'text-green-600 bg-green-100'
       default: return 'text-gray-600 bg-gray-100'
@@ -376,10 +376,10 @@ export default function AccountsPayablePage() {
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">⏳</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Pending Approval</p>
-            <p className="text-2xl font-semibold text-yellow-600">{formatTotals(summary.pending_amount)}</p>
+            <p className="text-2xl font-semibold text-amber-600">{formatTotals(summary.pending_amount)}</p>
             <p className="text-xs text-gray-400 mt-1">{summary.pending_count} expenses</p>
           </div>
 
@@ -406,19 +406,19 @@ export default function AccountsPayablePage() {
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">⏳</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">1-30 days overdue</p>
-            <p className="text-2xl font-semibold text-yellow-600">{formatTotals(summary.aging.days30)}</p>
+            <p className="text-2xl font-semibold text-amber-600">{formatTotals(summary.aging.days30)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">⏰</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">31-60 days overdue</p>
-            <p className="text-2xl font-semibold text-orange-600">{formatTotals(summary.aging.days60)}</p>
+            <p className="text-2xl font-semibold text-amber-600">{formatTotals(summary.aging.days60)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -449,7 +449,7 @@ export default function AccountsPayablePage() {
             )}
             {(summary.aging.days30[summary.single_currency!] || 0) > 0 && (
               <div 
-                className="bg-yellow-500 flex items-center justify-center text-white text-xs font-medium"
+                className="bg-amber-500 flex items-center justify-center text-white text-xs font-medium"
                 style={{ width: `${((summary.aging.days30[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
                 title={`1-30 days overdue: ${formatTotals(summary.aging.days30)}`}
               >
@@ -458,7 +458,7 @@ export default function AccountsPayablePage() {
             )}
             {(summary.aging.days60[summary.single_currency!] || 0) > 0 && (
               <div 
-                className="bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
+                className="bg-amber-500 flex items-center justify-center text-white text-xs font-medium"
                 style={{ width: `${((summary.aging.days60[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
                 title={`31-60 days overdue: ${formatTotals(summary.aging.days60)}`}
               >
@@ -481,11 +481,11 @@ export default function AccountsPayablePage() {
               <span className="text-gray-600">Not due yet</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded bg-amber-500"></div>
               <span className="text-gray-600">1-30 days overdue</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-orange-500"></div>
+              <div className="w-3 h-3 rounded bg-amber-500"></div>
               <span className="text-gray-600">31-60 days overdue</span>
             </div>
             <div className="flex items-center gap-2">
@@ -644,12 +644,12 @@ export default function AccountsPayablePage() {
                           </div>
                         )}
                         {nonZero(supplier.aging.days30) && (
-                          <div className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">
+                          <div className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
                             {formatTotals(supplier.aging.days30)}
                           </div>
                         )}
                         {nonZero(supplier.aging.days60) && (
-                          <div className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded">
+                          <div className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
                             {formatTotals(supplier.aging.days60)}
                           </div>
                         )}
@@ -681,7 +681,7 @@ export default function AccountsPayablePage() {
                                   <p className="text-xs text-gray-500">
                                     {expense.description || catConfig.label} • {new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                                     {expense.is_overdue && (
-                                      <span className="text-orange-500 ml-2">({expense.days_past_due} days overdue)</span>
+                                      <span className="text-amber-500 ml-2">({expense.days_past_due} days overdue)</span>
                                     )}
                                   </p>
                                 </div>
@@ -765,7 +765,7 @@ export default function AccountsPayablePage() {
                   (paginatedData as Expense[]).map((expense) => {
                     const catConfig = CATEGORY_CONFIG[expense.category] || CATEGORY_CONFIG.other
                     return (
-                      <tr key={expense.id} className={`hover:bg-gray-50 ${expense.is_overdue ? 'bg-orange-50/50' : ''}`}>
+                      <tr key={expense.id} className={`hover:bg-gray-50 ${expense.is_overdue ? 'bg-amber-50/50' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <span>{catConfig.icon}</span>
@@ -785,7 +785,7 @@ export default function AccountsPayablePage() {
                         </td>
                         <td className="px-4 py-3">
                           <p className="text-sm text-gray-600">{new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}</p>
-                          <p className={`text-xs ${expense.is_overdue ? 'text-orange-500' : 'text-gray-400'}`}>
+                          <p className={`text-xs ${expense.is_overdue ? 'text-amber-500' : 'text-gray-400'}`}>
                             Due {new Date(`${String(expense.due_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                             {expense.due_from_invoice ? ` (bill ${expense.due_from_invoice})` : ''}
                           </p>

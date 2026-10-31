@@ -103,7 +103,7 @@ interface Summary {
 const PRIORITIES = [
   { value: 'low', label: 'Low', color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
   { value: 'medium', label: 'Medium', color: 'bg-blue-100 text-blue-600', dot: 'bg-blue-400' },
-  { value: 'high', label: 'High', color: 'bg-orange-100 text-orange-600', dot: 'bg-orange-400' },
+  { value: 'high', label: 'High', color: 'bg-amber-100 text-amber-600', dot: 'bg-amber-400' },
   { value: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-600', dot: 'bg-red-500' }
 ]
 
@@ -652,10 +652,10 @@ export default function TasksPage() {
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3">
             <div className="flex items-center gap-1.5 mb-1">
-              <AlertTriangle className="h-3 w-3 text-orange-500" />
+              <AlertTriangle className="h-3 w-3 text-amber-500" />
               <p className="text-xs text-gray-500">High Priority</p>
             </div>
-            <p className="text-xl font-semibold text-orange-600">{summary.high_priority}</p>
+            <p className="text-xl font-semibold text-amber-600">{summary.high_priority}</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3">
             <div className="flex items-center gap-1.5 mb-1">
@@ -719,8 +719,8 @@ export default function TasksPage() {
             onClick={() => setShowArchived(!showArchived)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
               showArchived 
-                ? 'bg-gray-700 text-white' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-primary-600 text-white' 
+                : 'bg-gray-100 text-gray-600 hover:bg-primary-700'
             }`}
           >
             {showArchived ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}

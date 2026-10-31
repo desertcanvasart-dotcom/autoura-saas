@@ -461,11 +461,11 @@ export default function TenantSettingsPage() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-semibold text-yellow-900">Access Denied</h3>
-              <p className="text-xs text-yellow-700 mt-0.5">
+              <h3 className="text-sm font-semibold text-amber-900">Access Denied</h3>
+              <p className="text-xs text-amber-700 mt-0.5">
                 Only owners and admins can access tenant settings.
               </p>
             </div>

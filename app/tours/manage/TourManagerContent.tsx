@@ -843,7 +843,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               <option value="in_transit">In the air (overnight flight) — nothing is sold this day</option>
             </select>
             {dayNight === 'in_transit' && (
-              <p className="mt-1 text-xs text-sky-700">
+              <p className="mt-1 text-xs text-primary-700">
                 The whole day is the flight out: no hotel, vehicle, guide, meal or airport help is priced on it, whatever else the day says. The arrival — its transfer and meet &amp; greet — moves to the next day on the ground.
               </p>
             )}
@@ -964,7 +964,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             <span className="text-xs text-gray-500">Road transfers:</span>
             {([['', 'As usual'], ['on', 'On'], ['off', 'Off']] as const).map(([value, label]) => (
               <button key={label} type="button" onClick={() => setDayRoad(value)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${dayRoad === value ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${dayRoad === value ? 'bg-primary-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
                 {label}
               </button>
             ))}
@@ -1232,7 +1232,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 onClick={() => { setDayTransportType(value as typeof dayTransportType); setDayTransportRateId(''); if (!value) { setDayLegFrom(''); setDayLegTo('') } if (value !== 'flight') setDayLegAssist({}) }}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   dayTransportType === value
-                    ? 'bg-green-600 text-white border-green-600'
+                    ? 'bg-primary-600 text-white border-green-600'
                     : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                 }`}
               >
@@ -1375,18 +1375,18 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                     : <span className="italic">night not stated — read from the title</span>}
                 </p>
                 {day.sightseeing_length && day.sightseeing_length !== 'day_tour' && (
-                  <p className="text-xs text-teal-700 mt-0.5">
+                  <p className="text-xs text-primary-700 mt-0.5">
                     ⏱️ {day.sightseeing_length === 'half_day' ? 'Half day (4 hours)' : 'Long day (12 hours)'}
                   </p>
                 )}
                 {day.city_transfer && (
-                  <p className="text-xs text-purple-700 mt-0.5">🚐 Local transfer</p>
+                  <p className="text-xs text-primary-700 mt-0.5">🚐 Local transfer</p>
                 )}
                 {day.day_trip_from && (
-                  <p className="text-xs text-teal-700 mt-0.5">↩️ Day trip from {day.day_trip_from} — the night is there</p>
+                  <p className="text-xs text-primary-700 mt-0.5">↩️ Day trip from {day.day_trip_from} — the night is there</p>
                 )}
                 {day.property_by_tier && Object.values(day.property_by_tier).some(Boolean) && (
-                  <p className="text-xs text-indigo-700 mt-0.5">
+                  <p className="text-xs text-primary-700 mt-0.5">
                     {day.accommodation_type === 'cruise' ? '🚢 Named ship' : '🏨 Named hotel'} for{' '}
                     {Object.values(day.property_by_tier).filter(Boolean).length} tier
                     {Object.values(day.property_by_tier).filter(Boolean).length === 1 ? '' : 's'}
@@ -1398,7 +1398,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   </p>
                 )}
                 {day.transport_type && (
-                  <p className="text-xs text-sky-700 mt-0.5">
+                  <p className="text-xs text-primary-700 mt-0.5">
                     Travel: {day.transport_type === 'sleeping_train' ? 'Sleeping train' : day.transport_type === 'train' ? 'Day train' : 'Flight'}
                     {day.transport_rate_id ? ' (named rate)' : ' (auto by route)'}
                     {(day.leg_from || day.leg_to) && ` · ${day.leg_from || '…'} → ${day.leg_to || '…'}`}
@@ -1573,7 +1573,7 @@ function EditVariationModal({ variation, tierLabel, onClose, onSaved, showToast 
           </button>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-            <button type="button" onClick={save} disabled={busy} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60">Save</button>
+            <button type="button" onClick={save} disabled={busy} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">Save</button>
           </div>
         </div>
       </div>
@@ -1765,7 +1765,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
             <button
               onClick={handleCreate}
               disabled={saving || chosenTiers.length === 0}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>
@@ -2605,7 +2605,7 @@ export default function TourManagerContent() {
               <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+              <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium">
                 <Plus className="w-4 h-4" />
                 Add Template
               </button>
@@ -2707,7 +2707,7 @@ export default function TourManagerContent() {
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <Layers className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Variations</p>
             <p className="text-2xl font-bold text-gray-900">{totalVariations}</p>
@@ -2869,7 +2869,7 @@ export default function TourManagerContent() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {(template.variations?.length || 0) > 0 ? (
-                            <span className="text-sm font-medium text-purple-600">{template.variations?.length || 0}</span>
+                            <span className="text-sm font-medium text-primary-600">{template.variations?.length || 0}</span>
                           ) : (
                             <button
                               onClick={(e) => { e.stopPropagation(); setAddVariationTemplate(template) }}
@@ -2891,7 +2891,7 @@ export default function TourManagerContent() {
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => editDays(template)}
-                              className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                              className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
                               title="Edit days"
                             >
                               <Calendar className="w-4 h-4" />
@@ -2925,7 +2925,7 @@ export default function TourManagerContent() {
                         <tr className="bg-gray-50">
                           <td colSpan={7} className="px-8 py-3">
                             <div className="flex items-center gap-2 mb-2">
-                              <Layers className="w-4 h-4 text-purple-600" />
+                              <Layers className="w-4 h-4 text-primary-600" />
                               <span className="text-sm font-medium text-gray-700">Variations</span>
                               <button
                                 onClick={() => setAddVariationTemplate(template)}
@@ -2936,7 +2936,7 @@ export default function TourManagerContent() {
                               </button>
                               <button
                                 onClick={() => editDays(template)}
-                                className="ml-2 text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
+                                className="ml-2 text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
                               >
                                 <Calendar className="w-3 h-3" />
                                 Edit Days
@@ -3010,7 +3010,7 @@ export default function TourManagerContent() {
                       <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                         <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-sm font-medium">No tour templates found</p>
-                        <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                           Create Your First Template
                         </button>
                       </td>
@@ -3100,7 +3100,7 @@ export default function TourManagerContent() {
                 <div className="flex border-t border-gray-200 divide-x divide-gray-200">
                   <button
                     onClick={() => editDays(template)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-primary-600 hover:bg-primary-50 transition-colors"
                   >
                     <Calendar className="w-4 h-4" />Days
                   </button>
@@ -3129,7 +3129,7 @@ export default function TourManagerContent() {
               <div className="col-span-full bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
                 <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-500">No tour templates found</p>
-                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                   Create Your First Template
                 </button>
               </div>
@@ -3157,7 +3157,7 @@ export default function TourManagerContent() {
                   </div>
                   <div className="hidden md:flex items-center gap-1">
                     {(template.variations?.length || 0) > 0 ? (
-                      <span className="text-xs text-purple-600 font-medium">{template.variations?.length || 0} var</span>
+                      <span className="text-xs text-primary-600 font-medium">{template.variations?.length || 0} var</span>
                     ) : (
                       <button
                         onClick={() => setAddVariationTemplate(template)}
@@ -3170,7 +3170,7 @@ export default function TourManagerContent() {
                   {template.is_featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
                 </div>
                 <div className="flex items-center gap-1 ml-4">
-                  <button onClick={() => editDays(template)} className="p-1 text-gray-400 hover:text-purple-600 transition-colors">
+                  <button onClick={() => editDays(template)} className="p-1 text-gray-400 hover:text-primary-600 transition-colors">
                     <Calendar className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleEdit(template)} className="p-1 text-gray-400 hover:text-green-600 transition-colors">
@@ -3189,7 +3189,7 @@ export default function TourManagerContent() {
               <div className="p-12 text-center">
                 <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-500">No tour templates found</p>
-                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                   Create Your First Template
                 </button>
               </div>
@@ -3720,7 +3720,7 @@ export default function TourManagerContent() {
                   <button
                     type="button"
                     onClick={() => setActiveTab(activeTab === 'basic' ? 'details' : 'variations')}
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                    className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
                   >
                     Next →
                   </button>
@@ -3728,7 +3728,7 @@ export default function TourManagerContent() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Check className="w-4 h-4" />
                     {submitting

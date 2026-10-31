@@ -135,8 +135,8 @@ function Pagination({
                 onClick={() => goToPage(pageNum)}
                 className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
                   currentPage === pageNum
-                    ? 'bg-green-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-600 hover:bg-primary-700'
                 }`}
               >
                 {pageNum}
@@ -477,7 +477,7 @@ export default function TippingPage() {
           </div>
           <div className="flex items-center gap-2">
             <BulkRateImportExport tableName="tipping_rates" onImportComplete={fetchRates} />
-            <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+            <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">
               <Plus className="w-4 h-4" /> Add Rate
             </button>
             <Link href="/rates" className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
@@ -504,7 +504,7 @@ export default function TippingPage() {
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Driver Tips</p>
-            <p className="text-2xl font-bold text-orange-600">{stats.drivers}</p>
+            <p className="text-2xl font-bold text-amber-600">{stats.drivers}</p>
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Avg. Tip</p>
@@ -606,10 +606,10 @@ export default function TippingPage() {
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                         rate.role_type === 'guide' ? 'bg-blue-100 text-blue-800' :
-                        rate.role_type === 'driver' ? 'bg-orange-100 text-orange-800' :
-                        rate.role_type === 'boat_crew' ? 'bg-cyan-100 text-cyan-800' :
-                        rate.role_type === 'porter' ? 'bg-purple-100 text-purple-800' :
-                        rate.role_type === 'hotel_staff' ? 'bg-pink-100 text-pink-800' :
+                        rate.role_type === 'driver' ? 'bg-amber-100 text-amber-800' :
+                        rate.role_type === 'boat_crew' ? 'bg-primary-100 text-primary-800' :
+                        rate.role_type === 'porter' ? 'bg-primary-100 text-primary-800' :
+                        rate.role_type === 'hotel_staff' ? 'bg-primary-100 text-primary-800' :
                         rate.role_type === 'restaurant' ? 'bg-amber-100 text-amber-800' :
                         'bg-gray-100 text-gray-700'
                       }`}>
@@ -826,7 +826,7 @@ export default function TippingPage() {
                 </button>
                 <button 
                   type="submit" disabled={submitting} 
-                  className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center justify-center gap-2"
+                  className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />
                   {editingRate ? 'Update' : 'Create'}

@@ -94,7 +94,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
               <a
                 href={viewLink}
                 className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  isB2B ? 'text-purple-600 hover:bg-purple-50' : 'text-blue-600 hover:bg-blue-50'
+                  isB2B ? 'text-primary-600 hover:bg-primary-50' : 'text-blue-600 hover:bg-blue-50'
                 }`}
               >
                 {viewLabel}
@@ -114,7 +114,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
               onClick={onSave}
               disabled={isSaving}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition-colors ${
-                isB2B ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
+                isB2B ? 'bg-primary-600 hover:bg-primary-700' : 'bg-green-600 hover:bg-primary-700'
               } ${priceChanged ? 'ring-2 ring-offset-1 ring-amber-400' : ''}`}
               title={priceChanged ? 'The price has changed since the last save' : undefined}
             >

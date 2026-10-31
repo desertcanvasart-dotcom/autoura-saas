@@ -514,10 +514,10 @@ export default function SleepingTrainRatesContent() {
               <button
                 onClick={() => setNotification(null)}
                 className={`px-6 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
-                  notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                  notification.type === 'success' ? 'bg-primary-600 hover:bg-primary-700' :
                   notification.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
                   notification.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' :
-                  'bg-blue-600 hover:bg-blue-700'
+                  'bg-blue-600 hover:bg-primary-700'
                 }`}
               >
                 Got it
@@ -579,13 +579,13 @@ export default function SleepingTrainRatesContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-100 rounded-lg">
-            <BedDouble className="w-6 h-6 text-indigo-600" />
+          <div className="p-2 bg-primary-100 rounded-lg">
+            <BedDouble className="w-6 h-6 text-primary-600" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
               Sleeping Train Rates
-              <Moon className="w-4 h-4 text-indigo-400" />
+              <Moon className="w-4 h-4 text-primary-400" />
             </h1>
             <p className="text-sm text-gray-600">Overnight sleeper train cabin pricing</p>
           </div>
@@ -607,7 +607,7 @@ export default function SleepingTrainRatesContent() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <BedDouble className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{rates.length}</p>
           <p className="text-xs text-gray-600">Total Rates</p>
@@ -631,7 +631,7 @@ export default function SleepingTrainRatesContent() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{uniqueRoutes}</p>
           <p className="text-xs text-gray-600">Routes</p>
@@ -817,7 +817,7 @@ export default function SleepingTrainRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <BedDouble className="w-4 h-4 text-indigo-500" />
+                        <BedDouble className="w-4 h-4 text-primary-500" />
                         <div>
                           <span className="text-sm font-semibold text-gray-900">
                             {rate.origin_city} <ArrowRight className="w-3 h-3 inline mx-1" /> {rate.destination_city}
@@ -838,7 +838,7 @@ export default function SleepingTrainRatesContent() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
+                      <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs font-medium">
                         <VocabLabel kind="sleeper_cabin" value={rate.cabin_type} fallback="—" />
                       </span>
                     </td>
@@ -880,7 +880,7 @@ export default function SleepingTrainRatesContent() {
                         </button>
                         <button
                           onClick={() => handleClone(rate)}
-                          className="p-1.5 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                          className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
                           title="Clone"
                         >
                           <Copy className="w-4 h-4" />
@@ -905,7 +905,7 @@ export default function SleepingTrainRatesContent() {
               <div key={rate.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <BedDouble className="w-5 h-5 text-indigo-500" />
+                    <BedDouble className="w-5 h-5 text-primary-500" />
                     <span className="font-semibold text-gray-900">
                       {rate.origin_city} → {rate.destination_city}
                     </span>
@@ -918,7 +918,7 @@ export default function SleepingTrainRatesContent() {
                 </div>
 
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">
+                  <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs">
                     <VocabLabel kind="sleeper_cabin" value={rate.cabin_type} />
                   </span>
                   {rate.season && (
@@ -955,7 +955,7 @@ export default function SleepingTrainRatesContent() {
                     </button>
                     <button
                       onClick={() => handleClone(rate)}
-                      className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                      className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
                       title="Clone"
                     >
                       <Copy className="w-4 h-4" />
@@ -977,11 +977,11 @@ export default function SleepingTrainRatesContent() {
             {paginatedRates.map((rate) => (
               <div key={rate.id} className="px-4 py-2 flex items-center justify-between hover:bg-gray-50">
                 <div className="flex items-center gap-4">
-                  <BedDouble className="w-4 h-4 text-indigo-500" />
+                  <BedDouble className="w-4 h-4 text-primary-500" />
                   <span className="font-medium text-gray-900">
                     {rate.origin_city} → {rate.destination_city}
                   </span>
-                  <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">
+                  <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs">
                     <VocabLabel kind="sleeper_cabin" value={rate.cabin_type} />
                   </span>
                 </div>
@@ -996,7 +996,7 @@ export default function SleepingTrainRatesContent() {
                     <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Edit">
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-indigo-600" title="Clone">
+                    <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Clone">
                       <Copy className="w-4 h-4" />
                     </button>
                     <button onClick={() => confirmDelete(rate.id, `${rate.origin_city} → ${rate.destination_city}`)} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
@@ -1158,7 +1158,7 @@ export default function SleepingTrainRatesContent() {
               {/* Route Info */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">1</span>
                   Route & Cabin Details
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1308,7 +1308,7 @@ export default function SleepingTrainRatesContent() {
               {/* Validity */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">4</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">4</span>
                   Validity Period
                 </h3>
                 <div className="grid grid-cols-2 gap-3">

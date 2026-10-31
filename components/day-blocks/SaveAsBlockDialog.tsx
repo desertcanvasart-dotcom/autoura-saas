@@ -164,7 +164,7 @@ export default function SaveAsBlockDialog({ day, nextDay, takenCodes, onClose, o
             type="button"
             onClick={() => void save()}
             disabled={saving || !b.code.trim() || !b.name.trim()}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+            className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save block'}
           </button>

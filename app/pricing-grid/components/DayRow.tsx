@@ -511,13 +511,13 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
           )}
 
           {/* Day Type + Component Overrides (rich gate inputs) */}
-          <div className="px-4 py-2 bg-indigo-50/40 border-b border-indigo-100/40">
+          <div className="px-4 py-2 bg-primary-50/40 border-b border-primary-100/40">
             <div className="flex items-center gap-3 flex-wrap">
-              <label className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">Day Type</label>
+              <label className="text-[11px] font-semibold text-primary-700 uppercase tracking-wider">Day Type</label>
               <select
                 value={activeDayType}
                 onChange={(e) => onUpdateDay({ dayType: e.target.value as DayType })}
-                className="text-[11px] border border-indigo-200 bg-white rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                className="text-[11px] border border-primary-200 bg-white rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-400"
               >
                 {DAY_TYPES.map(t => (
                   <option key={t} value={t}>{DAY_TYPE_LABELS[t]}</option>
@@ -526,11 +526,11 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
               <button
                 type="button"
                 onClick={() => setShowDayTypeOverrides(s => !s)}
-                className="text-[10px] text-indigo-600 hover:text-indigo-800 underline-offset-2 hover:underline"
+                className="text-[10px] text-primary-600 hover:text-primary-800 underline-offset-2 hover:underline"
               >
                 {showDayTypeOverrides ? 'hide overrides' : 'override components'}
               </button>
-              <span className="text-[10px] text-indigo-500/80 ml-auto">
+              <span className="text-[10px] text-primary-500/80 ml-auto">
                 What happens on this day — saved with the itinerary.
               </span>
             </div>
@@ -553,14 +553,14 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                         type="checkbox"
                         checked={eff}
                         onChange={(e) => onUpdateDay({ [key]: e.target.checked } as Partial<GridDay>)}
-                        className="h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-400"
+                        className="h-3 w-3 rounded border-gray-300 text-primary-600 focus:ring-primary-400"
                       />
-                      <span className={isOverridden ? 'font-semibold text-indigo-700' : ''}>{label}</span>
+                      <span className={isOverridden ? 'font-semibold text-primary-700' : ''}>{label}</span>
                       {isOverridden && (
                         <button
                           type="button"
                           onClick={(e) => { e.preventDefault(); onUpdateDay({ [key]: undefined } as Partial<GridDay>) }}
-                          className="text-[9px] text-indigo-400 hover:text-indigo-700"
+                          className="text-[9px] text-primary-400 hover:text-primary-700"
                           title="Clear override (use the preset's default)"
                         >
                           ⨯
@@ -584,7 +584,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); onUpdateDay({ intercity: undefined } as Partial<GridDay>) }}
-                      className="text-[9px] text-indigo-400 hover:text-indigo-700"
+                      className="text-[9px] text-primary-400 hover:text-primary-700"
                       title="Clear override"
                     >
                       reset
@@ -611,9 +611,9 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
           {/* PER-PERSON SERVICES */}
           <div>
-            <div className="px-4 py-1.5 bg-emerald-50/70 border-b border-emerald-100/50 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Per-Person Services</span>
-              <span className="text-[11px] text-emerald-600 font-medium">
+            <div className="px-4 py-1.5 bg-primary-50/70 border-b border-primary-100/50 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-primary-700 uppercase tracking-wider">Per-Person Services</span>
+              <span className="text-[11px] text-primary-600 font-medium">
                 <strong>{sym}{cv(calc.perPersonTotal).toFixed(2)}/pp</strong>
               </span>
             </div>

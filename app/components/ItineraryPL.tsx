@@ -134,14 +134,14 @@ export default function ItineraryPL({
   const getMarginColor = (percent: number) => {
     if (percent >= 25) return 'text-green-600'
     if (percent >= 15) return 'text-amber-600'
-    if (percent >= 0) return 'text-orange-600'
+    if (percent >= 0) return 'text-amber-600'
     return 'text-red-600'
   }
 
   const getMarginBg = (percent: number) => {
     if (percent >= 25) return 'bg-green-50 border-green-200'
     if (percent >= 15) return 'bg-amber-50 border-amber-200'
-    if (percent >= 0) return 'bg-orange-50 border-orange-200'
+    if (percent >= 0) return 'bg-amber-50 border-amber-200'
     return 'bg-red-50 border-red-200'
   }
 
@@ -263,7 +263,7 @@ export default function ItineraryPL({
                         className={`h-full rounded-full transition-all ${
                           item.margin_percent >= 25 ? 'bg-green-500' :
                           item.margin_percent >= 15 ? 'bg-amber-500' :
-                          item.margin_percent >= 0 ? 'bg-orange-500' : 'bg-red-500'
+                          item.margin_percent >= 0 ? 'bg-amber-500' : 'bg-red-500'
                         }`}
                         style={{ width: `${marginWidth}%` }}
                       />

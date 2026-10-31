@@ -100,14 +100,14 @@ function fmtDay(day: string | null | undefined): string {
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
   guide: { label: 'Tour Guide', icon: '👨‍🏫', color: 'bg-blue-100 text-blue-700' },
-  driver: { label: 'Driver', icon: '🚗', color: 'bg-purple-100 text-purple-700' },
-  hotel: { label: 'Hotel', icon: '🏨', color: 'bg-indigo-100 text-indigo-700' },
-  transportation: { label: 'Transportation', icon: '🚐', color: 'bg-cyan-100 text-cyan-700' },
-  entrance: { label: 'Entrance Fees', icon: '🎫', color: 'bg-pink-100 text-pink-700' },
-  meal: { label: 'Meals', icon: '🍽️', color: 'bg-orange-100 text-orange-700' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️', color: 'bg-sky-100 text-sky-700' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️', color: 'bg-violet-100 text-violet-700' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳', color: 'bg-teal-100 text-teal-700' },
+  driver: { label: 'Driver', icon: '🚗', color: 'bg-primary-100 text-primary-700' },
+  hotel: { label: 'Hotel', icon: '🏨', color: 'bg-primary-100 text-primary-700' },
+  transportation: { label: 'Transportation', icon: '🚐', color: 'bg-primary-100 text-primary-700' },
+  entrance: { label: 'Entrance Fees', icon: '🎫', color: 'bg-primary-100 text-primary-700' },
+  meal: { label: 'Meals', icon: '🍽️', color: 'bg-amber-100 text-amber-700' },
+  airport_staff: { label: 'Airport Staff', icon: '✈️', color: 'bg-primary-100 text-primary-700' },
+  hotel_staff: { label: 'Hotel Staff', icon: '🛎️', color: 'bg-primary-100 text-primary-700' },
+  ground_handler: { label: 'Ground Handler', icon: '🧳', color: 'bg-primary-100 text-primary-700' },
   tipping: { label: 'Tipping', icon: '💵', color: 'bg-green-100 text-green-700' },
   permits: { label: 'Permits', icon: '📋', color: 'bg-amber-100 text-amber-700' },
   toll: { label: 'Toll Fees', icon: '🛣️', color: 'bg-stone-100 text-stone-700' },
@@ -120,12 +120,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-600', bg: 'bg-blue-100' },
   confirmed: { label: 'Confirmed', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: 'Completed', color: 'text-purple-600', bg: 'bg-purple-100' },
+  completed: { label: 'Completed', color: 'text-primary-600', bg: 'bg-primary-100' },
   cancelled: { label: 'Cancelled', color: 'text-red-600', bg: 'bg-red-100' },
-  pending: { label: 'Pending', color: 'text-yellow-600', bg: 'bg-yellow-100' },
+  pending: { label: 'Pending', color: 'text-amber-600', bg: 'bg-amber-100' },
   approved: { label: 'Approved', color: 'text-blue-600', bg: 'bg-blue-100' },
   paid: { label: 'Paid', color: 'text-green-600', bg: 'bg-green-100' },
-  partial: { label: 'Partial', color: 'text-orange-600', bg: 'bg-orange-100' }
+  partial: { label: 'Partial', color: 'text-amber-600', bg: 'bg-amber-100' }
 }
 
 export default function TripPnLDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -182,8 +182,8 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
 
   const getMarginColor = (margin: number) => {
     if (margin >= 30) return 'text-green-600 bg-green-100'
-    if (margin >= 15) return 'text-yellow-600 bg-yellow-100'
-    if (margin >= 0) return 'text-orange-600 bg-orange-100'
+    if (margin >= 15) return 'text-amber-600 bg-amber-100'
+    if (margin >= 0) return 'text-amber-600 bg-amber-100'
     return 'text-red-600 bg-red-100'
   }
 

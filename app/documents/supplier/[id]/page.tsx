@@ -374,7 +374,7 @@ export default function SupplierDocumentViewPage() {
                 <button
                   onClick={handleSendEmail}
                   disabled={actionLoading === 'email'}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Mail className="w-4 h-4" />
                   {actionLoading === 'email' ? 'Sending...' : 'Email'}
@@ -383,7 +383,7 @@ export default function SupplierDocumentViewPage() {
               {document.supplier_contact_phone && (
                 <button
                   onClick={handleSendWhatsApp}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1.5"
                 >
                   <MessageSquare className="w-4 h-4" />
                   WhatsApp
@@ -393,7 +393,7 @@ export default function SupplierDocumentViewPage() {
                 <button
                   onClick={handleMarkConfirmed}
                   disabled={actionLoading === 'confirm'}
-                  className="px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <CheckCircle className="w-4 h-4" />
                   Mark Confirmed

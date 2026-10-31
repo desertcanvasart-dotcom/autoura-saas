@@ -261,7 +261,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 {d.balanceDue > 0 && (
-                  <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded shrink-0 ml-3">
+                  <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded shrink-0 ml-3">
                     {money(d.balanceDue, d.currency)} due
                   </span>
                 )}
@@ -413,8 +413,8 @@ function StatCard({
   const dotColors = {
     primary: 'bg-primary-600',
     warning: 'bg-warning',
-    purple: 'bg-purple-600',
-    orange: 'bg-orange-600',
+    purple: 'bg-primary-600',
+    orange: 'bg-amber-600',
   }
   const card = (
       <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 ${href ? 'hover:shadow-md' : ''} transition-shadow h-full min-h-[120px] flex flex-col`}>

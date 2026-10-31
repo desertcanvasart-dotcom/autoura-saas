@@ -216,7 +216,7 @@ export default function BookingSuppliersPanel({
                   </td>
                   <td className="py-2 pr-3 text-gray-900">
                     {lineSupplier(r) ?? <span className="text-gray-400 italic">{['accepted', 'assigned', 'done'].includes(normalizeStatus(r.status)) ? 'Supplier not recorded' : 'No supplier yet'}</span>}
-                    {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-medium">Your team</span>}
+                    {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 text-[10px] font-medium">Your team</span>}
                     {r.assigned_vehicle_plate && <span className="ml-1.5 text-xs text-gray-500">{r.assigned_vehicle_plate}</span>}
                     <div className="text-xs text-gray-500">{lineService(r)}</div>
                     {(r.pickup_location || r.dropoff_location) && (

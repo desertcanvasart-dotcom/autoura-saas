@@ -47,17 +47,17 @@ interface Stats {
 
 const DOCUMENT_TYPES = [
   { value: 'hotel_voucher', label: 'Hotel Voucher', icon: Hotel, color: 'bg-blue-100 text-blue-700' },
-  { value: 'service_order', label: 'Service Order', icon: FileText, color: 'bg-purple-100 text-purple-700' },
+  { value: 'service_order', label: 'Service Order', icon: FileText, color: 'bg-primary-100 text-primary-700' },
   { value: 'transport_voucher', label: 'Transport Voucher', icon: Car, color: 'bg-amber-100 text-amber-700' },
-  { value: 'guide_assignment', label: 'Guide Assignment', icon: Users, color: 'bg-pink-100 text-pink-700' },
-  { value: 'cruise_voucher', label: 'Cruise Voucher', icon: Ship, color: 'bg-cyan-100 text-cyan-700' }
+  { value: 'guide_assignment', label: 'Guide Assignment', icon: Users, color: 'bg-primary-100 text-primary-700' },
+  { value: 'cruise_voucher', label: 'Cruise Voucher', icon: Ship, color: 'bg-primary-100 text-primary-700' }
 ]
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700' },
   { value: 'sent', label: 'Sent', color: 'bg-blue-100 text-blue-700' },
   { value: 'confirmed', label: 'Confirmed', color: 'bg-green-100 text-green-700' },
-  { value: 'completed', label: 'Completed', color: 'bg-purple-100 text-purple-700' },
+  { value: 'completed', label: 'Completed', color: 'bg-primary-100 text-primary-700' },
   { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-700' }
 ]
 
@@ -464,9 +464,9 @@ export default function SupplierDocumentsPage() {
             </div>
             <div className="bg-white rounded-lg border border-gray-200 p-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <CheckCircle className="w-4 h-4 text-purple-500" />
+                <CheckCircle className="w-4 h-4 text-primary-500" />
               </div>
-              <p className="text-xl font-bold text-purple-600">{stats.completed}</p>
+              <p className="text-xl font-bold text-primary-600">{stats.completed}</p>
               <p className="text-xs text-gray-500">Completed</p>
             </div>
           </div>
@@ -673,7 +673,7 @@ export default function SupplierDocumentsPage() {
                                 {doc.status === 'confirmed' && (
                                   <button
                                     onClick={() => handleUpdateStatus(doc.id, 'completed')}
-                                    className="p-1.5 text-purple-500 hover:bg-purple-50 rounded"
+                                    className="p-1.5 text-primary-500 hover:bg-primary-50 rounded"
                                     title="Mark as Completed"
                                   >
                                     <CheckCircle className="w-4 h-4" />

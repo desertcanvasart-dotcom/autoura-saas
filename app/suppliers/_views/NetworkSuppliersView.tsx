@@ -90,7 +90,7 @@ export default function NetworkSuppliersPage() {
                     {r.my_supplier_id ? (
                       <span className="text-green-700 font-medium">On your list</span>
                     ) : canAdd ? (
-                      <button disabled={busy === r.account_id} onClick={() => add(r)} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">Add to my suppliers</button>
+                      <button disabled={busy === r.account_id} onClick={() => add(r)} className="px-3 py-1.5 rounded-lg bg-primary-600 text-white disabled:opacity-50">Add to my suppliers</button>
                     ) : <span className="text-gray-500">A manager can add them</span>}
                   </div>
                 </li>

@@ -188,7 +188,7 @@ export default function ReceiptPage() {
                 disabled={sending}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   sent 
-                    ? 'bg-green-600 text-white' 
+                    ? 'bg-primary-600 text-white' 
                     : 'bg-[#25D366] text-white hover:bg-[#20BD5A]'
                 } disabled:opacity-50`}
               >

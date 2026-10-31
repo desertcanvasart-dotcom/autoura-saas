@@ -226,14 +226,14 @@ const SINGLE_DAY_TYPES = new Set(['airport_staff', 'restaurant'])
 const COLOR_CLASSES: Record<string, { bg: string, border: string, text: string, light: string }> = {
   blue: { bg: 'bg-blue-600', border: 'border-blue-200', text: 'text-blue-600', light: 'bg-blue-50' },
   green: { bg: 'bg-green-600', border: 'border-green-200', text: 'text-green-600', light: 'bg-green-50' },
-  purple: { bg: 'bg-purple-600', border: 'border-purple-200', text: 'text-purple-600', light: 'bg-purple-50' },
-  orange: { bg: 'bg-orange-600', border: 'border-orange-200', text: 'text-orange-600', light: 'bg-orange-50' },
-  indigo: { bg: 'bg-indigo-600', border: 'border-indigo-200', text: 'text-indigo-600', light: 'bg-indigo-50' },
-  cyan: { bg: 'bg-cyan-600', border: 'border-cyan-200', text: 'text-cyan-600', light: 'bg-cyan-50' },
+  purple: { bg: 'bg-primary-600', border: 'border-primary-200', text: 'text-primary-600', light: 'bg-primary-50' },
+  orange: { bg: 'bg-amber-600', border: 'border-amber-200', text: 'text-amber-600', light: 'bg-amber-50' },
+  indigo: { bg: 'bg-primary-600', border: 'border-primary-200', text: 'text-primary-600', light: 'bg-primary-50' },
+  cyan: { bg: 'bg-primary-600', border: 'border-primary-200', text: 'text-primary-600', light: 'bg-primary-50' },
   // Drivers are teal. Missing, the Drivers tab crashed the page the moment it
   // became active (COLOR_CLASSES['teal'].text on undefined) — live 2026-09-24.
-  teal: { bg: 'bg-teal-600', border: 'border-teal-200', text: 'text-teal-600', light: 'bg-teal-50' },
-  pink: { bg: 'bg-pink-600', border: 'border-pink-200', text: 'text-pink-600', light: 'bg-pink-50' }
+  teal: { bg: 'bg-primary-600', border: 'border-primary-200', text: 'text-primary-600', light: 'bg-primary-50' },
+  pink: { bg: 'bg-primary-600', border: 'border-primary-200', text: 'text-primary-600', light: 'bg-primary-50' }
 }
 
 export default function ResourceAssignmentV2({
@@ -824,7 +824,7 @@ export default function ResourceAssignmentV2({
           </p>
         </div>
         {conflicts.length > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-sm">
             <AlertCircle className="w-4 h-4" />
             <span className="font-medium">{conflicts.length} Conflict{conflicts.length > 1 ? 's' : ''}</span>
           </div>
@@ -861,7 +861,7 @@ export default function ResourceAssignmentV2({
                   </span>
                 )}
                 {hasConflict && (
-                  <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                  <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
                 )}
               </button>
             )
@@ -882,12 +882,12 @@ export default function ResourceAssignmentV2({
       <div className="p-6">
         {/* Conflicts Warning */}
         {activeConflicts.length > 0 && (
-          <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-orange-800">Scheduling Conflicts Detected</p>
-                <ul className="mt-2 text-sm text-orange-700 space-y-1">
+                <p className="font-medium text-amber-800">Scheduling Conflicts Detected</p>
+                <ul className="mt-2 text-sm text-amber-700 space-y-1">
                   {activeConflicts.map((conflict, idx) => (
                     <li key={idx}>
                       <strong>{conflict.resource_name}</strong> is also booked for {conflict.conflicting_itinerary} ({conflict.dates})
@@ -928,7 +928,7 @@ export default function ResourceAssignmentV2({
                         )}
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                           resource.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                          resource.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          resource.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
                           {resource.status}
@@ -1253,7 +1253,7 @@ export default function ResourceAssignmentV2({
                     ))}
                   </select>
                   {filteredAvailableResources.length === 0 && (
-                    <p className="text-sm text-orange-600 mt-2">
+                    <p className="text-sm text-amber-600 mt-2">
                       No {activeTypeConfig.label.toLowerCase()} found for this filter. Try selecting a different option.
                     </p>
                   )}

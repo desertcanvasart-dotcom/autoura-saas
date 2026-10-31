@@ -931,8 +931,8 @@ ${bodyText}`
 
   const getAvatarColor = (email: string) => {
     const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500',
-      'bg-pink-500', 'bg-indigo-500', 'bg-red-500', 'bg-teal-500'
+      'bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-primary-500',
+      'bg-primary-500', 'bg-primary-500', 'bg-red-500', 'bg-primary-500'
     ]
     const hash = email.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
     return colors[hash % colors.length]
@@ -1430,10 +1430,10 @@ ${bodyText}`
                                 <button
                                   onClick={(e) => toggleStar(email.id, e)}
                                   className={`p-0.5 rounded transition-colors ${
-                                    isStarred ? 'text-yellow-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'
+                                    isStarred ? 'text-amber-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'
                                   }`}
                                 >
-                                  <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-yellow-500' : ''}`} />
+                                  <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-amber-500' : ''}`} />
                                 </button>
                                 <span className="text-[11px] text-gray-500">
                                   {formatDate(email.date)}
@@ -1582,7 +1582,7 @@ ${bodyText}`
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     title="Parse and price in the Pricing Grid"
                   >
-                    <Sparkles className="w-4 h-4 text-purple-500" />
+                    <Sparkles className="w-4 h-4 text-primary-500" />
                   </button>
                   <button
                     onClick={() => handleEmailAction('spam', thread.length ? thread.filter(m => !isFromMe(m)).map(m => m.id) : [selectedEmail.id])}
@@ -1707,7 +1707,7 @@ ${bodyText}`
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             title="Parse and price in the Pricing Grid"
           >
-            <Sparkles className="w-5 h-5 text-purple-500" />
+            <Sparkles className="w-5 h-5 text-primary-500" />
           </button>
           <button
             onClick={() => setShowExpandedEmail(false)}

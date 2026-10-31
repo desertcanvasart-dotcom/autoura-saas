@@ -70,10 +70,10 @@ interface B2CQuote {
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; icon: any }> = {
   draft: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', icon: Clock },
   sent: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', icon: Send },
-  viewed: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300', icon: Eye },
+  viewed: { bg: 'bg-primary-100', text: 'text-primary-700', border: 'border-primary-300', icon: Eye },
   accepted: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', icon: CheckCircle },
   rejected: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', icon: XCircle },
-  expired: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: AlertCircle }
+  expired: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300', icon: AlertCircle }
 }
 
 // params is a Promise in a client page (Next 15+): reading params.id
@@ -306,7 +306,7 @@ export default function B2CQuoteDetailPage({ params: paramsPromise }: { params: 
                 type="button"
                 onClick={() => handleSendQuote('email')}
                 disabled={sending || !quote.clients?.email}
-                className="h-10 px-4 whitespace-nowrap shrink-0 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <>
@@ -324,7 +324,7 @@ export default function B2CQuoteDetailPage({ params: paramsPromise }: { params: 
                 type="button"
                 onClick={() => handleSendQuote('whatsapp')}
                 disabled={sending || !quote.clients?.phone}
-                className="h-10 px-4 whitespace-nowrap shrink-0 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!quote.clients?.phone ? 'No phone number available' : 'Send via WhatsApp'}
               >
                 {sending ? (
@@ -575,7 +575,7 @@ export default function B2CQuoteDetailPage({ params: paramsPromise }: { params: 
                   type="button"
                   onClick={() => handleSendQuote('email')}
                   disabled={sending || !quote.clients?.email}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sending ? (
                     <>
@@ -593,7 +593,7 @@ export default function B2CQuoteDetailPage({ params: paramsPromise }: { params: 
                   type="button"
                   onClick={() => handleSendQuote('whatsapp')}
                   disabled={sending || !quote.clients?.phone}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!quote.clients?.phone ? 'No phone number available' : 'Send via WhatsApp'}
                 >
                   {sending ? (

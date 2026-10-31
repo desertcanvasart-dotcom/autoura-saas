@@ -104,7 +104,7 @@ const PAYMENT_METHODS: Record<string, string> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  pending: { label: 'Pending', color: 'text-yellow-700', bg: 'bg-yellow-100', icon: Clock },
+  pending: { label: 'Pending', color: 'text-amber-700', bg: 'bg-amber-100', icon: Clock },
   approved: { label: 'Approved', color: 'text-blue-700', bg: 'bg-blue-100', icon: CheckCircle },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100', icon: AlertCircle }

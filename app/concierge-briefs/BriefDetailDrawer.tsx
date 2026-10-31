@@ -77,7 +77,7 @@ const ACTIONS: Record<StatusKey, { to: StatusKey; label: string; primary?: boole
 const SLA_BADGE: Record<SlaLevel, string> = {
   overdue: 'bg-red-100 text-red-700',
   soon: 'bg-amber-100 text-amber-700',
-  ok: 'bg-emerald-100 text-emerald-700',
+  ok: 'bg-primary-100 text-primary-700',
   met: 'bg-green-100 text-green-700',
   none: 'bg-gray-100 text-gray-500',
 }

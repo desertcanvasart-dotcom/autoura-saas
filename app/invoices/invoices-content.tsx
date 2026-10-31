@@ -160,11 +160,11 @@ function totalsOf(f: FormData) {
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100' },
-  viewed: { label: 'Viewed', color: 'text-purple-700', bg: 'bg-purple-100' },
+  viewed: { label: 'Viewed', color: 'text-primary-700', bg: 'bg-primary-100' },
   // The stored word is partially_paid (lib/invoices/invoice-balance); with no
   // entry, a part-paid invoice showed as Draft.
-  partially_paid: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100' },
-  partial: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100' },
+  partially_paid: { label: 'Part paid', color: 'text-amber-700', bg: 'bg-amber-100' },
+  partial: { label: 'Part paid', color: 'text-amber-700', bg: 'bg-amber-100' },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100' },
   overdue: { label: 'Overdue', color: 'text-red-700', bg: 'bg-red-100' },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bg: 'bg-gray-100' }
@@ -173,7 +173,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   standard: { label: 'Standard', color: 'text-gray-600', bg: 'bg-gray-50', icon: FileText },
   deposit: { label: 'Deposit', color: 'text-amber-700', bg: 'bg-amber-50', icon: Wallet },
-  final: { label: 'Final', color: 'text-emerald-700', bg: 'bg-emerald-50', icon: Receipt }
+  final: { label: 'Final', color: 'text-primary-700', bg: 'bg-primary-50', icon: Receipt }
 }
 
 export default function InvoicesContent() {
@@ -614,14 +614,14 @@ export default function InvoicesContent() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
             <span className="text-xs text-gray-500 font-medium">Finals</span>
           </div>
-          <p className="text-2xl font-bold text-emerald-600 mt-2">{finalCount}</p>
+          <p className="text-2xl font-bold text-primary-600 mt-2">{finalCount}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
             <span className="text-xs text-gray-500 font-medium">Billed</span>
           </div>
           <p className="text-2xl font-bold text-gray-900 mt-2">{formatTotals(totalRevenue)}</p>
@@ -635,10 +635,10 @@ export default function InvoicesContent() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
             <span className="text-xs text-gray-500 font-medium">Outstanding</span>
           </div>
-          <p className="text-2xl font-bold text-orange-600 mt-2">{formatTotals(totalOutstanding)}</p>
+          <p className="text-2xl font-bold text-amber-600 mt-2">{formatTotals(totalOutstanding)}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2">
@@ -758,7 +758,7 @@ export default function InvoicesContent() {
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <span className={`text-sm font-medium ${Number(invoice.balance_due) > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
+                        <span className={`text-sm font-medium ${Number(invoice.balance_due) > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
                           {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}
                         </span>
                       </td>

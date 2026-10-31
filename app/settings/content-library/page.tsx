@@ -46,9 +46,9 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 
 // Tier badge colors
 const TIER_COLORS: Record<string, { bg: string; text: string }> = {
-  budget: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  budget: { bg: 'bg-primary-50', text: 'text-primary-700' },
   standard: { bg: 'bg-blue-50', text: 'text-blue-700' },
-  deluxe: { bg: 'bg-purple-50', text: 'text-purple-700' },
+  deluxe: { bg: 'bg-primary-50', text: 'text-primary-700' },
   luxury: { bg: 'bg-amber-50', text: 'text-amber-700' },
 }
 
@@ -396,7 +396,7 @@ export default function ContentLibraryPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         {hasAllTiers ? (
-                          <div className="flex items-center gap-1 text-xs text-emerald-600">
+                          <div className="flex items-center gap-1 text-xs text-primary-600">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>All tiers</span>
                           </div>
@@ -411,9 +411,9 @@ export default function ContentLibraryPage() {
                       {/* Tier Indicators - B S D L */}
                       <div className="flex gap-0.5">
                         {[
-                          { key: 'budget', label: 'B', color: 'bg-emerald-500' },
+                          { key: 'budget', label: 'B', color: 'bg-primary-500' },
                           { key: 'standard', label: 'S', color: 'bg-blue-500' },
-                          { key: 'deluxe', label: 'D', color: 'bg-purple-500' },
+                          { key: 'deluxe', label: 'D', color: 'bg-primary-500' },
                           { key: 'luxury', label: 'L', color: 'bg-amber-500' }
                         ].map(tier => {
                           const hasTier = !item.missing_tiers.includes(tier.key)

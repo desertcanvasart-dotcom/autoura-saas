@@ -568,9 +568,9 @@ export default function RestaurantsContent() {
         <div className="container mx-auto px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <UtensilsCrossed className="w-5 h-5 text-orange-600" />
+              <UtensilsCrossed className="w-5 h-5 text-amber-600" />
               <h1 className="text-xl font-bold text-gray-900">Restaurant Contacts & Rates</h1>
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -611,7 +611,7 @@ export default function RestaurantsContent() {
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <UtensilsCrossed className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <p className="text-xs text-gray-600">Total Restaurants</p>
             <p className="text-2xl font-bold text-gray-900">{restaurants.length}</p>
@@ -647,7 +647,7 @@ export default function RestaurantsContent() {
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-gray-400">📊</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. Lunch Rate</p>
             <p className="text-2xl font-bold text-gray-900">€{avgRate}</p>
@@ -1046,7 +1046,7 @@ export default function RestaurantsContent() {
               {/* Basic Information */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-bold">1</span>
                   Basic Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1195,7 +1195,7 @@ export default function RestaurantsContent() {
               {/* Meal Rates - Non-EUR */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center text-xs font-bold">5</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">5</span>
                   Meal Rates - Non-EUR Passport Holders <span className="text-xs font-normal text-gray-500 ml-2">(per person)</span>
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1225,7 +1225,7 @@ export default function RestaurantsContent() {
               {/* Discounts & Inclusions */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">6</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">6</span>
                   Discounts & Inclusions
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -1262,7 +1262,7 @@ export default function RestaurantsContent() {
               {/* Rate Validity */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">7</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">7</span>
                   Rate Validity Period
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1282,7 +1282,7 @@ export default function RestaurantsContent() {
               {/* Meal Types */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">8</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">8</span>
                   Meal Types Offered
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -1299,7 +1299,7 @@ export default function RestaurantsContent() {
               {/* Dietary Options */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-xs font-bold">9</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">9</span>
                   Dietary Options
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">

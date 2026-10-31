@@ -67,7 +67,7 @@ interface TourTemplate {
 const STATUS_CONFIG = {
   draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700', dot: 'bg-gray-400' },
   open: { label: 'Open', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
-  limited: { label: 'Limited', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
+  limited: { label: 'Limited', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
   full: { label: 'Full', color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
   guaranteed: { label: 'Guaranteed', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
   cancelled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-500 line-through', dot: 'bg-gray-400' }
@@ -481,7 +481,7 @@ export default function DeparturesPage() {
                         <div
                           className={`h-full transition-all ${
                             occupancyPercent >= 100 ? 'bg-red-500' :
-                            occupancyPercent >= 80 ? 'bg-yellow-500' :
+                            occupancyPercent >= 80 ? 'bg-amber-500' :
                             'bg-green-500'
                           }`}
                           style={{ width: `${Math.min(occupancyPercent, 100)}%` }}

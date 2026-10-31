@@ -771,7 +771,7 @@ export default function ComposeModal({
                       </span>
                     )}
                     {template.channel === 'both' && (
-                      <span className="text-[9px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                      <span className="text-[9px] px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded">
                         +WA
                       </span>
                     )}

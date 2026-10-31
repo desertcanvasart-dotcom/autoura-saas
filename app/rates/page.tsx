@@ -86,7 +86,7 @@ export default function RatesOverviewPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <p className="text-sm text-gray-500">Expiring in 30 days</p>
-          <p className={`mt-1 text-2xl font-semibold tabular-nums ${expiring ? 'text-orange-700' : 'text-gray-900'}`}>{show(expiring)}</p>
+          <p className={`mt-1 text-2xl font-semibold tabular-nums ${expiring ? 'text-amber-700' : 'text-gray-900'}`}>{show(expiring)}</p>
         </div>
         <Link href="/rates/check" className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300">
           <p className="text-sm text-gray-500">Flagged by Rates check</p>
@@ -107,7 +107,7 @@ export default function RatesOverviewPage() {
                       <span className="text-[15px] text-gray-900">{c.label}</span>
                       <span className="text-xs text-gray-500 text-right">
                         {!s ? '…' : s.count === 0 ? 'No rates yet' : `${s.count.toLocaleString()} ${s.count === 1 ? 'rate' : 'rates'} · updated ${formatDate(s.updatedAt)}`}
-                        {s && s.expiring > 0 && <span className="block text-orange-700">{s.expiring} expiring soon</span>}
+                        {s && s.expiring > 0 && <span className="block text-amber-700">{s.expiring} expiring soon</span>}
                       </span>
                     </Link>
                   </li>

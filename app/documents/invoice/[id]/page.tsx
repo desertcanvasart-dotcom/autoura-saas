@@ -129,7 +129,7 @@ export default function InvoicePage() {
     const colors: Record<string, string> = {
       completed: 'bg-green-100 text-green-700',
       paid: 'bg-green-100 text-green-700',
-      pending: 'bg-orange-100 text-orange-700',
+      pending: 'bg-amber-100 text-amber-700',
       sent: 'bg-blue-100 text-blue-700',
       draft: 'bg-gray-100 text-gray-700',
       overdue: 'bg-red-100 text-red-700'

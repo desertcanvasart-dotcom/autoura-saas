@@ -38,9 +38,9 @@ const STATUS_CONFIG: Record<string, {
   },
   viewed: {
     label: 'Viewed',
-    color: 'text-purple-700',
-    bg: 'bg-purple-100',
-    border: 'border-purple-300',
+    color: 'text-primary-700',
+    bg: 'bg-primary-100',
+    border: 'border-primary-300',
     icon: Eye,
     description: 'Client/partner has viewed the quote (B2C only)'
   },
@@ -62,9 +62,9 @@ const STATUS_CONFIG: Record<string, {
   },
   expired: {
     label: 'Expired',
-    color: 'text-orange-700',
-    bg: 'bg-orange-100',
-    border: 'border-orange-300',
+    color: 'text-amber-700',
+    bg: 'bg-amber-100',
+    border: 'border-amber-300',
     icon: AlertCircle,
     description: 'Quote validity period has passed'
   }

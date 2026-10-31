@@ -43,7 +43,7 @@ type Payload = {
 const STATUS_STYLE: Record<Extra['status'], string> = {
   requested: 'bg-amber-100 text-amber-800',
   offered: 'bg-blue-100 text-blue-800',
-  accepted: 'bg-indigo-100 text-indigo-800',
+  accepted: 'bg-primary-100 text-primary-800',
   confirmed: 'bg-[#e8ede3] text-[#4a5c35]',
   declined: 'bg-gray-100 text-gray-600',
   withdrawn: 'bg-gray-100 text-gray-600',
@@ -178,7 +178,7 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
                 {e.quantity > 1 && <span className="text-gray-500">× {e.quantity}</span>}
                 <span className={`text-[11px] px-1.5 py-0.5 rounded ${STATUS_STYLE[e.status]}`}>{STATUS_LABEL[e.status]}</span>
                 {e.requested_via === 'portal' && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">from the portal</span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-primary-100 text-primary-800">from the portal</span>
                 )}
               </p>
               {e.description && <p className="text-xs text-gray-600 mt-0.5">{e.description}</p>}

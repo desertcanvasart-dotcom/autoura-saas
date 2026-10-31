@@ -460,7 +460,7 @@ export default function CalendarPage() {
     const colors: any = {
       'not_paid': 'bg-gray-400',
       'deposit_received': 'bg-blue-500',
-      'partially_paid': 'bg-yellow-500',
+      'partially_paid': 'bg-amber-500',
       'paid': 'bg-green-500',
       'completed': 'bg-green-600'
     }
@@ -924,7 +924,7 @@ export default function CalendarPage() {
               <span className="text-gray-600">Deposit Received</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+              <div className="w-3 h-3 bg-amber-500 rounded"></div>
               <span className="text-gray-600">Partially Paid</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -932,7 +932,7 @@ export default function CalendarPage() {
               <span className="text-gray-600">Paid</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 bg-orange-500 rounded border-2 border-orange-700"></div>
+              <div className="w-3 h-3 bg-amber-500 rounded border-2 border-amber-700"></div>
               <span className="text-gray-600">Conflict</span>
             </div>
           </div>
@@ -1034,8 +1034,8 @@ function StatCard({ icon, label, value, color, badge }: any) {
   const dotColors: any = {
     blue: 'bg-blue-600',
     green: 'bg-green-600',
-    purple: 'bg-purple-600',
-    orange: 'bg-orange-600',
+    purple: 'bg-primary-600',
+    orange: 'bg-amber-600',
   }
 
   return (
@@ -1046,7 +1046,7 @@ function StatCard({ icon, label, value, color, badge }: any) {
           <div className={`w-1.5 h-1.5 rounded-full ${dotColors[color]}`} />
         </div>
         {badge && (
-          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
+          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
             {badge}
           </span>
         )}
@@ -1186,7 +1186,7 @@ function DraggableBooking({ booking, getStatusColor, conflicts, onSelect }: any)
       onClick={() => { if (!isDragging) onSelect?.(booking) }}
       title="Click to assign resources · drag to reschedule"
       className={`text-xs p-1 rounded ${getStatusColor(booking.payment_status)} text-white hover:opacity-80 transition-opacity cursor-pointer active:cursor-grabbing ${
-        conflicts.includes(booking.id) ? 'ring-2 ring-orange-700' : ''
+        conflicts.includes(booking.id) ? 'ring-2 ring-amber-700' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
     >
       <div className="font-medium truncate flex items-center justify-between gap-1">
@@ -1244,7 +1244,7 @@ function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getSta
                       key={booking.id}
                       onClick={() => onSelectBooking?.(booking)}
                       className={`block w-full text-left p-2 rounded-lg ${getStatusColor(booking.payment_status)} text-white hover:opacity-80 transition-opacity ${
-                        conflicts.includes(booking.id) ? 'ring-2 ring-orange-700' : ''
+                        conflicts.includes(booking.id) ? 'ring-2 ring-amber-700' : ''
                       }`}
                     >
                       <div className="font-semibold text-xs mb-1">
@@ -1363,7 +1363,7 @@ function TimelineView({ bookings, conflicts, getStatusColor, onSelectBooking }: 
                     type="button"
                     onClick={() => onSelectBooking?.(booking)}
                     className={`absolute top-1.5 h-9 rounded-lg ${getStatusColor(booking.payment_status)} hover:opacity-80 transition-all ${
-                      hasConflict ? 'ring-2 ring-orange-700 z-10' : ''
+                      hasConflict ? 'ring-2 ring-amber-700 z-10' : ''
                     }`}
                     style={position}
                   >
@@ -1371,7 +1371,7 @@ function TimelineView({ bookings, conflicts, getStatusColor, onSelectBooking }: 
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium">{duration}d</span>
                         {hasConflict && (
-                          <AlertCircle className="w-3 h-3 text-orange-300" />
+                          <AlertCircle className="w-3 h-3 text-amber-300" />
                         )}
                       </div>
                       <div className="text-xs opacity-90">
@@ -1392,14 +1392,14 @@ function TimelineView({ bookings, conflicts, getStatusColor, onSelectBooking }: 
       </div>
 
       {conflicts.length > 0 && (
-        <div className="bg-orange-50 border-t border-orange-200 p-3">
+        <div className="bg-amber-50 border-t border-amber-200 p-3">
           <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-semibold text-orange-900 mb-1">
+              <h4 className="text-sm font-semibold text-amber-900 mb-1">
                 {conflicts.length} Booking Conflict{conflicts.length > 1 ? 's' : ''} Detected
               </h4>
-              <p className="text-xs text-orange-700">
+              <p className="text-xs text-amber-700">
                 Some bookings have overlapping dates. Review these bookings to ensure you have adequate resources.
               </p>
             </div>
@@ -1456,10 +1456,10 @@ function ConfirmMoveModal({ booking, newDate, conflicts = [], onConfirm, onCance
         </div>
 
         {hasConflicts && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-orange-800">
+              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-800">
                 <p className="font-semibold mb-1">
                   Resource conflict{conflicts.length > 1 ? 's' : ''} on the new dates
                 </p>
@@ -1486,7 +1486,7 @@ function ConfirmMoveModal({ booking, newDate, conflicts = [], onConfirm, onCance
           <button
             onClick={onConfirm}
             className={`flex-1 px-3 py-2 text-white text-sm rounded-lg font-medium transition-colors ${
-              hasConflicts ? 'bg-orange-600 hover:bg-orange-700' : 'bg-primary-600 hover:bg-primary-700'
+              hasConflicts ? 'bg-primary-600 hover:bg-primary-700' : 'bg-primary-600 hover:bg-primary-700'
             }`}
           >
             {hasConflicts ? 'Reschedule anyway' : 'Confirm Move'}

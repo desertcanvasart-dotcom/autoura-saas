@@ -95,10 +95,10 @@ interface Toast {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
-  pending_deposit: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Clock },
+  pending_deposit: { bg: 'bg-amber-100', text: 'text-amber-700', icon: Clock },
   confirmed: { bg: 'bg-blue-100', text: 'text-blue-700', icon: CheckCircle2 },
   paid_full: { bg: 'bg-green-100', text: 'text-green-700', icon: DollarSign },
-  in_progress: { bg: 'bg-purple-100', text: 'text-purple-700', icon: Plane },
+  in_progress: { bg: 'bg-primary-100', text: 'text-primary-700', icon: Plane },
   completed: { bg: 'bg-gray-100', text: 'text-gray-700', icon: PartyPopper },
   cancelled: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle }
 }
@@ -716,7 +716,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {!isViewer && (<>
               <button
                 onClick={() => setShowAddPassenger(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Add Passenger
@@ -819,7 +819,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     <button
                       type="submit"
                       disabled={saving === 'passenger'}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                     >
                       {saving === 'passenger' ? 'Adding…' : 'Add Passenger'}
                     </button>
@@ -880,7 +880,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               {(isAdmin || isManager) && (
               <button
                 onClick={() => setShowAddPayment(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Record Payment
@@ -971,7 +971,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                     <button
                       type="submit"
                       disabled={saving === 'payment'}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                     >
                       {saving === 'payment' ? 'Recording…' : 'Record Payment'}
                     </button>

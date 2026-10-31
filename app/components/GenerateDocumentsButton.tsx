@@ -117,7 +117,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode, la
             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
             : quiet
               ? 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-primary-600 text-white hover:bg-primary-700'
         }`}
       >
         {generating ? (

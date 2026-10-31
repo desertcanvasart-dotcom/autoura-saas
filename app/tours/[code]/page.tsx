@@ -203,9 +203,9 @@ export default function TourDetailPage() {
 
   const getTierStyle = (tier: string) => {
     const styles: Record<string, { bg: string; text: string; icon: string }> = {
-      budget: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', icon: '💰' },
+      budget: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: '💰' },
       standard: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: '💎' },
-      deluxe: { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-700', icon: '✨' },
+      deluxe: { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: '✨' },
       luxury: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: '👑' }
     }
     return styles[tier] || styles.standard
@@ -214,7 +214,7 @@ export default function TourDetailPage() {
   const getGroupTypeStyle = (type: string) => {
     return type === 'private' 
       ? { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-700', icon: '🔒', label: 'Private' }
-      : { bg: 'bg-sky-50 border-sky-200', text: 'text-sky-700', icon: '👥', label: 'Shared' }
+      : { bg: 'bg-primary-50 border-primary-200', text: 'text-primary-700', icon: '👥', label: 'Shared' }
   }
 
   const getSeasonBadge = (season: string) => {
@@ -309,7 +309,7 @@ export default function TourDetailPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Calendar className="h-4 w-4 text-[#647C47]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Duration</p>
           <p className="text-lg font-semibold text-gray-900">
@@ -331,7 +331,7 @@ export default function TourDetailPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Tag className="h-4 w-4 text-[#647C47]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Category</p>
           <p className="text-lg font-semibold text-gray-900 truncate">{tour.category_name || 'Uncategorized'}</p>
@@ -440,10 +440,10 @@ export default function TourDetailPage() {
                               <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded">🍳 Breakfast</span>
                             )}
                             {day.lunch_included && (
-                              <span className="px-2 py-1 bg-orange-50 text-orange-700 rounded">🍽️ Lunch</span>
+                              <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded">🍽️ Lunch</span>
                             )}
                             {day.dinner_included && (
-                              <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded">🌙 Dinner</span>
+                              <span className="px-2 py-1 bg-primary-50 text-primary-700 rounded">🌙 Dinner</span>
                             )}
                             {day.overnight_city && (
                               <span className="px-2 py-1 bg-slate-50 text-slate-700 rounded">🏨 {day.overnight_city}</span>

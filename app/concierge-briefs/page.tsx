@@ -77,7 +77,7 @@ const ACTIONS: Record<StatusKey, { to: StatusKey; label: string; primary?: boole
 const SLA_BADGE: Record<SlaLevel, string> = {
   overdue: 'bg-red-100 text-red-700',
   soon: 'bg-amber-100 text-amber-700',
-  ok: 'bg-emerald-100 text-emerald-700',
+  ok: 'bg-primary-100 text-primary-700',
   met: 'bg-green-100 text-green-700',
   none: 'bg-gray-100 text-gray-500',
 }
@@ -339,7 +339,7 @@ export default function ConciergeBriefsPage() {
                           <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-[#647C47]/10 text-[#647C47]">{i}</span>
                         ))}
                         {cons.map(c => (
-                          <span key={c} className="px-1.5 py-0.5 rounded text-[10px] bg-orange-50 text-orange-600">{c}</span>
+                          <span key={c} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-600">{c}</span>
                         ))}
                       </div>
                     )}

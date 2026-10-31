@@ -278,7 +278,7 @@ export default function WritingRulesPage() {
         )}
 
         {success && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-700">
+          <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-lg flex items-center gap-2 text-primary-700">
             <CheckCircle2 className="w-5 h-5" />
             <span>{success}</span>
           </div>
@@ -419,10 +419,10 @@ export default function WritingRulesPage() {
                                   )}
                                   {rule.examples.good && rule.examples.good.length > 0 && (
                                     <div>
-                                      <h4 className="text-xs font-medium text-emerald-600 mb-2">✓ Better</h4>
+                                      <h4 className="text-xs font-medium text-primary-600 mb-2">✓ Better</h4>
                                       <div className="space-y-1">
                                         {rule.examples.good.map((ex, i) => (
-                                          <p key={i} className="text-sm text-gray-600 bg-emerald-50 px-3 py-2 rounded-lg">
+                                          <p key={i} className="text-sm text-gray-600 bg-primary-50 px-3 py-2 rounded-lg">
                                             "{ex}"
                                           </p>
                                         ))}
@@ -611,7 +611,7 @@ export default function WritingRulesPage() {
 
                 {/* Good Examples */}
                 <div>
-                  <label className="block text-sm font-medium text-emerald-600 mb-2">✓ Good Examples</label>
+                  <label className="block text-sm font-medium text-primary-600 mb-2">✓ Good Examples</label>
                   <div className="space-y-2">
                     {formData.examples.good.map((ex, i) => (
                       <div key={i} className="flex gap-2">

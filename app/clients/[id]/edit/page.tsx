@@ -383,9 +383,9 @@ export default function EditClientPage() {
                     name="vip_status"
                     checked={formData.vip_status}
                     onChange={handleChange}
-                    className="w-4 h-4 text-yellow-500 border-gray-300 rounded focus:ring-2 focus:ring-yellow-500"
+                    className="w-4 h-4 text-amber-500 border-gray-300 rounded focus:ring-2 focus:ring-amber-500"
                   />
-                  <Star className="w-4 h-4 text-yellow-500" />
+                  <Star className="w-4 h-4 text-amber-500" />
                   <span className="text-sm text-gray-700">VIP Client</span>
                 </label>
               </div>
@@ -511,7 +511,7 @@ export default function EditClientPage() {
               <button
                 type="button"
                 onClick={addTag}
-                className="px-4 py-2.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors shadow-sm"
+                className="px-4 py-2.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
               >
                 Add
               </button>

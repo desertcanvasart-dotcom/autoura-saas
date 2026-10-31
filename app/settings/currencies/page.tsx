@@ -293,14 +293,14 @@ export default function CurrenciesSettingsPage() {
                         onChange={e => set({ yourRate: { ...draft.yourRate, [r.currency]: e.target.value } })}
                         aria-label={`Your rate for ${r.currency}`}
                         className={`w-36 h-9 px-3 text-right rounded-lg border tabular-nums ${
-                          edited ? 'border-orange-400 bg-orange-50' : 'border-gray-200'
+                          edited ? 'border-amber-400 bg-amber-50' : 'border-gray-200'
                         }`}
                       />
                     </td>
                     <td className="px-3 py-2.5 text-xs">
                       {custom ? (
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-semibold">Custom</span>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Custom</span>
                           <span className="text-gray-500">
                             {edited ? 'Not saved yet' : `Set by ${r.override?.set_by ?? 'an admin'} on ${when(r.override?.set_at ?? null)}`}
                           </span>

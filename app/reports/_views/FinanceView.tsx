@@ -384,20 +384,20 @@ export default function FinancialReportsPage() {
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">✅</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Collected</p>
-              <p className="text-2xl font-semibold text-emerald-600">{formatAmount(summary.total_collected)}</p>
+              <p className="text-2xl font-semibold text-primary-600">{formatAmount(summary.total_collected)}</p>
               <p className="text-xs text-gray-400 mt-1">{summary.collection_rate.toFixed(1)}% collected</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">🎯</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Trips</p>
-              <p className="text-2xl font-semibold text-purple-600">{summary.trip_count}</p>
+              <p className="text-2xl font-semibold text-primary-600">{summary.trip_count}</p>
               <p className="text-xs text-gray-400 mt-1">{formatAmount(summary.average_trip_value)} avg</p>
             </div>
 
@@ -445,7 +445,7 @@ export default function FinancialReportsPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Margin</span>
-                      <span className={`font-medium ${q.margin >= 20 ? 'text-green-600' : q.margin >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      <span className={`font-medium ${q.margin >= 20 ? 'text-green-600' : q.margin >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
                         {q.margin.toFixed(1)}%
                       </span>
                     </div>
@@ -525,7 +525,7 @@ export default function FinancialReportsPage() {
                     <tr key={m.month} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month} {m.year}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatAmount(m.invoiced)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-emerald-600">{formatAmount(m.collected)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-primary-600">{formatAmount(m.collected)}</td>
                       <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.expenses)}</td>
                       <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatAmount(m.net_profit)}
@@ -539,7 +539,7 @@ export default function FinancialReportsPage() {
                     <td className="px-4 py-3 text-sm text-right text-blue-600">
                       {formatAmount(monthly.reduce((sum, m) => sum + m.invoiced, 0))}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-emerald-600">
+                    <td className="px-4 py-3 text-sm text-right text-primary-600">
                       {formatAmount(monthly.reduce((sum, m) => sum + m.collected, 0))}
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-red-600">
@@ -587,11 +587,11 @@ export default function FinancialReportsPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Pending Payables</p>
-              <p className="text-xl font-semibold text-orange-600">{formatAmount(cashFlow.pending_payables)}</p>
+              <p className="text-xl font-semibold text-amber-600">{formatAmount(cashFlow.pending_payables)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Projected Cash</p>
-              <p className={`text-xl font-semibold ${cashFlow.projected_cash >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
+              <p className={`text-xl font-semibold ${cashFlow.projected_cash >= 0 ? 'text-primary-600' : 'text-red-600'}`}>
                 {formatAmount(cashFlow.projected_cash)}
               </p>
             </div>
@@ -656,7 +656,7 @@ export default function FinancialReportsPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Taxable Income</p>
-              <p className="text-xl font-semibold text-purple-600">{formatAmount(taxSummary.taxable_income)}</p>
+              <p className="text-xl font-semibold text-primary-600">{formatAmount(taxSummary.taxable_income)}</p>
             </div>
           </div>
 
@@ -748,11 +748,11 @@ export default function FinancialReportsPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Pending</p>
-              <p className="text-xl font-semibold text-orange-600">{formatAmount(commissionSummary.total_pending)}</p>
+              <p className="text-xl font-semibold text-amber-600">{formatAmount(commissionSummary.total_pending)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Recipients</p>
-              <p className="text-xl font-semibold text-purple-600">{commissionSummary.recipients.length}</p>
+              <p className="text-xl font-semibold text-primary-600">{commissionSummary.recipients.length}</p>
             </div>
           </div>
 
@@ -830,7 +830,7 @@ export default function FinancialReportsPage() {
                           <td className="px-4 py-3 text-sm text-right text-green-600">
                             {formatAmount(recipient.total_paid)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-orange-600">
+                          <td className="px-4 py-3 text-sm text-right text-amber-600">
                             {formatAmount(recipient.total_pending)}
                           </td>
                           <td className="px-4 py-3 text-sm text-center text-gray-600">{recipient.trip_count}</td>

@@ -98,17 +98,17 @@ export default function AttachmentList({
     
     // Archives
     if (mimeType.includes('zip') || mimeType.includes('rar') || ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
-      return <Archive className="w-4 h-4 text-yellow-600" />
+      return <Archive className="w-4 h-4 text-amber-600" />
     }
     
     // Audio
     if (mimeType.startsWith('audio/')) {
-      return <Music className="w-4 h-4 text-purple-500" />
+      return <Music className="w-4 h-4 text-primary-500" />
     }
     
     // Video
     if (mimeType.startsWith('video/')) {
-      return <Video className="w-4 h-4 text-pink-500" />
+      return <Video className="w-4 h-4 text-primary-500" />
     }
     
     // Code

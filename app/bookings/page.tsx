@@ -42,10 +42,10 @@ interface Booking {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
-  pending_deposit: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Clock },
+  pending_deposit: { bg: 'bg-amber-100', text: 'text-amber-700', icon: Clock },
   confirmed: { bg: 'bg-blue-100', text: 'text-blue-700', icon: CheckCircle2 },
   paid_full: { bg: 'bg-green-100', text: 'text-green-700', icon: DollarSign },
-  in_progress: { bg: 'bg-purple-100', text: 'text-purple-700', icon: Plane },
+  in_progress: { bg: 'bg-primary-100', text: 'text-primary-700', icon: Plane },
   completed: { bg: 'bg-gray-100', text: 'text-gray-700', icon: PartyPopper },
   cancelled: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle }
 }
@@ -195,17 +195,17 @@ export default function BookingsPage() {
               <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
               <div className="text-xs text-gray-500">Total Bookings</div>
             </div>
-            <div className="bg-yellow-50 rounded-lg p-3">
-              <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
-              <div className="text-xs text-yellow-600">Pending Deposit</div>
+            <div className="bg-amber-50 rounded-lg p-3">
+              <div className="text-2xl font-bold text-amber-700">{stats.pending}</div>
+              <div className="text-xs text-amber-600">Pending Deposit</div>
             </div>
             <div className="bg-blue-50 rounded-lg p-3">
               <div className="text-2xl font-bold text-blue-700">{stats.confirmed}</div>
               <div className="text-xs text-blue-600">Confirmed</div>
             </div>
-            <div className="bg-purple-50 rounded-lg p-3">
-              <div className="text-2xl font-bold text-purple-700">{stats.inProgress}</div>
-              <div className="text-xs text-purple-600">In Progress</div>
+            <div className="bg-primary-50 rounded-lg p-3">
+              <div className="text-2xl font-bold text-primary-700">{stats.inProgress}</div>
+              <div className="text-xs text-primary-600">In Progress</div>
             </div>
             <div className="bg-green-50 rounded-lg p-3">
               <div className="text-2xl font-bold text-green-700">{stats.completed}</div>

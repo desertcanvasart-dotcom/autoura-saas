@@ -643,14 +643,14 @@ export default function NewClientPage() {
               </div>
 
               <div className="pt-3 border-t border-gray-100">
-                <label className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-yellow-50 transition-colors">
+                <label className="flex items-center gap-2 cursor-pointer p-2 rounded-md hover:bg-amber-50 transition-colors">
                   <input
                     type="checkbox"
                     checked={formData.vip_status}
                     onChange={(e) => handleInputChange('vip_status', e.target.checked)}
-                    className="w-3.5 h-3.5 text-yellow-500 rounded border-gray-300"
+                    className="w-3.5 h-3.5 text-amber-500 rounded border-gray-300"
                   />
-                  <Star className="w-4 h-4 text-yellow-500" />
+                  <Star className="w-4 h-4 text-amber-500" />
                   <span className="text-xs font-medium text-gray-700">Mark as VIP Client</span>
                 </label>
               </div>
@@ -738,7 +738,7 @@ export default function NewClientPage() {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm disabled:opacity-50"
             >
               {loading ? (
                 <>

@@ -111,11 +111,11 @@ interface PaymentFormData {
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100', icon: FileText },
   sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100', icon: Send },
-  viewed: { label: 'Viewed', color: 'text-purple-700', bg: 'bg-purple-100', icon: FileText },
+  viewed: { label: 'Viewed', color: 'text-primary-700', bg: 'bg-primary-100', icon: FileText },
   // The stored word; with no entry a part-paid invoice showed as Draft, and
   // a deposit linked to one crashed this page.
-  partially_paid: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100', icon: Clock },
-  partial: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100', icon: Clock },
+  partially_paid: { label: 'Part paid', color: 'text-amber-700', bg: 'bg-amber-100', icon: Clock },
+  partial: { label: 'Part paid', color: 'text-amber-700', bg: 'bg-amber-100', icon: Clock },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircle },
   overdue: { label: 'Overdue', color: 'text-red-700', bg: 'bg-red-100', icon: AlertCircle },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bg: 'bg-gray-100', icon: X }
@@ -124,7 +124,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   standard: { label: 'Standard', color: 'text-gray-600', bg: 'bg-gray-50', icon: FileText },
   deposit: { label: 'Deposit', color: 'text-amber-700', bg: 'bg-amber-50', icon: Wallet },
-  final: { label: 'Final', color: 'text-emerald-700', bg: 'bg-emerald-50', icon: Receipt }
+  final: { label: 'Final', color: 'text-primary-700', bg: 'bg-primary-50', icon: Receipt }
 }
 
 const PAYMENT_METHODS = [
@@ -544,7 +544,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <button
             onClick={handleSendWhatsApp}
             disabled={sendingWhatsApp}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
             {sendingWhatsApp ? (
               <>
@@ -591,7 +591,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <button
               onClick={handleCreateFinalInvoice}
               disabled={creatingFinalInvoice}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {creatingFinalInvoice ? (
                 <>
@@ -624,16 +624,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         <div className={`mb-6 p-4 rounded-lg border ${
           invoice.invoice_type === 'final' 
             ? 'bg-amber-50 border-amber-200' 
-            : 'bg-emerald-50 border-emerald-200'
+            : 'bg-primary-50 border-primary-200'
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <LinkIcon className={`h-5 w-5 ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-emerald-600'}`} />
+              <LinkIcon className={`h-5 w-5 ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-primary-600'}`} />
               <div>
-                <p className={`text-sm font-medium ${invoice.invoice_type === 'final' ? 'text-amber-800' : 'text-emerald-800'}`}>
+                <p className={`text-sm font-medium ${invoice.invoice_type === 'final' ? 'text-amber-800' : 'text-primary-800'}`}>
                   {invoice.invoice_type === 'final' ? 'Deposit Invoice' : 'Final Invoice'}
                 </p>
-                <p className={`text-xs ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                <p className={`text-xs ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-primary-600'}`}>
                   {linkedInvoice?.invoice_number || childInvoice?.invoice_number} • 
                   {' '}{formatMoney(linkedInvoice?.total_amount || childInvoice?.total_amount, linkedInvoice?.currency || childInvoice?.currency || 'EUR')} • 
                   {' '}{(STATUS_CONFIG[linkedInvoice?.status || childInvoice?.status || 'draft'] ?? STATUS_CONFIG.draft).label}
@@ -645,7 +645,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               className={`flex items-center gap-1 text-sm font-medium ${
                 invoice.invoice_type === 'final' 
                   ? 'text-amber-700 hover:text-amber-800' 
-                  : 'text-emerald-700 hover:text-emerald-800'
+                  : 'text-primary-700 hover:text-primary-800'
               }`}
             >
               View
@@ -677,7 +677,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div>
               <p className="text-xs text-gray-500">Balance Due on Arrival</p>
-              <p className="text-lg font-bold text-emerald-600">
+              <p className="text-lg font-bold text-primary-600">
                 {formatMoney(trip.balanceAmount, invoice.currency)}
               </p>
             </div>
@@ -862,7 +862,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <button
                 onClick={handleCreateFinalInvoice}
                 disabled={creatingFinalInvoice}
-                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
                 {creatingFinalInvoice ? (
                   <>

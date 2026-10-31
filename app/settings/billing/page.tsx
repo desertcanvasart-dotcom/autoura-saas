@@ -167,7 +167,7 @@ export default function BillingPage() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      active: 'bg-primary-50 text-primary-700 border-primary-200',
       trialing: 'bg-blue-50 text-blue-700 border-blue-200',
       past_due: 'bg-red-50 text-red-700 border-red-200',
       canceled: 'bg-gray-50 text-gray-700 border-gray-200',
@@ -431,8 +431,8 @@ export default function BillingPage() {
             className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#647C47]/50 hover:shadow-sm transition-all group"
           >
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                <FileText className="w-4 h-4 text-purple-600" />
+              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center group-hover:bg-primary-100 transition-colors">
+                <FileText className="w-4 h-4 text-primary-600" />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">Invoices</p>
@@ -446,8 +446,8 @@ export default function BillingPage() {
             className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#647C47]/50 hover:shadow-sm transition-all group"
           >
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                <TrendingUp className="w-4 h-4 text-emerald-600" />
+              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center group-hover:bg-primary-100 transition-colors">
+                <TrendingUp className="w-4 h-4 text-primary-600" />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">Usage Details</p>

@@ -42,9 +42,9 @@ const KIND_META: Record<string, { label: string; dot: string }> = {
   arrived:     { label: 'Arrived',      dot: 'bg-green-500' },
   picked_up:   { label: 'Picked up',    dot: 'bg-green-500' },
   dropped_off: { label: 'Dropped off',  dot: 'bg-green-500' },
-  checked_in:  { label: 'Checked in',   dot: 'bg-indigo-500' },
-  checked_out: { label: 'Checked out',  dot: 'bg-indigo-500' },
-  completed:   { label: 'Completed',    dot: 'bg-emerald-600' },
+  checked_in:  { label: 'Checked in',   dot: 'bg-primary-500' },
+  checked_out: { label: 'Checked out',  dot: 'bg-primary-500' },
+  completed:   { label: 'Completed',    dot: 'bg-primary-600' },
   delayed:     { label: 'Running late', dot: 'bg-amber-500' },
   note:        { label: 'Note',         dot: 'bg-gray-400' },
 }

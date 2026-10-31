@@ -89,7 +89,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
   sent: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', icon: Send },
   accepted: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', icon: CheckCircle },
   rejected: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', icon: XCircle },
-  expired: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: AlertCircle }
+  expired: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300', icon: AlertCircle }
 }
 
 // params is a Promise in a client page (Next 15+): reading params.id
@@ -293,7 +293,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-3" />
           <p className="text-sm text-gray-500">Loading quote...</p>
         </div>
       </div>
@@ -365,7 +365,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
                 type="button"
                 onClick={() => handleSendQuote('email')}
                 disabled={sending || !quote.b2b_partners?.email}
-                className="h-10 px-4 whitespace-nowrap shrink-0 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <>
@@ -383,7 +383,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
                 type="button"
                 onClick={() => handleSendQuote('whatsapp')}
                 disabled={sending || !quote.b2b_partners?.phone}
-                className="h-10 px-4 whitespace-nowrap shrink-0 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 whitespace-nowrap shrink-0 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!quote.b2b_partners?.phone ? 'No phone number available' : 'Send via WhatsApp'}
               >
                 {sending ? (
@@ -470,7 +470,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
         {quote.b2b_partners && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-600" />
+              <Building2 className="w-5 h-5 text-primary-600" />
               Partner Information
             </h2>
             <div className="grid grid-cols-3 gap-4">
@@ -516,12 +516,12 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-purple-600" />
+                <MapPin className="w-5 h-5 text-primary-600" />
                 Linked Itinerary
               </h2>
               <Link
                 href={`/itineraries/${quote.itineraries.id}`}
-                className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1"
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
               >
                 View Full Itinerary
                 <ArrowLeft className="w-4 h-4 rotate-180" />
@@ -597,7 +597,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
         {/* Cost Breakdown */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-purple-600" />
+            <DollarSign className="w-5 h-5 text-primary-600" />
             Cost Breakdown
           </h2>
 

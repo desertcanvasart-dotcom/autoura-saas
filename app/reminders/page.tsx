@@ -81,7 +81,7 @@ const REMINDER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   before_due_7: { label: '7 Days Before', color: 'bg-blue-100 text-blue-700' },
   before_due_3: { label: '3 Days Before', color: 'bg-blue-100 text-blue-700' },
   on_due: { label: 'Due Today', color: 'bg-amber-100 text-amber-700' },
-  overdue_7: { label: '7 Days Overdue', color: 'bg-orange-100 text-orange-700' },
+  overdue_7: { label: '7 Days Overdue', color: 'bg-amber-100 text-amber-700' },
   overdue_14: { label: '14 Days Overdue', color: 'bg-red-100 text-red-700' },
   overdue_30: { label: '30+ Days Overdue', color: 'bg-red-100 text-red-800' },
   manual: { label: 'Manual', color: 'bg-gray-100 text-gray-700' }

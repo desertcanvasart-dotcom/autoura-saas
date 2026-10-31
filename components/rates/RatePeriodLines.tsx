@@ -38,7 +38,7 @@ export function RatePeriodLines({
         >
           <span className="min-w-0 truncate">
             {line.season && (
-              <span className="mr-1 rounded bg-sky-100 px-1 py-0.5 text-[10px] font-medium text-sky-800">
+              <span className="mr-1 rounded bg-primary-100 px-1 py-0.5 text-[10px] font-medium text-primary-800">
                 <VocabLabel kind="rate_season" value={line.season} />
               </span>
             )}

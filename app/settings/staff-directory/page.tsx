@@ -97,12 +97,12 @@ const fmtFocusedTime = (minutes: number) =>
   `~${Math.floor(minutes / 60)}h ${minutes % 60}m`
 
 const ROLES = [
-  { value: 'owner', label: 'Owner', icon: '👑', color: 'bg-purple-100 text-purple-700' },
+  { value: 'owner', label: 'Owner', icon: '👑', color: 'bg-primary-100 text-primary-700' },
   { value: 'manager', label: 'Manager', icon: '💼', color: 'bg-blue-100 text-blue-700' },
   { value: 'coordinator', label: 'Coordinator', icon: '📋', color: 'bg-green-100 text-green-700' },
   { value: 'sales', label: 'Sales', icon: '💰', color: 'bg-amber-100 text-amber-700' },
-  { value: 'guide', label: 'Tour Guide', icon: '👨‍🏫', color: 'bg-cyan-100 text-cyan-700' },
-  { value: 'driver', label: 'Driver', icon: '🚗', color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'guide', label: 'Tour Guide', icon: '👨‍🏫', color: 'bg-primary-100 text-primary-700' },
+  { value: 'driver', label: 'Driver', icon: '🚗', color: 'bg-primary-100 text-primary-700' },
   { value: 'staff', label: 'Staff', icon: '👤', color: 'bg-gray-100 text-gray-700' }
 ]
 
@@ -479,7 +479,7 @@ export default function TeamMembersPage() {
                       )}
                       {member.user_id && (
                         <span
-                          className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700"
+                          className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700"
                           title="This person has a login account"
                         >
                           <KeyRound className="h-3 w-3" />

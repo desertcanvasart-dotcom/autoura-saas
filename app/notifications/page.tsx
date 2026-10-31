@@ -134,12 +134,12 @@ export default function NotificationsPage() {
       case 'task_due_soon': return 'bg-amber-50 border-l-amber-500'
       case 'task_overdue': return 'bg-red-50 border-l-red-500'
       case 'task_completed': return 'bg-green-50 border-l-green-500'
-      case 'whatsapp_assigned': return 'bg-emerald-50 border-l-[#25D366]'
-      case 'whatsapp_new_message': return 'bg-emerald-50 border-l-[#25D366]'
-      case 'whatsapp_mention': return 'bg-emerald-50 border-l-[#25D366]'
+      case 'whatsapp_assigned': return 'bg-primary-50 border-l-[#25D366]'
+      case 'whatsapp_new_message': return 'bg-primary-50 border-l-[#25D366]'
+      case 'whatsapp_mention': return 'bg-primary-50 border-l-[#25D366]'
       case 'invoice_paid': return 'bg-blue-50 border-l-blue-500'
-      case 'booking_confirmed': return 'bg-purple-50 border-l-purple-500'
-      case 'client_created': return 'bg-cyan-50 border-l-cyan-500'
+      case 'booking_confirmed': return 'bg-primary-50 border-l-primary-500'
+      case 'client_created': return 'bg-primary-50 border-l-primary-500'
       default: return 'bg-gray-50 border-l-gray-400'
     }
   }

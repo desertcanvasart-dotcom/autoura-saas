@@ -91,17 +91,17 @@ interface Itinerary {
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
     hotel: { label: 'Hotel', icon: Building, color: 'text-blue-600 bg-blue-50' },
-    shopping: { label: 'Shopping', icon: Store, color: 'text-pink-600 bg-pink-50' },
-    restaurant: { label: 'Restaurant', icon: UtensilsCrossed, color: 'text-orange-600 bg-orange-50' },
-    transport: { label: 'Transport', icon: Car, color: 'text-purple-600 bg-purple-50' },
-    cruise: { label: 'Cruise', icon: Ship, color: 'text-cyan-600 bg-cyan-50' },
+    shopping: { label: 'Shopping', icon: Store, color: 'text-primary-600 bg-primary-50' },
+    restaurant: { label: 'Restaurant', icon: UtensilsCrossed, color: 'text-amber-600 bg-amber-50' },
+    transport: { label: 'Transport', icon: Car, color: 'text-primary-600 bg-primary-50' },
+    cruise: { label: 'Cruise', icon: Ship, color: 'text-primary-600 bg-primary-50' },
     attraction: { label: 'Attraction', icon: Receipt, color: 'text-amber-600 bg-amber-50' },
-    optional_tour: { label: 'Optional Tour', icon: MapPin, color: 'text-teal-600 bg-teal-50' },
-    activity: { label: 'Activity', icon: Sparkles, color: 'text-rose-600 bg-rose-50' },
-    show: { label: 'Show/Event', icon: Ticket, color: 'text-violet-600 bg-violet-50' },
+    optional_tour: { label: 'Optional Tour', icon: MapPin, color: 'text-primary-600 bg-primary-50' },
+    activity: { label: 'Activity', icon: Sparkles, color: 'text-primary-600 bg-primary-50' },
+    show: { label: 'Show/Event', icon: Ticket, color: 'text-primary-600 bg-primary-50' },
     spa: { label: 'Spa/Wellness', icon: Heart, color: 'text-red-600 bg-red-50' },
-    agent_referral: { label: 'Agent Referral', icon: Users, color: 'text-indigo-600 bg-indigo-50' },
-    partner: { label: 'Partner', icon: Handshake, color: 'text-emerald-600 bg-emerald-50' },
+    agent_referral: { label: 'Agent Referral', icon: Users, color: 'text-primary-600 bg-primary-50' },
+    partner: { label: 'Partner', icon: Handshake, color: 'text-primary-600 bg-primary-50' },
     other: { label: 'Other', icon: MoreHorizontal, color: 'text-gray-600 bg-gray-50' }
   }
 
@@ -354,8 +354,8 @@ export default function CommissionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 rounded-lg">
-            <Handshake className="h-5 w-5 text-emerald-600" />
+          <div className="p-2 bg-primary-50 rounded-lg">
+            <Handshake className="h-5 w-5 text-primary-600" />
           </div>
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Commission Tracking</h1>
@@ -397,17 +397,17 @@ export default function CommissionsPage() {
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-orange-500" />
+              <Clock className="h-4 w-4 text-amber-500" />
               <span className="text-xs text-gray-500">Pending Out</span>
             </div>
-            <p className="text-xl font-bold text-orange-600">{formatTotals(summary.pending_payable)}</p>
+            <p className="text-xl font-bold text-amber-600">{formatTotals(summary.pending_payable)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <Check className="h-4 w-4 text-emerald-500" />
+              <Check className="h-4 w-4 text-primary-500" />
               <span className="text-xs text-gray-500">Received</span>
             </div>
-            <p className="text-xl font-bold text-emerald-600">{formatTotals(summary.received)}</p>
+            <p className="text-xl font-bold text-primary-600">{formatTotals(summary.received)}</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
@@ -418,7 +418,7 @@ export default function CommissionsPage() {
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="h-4 w-4 text-purple-500" />
+              <DollarSign className="h-4 w-4 text-primary-500" />
               <span className="text-xs text-gray-500">Net</span>
             </div>
             <p className={`text-xl font-bold ${Object.values(summary.net_commission).every(v => v >= 0) ? 'text-green-600' : 'text-red-600'}`}>

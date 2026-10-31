@@ -159,7 +159,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             title={!canB2b && config.clientType === 'b2c' ? 'B2B quotes are made by managers and admins' : undefined}
             className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-70 ${
               config.clientType === 'b2b'
-                ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 hover:bg-primary-100'
                 : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
             }`}
           >
@@ -171,7 +171,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             <select
               value={config.partnerId || ''}
               onChange={(e) => selectPartner(e.target.value)}
-              className="px-2 py-1 text-sm border border-purple-200 rounded-lg font-medium bg-purple-50 text-purple-700 focus:bg-white focus:ring-2 focus:ring-purple-200 transition-all max-w-[180px]"
+              className="px-2 py-1 text-sm border border-primary-200 rounded-lg font-medium bg-primary-50 text-primary-700 focus:bg-white focus:ring-2 focus:ring-primary-200 transition-all max-w-[180px]"
             >
               <option value="">Select Partner...</option>
               {partners.map(p => (
@@ -186,7 +186,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             onClick={toggleGuide}
             className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap ${
               config.withGuide
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 hover:bg-primary-100'
                 : 'bg-gray-100 border-gray-200 text-gray-400 hover:bg-gray-150'
             }`}
           >
@@ -203,7 +203,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             title="Throughout: one guide travels day 1 to the end — bed, meals (small parties), flight seats, +1 vehicle seat"
             className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap ${
               config.guideMode === 'throughout'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 hover:bg-primary-100'
                 : 'bg-gray-100 border-gray-200 text-gray-400 hover:bg-gray-150'
             }`}
           >

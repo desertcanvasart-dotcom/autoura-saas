@@ -273,7 +273,7 @@ const platformStages = [
 const capabilityClusters = [
   {
     icon: Sparkles,
-    iconBg: 'bg-emerald-100 text-emerald-700',
+    iconBg: 'bg-primary-100 text-primary-700',
     title: 'AI & Automation',
     bullets: [
       'WhatsApp parsing with 74 Egyptian travel abbreviations decoded',
@@ -309,7 +309,7 @@ const capabilityClusters = [
   },
   {
     icon: Handshake,
-    iconBg: 'bg-violet-100 text-violet-700',
+    iconBg: 'bg-primary-100 text-primary-700',
     title: 'B2B Partner System',
     bullets: [
       'Partner profiles with custom pricing rules',
@@ -321,7 +321,7 @@ const capabilityClusters = [
   },
   {
     icon: BarChart3,
-    iconBg: 'bg-rose-100 text-rose-700',
+    iconBg: 'bg-primary-100 text-primary-700',
     title: 'Financial Suite',
     bullets: [
       'Per-trip P&L visible before departure',
@@ -333,7 +333,7 @@ const capabilityClusters = [
   },
   {
     icon: MessageSquare,
-    iconBg: 'bg-cyan-100 text-cyan-700',
+    iconBg: 'bg-primary-100 text-primary-700',
     title: 'Communications Hub',
     bullets: [
       'Unified WhatsApp + Gmail inbox',
@@ -349,7 +349,7 @@ const destinationTemplates = [
   {
     name: 'Egypt',
     status: 'Complete',
-    statusColor: 'bg-emerald-100 text-emerald-700',
+    statusColor: 'bg-primary-100 text-primary-700',
     bullets: [
       '200+ entrance fees with EU/non-EU rates',
       'Pre-built Nile cruise itineraries (Luxor–Aswan)',
@@ -663,12 +663,12 @@ export default function AutouraHomepage() {
                     {aiDemoExtracted.map((field, i) => (
                       <div key={i} className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
-                          <Check className="w-4 h-4 text-emerald-500" />
+                          <Check className="w-4 h-4 text-primary-500" />
                           <span className="text-stone-500">{field.label}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-stone-900">{field.value}</span>
-                          <span className="text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{field.confidence}%</span>
+                          <span className="text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">{field.confidence}%</span>
                         </div>
                       </div>
                     ))}
@@ -828,7 +828,7 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Destination Templates */}
-      <section className="py-16 sm:py-24 px-4 sm:px-6 bg-gradient-to-br from-amber-50/50 to-orange-50/30">
+      <section className="py-16 sm:py-24 px-4 sm:px-6 bg-gradient-to-br from-amber-50/50 to-amber-50/30">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-16 items-start max-w-6xl mx-auto">
             {/* Text */}

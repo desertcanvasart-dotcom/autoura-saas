@@ -12,11 +12,11 @@ const money = (n: number, c = 'EUR') => `${getCurrencySymbol(c)}${Number(n || 0)
 
 const STATUS_BADGE: Record<string, string> = {
   received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700',
-  approved: 'bg-indigo-100 text-indigo-700', paid: 'bg-green-100 text-green-700',
+  approved: 'bg-primary-100 text-primary-700', paid: 'bg-green-100 text-green-700',
   disputed: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400',
 }
 const MATCH_BADGE: Record<string, string> = {
-  unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-orange-100 text-orange-700',
+  unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-amber-100 text-amber-700',
   matched: 'bg-green-100 text-green-700', discrepancy: 'bg-red-100 text-red-700',
 }
 
@@ -127,7 +127,7 @@ export default function SupplierInvoicesPage() {
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <Stat label="Total" value={String(summary.total)} sub={formatTotals(summary.total_amount)} />
           <Stat label="Unmatched" value={String(summary.unmatched)} accent="text-amber-600" />
-          <Stat label="Approved" value={String(summary.approved)} accent="text-indigo-600" />
+          <Stat label="Approved" value={String(summary.approved)} accent="text-primary-600" />
           <Stat label="Paid" value={String(summary.paid)} accent="text-green-600" />
           <Stat label="Disputed" value={String(summary.disputed)} accent="text-red-600" />
         </div>

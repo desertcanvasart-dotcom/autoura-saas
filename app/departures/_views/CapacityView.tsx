@@ -85,14 +85,14 @@ const STATUS_CONFIG = {
   },
   limited: {
     label: 'Limited',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    dotColor: 'bg-yellow-500',
+    color: 'bg-amber-100 text-amber-800 border-amber-200',
+    dotColor: 'bg-amber-500',
     description: 'Some availability remaining'
   },
   busy: {
     label: 'Busy',
-    color: 'bg-orange-100 text-orange-800 border-orange-200',
-    dotColor: 'bg-orange-500',
+    color: 'bg-amber-100 text-amber-800 border-amber-200',
+    dotColor: 'bg-amber-500',
     description: 'Nearly at capacity'
   },
   blackout: {
@@ -116,8 +116,8 @@ const DEPARTURE_STATUS_CONFIG = {
   },
   limited: {
     label: 'Limited',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    dotColor: 'bg-yellow-500'
+    color: 'bg-amber-100 text-amber-800 border-amber-200',
+    dotColor: 'bg-amber-500'
   },
   full: {
     label: 'Full',
@@ -686,7 +686,7 @@ export default function CapacityPage() {
                             ${today ? 'ring-2 ring-[#647C47]' : ''}
                             ${selectedDate === dateStr ? 'border-[#647C47] bg-[#647C47]/5' : 'border-gray-200'}
                             ${hasDepartures ? 'bg-blue-50/50' : ''}
-                            ${inItinerary ? 'bg-purple-50/50' : ''}
+                            ${inItinerary ? 'bg-primary-50/50' : ''}
                             hover:border-[#647C47] cursor-pointer
                           `}
                         >
@@ -708,7 +708,7 @@ export default function CapacityPage() {
                               </div>
                             )}
                             {inItinerary && !hasDepartures && (
-                              <div className="w-2 h-2 rounded-full bg-purple-500" />
+                              <div className="w-2 h-2 rounded-full bg-primary-500" />
                             )}
                           </div>
 
@@ -737,11 +737,11 @@ export default function CapacityPage() {
                           {inItinerary && !hasDepartures && (
                             <div className="mt-1">
                               {isItinStart ? (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 block truncate">
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary-100 text-primary-800 block truncate">
                                   🚀 Start
                                 </span>
                               ) : (
-                                <span className="text-[9px] text-purple-600">
+                                <span className="text-[9px] text-primary-600">
                                   Day {itinDayNum}
                                 </span>
                               )}
@@ -832,9 +832,9 @@ export default function CapacityPage() {
         <div className="space-y-4">
           {/* Itinerary Info Panel - Show when itinerary is selected in tours mode */}
           {viewMode === 'tours' && selectedItinerary && (
-            <div className="bg-white border border-purple-200 rounded-xl shadow-sm p-4">
+            <div className="bg-white border border-primary-200 rounded-xl shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-purple-500" />
+                <div className="w-2 h-2 rounded-full bg-primary-500" />
                 <h3 className="text-sm font-semibold text-gray-900">Selected Itinerary</h3>
               </div>
 
@@ -849,7 +849,7 @@ export default function CapacityPage() {
                     selectedItinerary.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                     selectedItinerary.status === 'draft' ? 'bg-gray-100 text-gray-800' :
                     selectedItinerary.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
+                    'bg-amber-100 text-amber-800'
                   }`}>
                     {selectedItinerary.status.charAt(0).toUpperCase() + selectedItinerary.status.slice(1)}
                   </span>
@@ -863,8 +863,8 @@ export default function CapacityPage() {
 
                 {/* Show day info if date selected within itinerary */}
                 {selectedDate && isDateInItinerary(selectedDate) && (
-                  <div className="pt-2 border-t border-purple-100">
-                    <p className="text-xs text-purple-700">
+                  <div className="pt-2 border-t border-primary-100">
+                    <p className="text-xs text-primary-700">
                       <strong>Selected:</strong> Day {getItineraryDayNumber(selectedDate)} of {selectedItinerary.total_days}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">
@@ -950,7 +950,7 @@ export default function CapacityPage() {
                               <div
                                 className={`h-full rounded-full transition-all ${
                                   fillPercent >= 100 ? 'bg-red-500' :
-                                  fillPercent >= 80 ? 'bg-yellow-500' : 'bg-green-500'
+                                  fillPercent >= 80 ? 'bg-amber-500' : 'bg-green-500'
                                 }`}
                                 style={{ width: `${Math.min(fillPercent, 100)}%` }}
                               />

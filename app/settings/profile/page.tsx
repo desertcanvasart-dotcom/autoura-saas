@@ -522,8 +522,8 @@ export default function ProfilePage() {
                   </div>
                 </Link>
                 <Link href="/resources" className="flex items-center gap-2.5 p-2 rounded-md hover:bg-gray-50 transition-colors group">
-                  <div className="w-8 h-8 bg-purple-50 rounded-md flex items-center justify-center group-hover:bg-purple-100 border border-purple-100">
-                    <Building2 className="w-4 h-4 text-purple-600" />
+                  <div className="w-8 h-8 bg-primary-50 rounded-md flex items-center justify-center group-hover:bg-primary-100 border border-primary-100">
+                    <Building2 className="w-4 h-4 text-primary-600" />
                   </div>
                   <div>
                     <p className="text-xs font-medium text-gray-700">Manage Resources</p>

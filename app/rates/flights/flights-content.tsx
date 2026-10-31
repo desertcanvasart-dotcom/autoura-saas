@@ -604,7 +604,7 @@ export default function FlightsContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Plane className="h-5 w-5 text-sky-600" />
+          <Plane className="h-5 w-5 text-primary-600" />
           <h1 className="text-lg font-semibold text-gray-900">Flight Rates</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -623,7 +623,7 @@ export default function FlightsContent() {
       <div className="grid grid-cols-6 gap-3">
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-sky-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
             <span className="text-xs text-gray-500">Total Rates</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{totalRates}</p>
@@ -644,21 +644,21 @@ export default function FlightsContent() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
             <span className="text-xs text-gray-500">International</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{internationalRoutes}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
             <span className="text-xs text-gray-500">Airlines</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueAirlines}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
             <span className="text-xs text-gray-500">Linked</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{linkedToSuppliers}</p>
@@ -813,7 +813,7 @@ export default function FlightsContent() {
                   <td className="px-4 py-2">
                     <span className="text-sm text-gray-700"><VocabLabel kind="airline" value={rate.airline} /></span>
                     {(rate as { airline_code?: string | null }).airline_code && (
-                      <span className="ml-1.5 text-[10px] font-mono font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded px-1 py-0.5">
+                      <span className="ml-1.5 text-[10px] font-mono font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded px-1 py-0.5">
                         {(rate as { airline_code?: string | null }).airline_code}
                       </span>
                     )}
@@ -830,7 +830,7 @@ export default function FlightsContent() {
                       rate.cabin_class === 'first' 
                         ? 'bg-amber-100 text-amber-800' 
                         : rate.cabin_class === 'business'
-                        ? 'bg-purple-100 text-purple-800'
+                        ? 'bg-primary-100 text-primary-800'
                         : 'bg-gray-100 text-gray-700'
                     }`}>
                       {rate.cabin_class.charAt(0).toUpperCase() + rate.cabin_class.slice(1)}
@@ -856,7 +856,7 @@ export default function FlightsContent() {
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       rate.flight_type === 'domestic' 
                         ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-purple-100 text-purple-800'
+                        : 'bg-primary-100 text-primary-800'
                     }`}>
                       {rate.flight_type === 'domestic' ? 'DOM' : 'INT'}
                     </span>
@@ -1026,7 +1026,7 @@ export default function FlightsContent() {
                         onClick={() => applyPopularRoute(route.from, route.to)}
                         className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                           formData.route_from === route.from && formData.route_to === route.to
-                            ? 'bg-sky-100 border-sky-300 text-sky-700'
+                            ? 'bg-primary-100 border-primary-300 text-primary-700'
                             : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                         }`}
                       >
@@ -1040,7 +1040,7 @@ export default function FlightsContent() {
               {/* Supplier Selection */}
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-gray-700 border-b pb-2 flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-cyan-600" />
+                  <Building2 className="h-4 w-4 text-primary-600" />
                   Airline / Supplier
                 </h3>
                 
@@ -1087,7 +1087,7 @@ export default function FlightsContent() {
               {/* Route */}
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-gray-700 border-b pb-2 flex items-center gap-2">
-                  <Plane className="h-4 w-4 text-sky-600" />
+                  <Plane className="h-4 w-4 text-primary-600" />
                   Route Information
                 </h3>
                 
@@ -1128,15 +1128,15 @@ export default function FlightsContent() {
                 </div>
 
                 {formData.route_from && formData.route_to && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-sky-50 border border-sky-100 rounded-md">
-                    <Plane className="h-4 w-4 text-sky-600" />
-                    <span className="text-sm text-sky-700">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 border border-primary-100 rounded-md">
+                    <Plane className="h-4 w-4 text-primary-600" />
+                    <span className="text-sm text-primary-700">
                       Route: <strong>{formData.route_from}</strong> → <strong>{formData.route_to}</strong>
                     </span>
                     <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${
                       formData.flight_type === 'domestic' 
                         ? 'bg-blue-100 text-blue-700' 
-                        : 'bg-purple-100 text-purple-700'
+                        : 'bg-primary-100 text-primary-700'
                     }`}>
                       {formData.flight_type === 'domestic' ? 'Domestic' : 'International'}
                     </span>
@@ -1183,7 +1183,7 @@ export default function FlightsContent() {
               {/* Schedule */}
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-gray-700 border-b pb-2 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-orange-600" />
+                  <Clock className="h-4 w-4 text-amber-600" />
                   Schedule
                 </h3>
                 

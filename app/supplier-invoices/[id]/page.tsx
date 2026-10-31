@@ -9,8 +9,8 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { getCurrencySymbol } from '@/lib/currency'
 
 const money = (n: number, c = 'EUR') => `${getCurrencySymbol(c)}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const STATUS_BADGE: Record<string, string> = { received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700', approved: 'bg-indigo-100 text-indigo-700', paid: 'bg-green-100 text-green-700', disputed: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400' }
-const MATCH_BADGE: Record<string, string> = { unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-orange-100 text-orange-700', matched: 'bg-green-100 text-green-700', discrepancy: 'bg-red-100 text-red-700' }
+const STATUS_BADGE: Record<string, string> = { received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700', approved: 'bg-primary-100 text-primary-700', paid: 'bg-green-100 text-green-700', disputed: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400' }
+const MATCH_BADGE: Record<string, string> = { unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-amber-100 text-amber-700', matched: 'bg-green-100 text-green-700', discrepancy: 'bg-red-100 text-red-700' }
 
 export default function SupplierInvoiceDetail() {
   const { id } = useParams<{ id: string }>()
@@ -172,7 +172,7 @@ export default function SupplierInvoiceDetail() {
         )}
         <div className="ml-auto flex items-center gap-2">
           <button disabled={busy !== null || (!canApprove && inv.match_status !== 'discrepancy' && inv.match_status !== 'partial')} onClick={async () => { const override = inv.match_status !== 'matched'; if (override && !(await dialog.confirm({ message: 'Invoice is not fully matched. Approve with a discrepancy?', variant: 'warning' }))) return; action('approve', () => fetch(`/api/supplier-invoices/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ override }) })) }}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Approve</button>
+            className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Approve</button>
           <button disabled={busy !== null || !canPay} onClick={() => { const entered = prompt('Payment reference (optional):'); if (entered === null) return; const ref = entered || undefined; action('pay', () => fetch(`/api/supplier-invoices/${id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_reference: ref }) })) }}
             className="px-4 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50 inline-flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Mark paid</button>
         </div>
