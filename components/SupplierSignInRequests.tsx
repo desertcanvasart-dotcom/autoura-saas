@@ -33,12 +33,16 @@ export async function decideClaim(id: string, decision: 'approve' | 'reject'): P
   return res.ok && d.success ? null : (d.error || 'Could not save')
 }
 
-/** On the Suppliers page: the waiting requests, with Confirm / Not them for admins. */
-export default function SupplierSignInRequests({ isAdmin }: { isAdmin: boolean }) {
+/**
+ * The waiting requests, with Confirm / Not them for admins. On Suppliers it
+ * shows only when there are some; Settings › Supplier network passes
+ * `emptyText` so an empty list says so.
+ */
+export default function SupplierSignInRequests({ isAdmin, emptyText }: { isAdmin: boolean; emptyText?: string }) {
   const { claims, load } = useClaims('status=pending')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  if (claims.length === 0) return null
+  if (claims.length === 0) return emptyText ? <p className="text-sm text-gray-500">{emptyText}</p> : null
 
   const decide = async (id: string, decision: 'approve' | 'reject') => {
     setBusy(id); setError(null)
