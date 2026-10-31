@@ -110,7 +110,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/settings/copilot-knowledge': ['admin', 'manager'],
   
   // Admin and Manager
-  '/financial-reports': ['admin', 'manager'],
   '/profit-loss': ['admin', 'manager'],
   '/accounts-receivable': ['admin', 'manager'],
   '/accounts-payable': ['admin', 'manager'],
@@ -153,7 +152,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // approve and publish (lib/publish/admin-route.ts).
   '/publish': ['admin', 'manager', 'member'],
   '/copilot': ['admin', 'manager', 'member'],
-  '/copilot-analytics': ['admin', 'manager'],
   // Receipts, invoices and contracts open from Payments and Itineraries.
   '/documents': ['admin', 'manager', 'member'],
   '/whatsapp-parser': ['admin', 'manager', 'member'],
@@ -174,7 +172,9 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   
   // All authenticated users (including viewer)
   '/dashboard': ['admin', 'manager', 'member', 'viewer'],
-  '/analytics': ['admin', 'manager', 'member', 'viewer'],
+  // Analytics for everyone; the Finance and Copilot tabs are held to
+  // managers by their APIs and hidden from others by the page.
+  '/reports': ['admin', 'manager', 'member', 'viewer'],
   '/calendar': ['admin', 'manager', 'member', 'viewer'],
   '/notifications': ['admin', 'manager', 'member', 'viewer'],
 }

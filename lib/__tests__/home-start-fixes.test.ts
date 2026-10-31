@@ -79,7 +79,7 @@ describe('analytics', () => {
     expect(r).toMatch(/from\('client_followups'\)/)
   })
   it('the page links to the real follow-ups page and invents no channel', () => {
-    const p = src('app/analytics/page.tsx')
+    const p = src('app/reports/_views/AnalyticsView.tsx')
     expect(p).toMatch(/href="\/followups"/)
     expect(p).not.toMatch(/Best channel/)
   })
