@@ -577,7 +577,7 @@ export default function TrainRatesContent() {
             <Train className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Train Rates
               <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
             </h1>
@@ -1273,7 +1273,7 @@ export default function TrainRatesContent() {
                       placeholder="Blank = customer fare"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
-                    <p className="text-[11px] text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       The throughout guide&rsquo;s seat. Blank = he pays the customer fare; 0 = rides free.
                     </p>
                   </div>

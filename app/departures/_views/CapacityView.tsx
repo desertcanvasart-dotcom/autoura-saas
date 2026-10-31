@@ -499,7 +499,7 @@ export default function CapacityPage() {
               <Calendar className="w-5 h-5 text-[#647C47]" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Capacity Calendar</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Capacity Calendar</h1>
               <p className="text-sm text-gray-500">Manage availability and view tour departures</p>
             </div>
           </div>
@@ -703,7 +703,7 @@ export default function CapacityPage() {
                                   )
                                 })}
                                 {departuresOnDate.length > 2 && (
-                                  <span className="text-[8px] text-gray-500 ml-1">+{departuresOnDate.length - 2}</span>
+                                  <span className="text-xs text-gray-500 ml-1">+{departuresOnDate.length - 2}</span>
                                 )}
                               </div>
                             )}
@@ -715,10 +715,10 @@ export default function CapacityPage() {
                           {/* Show tour departure info */}
                           {departureStarting && (
                             <div className="mt-1">
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded ${DEPARTURE_STATUS_CONFIG[departureStarting.status].color} block truncate`}>
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${DEPARTURE_STATUS_CONFIG[departureStarting.status].color} block truncate`}>
                                 {departureStarting.tour_code || departureStarting.tour_name.slice(0, 12)}
                               </span>
-                              <div className="flex items-center gap-1 mt-0.5 text-[9px] text-gray-500">
+                              <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-500">
                                 <Users className="w-2.5 h-2.5" />
                                 {departureStarting.booked_pax}/{departureStarting.max_pax}
                               </div>
@@ -727,7 +727,7 @@ export default function CapacityPage() {
 
                           {hasDepartures && !departureStarting && (
                             <div className="mt-1">
-                              <span className="text-[9px] text-gray-400 italic">
+                              <span className="text-xs text-gray-400 italic">
                                 in trip
                               </span>
                             </div>
@@ -737,11 +737,11 @@ export default function CapacityPage() {
                           {inItinerary && !hasDepartures && (
                             <div className="mt-1">
                               {isItinStart ? (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary-100 text-primary-800 block truncate">
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-800 block truncate">
                                   🚀 Start
                                 </span>
                               ) : (
-                                <span className="text-[9px] text-primary-600">
+                                <span className="text-xs text-primary-600">
                                   Day {itinDayNum}
                                 </span>
                               )}
@@ -785,7 +785,7 @@ export default function CapacityPage() {
 
                         {entry && !past && (
                           <div className="mt-1">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${config.color}`}>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${config.color}`}>
                               {config.label}
                             </span>
                           </div>
@@ -845,7 +845,7 @@ export default function CapacityPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] px-2 py-0.5 rounded ${
+                  <span className={`text-xs px-2 py-0.5 rounded ${
                     selectedItinerary.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                     selectedItinerary.status === 'draft' ? 'bg-gray-100 text-gray-800' :
                     selectedItinerary.status === 'sent' ? 'bg-blue-100 text-blue-800' :
@@ -923,7 +923,7 @@ export default function CapacityPage() {
                                 <p className="text-xs text-gray-500">{dep.tour_code}</p>
                               )}
                             </div>
-                            <span className={`text-[10px] px-2 py-0.5 rounded ${depConfig.color}`}>
+                            <span className={`text-xs px-2 py-0.5 rounded ${depConfig.color}`}>
                               {depConfig.label}
                             </span>
                           </div>

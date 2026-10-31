@@ -147,7 +147,7 @@ export default function BillingPlansPage() {
                 }`}
               >
                 Yearly
-                <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 text-[10px] rounded-full font-semibold">
+                <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full font-semibold">
                   -17%
                 </span>
               </button>
@@ -213,7 +213,7 @@ export default function BillingPlansPage() {
                       <div>
                         <h3 className="text-sm font-semibold text-gray-900">{tier.name}</h3>
                         {isCurrentPlan && (
-                          <span className="text-[10px] font-medium text-[#647C47] bg-[#647C47]/10 px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-medium text-[#647C47] bg-[#647C47]/10 px-1.5 py-0.5 rounded">
                             Current
                           </span>
                         )}
@@ -234,12 +234,12 @@ export default function BillingPlansPage() {
                           <span className="text-xs text-gray-500">/mo</span>
                         </div>
                         {billingCycle === 'yearly' && tier.annualPrice !== null && (
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             Billed {formatPrice(tier.annualPrice)}/year
                           </p>
                         )}
                         {tier.onboardingFeeUsd !== null && (
-                          <p className="text-[11px] text-gray-500 mt-1.5">
+                          <p className="text-xs text-gray-500 mt-1.5">
                             + {formatPrice(tier.onboardingFeeUsd)} one-time onboarding
                           </p>
                         )}
@@ -253,7 +253,7 @@ export default function BillingPlansPage() {
 
                   {/* Limits */}
                   <div className="mb-3">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Includes</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Includes</p>
                     <ul className="space-y-1.5">
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
                         <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />

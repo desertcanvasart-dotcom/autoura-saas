@@ -253,7 +253,7 @@ export default function CurrenciesSettingsPage() {
         <div className="overflow-x-auto border-t border-gray-200">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                 <th className="px-5 py-3 w-16">In use</th>
                 <th className="px-3 py-3">Currency</th>
                 <th className="px-3 py-3 text-right">API rate</th>

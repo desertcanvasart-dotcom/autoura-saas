@@ -260,7 +260,7 @@ export default function FinancialReportsPage() {
             📊
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Financial Reports</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Financial Reports</h1>
             <p className="text-sm text-gray-500">Revenue, cash flow, tax & commission analysis</p>
           </div>
         </div>

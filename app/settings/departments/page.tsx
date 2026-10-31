@@ -427,7 +427,7 @@ export default function DepartmentsSettingsPage() {
                           className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47] disabled:opacity-40"
                         />
                         {type.label}
-                        {owner && <span className="text-[10px] text-gray-400">· {owner}</span>}
+                        {owner && <span className="text-xs text-gray-400">· {owner}</span>}
                       </label>
                     )
                   })}
@@ -474,7 +474,7 @@ export default function DepartmentsSettingsPage() {
                   </button>
                 </div>
                 {customTypeInput && normalizeServiceType(customTypeInput) !== customTypeInput.trim() && (
-                  <p className="text-[11px] text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-1">
                     Will be saved as: <span className="font-mono">{normalizeServiceType(customTypeInput) || '—'}</span>
                   </p>
                 )}

@@ -307,7 +307,7 @@ export default function AccountsPayablePage() {
               <AlertTriangle className="w-8 h-8 text-red-600" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h1>
           <p className="text-gray-600 mb-6">
             You don't have permission to view accounts payable. Manager access is required.
           </p>
@@ -341,7 +341,7 @@ export default function AccountsPayablePage() {
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">Accounts Payable</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Accounts Payable</h1>
               {tenant && (
                 <span className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-full">
                   {tenant.company_name}

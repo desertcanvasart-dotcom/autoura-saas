@@ -58,14 +58,14 @@ export default function CopilotThreadList({
               <span className="text-sm font-medium text-gray-900 truncate flex-1">
                 {t.client_name || t.contact_info}
               </span>
-              <span className="text-[10px] text-gray-400 flex items-center gap-0.5 shrink-0">
+              <span className="text-xs text-gray-400 flex items-center gap-0.5 shrink-0">
                 <Clock className="h-2.5 w-2.5" />{timeAgo(t.last_draft_at || t.last_message_at)}
               </span>
             </div>
             {t.subject && <p className="text-xs text-gray-500 truncate mb-0.5">{t.subject}</p>}
             <p className="text-xs text-gray-400 truncate">{t.latest_inbox_snippet || '—'}</p>
             {t.pending_draft_count > 0 && (
-              <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#647C47]/10 text-[#647C47]">
+              <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-[#647C47]/10 text-[#647C47]">
                 {t.pending_draft_count} draft{t.pending_draft_count > 1 ? 's' : ''} to review
               </span>
             )}

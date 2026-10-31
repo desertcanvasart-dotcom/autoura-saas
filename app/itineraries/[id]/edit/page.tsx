@@ -1050,7 +1050,7 @@ export default function ItineraryEditorPage() {
             )}
 
             {/* Itinerary Code */}
-            <h1 className="text-lg font-bold text-gray-900 whitespace-nowrap">{itinerary.itinerary_code}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 whitespace-nowrap">{itinerary.itinerary_code}</h1>
 
             {/* Separator */}
             <span className="text-gray-300">|</span>
@@ -1334,7 +1334,7 @@ export default function ItineraryEditorPage() {
                     placeholder="Day title..."
                   />
                   <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${getCityColor(day.city).bg} ${getCityColor(day.city).text}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getCityColor(day.city).bg} ${getCityColor(day.city).text}`}>
                       📍 {day.city}
                     </span>
                     {day.flight_from && <span className="flex items-center gap-1"><Plane size={12} /> from {day.flight_from}</span>}
@@ -1736,7 +1736,7 @@ export default function ItineraryEditorPage() {
                                         <span className="capitalize">{(service.service_type ?? '').replace('_', ' ')}</span>
                                         {(service.quantity ?? 0) > 1 && ` • Qty: ${service.quantity}`}
                                         {service.supplier_name && (
-                                          <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
+                                          <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
                                             📦 {service.supplier_name}
                                           </span>
                                         )}
@@ -1947,7 +1947,7 @@ export default function ItineraryEditorPage() {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-semibold text-[#647C47]">{fmtRate(attr.base_rate_eur, attr, 0)} / {fmtRate(attr.base_rate_non_eur, attr, 0)}</div>
-                        <div className="text-[11px] text-gray-500">EUR / non-EUR</div>
+                        <div className="text-xs text-gray-500">EUR / non-EUR</div>
                       </div>
                     </div>
                   )

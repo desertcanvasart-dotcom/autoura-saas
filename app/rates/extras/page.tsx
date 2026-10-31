@@ -122,7 +122,7 @@ export default function ExtrasPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-start justify-between mb-1">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
           <Sparkles className="w-6 h-6 text-primary-600" /> Extras
         </h1>
         <div className="flex items-center gap-2">

@@ -352,7 +352,7 @@ export default function ClientProfilePage() {
               {/* Info */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <h1 className="text-2xl font-bold text-gray-900">
+                  <h1 className="text-2xl font-semibold text-gray-900">
                     {client.first_name} {client.last_name}
                   </h1>
                   {client.vip_status && (
@@ -673,7 +673,7 @@ export default function ClientProfilePage() {
                           </p>
                         </div>
                         {em.auto_linked && (
-                          <span className="shrink-0 text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                          <span className="shrink-0 text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
                             auto-linked
                           </span>
                         )}

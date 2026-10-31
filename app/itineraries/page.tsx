@@ -374,7 +374,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
                         href={`/itineraries/${itinerary.id}`}
                         title={attention[itinerary.id].items.join('\n')}
                         aria-label={`${attention[itinerary.id].count} need attention: ${attention[itinerary.id].items.join('; ')}`}
-                        className={`ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                        className={`ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold ${
                           attention[itinerary.id].warnings > 0 ? 'bg-amber-100 text-amber-800' : 'bg-blue-50 text-blue-700'
                         }`}
                       >

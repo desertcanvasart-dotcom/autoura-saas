@@ -43,7 +43,7 @@ function CategoryChooser({ label, primary }: { label: string; primary?: boolean 
           <p className="px-4 pb-1 text-xs text-gray-500">Which rate sheet?</p>
           {RATE_GROUPS.map(g => (
             <div key={g.key} className="pt-1">
-              <p className="px-4 pt-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{g.title}</p>
+              <p className="px-4 pt-1 text-xs font-semibold uppercase tracking-wider text-gray-400">{g.title}</p>
               {g.categories.map(c => (
                 <Link key={c.slug} role="menuitem" href={rateCategoryHref(c.slug)} className="block px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
                   {c.label}

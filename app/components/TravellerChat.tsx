@@ -137,7 +137,7 @@ export default function TravellerChat({ itineraryId }: { itineraryId: string }) 
                     : 'bg-gray-100 text-gray-900'
                 }`}>
                   <p className="whitespace-pre-line break-words">{m.content}</p>
-                  <p className={`mt-1 text-[10px] ${m.direction === 'outbound' ? 'text-white/70' : 'text-gray-500'}`}>
+                  <p className={`mt-1 text-xs ${m.direction === 'outbound' ? 'text-white/70' : 'text-gray-500'}`}>
                     {m.sender_name ? `${m.sender_name} · ` : ''}{fmtTime(m.created_at)}
                     {m.direction === 'inbound' && m.notify_outcome && NOTIFY_PROBLEM[m.notify_outcome] && (
                       <span className="ml-1 text-amber-600" title={NOTIFY_PROBLEM[m.notify_outcome]}>⚠ not notified</span>

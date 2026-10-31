@@ -605,7 +605,7 @@ export default function GuideRatesContent() {
             <Users className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Guide Rates
               <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
             </h1>
@@ -875,7 +875,7 @@ export default function GuideRatesContent() {
                       <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
                         <VocabLabel kind="guide_grade" value={rate.guide_type} />
                         {rate.guide_mode && rate.guide_mode !== 'spot' && (
-                          <span className="ml-1 px-1.5 py-0.5 rounded bg-primary-100 text-primary-800 text-[10px] font-medium"><VocabLabel kind="guide_mode" value={rate.guide_mode} /></span>
+                          <span className="ml-1 px-1.5 py-0.5 rounded bg-primary-100 text-primary-800 text-xs font-medium"><VocabLabel kind="guide_mode" value={rate.guide_mode} /></span>
                         )}
                       </span>
                     </td>

@@ -112,7 +112,7 @@ export default function VariationOptionsPage() {
         <ArrowLeft className="w-4 h-4" /> Back to Tour Manager
       </Link>
 
-      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-[#647C47]" />
         Options and upgrades
       </h1>
@@ -201,7 +201,7 @@ export default function VariationOptionsPage() {
                 ))}
               </div>
             )}
-            <p className="px-4 py-3 text-[11px] text-gray-500 border-t">
+            <p className="px-4 py-3 text-xs text-gray-500 border-t">
               A set price is charged exactly as entered — the quote&apos;s margin is never added on top. An option with no cost and no price is unpriced, and a quote that includes it is flagged incomplete.
             </p>
           </section>

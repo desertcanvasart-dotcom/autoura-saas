@@ -201,7 +201,7 @@ export default function B2BPartnersPage() {
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <XCircle className="w-8 h-8 text-red-600" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">You don't have permission to manage B2B partners.</p>
           <button
             onClick={() => router.push('/dashboard')}
@@ -248,7 +248,7 @@ export default function B2BPartnersPage() {
             <Building2 className="w-5 h-5 text-[#647C47]" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">B2B Partners</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">B2B Partners</h1>
             <p className="text-sm text-gray-500">Manage partner accounts and pricing</p>
           </div>
         </div>

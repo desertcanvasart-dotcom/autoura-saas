@@ -142,7 +142,7 @@ export default function BookingsPage() {
                 <BookOpen className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">Bookings</h1>
                 <p className="text-sm text-gray-500">Manage confirmed trips and payments</p>
               </div>
             </div>

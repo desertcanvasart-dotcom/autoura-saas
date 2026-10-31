@@ -73,12 +73,12 @@ export default function ExpiringContracts() {
           <FileSignature className="w-4 h-4 text-amber-500" />
           Supplier contracts
           {expired > 0 && (
-            <span className="text-[11px] font-medium text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
+            <span className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
               {expired} expired
             </span>
           )}
           {expiring > 0 && (
-            <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+            <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
               {expiring} expiring
             </span>
           )}
@@ -120,7 +120,7 @@ export default function ExpiringContracts() {
                       {' · '}{today ? describeExpiry(today, item.validTo) : ''} ({fmtDate(item.validTo)})
                     </p>
                   </div>
-                  <span className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0 border ${lapsed ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                  <span className={`text-xs uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0 border ${lapsed ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
                     {lapsed ? 'expired' : `${item.daysLeft}d`}
                   </span>
                 </Link>

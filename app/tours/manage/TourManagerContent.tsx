@@ -820,11 +820,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               {destinationCities.map(c => <option key={c} value={c} />)}
             </datalist>
             {namesSeveralPlaces(dayCity) ? (
-              <p className="text-[11px] text-red-600 mt-1" role="alert">
+              <p className="text-xs text-red-600 mt-1" role="alert">
                 {severalPlacesReason(dayCity)}. Choose one to save this day.
               </p>
             ) : (
-              <p className="text-[11px] text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Left blank, pricing reads the title — and a day it cannot place is a gap, not Cairo.
               </p>
             )}
@@ -847,7 +847,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 The whole day is the flight out: no hotel, vehicle, guide, meal or airport help is priced on it, whatever else the day says. The arrival — its transfer and meet &amp; greet — moves to the next day on the ground.
               </p>
             )}
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               Say it here and the words in the title stop deciding it.
             </p>
           </div>
@@ -869,7 +869,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               placeholder="Where they stay tonight — e.g. Cairo, for a day in Alexandria"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
             />
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               {dayTripFromCity.trim() && dayCity.trim() && dayTripFromCity.trim().toLowerCase() !== dayCity.trim().toLowerCase()
                 ? `Out from ${dayTripFromCity.trim()} to ${dayCity.trim()} and back the same day: priced at the Intercity Day Trip rate, with the night in ${dayTripFromCity.trim()}.`
                 : 'Leave blank when the party sleeps in this day’s city.'}
@@ -891,7 +891,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             <option value="day_tour">Full day (8 hours)</option>
             <option value="long_day_tour">Long day (12 hours)</option>
           </select>
-          <p className="text-[11px] text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             The transport for the day is priced from the matching route.
           </p>
         </div>
@@ -903,7 +903,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/60">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <span className="text-xs font-medium text-gray-700">
-              Transport this day{dayTransportLines ? <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px]">Changed on this day</span> : <span className="ml-2 text-[10px] text-gray-500">automatic</span>}
+              Transport this day{dayTransportLines ? <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-xs">Changed on this day</span> : <span className="ml-2 text-xs text-gray-500">automatic</span>}
             </span>
             <div className="flex gap-2">
               <button type="button" onClick={() => setDayTransportLines(prev => [...(prev ?? (transportPreview ?? []).map(l => ({ service_type: l.serviceType, ...(l.route ? { from: l.route.from, to: l.route.to } : { city: l.city }) }))), { service_type: transportTypeItems[0]?.key ?? 'day_tour', city: dayCity.trim() || undefined }])}
@@ -915,7 +915,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
           </div>
           {dayTransportLines ? (
             <div className="mt-2 space-y-1">
-              {dayTransportLines.length === 0 && <p className="text-[11px] text-gray-500">No transport this day.</p>}
+              {dayTransportLines.length === 0 && <p className="text-xs text-gray-500">No transport this day.</p>}
               {dayTransportLines.map((line, n) => {
                 const shown = transportPreview?.[n]
                 return (
@@ -943,8 +943,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             </div>
           ) : (
             <div className="mt-2 space-y-1">
-              {transportPreview === null && <p className="text-[11px] text-gray-500">Working out this day’s transport…</p>}
-              {transportPreview?.length === 0 && <p className="text-[11px] text-gray-500">No transport this day, by the rules.</p>}
+              {transportPreview === null && <p className="text-xs text-gray-500">Working out this day’s transport…</p>}
+              {transportPreview?.length === 0 && <p className="text-xs text-gray-500">No transport this day, by the rules.</p>}
               {transportPreview?.map((l, n) => (
                 <div key={n} className="flex items-center gap-2 text-xs">
                   <span className="text-gray-700">{transportTypeLabel(l.serviceType) || l.label}</span>
@@ -952,7 +952,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   <span className={l.cost != null ? 'text-gray-700' : 'text-red-600'}>{l.cost != null ? `${l.cost.toFixed(2)} (${l.vehicleType}${l.rateName ? `, ${l.rateName}` : ''})` : `No rate — ${l.reason}`}</span>
                 </div>
               ))}
-              <p className="text-[11px] text-gray-500">Decided by the rules from the day’s city, sightseeing and travel. Add or change a line to set it yourself.</p>
+              <p className="text-xs text-gray-500">Decided by the rules from the day’s city, sightseeing and travel. Add or change a line to set it yourself.</p>
             </div>
           )}
         </div>
@@ -969,7 +969,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">{roadSentence}</p>
+          <p className="text-xs text-gray-500 mt-1">{roadSentence}</p>
         </div>
 
         {(dayNight === 'cruise' || cruiseAssistDefaults.disembark) && (
@@ -982,7 +982,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 {label}
               </label>
             ))}
-            <p className="text-[11px] text-gray-500">Priced from your hotel check-in / check-out assistance rates. Ticked by itself on the first night aboard and the first day ashore; untick to leave it out.</p>
+            <p className="text-xs text-gray-500">Priced from your hotel check-in / check-out assistance rates. Ticked by itself on the first night aboard and the first day ashore; untick to leave it out.</p>
           </div>
         )}
 
@@ -998,7 +998,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
           />
           <span>
             Local transfer this day
-            <span className="block text-[11px] text-gray-500">
+            <span className="block text-xs text-gray-500">
               Somewhere else in town that is not sightseeing — the sound &amp; light show, the
               market, an evening out. Dinner at a restaurant already adds its own transfer.
             </span>
@@ -1038,13 +1038,13 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                       ))}
                     </select>
                     {options.length === 0 && (
-                      <span className="text-[11px] text-amber-700 shrink-0">none on file</span>
+                      <span className="text-xs text-amber-700 shrink-0">none on file</span>
                     )}
                   </div>
                 )
               })}
             </div>
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               A named hotel is priced exactly. If it is later switched off or deleted, the quote
               shows a gap rather than quietly using a different one.
             </p>
@@ -1136,7 +1136,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
           {/* Attractions that arrived as WORDS (a days sheet, the AI builder).
               The picker cannot show them, so say they are there — and kept. */}
           {dayAttractions.length === 0 && editingDayIndex !== null && wordedAttractions(itinerary[editingDayIndex] as unknown as Record<string, unknown>).length > 0 && (
-            <p className="text-[11px] text-gray-500 mt-1.5">
+            <p className="text-xs text-gray-500 mt-1.5">
               This day already names, in words: <span className="text-gray-700">{wordedAttractions(itinerary[editingDayIndex] as unknown as Record<string, unknown>).join(', ')}</span>.
               They are kept as they are, and priced by name. Pick from the list only to replace them with exact fees.
             </p>
@@ -1146,7 +1146,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               follows from its attractions, so a day that names none and says
               nothing was priced as a free day without anyone deciding that. */}
           {isDayTour && (
-            <p className="text-[11px] text-gray-500 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               This is a day tour: its guide, vehicle and tips are always included in the price, and it has no night.
               Pick the attractions above so their entrance fees are priced too.
             </p>
@@ -1161,7 +1161,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             />
             <span>
               No guided sightseeing on this day
-              <span className="block text-[11px] text-gray-500">
+              <span className="block text-xs text-gray-500">
                 An arrival or departure day, a day at leisure, a day of travel. Without this tick or an attraction,
                 pricing cannot tell a free day from a day nobody finished describing — and records a gap.
               </span>
@@ -1206,12 +1206,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             </div>
           )}
           {activityOptions.length === 0 && (
-            <p className="text-[11px] text-gray-500 mt-1.5">
+            <p className="text-xs text-gray-500 mt-1.5">
               No activities yet. Add them in Rates → Activities &amp; Add-ons (e.g. the Philae motorboat), then they appear here.
             </p>
           )}
           {dayActivities.length > 0 && dayNight === 'cruise' && (
-            <p className="text-[11px] text-amber-700 mt-1.5">
+            <p className="text-xs text-amber-700 mt-1.5">
               This is a cruise night — activities here are treated as included in the cruise sightseeing package and are not charged again.
             </p>
           )}
@@ -1256,7 +1256,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                   <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
-              <p className="text-[11px] text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 {dayTransportType === 'sleeping_train'
                   ? 'Board tonight, wake in the next day\u2019s city \u2014 no hotel bed this night.'
                   : 'The leg runs from the previous day\u2019s city to this one; several matching rates become a pick-the-exact-one hole unless named here.'}
@@ -1283,7 +1283,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                 />
               </div>
               {!usualLeg.from && !dayLegFrom.trim() && dayTransportType !== 'sleeping_train' && (
-                <p className="text-[11px] text-amber-700 mt-1">
+                <p className="text-xs text-amber-700 mt-1">
                   This is the first day, so there is no previous city to leave from \u2014 without a From, no ticket is priced. Type where the flight leaves from (Cairo for a connection after landing).
                 </p>
               )}
@@ -1308,7 +1308,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
                     />
                     {`Arrival assistance${legToCode ? ` at ${legToCode}` : ''}`}
                   </label>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     {isArrivalDayForm
                       ? 'On the arrival day both are on unless you untick them: the party is met where the international flight lands, and again where the connection lands.'
                       : 'Off unless you tick them \u2014 a flight in the middle of a trip is priced as its ticket alone, as before.'}
@@ -2601,7 +2601,7 @@ export default function TourManagerContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Map className="w-5 h-5 text-green-600" />
-              <h1 className="text-xl font-bold text-gray-900">Tour Programs Manager</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Tour Programs Manager</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
             </div>
             <div className="flex items-center gap-2">

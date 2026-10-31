@@ -526,7 +526,7 @@ export default function AirportServicesPage() {
         <div className="container mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Plane className="w-5 h-5 text-primary-600" />
-            <h1 className="text-xl font-bold text-gray-900">Airport Services</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Airport Services</h1>
             <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
           </div>
           <div className="flex items-center gap-2">
@@ -691,13 +691,13 @@ export default function AirportServicesPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
                       {fmtRate(Number(rate.rate_eur), rate, 2)}
-                      <span className="block text-[11px] font-normal text-gray-500">
+                      <span className="block text-xs font-normal text-gray-500">
                         {pricingBasisLabel(toPricingBasis(rate.pricing_type), rate.max_capacity)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate">
                       {rate.description || '-'}
-                      {rate.supplier_name && <span className="block text-[11px] text-gray-400 truncate">via {rate.supplier_name}</span>}
+                      {rate.supplier_name && <span className="block text-xs text-gray-400 truncate">via {rate.supplier_name}</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${

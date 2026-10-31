@@ -278,7 +278,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
                       return (
                         <div key={i} className={`flex ${visitorSide ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${visitorSide ? 'bg-[#647C47]/10 text-gray-800' : 'bg-gray-100 text-gray-700'}`}>
-                            <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">{m.role || 'message'}</div>
+                            <div className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">{m.role || 'message'}</div>
                             <div className="whitespace-pre-wrap">{m.content}</div>
                           </div>
                         </div>

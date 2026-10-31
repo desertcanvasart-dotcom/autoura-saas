@@ -77,7 +77,7 @@ export default function DocumentsPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
-          <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Documents</h1>
           <p className="text-sm text-gray-500">Manage customer contracts and supplier vouchers</p>
         </div>
       </header>

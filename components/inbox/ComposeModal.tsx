@@ -655,7 +655,7 @@ export default function ComposeModal({
               {openingDraft ? 'Draft' : COMPOSE_TITLES[mode]}
             </h3>
             {/* Where the autosave stands — the person can see their work is kept. */}
-            <span className="text-[11px] text-gray-400" aria-live="polite">
+            <span className="text-xs text-gray-400" aria-live="polite">
               {loadingDraft ? 'Opening draft…'
                 : saveState === 'saving' ? 'Saving…'
                 : saveState === 'saved' ? 'Saved to Drafts'
@@ -748,7 +748,7 @@ export default function ComposeModal({
           return (
             <div key={category}>
               <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 sticky top-0">
-                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   {category === 'customer' && '👤 Customer Templates'}
                   {category === 'partner' && '🏨 Partner Templates'}
                   {category === 'internal' && '📋 Internal Templates'}
@@ -766,12 +766,12 @@ export default function ComposeModal({
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-gray-900">{template.name}</span>
                     {template.channel === 'whatsapp' && (
-                      <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
+                      <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
                         WA only
                       </span>
                     )}
                     {template.channel === 'both' && (
-                      <span className="text-[9px] px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded">
+                      <span className="text-xs px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded">
                         +WA
                       </span>
                     )}
@@ -810,7 +810,7 @@ export default function ComposeModal({
                       >
                         <span className="font-medium text-gray-900">{sig.name}</span>
                         {sig.is_default && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded">
+                          <span className="text-xs px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded">
                             Default
                           </span>
                         )}
@@ -850,7 +850,7 @@ export default function ComposeModal({
                       <FileIcon className="w-4 h-4 text-gray-400" />
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-gray-700 truncate max-w-[150px]">{file.filename}</p>
-                        <p className="text-[10px] text-gray-500">{formatFileSize(file.size)}</p>
+                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                       </div>
                       <button
                         onClick={() => { markDirty(); setCarried(prev => prev.filter((_, i) => i !== index)) }}
@@ -885,7 +885,7 @@ export default function ComposeModal({
                         <p className="text-xs font-medium text-gray-700 truncate max-w-[150px]">
                           {file.filename}
                         </p>
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-xs text-gray-500">
                           {formatFileSize(file.size)}
                         </p>
                       </div>
@@ -1258,7 +1258,7 @@ export default function ComposeModal({
                       className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                     />
                     {(crmPlaceholderData[placeholder] || partnerPlaceholderData[placeholder]) && !placeholderValues[placeholder] && (
-                      <p className="text-[10px] text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-400 mt-0.5">
                         Will use: {crmPlaceholderData[placeholder] || partnerPlaceholderData[placeholder]}
                       </p>
                     )}

@@ -112,7 +112,7 @@ export default function SupplierInvoicesPage() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center"><Receipt className="h-5 w-5 text-gray-500" /></div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Supplier Invoices</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Supplier Invoices</h1>
             <p className="text-sm text-gray-500">Accounts payable — match, approve, and pay supplier bills</p>
           </div>
         </div>
@@ -226,7 +226,7 @@ function Stat({ label, value, sub, accent }: { label: string; value: string; sub
     <div className="bg-white border border-gray-200 rounded-lg p-3">
       <p className="text-xs text-gray-500">{label}</p>
       <p className={`text-xl font-semibold ${accent || 'text-gray-900'}`}>{value}</p>
-      {sub && <p className="text-[11px] text-gray-400">{sub}</p>}
+      {sub && <p className="text-xs text-gray-400">{sub}</p>}
     </div>
   )
 }

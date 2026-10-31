@@ -95,7 +95,7 @@ export default function RatesMenu() {
         {item('/rates', 'Overview')}
         {RATE_GROUPS.map(g => (
           <div key={g.key} className="mt-3">
-            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">{g.title}</p>
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">{g.title}</p>
             <div className="space-y-0.5">{g.categories.map(c => item(rateCategoryHref(c.slug), c.label, count(c.slug)))}</div>
           </div>
         ))}

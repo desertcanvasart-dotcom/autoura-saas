@@ -76,7 +76,7 @@ export default function ToolbarMenu({
         >
           {groups.map((group, gi) => (
             <div key={group.label} className={gi > 0 ? 'mt-1 pt-1 border-t border-gray-100' : ''}>
-              <p className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
                 {group.label}
               </p>
               {group.items.map(item => (

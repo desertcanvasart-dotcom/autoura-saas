@@ -1215,16 +1215,16 @@ function PricingGridContent() {
                 onClick={() => writeDescriptions('fill')}
                 disabled={writing !== null}
                 title="Write the days that have no description, from your Content Library and Writing Rules"
-                className="px-2.5 py-1 text-[11px] font-medium text-[#556B2F] hover:bg-[#556B2F]/10 rounded-md transition-colors disabled:opacity-50"
+                className="px-2.5 py-1 text-xs font-medium text-[#556B2F] hover:bg-[#556B2F]/10 rounded-md transition-colors disabled:opacity-50"
               >
                 {writing === 'all' ? 'Writing…' : 'Write descriptions'}
               </button>
               <span className="text-gray-300">|</span>
-              <button onClick={expandAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+              <button onClick={expandAll} className="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
                 Expand All
               </button>
               <span className="text-gray-300">|</span>
-              <button onClick={collapseAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+              <button onClick={collapseAll} className="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
                 Collapse All
               </button>
             </div>
@@ -1307,7 +1307,7 @@ function PricingGridContent() {
                     key={day.id}
                     type="button"
                     onClick={() => jumpToDay(day.id)}
-                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition-colors ${
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${
                       day.isExpanded
                         ? 'bg-[#556B2F] text-white border-[#556B2F]'
                         : 'bg-white text-gray-700 border-gray-200 hover:border-[#556B2F]'

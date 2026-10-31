@@ -675,7 +675,7 @@ export default function ActivityRatesContent() {
             <Ticket className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Activities & Add-ons
               <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
             </h1>

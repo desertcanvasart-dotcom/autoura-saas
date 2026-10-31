@@ -182,7 +182,7 @@ export default function ToursBrowsePage() {
             🗺️
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Tour Inventory</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Tour Inventory</h1>
             <p className="text-sm text-gray-500">Browse available tours and pricing</p>
           </div>
         </div>
@@ -216,7 +216,7 @@ export default function ToursBrowsePage() {
             {priced.length}
             <span className="text-sm font-normal text-gray-400"> of {tours.length}</span>
           </p>
-          {stillPricing > 0 && <p className="text-[11px] text-gray-400 mt-0.5">pricing {stillPricing} more…</p>}
+          {stillPricing > 0 && <p className="text-xs text-gray-400 mt-0.5">pricing {stillPricing} more…</p>}
         </div>
         {/* Optional-metadata tiles appear once the data exists — headline
             "Categories 0" / "Starting From —" above a populated list reads
@@ -373,7 +373,7 @@ export default function ToursBrowsePage() {
               {/* Price & Action */}
               <div className="flex items-end justify-between pt-3 border-t border-gray-100">
                 <div>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Starting from</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Starting from</p>
                   {/* No price is said plainly. It used to read as a euro sign
                       followed by N/A, and before that the card showed a
                       made-up duration x 150 estimate. */}
@@ -395,7 +395,7 @@ export default function ToursBrowsePage() {
                           {price.starting_from ? `${sym}${price.starting_from.toLocaleString()}` : 'Price on request'}
                         </p>
                         {price.starting_from && (
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             per person{price.starting_from_tier ? ` • ${price.starting_from_tier}` : ''}
                           </p>
                         )}
@@ -403,7 +403,7 @@ export default function ToursBrowsePage() {
                             of this tour's services still have no rate, so the
                             figure is lower than the finished tour will be. */}
                         {price.starting_from != null && !price.complete && (
-                          <span className="inline-block mt-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                          <span className="inline-block mt-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                             Incomplete · {price.gaps} {price.gaps === 1 ? 'service' : 'services'} without a rate
                           </span>
                         )}
@@ -427,8 +427,8 @@ export default function ToursBrowsePage() {
 
             {/* Card Footer */}
             <div className="bg-gray-50 px-4 py-2 border-t border-gray-100 flex items-center justify-between">
-              <p className="text-[10px] text-gray-400 font-mono uppercase">{tour.template_code}</p>
-              <p className="text-[10px] text-gray-400">
+              <p className="text-xs text-gray-400 font-mono uppercase">{tour.template_code}</p>
+              <p className="text-xs text-gray-400">
                 {tour.variations_count || 0} variation{tour.variations_count !== 1 ? 's' : ''}
               </p>
             </div>

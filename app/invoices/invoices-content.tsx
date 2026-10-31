@@ -583,7 +583,7 @@ export default function InvoicesContent() {
             <FileText className="h-5 w-5 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Invoices</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Invoices</h1>
             <p className="text-sm text-gray-500">Manage client invoices and payments</p>
           </div>
         </div>
@@ -732,7 +732,7 @@ export default function InvoicesContent() {
                           <TypeIcon className="h-3 w-3" />
                           {typeConfig.label}
                           {invoice.invoice_type !== 'standard' && (
-                            <span className="text-[10px] opacity-75">({invoice.deposit_percent}%)</span>
+                            <span className="text-xs opacity-75">({invoice.deposit_percent}%)</span>
                           )}
                         </span>
                       </td>

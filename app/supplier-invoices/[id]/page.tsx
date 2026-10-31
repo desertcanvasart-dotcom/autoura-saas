@@ -77,7 +77,7 @@ export default function SupplierInvoiceDetail() {
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">{inv.supplier_name}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{inv.supplier_name}</h1>
             <p className="text-sm text-gray-500">{inv.supplier_invoice_number} · {inv.internal_reference}</p>
             <div className="flex items-center gap-2 mt-2">
               <span className={`px-2 py-0.5 rounded text-xs font-medium ${MATCH_BADGE[inv.match_status] || ''}`}>{inv.match_status}</span>

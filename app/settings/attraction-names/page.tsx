@@ -229,7 +229,7 @@ export default function AttractionAliasesPage() {
             <div className="p-4 border-b border-gray-100">
               <h2 className="text-sm font-semibold text-gray-900">
                 Your aliases <span className="ml-2 text-xs font-normal text-gray-500">{aliases.length}</span>
-                {broken.length > 0 && <span className="ml-2 text-[11px] font-medium text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">{broken.length} no longer reach a fee</span>}
+                {broken.length > 0 && <span className="ml-2 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">{broken.length} no longer reach a fee</span>}
               </h2>
               <p className="text-xs text-gray-500 mt-1">Matched on the whole wording, ignoring capitals — never on part of it.</p>
             </div>
@@ -278,7 +278,7 @@ export default function AttractionAliasesPage() {
                               <span className="font-medium">“{a.alias}”</span>
                               <ArrowRight className="inline w-3.5 h-3.5 mx-1.5 text-gray-400" />
                               {canonicalParts(a.canonical).join('  +  ')}
-                              {!a.is_active && <span className="ml-2 text-[11px] text-gray-500 border border-gray-300 rounded px-1.5 py-0.5">switched off</span>}
+                              {!a.is_active && <span className="ml-2 text-xs text-gray-500 border border-gray-300 rounded px-1.5 py-0.5">switched off</span>}
                             </p>
                             {!a.health.ok && (
                               <p className="text-xs text-red-700 mt-1 flex items-start gap-1"><AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {a.health.problem}</p>

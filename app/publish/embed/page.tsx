@@ -97,7 +97,7 @@ export default function PublishEmbedPage() {
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><Code2 className="h-5 w-5 text-[#647C47]" /></div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">On your own website</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">On your own website</h1>
           <p className="text-sm text-gray-500">Show your tours on the website you already have — prices always live from Autoura, enquiries straight into your CRM.</p>
         </div>
       </div>

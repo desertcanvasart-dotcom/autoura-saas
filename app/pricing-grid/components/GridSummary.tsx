@@ -126,7 +126,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
       </div>
 
       {/* Context + what the last save did */}
-      <div className="px-4 py-1 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-x-3 text-[11px] text-gray-500">
+      <div className="px-4 py-1 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-x-3 text-xs text-gray-500">
         <span>
           {dayCount} days {'\u00B7'} {pax} pax {'\u00B7'} {config.passport === 'eu' ? 'EU' : 'Non-EU'} {'\u00B7'} {config.tier} {'\u00B7'} {config.clientType.toUpperCase()}
           {savedItineraryCode && <span className="ml-1 font-medium text-green-700">{'\u00B7'} {savedItineraryCode}</span>}
@@ -147,7 +147,7 @@ function SummaryCell({ label, value, symbol, color, strong }: {
 }) {
   return (
     <div>
-      <div className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">{label}</div>
+      <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">{label}</div>
       <div className={`${strong ? 'text-lg' : 'text-sm'} font-bold tabular-nums ${color || 'text-gray-900'}`}>
         {symbol}{value.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>

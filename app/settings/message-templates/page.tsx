@@ -762,7 +762,7 @@ export default function TemplatesPage() {
                       {LANGUAGES.find(l => l.code === template.language)?.flag || template.language}
                     </span>
                   )}
-                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${getChannelColor(template.channel)}`}>
+                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${getChannelColor(template.channel)}`}>
                     {getChannelIcon(template.channel)}
                   </span>
                 </div>
@@ -775,14 +775,14 @@ export default function TemplatesPage() {
 
               {/* Tags */}
               <div className="flex items-center gap-1.5 mb-2">
-                <span className={`px-1.5 py-0.5 rounded text-[10px] ${getCategoryColor(template.category)}`}>
+                <span className={`px-1.5 py-0.5 rounded text-xs ${getCategoryColor(template.category)}`}>
                   {template.category}
                 </span>
-                <span className="text-[10px] text-gray-400 uppercase">
+                <span className="text-xs text-gray-400 uppercase">
                   {SUBCATEGORY_LABELS[template.subcategory] || template.subcategory}
                 </span>
                 {template.version && template.version > 1 && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600" title={`Version ${template.version}`}>
+                  <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600" title={`Version ${template.version}`}>
                     v{template.version}
                   </span>
                 )}

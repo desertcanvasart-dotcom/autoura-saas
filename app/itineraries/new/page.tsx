@@ -98,7 +98,7 @@ export default function NewItineraryPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Create New Itinerary</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Create New Itinerary</h1>
             <p className="text-gray-600 mt-1">Fill in the details to create a new trip plan</p>
           </div>
           <Link 

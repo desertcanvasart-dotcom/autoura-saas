@@ -319,12 +319,12 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
             <span className="font-medium text-gray-700">AI Copilot</span>
             {tone && <span className="text-gray-400">· {tone}</span>}
             {retrievedCount > 0 && (
-              <span className="text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5 text-[10px]">
+              <span className="text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5 text-xs">
                 {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
               </span>
             )}
             {fromPregenerate && drafts.length > 0 && (
-              <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-[10px]">
+              <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-xs">
                 ready
               </span>
             )}
@@ -357,11 +357,11 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
               <div key={d.id} className="rounded-lg border border-primary-100 bg-white p-3">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Option {idx + 1}</span>
                     {d.ai_confidence && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>{d.ai_confidence}</span>
                     )}
-                    {d.ai_flags?.subject && <span className="text-[11px] text-gray-500 truncate">{d.ai_flags.subject}</span>}
+                    {d.ai_flags?.subject && <span className="text-xs text-gray-500 truncate">{d.ai_flags.subject}</span>}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-[#647C47] text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
@@ -373,7 +373,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
                   </div>
                 </div>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{d.draft_body}</p>
-                {d.ai_flags?.rationale && <p className="mt-1.5 text-[11px] text-gray-400 italic">{d.ai_flags.rationale}</p>}
+                {d.ai_flags?.rationale && <p className="mt-1.5 text-xs text-gray-400 italic">{d.ai_flags.rationale}</p>}
               </div>
             ))}
           </div>
@@ -419,7 +419,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {attachments.map((a, idx) => (
-              <span key={idx} className="inline-flex items-center gap-1 text-[11px] bg-gray-100 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5">
+              <span key={idx} className="inline-flex items-center gap-1 text-xs bg-gray-100 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5">
                 <Paperclip className="w-3 h-3 text-gray-500" />
                 <span className="truncate max-w-[160px]">{a.filename}</span>
                 <span className="text-gray-400">{formatBytes(a.size)}</span>
@@ -428,7 +428,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
                 </button>
               </span>
             ))}
-            <span className="text-[11px] text-gray-400 self-center">
+            <span className="text-xs text-gray-400 self-center">
               {formatBytes(totalAttachBytes)} total
             </span>
           </div>

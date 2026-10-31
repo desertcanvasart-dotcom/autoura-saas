@@ -203,8 +203,8 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
           Package is the grid's historical behaviour. */}
       <div className="px-4 pt-3 pb-2.5 border-b border-gray-100">
         <div className="flex items-center gap-2 mb-1.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Package Type</div>
-          <div className="text-[11px] text-gray-400">— decides what each day must include</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Package Type</div>
+          <div className="text-xs text-gray-400">— decides what each day must include</div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {PACKAGE_TYPE_CONFIGS.map(pkg => (
@@ -230,7 +230,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
 
         {/* Mode 1: Paste Text */}
         <div className="flex-1 px-4 py-2.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Paste Text</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Paste Text</div>
           <button
             type="button"
             onClick={() => { setShowPaste(!showPaste); setUploadedFile(null); setUploadError(null) }}
@@ -248,7 +248,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
 
         {/* Mode 2: Upload File */}
         <div className="flex-1 px-4 py-2.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Upload File</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Upload File</div>
           <div
             className={`relative flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
               isDragging
@@ -295,7 +295,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
 
         {/* Mode 3: Load / Build */}
         <div className="flex-1 px-4 py-2.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Load / Build</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Load / Build</div>
           <div className="flex items-center gap-1">
             <input
               type="text"

@@ -165,7 +165,7 @@ export default function CopilotAnalyticsPage() {
               <div className="space-y-2">
                 {data.top_knowledge.map((k) => (
                   <div key={k.id} className="flex items-center gap-3">
-                    <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${typeColor(k.source_type)}`}>
+                    <span className={`text-xs uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${typeColor(k.source_type)}`}>
                       {k.source_type.replace('kb_', '').replace('_', ' ')}
                     </span>
                     <span className="text-sm text-gray-800 truncate flex-1">{k.title || '(untitled)'}</span>
@@ -181,7 +181,7 @@ export default function CopilotAnalyticsPage() {
             <Card title="Per-user activity" icon={<Users className="w-4 h-4 text-gray-500" />}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-[11px] uppercase text-gray-400 tracking-wide">
+                  <thead className="text-xs uppercase text-gray-400 tracking-wide">
                     <tr>
                       <th className="text-left py-1.5">User</th>
                       <th className="text-right py-1.5">Reviewed</th>
@@ -250,7 +250,7 @@ function Card({ title, subtitle, icon, children }: { title: string; subtitle?: s
           {icon}
           <h3 className="text-sm font-medium text-gray-900">{title}</h3>
         </div>
-        {subtitle && <p className="text-[11px] text-gray-400 mt-0.5">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
       </div>
       {children}
     </div>
@@ -292,7 +292,7 @@ function DailyChart({ days }: { days: Array<{ date: string; generated: number; s
                 <div className="absolute bottom-0 left-0 right-0 bg-green-500 rounded-t" style={{ height: `${sentPct}%` }} />
               </div>
             </div>
-            <span className="text-[9px] text-gray-400 truncate">{d.date.slice(5)}</span>
+            <span className="text-xs text-gray-400 truncate">{d.date.slice(5)}</span>
           </div>
         )
       })}

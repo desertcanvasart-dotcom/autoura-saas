@@ -508,7 +508,7 @@ export default function PublishPageReview({ params }: { params: Promise<{ id: st
       <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-[#647C47]"><ArrowLeft className="h-4 w-4" />Website</Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{detail.page.tourName}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{detail.page.tourName}</h1>
           <p className="text-sm text-gray-500 flex items-center gap-1"><Globe className="h-4 w-4" />/{detail.locale.language}/tours/{detail.locale.slug}</p>
         </div>
         <div className="flex items-center gap-1 border border-gray-200 rounded-md p-0.5">

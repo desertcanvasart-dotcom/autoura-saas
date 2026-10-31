@@ -452,7 +452,7 @@ export default function ExpensesPage() {
             💰
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Expenses</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
             <p className="text-sm text-gray-500">Track operational costs and supplier payments</p>
           </div>
         </div>

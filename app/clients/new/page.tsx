@@ -162,7 +162,7 @@ export default function NewClientPage() {
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Back to Clients
               </Link>
-              <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
                 <User className="w-5 h-5 text-primary-600" />
                 Add New Client
               </h1>
@@ -189,7 +189,7 @@ export default function NewClientPage() {
                     >
                       {step.num}
                     </div>
-                    <span className={`text-[10px] mt-1.5 ${currentStep >= step.num ? 'text-primary-600 font-medium' : 'text-gray-400'}`}>
+                    <span className={`text-xs mt-1.5 ${currentStep >= step.num ? 'text-primary-600 font-medium' : 'text-gray-400'}`}>
                       {step.label}
                     </span>
                   </button>

@@ -130,7 +130,7 @@ export default function EditPaymentPage() {
     return (
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-xl font-bold text-gray-900 mb-3">Payment Not Found</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-3">Payment Not Found</h1>
           <Link href="/payments" className="text-sm text-primary-600 hover:text-primary-700">
             ← Back to Payments
           </Link>
@@ -144,7 +144,7 @@ export default function EditPaymentPage() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Payment</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Edit Payment</h1>
             <p className="text-sm text-gray-600 mt-1">Update payment information</p>
           </div>
           <Link

@@ -119,7 +119,7 @@ function SignatureCard({
           <div className="flex items-center gap-2 mb-2">
             <h3 className="font-medium text-gray-900 text-sm">{signature.name}</h3>
             {signature.is_default && (
-              <span className="inline-flex items-center gap-1 text-[11px] bg-[#647C47]/10 text-[#647C47] border border-[#647C47]/20 rounded-full px-1.5 py-0.5 font-medium">
+              <span className="inline-flex items-center gap-1 text-xs bg-[#647C47]/10 text-[#647C47] border border-[#647C47]/20 rounded-full px-1.5 py-0.5 font-medium">
                 <Star className="w-2.5 h-2.5 fill-current" />
                 Default
               </span>
@@ -216,7 +216,7 @@ function SignatureModal({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-medium text-gray-700">Signature</label>
-              <div className="flex rounded-md border border-gray-200 overflow-hidden text-[11px]">
+              <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
                 <button
                   type="button"
                   onClick={() => setMode('editor')}
@@ -241,7 +241,7 @@ function SignatureModal({
                   placeholder="Your name, title, contact info…"
                   minHeight={180}
                 />
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   Formatting is preserved when attached to emails.
                 </p>
               </>
@@ -255,14 +255,14 @@ function SignatureModal({
                   className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40 resize-y"
                   style={{ minHeight: 180 }}
                 />
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   Paste a full HTML signature. Use absolute image URLs (https://…). Scripts and
                   event handlers are stripped; switching back to the visual editor may reformat
                   complex layouts.
                 </p>
                 {content.trim() && (
                   <div className="mt-2">
-                    <div className="text-[11px] font-medium text-gray-500 mb-1">Preview</div>
+                    <div className="text-xs font-medium text-gray-500 mb-1">Preview</div>
                     <div
                       className="border border-gray-200 rounded-lg p-3 text-sm [&_a]:text-blue-600"
                       dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(content) }}

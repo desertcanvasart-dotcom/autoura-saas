@@ -290,7 +290,7 @@ export default function SupplierDocumentsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {itineraryFilter ? (
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">
+                <h1 className="text-2xl font-semibold text-gray-900">
                   Documents for {current?.itinerary_code ?? 'this itinerary'}
                 </h1>
                 <p className="text-sm text-gray-500">
@@ -299,7 +299,7 @@ export default function SupplierDocumentsPage() {
               </div>
             ) : (
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Supplier Documents</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">Supplier Documents</h1>
                 <p className="text-sm text-gray-500">Vouchers, service orders, and supplier communications — grouped by itinerary</p>
               </div>
             )}

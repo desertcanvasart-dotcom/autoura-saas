@@ -433,7 +433,7 @@ export default function B2BQuotesPage() {
                 <Building2 className="w-6 h-6 text-primary-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">B2B Quotes</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">B2B Quotes</h1>
                 <p className="text-sm text-gray-500">Tour operator rate sheets with multi-pax pricing</p>
               </div>
             </div>

@@ -158,7 +158,7 @@ export default function DashboardPage() {
   return (
     <div className="p-4 lg:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-semibold text-gray-900">
           Welcome Back{userName ? `, ${userName}` : ''}! 👋
         </h1>
         <p className="text-sm text-gray-600 mt-1">Here’s what needs you today.</p>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-gray-900 truncate">{m.sender || 'Unknown sender'}</p>
                 <p className="text-xs text-gray-500 truncate">{m.snippet}</p>
               </div>
-              <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0 ml-3 mt-0.5">
+              <span className="text-xs uppercase tracking-wide text-gray-400 shrink-0 ml-3 mt-0.5">
                 {m.channel}
               </span>
             </Row>

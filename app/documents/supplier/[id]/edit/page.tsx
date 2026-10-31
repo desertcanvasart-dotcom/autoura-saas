@@ -218,7 +218,7 @@ export default function EditSupplierDocumentPage() {
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </Link>
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">Edit {document.document_number}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">Edit {document.document_number}</h1>
                 <p className="text-xs text-gray-500">{document.document_type?.replace('_', ' ').toUpperCase()}</p>
               </div>
             </div>

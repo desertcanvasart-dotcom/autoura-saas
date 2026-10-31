@@ -126,12 +126,12 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
           <span className="font-medium text-gray-700">AI Copilot</span>
           {tone && <span className="text-gray-400">· {tone}</span>}
           {retrievedCount > 0 && (
-            <span className="text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5 text-[10px]">
+            <span className="text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5 text-xs">
               {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
             </span>
           )}
           {fromPregenerate && drafts.length > 0 && (
-            <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-[10px]">
+            <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-xs">
               ready
             </span>
           )}
@@ -192,11 +192,11 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
             >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                     Option {idx + 1}
                   </span>
                   {d.ai_confidence && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${confidenceColor(d.ai_confidence)}`}>
                       {d.ai_confidence}
                     </span>
                   )}
@@ -221,7 +221,7 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
               </div>
               <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{d.draft_body}</p>
               {d.ai_flags?.rationale && (
-                <p className="mt-1.5 text-[11px] text-gray-400 italic">{d.ai_flags.rationale}</p>
+                <p className="mt-1.5 text-xs text-gray-400 italic">{d.ai_flags.rationale}</p>
               )}
             </div>
           ))}

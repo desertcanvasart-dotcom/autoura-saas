@@ -215,14 +215,14 @@ export function TaskChecklist<T extends TaskWithChecklist>({
                           )}
                           {row.unpriced && (
                             <span
-                              className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-50 text-amber-800 border border-amber-200"
+                              className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-50 text-amber-800 border border-amber-200"
                               title={'The day calls for this, but the itinerary has no priced service for it yet'}
                             >
                               {'Not priced'}
                             </span>
                           )}
                           {row.is_new && !row.booked && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-50 text-blue-700 border border-blue-200">{'New'}</span>
+                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-50 text-blue-700 border border-blue-200">{'New'}</span>
                           )}
                         </div>
                         {row.notes && <div className="text-xs text-gray-500 mt-0.5">{row.notes}</div>}

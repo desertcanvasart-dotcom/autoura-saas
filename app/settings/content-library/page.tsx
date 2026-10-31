@@ -420,7 +420,7 @@ export default function ContentLibraryPage() {
                           return (
                             <div
                               key={tier.key}
-                              className={`w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center ${
+                              className={`w-4 h-4 rounded text-xs font-bold flex items-center justify-center ${
                                 hasTier
                                   ? `${tier.color} text-white`
                                   : 'bg-gray-200 text-gray-400'

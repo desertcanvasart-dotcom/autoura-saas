@@ -110,7 +110,7 @@ export default function CopilotReviewPanel({
         {/* Inbound message */}
         {latestInbound && (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Customer message</div>
+            <div className="text-xs uppercase tracking-wide text-gray-400 font-semibold mb-1">Customer message</div>
             <div className="bg-gray-100 rounded-lg px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{latestInbound.message_body}</div>
           </div>
         )}
@@ -130,14 +130,14 @@ export default function CopilotReviewPanel({
         {activeDraft ? (
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">AI draft reply</span>
+              <span className="text-xs uppercase tracking-wide text-gray-400 font-semibold">AI draft reply</span>
               {activeDraft.ai_confidence && (
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${CONF[activeDraft.ai_confidence] || ''}`}>
+                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${CONF[activeDraft.ai_confidence] || ''}`}>
                   {activeDraft.ai_confidence} confidence
                 </span>
               )}
               {activeDraft.status !== 'pending' && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">{activeDraft.status}</span>
+                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">{activeDraft.status}</span>
               )}
             </div>
             {activeDraft.operator_notes && (

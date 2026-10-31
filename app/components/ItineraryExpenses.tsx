@@ -194,7 +194,7 @@ export default function ItineraryExpenses({
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {expense.description || cat.label}
                       </p>
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${status.bg} ${status.color}`}>
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${status.bg} ${status.color}`}>
                         {status.label}
                       </span>
                     </div>
@@ -232,7 +232,7 @@ export default function ItineraryExpenses({
                       {getCurrencySymbol(expense.currency)}{Number(expense.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     {expense.currency !== currency && (
-                      <p className="text-[10px] text-gray-400">{expense.currency}</p>
+                      <p className="text-xs text-gray-400">{expense.currency}</p>
                     )}
                   </div>
 
@@ -279,7 +279,7 @@ export default function ItineraryExpenses({
                       {getCurrencySymbol(curr)}{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   ))}
-                  <p className="text-[10px] text-amber-600 mt-0.5">(converted at approximate rates)</p>
+                  <p className="text-xs text-amber-600 mt-0.5">(converted at approximate rates)</p>
                 </div>
               )}
             </div>

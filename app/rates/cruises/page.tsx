@@ -957,7 +957,7 @@ export default function CruisesPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Ship className="w-5 h-5 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">Cruises</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Cruises</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <div className="flex items-center gap-2">
@@ -1137,7 +1137,7 @@ export default function CruisesPage() {
                       {sanitizeSailingDays(cruise.sailing_days).length > 0 ? (
                         <span className="inline-flex flex-wrap justify-center gap-1">
                           {sanitizeSailingDays(cruise.sailing_days).map(d => (
-                            <span key={d} className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[11px] font-medium">
+                            <span key={d} className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                               {dayName(d).slice(0, 3)}
                             </span>
                           ))}
@@ -1386,7 +1386,7 @@ export default function CruisesPage() {
                   })}
                 </div>
                 {formData.sailing_days.length > 0 && (
-                  <p className="mt-1 text-[11px] text-gray-500">Departs {sailingDaysLabel(formData.sailing_days)}</p>
+                  <p className="mt-1 text-xs text-gray-500">Departs {sailingDaysLabel(formData.sailing_days)}</p>
                 )}
               </div>
 

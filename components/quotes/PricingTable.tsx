@@ -87,7 +87,7 @@ export default function PricingTable({
 
                 {/* Tour Leader Indicator */}
                 {tourLeaderIncluded && (
-                  <div className="text-[10px] text-primary-600 font-medium mb-2">
+                  <div className="text-xs text-primary-600 font-medium mb-2">
                     +1 TL = {effectivePax} total
                   </div>
                 )}

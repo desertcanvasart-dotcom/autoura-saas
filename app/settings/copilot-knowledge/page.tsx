@@ -209,13 +209,13 @@ function EntryCard({ entry, onEdit, onDelete, onToggle }: { entry: Entry; onEdit
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded border ${meta.color}`}>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border ${meta.color}`}>
               <Icon className="w-3 h-3" />
               {meta.label}
             </span>
-            {!entry.is_active && <span className="text-[11px] text-gray-400">disabled</span>}
+            {!entry.is_active && <span className="text-xs text-gray-400">disabled</span>}
             {(entry.metadata?.total_chunks || 1) > 1 && (
-              <span className="text-[11px] text-gray-400">{entry.metadata.total_chunks} chunks</span>
+              <span className="text-xs text-gray-400">{entry.metadata.total_chunks} chunks</span>
             )}
           </div>
           {entry.title && <h3 className="font-medium text-gray-900 text-sm mb-1">{entry.title}</h3>}
@@ -304,7 +304,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                       <Sparkles className="w-3.5 h-3.5 text-primary-600" />
                       AI-structured
                     </div>
-                    <p className="text-[11px] text-gray-500 leading-tight">
+                    <p className="text-xs text-gray-500 leading-tight">
                       Claude splits the text into typed entries (FAQ / policy / tour / other).
                     </p>
                   </button>
@@ -313,7 +313,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                     className={`text-left p-3 rounded-lg border text-sm ${mode === 'as_is' ? 'bg-primary-50 border-primary-300 ring-2 ring-primary-200' : 'border-gray-200 hover:bg-gray-50'}`}
                   >
                     <div className="font-medium text-gray-900 mb-0.5">As a single entry</div>
-                    <p className="text-[11px] text-gray-500 leading-tight">
+                    <p className="text-xs text-gray-500 leading-tight">
                       Stores the whole paste as one entry of the type you choose. Still auto-chunked.
                     </p>
                   </button>
@@ -356,7 +356,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                   placeholder="Paste FAQs, policies, tour descriptions, or any business knowledge here…"
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono resize-y"
                 />
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   {mode === 'ai_extract'
                     ? 'Claude will detect FAQs, policies, and tour blocks automatically.'
                     : 'Long content will be split into retrieval chunks automatically.'}
@@ -374,7 +374,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                   Imported {result.created} of {result.total} entries.
                 </p>
                 {result.failures.length > 0 && (
-                  <p className="text-[11px] text-amber-700">
+                  <p className="text-xs text-amber-700">
                     {result.failures.length} chunks failed — you can review and re-import those manually.
                   </p>
                 )}
@@ -386,7 +386,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                     {result.preview.map((p: any, idx: number) => (
                       <div key={idx} className="border border-gray-200 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] uppercase tracking-wide text-primary-700 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5">
+                          <span className="text-xs uppercase tracking-wide text-primary-700 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5">
                             {p.source_type.replace('kb_', '')}
                           </span>
                           {p.title && <span className="text-sm font-medium text-gray-900 truncate">{p.title}</span>}
@@ -496,7 +496,7 @@ function EntryModal({ entry, onClose, onSaved }: { entry: Entry | null; onClose:
                         <Icon className="w-4 h-4" />
                         {m.label}
                       </div>
-                      <p className="text-[11px] text-gray-500 leading-tight">{m.hint}</p>
+                      <p className="text-xs text-gray-500 leading-tight">{m.hint}</p>
                     </button>
                   )
                 })}
@@ -537,7 +537,7 @@ function EntryModal({ entry, onClose, onSaved }: { entry: Entry | null; onClose:
               rows={10}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 font-mono"
             />
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               Long content is automatically split into chunks for better retrieval.
             </p>
           </div>

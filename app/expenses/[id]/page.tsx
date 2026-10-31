@@ -249,7 +249,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold text-gray-900">{expense.expense_number}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">{expense.expense_number}</h1>
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
                   <StatusIcon className="h-3.5 w-3.5" />
                   {statusConfig.label}

@@ -405,7 +405,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold text-gray-900">{quote.quote_number}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">{quote.quote_number}</h1>
                 <StatusManager
                   quoteId={quote.id}
                   quoteType="b2b"

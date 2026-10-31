@@ -98,7 +98,7 @@ export default function PublishDomainsPage() {
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><Globe2 className="h-5 w-5 text-[#647C47]" /></div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Your website&apos;s address</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Your website&apos;s address</h1>
           <p className="text-sm text-gray-500">Connect your own domain, such as tours.youragency.com, or take a free address. Secure (https) automatically.</p>
         </div>
       </div>

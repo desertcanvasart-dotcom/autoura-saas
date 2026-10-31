@@ -54,7 +54,7 @@ export default function NetworkSuppliersPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-      <h1 className="text-2xl font-bold text-gray-900">Network suppliers</h1>
+      <h1 className="text-2xl font-semibold text-gray-900">Network suppliers</h1>
       <p className="text-sm text-gray-600 mt-1">Verified suppliers on Autoura who chose to be found by other agencies. Add one to your list, then ask them and agree each price — nobody else sees your rates or notes.</p>
 
       {off ? (

@@ -119,7 +119,7 @@ function FixedCostsContent() {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-[#647C47]" /> Fixed Daily Costs
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">Per-person costs per sightseeing day. Pricing reads the water cost (a type containing &ldquo;water&rdquo;); other types are kept for reference.</p>

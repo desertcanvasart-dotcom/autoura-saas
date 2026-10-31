@@ -605,7 +605,7 @@ export default function FlightsContent() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Plane className="h-5 w-5 text-primary-600" />
-          <h1 className="text-lg font-semibold text-gray-900">Flight Rates</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Flight Rates</h1>
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="flight_rates" onImportComplete={fetchRates} />
@@ -813,7 +813,7 @@ export default function FlightsContent() {
                   <td className="px-4 py-2">
                     <span className="text-sm text-gray-700"><VocabLabel kind="airline" value={rate.airline} /></span>
                     {(rate as { airline_code?: string | null }).airline_code && (
-                      <span className="ml-1.5 text-[10px] font-mono font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded px-1 py-0.5">
+                      <span className="ml-1.5 text-xs font-mono font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded px-1 py-0.5">
                         {(rate as { airline_code?: string | null }).airline_code}
                       </span>
                     )}
@@ -1286,7 +1286,7 @@ export default function FlightsContent() {
                       placeholder="Blank = customer fare"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
-                    <p className="text-[11px] text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       The throughout guide&rsquo;s seat. Blank = he pays the customer fare; 0 = rides free.
                     </p>
                   </div>

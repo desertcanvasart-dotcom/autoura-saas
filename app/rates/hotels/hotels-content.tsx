@@ -1109,7 +1109,7 @@ export default function HotelsContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-primary-600" />
-              <h1 className="text-xl font-bold text-gray-900">Hotels & Accommodation</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Hotels & Accommodation</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <div className="flex items-center gap-2">

@@ -399,7 +399,7 @@ function EmailSettingsContent() {
                     <div key={template.id} className="bg-white rounded-lg border border-gray-200 p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded font-medium uppercase">
+                          <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded font-medium uppercase">
                             {template.category}
                           </span>
                           <h4 className="text-sm font-medium text-gray-900 mt-1">{template.name}</h4>
@@ -557,7 +557,7 @@ function TemplateModal({
               onChange={setContent}
               placeholder="Write your template content..."
             />
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               Tip: Use placeholders like {"{{client_name}}"}, {"{{dates}}"}, {"{{total}}"} for dynamic content
             </p>
           </div>

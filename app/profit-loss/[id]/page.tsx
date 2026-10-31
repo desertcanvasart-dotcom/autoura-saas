@@ -226,7 +226,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">{pnlData.itinerary_code}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">{pnlData.itinerary_code}</h1>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[pnlData.status]?.bg || 'bg-gray-100'} ${STATUS_CONFIG[pnlData.status]?.color || 'text-gray-600'}`}>
                 {STATUS_CONFIG[pnlData.status]?.label || pnlData.status}
               </span>

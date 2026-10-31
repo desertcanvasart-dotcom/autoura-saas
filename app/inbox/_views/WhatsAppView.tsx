@@ -926,7 +926,7 @@ export default function WhatsAppInboxPage() {
       <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-gray-900">WhatsApp Inbox</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">WhatsApp Inbox</h1>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowAgentsModal(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Manage Agents">
                 <Users className="w-4 h-4" />
@@ -1119,7 +1119,7 @@ export default function WhatsAppInboxPage() {
                     <>
                       {/* Outgoing: Send to customer in this language */}
                       <div className="relative">
-                        <div className="text-[10px] text-gray-400 mb-0.5">Send in:</div>
+                        <div className="text-xs text-gray-400 mb-0.5">Send in:</div>
                         <button onClick={() => { setShowLanguageSelector(!showLanguageSelector); setShowAgentLanguageSelector(false) }} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
                           <span>{getLanguageInfo(customerLanguage).flag}</span><span>{getLanguageInfo(customerLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
                         </button>
@@ -1135,7 +1135,7 @@ export default function WhatsAppInboxPage() {
                       </div>
                       {/* Incoming: Read messages in this language */}
                       <div className="relative">
-                        <div className="text-[10px] text-gray-400 mb-0.5">Read in:</div>
+                        <div className="text-xs text-gray-400 mb-0.5">Read in:</div>
                         <button onClick={() => { setShowAgentLanguageSelector(!showAgentLanguageSelector); setShowLanguageSelector(false) }} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-green-300 rounded-lg text-sm hover:bg-gray-50">
                           <span>{getLanguageInfo(agentLanguage).flag}</span><span>{getLanguageInfo(agentLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
                         </button>

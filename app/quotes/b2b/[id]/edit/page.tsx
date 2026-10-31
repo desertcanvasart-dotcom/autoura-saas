@@ -252,7 +252,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-sm font-medium">Back to Quote</span>
               </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Edit Quote {quote.quote_number}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Edit Quote {quote.quote_number}</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {quote.b2b_partners?.company_name} • {quote.itineraries?.trip_name}
               </p>

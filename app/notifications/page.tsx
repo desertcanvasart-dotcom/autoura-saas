@@ -214,7 +214,7 @@ export default function NotificationsPage() {
             <Bell className="h-5 w-5 text-gray-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Notifications</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Notifications</h1>
             <p className="text-sm text-gray-500">
               {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
             </p>
@@ -336,7 +336,7 @@ export default function NotificationsPage() {
                       <p className={`text-sm ${!notification.is_read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
                         {notification.title}
                       </p>
-                      <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded mt-1 ${
+                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded mt-1 ${
                         notification.type.startsWith('whatsapp_') 
                           ? 'bg-[#25D366]/20 text-[#128C7E]' 
                           : 'bg-white/80 text-gray-600'
@@ -389,7 +389,7 @@ export default function NotificationsPage() {
                     </button>
 
                     {notification.email_sent && (
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-xs text-gray-400">
                         ✉️ Email sent
                       </span>
                     )}

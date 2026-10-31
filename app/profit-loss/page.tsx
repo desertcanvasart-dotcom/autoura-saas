@@ -280,7 +280,7 @@ export default function ProfitLossPage() {
             📊
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Profit & Loss</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Profit & Loss</h1>
             <p className="text-sm text-gray-500">Trip profitability analysis</p>
           </div>
         </div>
@@ -335,13 +335,13 @@ export default function ProfitLossPage() {
                 {netCommissionTotal >= 0 ? '+' : '−'}{reportingSymbol}
                 {Math.abs(netCommissionTotal).toLocaleString()}
               </p>
-              <p className="text-[11px] text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-400 mt-0.5">
                 in {reportingSymbol}{summary.total_commissions_receivable.toLocaleString()} · out{' '}
                 {reportingSymbol}{summary.total_commissions_payable.toLocaleString()}
               </p>
               {summary.total_disputed_receivable > 0 && (
                 <p
-                  className="text-[11px] text-amber-600 mt-0.5"
+                  className="text-xs text-amber-600 mt-0.5"
                   title="Disputed receivable commission may never be collected, so it is deliberately left out of margin."
                 >
                   {reportingSymbol}{summary.total_disputed_receivable.toLocaleString()} disputed,

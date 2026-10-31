@@ -122,7 +122,7 @@ export default function PublishLookPage() {
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><PaletteIcon className="h-5 w-5 text-[#647C47]" /></div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Look and feel</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Look and feel</h1>
           <p className="text-sm text-gray-500">Your website&apos;s theme, colours and fonts. Prices and facts always come from your records.</p>
         </div>
       </div>
@@ -274,7 +274,7 @@ export default function PublishLookPage() {
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">Preview</p>
           <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm" style={{ background: HEX.test(palette.surface) ? palette.surface : '#fff', color: HEX.test(palette.ink) ? palette.ink : '#000' }}>
             <div className="p-5" style={{ background: HEX.test(palette.primary) ? palette.primary : '#000', color: HEX.test(palette.primary) ? readableOn(palette.primary) : '#fff' }}>
-              <p className="text-[10px] uppercase tracking-[0.16em] opacity-80">{THEME_TEXT[archetype]?.label}</p>
+              <p className="text-xs uppercase tracking-[0.16em] opacity-80">{THEME_TEXT[archetype]?.label}</p>
               <p className="mt-2 text-2xl font-extrabold leading-none uppercase" style={{ fontFamily: `'${font?.display}', system-ui, sans-serif` }}>Egypt, your way</p>
               <span className="mt-4 inline-block rounded-full px-4 py-2 text-xs font-semibold"
                 style={{ background: HEX.test(palette.accent) ? palette.accent : '#ccc', color: HEX.test(palette.accent) ? readableOn(palette.accent) : '#000' }}>Journeys →</span>

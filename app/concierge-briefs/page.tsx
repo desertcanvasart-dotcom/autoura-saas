@@ -227,7 +227,7 @@ export default function ConciergeBriefsPage() {
           <ConciergeBell className="h-5 w-5 text-[#647C47]" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Concierge Leads</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Concierge Leads</h1>
           <p className="text-sm text-gray-500">Planning briefs from the AI Concierge — triage and respond</p>
         </div>
       </div>
@@ -336,10 +336,10 @@ export default function ConciergeBriefsPage() {
                     {(b.interests?.length || cons.length > 0) && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {b.interests?.map(i => (
-                          <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-[#647C47]/10 text-[#647C47]">{i}</span>
+                          <span key={i} className="px-1.5 py-0.5 rounded text-xs bg-[#647C47]/10 text-[#647C47]">{i}</span>
                         ))}
                         {cons.map(c => (
-                          <span key={c} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-600">{c}</span>
+                          <span key={c} className="px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-600">{c}</span>
                         ))}
                       </div>
                     )}

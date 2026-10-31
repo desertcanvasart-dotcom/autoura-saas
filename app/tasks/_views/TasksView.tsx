@@ -567,7 +567,7 @@ export default function TasksPage() {
             ✅
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Tasks</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Tasks</h1>
             <p className="text-sm text-gray-500">Manage operational tasks and assignments</p>
           </div>
         </div>

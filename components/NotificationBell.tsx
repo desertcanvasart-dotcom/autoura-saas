@@ -204,7 +204,7 @@ export default function NotificationBell() {
         
         {/* Unread Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -299,7 +299,7 @@ export default function NotificationBell() {
                       )}
                       
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="text-[10px] text-gray-400">
+                        <span className="text-xs text-gray-400">
                           {formatTime(notification.created_at)}
                         </span>
                         
@@ -310,7 +310,7 @@ export default function NotificationBell() {
                               if (!notification.is_read) markAsRead(notification.id)
                               setIsOpen(false)
                             }}
-                            className="text-[10px] text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5"
+                            className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5"
                           >
                             View <ExternalLink className="w-2.5 h-2.5" />
                           </Link>
@@ -319,7 +319,7 @@ export default function NotificationBell() {
                         {!notification.is_read && (
                           <button
                             onClick={() => markAsRead(notification.id)}
-                            className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-0.5"
+                            className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-0.5"
                           >
                             <Check className="w-2.5 h-2.5" /> Read
                           </button>

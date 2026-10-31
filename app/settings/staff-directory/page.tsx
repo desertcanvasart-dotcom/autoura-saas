@@ -820,7 +820,7 @@ export default function TeamMembersPage() {
                         key={label}
                         className="bg-gray-50 border border-gray-200 rounded-lg p-2.5"
                       >
-                        <p className="text-[11px] text-gray-500">{label}</p>
+                        <p className="text-xs text-gray-500">{label}</p>
                         <p className="text-lg font-semibold text-gray-900">
                           {value === null ? '—' : value}
                         </p>
@@ -828,7 +828,7 @@ export default function TeamMembersPage() {
                     ))}
                   </div>
 
-                  <p className="text-[11px] text-gray-400">{ACTIVITY_FOOTNOTE}</p>
+                  <p className="text-xs text-gray-400">{ACTIVITY_FOOTNOTE}</p>
                 </>
               ) : null}
             </div>

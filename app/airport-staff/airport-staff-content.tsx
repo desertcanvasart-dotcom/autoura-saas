@@ -334,7 +334,7 @@ export default function AirportStaffContent() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-gray-900">Airport Staff</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">Airport Staff</h1>
                 <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
               </div>
               {tenant && (

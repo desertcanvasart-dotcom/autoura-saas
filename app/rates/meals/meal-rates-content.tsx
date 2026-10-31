@@ -657,7 +657,7 @@ export default function MealRatesContent() {
             <Utensils className="w-6 h-6 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Meal Rates
               <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
             </h1>

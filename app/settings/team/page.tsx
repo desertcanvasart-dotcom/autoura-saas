@@ -413,7 +413,7 @@ export default function UserManagementPage() {
                             {member.full_name || 'Unnamed'}
                           </h4>
                           {!member.is_active && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 rounded">
+                            <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded">
                               Inactive
                             </span>
                           )}

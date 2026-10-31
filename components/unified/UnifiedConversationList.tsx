@@ -92,7 +92,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
           <h2 className="font-semibold text-gray-800">Email Conversations</h2>
           <button
             onClick={() => setAwaitingOnly(v => !v)}
-            className={`text-[11px] px-2 py-1 rounded-lg font-medium mr-auto ml-2 ${
+            className={`text-xs px-2 py-1 rounded-lg font-medium mr-auto ml-2 ${
               awaitingOnly ? 'bg-amber-100 text-amber-800' : 'text-gray-500 hover:bg-gray-100'
             }`}
             title="Conversations a customer is waiting on"
@@ -140,12 +140,12 @@ export default function UnifiedConversationList({ onSelectConversation, selected
                       {conv.client?.full_name || conv.client_name || conv.client_email || 'Unknown'}
                     </span>
                     {conv.unread_count > 0 && (
-                      <span className="bg-[#647C47] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
+                      <span className="bg-[#647C47] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
                     )}
                     {/* Waiting on us, and for how long — dated from the
                         customer's FIRST unanswered message. */}
                     {conv.awaiting_reply_since && (
-                      <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium">
+                      <span className="bg-amber-100 text-amber-800 text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium">
                         Waiting {timeAgo(conv.awaiting_reply_since)}
                       </span>
                     )}
@@ -154,7 +154,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
                   <p className="text-xs text-gray-400 truncate mt-0.5">{conv.last_message_snippet}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="text-[10px] text-gray-400">{timeAgo(conv.last_message_at)}</span>
+                  <span className="text-xs text-gray-400">{timeAgo(conv.last_message_at)}</span>
                   <ChannelBadge channel="email" />
                 </div>
               </div>

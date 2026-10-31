@@ -472,7 +472,7 @@ export default function TippingPage() {
         <div className="container mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-green-600" />
-            <h1 className="text-xl font-bold text-gray-900">Tipping Rates</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Tipping Rates</h1>
             <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
           </div>
           <div className="flex items-center gap-2">
@@ -629,7 +629,7 @@ export default function TippingPage() {
                       {/* A row pricing can never charge says so here, rather
                           than sitting in the list looking like it counts. */}
                       {rate.is_active !== false && whyTipRowIsNotPriced(rate) && (
-                        <div className="mt-1 text-[11px] leading-tight text-amber-700" title={whyTipRowIsNotPriced(rate) ?? undefined}>
+                        <div className="mt-1 text-xs leading-tight text-amber-700" title={whyTipRowIsNotPriced(rate) ?? undefined}>
                           Not priced — hover for why
                         </div>
                       )}

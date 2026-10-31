@@ -161,7 +161,7 @@ export default function RatePeriodsEditor({
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {RATE_FIELDS[entity].map(field => (
                   <div key={field}>
-                    <label className="block text-[11px] text-gray-500 mb-1">
+                    <label className="block text-xs text-gray-500 mb-1">
                       {FIELD_LABELS[field] ?? field}
                       {currencyLabel ? ` (${currencyLabel})` : ''}
                     </label>

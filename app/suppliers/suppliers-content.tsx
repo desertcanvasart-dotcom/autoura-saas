@@ -817,7 +817,7 @@ export default function SuppliersContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-semibold text-gray-900">
+              <h1 className="text-2xl font-semibold text-gray-900">
                 {selectedType === 'all' ? 'All Suppliers' : getTypeConfig(selectedType).label}
               </h1>
               <p className="text-sm text-gray-500">Manage supplier relationships, contacts, and rates</p>
@@ -1066,13 +1066,13 @@ export default function SuppliersContent() {
                       {/* Type-specific badges */}
                       {supplier.languages && supplier.languages.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
-                          {supplier.languages.slice(0, 3).map(l => <span key={l} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px]">{l}</span>)}
-                          {supplier.languages.length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">+{supplier.languages.length - 3}</span>}
+                          {supplier.languages.slice(0, 3).map(l => <span key={l} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs">{l}</span>)}
+                          {supplier.languages.length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{supplier.languages.length - 3}</span>}
                         </div>
                       )}
                       {supplier.vehicle_types && supplier.vehicle_types.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
-                          {supplier.vehicle_types.map(v => <span key={v} className="px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded text-[10px]"><VocabLabel kind="vehicle_type" value={v} /></span>)}
+                          {supplier.vehicle_types.map(v => <span key={v} className="px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded text-xs"><VocabLabel kind="vehicle_type" value={v} /></span>)}
                         </div>
                       )}
                       {supplier.star_rating && (

@@ -133,7 +133,7 @@ export default function UnifiedMessageThread({ conversation, onConversationUpdat
                   <span className="text-xs font-medium text-gray-700 truncate">
                     {msg.direction === 'outbound' ? 'You' : msg.from_address.split('<')[0].trim() || msg.from_address}
                   </span>
-                  <span className="text-[10px] text-gray-400 whitespace-nowrap">{formatDate(msg.sent_at)}</span>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{formatDate(msg.sent_at)}</span>
                 </div>
                 {msg.body_html ? (
                   <div className="text-sm text-gray-700 prose prose-sm max-w-none [&_*]:!text-sm [&_img]:!max-w-full"
@@ -144,7 +144,7 @@ export default function UnifiedMessageThread({ conversation, onConversationUpdat
                 {msg.attachments?.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {msg.attachments.map((att: any, i: number) => (
-                      <span key={i} className="text-[10px] bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-500">
+                      <span key={i} className="text-xs bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-500">
                         {att.filename || `Attachment ${i + 1}`}
                       </span>
                     ))}

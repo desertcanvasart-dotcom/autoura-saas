@@ -176,9 +176,9 @@ export default function BookingExtrasPanel({ bookingId, onTotalsChanged }: { boo
                 {e.kind === 'upgrade' && <ArrowUpRight className="w-3.5 h-3.5 text-[#647C47] flex-shrink-0" />}
                 <span className="font-medium">{e.title}</span>
                 {e.quantity > 1 && <span className="text-gray-500">× {e.quantity}</span>}
-                <span className={`text-[11px] px-1.5 py-0.5 rounded ${STATUS_STYLE[e.status]}`}>{STATUS_LABEL[e.status]}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_STYLE[e.status]}`}>{STATUS_LABEL[e.status]}</span>
                 {e.requested_via === 'portal' && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-primary-100 text-primary-800">from the portal</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-800">from the portal</span>
                 )}
               </p>
               {e.description && <p className="text-xs text-gray-600 mt-0.5">{e.description}</p>}
@@ -352,14 +352,14 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
     <div className="space-y-3">
       {groups.map(g => (
         <div key={g.source}>
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{g.label}</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{g.label}</p>
           <div className="divide-y bg-white rounded-lg border">
             {g.items.map(item => (
               <div key={item.source_id} className="p-2.5 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">{item.title}</p>
                   {item.subtitle && <p className="text-xs text-gray-600">{item.subtitle}</p>}
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     {item.unit_price == null ? item.price_note : `${money(item.unit_price, currency)} · ${item.price_note}`}
                     {item.unit === 'per_person' && numTravelers > 1 && ` · × ${numTravelers} travellers`}
                     {item.supplier_cost != null && ` · we pay ${money(item.supplier_cost, item.supplier_currency || currency)}`}
@@ -383,7 +383,7 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
           </div>
         </div>
       ))}
-      <p className="text-[11px] text-gray-500">Adding it changes nothing the customer owes — it becomes an offer. Confirm does that, once they have agreed.</p>
+      <p className="text-xs text-gray-500">Adding it changes nothing the customer owes — it becomes an offer. Confirm does that, once they have agreed.</p>
     </div>
   )
 }
@@ -438,7 +438,7 @@ function AddExtraForm({ bookingId, currency, onDone, onError }: { bookingId: str
           <input type="number" min="0" step="0.01" value={supplierCost} onChange={e => setSupplierCost(e.target.value)} placeholder="optional" className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg" />
         </label>
       </div>
-      <p className="text-[11px] text-gray-500">Adding it changes nothing the customer owes. Confirm does that, once they have agreed.</p>
+      <p className="text-xs text-gray-500">Adding it changes nothing the customer owes. Confirm does that, once they have agreed.</p>
       <button type="submit" disabled={busy || !title.trim()}
         className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-40">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add

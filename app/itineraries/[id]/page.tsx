@@ -987,7 +987,7 @@ export default function ViewItineraryPage() {
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </Link>
               <div className="min-w-0">
-                <h1 className="text-xl font-semibold text-gray-900 truncate" title={itinerary.trip_name}>{itinerary.trip_name}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900 truncate" title={itinerary.trip_name}>{itinerary.trip_name}</h1>
                 <p className="text-sm text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-primary-600">{itinerary.itinerary_code}</span>
                   <span>•</span>
@@ -1667,11 +1667,11 @@ function ResourceChips({ items }: { items: DayResource[] }) {
     <span className="mt-1 flex flex-wrap gap-1">
       {items.map(r =>
         r.state === 'assigned' ? (
-          <span key={r.type} className="inline-flex max-w-[14rem] items-center rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[11px] text-green-800" title={`${r.label}: ${r.names.join(', ')}`}>
+          <span key={r.type} className="inline-flex max-w-[14rem] items-center rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs text-green-800" title={`${r.label}: ${r.names.join(', ')}`}>
             <span className="truncate">{r.label}: {r.names.join(', ')}</span>
           </span>
         ) : (
-          <span key={r.type} className="inline-flex items-center rounded border border-dashed border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800" title={`No ${r.label.toLowerCase()} assigned for this day`}>
+          <span key={r.type} className="inline-flex items-center rounded border border-dashed border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800" title={`No ${r.label.toLowerCase()} assigned for this day`}>
             {r.label} needed
           </span>
         ),

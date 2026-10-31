@@ -571,7 +571,7 @@ export default function TenantSettingsPage() {
               <p className="px-3 py-1.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg">
                 {defaultMargin.trim() === '' ? 'Not set — uses 25%' : `${defaultMargin}%`}
               </p>
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Set in <Link href="/settings/pricing" className="underline">Settings › Pricing defaults</Link>.
               </p>
             </div>
@@ -579,7 +579,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Minimum Margin %
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Warn below this)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(Warn below this)</span>
               </label>
               <input
                 type="number"
@@ -591,7 +591,7 @@ export default function TenantSettingsPage() {
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                 placeholder="Not set — no warning"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 On cost, like the markup. An itinerary whose quoted margin, or profit so far,
                 is below this shows it under Needs attention. A trip losing money is always shown.
               </p>
@@ -600,7 +600,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Deposit %
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(New bookings)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(New bookings)</span>
               </label>
               <input
                 type="number"
@@ -612,7 +612,7 @@ export default function TenantSettingsPage() {
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                 placeholder="Not set — uses 30%"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Applied when a confirmed itinerary creates its booking.
               </p>
             </div>
@@ -631,7 +631,7 @@ export default function TenantSettingsPage() {
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                 placeholder="Not set — uses 7"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Days from booking creation until the deposit deadline.
               </p>
             </div>
@@ -656,7 +656,7 @@ export default function TenantSettingsPage() {
                   <option value={companyTimezone}>{companyTimezone}</option>
                 )}
               </select>
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 What &ldquo;today&rdquo; means for due dates, reminders and emails sent by the system.
               </p>
             </div>
@@ -666,7 +666,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Country you operate in
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(Contracts)</span>
               </label>
               <input
                 type="text"
@@ -677,7 +677,7 @@ export default function TenantSettingsPage() {
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
                 placeholder="e.g. Egypt"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Contracts say the balance is paid on arrival here, and that clients need visas for travel here.
                 Blank: no country is named.
               </p>
@@ -685,7 +685,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Governing law
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Contracts)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(Contracts)</span>
               </label>
               <input
                 type="text"
@@ -696,7 +696,7 @@ export default function TenantSettingsPage() {
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
                 placeholder="e.g. Egyptian law"
               />
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 Disputes go to arbitration under this law. Blank: the law of the country you are registered in.
               </p>
             </div>
@@ -718,7 +718,7 @@ export default function TenantSettingsPage() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <p className="mt-1.5 text-[11px] text-gray-500">
+            <p className="mt-1.5 text-xs text-gray-500">
               Your company&apos;s own currency: invoices, commissions, the P&amp;L and new quotes
               start in it. Documents already issued keep their currency.
             </p>
@@ -739,7 +739,7 @@ export default function TenantSettingsPage() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <p className="mt-1.5 text-[11px] text-gray-500">
+            <p className="mt-1.5 text-xs text-gray-500">
               The currency all your stored rates are read in and pricing runs in. Individual
               rates entered in another currency (the per-rate selector) are converted into
               this one automatically. Changing this does NOT convert existing numbers — it
@@ -757,7 +757,7 @@ export default function TenantSettingsPage() {
                 <Users className="w-4 h-4 text-gray-600" />
                 <h2 className="text-sm font-semibold text-gray-900">Limits</h2>
               </div>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Plan controlled</span>
+              <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Plan controlled</span>
             </div>
 
             <p className="text-xs text-gray-600">
@@ -790,7 +790,7 @@ export default function TenantSettingsPage() {
               <h2 className="text-sm font-semibold text-gray-900">Team Activity</h2>
             </div>
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded ${
+              className={`text-xs px-1.5 py-0.5 rounded ${
                 activityEnabled ? 'text-green-700 bg-green-50' : 'text-gray-400 bg-gray-100'
               }`}
             >
@@ -850,7 +850,7 @@ export default function TenantSettingsPage() {
             </div>
           )}
 
-          <p className="mt-3 text-[11px] text-gray-400">
+          <p className="mt-3 text-xs text-gray-400">
             Activity reflects work inside Autoura only. Phone calls, meetings, and off-app
             work are not captured.
           </p>
@@ -868,7 +868,7 @@ export default function TenantSettingsPage() {
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Company Logo
             </label>
-            <p className="text-[10px] text-gray-400 mb-2">
+            <p className="text-xs text-gray-400 mb-2">
               Recommended: Square image (500x500px), PNG or JPEG. Max 2MB
             </p>
 
@@ -907,7 +907,7 @@ export default function TenantSettingsPage() {
                       {logoFile?.name || 'Current logo'}
                     </p>
                     {logoFile && (
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-gray-500">
                         {(logoFile.size / 1024).toFixed(1)} KB
                       </p>
                     )}
@@ -971,7 +971,7 @@ export default function TenantSettingsPage() {
 
           {/* Color Preview */}
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Preview</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Preview</p>
             <div className="flex items-center gap-2">
               <div
                 className="w-8 h-8 rounded-lg shadow-sm"
@@ -994,7 +994,7 @@ export default function TenantSettingsPage() {
             <FileText className="w-4 h-4 text-gray-600" />
             <h2 className="text-sm font-semibold text-gray-900">Document header &amp; footer</h2>
           </div>
-          <p className="text-[11px] text-gray-500 mb-3">
+          <p className="text-xs text-gray-500 mb-3">
             Printed on the documents you send suppliers (vouchers, service orders). The header shows your logo, company name and tagline; the footer shows the details below. Leave a field blank to leave it off.
           </p>
 
@@ -1030,7 +1030,7 @@ export default function TenantSettingsPage() {
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Footer note
-                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(bank details, a legal note — printed at the bottom of every page)</span>
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(bank details, a legal note — printed at the bottom of every page)</span>
               </label>
               <textarea
                 value={footerText}
@@ -1045,7 +1045,7 @@ export default function TenantSettingsPage() {
 
           {/* Live preview of exactly what the footer will print */}
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Footer preview</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Footer preview</p>
             <DocumentFooter
               company={identityFromTenant({
                 company_name: companyName, contact_email: contactEmail, company_phone: companyPhone,

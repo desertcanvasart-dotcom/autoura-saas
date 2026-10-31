@@ -518,7 +518,7 @@ export default function TourPriceCalculator() {
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <XCircle className="w-8 h-8 text-red-600" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">You need manager permissions to access the B2B calculator.</p>
           <button
             type="button"
@@ -545,7 +545,7 @@ export default function TourPriceCalculator() {
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               <Calculator className="w-5 h-5 text-[#647C47]" /> B2B Price Calculator
             </h1>
             <p className="text-sm text-gray-500">Calculate dynamic pricing based on actual rates</p>
@@ -824,7 +824,7 @@ export default function TourPriceCalculator() {
                       <li key={i}>• {h.message}</li>
                     ))}
                   </ul>
-                  <p className="text-[11px] text-red-500 mt-1.5">
+                  <p className="text-xs text-red-500 mt-1.5">
                     Add the missing rates before sending this rate sheet to a partner.
                   </p>
                 </div>
@@ -842,7 +842,7 @@ export default function TourPriceCalculator() {
                       <li key={i}>• {w}</li>
                     ))}
                   </ul>
-                  <p className="text-[11px] text-amber-600 mt-1.5">
+                  <p className="text-xs text-amber-600 mt-1.5">
                     The price is correct, but confirm the itinerary can be booked as dated.
                   </p>
                 </div>
@@ -1071,7 +1071,7 @@ export default function TourPriceCalculator() {
                           and when the operator set that price, say so. */}
                       +{rateCurrency} {(opt.selling_price ?? opt.line_total).toFixed(2)}
                       {opt.price_basis === 'operator_price' && (
-                        <span className="block text-[11px] text-gray-400">operator price · no margin added</span>
+                        <span className="block text-xs text-gray-400">operator price · no margin added</span>
                       )}
                     </span>
                   </label>

@@ -239,7 +239,7 @@ export default function TripTimeline({ itineraryId, startDate, endDate, today, p
             Add note
           </button>
         </div>
-        <p className="text-[11px] text-gray-400">Checkpoints appear on the traveller&apos;s live page; notes stay internal.</p>
+        <p className="text-xs text-gray-400">Checkpoints appear on the traveller&apos;s live page; notes stay internal.</p>
       </div>
 
       {pending && (
@@ -267,7 +267,7 @@ export default function TripTimeline({ itineraryId, startDate, endDate, today, p
         <div className="space-y-3">
           {groups.map(g => (
             <div key={g.key}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{g.title}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{g.title}</p>
               <ol className="divide-y divide-gray-100">
                 {g.items.map(e => {
                   const meta = KIND_META[e.event_kind] ?? { label: e.event_kind, dot: 'bg-gray-400' }

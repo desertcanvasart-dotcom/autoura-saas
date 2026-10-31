@@ -178,7 +178,7 @@ export default function GenerateTasksButton({ itineraryId, openSignal = 0, hideT
                   <ul className="space-y-1.5">
                     {preview.tasks.map(t => (
                       <li key={t.service_type} className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className={`px-2 py-0.5 rounded border text-[11px] font-medium shrink-0 ${ACTION_STYLE[t.action]}`}>
+                        <span className={`px-2 py-0.5 rounded border text-xs font-medium shrink-0 ${ACTION_STYLE[t.action]}`}>
                           {ACTION_LABEL[t.action]}
                         </span>
                         <span className="font-medium text-gray-900">{t.label}</span>

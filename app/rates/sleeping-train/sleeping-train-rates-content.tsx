@@ -583,7 +583,7 @@ export default function SleepingTrainRatesContent() {
             <BedDouble className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Sleeping Train Rates
               <Moon className="w-4 h-4 text-primary-400" />
             </h1>
@@ -1298,7 +1298,7 @@ export default function SleepingTrainRatesContent() {
                       placeholder="Blank = customer fare"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
-                    <p className="text-[11px] text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       The throughout guide&rsquo;s berth (single cabin rows). Blank = he pays the customer fare; 0 = rides free.
                     </p>
                   </div>

@@ -262,7 +262,7 @@ export default function PaymentsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Payment Tracking</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Payment Tracking</h1>
           <p className="text-sm text-gray-600 mt-1">All payments from invoices and itineraries</p>
         </div>
         <div className="flex items-center gap-2">

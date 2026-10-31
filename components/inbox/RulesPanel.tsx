@@ -154,7 +154,7 @@ export default function RulesPanel({
           {editing && canEdit && (
             <div className="border border-primary-200 bg-primary-50/40 rounded-lg p-4 space-y-3" data-testid="rule-editor">
               <p className="text-xs font-semibold text-gray-700">{editing.id ? 'Edit rule' : 'New rule'}</p>
-              <p className="text-[11px] text-gray-500">When an email…</p>
+              <p className="text-xs text-gray-500">When an email…</p>
               <div className="grid grid-cols-2 gap-2">
                 {([['from', 'is from'], ['to', 'is to'], ['subject', 'has the subject'], ['words', 'has the words']] as const).map(([k, label]) => (
                   <label key={k} className="text-xs text-gray-600">
@@ -168,7 +168,7 @@ export default function RulesPanel({
                   </label>
                 ))}
               </div>
-              <p className="text-[11px] text-gray-500">…then</p>
+              <p className="text-xs text-gray-500">…then</p>
               <div className="space-y-1.5">
                 <label className="flex items-center gap-2 text-sm">
                   <span className="w-36 text-gray-700">File it in folder</span>

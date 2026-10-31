@@ -601,7 +601,7 @@ export default function CalendarPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Booking Calendar</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Booking Calendar</h1>
             <p className="text-sm text-gray-600 mt-1">
               View and manage all your bookings • Drag to reschedule
               {activeFilterCount() > 0 && ` • ${activeFilterCount()} filter${activeFilterCount() > 1 ? 's' : ''} active`}
@@ -1503,7 +1503,7 @@ function CoverageBadge({ coverage }: { coverage?: TripCoverage | null }) {
   return (
     <span
       title={`Suppliers: ${coverage.covered} of ${coverage.total} covered${coverage.waiting ? `, ${coverage.waiting} waiting for an answer` : ''}${coverage.open ? `, ${coverage.open} to arrange` : ''}`}
-      className={`px-1 rounded text-[10px] font-semibold leading-4 ${all ? 'bg-white/25' : coverage.attention ? 'bg-amber-300 text-amber-950' : 'bg-white/40'}`}
+      className={`px-1 rounded text-xs font-semibold leading-4 ${all ? 'bg-white/25' : coverage.attention ? 'bg-amber-300 text-amber-950' : 'bg-white/40'}`}
     >
       {coverage.covered}/{coverage.total}
     </span>

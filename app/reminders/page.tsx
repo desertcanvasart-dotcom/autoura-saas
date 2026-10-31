@@ -324,7 +324,7 @@ export default function PaymentRemindersPage() {
             🔔
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Payment Reminders</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Payment Reminders</h1>
             <p className="text-sm text-gray-500">Manage automated payment reminder emails</p>
           </div>
         </div>

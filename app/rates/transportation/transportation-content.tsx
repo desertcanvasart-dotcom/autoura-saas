@@ -634,7 +634,7 @@ export default function TransportationContent() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Car className="h-5 w-5 text-blue-600" />
-          <h1 className="text-lg font-semibold text-gray-900">Transportation Rates</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Transportation Rates</h1>
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="transportation_rates" onImportComplete={fetchRates} />

@@ -358,7 +358,7 @@ export default function CommissionsPage() {
             <Handshake className="h-5 w-5 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Commission Tracking</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Commission Tracking</h1>
             <p className="text-sm text-gray-500">Track commissions from hotels, shops, and partners</p>
           </div>
         </div>

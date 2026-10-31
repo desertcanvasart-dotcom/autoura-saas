@@ -286,7 +286,7 @@ export default function TourDetailPage() {
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">{tour.template_name}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{tour.template_name}</h1>
             <p className="text-sm text-gray-500">{tour.destination_name} • {tour.duration_days} {tour.duration_days === 1 ? 'day' : 'days'}</p>
           </div>
         </div>

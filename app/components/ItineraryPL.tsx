@@ -183,22 +183,22 @@ export default function ItineraryPL({
             <div className="p-3 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-500">Client price</p>
               <p className="text-lg font-semibold text-blue-600">{formatCurrency(totals.clientPrice)}</p>
-              <p className="text-[11px] text-gray-400">What the client pays</p>
+              <p className="text-xs text-gray-400">What the client pays</p>
             </div>
             <div className="p-3 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-500">Supplier cost</p>
               <p className="text-lg font-semibold text-gray-900">{formatCurrency(totals.supplierCost)}</p>
-              <p className="text-[11px] text-gray-400">The priced services</p>
+              <p className="text-xs text-gray-400">The priced services</p>
             </div>
             <div className="p-3 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-500">Extra expenses</p>
               <p className="text-lg font-semibold text-gray-900">{extras == null ? '—' : formatCurrency(extras)}</p>
-              <p className="text-[11px] text-gray-400">{extras == null ? 'Not loaded' : 'Recorded beyond the suppliers'}</p>
+              <p className="text-xs text-gray-400">{extras == null ? 'Not loaded' : 'Recorded beyond the suppliers'}</p>
             </div>
             <div className={`p-3 rounded-lg border ${getMarginBg(netPercent)}`}>
               <p className="text-xs text-gray-500">Net margin</p>
               <p className={`text-lg font-bold ${getMarginColor(netPercent)}`}>{formatCurrency(net)} <span className="text-sm font-semibold">({netPercent.toFixed(1)}%)</span></p>
-              <p className="text-[11px] text-gray-500">
+              <p className="text-xs text-gray-500">
                 Quoted {formatCurrency(totals.margin)} ({totals.marginPercent.toFixed(1)}%)
                 {commission !== 0 && <> · commissions {commission > 0 ? '+' : ''}{formatCurrency(commission)}</>}
               </p>

@@ -569,7 +569,7 @@ export default function RestaurantsContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <UtensilsCrossed className="w-5 h-5 text-amber-600" />
-              <h1 className="text-xl font-bold text-gray-900">Restaurant Contacts & Rates</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Restaurant Contacts & Rates</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <div className="flex items-center gap-2">

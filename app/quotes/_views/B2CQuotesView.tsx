@@ -408,7 +408,7 @@ export default function B2CQuotesPage() {
                 <FileText className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">B2C Quotes</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">B2C Quotes</h1>
                 <p className="text-sm text-gray-500">Direct client quotes with margin pricing</p>
               </div>
             </div>

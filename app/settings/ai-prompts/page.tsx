@@ -157,7 +157,7 @@ function PromptsContent() {
                       {p.variables.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {p.variables.map(v => (
-                            <span key={v} className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{`{{${v}}}`}</span>
+                            <span key={v} className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{`{{${v}}}`}</span>
                           ))}
                         </div>
                       )}

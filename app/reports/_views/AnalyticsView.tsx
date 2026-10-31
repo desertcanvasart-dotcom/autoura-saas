@@ -310,7 +310,7 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Analytics Dashboard</h1>
           <p className="text-sm text-gray-600 mt-1">Business performance and insights</p>
         </div>
         
@@ -651,7 +651,7 @@ export default function AnalyticsPage() {
                 >
                   {pipelineData[stage.key as keyof typeof pipelineData]}
                 </div>
-                <p className="text-[11px] text-gray-600 font-medium truncate">{stage.label}</p>
+                <p className="text-xs text-gray-600 font-medium truncate">{stage.label}</p>
               </div>
               {index < pipelineStages.length - 1 && (
                 <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0 mx-0.5" />

@@ -168,7 +168,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
             aria-controls="jump-results"
             aria-activedescendant={results[cursor] ? `jump-${cursor}` : undefined}
           />
-          <kbd className="text-[11px] text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd>
+          <kbd className="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd>
         </div>
         <ul id="jump-results" ref={listRef} role="listbox" className="max-h-[50vh] overflow-y-auto py-1">
           {results.length === 0 && (

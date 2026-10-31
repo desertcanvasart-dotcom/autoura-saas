@@ -152,7 +152,7 @@ export default function InvoicePage() {
     return (
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-xl font-bold text-gray-900 mb-3">Invoice Not Found</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-3">Invoice Not Found</h1>
           <Link href="/payments" className="text-sm text-primary-600 hover:text-primary-700">
             ← Back to Payments
           </Link>

@@ -486,7 +486,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             <BackLink fallbackHref="/bookings" fallbackLabel="Bookings" trip={trip} />
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">{booking.booking_number}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">{booking.booking_number}</h1>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bg} ${statusConfig.text} flex items-center gap-1`}>
                   <StatusIcon className="w-4 h-4" />
                   {statusLabel(booking.status)}
@@ -1064,10 +1064,10 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                       <li key={doc.id} className="py-2 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm text-gray-800 truncate">
-                            {who} · <span className="uppercase text-[10px] tracking-wide text-gray-400">{doc.kind}</span>
+                            {who} · <span className="uppercase text-xs tracking-wide text-gray-400">{doc.kind}</span>
                             {doc.label ? ` · ${doc.label}` : ''}
                           </p>
-                          <p className="text-[11px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             {doc.original_filename || 'document'} · {(doc.size_bytes / 1024 / 1024).toFixed(1)} MB ·{' '}
                             {new Date(doc.uploaded_at).toLocaleDateString()}
                             {doc.purged_at && ' · purged on schedule'}
@@ -1083,7 +1083,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                             View
                           </a>
                         ) : (
-                          <span className="shrink-0 text-[11px] text-gray-400">unavailable</span>
+                          <span className="shrink-0 text-xs text-gray-400">unavailable</span>
                         )}
                       </li>
                     )

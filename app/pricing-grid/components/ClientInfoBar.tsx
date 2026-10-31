@@ -33,7 +33,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
               <Link
                 href={`/clients/${config.clientId}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded bg-green-50 text-green-700 hover:bg-green-100"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-green-50 text-green-700 hover:bg-green-100"
                 title="This trip saves onto this CRM client"
               >
                 <Link2 className="w-3 h-3" />CRM client
@@ -46,7 +46,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
               <span className="text-gray-600">{config.tourName}</span>
             )}
             {config.itineraryCode && (
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 rounded-full border border-green-200">
+              <span className="px-2 py-0.5 text-xs font-bold bg-green-50 text-green-700 rounded-full border border-green-200">
                 {config.itineraryCode}
               </span>
             )}
@@ -63,7 +63,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Tour Name — full width on small screens */}
             <div className="sm:col-span-2 lg:col-span-3">
-              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Tour Name</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">Tour Name</label>
               <input
                 type="text"
                 value={config.tourName}
@@ -75,7 +75,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
 
             {/* Client Name */}
             <div>
-              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Client Name</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">Client Name</label>
               <input
                 type="text"
                 value={config.clientName}
@@ -90,7 +90,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
                 creates) the client by the new details. A name edit is a
                 spelling fix and keeps it. */}
             <div>
-              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Email</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">Email</label>
               <input
                 type="email"
                 value={config.clientEmail}
@@ -102,7 +102,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
 
             {/* Phone */}
             <div>
-              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Phone</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">Phone</label>
               <input
                 type="tel"
                 value={config.clientPhone}
@@ -114,7 +114,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
 
             {/* Nationality */}
             <div>
-              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Nationality</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">Nationality</label>
               <input
                 type="text"
                 value={config.nationality}

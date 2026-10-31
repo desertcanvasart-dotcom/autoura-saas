@@ -669,7 +669,7 @@ export default function AttractionsContent() {
         <div className="container mx-auto px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-900">Attractions & Entrance Fees</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Attractions & Entrance Fees</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <div className="flex items-center gap-2">

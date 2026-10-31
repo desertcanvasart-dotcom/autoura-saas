@@ -524,7 +524,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <BackLink fallbackHref="/invoices" fallbackLabel="Invoices" />
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">{invoice.invoice_number}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">{invoice.invoice_number}</h1>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
                 <TypeIcon className="h-3.5 w-3.5" />
                 {typeConfig.label}
