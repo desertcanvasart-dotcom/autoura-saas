@@ -18,9 +18,9 @@ export default function ClientsPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Clients</h1>
       <p className="text-gray-600 mb-8">
-        Your travellers, under <strong>People &rarr; Clients</strong>. The tour operators and agencies you
+        Your travellers, under <strong>Contacts &rarr; Clients</strong> in the sidebar. The tour operators and agencies you
         sell to are kept apart, under <Link href="/docs/partners" className="text-primary-600 hover:underline">Partners</Link>;
-        your own staff are under <Link href="/docs/team-members" className="text-primary-600 hover:underline">Team Members</Link>.
+        your own staff are under <Link href="/docs/team-members" className="text-primary-600 hover:underline">Staff Directory</Link> (the <strong>Team</strong> link).
       </p>
 
       {/* Stages */}

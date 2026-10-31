@@ -19,7 +19,7 @@ export default function DashboardPage() {
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
       <p className="text-gray-600 mb-8">
         The dashboard is your home base: what departs soon, what clients owe, what is waiting for a reply, and what must be
-        fixed before a group travels. Dates are counted in your company&rsquo;s timezone (Settings &rarr; Organization).
+        fixed before a group travels. Dates are counted in your company&rsquo;s timezone (Settings &rsaquo; Organization &rsaquo; Company).
       </p>
 
       <DocScreenshot src="/docs/dashboard/full-dashboard.jpg" alt="Dashboard with greeting, four action cards, list panels, and quick action buttons" />
@@ -74,7 +74,7 @@ export default function DashboardPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick actions</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>New Quote</strong> &mdash; start a new itinerary.</li>
-          <li><strong>Rates Hub</strong> and <strong>B2B Packages</strong> &mdash; managers and admins.</li>
+          <li><strong>Rates Hub</strong> (opens the Rates overview) and <strong>B2B Packages</strong> &mdash; managers and admins.</li>
           <li><strong>Clients</strong> &mdash; your client list, with the total.</li>
         </ul>
       </section>
@@ -90,11 +90,11 @@ export default function DashboardPage() {
 
       {/* Analytics */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Analytics</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Reports</h2>
         <p className="text-gray-600">
-          The dashboard is deliberately focused on what needs action <em>today</em>. For trends and totals &mdash; revenue, bookings, and performance over time &mdash; open <strong>Analytics</strong> in the sidebar (just under Dashboard).
+          The dashboard is deliberately focused on what needs action <em>today</em>. For trends and totals &mdash; revenue, bookings, and performance over time &mdash; open <strong>Reports</strong> in the sidebar (just under Dashboard); it opens on the <strong>Analytics</strong> tab. See <Link href="/docs/analytics-reports" className="text-primary-600 hover:underline">Reports</Link>.
         </p>
-        <DocScreenshot src="/docs/dashboard/analytics.jpg" alt="Analytics page with revenue and booking trend charts" />
+        <DocScreenshot src="/docs/dashboard/analytics.jpg" alt="Reports, Analytics tab, with revenue and booking trend charts" />
       </section>
 
       {/* Previous / next — from the docs order (pager.tsx) */}

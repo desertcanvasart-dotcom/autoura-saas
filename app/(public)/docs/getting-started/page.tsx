@@ -43,9 +43,9 @@ export default function GettingStartedPage() {
         <ol className="list-decimal list-inside space-y-1 text-gray-700">
           <li><strong>Welcome</strong> &mdash; A quick introduction</li>
           <li><strong>Business</strong> &mdash; Your company details</li>
-          <li><strong>Your words</strong> &mdash; The cities you sell, what you call your service tiers, and the kinds of suppliers you work with. Egypt&apos;s defaults are pre-filled; every dropdown in the app follows your choices, and an admin can change them any time in Settings &rarr; Your Vocabulary</li>
+          <li><strong>Your words</strong> &mdash; The cities you sell, what you call your service tiers, and the kinds of suppliers you work with. Egypt&apos;s defaults are pre-filled; every dropdown in the app follows your choices, and an admin can change them any time in Settings &rsaquo; Catalog &rsaquo; Vocabulary</li>
           <li><strong>Branding</strong> &mdash; Logo and colors used on your documents</li>
-          <li><strong>Team</strong> &mdash; Invite your teammates: each gets an invitation email (if one cannot be sent, you are shown the link to pass on). Optional &mdash; you can invite people later from User Management</li>
+          <li><strong>Team</strong> &mdash; Invite your teammates: each gets an invitation email (if one cannot be sent, you are shown the link to pass on). Optional &mdash; you can invite people later from Settings &rsaquo; Team &amp; roles</li>
           <li><strong>Tour</strong> &mdash; A short tour of the app</li>
           <li><strong>Complete</strong> &mdash; You&apos;re ready to work</li>
         </ol>
@@ -74,8 +74,8 @@ export default function GettingStartedPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Working for Several Companies</h2>
         <p className="text-gray-600 mb-3">
-          One login can belong to several companies, with a different role in each. When it does, a <strong>Company</strong>
-          picker appears in the sidebar under your role: choose a company and Autoura reloads in it &mdash; its clients, trips,
+          One login can belong to several companies, with a different role in each. When it does, the account menu (your initials, top
+          right) lists them under <strong>Switch company</strong>: choose a company and Autoura reloads in it &mdash; its clients, trips,
           rates, settings and your role there. Autoura remembers your choice the next time you sign in.
         </p>
         <p className="text-gray-600">
@@ -83,9 +83,76 @@ export default function GettingStartedPage() {
         </p>
         <p className="text-gray-600 mt-3">
           Your Gmail is connected per company: in each company, connect the mailbox you use for it under
-          <strong> Settings &rarr; Email</strong> (it can be the same address). The Inbox, replies and the mail sync use the
+          <strong> Settings &rsaquo; Account &rsaquo; Email &amp; signature</strong> (it can be the same address). The Inbox, replies and the mail sync use the
           current company&rsquo;s mailbox, and disconnecting in one company leaves the others connected.
         </p>
+      </section>
+
+      {/* Finding your way */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Finding Your Way</h2>
+        <p className="text-gray-600 mb-3">
+          The <strong>sidebar</strong> on the left holds your daily work, in sections. You see only the links your role may open:
+        </p>
+        <div className="overflow-x-auto mb-4">
+          <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left px-4 py-3 font-semibold text-gray-900 border-b border-gray-200">Section</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-900 border-b border-gray-200">Links</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-600">
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">(top)</td>
+                <td className="px-4 py-2.5">Dashboard &middot; Reports</td>
+              </tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">Communicate</td>
+                <td className="px-4 py-2.5">Inbox &middot; Email &middot; WhatsApp &middot; Leads &middot; Copilot &middot; Message templates</td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">Sell</td>
+                <td className="px-4 py-2.5">Quote Builder &middot; Quotes &middot; Itineraries &middot; Bookings &middot; Calendar</td>
+              </tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">Operate</td>
+                <td className="px-4 py-2.5">Tasks &middot; Departures &middot; Documents</td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">Products</td>
+                <td className="px-4 py-2.5">Tours &middot; Inventory &middot; Transport packages &middot; Extras &middot; Website</td>
+              </tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">Suppliers &amp; rates</td>
+                <td className="px-4 py-2.5">Suppliers &middot; Supplier network &middot; Rates overview &middot; Rates check, then the rate sheets in four foldable groups (Accommodation; Transport &amp; tickets; Guides &amp; services; Costs)</td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">Contacts</td>
+                <td className="px-4 py-2.5">Clients &middot; Partners &middot; Team</td>
+              </tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">Finance</td>
+                <td className="px-4 py-2.5">Invoices &middot; Receivables &middot; Payments &middot; Receipts &middot; Supplier bills &middot; Payables &middot; Expenses &middot; Commissions &middot; Profit &amp; loss</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="text-gray-600 mb-3">
+          <strong>Settings</strong> is pinned at the bottom of the sidebar and opens the Settings area, with its own grouped menu (see{' '}
+          <Link href="/docs/team-settings" className="text-primary-600 hover:underline">Team &amp; Settings</Link>). Several pages have
+          tabs &mdash; Reports, Inbox, Quotes, Tasks, Departures, Suppliers, Invoices, Payments and Supplier bills &mdash; and some
+          sidebar links open a tab directly (Receivables is the Unpaid tab of Invoices, for example). Each tab has its own address,
+          so you can bookmark it. Old bookmarks from before the menu changed still work: they open the page or tab that took over.
+        </p>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Top Bar</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Search or jump to</strong> &mdash; click it or press <strong>&#8984;K</strong> (Ctrl&nbsp;K on Windows), anywhere in the app, Settings included. Type a few letters to jump to any page you may open, any rate sheet, any setting, or a client by name. It also knows old names: &ldquo;analytics&rdquo; finds Reports, &ldquo;follow-ups&rdquo; finds the Follow-ups tab of Tasks.</li>
+          <li><strong>Copilot</strong> &mdash; opens the AI Copilot&apos;s review queue in a panel over the page you are on (see <Link href="/docs/copilot" className="text-primary-600 hover:underline">AI Copilot</Link>)</li>
+          <li><strong>The bell</strong> &mdash; your notifications</li>
+          <li><strong>Account menu</strong> &mdash; your initials: <strong>Profile</strong>, <strong>Settings</strong>, <strong>Switch company</strong> (when you work for more than one) and <strong>Sign out</strong></li>
+        </ul>
+        <p className="text-gray-600 mt-3">On a phone, the menu button at the top left opens the sidebar.</p>
       </section>
 
       {/* Roles */}
@@ -109,24 +176,24 @@ export default function GettingStartedPage() {
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-3 font-medium text-gray-900">Administrator</td>
-                <td className="px-4 py-3 text-gray-600">Everything, including the admin-only Settings area: organization, vocabulary, destinations, WhatsApp, Copilot, billing and user management</td>
+                <td className="px-4 py-3 text-gray-600">Everything, including the admin-only Settings pages: company, team &amp; roles, billing, pricing defaults, currencies, destinations, vocabulary, WhatsApp and Copilot settings</td>
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="px-4 py-3 font-medium text-gray-900">Manager</td>
-                <td className="px-4 py-3 text-gray-600">All day-to-day operations plus Rates, Finance, Suppliers, Itineraries, Tour Departures, Team Members, and Tasks</td>
+                <td className="px-4 py-3 text-gray-600">All day-to-day operations plus Rates, all of Finance, Suppliers, Itineraries, Departures, Tours, Partners, the Team directory, Documents and the Finance and Copilot tabs of Reports; in Settings, the Organization, Pricing and Content &amp; AI pages not marked for admins</td>
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-3 font-medium text-gray-900">Member</td>
-                <td className="px-4 py-3 text-gray-600">Day-to-day selling and service: Inbox and WhatsApp, the Quote Builder, B2C Quotes, Bookings, the Booking Calendar, Follow-ups, Clients, and Invoices, Payments, Receipts and Expenses (adding and editing, not deleting). Itineraries and Tasks open from the links in their work (a quote, a booking, a notification) but are not in their sidebar. No Rates, Suppliers, Tours, B2B, Partners, Team Members, Documents, Reports, Receivables, Payables, Commissions or P&amp;L; in Settings, only their own profile, email and signatures</td>
+                <td className="px-4 py-3 text-gray-600">Day-to-day selling and service: the Inbox (Email and WhatsApp), Leads, Copilot, Message templates, the Quote Builder, B2C quotes, Bookings, the Calendar, Tasks (their own and unassigned ones) and Follow-ups, Clients, Website, the Analytics tab of Reports, and Invoices, Payments, Receipts and Expenses (adding and editing, not deleting). Itineraries open from the links in their work (a quote, a booking, a notification) but are not in their sidebar. No Rates, Suppliers, Tours, B2B quotes, Partners, Team, Departures, Documents, Receivables, Supplier bills, Payables, Commissions or P&amp;L; in Settings, the Account group (profile, email &amp; signature, notifications) and Message templates</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-medium text-gray-900">Viewer</td>
-                <td className="px-4 py-3 text-gray-600">The Dashboard (without money), Analytics, Notifications and their own profile</td>
+                <td className="px-4 py-3 text-gray-600">The Dashboard (without money), the Analytics tab of Reports, the Calendar, notifications, and their own profile and notification settings</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="User management page listing team members with their assigned roles" />
+        <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="Team & roles page listing users with their assigned roles" />
       </section>
 
       {/* Getting Help */}

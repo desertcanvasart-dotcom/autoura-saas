@@ -18,14 +18,14 @@ export default function B2BQuotesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">B2B Quotes</h1>
       <p className="text-gray-600 mb-8">
-        B2B quotes are rate sheets for your partners: what a trip costs at each group size. They are made in the B2B Calculator or from a trip in the Quote Builder, and all of them land in <strong>Sell &rarr; B2B Quotes</strong> (managers and admins).
+        B2B quotes are rate sheets for your partners: what a trip costs at each group size. They are made in the B2B Calculator or from a trip in the Quote Builder, and all of them land on the <strong>B2B quotes</strong> tab of <strong>Sell &rarr; Quotes</strong> (managers and admins). <strong>Quotes</strong> has two tabs, <strong>B2C quotes</strong> and <strong>B2B quotes</strong>; members see only the B2C tab. Old links to the B2B quotes list open the B2B tab, and each quote keeps its own address.
       </p>
 
       {/* Creating */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Saving a Quote from the Calculator</h2>
         <p className="text-gray-600 mb-3">
-          The calculator is opened from <strong>Tours &rarr; Tour Manager</strong> (the calculator icon on a variation), or after a B2B save in the Quote Builder.
+          The calculator is opened from <strong>Products &rarr; Tours</strong> (the Tour Manager) (the calculator icon on a variation), or after a B2B save in the Quote Builder.
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Calculate the price (see <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Pricing</Link>), and generate the rate sheet if the partner should see several group sizes</li>
@@ -43,7 +43,7 @@ export default function B2BQuotesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Partners</h2>
         <p className="text-gray-600">
-          Your partners (tour operators and agencies) are in <strong>People &rarr; Partners</strong>, apart from your clients. Each has a <strong>Default Margin (%)</strong> (0% counts), which the Quote Builder puts in the margin when you pick the partner; a margin you change after that is the one the quote uses.
+          Your partners (tour operators and agencies) are in <strong>Contacts &rarr; Partners</strong>, apart from your clients. Each has a <strong>Default Margin (%)</strong> (0% counts), which the Quote Builder puts in the margin when you pick the partner; a margin you change after that is the one the quote uses.
         </p>
         <DocScreenshot src="/docs/b2b-quotes/partners.jpg" alt="The B2B Partners page" />
       </section>
@@ -58,7 +58,7 @@ export default function B2BQuotesPage() {
           <li><strong>Tick quotes</strong> to <strong>Change Status&hellip;</strong>, <strong>Export CSV</strong> or <strong>Delete</strong> them together</li>
           <li><strong>New Quote</strong> opens the Quote Builder in B2B mode</li>
         </ul>
-        <DocScreenshot src="/docs/b2b-quotes/quotes-list.jpg" alt="The B2B Quotes list with its stats, search and status filter" />
+        <DocScreenshot src="/docs/b2b-quotes/quotes-list.jpg" alt="The B2B quotes tab of Quotes, with its stats, search and status filter" />
       </section>
 
       {/* Detail */}

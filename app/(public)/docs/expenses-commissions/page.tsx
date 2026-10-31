@@ -116,9 +116,9 @@ export default function ExpensesCommissionsPage() {
 
       {/* Pointer */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Receivables, Payables &amp; Supplier Invoices</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Receivables, Payables &amp; Supplier Bills</h2>
         <p className="text-gray-600">
-          Aging of what clients owe and what you owe, and matching supplier bills to expenses, are in{' '}
+          Aging of what clients owe (the Unpaid tab of Invoices) and what you owe (the Payables tab of Supplier bills), and matching supplier bills to expenses, are in{' '}
           <Link href="/docs/invoices-payments" className="text-primary-600 underline hover:text-primary-700">Invoices &amp; Payments</Link>.
         </p>
       </section>
@@ -127,7 +127,7 @@ export default function ExpensesCommissionsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Reports</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Reports</strong> (Home, managers and admins) is the yearly financial dashboard. Pick a year, then:
+          The <strong>Finance</strong> tab of <strong>Reports</strong> (top of the sidebar; managers and admins) is the yearly financial dashboard. Pick a year, then:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700">
           <li><strong>Overview</strong> &mdash; headline figures and spend by category</li>
@@ -137,7 +137,7 @@ export default function ExpensesCommissionsPage() {
           <li><strong>Commissions</strong> &mdash; by type and by recipient</li>
         </ul>
         <p className="mt-3 text-gray-600">Every table has a CSV export button.</p>
-        <DocScreenshot src="/docs/profit-loss/financial-reports.jpg" alt="Reports page with Overview, Revenue, Cash Flow, Tax Summary, and Commissions tabs" />
+        <DocScreenshot src="/docs/profit-loss/financial-reports.jpg" alt="Reports, Finance tab, with Overview, Revenue, Cash Flow, Tax Summary, and Commissions tabs" />
       </section>
 
       {/* Previous / next — from the docs order (pager.tsx) */}

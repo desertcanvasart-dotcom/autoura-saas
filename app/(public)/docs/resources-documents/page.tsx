@@ -92,7 +92,7 @@ export default function ResourcesDocumentsPage() {
           Open a document for its branded preview, with <strong>Edit</strong>, <strong>Download PDF</strong>, <strong>Print</strong>, <strong>Email</strong>, <strong>WhatsApp</strong> and, once sent, <strong>Mark Confirmed</strong>:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li><strong>Email</strong> sends the PDF to the supplier from your connected Gmail (Settings &rarr; Email) and marks it Sent</li>
+          <li><strong>Email</strong> sends the PDF to the supplier from your connected Gmail (Settings &rsaquo; Account &rsaquo; Email &amp; signature) and marks it Sent</li>
           <li><strong>WhatsApp</strong> opens a chat with the supplier with the details as a message &mdash; attach the PDF yourself &mdash; then asks whether to mark it Sent</li>
           <li>Each appears when the document has the supplier&apos;s email or phone</li>
         </ul>
@@ -108,7 +108,7 @@ export default function ResourcesDocumentsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Resource Management Page</h2>
         <p className="text-gray-600">
-          <strong>Manage Resources</strong> on Settings &rarr; Profile opens <strong>Resource Management</strong>: your guides, vehicles, hotels, restaurants, airport staff and hotel staff in tabs, with <strong>Filter by City</strong>, <strong>Show Inactive</strong> and <strong>Export</strong>. To add or change a supplier, use <Link href="/docs/suppliers" className="text-primary-600 hover:underline">Suppliers</Link>; the content you write about them is in the <Link href="/docs/content-library" className="text-primary-600 hover:underline">Content Library</Link>.
+          <strong>Manage Resources</strong> under Quick Actions on your profile (Settings &rsaquo; Account &rsaquo; Profile) opens <strong>Resource Management</strong>: your guides, vehicles, hotels, restaurants, airport staff and hotel staff in tabs, with <strong>Filter by City</strong>, <strong>Show Inactive</strong> and <strong>Export</strong>. To add or change a supplier, use <Link href="/docs/suppliers" className="text-primary-600 hover:underline">Suppliers</Link>; the content you write about them is in the <Link href="/docs/content-library" className="text-primary-600 hover:underline">Content Library</Link>.
         </p>
       </section>
 

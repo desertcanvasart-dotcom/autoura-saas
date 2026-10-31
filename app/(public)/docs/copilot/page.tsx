@@ -18,14 +18,14 @@ export default function CopilotPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">AI Copilot</h1>
       <p className="text-gray-600 mb-8">
-        The AI Copilot drafts replies to incoming WhatsApp and email messages so your team reviews and sends them instead of typing from scratch. A Copilot draft never reaches a customer until someone on your team sends it. (WhatsApp <strong>AI auto-reply</strong> is a separate feature that answers on its own &mdash; see Copilot Settings below.)
+        The AI Copilot drafts replies to incoming WhatsApp and email messages so your team reviews and sends them instead of typing from scratch. A Copilot draft never reaches a customer until someone on your team sends it. (WhatsApp <strong>AI auto-reply</strong> is a separate feature that answers on its own &mdash; see Copilot settings below.)
       </p>
 
       {/* Review Queue */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Review Queue</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Copilot</strong> in the sidebar (Communicate group). Conversations waiting for a reply are listed on the left &mdash; those with the most drafts to review first, then the most recent. Each shows:
+          Open <strong>Copilot</strong> in the sidebar (Communicate section). The <strong>Copilot</strong> button in the top bar opens the same queue in a panel over the page you are on; open a thread, or the expand button, to reach the full page. Conversations waiting for a reply are listed on the left &mdash; those with the most drafts to review first, then the most recent. Each shows:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Urgency dot</strong> &mdash; red for urgent, amber for high, grey otherwise</li>
@@ -57,19 +57,19 @@ export default function CopilotPage() {
           <li><strong>Regenerate</strong> &mdash; Opens an optional instruction (&ldquo;offer a 10% discount&rdquo;); click <strong>Generate</strong> for a new draft</li>
           <li><strong>Approve</strong> &mdash; Saves the draft with your edits, without sending it</li>
           <li><strong>Send</strong> (WhatsApp) &mdash; Sends the text in the editor straight away and marks the conversation resolved</li>
-          <li><strong>Approve &amp; hand off</strong> (email) &mdash; Email drafts are sent from <strong>Conversations</strong>, so the reply stays in the email thread: click <strong>Open conversation</strong>, and the reply box is already filled in with the approved draft and its subject. Check it and send.</li>
+          <li><strong>Approve &amp; hand off</strong> (email) &mdash; Email drafts are sent from the Inbox&apos;s <strong>All</strong> tab, so the reply stays in the email thread: click <strong>Open conversation</strong>, and the reply box is already filled in with the approved draft and its subject. Check it and send.</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          A conversation with no draft says <em>&ldquo;No AI draft yet for this thread.&rdquo;</em> Drafts are written in advance only when <strong>Proactive draft pre-generation</strong> is on (Copilot Settings); otherwise ask for one with <strong>Suggest Reply</strong> in the WhatsApp page or Conversations.
+          A conversation with no draft says <em>&ldquo;No AI draft yet for this thread.&rdquo;</em> Drafts are written in advance only when <strong>Proactive draft pre-generation</strong> is on (Copilot settings); otherwise ask for one with <strong>Suggest Reply</strong> on the Inbox&apos;s WhatsApp or All tab.
         </p>
         <ScreenshotPlaceholder caption="Review panel showing the customer message, expanded context card with client details, an editable AI draft with confidence badge, and the Reject / Regenerate / Approve / Send actions" />
       </section>
 
       {/* Inline */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Copilot in WhatsApp and Conversations</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Copilot in the Inbox</h2>
         <p className="text-gray-600 mb-3">
-          The <strong>WhatsApp</strong> page and <strong>Conversations</strong> have an <strong>AI Copilot</strong> panel above the message box (the email <strong>Inbox</strong> does not):
+          The Inbox&apos;s <strong>WhatsApp</strong> and <strong>All</strong> tabs have an <strong>AI Copilot</strong> panel above the message box (the <strong>Email</strong> tab does not):
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Click <strong>Suggest Reply</strong> &mdash; Copilot writes two options, <strong>Option 1</strong> and <strong>Option 2</strong>, with its confidence and reasoning. A draft written in advance shows straight away, marked <strong>ready</strong>.</li>
@@ -82,7 +82,7 @@ export default function CopilotPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Copilot Knowledge</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Copilot Knowledge</strong> (Communicate group) is the <strong>Copilot Knowledge Base</strong>: the facts Copilot draws on when drafting.
+          <strong>Copilot knowledge</strong> (<strong>Settings &rsaquo; Content &amp; AI</strong>, admins and managers) is the <strong>Copilot Knowledge Base</strong>: the facts Copilot draws on when drafting.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Types</strong> &mdash; <strong>FAQ</strong>, <strong>Policy</strong>, <strong>Tour</strong> and <strong>Other</strong>, with filter pills showing each count</li>
@@ -98,11 +98,11 @@ export default function CopilotPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Copilot Settings</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Copilot Settings</strong> is in the Settings section of the sidebar, for admins. It has two switches for the whole company:
+          <strong>Copilot settings</strong> is in <strong>Settings &rsaquo; Content &amp; AI</strong>, for admins. It has two switches for the whole company:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Proactive draft pre-generation</strong> (off by default) &mdash; Copilot drafts a reply as soon as a WhatsApp or email message arrives, so it is waiting in the review queue. Drafts written this way use the professional tone. Nothing is sent.</li>
-          <li><strong>WhatsApp AI auto-reply</strong> (off by default, marked dangerous) &mdash; The AI answers incoming WhatsApp messages by itself, with no review. The same switch is under <strong>Settings &rarr; WhatsApp</strong>, and it only works once the Autoura team has enabled AI replies for the platform.</li>
+          <li><strong>WhatsApp AI auto-reply</strong> (off by default, marked dangerous) &mdash; The AI answers incoming WhatsApp messages by itself, with no review. The same switch is under <strong>Settings &rsaquo; Messaging &rsaquo; WhatsApp</strong>, and it only works once the Autoura team has enabled AI replies for the platform.</li>
         </ul>
         <ScreenshotPlaceholder caption="Copilot Settings: the Proactive draft pre-generation switch and the WhatsApp AI auto-reply switch marked dangerous" />
       </section>
@@ -111,7 +111,7 @@ export default function CopilotPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Copilot Analytics</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Copilot Analytics</strong> is in the <strong>Home</strong> section of the sidebar, for admins and managers. Choose <strong>Last 7d</strong>, <strong>Last 30d</strong> (the default), <strong>Last 90d</strong> or <strong>All time</strong>:
+          Copilot analytics is the <strong>Copilot</strong> tab of <strong>Reports</strong> (top of the sidebar), for admins and managers. Choose <strong>Last 7d</strong>, <strong>Last 30d</strong> (the default), <strong>Last 90d</strong> or <strong>All time</strong>:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Drafts generated</strong>, <strong>Sent to customers</strong>, <strong>Dismissed</strong> and <strong>Pending review</strong></li>
@@ -120,14 +120,14 @@ export default function CopilotPage() {
           <li><strong>Top-retrieved knowledge</strong> &mdash; The entries Copilot uses most</li>
           <li><strong>Per-user activity</strong> &mdash; Drafts each person reviewed and sent, and their accept rate</li>
         </ul>
-        <ScreenshotPlaceholder caption="Copilot Analytics: the period buttons, the draft counts, the rates, the daily volume chart and the breakdowns" />
+        <ScreenshotPlaceholder caption="Reports, Copilot tab: the period buttons, the draft counts, the rates, the daily volume chart and the breakdowns" />
       </section>
 
       {/* Who */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Who Can Use It</h2>
         <p className="text-gray-600">
-          Copilot and Copilot Knowledge are open to admins, managers and members (members can edit the knowledge base). Copilot Analytics is for admins and managers; Copilot Settings for admins.
+          Copilot is open to admins, managers and members. Copilot knowledge and the Reports &rsaquo; Copilot tab are for admins and managers; Copilot settings for admins.
         </p>
         <Tip>
           Keep the knowledge base current &mdash; your policies, prices and FAQs &mdash; and Copilot&apos;s drafts get better with it. Disable an entry instead of deleting it while you check whether it is still true.

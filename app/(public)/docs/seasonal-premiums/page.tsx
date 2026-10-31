@@ -39,7 +39,7 @@ export default function SeasonalPremiumsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Setting up a season</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Settings &rarr; Seasonal Premiums</strong> (the <strong>Demand calendar</strong>; admins and managers):
+          Open <strong>Settings &rsaquo; Pricing &rsaquo; Seasonal premiums</strong> (the <strong>Demand calendar</strong>; admins and managers):
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Add a <strong>season</strong> &mdash; a name (e.g. &ldquo;New Year&rdquo;) and a premium between 0 and 200%.</li>

@@ -28,7 +28,7 @@ export default function B2BPricingPage() {
           The calculator has no sidebar entry of its own. Open it from:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Tours &rarr; Tour Manager</strong> &mdash; the calculator icon (<em>Calculate Price</em>) on any variation</li>
+          <li><strong>Products &rarr; Tours</strong> (the Tour Manager) &mdash; the calculator icon (<em>Calculate Price</em>) on any variation</li>
           <li><strong>The Quote Builder</strong> &mdash; after a B2B save, it opens on the new programme (see <Link href="/docs/b2b-import" className="text-primary-600 hover:underline">Converting Itineraries to B2B</Link>)</li>
         </ul>
         <p className="text-gray-600 mt-3">

@@ -17,7 +17,7 @@ export default function PartnersDocPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Partners</h1>
       <p className="text-gray-600 mb-8">
-        The tour operators and travel agencies you sell to, under <strong>People &rarr; Partners</strong>. They are
+        The tour operators and travel agencies you sell to, under <strong>Contacts &rarr; Partners</strong> in the sidebar. They are
         kept apart from your <Link href="/docs/clients" className="text-primary-600 hover:underline">clients</Link>, the
         travellers themselves. Admins and managers see and edit partners; others do not.
       </p>

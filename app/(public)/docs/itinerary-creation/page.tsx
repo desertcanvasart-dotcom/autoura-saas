@@ -25,8 +25,8 @@ export default function ItineraryCreationPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Ways In</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Parse</strong> on a WhatsApp conversation, or the purple sparkles icon on an email in the Inbox &mdash; the Quote Builder opens and reads the conversation</li>
-          <li><strong>New Quote</strong> on the B2C or B2B Quotes page &mdash; opens it in that mode</li>
+          <li><strong>Parse</strong> on a WhatsApp conversation, or the purple sparkles icon on an email on the Inbox&apos;s Email tab &mdash; the Quote Builder opens and reads the conversation</li>
+          <li><strong>New Quote</strong> on the B2C quotes or B2B quotes tab of Quotes &mdash; opens it in that mode</li>
           <li>From a client&apos;s page &mdash; opens it for that client</li>
           <li><strong>Price in Grid</strong> in the itinerary editor &mdash; opens that itinerary</li>
           <li><strong>Quote Builder</strong> in the sidebar</li>

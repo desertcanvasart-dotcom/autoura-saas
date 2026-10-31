@@ -7,12 +7,14 @@
 // the Integrations entry the index still showed. Same cure as travel-ops-pro:
 // one list here, every renderer reads it.
 //
-// The groups mirror the app sidebar (components/Sidebar.tsx) — Home ·
-// Communicate · Sell · Operate · Tours · Suppliers & Rates · People · Finance ·
-// Settings — so the operator reads the same map in the docs and in the app.
-// Communicate sits second, straight under Home, as it does in the app, and
-// holds Concierge Leads as the app does. Getting Started is the one docs-only
-// group. Each page's previous / next links are read from this order
+// The groups mirror the app's sidebar sections (lib/nav/config.ts MAIN_NAV) —
+// Home (the untitled top group: Dashboard, Reports) · Communicate · Sell ·
+// Operate · Products · Suppliers & Rates · Contacts · Finance — then Settings,
+// the app's Settings area, so the operator reads the same map in the docs and
+// in the app. Communicate sits second, straight under Home, as it does in the
+// app, and holds Concierge Leads (the "Leads" link). The Content Library lives
+// in Settings › Content & AI, so it is filed under Settings here. Getting
+// Started is the one docs-only group. Each page's previous / next links are read from this order
 // (pager.tsx).
 //
 // app/(public)/docs/__tests__/docs-toc.test.ts pins the /docs entries to the
@@ -74,24 +76,23 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Getting Started',
     items: [
-      { href: '/docs/getting-started', icon: Rocket, title: 'Getting Started', description: 'Sign up or accept an invitation, complete onboarding, and understand your role.' },
-      { href: '/docs/workflows', icon: Lightbulb, title: 'Workflows & Tips', description: 'End-to-end workflows — from a WhatsApp enquiry to a paid, completed trip, quotes, leads, Copilot, expenses, payments, partners and tasks — and the shortcuts that speed them.' },
+      { href: '/docs/getting-started', icon: Rocket, title: 'Getting Started', description: 'Sign up or accept an invitation, complete onboarding, find your way around the sidebar, top bar and ⌘K, and understand your role.' },
+      { href: '/docs/workflows', icon: Lightbulb, title: 'Workflows & Tips', description: 'End-to-end workflows — from a WhatsApp enquiry to a paid, completed trip, quotes, leads, Copilot, expenses, payments, partners and tasks — and the shortcuts that speed them, ⌘K included.' },
     ],
   },
   {
     label: 'Home',
     items: [
       { href: '/docs/dashboard', icon: LayoutDashboard, title: 'Dashboard', description: 'Your home base: departures, outstanding balances, replies needed, and quotes awaiting clients.' },
-      { href: '/docs/analytics-reports', icon: BarChart3, title: 'Analytics & Reports', description: 'KPIs, revenue forecast, booking pipeline, and financial reports with CSV export.' },
+      { href: '/docs/analytics-reports', icon: BarChart3, title: 'Reports', description: 'One page, three tabs: Analytics (KPIs, revenue forecast, booking pipeline), Finance (yearly financial reports with CSV export) and Copilot.' },
     ],
   },
   {
     label: 'Communicate',
     items: [
-      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'Conversations, the WhatsApp inbox with AI translation, the Gmail inbox, email signatures, and parsing a request into the Quote Builder.' },
+      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'The Inbox and its All, Email and WhatsApp tabs, AI translation, email signatures, and parsing a request into the Quote Builder.' },
       { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Concierge Leads', description: 'Triage planning briefs from the AI Concierge and turn them into itineraries.' },
-      { href: '/docs/copilot', icon: Sparkles, title: 'AI Copilot', description: 'Review and send AI-drafted replies, manage the knowledge base, and track copilot analytics.' },
-      { href: '/docs/content-library', icon: Library, title: 'Content Library', description: 'Reusable destination content, AI prompts, and house writing rules for generated itineraries.' },
+      { href: '/docs/copilot', icon: Sparkles, title: 'AI Copilot', description: 'Review and send AI-drafted replies from the sidebar or the top bar, manage the knowledge base, and track Copilot in Reports.' },
       { href: '/docs/message-templates', icon: MailPlus, title: 'Message Templates', description: 'Create and send pre-designed messages via WhatsApp, email, and SMS with placeholder auto-fill.' },
     ],
   },
@@ -111,13 +112,13 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Operate',
     items: [
-      { href: '/docs/tasks-departures', icon: CheckSquare, title: 'Tasks, Departures & Capacity', description: 'The task board and operations tasks from a trip, scheduled group departures, and the capacity calendar the WhatsApp AI reads.' },
-      { href: '/docs/followups-reminders', icon: Bell, title: 'Follow-ups & Reminders', description: 'Follow-ups scheduled on a client, and the weekly payment reminder emails for unpaid invoices.' },
+      { href: '/docs/tasks-departures', icon: CheckSquare, title: 'Tasks, Departures & Capacity', description: 'Tasks and its Follow-ups tab, who sees which tasks, operations tasks from a trip, and Departures with its List and Capacity views.' },
+      { href: '/docs/followups-reminders', icon: Bell, title: 'Follow-ups & Reminders', description: 'Follow-ups scheduled on a client and assigned to a teammate, the Follow-ups tab of Tasks, and the weekly payment reminder emails for unpaid invoices.' },
       { href: '/docs/resources-documents', icon: FolderOpen, title: 'Resources & Documents', description: 'Assign guides, drivers, vehicles and hotels to a trip, and generate and send vouchers and service orders.' },
     ],
   },
   {
-    label: 'Tours',
+    label: 'Products',
     items: [
       { href: '/docs/tour-programs', icon: ClipboardList, title: 'Tour Manager', description: 'Your tour catalogue: create, duplicate or import tours, edit their days, add variations by tier, and browse them in Tour Inventory.' },
       { href: '/docs/importing-tours', icon: Upload, title: 'Importing Tours', description: 'The two-sheet procedure — the tour and its day-by-day itinerary — in order, with the rules the import enforces: every meal and every day\'s sightseeing stated, nothing guessed.' },
@@ -127,33 +128,34 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Suppliers & Rates',
     items: [
-      { href: '/docs/suppliers', icon: Building2, title: 'Suppliers', description: 'Your supplier directory: several roles per supplier, a SUP-#### code each, their hotels, ships and trains, contracts, and import / export that updates by code.' },
-      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'The fourteen rate pages and the Rates Hub: what each rate holds, its currency, EU and non-EU prices, and CSV import.' },
+      { href: '/docs/suppliers', icon: Building2, title: 'Suppliers', description: 'Your supplier directory and the shared Autoura network: several roles per supplier, a SUP-#### code each, their hotels, ships and trains, contracts, and import / export that updates by code.' },
+      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'The fourteen rate sheets, the Rates menu and the Rates overview: what each rate holds, its currency, EU and non-EU prices, and CSV import.' },
       { href: '/docs/bulk-csv', icon: Upload, title: 'Bulk Import (CSV)', description: 'Sample, export, import — and how the supplier, property and rate sheets each match rows, treat blank cells and refuse what they cannot read.' },
     ],
   },
   {
-    label: 'People',
+    label: 'Contacts',
     items: [
       { href: '/docs/clients', icon: Users, title: 'Clients (CRM)', description: 'Your travellers: leads and customers, the New Client wizard, the profile with its trips, notes, follow-ups and communication log, and who may edit or delete.' },
       { href: '/docs/partners', icon: Handshake, title: 'Partners', description: 'The tour operators and agencies you sell to: a code, a currency and a default margin each, which the B2B Calculator and Quote Builder apply.' },
-      { href: '/docs/team-members', icon: UserCog, title: 'Team Members', description: 'Your staff directory — the guides, drivers and office staff trips, tasks and chats are assigned to. Not logins.' },
+      { href: '/docs/team-members', icon: UserCog, title: 'Staff Directory', description: 'The Team link: the guides, drivers and office staff trips, tasks and chats are assigned to. Not logins.' },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { href: '/docs/invoices-payments', icon: FileText, title: 'Invoices & Payments', description: 'Invoices and their statuses, payments, receipts, what clients owe and what you owe suppliers — and supplier bills read by AI, matched to expenses, approved and paid.' },
-      { href: '/docs/expenses-commissions', icon: Wallet, title: 'Expenses & Commissions', description: 'Trip and office expenses, approvals and CSV export; commissions generated from a trip or added by hand; and the yearly Reports.' },
+      { href: '/docs/invoices-payments', icon: FileText, title: 'Invoices & Payments', description: 'Invoices (All, Unpaid), Payments (Payments, Receipts) and Supplier bills (Bills, Payables) — statuses, what clients owe, what you owe suppliers, and bills read by AI, matched to expenses, approved and paid.' },
+      { href: '/docs/expenses-commissions', icon: Wallet, title: 'Expenses & Commissions', description: 'Trip and office expenses, approvals and CSV export; commissions generated from a trip or added by hand; and the yearly Finance reports.' },
       { href: '/docs/profit-loss', icon: TrendingUp, title: 'Profit & Loss', description: 'What each trip earned (invoices net of tax, or the quote), cost and paid in commission — trip by trip and in your agency’s currency.' },
     ],
   },
   {
     label: 'Settings',
     items: [
-      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'Who can log in and as what, your own profile and email, the admin Settings page, Organization, Billing, Attraction Names, Day Blocks, Destinations, Copilot and WhatsApp.' },
+      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'The Settings area and its groups: your profile, email and notifications; Company, Team & roles, Supplier network and Billing; Pricing defaults and Currencies & rates; Destinations, Day blocks, Attraction names; Copilot and WhatsApp.' },
       { href: '/docs/vocabulary', icon: BookOpen, title: 'Your Vocabulary', description: 'The 40 lists behind your dropdowns — tiers, supplier types, vehicles and more: rename, add, hide, reorder, delete or reset them.' },
       { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your peak dates as a premium on the selling price after margin, matched by departure date; applied in the B2B Calculator and every B2C quote.' },
+      { href: '/docs/content-library', icon: Library, title: 'Content Library', description: 'Settings › Content & AI: reusable destination content, AI prompts, and house writing rules for generated itineraries.' },
       { href: '/docs/activity-summary', icon: Activity, title: 'Team Activity', description: 'Optional, transparent activity summaries: last seen, focused time, and work counts per member.' },
       { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp (on Autoura’s account) and your own Gmail for the inbox, both live today. Accounting sync (Xero, QuickBooks) is planned.' },
     ],
