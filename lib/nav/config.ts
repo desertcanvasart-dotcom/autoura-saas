@@ -1,6 +1,8 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   House,
+  Receipt,
+  HandCoins,
   Inbox,
   ChartColumn,
   Star,
@@ -81,7 +83,65 @@ const ALL_AND_VIEWER: PermissionRole[] = ['admin', 'manager', 'member', 'viewer'
 const AM: PermissionRole[] = ['admin', 'manager']
 const A: PermissionRole[] = ['admin']
 
-export type NavBadge = 'inbox' | 'leads'
+// ============================================
+// RATES PAGE CATEGORY MENU
+// ============================================
+
+export interface RateCategory {
+  label: string
+  /** Sub-route under /rates. */
+  slug: string
+  icon: LucideIcon
+}
+
+export interface RateGroup {
+  key: string
+  title: string
+  categories: RateCategory[]
+}
+
+export const RATE_GROUPS: RateGroup[] = [
+  {
+    key: 'accommodation',
+    title: 'Accommodation',
+    categories: [
+      { label: 'Hotels', slug: 'hotels', icon: Hotel },
+      { label: 'Cruises', slug: 'cruises', icon: Ship },
+      { label: 'Sleeping trains', slug: 'sleeping-train', icon: BedDouble },
+      { label: 'Hotel services', slug: 'hotel-services', icon: ConciergeBell },
+    ],
+  },
+  {
+    key: 'transport',
+    title: 'Transport & tickets',
+    categories: [
+      { label: 'Transportation', slug: 'transportation', icon: Truck },
+      { label: 'Flights', slug: 'flights', icon: Plane },
+      { label: 'Trains', slug: 'trains', icon: TrainFront },
+      { label: 'Airport services', slug: 'airport-services', icon: Plane },
+    ],
+  },
+  {
+    key: 'services',
+    title: 'Guides & services',
+    categories: [
+      { label: 'Tour guides', slug: 'guides', icon: Users },
+      { label: 'Meals', slug: 'meals', icon: UtensilsCrossed },
+      { label: 'Attractions', slug: 'attractions', icon: Landmark },
+      { label: 'Activities', slug: 'activities', icon: Ticket },
+    ],
+  },
+  {
+    key: 'costs',
+    title: 'Costs',
+    categories: [
+      { label: 'Tipping', slug: 'tipping', icon: Coins },
+      { label: 'Fixed costs', slug: 'fixed-costs', icon: Coins },
+    ],
+  },
+]
+
+export type NavBadge = 'email' | 'whatsapp' | 'leads'
 
 export interface NavItem {
   label: string
@@ -98,23 +158,32 @@ export interface NavItem {
   keywords?: string[]
 }
 
-export interface NavSection {
+/** A foldable group inside a section (the rate sheets). */
+export interface NavGroup {
   key: string
-  /** No title: the top group (Dashboard, Inbox, Reports). */
-  title?: string
+  title: string
   items: NavItem[]
 }
 
+export interface NavSection {
+  key: string
+  /** No title: the top group (Dashboard, Reports). */
+  title?: string
+  items: NavItem[]
+  /** Folded until opened; an opened group stays open (per login). */
+  groups?: NavGroup[]
+}
+
+// The menu the operator approved on 2026-10-31, after the first cut hid
+// pages used every day: Communicate is back as its own section (Inbox and
+// each channel), every rate sheet is in the sidebar again (folded under
+// its group), and each finance list has its own link. Setup stays in
+// Settings; Message templates is in both places.
 export const MAIN_NAV: NavSection[] = [
   {
     key: 'top',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: House, roles: ALL_AND_VIEWER, keywords: ['home'] },
-      {
-        label: 'Inbox', href: '/inbox', icon: Inbox, roles: ALL, badge: 'inbox',
-        match: ['/communications'],
-        keywords: ['email', 'gmail', 'whatsapp', 'conversations', 'messages'],
-      },
       {
         label: 'Reports', href: '/reports', icon: ChartColumn, roles: ALL_AND_VIEWER,
         keywords: ['analytics', 'financial reports', 'copilot analytics'],
@@ -122,17 +191,35 @@ export const MAIN_NAV: NavSection[] = [
     ],
   },
   {
-    key: 'sell',
-    title: 'Sell',
+    key: 'communicate',
+    title: 'Communicate',
     items: [
+      {
+        label: 'Inbox', href: '/inbox?channel=all', icon: Inbox, roles: ALL,
+        match: ['/communications'],
+        keywords: ['all conversations', 'messages'],
+      },
+      { label: 'Email', href: '/inbox?channel=email', icon: Mail, roles: ALL, badge: 'email', keywords: ['gmail'] },
+      { label: 'WhatsApp', href: '/inbox?channel=whatsapp', icon: MessageCircle, roles: ALL, badge: 'whatsapp' },
       {
         label: 'Leads', href: '/concierge-briefs', icon: Star, roles: ALL, badge: 'leads',
         keywords: ['concierge', 'briefs'],
       },
+      { label: 'Copilot', href: '/copilot', icon: Sparkles, roles: ALL, keywords: ['drafts', 'review'] },
+      { label: 'Message templates', href: '/settings/message-templates', icon: MessageSquare, roles: ALL, keywords: ['templates'] },
+    ],
+  },
+  {
+    key: 'sell',
+    title: 'Sell',
+    items: [
       { label: 'Quote Builder', href: '/pricing-grid', icon: LayoutGrid, roles: ALL, keywords: ['pricing grid', 'new quote'] },
       { label: 'Quotes', href: '/quotes', icon: File, roles: ALL, keywords: ['b2c', 'b2b'] },
       { label: 'Itineraries', href: '/itineraries', icon: Map, roles: AM },
       { label: 'Bookings', href: '/bookings', icon: BookOpen, roles: ALL },
+      // Kept apart from Bookings: it plots itineraries and the guides and
+      // vehicles assigned to them, not the bookings table.
+      { label: 'Calendar', href: '/calendar', icon: CalendarRange, roles: ALL_AND_VIEWER, keywords: ['booking calendar', 'schedule'] },
     ],
   },
   {
@@ -144,9 +231,6 @@ export const MAIN_NAV: NavSection[] = [
         label: 'Departures', href: '/departures', icon: CalendarDays, roles: AM,
         keywords: ['tour departures', 'capacity calendar'],
       },
-      // Kept apart from Bookings: it plots itineraries and the guides and
-      // vehicles assigned to them, not the bookings table.
-      { label: 'Calendar', href: '/calendar', icon: CalendarRange, roles: ALL_AND_VIEWER, keywords: ['booking calendar', 'schedule'] },
       { label: 'Documents', href: '/documents', icon: Folder, roles: AM, keywords: ['contracts', 'vouchers'] },
     ],
   },
@@ -170,9 +254,20 @@ export const MAIN_NAV: NavSection[] = [
         match: ['/resources', '/airport-staff'],
         keywords: ['network suppliers'],
       },
-      { label: 'Rates', href: '/rates', icon: Tag, roles: AM, keywords: ['rates hub', 'rate sheets'] },
+      // The shared Autoura network, where an agency finds more suppliers
+      // (operator, 2026-10-31: it must be visible, not only a tab).
+      {
+        label: 'Supplier network', href: '/suppliers?tab=network', icon: Network, roles: AM,
+        keywords: ['network suppliers', 'find suppliers'],
+      },
+      { label: 'Rates overview', href: '/rates', icon: Tag, roles: AM, keywords: ['rates', 'rates hub', 'rate sheets'] },
       { label: 'Rates check', href: '/rates/check', icon: ScanLine, roles: AM },
     ],
+    groups: RATE_GROUPS.map(g => ({
+      key: `rates-${g.key}`,
+      title: g.title,
+      items: g.categories.map(c => ({ label: c.label, href: `/rates/${c.slug}`, icon: c.icon, roles: AM, keywords: ['rates'] })),
+    })),
   },
   {
     key: 'contacts',
@@ -180,18 +275,25 @@ export const MAIN_NAV: NavSection[] = [
     items: [
       { label: 'Clients', href: '/clients', icon: User, roles: ALL, keywords: ['customers', 'crm'] },
       { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: AM, keywords: ['b2b'] },
+      {
+        label: 'Team', href: '/settings/staff-directory', icon: Users, roles: AM,
+        keywords: ['staff directory', 'team members', 'guides', 'drivers'],
+      },
     ],
   },
   {
     key: 'finance',
     title: 'Finance',
     items: [
-      { label: 'Invoices', href: '/invoices', icon: ReceiptText, roles: ALL, keywords: ['receivables'] },
-      { label: 'Payments & receipts', href: '/payments', icon: CreditCard, roles: ALL },
-      {
-        label: 'Supplier bills', href: '/supplier-bills', icon: FileText, roles: AM,
-        match: ['/supplier-invoices'], keywords: ['supplier invoices', 'payables'],
-      },
+      { label: 'Invoices', href: '/invoices', icon: ReceiptText, roles: ALL },
+      // The Unpaid tab of Invoices (was /accounts-receivable).
+      { label: 'Receivables', href: '/invoices?tab=unpaid', icon: Wallet, roles: AM, keywords: ['unpaid invoices'] },
+      { label: 'Payments', href: '/payments', icon: CreditCard, roles: ALL },
+      // The Receipts tab of Payments (was /receipts).
+      { label: 'Receipts', href: '/payments?tab=receipts', icon: Receipt, roles: ALL },
+      { label: 'Supplier bills', href: '/supplier-bills', icon: FileText, roles: AM, match: ['/supplier-invoices'], keywords: ['supplier invoices'] },
+      // The Payables tab of Supplier bills (was /accounts-payable).
+      { label: 'Payables', href: '/supplier-bills?tab=payables', icon: HandCoins, roles: AM, keywords: ['unpaid costs'] },
       { label: 'Expenses', href: '/expenses', icon: Wallet, roles: ALL },
       { label: 'Commissions', href: '/commissions', icon: Percent, roles: AM },
       { label: 'Profit & loss', href: '/profit-loss', icon: ChartLine, roles: AM, keywords: ['p&l'] },
@@ -266,6 +368,13 @@ export const SETTINGS_NAV: SettingsGroup[] = [
         label: 'Staff directory', href: '/settings/staff-directory', icon: Users, roles: AM,
         keywords: ['team members', 'guides', 'drivers'],
         description: 'The people work is assigned to: office staff, guides and drivers, with or without a login.',
+      },
+      {
+        // Where the agency books suppliers from, and suppliers waiting to have
+        // their sign-in confirmed (operator, 2026-10-31: it was hard to find).
+        label: 'Supplier network', href: '/settings/supplier-network', icon: Network, roles: AM,
+        keywords: ['supplier sourcing', 'network suppliers', 'supplier sign-in'],
+        description: 'Where you book suppliers from, and suppliers waiting to have their sign-in confirmed.',
       },
       {
         label: 'Billing & plan', href: '/settings/billing', icon: CreditCard, roles: A, adminOnly: true,
@@ -365,64 +474,6 @@ export const SETTINGS_NAV: SettingsGroup[] = [
   },
 ]
 
-// ============================================
-// RATES PAGE CATEGORY MENU
-// ============================================
-
-export interface RateCategory {
-  label: string
-  /** Sub-route under /rates. */
-  slug: string
-  icon: LucideIcon
-}
-
-export interface RateGroup {
-  key: string
-  title: string
-  categories: RateCategory[]
-}
-
-export const RATE_GROUPS: RateGroup[] = [
-  {
-    key: 'accommodation',
-    title: 'Accommodation',
-    categories: [
-      { label: 'Hotels', slug: 'hotels', icon: Hotel },
-      { label: 'Cruises', slug: 'cruises', icon: Ship },
-      { label: 'Sleeping trains', slug: 'sleeping-train', icon: BedDouble },
-      { label: 'Hotel services', slug: 'hotel-services', icon: ConciergeBell },
-    ],
-  },
-  {
-    key: 'transport',
-    title: 'Transport & tickets',
-    categories: [
-      { label: 'Transportation', slug: 'transportation', icon: Truck },
-      { label: 'Flights', slug: 'flights', icon: Plane },
-      { label: 'Trains', slug: 'trains', icon: TrainFront },
-      { label: 'Airport services', slug: 'airport-services', icon: Plane },
-    ],
-  },
-  {
-    key: 'services',
-    title: 'Guides & services',
-    categories: [
-      { label: 'Tour guides', slug: 'guides', icon: Users },
-      { label: 'Meals', slug: 'meals', icon: UtensilsCrossed },
-      { label: 'Attractions', slug: 'attractions', icon: Landmark },
-      { label: 'Activities', slug: 'activities', icon: Ticket },
-    ],
-  },
-  {
-    key: 'costs',
-    title: 'Costs',
-    categories: [
-      { label: 'Tipping', slug: 'tipping', icon: Coins },
-      { label: 'Fixed costs', slug: 'fixed-costs', icon: Coins },
-    ],
-  },
-]
-
 /** Who may open the rate sheets (same as the Rates link). */
 export const RATES_ROLES: PermissionRole[] = AM
 
@@ -445,10 +496,6 @@ export interface JumpPage {
 }
 
 export const JUMP_ONLY_PAGES: JumpPage[] = [
-  { label: 'Copilot', href: '/copilot', icon: Sparkles, roles: ALL, hint: 'Copilot', keywords: ['drafts', 'review'] },
-  { label: 'All conversations', href: '/inbox?channel=all', icon: MessageSquare, roles: ALL, hint: 'Inbox', keywords: ['conversations'] },
-  { label: 'Email', href: '/inbox?channel=email', icon: Mail, roles: ALL, hint: 'Inbox', keywords: ['gmail'] },
-  { label: 'WhatsApp', href: '/inbox?channel=whatsapp', icon: MessageCircle, roles: ALL, hint: 'Inbox' },
   { label: 'Financial reports', href: '/reports?tab=finance', icon: ChartColumn, roles: AM, hint: 'Reports' },
   { label: 'Copilot analytics', href: '/reports?tab=copilot', icon: ChartColumn, roles: AM, hint: 'Reports' },
   { label: 'B2C quotes', href: '/quotes?tab=b2c', icon: File, roles: ALL, hint: 'Quotes' },
@@ -456,10 +503,6 @@ export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'New itinerary', href: '/itineraries/new', icon: Map, roles: ALL, hint: 'Itineraries' },
   { label: 'Follow-ups', href: '/tasks?type=follow-up', icon: Clock, roles: ALL, hint: 'Tasks', keywords: ['reminders'] },
   { label: 'Capacity calendar', href: '/departures?view=capacity', icon: CalendarRange, roles: A, hint: 'Departures' },
-  { label: 'Network suppliers', href: '/suppliers?tab=network', icon: Globe, roles: AM, hint: 'Suppliers' },
-  { label: 'Receivables', href: '/invoices?tab=unpaid', icon: ReceiptText, roles: AM, hint: 'Invoices', keywords: ['unpaid invoices'] },
-  { label: 'Receipts', href: '/payments?tab=receipts', icon: ReceiptText, roles: ALL, hint: 'Payments & receipts' },
-  { label: 'Payables', href: '/supplier-bills?tab=payables', icon: FileText, roles: AM, hint: 'Supplier bills', keywords: ['unpaid supplier invoices'] },
 ]
 
 /** Where Settings' "← Back to app" goes: the last page opened outside it. */
@@ -476,8 +519,19 @@ export function canSee(roles: PermissionRole[], role: PermissionRole): boolean {
 /** The main sidebar for one role: hidden items dropped, empty sections dropped. */
 export function mainNavFor(role: PermissionRole): NavSection[] {
   return MAIN_NAV
-    .map(section => ({ ...section, items: section.items.filter(i => canSee(i.roles, role)) }))
-    .filter(section => section.items.length > 0)
+    .map(section => ({
+      ...section,
+      items: section.items.filter(i => canSee(i.roles, role)),
+      groups: section.groups
+        ?.map(g => ({ ...g, items: g.items.filter(i => canSee(i.roles, role)) }))
+        .filter(g => g.items.length > 0),
+    }))
+    .filter(section => section.items.length > 0 || (section.groups?.length ?? 0) > 0)
+}
+
+/** Every link in a section, its groups' included. */
+export function sectionItems(section: NavSection): NavItem[] {
+  return [...section.items, ...(section.groups ?? []).flatMap(g => g.items)]
 }
 
 export function settingsNavFor(role: PermissionRole): SettingsGroup[] {
@@ -493,13 +547,24 @@ function covers(prefix: string, pathname: string): boolean {
 /**
  * The one entry that is "the current page": the longest href (or match path)
  * covering the path wins, so /tours/manage is Tours, not Inventory, and
- * /rates/check is Rates check, not Rates.
+ * /rates/check is Rates check, not Rates. Entries sharing a path (Inbox,
+ * Email and WhatsApp are all /inbox?channel=…) are told apart by the query:
+ * the one whose parameters the address carries; with none of them, the
+ * first listed (Inbox — the page's default tab).
  */
-export function activeHref<T extends Pick<NavItem, 'href' | 'match'>>(items: T[], pathname: string): string | null {
-  let best: { href: string; len: number } | null = null
+export function activeHref<T extends Pick<NavItem, 'href' | 'match'>>(items: T[], pathname: string, search = ''): string | null {
+  const here = new URLSearchParams(search)
+  let best: { href: string; len: number; query: number } | null = null
   for (const item of items) {
-    for (const p of [item.href, ...(item.match ?? [])]) {
-      if (covers(p, pathname) && (!best || p.length > best.len)) best = { href: item.href, len: p.length }
+    for (const target of [item.href, ...(item.match ?? [])]) {
+      const [path, query = ''] = target.split('?')
+      if (!covers(path, pathname)) continue
+      const wanted = [...new URLSearchParams(query)]
+      if (wanted.some(([k, v]) => here.has(k) && here.get(k) !== v)) continue
+      const score = wanted.filter(([k, v]) => here.get(k) === v).length
+      if (!best || path.length > best.len || (path.length === best.len && score > best.query)) {
+        best = { href: item.href, len: path.length, query: score }
+      }
     }
   }
   return best?.href ?? null
