@@ -33,13 +33,20 @@ function ilikeExact(value: string): string {
   return value.replace(/[\\%_]/g, ch => `\\${ch}`)
 }
 
+/** True when the address is already a client — and also when the check
+ *  could not be made: an unanswered lookup is not "unknown", and a sender
+ *  treated as new on a database error would become a duplicate client. */
 async function isKnownClientIgnoringCase(db: Db, tenantId: string, email: string): Promise<boolean> {
-  const { data } = await db
+  const { data, error } = await db
     .from('clients')
     .select('id')
     .eq('tenant_id', tenantId)
     .ilike('email', ilikeExact(email))
     .limit(1)
+  if (error) {
+    console.error('[create-leads] client lookup failed; sender skipped this sync', error.message ?? error)
+    return true
+  }
   return Array.isArray(data) && data.length > 0
 }
 
@@ -56,10 +63,20 @@ export async function createLeadsFromNewConversations(input: {
   if (senders.length === 0) return 0
 
   // Who we already know, and who was already told "not a lead".
-  const [{ data: clientRows }, { data: dismissedRows }] = await Promise.all([
+  // If either read fails, nothing is created this sync: an empty answer from
+  // a failed read would make every known client and dismissed sender look
+  // new, and they would come back as duplicate leads. The next sync retries.
+  const [{ data: clientRows, error: clientError }, { data: dismissedRows, error: dismissedError }] = await Promise.all([
     db.from('clients').select('email').eq('tenant_id', tenantId).in('email', senders),
     db.from('email_lead_dismissals').select('sender_email').eq('tenant_id', tenantId).in('sender_email', senders),
   ])
+  if (clientError || dismissedError) {
+    console.error(
+      '[create-leads] could not read known clients or dismissed senders; no leads created this sync',
+      (clientError ?? dismissedError)?.message ?? clientError ?? dismissedError,
+    )
+    return 0
+  }
   const knownClientEmails = new Set(
     ((clientRows ?? []) as Array<{ email: string | null }>).map(r => bareAddress(r.email)).filter(Boolean)
   )

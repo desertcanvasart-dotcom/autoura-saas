@@ -4,6 +4,7 @@ import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,19 +32,23 @@ export async function GET(request: NextRequest) {
     const tier = searchParams.get('tier')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabase
-      .from('meal_rates')
-      .select('*')
-      .order('restaurant_name')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('meal_rates')
+        .select('*')
+        .order('restaurant_name')
 
-    if (supplierId) query = query.eq('supplier_id', supplierId)
-    if (city) query = query.eq('city', city)
-    if (mealType) query = query.eq('meal_type', mealType)
-    if (cuisineType) query = query.eq('cuisine_type', cuisineType)
-    if (tier) query = query.eq('tier', tier)
-    if (activeOnly) query = query.eq('is_active', true)
-
-    const { data, error } = await query
+      if (supplierId) query = query.eq('supplier_id', supplierId)
+      if (city) query = query.eq('city', city)
+      if (mealType) query = query.eq('meal_type', mealType)
+      if (cuisineType) query = query.eq('cuisine_type', cuisineType)
+      if (tier) query = query.eq('tier', tier)
+      if (activeOnly) query = query.eq('is_active', true)
+      return query.order('id').range(from, to)
+    })
 
     if (error) {
       console.error('GET meal_rates error:', error)

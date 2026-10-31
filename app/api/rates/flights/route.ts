@@ -4,6 +4,7 @@ import { airlineCode } from '@/lib/vocabulary'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 // ============================================
 // FLIGHT RATES API - Full CRUD
@@ -56,27 +57,31 @@ export async function GET(request: NextRequest) {
     // ✅ MULTI-TENANT: RLS policies automatically filter by tenant_id
     // See migration: 007_create_tours_templates_tables.sql
     // Only returns rates belonging to authenticated user's tenant
-    let query = supabase
-      .from('flight_rates')
-      .select(`
-        *,
-        supplier:suppliers(id, name, city, contact_phone, contact_email)
-      `)
-      .order('route_from')
-      .order('route_to')
-      .order('airline')
-      .order('cabin_class')
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = supabase
+        .from('flight_rates')
+        .select(`
+          *,
+          supplier:suppliers(id, name, city, contact_phone, contact_email)
+        `)
+        .order('route_from')
+        .order('route_to')
+        .order('airline')
+        .order('cabin_class')
 
-    // Apply filters
-    if (routeFrom) query = query.ilike('route_from', `%${routeFrom}%`)
-    if (routeTo) query = query.ilike('route_to', `%${routeTo}%`)
-    if (airline) query = query.ilike('airline', `%${airline}%`)
-    if (flightType) query = query.eq('flight_type', flightType)
-    if (cabinClass) query = query.eq('cabin_class', cabinClass)
-    if (supplierId) query = query.eq('supplier_id', supplierId)
-    if (activeOnly) query = query.eq('is_active', true)
-
-    const { data, error } = await query
+      // Apply filters
+      if (routeFrom) query = query.ilike('route_from', `%${routeFrom}%`)
+      if (routeTo) query = query.ilike('route_to', `%${routeTo}%`)
+      if (airline) query = query.ilike('airline', `%${airline}%`)
+      if (flightType) query = query.eq('flight_type', flightType)
+      if (cabinClass) query = query.eq('cabin_class', cabinClass)
+      if (supplierId) query = query.eq('supplier_id', supplierId)
+      if (activeOnly) query = query.eq('is_active', true)
+      return query.order('id').range(from, to)
+    })
 
     if (error) {
       console.error('GET flight_rates error:', error)

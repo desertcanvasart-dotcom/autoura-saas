@@ -6,6 +6,7 @@ import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { attachPropertyNames } from '@/lib/suppliers/attach-property-names'
 import { operatorNameForSupplier } from '@/lib/suppliers/operator-name'
 import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,21 +25,26 @@ export async function GET(request: NextRequest) {
     const cabinType = searchParams.get('cabin_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = (createAdminClient() as any)
-      .from('sleeping_train_rates')
-      .select('*')
-      // Tenant rows, merged with the global catalog when the tenant's
-      // use_global_catalog flag is on (see lib/catalog-scope.ts).
-      .or(catalogOrExpr(await getCatalogScope(createAdminClient(), authResult.tenant_id)))
-      .order('origin_city')
+    const scopeExpr = catalogOrExpr(await getCatalogScope(createAdminClient(), authResult.tenant_id))
+    // Every page: PostgREST stops a plain select at 1000 rows without an
+    // error, so rows past that could not be found to edit or deactivate.
+    // `id` last keeps the paging stable between pages.
+    const { data, error } = await fetchAllPages((from, to) => {
+      let query = (createAdminClient() as any)
+        .from('sleeping_train_rates')
+        .select('*')
+        // Tenant rows, merged with the global catalog when the tenant's
+        // use_global_catalog flag is on (see lib/catalog-scope.ts).
+        .or(scopeExpr)
+        .order('origin_city')
 
-    if (supplierId) query = query.eq('supplier_id', supplierId)
-    if (originCity) query = query.eq('origin_city', originCity)
-    if (destinationCity) query = query.eq('destination_city', destinationCity)
-    if (cabinType) query = query.eq('cabin_type', cabinType)
-    if (activeOnly) query = query.eq('is_active', true)
-
-    const { data, error } = await query
+      if (supplierId) query = query.eq('supplier_id', supplierId)
+      if (originCity) query = query.eq('origin_city', originCity)
+      if (destinationCity) query = query.eq('destination_city', destinationCity)
+      if (cabinType) query = query.eq('cabin_type', cabinType)
+      if (activeOnly) query = query.eq('is_active', true)
+      return query.order('id').range(from, to)
+    })
 
     if (error) {
       console.error('GET sleeping_train_rates error:', error)

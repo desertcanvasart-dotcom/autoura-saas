@@ -15,6 +15,7 @@ import { supplierToGuide } from '@/lib/guides/supplier-guide'
 import { sumByCurrency } from '@/lib/currency-totals'
 import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
 import { supplierTypesOrFilter } from '@/lib/suppliers/type-filter'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,56 +78,89 @@ export async function GET(request: NextRequest) {
     // One mapping for the list and /api/guides/[id] (lib/guides/supplier-guide).
     let guides = (suppliers || []).map(supplierToGuide)
 
-    // If checking availability, filter out guides with conflicting bookings
+    // If checking availability, filter out guides with conflicting bookings.
+    // A failed read fails the request (fails closed): it used to come back
+    // empty, and every guide — booked or not — was listed as free.
     if (availability_from && availability_to) {
-      let bookingsQuery = supabase
-        .from('itineraries')
-        .select('assigned_guide_id')
-        .eq('tenant_id', tenant_id)
-        .not('assigned_guide_id', 'is', null)
-        .or(`and(start_date.lte.${availability_to},end_date.gte.${availability_from})`)
+      const { data: bookings, error: bookingsError } = await fetchAllPages((from, to) => {
+        let bookingsQuery = supabase
+          .from('itineraries')
+          .select('id, assigned_guide_id')
+          .eq('tenant_id', tenant_id)
+          .not('assigned_guide_id', 'is', null)
+          .or(`and(start_date.lte.${availability_to},end_date.gte.${availability_from})`)
 
-      if (exclude_itinerary_id) {
-        bookingsQuery = bookingsQuery.neq('id', exclude_itinerary_id)
+        if (exclude_itinerary_id) {
+          bookingsQuery = bookingsQuery.neq('id', exclude_itinerary_id)
+        }
+        return bookingsQuery.order('id').range(from, to)
+      })
+
+      if (bookingsError) {
+        console.error('Error checking guide availability:', bookingsError)
+        return NextResponse.json(
+          { success: false, error: 'Could not check guide availability' },
+          { status: 500 }
+        )
       }
 
-      const { data: bookings } = await bookingsQuery
-
-      const bookedGuideIds = bookings?.map(b => b.assigned_guide_id) || []
-      guides = guides.filter(g => !bookedGuideIds.includes(g.id))
+      const bookedGuideIds = new Set(bookings.map(b => b.assigned_guide_id))
+      guides = guides.filter(g => !bookedGuideIds.has(g.id))
     }
 
-    // Add statistics if requested
+    // Add statistics if requested: every guide's trips in one read, grouped
+    // in memory (was one query per guide). A failed read is an error, not a
+    // row of zeros.
     if (with_stats && guides.length > 0) {
-      const guidesWithStats = await Promise.all(
-        guides.map(async (guide) => {
-          const { data: bookings } = await supabase
-            .from('itineraries')
-            .select('id, start_date, end_date, total_cost, currency')
-            .eq('tenant_id', tenant_id)
-            .eq('assigned_guide_id', guide.id)
+      const guideIds = guides.map(g => g.id)
+      const { data: trips, error: tripsError } = await fetchAllPages((from, to) =>
+        supabase
+          .from('itineraries')
+          .select('id, assigned_guide_id, start_date, end_date, total_cost, currency')
+          .eq('tenant_id', tenant_id)
+          .in('assigned_guide_id', guideIds)
+          .order('id')
+          .range(from, to))
 
-          const now = new Date()
-          const activeBookings = bookings?.filter(b =>
-            b.start_date !== null && b.end_date !== null &&
-            new Date(b.start_date) <= now && new Date(b.end_date) >= now
-          ).length || 0
+      if (tripsError) {
+        console.error('Error fetching guide statistics:', tripsError)
+        return NextResponse.json(
+          { success: false, error: 'Failed to fetch guide statistics' },
+          { status: 500 }
+        )
+      }
 
-          const upcomingBookings = bookings?.filter(b =>
-            b.start_date !== null && new Date(b.start_date) > now
-          ).length || 0
+      const tripsByGuide = new Map<string, typeof trips>()
+      for (const trip of trips) {
+        const key = String(trip.assigned_guide_id)
+        const list = tripsByGuide.get(key)
+        if (list) list.push(trip)
+        else tripsByGuide.set(key, [trip])
+      }
 
-          // Per currency: trips in yen and euros were added into one number.
-          const totalRevenue = sumByCurrency(bookings, b => b.total_cost, b => b.currency)
+      const now = new Date()
+      const guidesWithStats = guides.map((guide) => {
+        const bookings = tripsByGuide.get(String(guide.id)) ?? []
 
-          return {
-            ...guide,
-            active_bookings: activeBookings,
-            upcoming_bookings: upcomingBookings,
-            total_revenue: totalRevenue,
-          }
-        })
-      )
+        const activeBookings = bookings.filter(b =>
+          b.start_date !== null && b.end_date !== null &&
+          new Date(b.start_date) <= now && new Date(b.end_date) >= now
+        ).length
+
+        const upcomingBookings = bookings.filter(b =>
+          b.start_date !== null && new Date(b.start_date) > now
+        ).length
+
+        // Per currency: trips in yen and euros were added into one number.
+        const totalRevenue = sumByCurrency(bookings, b => b.total_cost, b => b.currency)
+
+        return {
+          ...guide,
+          active_bookings: activeBookings,
+          upcoming_bookings: upcomingBookings,
+          total_revenue: totalRevenue,
+        }
+      })
 
       return NextResponse.json({ success: true, data: guidesWithStats })
     }

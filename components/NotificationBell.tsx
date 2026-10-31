@@ -144,12 +144,14 @@ export default function NotificationBell() {
     if (notifications.length === 0) return
     
     try {
-      // Delete all notifications one by one (or you can create a bulk delete endpoint)
-      const deletePromises = notifications.map(n => 
-        fetch(`/api/notifications/${n.id}`, { method: 'DELETE' })
-      )
-      
-      await Promise.all(deletePromises)
+      // One request clears every notification of yours, not only the ones
+      // loaded here. The list empties only when the server says it worked,
+      // so a failure leaves what is still there on screen.
+      const response = await fetch('/api/notifications/clear-all', { method: 'DELETE' })
+      if (!response.ok) {
+        console.error('Error clearing all notifications:', response.status)
+        return
+      }
       setNotifications([])
       setUnreadCount(0)
     } catch (error) {
