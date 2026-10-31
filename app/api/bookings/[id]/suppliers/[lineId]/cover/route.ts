@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { SAME_SERVICE_KEYS, alternativeCost, ownResourceTypes } from '@/lib/bookings/cover-options'
 import { loadCoverLine, loadSameServiceRates, supplierAlternatives } from '@/lib/bookings/cover-lookup'
-import { normalizeStatus } from '@/lib/bookings/service-booking-states'
+import { canTransition, normalizeStatus } from '@/lib/bookings/service-booking-states'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
 import { transitionServiceBooking } from '@/lib/bookings/service-booking-transition'
 import { computeConflicts } from '@/lib/itinerary-resource-conflicts'
@@ -185,6 +185,10 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const chosen = options.find(o => o.resource_id === resourceId)
     if (!chosen) return NextResponse.json({ success: false, error: 'Not found in your team or cars' }, { status: 404 })
     if (!line.service_date) return NextResponse.json({ success: false, error: 'The line has no date to assign' }, { status: 400 })
+    // The move is checked before anything is written: a refused move must not
+    // leave the line marked 'own' with an assignment standing alone (audit SN-8).
+    const allowed = canTransition(line.status, 'assigned', 'own')
+    if (!allowed.ok) return NextResponse.json({ success: false, error: allowed.reason }, { status: 409 })
 
     const { data: booking } = await supabase.from('bookings').select('itinerary_id').eq('id', id).maybeSingle()
     if (!booking?.itinerary_id) return NextResponse.json({ success: false, error: 'The booking has no itinerary' }, { status: 400 })

@@ -23,7 +23,7 @@ describe("the signed-in supplier's inbox", () => {
   it('days off name the agency by its approved claim — never an id the supplier could pick — and delete only their own', () => {
     const r = read('app/api/supplier-account/days-off/route.ts')
     expect(r).toContain('(await approvedLinks(db, signedIn.account.id)).find(l => l.id === linkId)')
-    expect(r).toContain(".eq('marked_by', 'supplier')")
+    expect(r).toContain('clearSupplierDayOff(db, { tenantId: found.link.tenant_id, supplierId: found.link.supplier_id }')
     expect(r).not.toMatch(/body\.(tenant_id|supplier_id)/)
   })
 
