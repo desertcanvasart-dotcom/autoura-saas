@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { clientIpFromHeaders } from '@/lib/client-ip'
 
 // ============================================
 // RATE LIMITING UTILITY
@@ -104,6 +105,33 @@ export const RATE_LIMITS = {
     limit: 5,          // exports
     windowMs: 3600000, // per hour
   },
+  // Publish websites (app/api/publish/internal/*): anonymous visitors.
+  // A visitor's WhatsApp clicks (each makes a tracked reference), and a whole
+  // site's — past either, the button opens WhatsApp without a reference.
+  publishWaVisitor: {
+    limit: 10,         // references
+    windowMs: 60000,   // per minute
+  },
+  publishWaSite: {
+    limit: 300,        // references
+    windowMs: 3600000, // per hour
+  },
+  // A whole site's enquiries (each makes a CRM lead and rings the bell); a
+  // visitor's own limit is `contact`.
+  publishEnquirySite: {
+    limit: 60,         // enquiries
+    windowMs: 3600000, // per hour
+  },
+  // Publish admin, a whole company: AI page drafts (Claude) and Google place
+  // searches (billed Text Search calls).
+  publishDraftCompany: {
+    limit: 20,         // drafts
+    windowMs: 3600000, // per hour
+  },
+  publishPlaceSearchCompany: {
+    limit: 30,         // searches
+    windowMs: 3600000, // per hour
+  },
   // Invitations
   invitation: {
     limit: 10,         // invites
@@ -168,49 +196,14 @@ export function checkRateLimit(
 // HELPER TO GET CLIENT IDENTIFIER
 // ============================================
 
-const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
-const IPV6_RE = /^[0-9a-fA-F:]+$/
-
-function isValidIp(value: string): boolean {
-  if (IPV4_RE.test(value)) {
-    return value.split('.').every(o => Number(o) <= 255)
-  }
-  return value.includes(':') && IPV6_RE.test(value)
-}
-
 /**
- * Best-effort client IP, resistant to X-Forwarded-For spoofing.
- *
- * X-Forwarded-For is client-controllable: a client can PREPEND arbitrary
- * entries, and each proxy APPENDS the address it saw. So the trustworthy
- * client IP is not the leftmost entry (the old bug — trivially spoofed to
- * rotate identifiers and bypass the limit) but the one the outermost trusted
- * proxy appended: the Nth entry from the right, where N = number of trusted
- * proxy hops (TRUSTED_PROXY_COUNT, default 1 for a single edge like Railway).
- * Values that don't parse as an IP are rejected so a garbage header can't
- * mint unlimited identifiers.
+ * Best-effort client IP, resistant to X-Forwarded-For spoofing: the entry the
+ * trusted edge appended, not the leftmost (see lib/client-ip.ts).
  */
 export function getClientIdentifier(request: NextRequest): string {
-  const hops = Math.max(1, parseInt(process.env.TRUSTED_PROXY_COUNT || '1', 10) || 1)
-
-  const forwardedFor = request.headers.get('x-forwarded-for')
-  if (forwardedFor) {
-    const parts = forwardedFor.split(',').map(p => p.trim()).filter(Boolean)
-    // The address the outermost trusted proxy observed.
-    const candidate = parts[parts.length - hops]
-    if (candidate && isValidIp(candidate)) {
-      return candidate
-    }
-  }
-
-  const realIp = request.headers.get('x-real-ip')?.trim()
-  if (realIp && isValidIp(realIp)) {
-    return realIp
-  }
-
   // Can't establish a trustworthy IP → one shared bucket (fail closed toward
   // limiting, not toward unlimited per-request identifiers).
-  return 'unknown'
+  return clientIpFromHeaders(request.headers) ?? 'unknown'
 }
 
 /**

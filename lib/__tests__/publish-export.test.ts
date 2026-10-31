@@ -18,9 +18,12 @@ function makeDb(tables: Record<string, Row[]>) {
   return {
     from(table: string) {
       const filters: Array<(r: Row) => boolean> = []
-      const exec = () => ({ data: (tables[table] ?? []).filter(r => filters.every(f => f(r))), error: null })
+      // PostgREST's cap: a plain select answers 1,000 rows at most.
+      let window: [number, number] = [0, 999]
+      const exec = () => ({ data: (tables[table] ?? []).filter(r => filters.every(f => f(r))).slice(window[0], window[1] + 1), error: null })
       const q: Record<string, unknown> = {
         select: () => q, order: () => q,
+        range: (from: number, to: number) => { window = [from, Math.min(to, from + 999)]; return q },
         eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return q },
         maybeSingle: async () => ({ data: exec().data[0] ?? null, error: null }),
         then: (res: (v: unknown) => unknown) => res(exec()),
@@ -65,7 +68,7 @@ const deps: ExportDeps = {
   now: () => new Date('2026-10-28T10:00:00Z'),
 }
 
-const db = () => makeDb({
+const tablesOf = (): Record<string, Row[]> => ({
   publish_sites: [{ id: SITE, tenant_id: T, archetype: 'modern', status: 'draft', languages: ['en', 'fr'], brand: { fontPair: 'sleek' }, settings: {}, tenants: { company_name: 'Sunrise Travel' } }],
   publish_domains: [{ site_id: SITE, hostname: 'sunrise.up.railway.app', kind: 'test', status: 'active' }],
   publish_glossary: [{ tenant_id: T, term_key: 'giza', kind: 'site', language: 'fr', spelling: 'Gizeh' }],
@@ -80,6 +83,7 @@ const db = () => makeDb({
     utm: { source: 'g' }, dates: { from: '2027-03' }, travellers: 2, message: '=SUM(A1) please', tour_templates: { template_name: 'Giza day' },
     clients: { first_name: 'Lena', last_name: 'Fischer', email: 'lena@example.com', phone: null } }],
 })
+const db = () => makeDb(tablesOf())
 
 describe('the website as one download', () => {
   it('has every published page in every language — as Markdown and as standalone HTML — and nothing unpublished', async () => {
@@ -120,6 +124,12 @@ describe('the website as one download', () => {
     expect(md).toContain('Stand before the Sphinx.')
     expect(md).toContain('- Guide')
     expect(md).toContain('Visits: Great Sphinx')
+  })
+
+  it('carries every enquiry, not the first 1,000', async () => {
+    const many = Array.from({ length: 1205 }, (_, i) => ({ tenant_id: T, created_at: '2026-10-01T00:00:00Z', source: 'web_form', language: 'en', message: `m${i}` }))
+    const { counts } = await buildSiteExport(makeDb({ ...tablesOf(), publish_enquiries: many }) as never, T, deps)
+    expect(counts.leads).toBe(1205)
   })
 
   it('media, redirects in three formats, leads (safe for spreadsheets) and site.json', async () => {

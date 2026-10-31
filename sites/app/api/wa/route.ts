@@ -1,6 +1,6 @@
-import { normalizeHost } from '@/lib/publish/site-data'
+import { normalizeHost } from '@/lib/publish/host'
 import { requestWaRef, siteForEmbedKey, siteForHost } from '../../../lib/internal-api'
-import { backTo, landingFrom, whatsAppLink } from '../../../lib/lead-capture'
+import { backTo, landingFrom, visitorIpOf, whatsAppLink } from '../../../lib/lead-capture'
 
 // ============================================
 // The WhatsApp button (GET /api/wa?page=…&lang=…)
@@ -8,7 +8,8 @@ import { backTo, landingFrom, whatsAppLink } from '../../../lib/lead-capture'
 // Records which page (and campaign) the visitor came from under a short
 // reference, then opens WhatsApp with the company's own number and a message
 // that carries it. A company without its own number shows no button; if one
-// is followed anyway, the visitor goes back to the page.
+// is followed anyway, the visitor goes back to the page. Past the app's click
+// limit (per visitor address, per site) WhatsApp still opens, with no reference.
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
       pageId: UUID.test(page) ? page : null,
       language,
       landingUrl: landing?.toString() ?? null,
+      visitorIp: visitorIpOf(request.headers),
     })
     target = whatsAppLink(ref, language)
   } catch (e) {

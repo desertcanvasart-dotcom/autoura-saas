@@ -12,6 +12,7 @@ import type { SitemapData, SiteResolution, PagePayload, PageNarrative, TourFacts
 import { loadTourFacts } from './tour-facts'
 import { placeReviews, reviewsSettingsOf, type PlaceReviews } from './reviews'
 import { factsHash, renderableNarrative, translateFacts, type NarrativeBundle } from './narrative'
+import { normalizeHost, domainServes } from './host'
 
 type Db = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,24 +21,9 @@ type Db = {
 
 // ---------- pure rules ----------
 
-/** The hostname as stored in publish_domains: lower case, no port, no trailing dot. */
-export function normalizeHost(host: string | null | undefined): string | null {
-  if (!host) return null
-  const h = host.trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '')
-  return /^[a-z0-9.-]+$/.test(h) && h.includes('.') ? h : null
-}
-
-/**
- * Whether a hostname serves its site. A test hostname always does (it is
- * how a site is seen before launch, and how our own brands run first); a
- * real one only once its domain is verified and the site is live. A
- * suspended site is served nowhere.
- */
-export function domainServes(kind: string, domainStatus: string, siteStatus: string): boolean {
-  if (siteStatus === 'suspended') return false
-  if (kind === 'test') return true
-  return domainStatus === 'active' && siteStatus === 'live'
-}
+// normalizeHost / domainServes live in host.ts (pure, for the renderer);
+// re-exported here for the callers that already import them from this file.
+export { normalizeHost, domainServes }
 
 export type PathTarget =
   | { kind: 'home' }
