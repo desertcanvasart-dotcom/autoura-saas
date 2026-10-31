@@ -22,8 +22,8 @@ interface B2BPartner {
 }
 
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
 
-const CURRENCIES = SUPPORTED_CURRENCIES
 
 const DEFAULT_MARGINS: Record<ClientType, number> = {
   b2b: 10,
@@ -31,6 +31,11 @@ const DEFAULT_MARGINS: Record<ClientType, number> = {
 }
 
 export default function GridHeader({ config, onChange, totals, guideLanguages = [] }: GridHeaderProps) {
+  // Only the currencies the company has in use (Settings › Currencies &
+  // rates), plus whatever this quote already shows.
+  const { tenant } = useTenant()
+  const inUse = tenant?.currencies_in_use
+  const CURRENCIES = SUPPORTED_CURRENCIES.filter(c => !inUse || inUse.includes(c) || c === config.currency)
   const [partners, setPartners] = useState<B2BPartner[]>([])
   // B2B pricing is managers' and admins' (the B2B APIs refuse anyone else).
   const { isAdmin, isManager } = useRole()

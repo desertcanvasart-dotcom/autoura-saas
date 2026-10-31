@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
             nationality: config.nationality || null,
             is_euro_passport: config.passport === 'eu',
             // A new trip starts in the saver's preferred cost mode.
-            cost_mode: await defaultCostMode(supabase, authResult.user?.id),
+            cost_mode: await defaultCostMode(supabase, authResult.tenant_id),
           })
           .select()
           .single()

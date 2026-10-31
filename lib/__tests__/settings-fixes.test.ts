@@ -102,7 +102,8 @@ describe('settings pages that said one thing and did another', () => {
   })
 
   it('only edited exchange rates are saved, each checked', () => {
-    expect(src('components/settings/LegacySettingsTabs.tsx')).toMatch(/exchangeRates\.filter\(r => editedRates\.has/)
+    // Settings › Currencies & rates sends only the rates whose input changed.
+    expect(src('app/settings/currencies/page.tsx')).toContain('for (const c of changed.rates)')
     expect(src('app/api/exchange-rates/route.ts')).toMatch(/Some rates could not be saved/)
   })
 

@@ -169,7 +169,8 @@ function PricingGridContent() {
     isInitialLoad.current = false
   }, [])
 
-  // Load user preferences as defaults (tier, margin, currency) on first load
+  // The company's pricing defaults (Settings › Pricing defaults and
+  // Currencies, migration 456) start a fresh grid: tier, markup, currency.
   const hasLoadedPrefs = useRef(false)
   useEffect(() => {
     if (hasLoadedPrefs.current) return
@@ -182,7 +183,7 @@ function PricingGridContent() {
 
     const loadPrefs = async () => {
       try {
-        const res = await fetch('/api/user-preferences')
+        const res = await fetch('/api/settings/pricing')
         const data = await res.json()
         if (data.success && data.data) {
           const prefs = data.data
@@ -190,11 +191,11 @@ function PricingGridContent() {
             ...prev,
             tier: prefs.default_tier || prev.tier,
             marginPercent: prefs.default_margin_percent ?? prev.marginPercent,
-            currency: prefs.default_currency || prev.currency,
+            currency: prefs.default_quote_currency || prev.currency,
           }))
         }
       } catch (err) {
-        console.error('Failed to load user preferences:', err)
+        console.error('Failed to load the pricing defaults:', err)
       }
     }
     loadPrefs()
@@ -303,14 +304,15 @@ function PricingGridContent() {
       .catch(() => setFxRates([]))
   }, [])
   useEffect(() => {
-    const shown = displayRate(runCurrency, config.currency, fxRates)
+    const buffer = Number((tenant as { conversion_buffer_percent?: number | null } | null)?.conversion_buffer_percent ?? 0)
+    const shown = displayRate(runCurrency, config.currency, fxRates, buffer)
     if (shown.ok) {
       if (config.exchangeRate !== shown.rate) setConfig(prev => ({ ...prev, exchangeRate: shown.rate }))
     } else if (shown.reason !== 'loading') {
       showToast('error', shown.reason)
       setConfig(prev => ({ ...prev, currency: runCurrency, exchangeRate: null }))
     }
-  }, [config.currency, config.exchangeRate, runCurrency, fxRates])
+  }, [config.currency, config.exchangeRate, runCurrency, fxRates, tenant])
 
   // --- URL Params: Auto-load conversation from inbox redirect ---
   const searchParams = useSearchParams()

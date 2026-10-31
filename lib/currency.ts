@@ -22,6 +22,9 @@ export interface ExchangeRate {
 export const SUPPORTED_CURRENCIES = ['EUR', 'USD', 'GBP', 'EGP', 'AED', 'SAR', 'JOD', 'MAD', 'TND', 'KES', 'TZS', 'ZAR'] as const
 export type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]
 
+/** Currency pickers list these first, then the rest alphabetically. */
+export const PREFERRED_FIRST: readonly CurrencyCode[] = ['EUR', 'USD', 'EGP']
+
 export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
   EUR: '€',
   USD: '$',
