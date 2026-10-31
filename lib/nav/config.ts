@@ -251,8 +251,14 @@ export const MAIN_NAV: NavSection[] = [
     items: [
       {
         label: 'Suppliers', href: '/suppliers', icon: Truck, roles: AM,
-        match: ['/network-suppliers', '/resources', '/airport-staff'],
+        match: ['/resources', '/airport-staff'],
         keywords: ['network suppliers'],
+      },
+      // The shared Autoura network, where an agency finds more suppliers
+      // (operator, 2026-10-31: it must be visible, not only a tab).
+      {
+        label: 'Supplier network', href: '/suppliers?tab=network', icon: Network, roles: AM,
+        keywords: ['network suppliers', 'find suppliers'],
       },
       { label: 'Rates overview', href: '/rates', icon: Tag, roles: AM, keywords: ['rates', 'rates hub', 'rate sheets'] },
       { label: 'Rates check', href: '/rates/check', icon: ScanLine, roles: AM },
@@ -359,6 +365,13 @@ export const SETTINGS_NAV: SettingsGroup[] = [
         label: 'Staff directory', href: '/settings/staff-directory', icon: Users, roles: AM,
         keywords: ['team members', 'guides', 'drivers'],
         description: 'The people work is assigned to: office staff, guides and drivers, with or without a login.',
+      },
+      {
+        // Where the agency books suppliers from, and suppliers waiting to have
+        // their sign-in confirmed (operator, 2026-10-31: it was hard to find).
+        label: 'Supplier network', href: '/settings/supplier-network', icon: Network, roles: AM,
+        keywords: ['supplier sourcing', 'network suppliers', 'supplier sign-in'],
+        description: 'Where you book suppliers from, and suppliers waiting to have their sign-in confirmed.',
       },
       {
         label: 'Billing & plan', href: '/settings/billing', icon: CreditCard, roles: A, adminOnly: true,
@@ -487,7 +500,6 @@ export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'New itinerary', href: '/itineraries/new', icon: Map, roles: ALL, hint: 'Itineraries' },
   { label: 'Follow-ups', href: '/tasks?type=follow-up', icon: Clock, roles: ALL, hint: 'Tasks', keywords: ['reminders'] },
   { label: 'Capacity calendar', href: '/departures?view=capacity', icon: CalendarRange, roles: A, hint: 'Departures' },
-  { label: 'Network suppliers', href: '/network-suppliers', icon: Globe, roles: AM, hint: 'Suppliers' },
 ]
 
 /** Where Settings' "← Back to app" goes: the last page opened outside it. */

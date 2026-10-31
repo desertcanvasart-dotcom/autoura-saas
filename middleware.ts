@@ -102,6 +102,8 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/settings/team': ['admin'],
   // The staff directory (guides, drivers, office staff — not logins).
   '/settings/staff-directory': ['admin', 'manager'],
+  // Sourcing (admins change it) and supplier sign-in approvals (admins decide).
+  '/settings/supplier-network': ['admin', 'manager'],
   // Everyone uses templates; the API lets only managers change them.
   '/settings/message-templates': ['admin', 'manager', 'member'],
   '/settings/content-library': ['admin', 'manager'],
@@ -125,8 +127,6 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Resources page could delete suppliers.
   '/departures': ['admin', 'manager'],
   '/suppliers': ['admin', 'manager'],
-  // The supplier network search (no entry until 2026-10-30: open by URL).
-  '/network-suppliers': ['admin', 'manager'],
   '/resources': ['admin', 'manager'],
   '/airport-staff': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],

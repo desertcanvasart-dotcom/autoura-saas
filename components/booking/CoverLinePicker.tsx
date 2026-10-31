@@ -92,7 +92,7 @@ export default function CoverLinePicker({
           ) : options.own.length === 0 && options.suppliers.length === 0 ? (
             <p className="text-xs text-gray-600">
               Nobody to offer: no own people or cars, and no supplier of this kind in your supplier book.
-              Add one under CRM → Suppliers{options.uses_network ? <>, or <a href="/network-suppliers" className="text-blue-700 underline">find one in the network</a></> : null}.
+              Add one under CRM → Suppliers{options.uses_network ? <>, or <a href="/suppliers?tab=network" className="text-blue-700 underline">find one in the network</a></> : null}.
             </p>
           ) : (
             <>
@@ -141,7 +141,7 @@ export default function CoverLinePicker({
                 )}
               </select>
               {options.uses_network && (
-                <a href="/network-suppliers" className="mt-2 block text-xs text-blue-700 hover:underline">Find more in the network →</a>
+                <a href="/suppliers?tab=network" className="mt-2 block text-xs text-blue-700 hover:underline">Find more in the network →</a>
               )}
               <div className="mt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setOpen(false)} className="px-2 py-1 text-xs text-gray-600">Cancel</button>
