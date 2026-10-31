@@ -25,12 +25,12 @@ export default function WorkflowsPage() {
           The complete end-to-end workflow for handling a new client inquiry:
         </p>
         <ol className="list-decimal list-inside space-y-3 text-gray-700">
-          <li><strong>Receive inquiry</strong> &mdash; The client messages on WhatsApp. The conversation appears in your WhatsApp inbox.</li>
+          <li><strong>Receive inquiry</strong> &mdash; The client messages on WhatsApp. The conversation appears on the Inbox&apos;s <strong>WhatsApp</strong> tab.</li>
           <li><strong>Parse</strong> &mdash; Open the conversation and click <strong>Parse</strong>. The <strong>Quote Builder</strong> opens with the chat loaded, reads the trip from it and prices every day from your rates.</li>
           <li><strong>Review and adjust</strong> &mdash; Check the days, services, hotels and margin in the grid.</li>
           <li><strong>Save</strong> &mdash; <strong>Save as Itinerary</strong> creates the itinerary and its B2C quote; for a partner, <strong>Save as B2B Quote</strong>.</li>
           <li><strong>Send to client</strong> &mdash; Share the itinerary link, or send the quote PDF by WhatsApp or email.</li>
-          <li><strong>Client accepts</strong> &mdash; Either set the itinerary&rsquo;s status to <strong>Confirmed</strong>, which creates its booking, or open the quote under <strong>B2C Quotes</strong> (B2B Quotes for partners), set its status to <strong>Accepted</strong> and click <strong>Convert to Booking</strong>. Each quote converts once.</li>
+          <li><strong>Client accepts</strong> &mdash; Either set the itinerary&rsquo;s status to <strong>Confirmed</strong>, which creates its booking, or open the quote under <strong>Quotes</strong> (the B2C quotes tab, or B2B quotes for partners), set its status to <strong>Accepted</strong> and click <strong>Convert to Booking</strong>. Each quote converts once.</li>
           <li><strong>Confirm suppliers</strong> &mdash; In the booking, track each supplier&apos;s confirmation status.</li>
           <li><strong>Invoice and get paid</strong> &mdash; Create the invoice, send it, and record payments as they arrive.</li>
           <li><strong>Complete trip</strong> &mdash; After the trip, mark the booking as completed; managers and admins review its P&amp;L.</li>
@@ -41,7 +41,7 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Working the Quote Pipeline</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>B2C Quotes</strong> to see every quote and its status</li>
+          <li>Go to <strong>Quotes</strong> (Sell section) &mdash; the <strong>B2C quotes</strong> tab &mdash; to see every quote and its status</li>
           <li>Chase the ones the client hasn&apos;t answered &mdash; the dashboard&apos;s <strong>Quotes awaiting client</strong> card takes you to the same list</li>
           <li>When a client says yes, open the quote, set it to <strong>Accepted</strong> and click <strong>Convert to Booking</strong></li>
         </ol>
@@ -67,7 +67,7 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Triaging Concierge Leads</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Concierge Leads</strong> (Communicate group) to see inbound briefs from your intake form</li>
+          <li>Go to <strong>Leads</strong> (Communicate section) to see inbound briefs from your intake form</li>
           <li>Open a brief to review the trip request</li>
           <li>Follow up by WhatsApp or email &mdash; each brief already has its client in <strong>Clients</strong>, created when it arrived</li>
         </ol>
@@ -77,10 +77,10 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Replying Faster with Copilot</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open <strong>Copilot</strong> in the sidebar to see AI-drafted replies to incoming messages</li>
+          <li>Open <strong>Copilot</strong> in the sidebar, or the <strong>Copilot</strong> button in the top bar, to see AI-drafted replies to incoming messages</li>
           <li>Review each draft, edit if needed, then send &mdash; nothing is sent without your approval, unless an admin has switched on WhatsApp AI auto-reply</li>
-          <li>In the WhatsApp inbox, Copilot suggestions also appear right in the composer</li>
-          <li>Improve future drafts by adding facts to <strong>Copilot Knowledge</strong>; admins tune <strong>Copilot Settings</strong></li>
+          <li>On the Inbox&apos;s WhatsApp tab, Copilot suggestions also appear right in the composer</li>
+          <li>Improve future drafts by adding facts to <strong>Copilot knowledge</strong> (Settings &rsaquo; Content &amp; AI, admins and managers); admins tune <strong>Copilot settings</strong></li>
         </ol>
       </section>
 
@@ -94,7 +94,7 @@ export default function WorkflowsPage() {
           <li>Open <strong>Documents</strong> &rarr; <strong>Itinerary PDF</strong> to download it, or <strong>Send</strong> &rarr; <strong>Send quote</strong> to send it to the client</li>
         </ol>
         <Tip>
-          <strong>New Quote</strong> on the Dashboard opens the new-itinerary form. Most quotes start in the <strong>Quote Builder</strong> (Sell group): <strong>Parse</strong> a WhatsApp or email straight into it and it prices every day from your rates.
+          <strong>New Quote</strong> on the Dashboard opens the new-itinerary form. Most quotes start in the <strong>Quote Builder</strong> (Sell section): <strong>Parse</strong> a WhatsApp or email straight into it and it prices every day from your rates.
         </Tip>
       </section>
 
@@ -113,7 +113,7 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Chasing Payments</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Receivables</strong> (Finance group; managers and admins) to see everything clients still owe</li>
+          <li>Go to <strong>Receivables</strong> (Finance section; managers and admins) &mdash; the <strong>Unpaid</strong> tab of Invoices &mdash; to see everything clients still owe</li>
           <li>Click the <strong>Send Reminder</strong> mail action on an overdue item &mdash; it opens a reminder email in your own mail program, to send yourself</li>
           <li>The app also emails reminders by itself, weekly from a week before the due date: open the invoice and click <strong>View All</strong> on its <strong>Reminder History</strong> for the Payment Reminders page</li>
         </ol>
@@ -129,9 +129,9 @@ export default function WorkflowsPage() {
           Selling to tour operators and agencies:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Partners</strong> &mdash; under <strong>People &rarr; Partners</strong>: each partner&rsquo;s contact, currency and default margin. See <Link href="/docs/partners" className="text-primary-600 hover:underline">Partners</Link>.</li>
+          <li><strong>Partners</strong> &mdash; under <strong>Contacts &rarr; Partners</strong>: each partner&rsquo;s contact, currency and default margin. See <Link href="/docs/partners" className="text-primary-600 hover:underline">Partners</Link>.</li>
           <li><strong>B2B Calculator</strong> &mdash; a rate sheet for a tour programme, at the partner&rsquo;s margin. See <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Pricing</Link>.</li>
-          <li><strong>B2B Quotes</strong> &mdash; quotes for partners from the Quote Builder in B2B mode, with their PDFs. See <Link href="/docs/b2b-quotes" className="text-primary-600 hover:underline">B2B Quotes</Link>.</li>
+          <li><strong>B2B quotes</strong> (a tab of Quotes) &mdash; quotes for partners from the Quote Builder in B2B mode, with their PDFs. See <Link href="/docs/b2b-quotes" className="text-primary-600 hover:underline">B2B Quotes</Link>.</li>
           <li><strong>Transport Packages</strong> &mdash; one price per vehicle for a cruise, a day tour or a road journey, which the calculator and Quote Builder apply. See <Link href="/docs/b2b-pricing-rules" className="text-primary-600 hover:underline">Transport Packages</Link>.</li>
         </ul>
       </section>
@@ -140,14 +140,14 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Managing Tasks</h2>
         <p className="text-gray-600 mb-3">
-          Switch between three views with the icons at the top of the Tasks page (managers and admins; members open tasks from their notifications):
+          Open <strong>Tasks</strong> (Operate section). Managers and admins see every task; members see the tasks assigned to them and the unassigned ones. Client follow-ups are on the page&apos;s <strong>Follow-ups</strong> tab. Switch between three views with the icons at the top of the Tasks tab:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
           <li><strong>Kanban Board</strong> &mdash; columns To Do, In Progress and Done; move a card with its <strong>Start</strong> and <strong>Complete</strong> buttons</li>
           <li><strong>Table View</strong> &mdash; Spreadsheet-style list with sorting</li>
           <li><strong>List View</strong> &mdash; Simple list with filters</li>
         </ul>
-        <DocScreenshot src="/docs/workflows/tasks.jpg" alt="Task management page showing Kanban board with draggable task cards" />
+        <DocScreenshot src="/docs/workflows/tasks.jpg" alt="Tasks page, Tasks tab, showing Kanban board with draggable task cards" />
       </section>
 
       {/* Tips */}
@@ -168,11 +168,11 @@ export default function WorkflowsPage() {
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>WhatsApp is two-way</strong> &mdash; Clients can reply to your WhatsApp messages and those replies appear in your inbox</span>
+            <span><strong>WhatsApp is two-way</strong> &mdash; Clients can reply to your WhatsApp messages and those replies appear in your Inbox</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>Search</strong> &mdash; List pages have a search bar that looks across several fields</span>
+            <span><strong>Search</strong> &mdash; List pages have a search bar that looks across several fields, and <strong>&#8984;K</strong> (Ctrl&nbsp;K) anywhere jumps to any page, rate sheet, setting or client by name</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />

@@ -18,7 +18,7 @@ export default function ContentLibraryPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Content Library &amp; Documents</h1>
       <p className="text-gray-600 mb-8">
-        <strong>Content Library</strong>, <strong>AI Prompts</strong> and <strong>Writing Rules</strong> sit in the sidebar&rsquo;s Communicate group, for admins and managers. The Content Library and Writing Rules are what the Quote Builder&apos;s <strong>Write descriptions</strong> writes your days from. The <strong>Documents</strong> hub, for customer and supplier paperwork, is in the Operate group.
+        <strong>Content library</strong>, <strong>Writing rules</strong> and <strong>AI prompts</strong> are in <strong>Settings &rsaquo; Content &amp; AI</strong>, for admins and managers (open Settings from the bottom of the sidebar or your account menu, or press &#8984;K and type the page&apos;s name). The Content Library and Writing Rules are what the Quote Builder&apos;s <strong>Write descriptions</strong> writes your days from. The <strong>Documents</strong> hub, for customer and supplier paperwork, is in the sidebar&apos;s Operate section.
       </p>
 
       {/* Content Library */}
@@ -91,7 +91,7 @@ export default function ContentLibraryPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Documents</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Documents</strong> (Operate group) is a hub that points you to where each kind of paperwork is made:
+          <strong>Documents</strong> (Operate section) is a hub that points you to where each kind of paperwork is made:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Customer Contracts</strong> &mdash; Made from an itinerary: its <strong>Documents</strong> menu has the itinerary PDF, the contract and the invoice (see <Link href="/docs/itineraries" className="text-primary-600 hover:underline">Itineraries</Link>)</li>

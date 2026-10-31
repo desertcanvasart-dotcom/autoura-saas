@@ -86,7 +86,7 @@ export default function B2CPricingPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">B2C Quotes</h2>
         <p className="text-gray-600 mb-3">
-          Saving a B2C trip makes its quote, or reprices the open one. They are in <strong>Sell &rarr; B2C Quotes</strong>:
+          Saving a B2C trip makes its quote, or reprices the open one. They are on the <strong>B2C quotes</strong> tab of <strong>Sell &rarr; Quotes</strong> (the tab Quotes opens on; B2B quotes are on the other tab, for managers and admins):
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Total Quotes</strong>, <strong>Drafts</strong>, <strong>Sent/Viewed</strong> and <strong>Accepted</strong>; the status filter counts every status</li>
@@ -97,7 +97,7 @@ export default function B2CPricingPage() {
         <p className="text-gray-600 mt-3">
           A quote has <strong>Quote PDF</strong>, <strong>Send Email</strong>, <strong>WhatsApp</strong>, its status, and <strong>Convert to Booking</strong> once accepted. <strong>Edit</strong> changes the base cost and margin; the selling price and price per person are worked out for you.
         </p>
-        <DocScreenshot src="/docs/b2c-pricing/b2c-quotes.jpg" alt="The B2C Quotes list with its stats, search, filters and the New Quote button" />
+        <DocScreenshot src="/docs/b2c-pricing/b2c-quotes.jpg" alt="The B2C quotes tab of Quotes, with its stats, search, filters and the New Quote button" />
       </section>
 
       {/* Previous / next — from the docs order (pager.tsx) */}

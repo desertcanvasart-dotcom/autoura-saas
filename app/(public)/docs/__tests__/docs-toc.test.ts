@@ -49,9 +49,15 @@ describe('docs table of contents', () => {
 })
 
 describe('the docs follow the app', () => {
-  // The docs still follow the sidebar's OLD sections (Home, Communicate…);
-  // regrouping them under the new ones (Sell, Operate, Products…) is its own
-  // docs pass after the navigation restructure.
+  // The docs groups follow the app sidebar's sections (lib/nav/config.ts),
+  // then Settings for the Settings area.
+  it('the groups are the sidebar sections, in the sidebar order', () => {
+    expect(CATEGORIES.map(c => c.label)).toEqual([
+      'Getting Started', 'Home', 'Communicate', 'Sell', 'Operate', 'Products',
+      'Suppliers & Rates', 'Contacts', 'Finance', 'Settings',
+    ])
+  })
+
   it('Communicate is second, under Home, and holds Concierge Leads', () => {
     expect(CATEGORIES.map(c => c.label).slice(0, 3)).toEqual(['Getting Started', 'Home', 'Communicate'])
     const communicate = CATEGORIES.find(c => c.label === 'Communicate')!.items.map(i => i.href)

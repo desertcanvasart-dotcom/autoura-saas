@@ -29,7 +29,7 @@ export default function ImportingToursPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Two sheets, one tour</h2>
         <p className="text-gray-600 mb-3">
           Both live in the <strong>Import / Export</strong> menu at the top of the Tour Manager
-          (Tours &rarr; Tour Manager).
+          (Products &rarr; Tours).
         </p>
         <div className="overflow-x-auto mb-4">
           <table className="min-w-full text-sm border border-gray-200 rounded-lg">
