@@ -7,7 +7,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole } from '@/hooks/useRole'
 import Link from 'next/link'
 import SendingDomainCard from '@/components/settings/SendingDomainCard'
-import { TemplateEditor } from '@/components/email/RichTextEditor'
+import dynamic from 'next/dynamic'
 import { 
   Mail, 
   Check, 
@@ -23,6 +23,13 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+
+// The tiptap editor is only used inside the template modal, so it is fetched
+// when the modal opens rather than in this page's first load.
+const TemplateEditor = dynamic(
+  () => import('@/components/email/RichTextEditor').then(m => m.TemplateEditor),
+  { ssr: false, loading: () => <div className="min-h-[200px] rounded-lg border border-gray-200 bg-gray-50 animate-pulse" /> },
+)
 
 interface EmailTemplate {
   id: string
