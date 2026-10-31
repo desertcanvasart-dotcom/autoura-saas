@@ -509,7 +509,7 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-xs font-medium text-gray-700">Add New Client</p>
-                    <p className="text-[10px] text-gray-400">Create a new client profile</p>
+                    <p className="text-xs text-gray-400">Create a new client profile</p>
                   </div>
                 </Link>
                 <Link href="/itineraries" className="flex items-center gap-2.5 p-2 rounded-md hover:bg-gray-50 transition-colors group">
@@ -518,16 +518,16 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-xs font-medium text-gray-700">View Itineraries</p>
-                    <p className="text-[10px] text-gray-400">Manage tour schedules</p>
+                    <p className="text-xs text-gray-400">Manage tour schedules</p>
                   </div>
                 </Link>
                 <Link href="/resources" className="flex items-center gap-2.5 p-2 rounded-md hover:bg-gray-50 transition-colors group">
-                  <div className="w-8 h-8 bg-purple-50 rounded-md flex items-center justify-center group-hover:bg-purple-100 border border-purple-100">
-                    <Building2 className="w-4 h-4 text-purple-600" />
+                  <div className="w-8 h-8 bg-primary-50 rounded-md flex items-center justify-center group-hover:bg-primary-100 border border-primary-100">
+                    <Building2 className="w-4 h-4 text-primary-600" />
                   </div>
                   <div>
                     <p className="text-xs font-medium text-gray-700">Manage Resources</p>
-                    <p className="text-[10px] text-gray-400">Hotels, guides & more</p>
+                    <p className="text-xs text-gray-400">Hotels, guides & more</p>
                   </div>
                 </Link>
               </div>
@@ -564,7 +564,7 @@ export default function ProfilePage() {
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-800">Your Activity</h3>
-                  <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Last 7 days</span>
+                  <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Last 7 days</span>
                 </div>
 
                 <div className="space-y-2 mb-3">
@@ -611,13 +611,13 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                   {tiles.map(([label, value]) => (
                     <div key={label} className="bg-gray-50 border border-gray-200 rounded-md p-2">
-                      <p className="text-[10px] text-gray-500">{label}</p>
+                      <p className="text-xs text-gray-500">{label}</p>
                       <p className="text-sm font-semibold text-gray-900">{value === null ? '—' : value}</p>
                     </div>
                   ))}
                 </div>
 
-                <p className="text-[10px] text-gray-400">
+                <p className="text-xs text-gray-400">
                   Activity reflects work inside Autoura only. Phone calls, meetings, and off-app work are not captured.
                 </p>
               </div>

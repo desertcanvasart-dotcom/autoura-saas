@@ -11,7 +11,7 @@ const NEW_PROPERTY = '__new__'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign, Star } from 'lucide-react'
+import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign, Star, Wallet } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { TierBadge, TierPicker, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
@@ -223,7 +223,7 @@ function Pagination({
           <select
             value={itemsPerPage}
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] bg-white"
+            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
           >
             {ITEMS_PER_PAGE_OPTIONS.map(option => (
               <option key={option} value={option}>{option}</option>
@@ -273,7 +273,7 @@ function Pagination({
                 onClick={() => goToPage(pageNum)}
                 className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
                   currentPage === pageNum
-                    ? 'bg-[#647C47] text-white'
+                    ? 'bg-primary-500 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -1108,9 +1108,9 @@ export default function HotelsContent() {
         <div className="container mx-auto px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-600" />
-              <h1 className="text-xl font-bold text-gray-900">Hotels & Accommodation</h1>
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <Building2 className="w-5 h-5 text-primary-600" />
+              <h1 className="text-2xl font-semibold text-gray-900">Hotels & Accommodation</h1>
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <div className="flex items-center gap-2">
               <BulkRateImportExport tableName="accommodation_rates" onImportComplete={fetchRates} />
@@ -1145,7 +1145,7 @@ export default function HotelsContent() {
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <Building2 className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Total Hotels</p>
             <p className="text-2xl font-bold text-gray-900">{rates.length}</p>
@@ -1171,7 +1171,7 @@ export default function HotelsContent() {
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400">💰</span>
+              <Wallet className="w-4 h-4 text-gray-400" />
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. Double (Low)</p>
@@ -1181,7 +1181,7 @@ export default function HotelsContent() {
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <MapPin className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
             </div>
             <p className="text-xs text-gray-600">Cities</p>
             <p className="text-2xl font-bold text-gray-900">{usedCities.length}</p>
@@ -1384,7 +1384,7 @@ export default function HotelsContent() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-sm text-orange-600">
+                        <span className="text-sm text-amber-600">
                           {ppdCell(rate, 'top')}
                         </span>
                       </td>
@@ -1669,7 +1669,7 @@ export default function HotelsContent() {
               {/* SECTION 1: Hotel Information */}
               <div className="mb-6">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">1</span>
                   Hotel Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1887,17 +1887,17 @@ export default function HotelsContent() {
               {/* SECTION 7: Supplements */}
               <div className="mb-6">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">7</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">7</span>
                   Supplements
                   <span className="text-xs font-normal text-gray-500 ml-2">(Optional add-ons per night)</span>
                 </h3>
                 <p className="text-xs text-gray-500 -mt-2 mb-3">
                   Offered in the Quote Builder under Hotel Services on nights at this hotel, per person per night — the low, high or peak price by the season of the hotel&apos;s rate period. Never added on their own.
                 </p>
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
                   {/* Add Supplement Dropdown */}
                   <div className="mb-4">
-                    <label className="block text-xs font-medium text-purple-700 mb-2">Add Supplement</label>
+                    <label className="block text-xs font-medium text-primary-700 mb-2">Add Supplement</label>
                     <div className="relative">
                       <select
                         value=""
@@ -1907,7 +1907,7 @@ export default function HotelsContent() {
                           }
                         }}
                         title="Select a supplement to add"
-                        className="w-full md:w-64 px-3 py-2 text-sm border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none"
+                        className="w-full md:w-64 px-3 py-2 text-sm border border-primary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white appearance-none"
                       >
                         <option value="">Select a supplement to add...</option>
                         {/* The agency's list (Settings → Your vocabulary → Hotel
@@ -1918,14 +1918,14 @@ export default function HotelsContent() {
                           </option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 pointer-events-none" />
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-400 pointer-events-none" />
                     </div>
                   </div>
 
                   {/* Supplement Tabs */}
                   {formData.supplements.length > 0 && (
                     <>
-                      <div className="flex flex-wrap gap-2 mb-4 pb-3 border-b border-purple-200">
+                      <div className="flex flex-wrap gap-2 mb-4 pb-3 border-b border-primary-200">
                         {formData.supplements.map(supp => (
                           <button
                             key={supp.type}
@@ -1933,8 +1933,8 @@ export default function HotelsContent() {
                             onClick={() => setActiveSupplementTab(supp.type)}
                             className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors ${
                               activeSupplementTab === supp.type
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-white text-purple-700 border border-purple-300 hover:bg-purple-100'
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white text-primary-700 border border-primary-300 hover:bg-primary-700'
                             }`}
                           >
                             {supplementLabel(supp)}
@@ -1951,13 +1951,13 @@ export default function HotelsContent() {
 
                       {/* Active Supplement Rates */}
                       {activeSupplementTab && (
-                        <div className="bg-white p-4 rounded-lg border border-purple-200">
+                        <div className="bg-white p-4 rounded-lg border border-primary-200">
                           {(() => {
                             const activeSupplement = formData.supplements.find(s => s.type === activeSupplementTab)
                             if (!activeSupplement) return null
                             return (
                               <>
-                                <h4 className="text-sm font-semibold text-purple-800 mb-3">{supplementLabel(activeSupplement)} Rates (per person per night)</h4>
+                                <h4 className="text-sm font-semibold text-primary-800 mb-3">{supplementLabel(activeSupplement)} Rates (per person per night)</h4>
 
                                 {/* Low Season Supplement */}
                                 <div className="mb-3">
@@ -1992,7 +1992,7 @@ export default function HotelsContent() {
 
                                 {/* High Season Supplement */}
                                 <div className="mb-3">
-                                  <p className="text-xs font-medium text-orange-700 mb-2">High Season</p>
+                                  <p className="text-xs font-medium text-amber-700 mb-2">High Season</p>
                                   <div className="grid grid-cols-2 gap-3">
                                     <div>
                                       <label className="block text-xs text-gray-500 mb-1">EU ({rateSymbol})</label>
@@ -2060,7 +2060,7 @@ export default function HotelsContent() {
                   )}
 
                   {formData.supplements.length === 0 && (
-                    <p className="text-sm text-purple-600 italic">No supplements added. Use the dropdown above to add view supplements, meal plans, or room upgrades.</p>
+                    <p className="text-sm text-primary-600 italic">No supplements added. Use the dropdown above to add view supplements, meal plans, or room upgrades.</p>
                   )}
                 </div>
               </div>
@@ -2068,7 +2068,7 @@ export default function HotelsContent() {
               {/* SECTION 8: Rate Card Validity */}
               <div className="mb-6">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">8</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">8</span>
                   Rate Card Validity
                   <span className="text-xs font-normal text-gray-500 ml-2">(When this rate sheet expires)</span>
                 </h3>

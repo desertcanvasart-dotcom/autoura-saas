@@ -119,8 +119,8 @@ function FixedCostsContent() {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-[#647C47]" /> Fixed Daily Costs
+            <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-primary-500" /> Fixed Daily Costs
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">Per-person costs per sightseeing day. Pricing reads the water cost (a type containing &ldquo;water&rdquo;); other types are kept for reference.</p>
           </div>
@@ -142,7 +142,7 @@ function FixedCostsContent() {
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Search fixed costs…"
-              className="w-full md:w-80 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+              className="w-full md:w-80 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
         )}
@@ -165,12 +165,12 @@ function FixedCostsContent() {
                   {c.description && <p className="text-sm text-gray-500">{c.description}</p>}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-lg font-bold text-[#647C47]">{fmtRate(c.cost_per_person_per_day, c, 2)}</span>
+                  <span className="text-lg font-bold text-primary-500">{fmtRate(c.cost_per_person_per_day, c, 2)}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                     {c.is_active ? 'Active' : 'Inactive'}
                   </span>
-                  <button onClick={() => handleEdit(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]" title="Edit"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => handleClone(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]" title="Duplicate"><Copy className="w-4 h-4" /></button>
+                  <button onClick={() => handleEdit(c)} className="p-1.5 text-gray-400 hover:text-primary-500" title="Edit"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleClone(c)} className="p-1.5 text-gray-400 hover:text-primary-500" title="Duplicate"><Copy className="w-4 h-4" /></button>
                   {c.tenant_id != null && (
                     <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>
                   )}
@@ -188,12 +188,12 @@ function FixedCostsContent() {
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Cost Type</label>
                 <input value={form.cost_type} onChange={e => setForm(f => ({ ...f, cost_type: e.target.value }))}
-                  placeholder="e.g., Water, Tips, Service Fee" className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-[#647C47]" />
+                  placeholder="e.g., Water, Tips, Service Fee" className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-primary-500" />
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Cost Per Person/Day</label>
                 <input type="number" step="0.01" value={form.cost_per_person_per_day} onChange={e => setForm(f => ({ ...f, cost_per_person_per_day: e.target.value }))}
-                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-[#647C47]" />
+                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-primary-500" />
               </div>
               <RateCurrencyField compact value={rateCurrency} onChange={setRateCurrency} />
               <div>
@@ -219,5 +219,5 @@ function FixedCostsContent() {
 }
 
 export default function FixedCostsPage() {
-  return <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div></div>}><FixedCostsContent /></Suspense>
+  return <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div></div>}><FixedCostsContent /></Suspense>
 }

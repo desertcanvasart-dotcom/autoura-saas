@@ -340,8 +340,8 @@ function Pagination({
                 onClick={() => goToPage(pageNum)}
                 className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
                   currentPage === pageNum
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-600 hover:bg-primary-700'
                 }`}
               >
                 {pageNum}
@@ -957,19 +957,19 @@ export default function CruisesPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Ship className="w-5 h-5 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">Cruises</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Cruises</h1>
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <div className="flex items-center gap-2">
               <BulkRateImportExport tableName="nile_cruises" onImportComplete={fetchCruises} />
               <button
                 onClick={handleAddNew}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
               >
                 <Plus className="w-4 h-4" />
                 Add Cruise
               </button>
-              <Link href="/suppliers?type=cruise" className="px-3 py-1.5 text-sm border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 font-medium">
+              <Link href="/suppliers?type=cruise" className="px-3 py-1.5 text-sm border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 font-medium">
                 Cruise Suppliers
               </Link>
               <Link href="/rates" className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
@@ -1004,7 +1004,7 @@ export default function CruisesPage() {
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Avg. PPD Rate</p>
-            <p className="text-2xl font-bold text-purple-600">{fmtAverage(stats.avgPPD)}</p>
+            <p className="text-2xl font-bold text-primary-600">{fmtAverage(stats.avgPPD)}</p>
           </div>
         </div>
 
@@ -1137,7 +1137,7 @@ export default function CruisesPage() {
                       {sanitizeSailingDays(cruise.sailing_days).length > 0 ? (
                         <span className="inline-flex flex-wrap justify-center gap-1">
                           {sanitizeSailingDays(cruise.sailing_days).map(d => (
-                            <span key={d} className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[11px] font-medium">
+                            <span key={d} className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                               {dayName(d).slice(0, 3)}
                             </span>
                           ))}
@@ -1147,7 +1147,7 @@ export default function CruisesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800">
                         <VocabLabel kind="cruise_cabin" value={cruise.cabin_type} />
                       </span>
                     </td>
@@ -1175,7 +1175,7 @@ export default function CruisesPage() {
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
                       {cruise.single_supplement_eur ? `+${fmtRate(cruise.single_supplement_eur, cruise, 2)}` : '-'}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-purple-600">
+                    <td className="px-4 py-3 text-right text-sm font-bold text-primary-600">
                       {cruise.triple_reduction_eur ? `-${fmtRate(cruise.triple_reduction_eur, cruise, 2)}` : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -1377,7 +1377,7 @@ export default function CruisesPage() {
                         }))}
                         aria-pressed={on}
                         className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                          on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                          on ? 'bg-primary-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                         }`}
                       >
                         {dayName(day).slice(0, 3)}
@@ -1386,7 +1386,7 @@ export default function CruisesPage() {
                   })}
                 </div>
                 {formData.sailing_days.length > 0 && (
-                  <p className="mt-1 text-[11px] text-gray-500">Departs {sailingDaysLabel(formData.sailing_days)}</p>
+                  <p className="mt-1 text-xs text-gray-500">Departs {sailingDaysLabel(formData.sailing_days)}</p>
                 )}
               </div>
 
@@ -1400,7 +1400,7 @@ export default function CruisesPage() {
               {/* Section 5: Service Tier & Preference */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs">2</span>
+                  <span className="w-5 h-5 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs">2</span>
                   Service Tier
                 </h3>
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -1540,7 +1540,7 @@ export default function CruisesPage() {
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
                   Cancel
                 </button>
-                <button type="submit" disabled={submitting} className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2">
+                <button type="submit" disabled={submitting} className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center justify-center gap-2">
                   <Check className="w-4 h-4" />
                   {editingCruise ? 'Update Rate' : 'Create Rate'}
                 </button>

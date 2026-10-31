@@ -98,17 +98,17 @@ export default function AttachmentList({
     
     // Archives
     if (mimeType.includes('zip') || mimeType.includes('rar') || ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
-      return <Archive className="w-4 h-4 text-yellow-600" />
+      return <Archive className="w-4 h-4 text-amber-600" />
     }
     
     // Audio
     if (mimeType.startsWith('audio/')) {
-      return <Music className="w-4 h-4 text-purple-500" />
+      return <Music className="w-4 h-4 text-primary-500" />
     }
     
     // Video
     if (mimeType.startsWith('video/')) {
-      return <Video className="w-4 h-4 text-pink-500" />
+      return <Video className="w-4 h-4 text-primary-500" />
     }
     
     // Code
@@ -162,7 +162,7 @@ export default function AttachmentList({
               <div className="text-xs font-medium text-gray-700 max-w-[180px] truncate">
                 {attachment.filename}
               </div>
-              <div className="text-[10px] text-gray-400">
+              <div className="text-xs text-gray-400">
                 {formatFileSize(attachment.size)}
               </div>
             </div>
@@ -182,7 +182,7 @@ export function AttachmentIndicator({ count }: { count: number }) {
   return (
     <div className="flex items-center gap-1 text-gray-400" title={`${count} attachment${count > 1 ? 's' : ''}`}>
       <Paperclip className="w-3 h-3" />
-      {count > 1 && <span className="text-[10px]">{count}</span>}
+      {count > 1 && <span className="text-xs">{count}</span>}
     </div>
   )
 }

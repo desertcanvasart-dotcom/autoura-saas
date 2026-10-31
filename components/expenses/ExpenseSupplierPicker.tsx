@@ -34,7 +34,7 @@ interface SupplierOption {
 const OTHER = '__other__'
 
 const inputClass =
-  'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white'
+  'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white'
 
 export default function ExpenseSupplierPicker({
   category, city, onCityChange, value, onChange,
@@ -155,9 +155,9 @@ export default function ExpenseSupplierPicker({
       {empty && (
         <p className="text-xs text-gray-500">
           No {roleLabel.toLowerCase()} suppliers{city ? ` in ${city}` : ''} yet.{' '}
-          {city && <button type="button" onClick={() => onCityChange('')} className="text-[#647C47] hover:underline">Show all locations</button>}
+          {city && <button type="button" onClick={() => onCityChange('')} className="text-primary-500 hover:underline">Show all locations</button>}
           {city && ' · '}
-          <Link href="/suppliers" target="_blank" className="text-[#647C47] hover:underline">Add one in Suppliers</Link>
+          <Link href="/suppliers" target="_blank" className="text-primary-500 hover:underline">Add one in Suppliers</Link>
         </p>
       )}
       {loadFailed && <p className="text-xs text-red-600">Couldn&apos;t load suppliers — type the name instead.</p>}

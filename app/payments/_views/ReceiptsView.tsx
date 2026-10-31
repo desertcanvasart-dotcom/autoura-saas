@@ -292,7 +292,7 @@ export default function ReceiptsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               <Receipt className="w-6 h-6 text-primary-600" />
               Receipts
             </h1>
@@ -405,7 +405,7 @@ export default function ReceiptsPage() {
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
                             payment.source === 'invoice' 
                               ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
+                              : 'bg-primary-100 text-primary-700'
                           }`}>
                             {payment.source === 'invoice' ? (
                               <FileText className="w-3 h-3" />

@@ -94,7 +94,7 @@ export default function PushToggle({ variant = 'dark' }: { variant?: 'dark' | 'l
   if (variant === 'light') {
     if (needsHomeScreen) {
       return (
-        <p className="text-[11px] leading-snug text-gray-500">
+        <p className="text-xs leading-snug text-gray-500">
           <span className="font-medium text-gray-700">Alerts on this iPhone:</span> tap Share → <span className="font-medium">Add to Home Screen</span>, open Autoura from there, then turn alerts on here.
         </p>
       )
@@ -102,7 +102,7 @@ export default function PushToggle({ variant = 'dark' }: { variant?: 'dark' | 'l
     if (state === 'unsupported') return null
     if (state === 'denied') {
       return (
-        <p className="flex items-start gap-1.5 text-[11px] leading-snug text-gray-500">
+        <p className="flex items-start gap-1.5 text-xs leading-snug text-gray-500">
           <BellOff className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
           Alerts are blocked for this site in your browser settings. Allow notifications for Autoura there, then reload.
         </p>

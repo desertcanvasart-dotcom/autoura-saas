@@ -95,7 +95,7 @@ export function PeopleEditor({ people, onChange, disabled }: { people: Person[];
                 return (
                   <button key={l} type="button" disabled={disabled} aria-pressed={on}
                     onClick={() => set(i, { languages: on ? p.languages.filter(x => x !== l) : [...p.languages, l] })}
-                    className={`text-xs px-2 py-1 rounded-full border ${on ? 'bg-[#647C47] border-[#647C47] text-white' : 'border-gray-300 text-gray-600'}`}>{langName(l)}</button>
+                    className={`text-xs px-2 py-1 rounded-full border ${on ? 'bg-primary-500 border-primary-500 text-white' : 'border-gray-300 text-gray-600'}`}>{langName(l)}</button>
                 )
               })}
             </div>
@@ -133,7 +133,7 @@ export function HoursEditor({ hours, onChange, disabled }: { hours: Hours | null
               return (
                 <button key={d} type="button" disabled={disabled} aria-pressed={on}
                   onClick={() => onChange({ ...hours, days: on ? hours.days.filter(x => x !== d) : DAYS.filter(x => x === d || hours.days.includes(x)) })}
-                  className={`text-xs px-2 py-1 rounded-full border ${on ? 'bg-[#647C47] border-[#647C47] text-white' : 'border-gray-300 text-gray-600'}`}>{DAY_LABEL[d]}</button>
+                  className={`text-xs px-2 py-1 rounded-full border ${on ? 'bg-primary-500 border-primary-500 text-white' : 'border-gray-300 text-gray-600'}`}>{DAY_LABEL[d]}</button>
               )
             })}
           </div>

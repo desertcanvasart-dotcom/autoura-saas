@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { supplierBacking, supplierCostCurrency } from '@/lib/bookings/booking-suppliers'
 import CoverLinePicker from '@/components/booking/CoverLinePicker'
 import RequestOnWhatsApp from '@/components/booking/RequestOnWhatsApp'
@@ -216,7 +216,7 @@ export default function BookingSuppliersPanel({
                   </td>
                   <td className="py-2 pr-3 text-gray-900">
                     {lineSupplier(r) ?? <span className="text-gray-400 italic">{['accepted', 'assigned', 'done'].includes(normalizeStatus(r.status)) ? 'Supplier not recorded' : 'No supplier yet'}</span>}
-                    {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-medium">Your team</span>}
+                    {r.resource_kind === 'own' && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 text-xs font-medium">Your team</span>}
                     {r.assigned_vehicle_plate && <span className="ml-1.5 text-xs text-gray-500">{r.assigned_vehicle_plate}</span>}
                     <div className="text-xs text-gray-500">{lineService(r)}</div>
                     {(r.pickup_location || r.dropoff_location) && (
@@ -225,7 +225,7 @@ export default function BookingSuppliersPanel({
                     {r.assigned_guide_name && r.resource_kind !== 'own' && <div className="text-xs text-gray-600">Guide: {r.assigned_guide_name}</div>}
                     {r.driver_note && <div className="text-xs text-gray-600">Driver: {r.driver_note}</div>}
                     {r.supplier_day_off && normalizeStatus(r.status) !== 'cancelled' && (
-                      <div className="text-xs text-amber-700">⚠ This supplier marked this day off</div>
+                      <div className="flex items-center gap-1 text-xs text-amber-700"><AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> This supplier marked this day off</div>
                     )}
                     {normalizeStatus(r.status) === 'requested' && r.reply_deadline && (
                       <div className={`text-xs ${new Date(r.reply_deadline) < new Date() ? 'text-amber-700' : 'text-gray-500'}`}>
@@ -285,7 +285,7 @@ export default function BookingSuppliersPanel({
                       </span>
                     ) : (r.confirmed_cost ?? r.quoted_cost) != null ? `${supplierCostCurrency(r, currency)} ${Number(r.confirmed_cost ?? r.quoted_cost).toFixed(2)}` : '—'}
                     {r.confirmed_cost != null && r.quoted_cost != null && Number(r.confirmed_cost) !== Number(r.quoted_cost) && (
-                      <div className="text-[10px] text-gray-400">quoted {Number(r.quoted_cost).toFixed(2)}</div>
+                      <div className="text-xs text-gray-400">quoted {Number(r.quoted_cost).toFixed(2)}</div>
                     )}
                   </td>
                   <td className="py-2 pr-3">
@@ -324,7 +324,7 @@ export default function BookingSuppliersPanel({
                         className="inline-flex items-center gap-2 group"
                       >
                         <span className="font-medium text-gray-900 group-hover:underline">{r.expense.expense_number}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${EXPENSE_STATE[r.expense.status]?.style ?? 'bg-gray-100 text-gray-700'}`}>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${EXPENSE_STATE[r.expense.status]?.style ?? 'bg-gray-100 text-gray-700'}`}>
                           {EXPENSE_STATE[r.expense.status]?.label ?? r.expense.status}
                         </span>
                       </Link>

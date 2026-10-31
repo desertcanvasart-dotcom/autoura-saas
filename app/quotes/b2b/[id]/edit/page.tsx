@@ -201,7 +201,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-3" />
           <p className="text-sm text-gray-500">Loading quote...</p>
         </div>
       </div>
@@ -252,7 +252,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-sm font-medium">Back to Quote</span>
               </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Edit Quote {quote.quote_number}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Edit Quote {quote.quote_number}</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {quote.b2b_partners?.company_name} • {quote.itineraries?.trip_name}
               </p>
@@ -285,7 +285,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                 </label>
                 {/* The agency's own tiers (Settings → Vocabulary), not four fixed names. */}
                 <VocabSelect kind="tier" value={tier} onChange={setTier} placeholder={null}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
               </div>
 
               <div>
@@ -304,7 +304,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                     type="checkbox"
                     checked={tourLeaderIncluded}
                     onChange={(e) => setTourLeaderIncluded(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                   />
                   <span className="text-sm font-medium text-gray-700">
                     Include Tour Leader (+1)
@@ -330,7 +330,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={ppdAccommodation}
                   onChange={(e) => setPpdAccommodation(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -345,7 +345,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={ppdCruise}
                   onChange={(e) => setPpdCruise(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -360,7 +360,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={singleSupplement}
                   onChange={(e) => setSingleSupplement(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -383,7 +383,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={fixedTransport}
                   onChange={(e) => setFixedTransport(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -398,7 +398,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={fixedGuide}
                   onChange={(e) => setFixedGuide(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -413,7 +413,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={fixedOther}
                   onChange={(e) => setFixedOther(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -436,7 +436,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={ppEntranceFees}
                   onChange={(e) => setPpEntranceFees(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -451,7 +451,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={ppMeals}
                   onChange={(e) => setPpMeals(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -466,7 +466,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={ppTips}
                   onChange={(e) => setPpTips(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -481,7 +481,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   min="0"
                   value={ppDomesticFlights}
                   onChange={(e) => setPpDomesticFlights(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -512,7 +512,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
           )}
 
           {/* Sample Calculation */}
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-6">
+          <div className="bg-primary-50 border border-primary-200 rounded-xl p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Sample Calculation ({samplePax} pax)</h2>
 
             <div className="grid grid-cols-2 gap-6">
@@ -540,11 +540,11 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
               <div className="space-y-2">
                 <div className="flex justify-between text-base font-bold">
                   <span className="text-gray-900">Total:</span>
-                  <span className="text-purple-700">{currency} {sampleTotal.toFixed(2)}</span>
+                  <span className="text-primary-700">{currency} {sampleTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-base font-bold">
                   <span className="text-gray-900">Per Person:</span>
-                  <span className="text-purple-700">{currency} {samplePerPerson.toFixed(2)}</span>
+                  <span className="text-primary-700">{currency} {samplePerPerson.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -553,7 +553,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                 read, and still said "recalculated successfully" — the partner
                 kept getting the old prices. Engine-priced quotes keep these
                 fields at 0, so rebuilding the table from them would zero it. */}
-            <p className="mt-4 pt-4 border-t border-purple-200 text-xs text-purple-700">
+            <p className="mt-4 pt-4 border-t border-primary-200 text-xs text-primary-700">
               Saving these values does not change the multi-pax pricing table the partner receives.
               To change partner prices, create a new quote from the itinerary or the B2B calculator.
             </p>
@@ -571,7 +571,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 >
                   <option value="draft">Draft</option>
@@ -590,7 +590,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   type="date"
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
 
@@ -602,7 +602,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   type="date"
                   value={validUntil}
                   onChange={(e) => setValidUntil(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
 
@@ -615,7 +615,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   value={season}
                   onChange={(e) => setSeason(e.target.value)}
                   placeholder="e.g., High Season"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -634,7 +634,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   value={internalNotes}
                   onChange={(e) => setInternalNotes(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="Notes for internal use only..."
                 />
               </div>
@@ -647,7 +647,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
                   value={termsAndConditions}
                   onChange={(e) => setTermsAndConditions(e.target.value)}
                   rows={5}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="Terms and conditions for this rate sheet..."
                 />
               </div>
@@ -665,7 +665,7 @@ export default function EditB2BQuotePage({ params: paramsPromise }: { params: Pr
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>

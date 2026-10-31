@@ -508,10 +508,10 @@ export default function TrainRatesContent() {
               <button
                 onClick={() => setNotification(null)}
                 className={`px-6 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
-                  notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                  notification.type === 'success' ? 'bg-primary-600 hover:bg-primary-700' :
                   notification.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
                   notification.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' :
-                  'bg-blue-600 hover:bg-blue-700'
+                  'bg-blue-600 hover:bg-primary-700'
                 }`}
               >
                 Got it
@@ -573,13 +573,13 @@ export default function TrainRatesContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-100 rounded-lg">
-            <Train className="w-6 h-6 text-emerald-600" />
+          <div className="p-2 bg-primary-100 rounded-lg">
+            <Train className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
               Train Rates
-              <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+              <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
             </h1>
             <p className="text-sm text-gray-600">Regular train tickets pricing</p>
           </div>
@@ -625,7 +625,7 @@ export default function TrainRatesContent() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{uniqueRoutes}</p>
           <p className="text-xs text-gray-600">Routes</p>
@@ -810,7 +810,7 @@ export default function TrainRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Train className="w-4 h-4 text-emerald-500" />
+                        <Train className="w-4 h-4 text-primary-500" />
                         <div>
                           <span className="text-sm font-semibold text-gray-900">
                             {rate.origin_city} <ArrowRight className="w-3 h-3 inline mx-1" /> {rate.destination_city}
@@ -820,7 +820,7 @@ export default function TrainRatesContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">
+                      <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs font-medium">
                         <VocabLabel kind="train_class" value={rate.class_type} fallback="—" />
                       </span>
                     </td>
@@ -878,7 +878,7 @@ export default function TrainRatesContent() {
                         </button>
                         <button
                           onClick={() => handleClone(rate)}
-                          className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                          className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
                           title="Clone"
                         >
                           <Copy className="w-4 h-4" />
@@ -903,7 +903,7 @@ export default function TrainRatesContent() {
               <div key={rate.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Train className="w-5 h-5 text-emerald-500" />
+                    <Train className="w-5 h-5 text-primary-500" />
                     <span className="font-semibold text-gray-900">
                       {rate.origin_city} → {rate.destination_city}
                     </span>
@@ -916,7 +916,7 @@ export default function TrainRatesContent() {
                 </div>
 
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">
+                  <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs">
                     <VocabLabel kind="train_class" value={rate.class_type} />
                   </span>
                   {rate.duration_hours && (
@@ -942,7 +942,7 @@ export default function TrainRatesContent() {
                     </button>
                     <button
                       onClick={() => handleClone(rate)}
-                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                      className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
                       title="Clone"
                     >
                       <Copy className="w-4 h-4" />
@@ -964,11 +964,11 @@ export default function TrainRatesContent() {
             {paginatedRates.map((rate) => (
               <div key={rate.id} className="px-4 py-2 flex items-center justify-between hover:bg-gray-50">
                 <div className="flex items-center gap-4">
-                  <Train className="w-4 h-4 text-emerald-500" />
+                  <Train className="w-4 h-4 text-primary-500" />
                   <span className="font-medium text-gray-900">
                     {rate.origin_city} → {rate.destination_city}
                   </span>
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">
+                  <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs">
                     <VocabLabel kind="train_class" value={rate.class_type} />
                   </span>
                   {rate.duration_hours && (
@@ -986,7 +986,7 @@ export default function TrainRatesContent() {
                     <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Edit">
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-emerald-600" title="Clone">
+                    <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Clone">
                       <Copy className="w-4 h-4" />
                     </button>
                     <button onClick={() => confirmDelete(rate.id, `${rate.origin_city} → ${rate.destination_city}`)} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
@@ -1148,7 +1148,7 @@ export default function TrainRatesContent() {
               {/* Route Info */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">1</span>
                   Route Details
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1273,7 +1273,7 @@ export default function TrainRatesContent() {
                       placeholder="Blank = customer fare"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
-                    <p className="text-[11px] text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       The throughout guide&rsquo;s seat. Blank = he pays the customer fare; 0 = rides free.
                     </p>
                   </div>
@@ -1283,7 +1283,7 @@ export default function TrainRatesContent() {
               {/* Validity */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">3</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">3</span>
                   Validity Period
                 </h3>
                 <div className="grid grid-cols-2 gap-3">

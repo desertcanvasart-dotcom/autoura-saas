@@ -156,7 +156,7 @@ export default function ReceiptPage() {
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl mx-auto text-center py-12">
           <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900 mb-3">Payment Not Found</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-3">Payment Not Found</h1>
           <p className="text-sm text-gray-600 mb-4">The receipt you're looking for doesn't exist.</p>
           <Link href="/payments?tab=receipts" className="text-sm text-primary-600 hover:text-primary-700">
             ← Back to Receipts
@@ -188,7 +188,7 @@ export default function ReceiptPage() {
                 disabled={sending}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   sent 
-                    ? 'bg-green-600 text-white' 
+                    ? 'bg-primary-600 text-white' 
                     : 'bg-[#25D366] text-white hover:bg-[#20BD5A]'
                 } disabled:opacity-50`}
               >

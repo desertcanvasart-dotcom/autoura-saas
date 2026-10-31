@@ -37,7 +37,7 @@ function fileToBase64(file: File): Promise<string> {
 function getFileIcon(type: string) {
   if (type === 'application/pdf') return <File className="w-4 h-4 text-red-500" />
   if (type.startsWith('image/')) return <Image className="w-4 h-4 text-blue-500" />
-  return <FileSpreadsheet className="w-4 h-4 text-purple-500" />
+  return <FileSpreadsheet className="w-4 h-4 text-primary-500" />
 }
 
 function formatFileSize(bytes: number) {
@@ -203,8 +203,8 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
           Package is the grid's historical behaviour. */}
       <div className="px-4 pt-3 pb-2.5 border-b border-gray-100">
         <div className="flex items-center gap-2 mb-1.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Package Type</div>
-          <div className="text-[11px] text-gray-400">— decides what each day must include</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Package Type</div>
+          <div className="text-xs text-gray-400">— decides what each day must include</div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {PACKAGE_TYPE_CONFIGS.map(pkg => (
@@ -215,7 +215,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
               title={pkg.description}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                 packageType === pkg.slug
-                  ? 'bg-[#647C47] border-[#4a5c35] text-white shadow-sm'
+                  ? 'bg-primary-500 border-[#4a5c35] text-white shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -230,7 +230,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
 
         {/* Mode 1: Paste Text */}
         <div className="flex-1 px-4 py-2.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Paste Text</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Paste Text</div>
           <button
             type="button"
             onClick={() => { setShowPaste(!showPaste); setUploadedFile(null); setUploadError(null) }}
@@ -238,7 +238,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors w-full justify-center ${
               showPaste
                 ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-primary-600 text-white hover:bg-primary-700'
             } disabled:opacity-50`}
           >
             <FileText className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
 
         {/* Mode 2: Upload File */}
         <div className="flex-1 px-4 py-2.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Upload File</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Upload File</div>
           <div
             className={`relative flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
               isDragging
@@ -295,20 +295,20 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
 
         {/* Mode 3: Load / Build */}
         <div className="flex-1 px-4 py-2.5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Load / Build</div>
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Load / Build</div>
           <div className="flex items-center gap-1">
             <input
               type="text"
               value={itineraryId}
               onChange={(e) => setItineraryId(e.target.value)}
               placeholder="Itinerary ID..."
-              className="flex-1 min-w-0 px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-purple-200 transition-all"
+              className="flex-1 min-w-0 px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-200 transition-all"
             />
             <button
               type="button"
               onClick={() => itineraryId && onLoadItinerary(itineraryId)}
               disabled={!itineraryId || isWorking}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-40 transition-colors whitespace-nowrap"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-40 transition-colors whitespace-nowrap"
             >
               <Upload className="w-3.5 h-3.5" />
             </button>
@@ -367,7 +367,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
               type="button"
               onClick={handleFileUpload}
               disabled={isExtracting}
-              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
             >
               {isExtracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {isExtracting ? 'Extracting from file...' : 'Extract & Generate Quote'}
@@ -436,7 +436,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
                 }
               }}
               disabled={isParsing || !text.trim()}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
             >
               {isParsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               {isParsing ? 'Parsing...' : 'Parse & Generate Quote'}

@@ -76,7 +76,7 @@ export default function OpsPage() {
           </Link>
           <Radio className="w-5 h-5 text-green-400" />
           <div>
-            <h1 className="text-lg font-semibold leading-tight">Today on the ground</h1>
+            <h1 className="text-2xl font-semibold leading-tight">Today on the ground</h1>
             <p className="text-xs text-gray-400">
               {trips === null ? 'Loading…' : `${trips.length} active trip${trips.length === 1 ? '' : 's'} · updates every 30s`}
             </p>

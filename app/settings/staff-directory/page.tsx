@@ -15,7 +15,14 @@ import {
   XCircle,
   Users,
   KeyRound,
-  Activity
+  Activity,
+  Crown,
+  Briefcase,
+  ClipboardList,
+  Wallet,
+  UserRound,
+  Car,
+  Building2
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -97,13 +104,13 @@ const fmtFocusedTime = (minutes: number) =>
   `~${Math.floor(minutes / 60)}h ${minutes % 60}m`
 
 const ROLES = [
-  { value: 'owner', label: 'Owner', icon: '👑', color: 'bg-purple-100 text-purple-700' },
-  { value: 'manager', label: 'Manager', icon: '💼', color: 'bg-blue-100 text-blue-700' },
-  { value: 'coordinator', label: 'Coordinator', icon: '📋', color: 'bg-green-100 text-green-700' },
-  { value: 'sales', label: 'Sales', icon: '💰', color: 'bg-amber-100 text-amber-700' },
-  { value: 'guide', label: 'Tour Guide', icon: '👨‍🏫', color: 'bg-cyan-100 text-cyan-700' },
-  { value: 'driver', label: 'Driver', icon: '🚗', color: 'bg-indigo-100 text-indigo-700' },
-  { value: 'staff', label: 'Staff', icon: '👤', color: 'bg-gray-100 text-gray-700' }
+  { value: 'owner', label: 'Owner', icon: Crown, color: 'bg-primary-100 text-primary-700' },
+  { value: 'manager', label: 'Manager', icon: Briefcase, color: 'bg-blue-100 text-blue-700' },
+  { value: 'coordinator', label: 'Coordinator', icon: ClipboardList, color: 'bg-green-100 text-green-700' },
+  { value: 'sales', label: 'Sales', icon: Wallet, color: 'bg-amber-100 text-amber-700' },
+  { value: 'guide', label: 'Tour Guide', icon: UserRound, color: 'bg-primary-100 text-primary-700' },
+  { value: 'driver', label: 'Driver', icon: Car, color: 'bg-primary-100 text-primary-700' },
+  { value: 'staff', label: 'Staff', icon: User, color: 'bg-gray-100 text-gray-700' }
 ]
 
 export default function TeamMembersPage() {
@@ -346,7 +353,7 @@ export default function TeamMembersPage() {
   if (loading) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -357,7 +364,7 @@ export default function TeamMembersPage() {
       <div className="flex items-center justify-end">
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Plus className="h-4 w-4" />
           Add Member
@@ -378,7 +385,7 @@ export default function TeamMembersPage() {
           return (
             <div key={role.value} className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span>{role.icon}</span>
+                <role.icon className="w-4 h-4 text-gray-500" />
                 <span className="text-xs text-gray-500">{role.label}s</span>
               </div>
               <p className="text-2xl font-semibold text-gray-900">{count}</p>
@@ -395,18 +402,18 @@ export default function TeamMembersPage() {
             placeholder="Search team members..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">All Roles</option>
           {ROLES.map(role => (
-            <option key={role.value} value={role.value}>{role.icon} {role.label}</option>
+            <option key={role.value} value={role.value}>{role.label}</option>
           ))}
         </select>
 
@@ -414,18 +421,18 @@ export default function TeamMembersPage() {
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="">All Departments</option>
             {departments.map(d => (
-              <option key={d.id} value={d.id}>🏢 {d.name}</option>
+              <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
         )}
 
         <Link
           href="/settings/departments"
-          className="text-sm text-[#647C47] hover:text-[#4f6238] hover:underline whitespace-nowrap"
+          className="text-sm text-primary-500 hover:text-primary-700 hover:underline whitespace-nowrap"
         >
           Manage departments
         </Link>
@@ -435,7 +442,7 @@ export default function TeamMembersPage() {
             type="checkbox"
             checked={showInactive}
             onChange={(e) => setShowInactive(e.target.checked)}
-            className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"
+            className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
           />
           Show inactive
         </label>
@@ -449,7 +456,7 @@ export default function TeamMembersPage() {
             <p className="text-gray-500">No team members found</p>
             <button
               onClick={openAddModal}
-              className="mt-3 text-sm text-[#647C47] hover:underline"
+              className="mt-3 text-sm text-primary-500 hover:underline"
             >
               Add your first team member
             </button>
@@ -464,8 +471,8 @@ export default function TeamMembersPage() {
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 shrink-0 bg-gray-100 rounded-full flex items-center justify-center text-base">
-                      {roleConfig.icon}
+                    <div className="w-8 h-8 shrink-0 bg-gray-100 rounded-full flex items-center justify-center">
+                      <roleConfig.icon className="w-4 h-4 text-gray-600" />
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900">{member.name}</h3>
@@ -474,12 +481,12 @@ export default function TeamMembersPage() {
                       </span>
                       {departmentName(member.department_id) && (
                         <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
-                          🏢 {departmentName(member.department_id)}
+                          <Building2 className="w-3 h-3 mr-1" />{departmentName(member.department_id)}
                         </span>
                       )}
                       {member.user_id && (
                         <span
-                          className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700"
+                          className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700"
                           title="This person has a login account"
                         >
                           <KeyRound className="h-3 w-3" />
@@ -585,7 +592,7 @@ export default function TeamMembersPage() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="John Doe"
                   required
                 />
@@ -597,7 +604,7 @@ export default function TeamMembersPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="john@example.com"
                 />
               </div>
@@ -608,7 +615,7 @@ export default function TeamMembersPage() {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="+ country code and number"
                 />
               </div>
@@ -623,10 +630,10 @@ export default function TeamMembersPage() {
                     role: e.target.value,
                     staff_type: e.target.value === 'driver' ? 'driver' : e.target.value === 'guide' ? 'guide' : formData.staff_type,
                   })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   {ROLES.map(role => (
-                    <option key={role.value} value={role.value}>{role.icon} {role.label}</option>
+                    <option key={role.value} value={role.value}>{role.label}</option>
                   ))}
                 </select>
               </div>
@@ -639,7 +646,7 @@ export default function TeamMembersPage() {
                 <select
                   value={formData.staff_type}
                   onChange={(e) => setFormData({ ...formData, staff_type: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="office">Office</option>
                   <option value="guide">Guide</option>
@@ -654,7 +661,7 @@ export default function TeamMembersPage() {
                 <select
                   value={formData.department_id}
                   onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">— No department —</option>
                   {departments.map(d => (
@@ -668,7 +675,7 @@ export default function TeamMembersPage() {
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   rows={3}
                   placeholder="Additional notes..."
                 />
@@ -685,7 +692,7 @@ export default function TeamMembersPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editingMember ? 'Update' : 'Add Member'}
                 </button>
@@ -731,7 +738,7 @@ export default function TeamMembersPage() {
 
               {activityLoading ? (
                 <div className="flex items-center justify-center py-10">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#647C47]"></div>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
                 </div>
               ) : activityError ? (
                 <p className="text-sm text-gray-500 text-center py-8">{activityError}</p>
@@ -780,7 +787,7 @@ export default function TeamMembersPage() {
                               title={`${cell.day}: ${cell.minutes}m`}
                             >
                               <div
-                                className="w-full rounded-sm bg-[#647C47]"
+                                className="w-full rounded-sm bg-primary-500"
                                 style={{
                                   height: `${Math.max(
                                     cell.minutes > 0 ? 4 : 2,
@@ -820,7 +827,7 @@ export default function TeamMembersPage() {
                         key={label}
                         className="bg-gray-50 border border-gray-200 rounded-lg p-2.5"
                       >
-                        <p className="text-[11px] text-gray-500">{label}</p>
+                        <p className="text-xs text-gray-500">{label}</p>
                         <p className="text-lg font-semibold text-gray-900">
                           {value === null ? '—' : value}
                         </p>
@@ -828,7 +835,7 @@ export default function TeamMembersPage() {
                     ))}
                   </div>
 
-                  <p className="text-[11px] text-gray-400">{ACTIVITY_FOOTNOTE}</p>
+                  <p className="text-xs text-gray-400">{ACTIVITY_FOOTNOTE}</p>
                 </>
               ) : null}
             </div>

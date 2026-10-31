@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-[#647C47] hover:underline"
+            className="inline-flex items-center gap-2 text-primary-500 hover:underline"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to login
@@ -84,7 +84,7 @@ export default function ForgotPasswordPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="Enter your email"
                 required
               />
@@ -94,7 +94,7 @@ export default function ForgotPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-[#647C47] text-white font-medium rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-primary-500 text-white font-medium rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          <Link href="/login" className="text-[#647C47] hover:underline inline-flex items-center gap-1">
+          <Link href="/login" className="text-primary-500 hover:underline inline-flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" />
             Back to login
           </Link>

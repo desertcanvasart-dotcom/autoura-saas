@@ -77,7 +77,7 @@ const ACTIONS: Record<StatusKey, { to: StatusKey; label: string; primary?: boole
 const SLA_BADGE: Record<SlaLevel, string> = {
   overdue: 'bg-red-100 text-red-700',
   soon: 'bg-amber-100 text-amber-700',
-  ok: 'bg-emerald-100 text-emerald-700',
+  ok: 'bg-primary-100 text-primary-700',
   met: 'bg-green-100 text-green-700',
   none: 'bg-gray-100 text-gray-500',
 }
@@ -214,7 +214,7 @@ export default function ConciergeBriefsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -223,11 +223,11 @@ export default function ConciergeBriefsPage() {
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-          <ConciergeBell className="h-5 w-5 text-[#647C47]" />
+        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+          <ConciergeBell className="h-5 w-5 text-primary-500" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Concierge Leads</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Concierge Leads</h1>
           <p className="text-sm text-gray-500">Planning briefs from the AI Concierge — triage and respond</p>
         </div>
       </div>
@@ -243,12 +243,12 @@ export default function ConciergeBriefsPage() {
               onClick={() => setTab(t.key)}
               className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 active
-                  ? 'border-[#647C47] text-[#647C47]'
+                  ? 'border-primary-500 text-primary-500'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
               {t.label}
-              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${active ? 'bg-[#647C47]/10 text-[#647C47]' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${active ? 'bg-primary-500/10 text-primary-500' : 'bg-gray-100 text-gray-500'}`}>
                 {count}
               </span>
             </button>
@@ -336,10 +336,10 @@ export default function ConciergeBriefsPage() {
                     {(b.interests?.length || cons.length > 0) && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {b.interests?.map(i => (
-                          <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-[#647C47]/10 text-[#647C47]">{i}</span>
+                          <span key={i} className="px-1.5 py-0.5 rounded text-xs bg-primary-500/10 text-primary-500">{i}</span>
                         ))}
                         {cons.map(c => (
-                          <span key={c} className="px-1.5 py-0.5 rounded text-[10px] bg-orange-50 text-orange-600">{c}</span>
+                          <span key={c} className="px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-600">{c}</span>
                         ))}
                       </div>
                     )}
@@ -356,7 +356,7 @@ export default function ConciergeBriefsPage() {
                     {b.client_id && (
                       <Link
                         href={`/clients/${b.client_id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#647C47] hover:bg-[#647C47]/10 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-primary-500 hover:bg-primary-500/10 rounded-lg transition-colors"
                       >
                         <ExternalLink className="h-3.5 w-3.5" /> Client
                       </Link>
@@ -369,7 +369,7 @@ export default function ConciergeBriefsPage() {
                           disabled={updating === b.id}
                           className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
                             a.primary
-                              ? 'bg-[#647C47] text-white hover:bg-[#4f6238]'
+                              ? 'bg-primary-500 text-white hover:bg-primary-700'
                               : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
                           }`}
                         >

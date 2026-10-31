@@ -162,7 +162,7 @@ export default function SeasonsPage() {
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Search seasons…"
-              className="w-full md:w-80 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+              className="w-full md:w-80 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           )}
 
@@ -200,14 +200,14 @@ export default function SeasonsPage() {
                         act(`edit-${s.id}`, { action: 'update_season', id: s.id, name, uplift_percent: pct }, `${name.trim() || s.name} updated`)
                       }}
                       disabled={busy !== null}
-                      className="text-xs text-gray-500 hover:text-[#647C47] border border-gray-200 rounded px-2 py-0.5"
+                      className="text-xs text-gray-500 hover:text-primary-500 border border-gray-200 rounded px-2 py-0.5"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => act(`toggle-${s.id}`, { action: 'update_season', id: s.id, is_active: !s.is_active }, s.is_active ? 'Season switched off' : 'Season switched on')}
                       disabled={busy !== null}
-                      className="text-xs text-gray-500 hover:text-[#647C47] border border-gray-200 rounded px-2 py-0.5"
+                      className="text-xs text-gray-500 hover:text-primary-500 border border-gray-200 rounded px-2 py-0.5"
                     >
                       {s.is_active ? 'Switch off' : 'Switch on'}
                     </button>
@@ -277,7 +277,7 @@ export default function SeasonsPage() {
                   <button
                     onClick={() => addDates(s.id)}
                     disabled={busy !== null || !dateForms[s.id]?.start || !dateForms[s.id]?.end}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm text-white bg-[#647C47] rounded-md hover:bg-[#4f6238] disabled:opacity-50"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm text-white bg-primary-500 rounded-md hover:bg-primary-700 disabled:opacity-50"
                   >
                     {busy === `dates-${s.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                     Add dates
@@ -313,7 +313,7 @@ export default function SeasonsPage() {
               <button
                 onClick={addSeason}
                 disabled={busy !== null || !newSeason.name.trim()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 {busy === 'new-season' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                 Add season

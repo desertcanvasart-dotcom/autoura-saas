@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MessageCircle, Send, Check, AlertCircle, Settings, Phone, Zap, Bot, Sparkles, Loader2 } from 'lucide-react'
+import { MessageCircle, Send, Check, AlertCircle, Settings, Phone, Zap, Bot, Sparkles, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 // /api/whatsapp/status — the page read /api/whatsapp/test, which only
 // answers POST, so it always showed "Configuration Incomplete".
@@ -184,24 +184,27 @@ export default function WhatsAppSettingsPage() {
           </div>
 
           <div className="space-y-0">
-            {[
-              ['Provider', config?.provider === 'meta' ? 'Meta Cloud API' : 'Twilio'],
-              ['Credentials', config?.has_credentials ? '✅ Set' : '❌ Missing'],
+            {([
+              ['Provider', config?.provider === 'meta' ? 'Meta Cloud API' : 'Twilio', null],
+              ['Credentials', config?.has_credentials ? 'Set' : 'Missing', config?.has_credentials ? 'ok' : 'bad'],
               [
                 'Your WhatsApp number',
                 config?.whatsapp_number
                   ? `${config.whatsapp_number} ${config.own_number ? '(your own)' : '(shared platform number)'}`
-                  : '❌ Not set',
+                  : 'Not set',
+                config?.whatsapp_number ? null : 'bad',
               ],
-            ].map(([key, value]) => (
+            ] as Array<[string, string, 'ok' | 'bad' | null]>).map(([key, value, tone]) => (
               <div key={key} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
                 <span className="text-xs text-gray-600 font-medium">{key}</span>
                 <span className={`
-                  text-xs px-2 py-0.5 rounded
-                  ${value.includes('✅') ? 'bg-green-50 text-green-700' : ''}
-                  ${value.includes('❌') ? 'bg-red-50 text-red-700' : ''}
-                  ${!value.includes('✅') && !value.includes('❌') ? 'text-gray-700' : ''}
+                  inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded
+                  ${tone === 'ok' ? 'bg-green-50 text-green-700' : ''}
+                  ${tone === 'bad' ? 'bg-red-50 text-red-700' : ''}
+                  ${tone === null ? 'text-gray-700' : ''}
                 `}>
+                  {tone === 'ok' && <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />}
+                  {tone === 'bad' && <XCircle className="w-3.5 h-3.5 text-red-600" />}
                   {value}
                 </span>
               </div>
@@ -309,9 +312,9 @@ export default function WhatsAppSettingsPage() {
         {/* AI Auto-Reply Settings */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Bot className="w-4 h-4 text-purple-600" />
+            <Bot className="w-4 h-4 text-primary-600" />
             <h2 className="text-sm font-semibold text-gray-900">AI Auto-Reply</h2>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700 rounded-full">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-primary-100 text-primary-700 rounded-full">
               <Sparkles className="w-3 h-3" />
               Powered by Claude
             </span>
@@ -334,9 +337,9 @@ export default function WhatsAppSettingsPage() {
                 <div className="flex items-center gap-3">
                   <div className={`
                     w-8 h-8 rounded-lg flex items-center justify-center
-                    ${aiSettings.enabled ? 'bg-purple-100' : 'bg-gray-100'}
+                    ${aiSettings.enabled ? 'bg-primary-100' : 'bg-gray-100'}
                   `}>
-                    <Bot className={`w-4 h-4 ${aiSettings.enabled ? 'text-purple-600' : 'text-gray-400'}`} />
+                    <Bot className={`w-4 h-4 ${aiSettings.enabled ? 'text-primary-600' : 'text-gray-400'}`} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">
@@ -358,7 +361,7 @@ export default function WhatsAppSettingsPage() {
                   aria-label={aiSettings.enabled ? 'Disable AI auto-reply' : 'Enable AI auto-reply'}
                   className={`
                     relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                    ${aiSettings.enabled ? 'bg-purple-600' : 'bg-gray-200'}
+                    ${aiSettings.enabled ? 'bg-primary-600' : 'bg-gray-200'}
                     ${(aiToggling || !aiSettings.canEnable) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                   `}
                 >
@@ -446,9 +449,9 @@ export default function WhatsAppSettingsPage() {
               {/* Features List */}
               {aiSettings.enabled && (
                 <div className="space-y-3">
-                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <p className="text-xs font-medium text-purple-800 mb-2">AI will automatically:</p>
-                    <ul className="text-xs text-purple-700 space-y-1">
+                  <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg">
+                    <p className="text-xs font-medium text-primary-800 mb-2">AI will automatically:</p>
+                    <ul className="text-xs text-primary-700 space-y-1">
                       <li className="flex items-center gap-1.5">
                         <Check className="w-3 h-3" />
                         Answer customer inquiries about their bookings

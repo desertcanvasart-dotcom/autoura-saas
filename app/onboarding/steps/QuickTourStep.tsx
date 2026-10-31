@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowRight, ArrowLeft, MessageSquare, FileText, Users as UsersIcon, Settings, DollarSign, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowRight, ArrowLeft, MessageSquare, FileText, Users as UsersIcon, Settings, DollarSign, BarChart3, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react'
 
 interface QuickTourStepProps {
   onNext: () => void
@@ -180,7 +180,7 @@ export default function QuickTourStep({ onNext, onBack, onSkip }: QuickTourStepP
           {/* Tip */}
           <div className="max-w-2xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="text-sm text-amber-900">
-              <strong className="font-semibold">💡 {slide.tip.split(':')[0]}:</strong>
+              <strong className="font-semibold"><Lightbulb className="inline w-4 h-4 -mt-0.5 mr-1 text-amber-600" />{slide.tip.split(':')[0]}:</strong>
               {slide.tip.split(':')[1]}
             </p>
           </div>

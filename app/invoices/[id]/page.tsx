@@ -111,11 +111,11 @@ interface PaymentFormData {
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100', icon: FileText },
   sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100', icon: Send },
-  viewed: { label: 'Viewed', color: 'text-purple-700', bg: 'bg-purple-100', icon: FileText },
+  viewed: { label: 'Viewed', color: 'text-primary-700', bg: 'bg-primary-100', icon: FileText },
   // The stored word; with no entry a part-paid invoice showed as Draft, and
   // a deposit linked to one crashed this page.
-  partially_paid: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100', icon: Clock },
-  partial: { label: 'Part paid', color: 'text-orange-700', bg: 'bg-orange-100', icon: Clock },
+  partially_paid: { label: 'Part paid', color: 'text-amber-700', bg: 'bg-amber-100', icon: Clock },
+  partial: { label: 'Part paid', color: 'text-amber-700', bg: 'bg-amber-100', icon: Clock },
   paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircle },
   overdue: { label: 'Overdue', color: 'text-red-700', bg: 'bg-red-100', icon: AlertCircle },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bg: 'bg-gray-100', icon: X }
@@ -124,7 +124,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   standard: { label: 'Standard', color: 'text-gray-600', bg: 'bg-gray-50', icon: FileText },
   deposit: { label: 'Deposit', color: 'text-amber-700', bg: 'bg-amber-50', icon: Wallet },
-  final: { label: 'Final', color: 'text-emerald-700', bg: 'bg-emerald-50', icon: Receipt }
+  final: { label: 'Final', color: 'text-primary-700', bg: 'bg-primary-50', icon: Receipt }
 }
 
 const PAYMENT_METHODS = [
@@ -334,7 +334,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         throw new Error(data.error || 'Failed to send invoice')
       }
       
-      showToast('success', 'Invoice sent via WhatsApp! ✅')
+      showToast('success', 'Invoice sent via WhatsApp!')
       fetchInvoice()
     } catch (error: any) {
       console.error('Error sending WhatsApp:', error)
@@ -483,7 +483,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -492,7 +492,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">Invoice not found</p>
-        <Link href="/invoices" className="text-[#647C47] hover:underline mt-2 inline-block">
+        <Link href="/invoices" className="text-primary-500 hover:underline mt-2 inline-block">
           Back to Invoices
         </Link>
       </div>
@@ -524,7 +524,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <BackLink fallbackHref="/invoices" fallbackLabel="Invoices" />
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">{invoice.invoice_number}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">{invoice.invoice_number}</h1>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
                 <TypeIcon className="h-3.5 w-3.5" />
                 {typeConfig.label}
@@ -544,7 +544,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <button
             onClick={handleSendWhatsApp}
             disabled={sendingWhatsApp}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
             {sendingWhatsApp ? (
               <>
@@ -591,7 +591,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <button
               onClick={handleCreateFinalInvoice}
               disabled={creatingFinalInvoice}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {creatingFinalInvoice ? (
                 <>
@@ -610,7 +610,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {Number(invoice.balance_due) > 0 && invoice.status !== 'cancelled' && invoice.status !== 'draft' && (
             <button
               onClick={() => setShowPaymentModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Record Payment
@@ -624,16 +624,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         <div className={`mb-6 p-4 rounded-lg border ${
           invoice.invoice_type === 'final' 
             ? 'bg-amber-50 border-amber-200' 
-            : 'bg-emerald-50 border-emerald-200'
+            : 'bg-primary-50 border-primary-200'
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <LinkIcon className={`h-5 w-5 ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-emerald-600'}`} />
+              <LinkIcon className={`h-5 w-5 ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-primary-600'}`} />
               <div>
-                <p className={`text-sm font-medium ${invoice.invoice_type === 'final' ? 'text-amber-800' : 'text-emerald-800'}`}>
+                <p className={`text-sm font-medium ${invoice.invoice_type === 'final' ? 'text-amber-800' : 'text-primary-800'}`}>
                   {invoice.invoice_type === 'final' ? 'Deposit Invoice' : 'Final Invoice'}
                 </p>
-                <p className={`text-xs ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                <p className={`text-xs ${invoice.invoice_type === 'final' ? 'text-amber-600' : 'text-primary-600'}`}>
                   {linkedInvoice?.invoice_number || childInvoice?.invoice_number} • 
                   {' '}{formatMoney(linkedInvoice?.total_amount || childInvoice?.total_amount, linkedInvoice?.currency || childInvoice?.currency || 'EUR')} • 
                   {' '}{(STATUS_CONFIG[linkedInvoice?.status || childInvoice?.status || 'draft'] ?? STATUS_CONFIG.draft).label}
@@ -645,7 +645,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               className={`flex items-center gap-1 text-sm font-medium ${
                 invoice.invoice_type === 'final' 
                   ? 'text-amber-700 hover:text-amber-800' 
-                  : 'text-emerald-700 hover:text-emerald-800'
+                  : 'text-primary-700 hover:text-primary-800'
               }`}
             >
               View
@@ -677,7 +677,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div>
               <p className="text-xs text-gray-500">Balance Due on Arrival</p>
-              <p className="text-lg font-bold text-emerald-600">
+              <p className="text-lg font-bold text-primary-600">
                 {formatMoney(trip.balanceAmount, invoice.currency)}
               </p>
             </div>
@@ -851,7 +851,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {Number(invoice.balance_due) > 0 && invoice.status !== 'cancelled' && invoice.status !== 'draft' && (
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors"
+                className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
               >
                 <Plus className="h-4 w-4" />
                 Record Payment
@@ -862,7 +862,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <button
                 onClick={handleCreateFinalInvoice}
                 disabled={creatingFinalInvoice}
-                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
                 {creatingFinalInvoice ? (
                   <>
@@ -955,7 +955,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <h3 className="text-sm font-semibold text-gray-900">Reminder History</h3>
               <Link 
                 href="/reminders" 
-                className="text-xs text-[#647C47] hover:underline"
+                className="text-xs text-primary-500 hover:underline"
               >
                 View All
               </Link>
@@ -1043,7 +1043,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     min="0"
                     max={Number(invoice.balance_due)}
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
                 <div>
@@ -1061,7 +1061,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <select
                     value={paymentForm.payment_method}
                     onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_method: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
                   >
                     {PAYMENT_METHODS.map(method => (
                       <option key={method.value} value={method.value}>{method.label}</option>
@@ -1074,7 +1074,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     type="date"
                     value={paymentForm.payment_date}
                     onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_date: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>
@@ -1086,7 +1086,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   value={paymentForm.transaction_reference}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, transaction_reference: e.target.value }))}
                   placeholder="e.g., TXN-12345"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
 
@@ -1097,7 +1097,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   placeholder="Optional notes..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] resize-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
                 />
               </div>
 
@@ -1112,7 +1112,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <button
                   type="submit"
                   disabled={savingPayment}
-                  className="px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                 >
                   {savingPayment ? 'Recording...' : 'Record Payment'}
                 </button>

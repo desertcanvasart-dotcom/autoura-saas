@@ -175,7 +175,7 @@ export default function DayBlocksPage() {
             <button
               onClick={() => fileRef.current?.click()}
               disabled={busy !== null}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4a5c35] disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#4a5c35] disabled:opacity-50"
             >
               {busy === 'import' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Import sheet (CSV)
             </button>
@@ -186,7 +186,7 @@ export default function DayBlocksPage() {
         <button
           onClick={exportSheet}
           disabled={state !== 'ready'}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-500 border border-primary-500/40 rounded-lg hover:bg-primary-500/5 disabled:opacity-50"
         >
           <Download className="w-4 h-4" /> {blocks.length ? 'Export sheet' : 'Download an empty sheet'}
         </button>
@@ -225,7 +225,7 @@ export default function DayBlocksPage() {
             <button
               onClick={applyImport}
               disabled={busy !== null || pending.summary.added.length + pending.summary.updated.length === 0}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4a5c35] disabled:opacity-50"
+              className="px-3 py-1.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#4a5c35] disabled:opacity-50"
             >
               {busy === 'apply' ? 'Importing…' : 'Import these changes'}
             </button>
@@ -274,7 +274,7 @@ export default function DayBlocksPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs px-1.5 py-0.5 bg-gray-100 rounded">{b.code}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-[#647C47]/10 text-[#4a5c35]">{TYPE_LABEL[b.day_type]}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-primary-500/10 text-[#4a5c35]">{TYPE_LABEL[b.day_type]}</span>
                         {!b.is_active && <span className="text-xs text-gray-500">Switched off</span>}
                       </div>
                       <p className="text-sm font-medium text-gray-900 mt-1">{b.name}</p>

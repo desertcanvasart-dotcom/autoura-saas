@@ -24,7 +24,27 @@ import {
   CheckCircle,
   CreditCard,
   TrendingDown,
-  Users
+  Users,
+  UserRound,
+  Car,
+  Hotel,
+  UtensilsCrossed,
+  Bus,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Landmark,
+  Package,
+  Ticket,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  HandCoins,
+  Hourglass,
+  AlarmClock,
+  type LucideIcon
 } from 'lucide-react'
 
 interface AgingBucket {
@@ -85,35 +105,35 @@ interface Summary {
 // of mixed-currency money is not a number.
 const nonZero = (t: CurrencyTotals) => Object.values(t).some(v => v !== 0)
 
-const SUPPLIER_TYPES: Record<string, { label: string; icon: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫' },
-  driver: { label: 'Driver', icon: '🚗' },
-  hotel: { label: 'Hotel', icon: '🏨' },
-  restaurant: { label: 'Restaurant', icon: '🍽️' },
-  transport_company: { label: 'Transport Company', icon: '🚐' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  government: { label: 'Government', icon: '🏛️' },
-  other: { label: 'Other', icon: '📦' }
+const SUPPLIER_TYPES: Record<string, { label: string; icon: LucideIcon }> = {
+  guide: { label: 'Tour Guide', icon: UserRound },
+  driver: { label: 'Driver', icon: Car },
+  hotel: { label: 'Hotel', icon: Hotel },
+  restaurant: { label: 'Restaurant', icon: UtensilsCrossed },
+  transport_company: { label: 'Transport Company', icon: Bus },
+  airport_staff: { label: 'Airport Staff', icon: Plane },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell },
+  ground_handler: { label: 'Ground Handler', icon: Luggage },
+  government: { label: 'Government', icon: Landmark },
+  other: { label: 'Other', icon: Package }
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫' },
-  driver: { label: 'Driver', icon: '🚗' },
-  hotel: { label: 'Hotel', icon: '🏨' },
-  transportation: { label: 'Transportation', icon: '🚐' },
-  entrance: { label: 'Entrance Fees', icon: '🎫' },
-  meal: { label: 'Meals', icon: '🍽️' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  tipping: { label: 'Tipping', icon: '💵' },
-  permits: { label: 'Permits', icon: '📋' },
-  toll: { label: 'Toll Fees', icon: '🛣️' },
-  parking: { label: 'Parking', icon: '🅿️' },
-  fuel: { label: 'Fuel', icon: '⛽' },
-  other: { label: 'Other', icon: '📦' }
+const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
+  guide: { label: 'Tour Guide', icon: UserRound },
+  driver: { label: 'Driver', icon: Car },
+  hotel: { label: 'Hotel', icon: Hotel },
+  transportation: { label: 'Transportation', icon: Bus },
+  entrance: { label: 'Entrance Fees', icon: Ticket },
+  meal: { label: 'Meals', icon: UtensilsCrossed },
+  airport_staff: { label: 'Airport Staff', icon: Plane },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell },
+  ground_handler: { label: 'Ground Handler', icon: Luggage },
+  tipping: { label: 'Tipping', icon: Banknote },
+  permits: { label: 'Permits', icon: ClipboardList },
+  toll: { label: 'Toll Fees', icon: Milestone },
+  parking: { label: 'Parking', icon: SquareParking },
+  fuel: { label: 'Fuel', icon: Fuel },
+  other: { label: 'Other', icon: Package }
 }
 
 const ITEMS_PER_PAGE = 15
@@ -226,8 +246,8 @@ export default function AccountsPayablePage() {
   const getAgingColor = (bucket: string) => {
     switch (bucket) {
       case 'current': return 'text-green-600 bg-green-100'
-      case '30': return 'text-yellow-600 bg-yellow-100'
-      case '60': return 'text-orange-600 bg-orange-100'
+      case '30': return 'text-amber-600 bg-amber-100'
+      case '60': return 'text-amber-600 bg-amber-100'
       case '90plus': return 'text-red-600 bg-red-100'
       default: return 'text-gray-600 bg-gray-100'
     }
@@ -245,7 +265,7 @@ export default function AccountsPayablePage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100'
+      case 'pending': return 'text-amber-600 bg-amber-100'
       case 'approved': return 'text-blue-600 bg-blue-100'
       case 'paid': return 'text-green-600 bg-green-100'
       default: return 'text-gray-600 bg-gray-100'
@@ -307,7 +327,7 @@ export default function AccountsPayablePage() {
               <AlertTriangle className="w-8 h-8 text-red-600" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h1>
           <p className="text-gray-600 mb-6">
             You don't have permission to view accounts payable. Manager access is required.
           </p>
@@ -326,7 +346,7 @@ export default function AccountsPayablePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -337,11 +357,11 @@ export default function AccountsPayablePage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            💸
+            <HandCoins className="w-5 h-5 text-gray-500" />
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">Accounts Payable</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Accounts Payable</h1>
               {tenant && (
                 <span className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-full">
                   {tenant.company_name}
@@ -353,7 +373,7 @@ export default function AccountsPayablePage() {
         </div>
         <Link
           href="/expenses"
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Receipt className="h-4 w-4" />
           View All Expenses
@@ -365,7 +385,7 @@ export default function AccountsPayablePage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💰</span>
+              <Wallet className="w-5 h-5 text-red-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Total Payable</p>
@@ -375,17 +395,17 @@ export default function AccountsPayablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⏳</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+              <Hourglass className="w-5 h-5 text-amber-600" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Pending Approval</p>
-            <p className="text-2xl font-semibold text-yellow-600">{formatTotals(summary.pending_amount)}</p>
+            <p className="text-2xl font-semibold text-amber-600">{formatTotals(summary.pending_amount)}</p>
             <p className="text-xs text-gray-400 mt-1">{summary.pending_count} expenses</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
+              <CheckCircle className="w-5 h-5 text-blue-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Approved to Pay</p>
@@ -395,7 +415,7 @@ export default function AccountsPayablePage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
+              <CheckCircle className="w-5 h-5 text-green-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Not due yet</p>
@@ -405,25 +425,25 @@ export default function AccountsPayablePage() {
           {/* The cards add up to the total: 1-30 days was missing. */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⏳</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+              <Hourglass className="w-5 h-5 text-amber-600" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">1-30 days overdue</p>
-            <p className="text-2xl font-semibold text-yellow-600">{formatTotals(summary.aging.days30)}</p>
+            <p className="text-2xl font-semibold text-amber-600">{formatTotals(summary.aging.days30)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⏰</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+              <AlarmClock className="w-5 h-5 text-amber-600" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">31-60 days overdue</p>
-            <p className="text-2xl font-semibold text-orange-600">{formatTotals(summary.aging.days60)}</p>
+            <p className="text-2xl font-semibold text-amber-600">{formatTotals(summary.aging.days60)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🚨</span>
+              <AlertTriangle className="w-5 h-5 text-red-600" />
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">60+ days overdue</p>
@@ -449,7 +469,7 @@ export default function AccountsPayablePage() {
             )}
             {(summary.aging.days30[summary.single_currency!] || 0) > 0 && (
               <div 
-                className="bg-yellow-500 flex items-center justify-center text-white text-xs font-medium"
+                className="bg-amber-500 flex items-center justify-center text-white text-xs font-medium"
                 style={{ width: `${((summary.aging.days30[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
                 title={`1-30 days overdue: ${formatTotals(summary.aging.days30)}`}
               >
@@ -458,7 +478,7 @@ export default function AccountsPayablePage() {
             )}
             {(summary.aging.days60[summary.single_currency!] || 0) > 0 && (
               <div 
-                className="bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
+                className="bg-amber-500 flex items-center justify-center text-white text-xs font-medium"
                 style={{ width: `${((summary.aging.days60[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
                 title={`31-60 days overdue: ${formatTotals(summary.aging.days60)}`}
               >
@@ -481,11 +501,11 @@ export default function AccountsPayablePage() {
               <span className="text-gray-600">Not due yet</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded bg-amber-500"></div>
               <span className="text-gray-600">1-30 days overdue</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-orange-500"></div>
+              <div className="w-3 h-3 rounded bg-amber-500"></div>
               <span className="text-gray-600">31-60 days overdue</span>
             </div>
             <div className="flex items-center gap-2">
@@ -504,7 +524,7 @@ export default function AccountsPayablePage() {
             placeholder="Search suppliers or expenses..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -540,13 +560,13 @@ export default function AccountsPayablePage() {
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
             hasActiveFilters 
-              ? 'border-[#647C47] text-[#647C47] bg-[#647C47]/5' 
+              ? 'border-primary-500 text-primary-500 bg-primary-500/5' 
               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Filter className="h-4 w-4" />
           Filters
-          {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-[#647C47]"></span>}
+          {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-500"></span>}
         </button>
 
         {hasActiveFilters && (
@@ -565,7 +585,7 @@ export default function AccountsPayablePage() {
               <select
                 value={agingFilter}
                 onChange={(e) => setAgingFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Aging</option>
                 <option value="current">Not due yet</option>
@@ -579,11 +599,11 @@ export default function AccountsPayablePage() {
               <select
                 value={supplierTypeFilter}
                 onChange={(e) => setSupplierTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Types</option>
                 {Object.entries(SUPPLIER_TYPES).map(([key, val]) => (
-                  <option key={key} value={key}>{val.icon} {val.label}</option>
+                  <option key={key} value={key}>{val.label}</option>
                 ))}
               </select>
             </div>
@@ -592,7 +612,7 @@ export default function AccountsPayablePage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Statuses</option>
                 <option value="pending">Pending Approval</option>
@@ -622,7 +642,7 @@ export default function AccountsPayablePage() {
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
-                        {typeConfig.icon}
+                        <typeConfig.icon className="w-5 h-5 text-gray-500" />
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-semibold text-gray-900">{supplier.supplier_name}</p>
@@ -644,12 +664,12 @@ export default function AccountsPayablePage() {
                           </div>
                         )}
                         {nonZero(supplier.aging.days30) && (
-                          <div className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">
+                          <div className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
                             {formatTotals(supplier.aging.days30)}
                           </div>
                         )}
                         {nonZero(supplier.aging.days60) && (
-                          <div className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded">
+                          <div className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">
                             {formatTotals(supplier.aging.days60)}
                           </div>
                         )}
@@ -673,15 +693,15 @@ export default function AccountsPayablePage() {
                           return (
                             <div key={expense.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                               <div className="flex items-center gap-3">
-                                <span className="text-lg">{catConfig.icon}</span>
+                                <catConfig.icon className="w-5 h-5 text-gray-500" />
                                 <div>
-                                  <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                                  <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                     {expense.expense_number}
                                   </Link>
                                   <p className="text-xs text-gray-500">
                                     {expense.description || catConfig.label} • {new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                                     {expense.is_overdue && (
-                                      <span className="text-orange-500 ml-2">({expense.days_past_due} days overdue)</span>
+                                      <span className="text-amber-500 ml-2">({expense.days_past_due} days overdue)</span>
                                     )}
                                   </p>
                                 </div>
@@ -718,7 +738,7 @@ export default function AccountsPayablePage() {
                                   )}
                                   <Link
                                     href={`/expenses/${expense.id}`}
-                                    className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                                    className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                                     title="View Expense"
                                   >
                                     <Eye className="h-4 w-4" />
@@ -765,12 +785,12 @@ export default function AccountsPayablePage() {
                   (paginatedData as Expense[]).map((expense) => {
                     const catConfig = CATEGORY_CONFIG[expense.category] || CATEGORY_CONFIG.other
                     return (
-                      <tr key={expense.id} className={`hover:bg-gray-50 ${expense.is_overdue ? 'bg-orange-50/50' : ''}`}>
+                      <tr key={expense.id} className={`hover:bg-gray-50 ${expense.is_overdue ? 'bg-amber-50/50' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span>{catConfig.icon}</span>
+                            <catConfig.icon className="w-4 h-4 text-gray-500" />
                             <div>
-                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                 {expense.expense_number}
                               </Link>
                               <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
@@ -785,7 +805,7 @@ export default function AccountsPayablePage() {
                         </td>
                         <td className="px-4 py-3">
                           <p className="text-sm text-gray-600">{new Date(`${String(expense.expense_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}</p>
-                          <p className={`text-xs ${expense.is_overdue ? 'text-orange-500' : 'text-gray-400'}`}>
+                          <p className={`text-xs ${expense.is_overdue ? 'text-amber-500' : 'text-gray-400'}`}>
                             Due {new Date(`${String(expense.due_date).slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                             {expense.due_from_invoice ? ` (bill ${expense.due_from_invoice})` : ''}
                           </p>
@@ -827,7 +847,7 @@ export default function AccountsPayablePage() {
                             )}
                             <Link
                               href={`/expenses/${expense.id}`}
-                              className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                               title="View"
                             >
                               <Eye className="h-4 w-4" />
@@ -873,9 +893,9 @@ export default function AccountsPayablePage() {
                       <tr key={expense.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span>{catConfig.icon}</span>
+                            <catConfig.icon className="w-4 h-4 text-gray-500" />
                             <div>
-                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                 {expense.expense_number}
                               </Link>
                               <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
@@ -903,7 +923,7 @@ export default function AccountsPayablePage() {
                         <td className="px-4 py-3 text-right">
                           <Link
                             href={`/expenses/${expense.id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors inline-block"
+                            className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors inline-block"
                             title="View"
                           >
                             <Eye className="h-4 w-4" />
@@ -950,7 +970,7 @@ export default function AccountsPayablePage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 text-sm rounded-lg ${
                     currentPage === pageNum
-                      ? 'bg-[#647C47] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >

@@ -47,7 +47,7 @@ export default function BlockPicker({ blocks, onPick, label, title, disabled, co
         disabled={disabled || blocks.length === 0}
         title={blocks.length === 0 ? 'No day blocks yet: add them in Settings → Day blocks' : title}
         className={compact && current
-          ? 'flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-mono font-medium text-green-800 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-40 whitespace-nowrap'
+          ? 'flex items-center gap-1 px-1.5 py-0.5 text-xs font-mono font-medium text-green-800 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-40 whitespace-nowrap'
           : compact
             ? 'flex items-center gap-1 p-1.5 text-gray-400 hover:text-green-700 rounded-md hover:bg-green-50 transition-colors disabled:opacity-40'
             : 'flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:border-green-500 hover:text-green-700 transition-colors disabled:opacity-40 whitespace-nowrap'}
@@ -76,11 +76,11 @@ export default function BlockPicker({ blocks, onPick, label, title, disabled, co
                   className={`w-full text-left px-3 py-2 hover:bg-green-50 ${b.code === current ? 'bg-green-50/70' : ''}`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] px-1 py-0.5 bg-gray-100 rounded text-gray-600">{b.code}</span>
+                    <span className="font-mono text-xs px-1 py-0.5 bg-gray-100 rounded text-gray-600">{b.code}</span>
                     <span className="text-sm text-gray-900 truncate">{b.name}</span>
-                    {b.code === current && <span className="ml-auto shrink-0 text-[10px] font-medium text-green-700">This day</span>}
+                    {b.code === current && <span className="ml-auto shrink-0 text-xs font-medium text-green-700">This day</span>}
                   </div>
-                  <div className="text-[11px] text-gray-500 mt-0.5">
+                  <div className="text-xs text-gray-500 mt-0.5">
                     {b.city ?? 'Any city'}{b.to_city && b.to_city !== b.city ? ` → ${b.to_city}` : ''} · {nightLabel(b)}
                   </div>
                 </button>

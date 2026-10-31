@@ -17,7 +17,28 @@ import {
   FileText,
   Building,
   Percent,
-  AlertTriangle
+  AlertTriangle,
+  UserRound,
+  Car,
+  Hotel,
+  Bus,
+  Ticket,
+  Utensils,
+  Plane,
+  ConciergeBell,
+  Luggage,
+  Banknote,
+  ClipboardList,
+  Milestone,
+  SquareParking,
+  Fuel,
+  Building2,
+  Laptop,
+  Megaphone,
+  Package,
+  CheckCircle2,
+  Target,
+  type LucideIcon
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -128,25 +149,25 @@ interface YearOverYear {
   expense_change_percent: number
 }
 
-const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
-  guide: { label: 'Tour Guide', icon: '👨‍🏫' },
-  driver: { label: 'Driver', icon: '🚗' },
-  hotel: { label: 'Hotel', icon: '🏨' },
-  transportation: { label: 'Transportation', icon: '🚐' },
-  entrance: { label: 'Entrance Fees', icon: '🎫' },
-  meal: { label: 'Meals', icon: '🍽️' },
-  airport_staff: { label: 'Airport Staff', icon: '✈️' },
-  hotel_staff: { label: 'Hotel Staff', icon: '🛎️' },
-  ground_handler: { label: 'Ground Handler', icon: '🧳' },
-  tipping: { label: 'Tipping', icon: '💵' },
-  permits: { label: 'Permits', icon: '📋' },
-  toll: { label: 'Toll Fees', icon: '🛣️' },
-  parking: { label: 'Parking', icon: '🅿️' },
-  fuel: { label: 'Fuel', icon: '⛽' },
-  office: { label: 'Office', icon: '🏢' },
-  software: { label: 'Software', icon: '💻' },
-  marketing: { label: 'Marketing', icon: '📣' },
-  other: { label: 'Other', icon: '📦' }
+const CATEGORY_LABELS: Record<string, { label: string; icon: LucideIcon }> = {
+  guide: { label: 'Tour Guide', icon: UserRound },
+  driver: { label: 'Driver', icon: Car },
+  hotel: { label: 'Hotel', icon: Hotel },
+  transportation: { label: 'Transportation', icon: Bus },
+  entrance: { label: 'Entrance Fees', icon: Ticket },
+  meal: { label: 'Meals', icon: Utensils },
+  airport_staff: { label: 'Airport Staff', icon: Plane },
+  hotel_staff: { label: 'Hotel Staff', icon: ConciergeBell },
+  ground_handler: { label: 'Ground Handler', icon: Luggage },
+  tipping: { label: 'Tipping', icon: Banknote },
+  permits: { label: 'Permits', icon: ClipboardList },
+  toll: { label: 'Toll Fees', icon: Milestone },
+  parking: { label: 'Parking', icon: SquareParking },
+  fuel: { label: 'Fuel', icon: Fuel },
+  office: { label: 'Office', icon: Building2 },
+  software: { label: 'Software', icon: Laptop },
+  marketing: { label: 'Marketing', icon: Megaphone },
+  other: { label: 'Other', icon: Package }
 }
 
 export default function FinancialReportsPage() {
@@ -246,7 +267,7 @@ export default function FinancialReportsPage() {
   if (loading || currencyLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -256,11 +277,11 @@ export default function FinancialReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            📊
+          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+            <BarChart3 className="w-5 h-5 text-gray-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Financial Reports</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Financial Reports</h1>
             <p className="text-sm text-gray-500">Revenue, cash flow, tax & commission analysis</p>
           </div>
         </div>
@@ -269,7 +290,7 @@ export default function FinancialReportsPage() {
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             {availableYears.length > 0 ? (
               availableYears.map(year => (
@@ -341,7 +362,7 @@ export default function FinancialReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💰</span>
+                <Wallet className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
@@ -356,7 +377,7 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💸</span>
+                <Receipt className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
@@ -371,7 +392,7 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📈</span>
+                <TrendingUp className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Gross Profit</p>
@@ -383,27 +404,27 @@ export default function FinancialReportsPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">✅</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <CheckCircle2 className="w-5 h-5 text-gray-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Collected</p>
-              <p className="text-2xl font-semibold text-emerald-600">{formatAmount(summary.total_collected)}</p>
+              <p className="text-2xl font-semibold text-primary-600">{formatAmount(summary.total_collected)}</p>
               <p className="text-xs text-gray-400 mt-1">{summary.collection_rate.toFixed(1)}% collected</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🎯</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                <Target className="w-5 h-5 text-gray-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Trips</p>
-              <p className="text-2xl font-semibold text-purple-600">{summary.trip_count}</p>
+              <p className="text-2xl font-semibold text-primary-600">{summary.trip_count}</p>
               <p className="text-xs text-gray-400 mt-1">{formatAmount(summary.average_trip_value)} avg</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📄</span>
+                <FileText className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Invoices</p>
@@ -445,7 +466,7 @@ export default function FinancialReportsPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Margin</span>
-                      <span className={`font-medium ${q.margin >= 20 ? 'text-green-600' : q.margin >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      <span className={`font-medium ${q.margin >= 20 ? 'text-green-600' : q.margin >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
                         {q.margin.toFixed(1)}%
                       </span>
                     </div>
@@ -525,7 +546,7 @@ export default function FinancialReportsPage() {
                     <tr key={m.month} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month} {m.year}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatAmount(m.invoiced)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-emerald-600">{formatAmount(m.collected)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-primary-600">{formatAmount(m.collected)}</td>
                       <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.expenses)}</td>
                       <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatAmount(m.net_profit)}
@@ -539,7 +560,7 @@ export default function FinancialReportsPage() {
                     <td className="px-4 py-3 text-sm text-right text-blue-600">
                       {formatAmount(monthly.reduce((sum, m) => sum + m.invoiced, 0))}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-emerald-600">
+                    <td className="px-4 py-3 text-sm text-right text-primary-600">
                       {formatAmount(monthly.reduce((sum, m) => sum + m.collected, 0))}
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-red-600">
@@ -587,11 +608,11 @@ export default function FinancialReportsPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Pending Payables</p>
-              <p className="text-xl font-semibold text-orange-600">{formatAmount(cashFlow.pending_payables)}</p>
+              <p className="text-xl font-semibold text-amber-600">{formatAmount(cashFlow.pending_payables)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Projected Cash</p>
-              <p className={`text-xl font-semibold ${cashFlow.projected_cash >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
+              <p className={`text-xl font-semibold ${cashFlow.projected_cash >= 0 ? 'text-primary-600' : 'text-red-600'}`}>
                 {formatAmount(cashFlow.projected_cash)}
               </p>
             </div>
@@ -656,7 +677,7 @@ export default function FinancialReportsPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Taxable Income</p>
-              <p className="text-xl font-semibold text-purple-600">{formatAmount(taxSummary.taxable_income)}</p>
+              <p className="text-xl font-semibold text-primary-600">{formatAmount(taxSummary.taxable_income)}</p>
             </div>
           </div>
 
@@ -711,7 +732,7 @@ export default function FinancialReportsPage() {
                   <div key={cat.category}>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <div className="flex items-center gap-2">
-                        <span>{config.icon}</span>
+                        <config.icon className="w-4 h-4 text-gray-500" />
                         <span className="text-gray-700">{config.label}</span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -721,7 +742,7 @@ export default function FinancialReportsPage() {
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#647C47] rounded-full transition-all"
+                        className="h-full bg-primary-500 rounded-full transition-all"
                         style={{ width: `${cat.percentage}%` }}
                       />
                     </div>
@@ -748,11 +769,11 @@ export default function FinancialReportsPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Pending</p>
-              <p className="text-xl font-semibold text-orange-600">{formatAmount(commissionSummary.total_pending)}</p>
+              <p className="text-xl font-semibold text-amber-600">{formatAmount(commissionSummary.total_pending)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Recipients</p>
-              <p className="text-xl font-semibold text-purple-600">{commissionSummary.recipients.length}</p>
+              <p className="text-xl font-semibold text-primary-600">{commissionSummary.recipients.length}</p>
             </div>
           </div>
 
@@ -764,7 +785,7 @@ export default function FinancialReportsPage() {
                 const config = CATEGORY_LABELS[type.type] || CATEGORY_LABELS.other
                 return (
                   <div key={type.type} className="p-4 bg-gray-50 rounded-lg text-center">
-                    <span className="text-2xl">{config.icon}</span>
+                    <config.icon className="w-6 h-6 text-gray-500 mx-auto" />
                     <p className="text-xs text-gray-500 mt-2">{config.label}</p>
                     <p className="text-lg font-semibold text-gray-900 mt-1">{formatAmount(type.amount)}</p>
                     <p className="text-xs text-gray-400">{type.count} payments</p>
@@ -819,7 +840,7 @@ export default function FinancialReportsPage() {
                         <tr key={idx} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <span>{config.icon}</span>
+                              <config.icon className="w-4 h-4 text-gray-500" />
                               <span className="text-sm font-medium text-gray-900">{recipient.name}</span>
                             </div>
                           </td>
@@ -830,7 +851,7 @@ export default function FinancialReportsPage() {
                           <td className="px-4 py-3 text-sm text-right text-green-600">
                             {formatAmount(recipient.total_paid)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-orange-600">
+                          <td className="px-4 py-3 text-sm text-right text-amber-600">
                             {formatAmount(recipient.total_pending)}
                           </td>
                           <td className="px-4 py-3 text-sm text-center text-gray-600">{recipient.trip_count}</td>

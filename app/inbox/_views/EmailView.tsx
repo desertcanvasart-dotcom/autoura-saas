@@ -931,8 +931,8 @@ ${bodyText}`
 
   const getAvatarColor = (email: string) => {
     const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500',
-      'bg-pink-500', 'bg-indigo-500', 'bg-red-500', 'bg-teal-500'
+      'bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-primary-500',
+      'bg-primary-500', 'bg-primary-500', 'bg-red-500', 'bg-primary-500'
     ]
     const hash = email.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
     return colors[hash % colors.length]
@@ -991,7 +991,7 @@ ${bodyText}`
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
                 <Mail className="w-5 h-5 text-primary-600" />
                 Inbox
                 {/* NEW: Unread count badge */}
@@ -1112,7 +1112,7 @@ ${bodyText}`
                     <>
                       <span className="flex-1 text-left">{item.label}</span>
                       {item.id === 'inbox' && item.count > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                           folder === item.id ? 'bg-primary-200 text-primary-800' : 'bg-gray-100 text-gray-600'
                         }`}>
                           {item.count}
@@ -1126,7 +1126,7 @@ ${bodyText}`
 
             {!isFolderCollapsed && customLabels.length > 0 && (
               <div className="mt-4 pt-3 border-t border-gray-200">
-                <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
                   Folders
                 </p>
                 <nav className="space-y-0.5">
@@ -1165,7 +1165,7 @@ ${bodyText}`
                               <Pencil className="w-3.5 h-3.5 text-gray-400" /> Rename
                             </button>
                             <div className="px-3 py-1.5 border-t border-b border-gray-100 my-1">
-                              <p className="text-[10px] text-gray-400 mb-1">Colour</p>
+                              <p className="text-xs text-gray-400 mb-1">Colour</p>
                               <div className="grid grid-cols-6 gap-1">
                                 {GMAIL_LABEL_COLORS.map(c => (
                                   <button
@@ -1216,7 +1216,7 @@ ${bodyText}`
 
             {!isFolderCollapsed && (
               <div className="mt-4 pt-3 border-t border-gray-200">
-                <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Filters</p>
+                <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Filters</p>
                 <nav className="space-y-0.5">
                   {[
                     { id: 'business' as FilterType, label: 'Business' },
@@ -1371,7 +1371,7 @@ ${bodyText}`
               {Object.entries(groupedEmails).map(([group, groupEmails]) => (
                 <div key={group}>
                   <div className="sticky top-[41px] px-3 py-1.5 bg-gray-50 border-b border-gray-100">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{group}</span>
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{group}</span>
                   </div>
                   {groupEmails.map((email) => {
                     const displayName = getDisplayName(email)
@@ -1414,7 +1414,7 @@ ${bodyText}`
                             <div className="flex items-center justify-between gap-2 mb-0.5">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 {isSentByMe && (
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium flex-shrink-0">
+                                  <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium flex-shrink-0">
                                     To
                                   </span>
                                 )}
@@ -1430,12 +1430,12 @@ ${bodyText}`
                                 <button
                                   onClick={(e) => toggleStar(email.id, e)}
                                   className={`p-0.5 rounded transition-colors ${
-                                    isStarred ? 'text-yellow-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'
+                                    isStarred ? 'text-amber-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'
                                   }`}
                                 >
-                                  <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-yellow-500' : ''}`} />
+                                  <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-amber-500' : ''}`} />
                                 </button>
-                                <span className="text-[11px] text-gray-500">
+                                <span className="text-xs text-gray-500">
                                   {formatDate(email.date)}
                                 </span>
                               </div>
@@ -1451,14 +1451,14 @@ ${bodyText}`
                               {customLabels.filter(l => email.labelIds?.includes(l.id) && folder !== `label:${l.id}`).slice(0, 3).map(l => (
                                 <span
                                   key={l.id}
-                                  className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 max-w-[90px] truncate"
+                                  className="text-xs px-1.5 py-0.5 rounded flex-shrink-0 max-w-[90px] truncate"
                                   style={{ backgroundColor: l.color?.backgroundColor || '#e5e7eb', color: l.color?.textColor || '#374151' }}
                                 >
                                   {l.name}
                                 </span>
                               ))}
                             </div>
-                            <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
                               {decodeHtmlEntities(email.snippet)}
                             </p>
                           </div>
@@ -1582,7 +1582,7 @@ ${bodyText}`
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     title="Parse and price in the Pricing Grid"
                   >
-                    <Sparkles className="w-4 h-4 text-purple-500" />
+                    <Sparkles className="w-4 h-4 text-primary-500" />
                   </button>
                   <button
                     onClick={() => handleEmailAction('spam', thread.length ? thread.filter(m => !isFromMe(m)).map(m => m.id) : [selectedEmail.id])}
@@ -1707,7 +1707,7 @@ ${bodyText}`
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             title="Parse and price in the Pricing Grid"
           >
-            <Sparkles className="w-5 h-5 text-purple-500" />
+            <Sparkles className="w-5 h-5 text-primary-500" />
           </button>
           <button
             onClick={() => setShowExpandedEmail(false)}

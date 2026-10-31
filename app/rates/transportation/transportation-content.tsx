@@ -532,7 +532,7 @@ export default function TransportationContent() {
           <select
             value={itemsPerPage}
             onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] bg-white"
+            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
           >
             {ITEMS_PER_PAGE_OPTIONS.map(option => (
               <option key={option} value={option}>{option}</option>
@@ -583,7 +583,7 @@ export default function TransportationContent() {
                 onClick={() => goToPage(pageNum)}
                 className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
                   currentPage === pageNum
-                    ? 'bg-[#647C47] text-white'
+                    ? 'bg-primary-500 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -623,7 +623,7 @@ export default function TransportationContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -634,13 +634,13 @@ export default function TransportationContent() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Car className="h-5 w-5 text-blue-600" />
-          <h1 className="text-lg font-semibold text-gray-900">Transportation Rates</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Transportation Rates</h1>
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="transportation_rates" onImportComplete={fetchRates} />
           <button
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Rate
@@ -673,14 +673,14 @@ export default function TransportationContent() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
             <span className="text-xs text-gray-500">Cities</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueCities}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
             <span className="text-xs text-gray-500">Vehicle Types</span>
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueVehicleTypes}</p>
@@ -695,7 +695,7 @@ export default function TransportationContent() {
             placeholder="Search rates..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-3 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-3 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -703,7 +703,7 @@ export default function TransportationContent() {
           <select
             value={cityFilter}
             onChange={(e) => setCityFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white"
           >
             <option value="">All Cities</option>
             {cityOptionsFor(cityOptions, cityFilter || '').map(city => (
@@ -715,13 +715,13 @@ export default function TransportationContent() {
 
         <div className="relative">
           <VocabSelect kind="transport_service_type" value={serviceTypeFilter} onChange={setServiceTypeFilter} placeholder={"All Service Types"}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
         <div className="relative">
           <VocabSelect kind="vehicle_type" value={vehicleTypeFilter} onChange={setVehicleTypeFilter} placeholder="All Vehicles"
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
@@ -740,21 +740,21 @@ export default function TransportationContent() {
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 ml-auto">
           <button
             onClick={() => setViewMode('table')}
-            className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-white shadow text-[#647C47]' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-white shadow text-primary-500' : 'text-gray-500 hover:text-gray-700'}`}
             title="Table View"
           >
             <Table2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('cards')}
-            className={`p-1.5 rounded ${viewMode === 'cards' ? 'bg-white shadow text-[#647C47]' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`p-1.5 rounded ${viewMode === 'cards' ? 'bg-white shadow text-primary-500' : 'text-gray-500 hover:text-gray-700'}`}
             title="Card View"
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('compact')}
-            className={`p-1.5 rounded ${viewMode === 'compact' ? 'bg-white shadow text-[#647C47]' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`p-1.5 rounded ${viewMode === 'compact' ? 'bg-white shadow text-primary-500' : 'text-gray-500 hover:text-gray-700'}`}
             title="Compact View"
           >
             <List className="w-4 h-4" />
@@ -796,7 +796,7 @@ export default function TransportationContent() {
                   type="checkbox"
                   checked={filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))}
                   onChange={handleSelectAll}
-                  className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                  className="h-4 w-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                   aria-label="Select all rates"
                 />
               </th>
@@ -826,7 +826,7 @@ export default function TransportationContent() {
                         checked={selectedIds.has(rate.id)}
                         onChange={() => handleSelectRate(rate.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                        className="h-4 w-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                         aria-label={`Select ${rate.route_name || rate.city}`}
                       />
                     </td>
@@ -878,7 +878,7 @@ export default function TransportationContent() {
                         <button
                           type="button"
                           onClick={() => openEditModal(rate)}
-                          className="p-1 text-gray-400 hover:text-[#647C47] transition-colors"
+                          className="p-1 text-gray-400 hover:text-primary-500 transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="h-4 w-4" />
@@ -1046,7 +1046,7 @@ export default function TransportationContent() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openEditModal(rate)}
-                        className="p-1 text-gray-400 hover:text-[#647C47] transition-colors"
+                        className="p-1 text-gray-400 hover:text-primary-500 transition-colors"
                         title="Edit"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -1110,7 +1110,7 @@ export default function TransportationContent() {
                       Service Type <span className="text-red-500">*</span>
                     </label>
                     <VocabSelect kind="transport_service_type" value={formData.service_type} onChange={handleServiceTypeChange} placeholder={null} required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" />
                   </div>
 
                 </div>
@@ -1125,7 +1125,7 @@ export default function TransportationContent() {
                       value={formData.city}
                       onChange={(e) => handleCityChange(e.target.value)}
                       required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">Select City</option>
                       {cityOptionsFor(cityOptions, formData.city || '').map(city => (
@@ -1143,7 +1143,7 @@ export default function TransportationContent() {
                         value={formData.destination_city}
                         onChange={(e) => handleDestinationCityChange(e.target.value)}
                         required
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                       >
                         <option value="">Select Destination</option>
                         {cityOptions.filter(city => city !== formData.city).map(city => (
@@ -1174,7 +1174,7 @@ export default function TransportationContent() {
                       value={formData.route_name}
                       onChange={(e) => setFormData(prev => ({ ...prev, route_name: e.target.value }))}
                       placeholder="Auto-generated from city & type"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
 
@@ -1215,7 +1215,7 @@ export default function TransportationContent() {
                                 type="number" step="0.01" min="0" placeholder="—"
                                 value={v.rate_eur}
                                 onChange={(e) => handleVehicleFieldChange(cls.key, 'rate_eur', e.target.value)}
-                                className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
+                                className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
                               />
                             </td>
                             <td className="px-3 py-1.5">
@@ -1223,7 +1223,7 @@ export default function TransportationContent() {
                                 type="number" min="1"
                                 value={v.capacity_min}
                                 onChange={(e) => handleVehicleFieldChange(cls.key, 'capacity_min', e.target.value)}
-                                className="w-16 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
+                                className="w-16 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
                               />
                             </td>
                             <td className="px-3 py-1.5">
@@ -1231,7 +1231,7 @@ export default function TransportationContent() {
                                 type="number" min="1"
                                 value={v.capacity_max}
                                 onChange={(e) => handleVehicleFieldChange(cls.key, 'capacity_max', e.target.value)}
-                                className="w-16 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
+                                className="w-16 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
                               />
                             </td>
                           </tr>
@@ -1251,7 +1251,7 @@ export default function TransportationContent() {
                   <select
                     value={formData.supplier_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, supplier_id: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47] focus:border-transparent bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
                   >
                     <option value="">No supplier linked</option>
                     {suppliers.map(s => (
@@ -1269,7 +1269,7 @@ export default function TransportationContent() {
                     id="is_active"
                     checked={formData.is_active}
                     onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                    className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                    className="h-4 w-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                   />
                   <label htmlFor="is_active" className="text-sm text-gray-600">
                     Active (available for booking)
@@ -1289,7 +1289,7 @@ export default function TransportationContent() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 text-sm bg-[#647C47] text-white rounded-md hover:bg-[#4f6238] transition-colors disabled:opacity-50 min-w-[100px]"
+                  className="px-4 py-2 text-sm bg-primary-500 text-white rounded-md hover:bg-primary-700 transition-colors disabled:opacity-50 min-w-[100px]"
                 >
                   {saving ? 'Saving...' : editingRate ? 'Update Rate' : 'Add Rate'}
                 </button>

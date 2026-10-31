@@ -30,7 +30,7 @@ describe('a warning, never a block', () => {
     expect(cover).toContain('day_off: off.has(s.id as string)')
     expect(cover).toContain("o.resource_type === 'guide' && off.has(o.resource_id)")
     const picker = readFileSync('components/booking/CoverLinePicker.tsx', 'utf8')
-    expect(picker).toContain("⚠ day off")
+    expect(picker).toContain("' · day off'")
     // Not filtered out anywhere:
     expect(cover).not.toMatch(/filter\([^)]*day_off/)
   })

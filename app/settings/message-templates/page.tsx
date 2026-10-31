@@ -29,7 +29,8 @@ import {
   Clock,
   CheckCircle2,
   Package,
-  Handshake
+  Handshake,
+  Languages
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -64,16 +65,16 @@ interface Template {
 }
 
 const LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'ar', name: 'Arabic', flag: '🇪🇬' },
-  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'fr', name: 'French', flag: '🇫🇷' },
-  { code: 'de', name: 'German', flag: '🇩🇪' },
-  { code: 'it', name: 'Italian', flag: '🇮🇹' },
-  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
-  { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
-  { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
+  { code: 'en', name: 'English' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
 ]
 
 interface Placeholder {
@@ -473,16 +474,16 @@ export default function TemplatesPage() {
     switch (channel) {
       case 'email': return 'bg-blue-100 text-blue-700'
       case 'whatsapp': return 'bg-green-100 text-green-700'
-      case 'sms': return 'bg-orange-100 text-orange-700'
-      case 'both': return 'bg-purple-100 text-purple-700'
+      case 'sms': return 'bg-amber-100 text-amber-700'
+      case 'both': return 'bg-primary-100 text-primary-700'
       default: return 'bg-gray-100 text-gray-700'
     }
   }
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'customer': return 'bg-emerald-100 text-emerald-700'
-      case 'supplier': return 'bg-cyan-100 text-cyan-700'
+      case 'customer': return 'bg-primary-100 text-primary-700'
+      case 'supplier': return 'bg-primary-100 text-primary-700'
       case 'partner': return 'bg-amber-100 text-amber-700'
       case 'internal': return 'bg-slate-100 text-slate-700'
       default: return 'bg-gray-100 text-gray-700'
@@ -496,7 +497,7 @@ export default function TemplatesPage() {
   if (loading) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
       </div>
     )
   }
@@ -514,7 +515,7 @@ export default function TemplatesPage() {
             onClick={() => setShowAnalytics(!showAnalytics)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
               showAnalytics
-                ? 'bg-purple-50 border-purple-200 text-purple-700'
+                ? 'bg-primary-50 border-primary-200 text-primary-700'
                 : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
@@ -548,7 +549,7 @@ export default function TemplatesPage() {
               })
               setShowCreateModal(true)
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Template
@@ -561,7 +562,7 @@ export default function TemplatesPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-purple-600" />
+              <BarChart3 className="w-5 h-5 text-primary-600" />
               Template Analytics
             </h2>
             <span className="text-xs text-gray-500">Last 30 days</span>
@@ -641,19 +642,19 @@ export default function TemplatesPage() {
                   </div>
                   <span className="text-sm font-medium text-green-700">{analytics.channelDistribution.whatsapp}</span>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
+                <div className="flex items-center justify-between p-2 bg-amber-50 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-orange-600" />
+                    <MessageSquare className="w-4 h-4 text-amber-600" />
                     <span className="text-sm text-gray-700">SMS</span>
                   </div>
-                  <span className="text-sm font-medium text-orange-700">{analytics.channelDistribution.sms}</span>
+                  <span className="text-sm font-medium text-amber-700">{analytics.channelDistribution.sms}</span>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                <div className="flex items-center justify-between p-2 bg-primary-50 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    <Sparkles className="w-4 h-4 text-primary-600" />
                     <span className="text-sm text-gray-700">All Channels</span>
                   </div>
-                  <span className="text-sm font-medium text-purple-700">{analytics.channelDistribution.both}</span>
+                  <span className="text-sm font-medium text-primary-700">{analytics.channelDistribution.both}</span>
                 </div>
               </div>
             </div>
@@ -671,7 +672,7 @@ export default function TemplatesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search templates..."
-              className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+              className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -731,7 +732,7 @@ export default function TemplatesPage() {
                 type="button"
                 onClick={loadStarterTemplates}
                 disabled={loadingStarter}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
               >
                 {loadingStarter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 Load starter templates
@@ -758,11 +759,11 @@ export default function TemplatesPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   {template.language && (
-                    <span className="text-sm" title={LANGUAGES.find(l => l.code === template.language)?.name || template.language}>
-                      {LANGUAGES.find(l => l.code === template.language)?.flag || template.language}
+                    <span className="text-xs font-medium text-gray-500 uppercase" title={LANGUAGES.find(l => l.code === template.language)?.name || template.language}>
+                      {template.language}
                     </span>
                   )}
-                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${getChannelColor(template.channel)}`}>
+                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${getChannelColor(template.channel)}`}>
                     {getChannelIcon(template.channel)}
                   </span>
                 </div>
@@ -775,14 +776,14 @@ export default function TemplatesPage() {
 
               {/* Tags */}
               <div className="flex items-center gap-1.5 mb-2">
-                <span className={`px-1.5 py-0.5 rounded text-[10px] ${getCategoryColor(template.category)}`}>
+                <span className={`px-1.5 py-0.5 rounded text-xs ${getCategoryColor(template.category)}`}>
                   {template.category}
                 </span>
-                <span className="text-[10px] text-gray-400 uppercase">
+                <span className="text-xs text-gray-400 uppercase">
                   {SUBCATEGORY_LABELS[template.subcategory] || template.subcategory}
                 </span>
                 {template.version && template.version > 1 && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600" title={`Version ${template.version}`}>
+                  <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600" title={`Version ${template.version}`}>
                     v{template.version}
                   </span>
                 )}
@@ -810,7 +811,7 @@ export default function TemplatesPage() {
                 </button>
                 <button
                   onClick={() => handleSend(template)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-[#647C47] hover:bg-[#4f6339] rounded transition-colors ml-auto"
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-primary-500 hover:bg-[#4f6339] rounded transition-colors ml-auto"
                 >
                   <Send className="w-3 h-3" />
                   Send
@@ -886,7 +887,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     required
                   />
                 </div>
@@ -895,7 +896,7 @@ export default function TemplatesPage() {
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="customer">Customer (B2C Travelers)</option>
                     <option value="supplier">Supplier (Hotels, Cruises, Guides)</option>
@@ -911,7 +912,7 @@ export default function TemplatesPage() {
                   <select
                     value={formData.channel}
                     onChange={(e) => setFormData({ ...formData, channel: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="email">Email</option>
                     <option value="whatsapp">WhatsApp</option>
@@ -925,7 +926,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.subcategory}
                     onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="e.g., quotation, voucher"
                   />
                 </div>
@@ -938,7 +939,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="Brief description of when to use this template"
                   />
                 </div>
@@ -948,11 +949,11 @@ export default function TemplatesPage() {
                     value={formData.language}
                     onChange={(e) => setFormData({ ...formData, language: e.target.value })}
                     title="Template language"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     {LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
-                        {lang.flag} {lang.name}
+                        {lang.name}
                       </option>
                     ))}
                   </select>
@@ -969,7 +970,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="Email subject line with {{placeholders}}"
                   />
                 </div>
@@ -1005,7 +1006,7 @@ export default function TemplatesPage() {
                     <textarea
                       value={formData.body}
                       onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] font-mono text-sm"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
                       rows={12}
                       placeholder="Template content with {{placeholders}}"
                       required
@@ -1066,7 +1067,7 @@ export default function TemplatesPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {selectedTemplate ? 'Update Template' : 'Create Template'}
@@ -1141,7 +1142,7 @@ export default function TemplatesPage() {
                   setShowPreviewModal(false)
                   handleSend(selectedTemplate)
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors"
               >
                 <Send className="w-4 h-4" />
                 Send This Template
@@ -1264,7 +1265,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
 
   // Get language info helper
   const getLanguageInfo = (code: string) => {
-    return LANGUAGES.find(l => l.code === code) || { code, name: code, flag: '🌐' }
+    return LANGUAGES.find(l => l.code === code) || { code, name: code }
   }
 
   const getRecipientLabel = () => {
@@ -1697,7 +1698,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                     setIsBulkMode(false) // Can't bulk schedule yet
                   }
                 }}
-                className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
               />
               <span className="text-sm text-gray-600">Schedule</span>
             </label>
@@ -1715,7 +1716,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                     setBulkProgress(null)
                   }
                 }}
-                className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
               />
               <span className="text-sm text-gray-600">Bulk</span>
             </label>
@@ -1744,11 +1745,11 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                           onClick={() => handleLanguageChange(variant.id)}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                             isActive
-                              ? 'border-[#647C47] bg-[#647C47]/10 text-[#647C47] font-medium'
+                              ? 'border-primary-500 bg-primary-500/10 text-primary-500 font-medium'
                               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                           }`}
                         >
-                          <span className="text-lg">{langInfo.flag}</span>
+                          <Languages className="w-4 h-4" />
                           <span className="text-sm">{langInfo.name}</span>
                         </button>
                       )
@@ -1784,7 +1785,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                       onClick={() => setChannel('sms')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                         channel === 'sms'
-                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          ? 'border-amber-500 bg-amber-50 text-amber-700'
                           : 'border-gray-200 text-gray-600'
                       }`}
                     >
@@ -1828,7 +1829,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                           type="checkbox"
                           checked={selectedRecipients.length === recipients.length && recipients.length > 0}
                           onChange={toggleSelectAll}
-                          className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                          className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
                         />
                         <span className="text-sm font-medium text-gray-700">Select All</span>
                       </label>
@@ -1848,7 +1849,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                             checked={isSelected}
                             onChange={() => toggleRecipientSelection(recipient)}
                             disabled={!hasContact}
-                            className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                            className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{recipient.name}</p>
@@ -1869,7 +1870,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                       setSelectedRecipient(recipient || null)
                     }}
                     title={getRecipientLabel()}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="">-- {getRecipientLabel()} --</option>
                     {recipients.map((recipient) => (
@@ -1925,7 +1926,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                         value={filledValues[ph] || ''}
                         onChange={(e) => setFilledValues({ ...filledValues, [ph]: e.target.value })}
                         placeholder={info?.example_value || ph}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       />
                     </div>
                   )
@@ -1939,7 +1940,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 <label className="block text-sm font-medium text-gray-700">Preview</label>
                 {languageVariants.length > 1 && (
                   <span className="text-xs text-gray-500 flex items-center gap-1">
-                    {getLanguageInfo(activeTemplate.language || 'en').flag} {getLanguageInfo(activeTemplate.language || 'en').name}
+                    <Languages className="w-3 h-3" />{getLanguageInfo(activeTemplate.language || 'en').name}
                   </span>
                 )}
               </div>
@@ -1969,7 +1970,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 <div className="flex items-center gap-3">
                   <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#647C47] transition-all"
+                      className="h-full bg-primary-500 transition-all"
                       style={{ width: `${((bulkProgress.sent + bulkProgress.failed) / bulkProgress.total) * 100}%` }}
                     />
                   </div>
@@ -2006,7 +2007,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 type="button"
                 onClick={handleBulkSend}
                 disabled={sending || selectedRecipients.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send to {selectedRecipients.length} Recipients
@@ -2016,7 +2017,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 type="button"
                 onClick={handleScheduleSend}
                 disabled={sending || !selectedRecipient || !scheduledFor}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Schedule Send
@@ -2026,7 +2027,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 type="button"
                 onClick={handleSend}
                 disabled={sending || !selectedRecipient}
-                className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send {channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : 'Email'}

@@ -113,8 +113,8 @@ export default function ItineraryMap({ days, defaultExpanded = false, height = 4
       <button onClick={() => setExpanded(v => !v)}
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-[#E8EDE0] flex items-center justify-center">
-            <MapIcon className="w-4 h-4 text-[#647C47]" />
+          <div className="w-7 h-7 rounded-md bg-primary-100 flex items-center justify-center">
+            <MapIcon className="w-4 h-4 text-primary-500" />
           </div>
           <span className="text-sm font-semibold text-gray-900">Route Map</span>
           <span className="text-xs text-gray-500">{stops.length} stop{stops.length !== 1 ? 's' : ''}</span>

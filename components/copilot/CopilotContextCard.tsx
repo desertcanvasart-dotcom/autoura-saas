@@ -81,7 +81,7 @@ export default function CopilotContextCard({ context }: { context: CopilotContex
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 text-gray-400 uppercase tracking-wide text-[10px] font-semibold mb-1">
+      <div className="flex items-center gap-1.5 text-gray-400 uppercase tracking-wide text-xs font-semibold mb-1">
         {icon}{title}
       </div>
       <div className="space-y-1">{children}</div>

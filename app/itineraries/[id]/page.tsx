@@ -11,7 +11,7 @@ import ComposeEmailModal from '@/components/unified/ComposeEmailModal'
 import { useCallback, useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList, Copy, XCircle, RotateCcw } from 'lucide-react'
+import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList, Copy, XCircle, RotateCcw, Hotel, Car, UserRound, Ticket, UtensilsCrossed, Drama, Briefcase, Banknote, Droplets, Smartphone, Mail, Moon, type LucideIcon } from 'lucide-react'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import { generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
@@ -433,7 +433,7 @@ export default function ViewItineraryPage() {
       const result = await response.json()
       
       if (result.success) {
-        setCommissionResult(`✅ ${result.message}`)
+        setCommissionResult(result.message)
         setTimeout(() => setCommissionResult(null), 5000)
         // The Finance tab's list and the P&L read them: refresh both.
         setExpenseRefreshTrigger(t => t + 1)
@@ -671,7 +671,7 @@ export default function ViewItineraryPage() {
       }
   
       markAsSent('WhatsApp')
-      setSendSuccess('Quote sent via WhatsApp! ✅')
+      setSendSuccess('Quote sent via WhatsApp!')
       setTimeout(() => setSendSuccess(null), 5000)
     } catch (error: any) {
       console.error('WhatsApp send error:', error)
@@ -723,7 +723,7 @@ export default function ViewItineraryPage() {
       const data = await response.json()
 
       if (data.success) {
-        setSendSuccess('Email sent successfully! ✅')
+        setSendSuccess('Email sent successfully!')
         markAsSent('Email')
         setTimeout(() => setSendSuccess(null), 5000)
       } else {
@@ -793,7 +793,7 @@ export default function ViewItineraryPage() {
       draft: 'bg-gray-50 text-gray-600 border-gray-200',
       sent: 'bg-primary-50 text-primary-600 border-primary-200',
       confirmed: 'bg-green-50 text-green-600 border-green-200',
-      completed: 'bg-purple-50 text-purple-600 border-purple-200',
+      completed: 'bg-gray-100 text-gray-700 border-gray-200',
       cancelled: 'bg-red-50 text-red-600 border-red-200'
     }
     return styles[status as keyof typeof styles] || styles.draft
@@ -803,18 +803,19 @@ export default function ViewItineraryPage() {
   const dayTotal = (day: DayWithServices) => day.services.reduce((n, sv) => n + (Number(sv.total_cost) || 0), 0)
 
   const getServiceIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      accommodation: '🏨',
-      transportation: '🚗',
-      guide: '👨‍🏫',
-      entrance: '🎫',
-      meal: '🍽️',
-      activity: '🎭',
-      service_fee: '💼',
-      tips: '💰',
-      supplies: '💧'
+    const icons: Record<string, LucideIcon> = {
+      accommodation: Hotel,
+      transportation: Car,
+      guide: UserRound,
+      entrance: Ticket,
+      meal: UtensilsCrossed,
+      activity: Drama,
+      service_fee: Briefcase,
+      tips: Banknote,
+      supplies: Droplets
     }
-    return icons[type] || '📋'
+    const Icon = icons[type] || ClipboardList
+    return <Icon className="w-4 h-4 text-gray-500" />
   }
 
   if (loading) {
@@ -833,7 +834,7 @@ export default function ViewItineraryPage() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
           <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
-            <span className="text-red-500 text-xl">⚠️</span>
+            <AlertTriangle className="w-5 h-5 text-red-600" />
           </div>
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Itinerary</h2>
           <p className="text-sm text-red-600 mb-4">{error}</p>
@@ -987,7 +988,7 @@ export default function ViewItineraryPage() {
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </Link>
               <div className="min-w-0">
-                <h1 className="text-xl font-semibold text-gray-900 truncate" title={itinerary.trip_name}>{itinerary.trip_name}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900 truncate" title={itinerary.trip_name}>{itinerary.trip_name}</h1>
                 <p className="text-sm text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-primary-600">{itinerary.itinerary_code}</span>
                   <span>•</span>
@@ -1006,7 +1007,7 @@ export default function ViewItineraryPage() {
                   {itinerary.tier && (
                     <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
                       itinerary.tier === 'luxury' ? 'bg-amber-100 text-amber-700' :
-                      itinerary.tier === 'deluxe' ? 'bg-purple-100 text-purple-700' :
+                      itinerary.tier === 'deluxe' ? 'bg-primary-100 text-primary-700' :
                       itinerary.tier === 'standard' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-700'
                     }`}>
@@ -1140,7 +1141,7 @@ export default function ViewItineraryPage() {
           onClose={() => setShowPickup(false)}
           onSent={how => {
             setShowPickup(false)
-            showToast('success', how === 'agency' ? 'Pickup details sent ✅' : 'Pickup details saved — finish sending in WhatsApp')
+            showToast('success', how === 'agency' ? 'Pickup details sent' : 'Pickup details saved — finish sending in WhatsApp')
             fetchItinerary()
           }}
         />
@@ -1194,8 +1195,8 @@ export default function ViewItineraryPage() {
 
       {commissionResult && (
         <div className="container mx-auto px-4 pt-3">
-          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-md">
-            <p className="text-sm text-emerald-700 font-medium">{commissionResult}</p>
+          <div className="bg-primary-50 border border-primary-200 p-3 rounded-md">
+            <p className="text-sm text-primary-700 font-medium">{commissionResult}</p>
           </div>
         </div>
       )}
@@ -1215,11 +1216,11 @@ export default function ViewItineraryPage() {
                 disabled={!itinerary.client_phone}
                 className={`w-full py-3 rounded-md font-medium flex items-center justify-center gap-2 transition-all text-sm ${
                   itinerary.client_phone
-                    ? 'bg-green-500 text-white hover:bg-green-600'
+                    ? 'bg-primary-600 text-white hover:bg-primary-700'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                <span className="text-lg">📱</span>
+                <Smartphone className="w-5 h-5" />
                 <div className="text-left">
                   <div>Send via WhatsApp</div>
                   {itinerary.client_phone && (
@@ -1244,7 +1245,7 @@ export default function ViewItineraryPage() {
                   </>
                 ) : (
                   <>
-                    <span className="text-lg">📧</span>
+                    <Mail className="w-5 h-5" />
                     <div className="text-left">
                       <div>Send via Email</div>
                       {itinerary.client_email && (
@@ -1470,14 +1471,14 @@ export default function ViewItineraryPage() {
                               <tr key={service.id} className={stale ? 'bg-amber-50' : ''}>
                                 <td className="py-2 pr-2 align-top">
                                   <div className="flex items-start gap-1.5">
-                                    <span className="text-base leading-5">{getServiceIcon(service.service_type)}</span>
+                                    <span className="leading-5 pt-0.5">{getServiceIcon(service.service_type)}</span>
                                     <div className="min-w-0">
                                       <p className="font-medium text-gray-900">{serviceLabel(service.service_name)}</p>
                                       <p className="text-xs text-gray-500 sm:hidden">{serviceTypeLabel(service.service_type)}</p>
                                       {service.notes && <p className="text-xs text-gray-600 mt-0.5">{service.notes}</p>}
                                       {stale && (
                                         <p className="mt-1 inline-block text-xs text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5" data-testid="overnight-stale">
-                                          ⚠ {rate === 'switched_off'
+                                          <AlertTriangle className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />{rate === 'switched_off'
                                             ? 'Switched off in your rates — this night can no longer be re-priced or booked from it. Switch it back on in Rates, or choose another.'
                                             : 'No longer in your rates — it was removed after this itinerary was priced. Check the night before confirming it.'}
                                         </p>
@@ -1524,7 +1525,7 @@ export default function ViewItineraryPage() {
                     const stay = overnightLabel(property, day.overnight_city)
                     return stay ? (
                       <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-xs text-gray-600">🌙 Overnight in <span className="font-medium">{stay}</span></p>
+                        <p className="text-xs text-gray-600"><Moon className="inline w-3.5 h-3.5 -mt-0.5 mr-1 text-gray-500" />Overnight in <span className="font-medium">{stay}</span></p>
                       </div>
                     ) : null
                   })()}
@@ -1636,9 +1637,9 @@ export default function ViewItineraryPage() {
             <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">Add the client&apos;s phone number (Edit itinerary) to send WhatsApp messages.</p>
           ) : (
             <div className="mt-3 flex flex-wrap items-start gap-2">
-              {itinerary.status === 'draft' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="confirmed" onSuccess={() => { setSendSuccess('Booking confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />}
-              {itinerary.status !== 'completed' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="pending_payment" onSuccess={() => { setSendSuccess('Payment reminder sent! ✅'); setTimeout(() => setSendSuccess(null), 5000) }} />}
-              <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="paid" onSuccess={() => { setSendSuccess('Payment confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />
+              {itinerary.status === 'draft' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="confirmed" onSuccess={() => { setSendSuccess('Booking confirmation sent!'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />}
+              {itinerary.status !== 'completed' && <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="pending_payment" onSuccess={() => { setSendSuccess('Payment reminder sent!'); setTimeout(() => setSendSuccess(null), 5000) }} />}
+              <WhatsAppButton variant="quiet" itineraryId={itinerary.id} type="status" status="paid" onSuccess={() => { setSendSuccess('Payment confirmation sent!'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} />
               {days.length > 0 && itinerary.status !== 'cancelled' && (
                 <button type="button" onClick={() => setShowPickup(true)} className="px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium flex items-center gap-1.5">
                   <Send className="w-4 h-4" /> Pickup details
@@ -1667,11 +1668,11 @@ function ResourceChips({ items }: { items: DayResource[] }) {
     <span className="mt-1 flex flex-wrap gap-1">
       {items.map(r =>
         r.state === 'assigned' ? (
-          <span key={r.type} className="inline-flex max-w-[14rem] items-center rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[11px] text-green-800" title={`${r.label}: ${r.names.join(', ')}`}>
+          <span key={r.type} className="inline-flex max-w-[14rem] items-center rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs text-green-800" title={`${r.label}: ${r.names.join(', ')}`}>
             <span className="truncate">{r.label}: {r.names.join(', ')}</span>
           </span>
         ) : (
-          <span key={r.type} className="inline-flex items-center rounded border border-dashed border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800" title={`No ${r.label.toLowerCase()} assigned for this day`}>
+          <span key={r.type} className="inline-flex items-center rounded border border-dashed border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800" title={`No ${r.label.toLowerCase()} assigned for this day`}>
             {r.label} needed
           </span>
         ),

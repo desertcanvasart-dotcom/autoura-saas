@@ -64,7 +64,7 @@ export default function RequestOnWhatsApp({
     return (
       <span className="inline-flex items-center gap-1.5 text-xs">
         <span className="text-gray-600">Did you send it?</span>
-        <button type="button" disabled={busy} onClick={confirm} className="px-2 py-0.5 rounded bg-green-600 text-white font-medium disabled:opacity-50">Yes</button>
+        <button type="button" disabled={busy} onClick={confirm} className="px-2 py-0.5 rounded bg-primary-600 text-white font-medium disabled:opacity-50">Yes</button>
         <button type="button" disabled={busy} onClick={() => setAsking(false)} className="px-2 py-0.5 rounded border border-gray-300 text-gray-700">No</button>
         {link && (
           <button type="button" onClick={() => { void navigator.clipboard?.writeText(link); notify('info', 'Reply link copied') }} className="text-blue-700 hover:underline">Copy link</button>

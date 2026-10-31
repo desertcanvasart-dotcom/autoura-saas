@@ -43,7 +43,7 @@ function CategoryChooser({ label, primary }: { label: string; primary?: boolean 
           <p className="px-4 pb-1 text-xs text-gray-500">Which rate sheet?</p>
           {RATE_GROUPS.map(g => (
             <div key={g.key} className="pt-1">
-              <p className="px-4 pt-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{g.title}</p>
+              <p className="px-4 pt-1 text-xs font-semibold uppercase tracking-wider text-gray-400">{g.title}</p>
               {g.categories.map(c => (
                 <Link key={c.slug} role="menuitem" href={rateCategoryHref(c.slug)} className="block px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
                   {c.label}
@@ -86,7 +86,7 @@ export default function RatesOverviewPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <p className="text-sm text-gray-500">Expiring in 30 days</p>
-          <p className={`mt-1 text-2xl font-semibold tabular-nums ${expiring ? 'text-orange-700' : 'text-gray-900'}`}>{show(expiring)}</p>
+          <p className={`mt-1 text-2xl font-semibold tabular-nums ${expiring ? 'text-amber-700' : 'text-gray-900'}`}>{show(expiring)}</p>
         </div>
         <Link href="/rates/check" className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300">
           <p className="text-sm text-gray-500">Flagged by Rates check</p>
@@ -107,7 +107,7 @@ export default function RatesOverviewPage() {
                       <span className="text-[15px] text-gray-900">{c.label}</span>
                       <span className="text-xs text-gray-500 text-right">
                         {!s ? '…' : s.count === 0 ? 'No rates yet' : `${s.count.toLocaleString()} ${s.count === 1 ? 'rate' : 'rates'} · updated ${formatDate(s.updatedAt)}`}
-                        {s && s.expiring > 0 && <span className="block text-orange-700">{s.expiring} expiring soon</span>}
+                        {s && s.expiring > 0 && <span className="block text-amber-700">{s.expiring} expiring soon</span>}
                       </span>
                     </Link>
                   </li>

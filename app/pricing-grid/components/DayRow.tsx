@@ -366,16 +366,16 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
           {!day.isExpanded && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1">
               {chosen.length === 0 ? (
-                <span className="text-[11px] text-gray-400 italic">No services yet</span>
+                <span className="text-xs text-gray-400 italic">No services yet</span>
               ) : (
                 <>
                   {chosen.slice(0, 6).map((name, i) => (
-                    <span key={i} className="max-w-[220px] truncate px-1.5 py-0.5 text-[11px] bg-gray-100 text-gray-600 rounded">
+                    <span key={i} className="max-w-[220px] truncate px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
                       {name}
                     </span>
                   ))}
                   {chosen.length > 6 && (
-                    <span className="text-[11px] text-gray-400">+{chosen.length - 6} more</span>
+                    <span className="text-xs text-gray-400">+{chosen.length - 6} more</span>
                   )}
                 </>
               )}
@@ -388,7 +388,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
           <div className={`text-sm font-bold ${calc.dailyPerPerson > 0 ? 'text-gray-900' : 'text-gray-300'}`}>
             {sym}{cv(calc.dailyPerPerson).toFixed(2)}/pp
           </div>
-          <div className="text-[11px] text-gray-400">
+          <div className="text-xs text-gray-400">
             {sym}{cv(calc.dailyTotal).toFixed(2)} total
           </div>
         </div>
@@ -494,7 +494,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 placeholder="Day description / activities..."
               />
               <div className="flex items-center justify-between gap-2 mt-0.5 px-1">
-                <span className="text-[10px] text-gray-400 truncate">
+                <span className="text-xs text-gray-400 truncate">
                   {writtenFrom && (writtenFrom.length > 0
                     ? <>From your library: {writtenFrom.map(s => `${s.name}${s.otherTier ? ` (${s.tier} text)` : ''}`).join(' · ')}</>
                     : 'Nothing for this day in your library — written from the day’s services')}
@@ -502,7 +502,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                 {onRewriteDescription && (
                   <button type="button" onClick={onRewriteDescription} disabled={rewriting}
                     title="Write this day from your Content Library and Writing Rules"
-                    className="shrink-0 text-[10px] text-[#556B2F] hover:underline disabled:opacity-50">
+                    className="shrink-0 text-xs text-[#556B2F] hover:underline disabled:opacity-50">
                     {rewriting ? 'Writing…' : day.description.trim() ? 'Rewrite from library' : 'Write from library'}
                   </button>
                 )}
@@ -511,13 +511,13 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
           )}
 
           {/* Day Type + Component Overrides (rich gate inputs) */}
-          <div className="px-4 py-2 bg-indigo-50/40 border-b border-indigo-100/40">
+          <div className="px-4 py-2 bg-primary-50/40 border-b border-primary-100/40">
             <div className="flex items-center gap-3 flex-wrap">
-              <label className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">Day Type</label>
+              <label className="text-xs font-semibold text-primary-700 uppercase tracking-wider">Day Type</label>
               <select
                 value={activeDayType}
                 onChange={(e) => onUpdateDay({ dayType: e.target.value as DayType })}
-                className="text-[11px] border border-indigo-200 bg-white rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                className="text-xs border border-primary-200 bg-white rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-400"
               >
                 {DAY_TYPES.map(t => (
                   <option key={t} value={t}>{DAY_TYPE_LABELS[t]}</option>
@@ -526,17 +526,17 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
               <button
                 type="button"
                 onClick={() => setShowDayTypeOverrides(s => !s)}
-                className="text-[10px] text-indigo-600 hover:text-indigo-800 underline-offset-2 hover:underline"
+                className="text-xs text-primary-600 hover:text-primary-800 underline-offset-2 hover:underline"
               >
                 {showDayTypeOverrides ? 'hide overrides' : 'override components'}
               </button>
-              <span className="text-[10px] text-indigo-500/80 ml-auto">
+              <span className="text-xs text-primary-500/80 ml-auto">
                 What happens on this day — saved with the itinerary.
               </span>
             </div>
 
             {showDayTypeOverrides && (
-              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 text-[11px]">
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
                 {([
                   ['overnight', 'Overnight'],
                   ['hasSightseeing', 'Sightseeing'],
@@ -553,14 +553,14 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                         type="checkbox"
                         checked={eff}
                         onChange={(e) => onUpdateDay({ [key]: e.target.checked } as Partial<GridDay>)}
-                        className="h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-400"
+                        className="h-3 w-3 rounded border-gray-300 text-primary-600 focus:ring-primary-400"
                       />
-                      <span className={isOverridden ? 'font-semibold text-indigo-700' : ''}>{label}</span>
+                      <span className={isOverridden ? 'font-semibold text-primary-700' : ''}>{label}</span>
                       {isOverridden && (
                         <button
                           type="button"
                           onClick={(e) => { e.preventDefault(); onUpdateDay({ [key]: undefined } as Partial<GridDay>) }}
-                          className="text-[9px] text-indigo-400 hover:text-indigo-700"
+                          className="text-xs text-primary-400 hover:text-primary-700"
                           title="Clear override (use the preset's default)"
                         >
                           ⨯
@@ -574,7 +574,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                   <select
                     value={effectiveIntercity}
                     onChange={(e) => onUpdateDay({ intercity: e.target.value as Intercity })}
-                    className="text-[11px] border border-gray-200 rounded px-2 py-0.5"
+                    className="text-xs border border-gray-200 rounded px-2 py-0.5"
                   >
                     <option value="none">none</option>
                     <option value="road">road</option>
@@ -584,7 +584,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); onUpdateDay({ intercity: undefined } as Partial<GridDay>) }}
-                      className="text-[9px] text-indigo-400 hover:text-indigo-700"
+                      className="text-xs text-primary-400 hover:text-primary-700"
                       title="Clear override"
                     >
                       reset
@@ -598,28 +598,28 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
           {/* GROUP SERVICES */}
           <div className="border-b border-gray-100">
             <div className="px-4 py-1.5 bg-amber-50/70 border-b border-amber-100/50 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Group Services</span>
-              <span className="text-[11px] text-amber-600 font-medium">
+              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Group Services</span>
+              <span className="text-xs text-amber-600 font-medium">
                 {sym}{cv(calc.groupTotal).toFixed(2)} ÷ {config.pax} pax = <strong>{sym}{cv(calc.groupPerPerson).toFixed(2)}/pp</strong>
               </span>
             </div>
             {GROUP_SLOTS.filter(shown).map(def => renderSlot(def))}
             {!GROUP_SLOTS.some(shown) && (
-              <div className="px-4 py-2 text-[11px] text-gray-400 italic">No group services</div>
+              <div className="px-4 py-2 text-xs text-gray-400 italic">No group services</div>
             )}
           </div>
 
           {/* PER-PERSON SERVICES */}
           <div>
-            <div className="px-4 py-1.5 bg-emerald-50/70 border-b border-emerald-100/50 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Per-Person Services</span>
-              <span className="text-[11px] text-emerald-600 font-medium">
+            <div className="px-4 py-1.5 bg-primary-50/70 border-b border-primary-100/50 flex items-center justify-between">
+              <span className="text-xs font-bold text-primary-700 uppercase tracking-wider">Per-Person Services</span>
+              <span className="text-xs text-primary-600 font-medium">
                 <strong>{sym}{cv(calc.perPersonTotal).toFixed(2)}/pp</strong>
               </span>
             </div>
             {PP_SLOTS.filter(shown).map(def => renderSlot(def))}
             {!PP_SLOTS.some(shown) && (
-              <div className="px-4 py-2 text-[11px] text-gray-400 italic">No per-person services</div>
+              <div className="px-4 py-2 text-xs text-gray-400 italic">No per-person services</div>
             )}
           </div>
 
@@ -627,13 +627,13 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
           <div className="px-4 py-2 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
             {addable.length > 0 && (
               <>
-                <span className="text-[11px] font-medium text-gray-500 mr-1">Add service:</span>
+                <span className="text-xs font-medium text-gray-500 mr-1">Add service:</span>
                 {addable.map(def => (
                   <button
                     key={def.slotId}
                     type="button"
                     onClick={() => setRevealed(prev => new Set(prev).add(def.slotId))}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-gray-600 bg-white border border-gray-200 rounded-full hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-gray-600 bg-white border border-gray-200 rounded-full hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50"
                   >
                     <Plus className="w-3 h-3" />
                     {def.label}
@@ -644,7 +644,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
             <button
               type="button"
               onClick={() => { setShowEmpty(v => !v); setRevealed(new Set()) }}
-              className="ml-auto text-[11px] text-gray-400 hover:text-gray-700 underline-offset-2 hover:underline"
+              className="ml-auto text-xs text-gray-400 hover:text-gray-700 underline-offset-2 hover:underline"
             >
               {showEmpty ? 'Hide empty services' : 'Show all services'}
             </button>
@@ -652,7 +652,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
           {/* DAY TOTAL */}
           <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Day {day.dayNumber} Total</span>
+            <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Day {day.dayNumber} Total</span>
             <div className="text-right flex items-center gap-4">
               <span className="text-xs text-gray-400">× {config.pax} pax = {sym}{cv(calc.dailyTotal).toFixed(2)}</span>
               <span className="text-sm font-bold text-gray-900">{sym}{cv(calc.dailyPerPerson).toFixed(2)}/pp</span>

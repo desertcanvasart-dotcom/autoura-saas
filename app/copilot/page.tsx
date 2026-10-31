@@ -68,11 +68,11 @@ export default function CopilotPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-            <ConciergeBell className="h-5 w-5 text-[#647C47]" />
+          <div className="w-9 h-9 bg-primary-500/10 rounded-lg flex items-center justify-center">
+            <ConciergeBell className="h-5 w-5 text-primary-500" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">Copilot</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Copilot</h1>
             <p className="text-xs text-gray-500">Review and send AI-drafted replies</p>
           </div>
         </div>
@@ -82,7 +82,7 @@ export default function CopilotPage() {
             <select
               value={tone}
               onChange={e => changeTone(e.target.value as CopilotTone)}
-              className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+              className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               {TONES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>

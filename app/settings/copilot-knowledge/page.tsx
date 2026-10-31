@@ -21,7 +21,7 @@ const TYPE_META: Record<SourceType, { label: string; icon: React.ComponentType<{
   kb_faq:    { label: 'FAQ',          icon: HelpCircle, color: 'text-blue-600 bg-blue-50 border-blue-200',       hint: 'Question + answer pairs the copilot should know.' },
   kb_policy: { label: 'Policy',       icon: FileText,   color: 'text-red-600 bg-red-50 border-red-200',           hint: 'Cancellation, refunds, terms — authoritative rules.' },
   kb_tour:   { label: 'Tour',         icon: MapPin,     color: 'text-green-600 bg-green-50 border-green-200',     hint: 'Tour descriptions, itineraries, what\'s included.' },
-  kb_custom: { label: 'Other',        icon: BookOpen,   color: 'text-purple-600 bg-purple-50 border-purple-200',  hint: 'Anything else the copilot should draw on.' },
+  kb_custom: { label: 'Other',        icon: BookOpen,   color: 'text-primary-600 bg-primary-50 border-primary-200',  hint: 'Anything else the copilot should draw on.' },
 }
 
 type Tone = 'professional' | 'friendly' | 'formal'
@@ -87,14 +87,14 @@ export default function CopilotKnowledgePage() {
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => setShowBulk(true)}
-            className="flex items-center gap-2 border border-purple-200 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-50 text-sm"
+            className="flex items-center gap-2 border border-primary-200 text-primary-700 px-3 py-2 rounded-lg hover:bg-primary-50 text-sm"
           >
             <Upload className="w-4 h-4" />
             Bulk import
           </button>
           <button
             onClick={() => setShowNew(true)}
-            className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 text-sm"
           >
             <Plus className="w-4 h-4" />
             Add entry
@@ -103,7 +103,7 @@ export default function CopilotKnowledgePage() {
       </div>
 
       {/* Tone preference card */}
-      <div className="mb-6 border border-purple-100 bg-purple-50/40 rounded-lg p-4">
+      <div className="mb-6 border border-primary-100 bg-primary-50/40 rounded-lg p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="text-sm font-medium text-gray-800 mb-1">Your copilot tone</h3>
@@ -119,8 +119,8 @@ export default function CopilotKnowledgePage() {
                 disabled={toneSaving}
                 className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border ${
                   tone === t
-                    ? 'bg-purple-600 text-white border-purple-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300'
                 }`}
               >
                 {tone === t && <Check className="w-3 h-3" />}
@@ -154,7 +154,7 @@ export default function CopilotKnowledgePage() {
         <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
           <BookOpen className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-500 mb-3">No entries yet. Start by adding an FAQ or policy.</p>
-          <button onClick={() => setShowNew(true)} className="text-sm text-purple-600 hover:underline">
+          <button onClick={() => setShowNew(true)} className="text-sm text-primary-600 hover:underline">
             Add your first entry
           </button>
         </div>
@@ -194,7 +194,7 @@ function FilterPill({ active, onClick, label }: { active: boolean; onClick: () =
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1 rounded-full text-xs ${active ? 'bg-purple-600 text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'}`}
+      className={`px-3 py-1 rounded-full text-xs ${active ? 'bg-primary-600 text-white' : 'text-gray-600 bg-gray-100 hover:bg-primary-700'}`}
     >
       {label}
     </button>
@@ -209,13 +209,13 @@ function EntryCard({ entry, onEdit, onDelete, onToggle }: { entry: Entry; onEdit
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded border ${meta.color}`}>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border ${meta.color}`}>
               <Icon className="w-3 h-3" />
               {meta.label}
             </span>
-            {!entry.is_active && <span className="text-[11px] text-gray-400">disabled</span>}
+            {!entry.is_active && <span className="text-xs text-gray-400">disabled</span>}
             {(entry.metadata?.total_chunks || 1) > 1 && (
-              <span className="text-[11px] text-gray-400">{entry.metadata.total_chunks} chunks</span>
+              <span className="text-xs text-gray-400">{entry.metadata.total_chunks} chunks</span>
             )}
           </div>
           {entry.title && <h3 className="font-medium text-gray-900 text-sm mb-1">{entry.title}</h3>}
@@ -225,7 +225,7 @@ function EntryCard({ entry, onEdit, onDelete, onToggle }: { entry: Entry; onEdit
           <p className="text-sm text-gray-600 line-clamp-2">{entry.answer_text}</p>
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">
-          <button onClick={onToggle} className="p-1.5 text-gray-400 hover:text-purple-600 rounded" title={entry.is_active ? 'Disable' : 'Enable'}>
+          <button onClick={onToggle} className="p-1.5 text-gray-400 hover:text-primary-600 rounded" title={entry.is_active ? 'Disable' : 'Enable'}>
             <Power className="w-4 h-4" />
           </button>
           <button onClick={onEdit} className="p-1.5 text-gray-400 hover:text-blue-600 rounded" title="Edit">
@@ -282,7 +282,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Upload className="w-4 h-4 text-purple-600" />
+            <Upload className="w-4 h-4 text-primary-600" />
             Bulk import knowledge
           </h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
@@ -298,22 +298,22 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setMode('ai_extract')}
-                    className={`text-left p-3 rounded-lg border text-sm ${mode === 'ai_extract' ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-200' : 'border-gray-200 hover:bg-gray-50'}`}
+                    className={`text-left p-3 rounded-lg border text-sm ${mode === 'ai_extract' ? 'bg-primary-50 border-primary-300 ring-2 ring-primary-200' : 'border-gray-200 hover:bg-gray-50'}`}
                   >
                     <div className="font-medium text-gray-900 mb-0.5 flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                      <Sparkles className="w-3.5 h-3.5 text-primary-600" />
                       AI-structured
                     </div>
-                    <p className="text-[11px] text-gray-500 leading-tight">
+                    <p className="text-xs text-gray-500 leading-tight">
                       Claude splits the text into typed entries (FAQ / policy / tour / other).
                     </p>
                   </button>
                   <button
                     onClick={() => setMode('as_is')}
-                    className={`text-left p-3 rounded-lg border text-sm ${mode === 'as_is' ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-200' : 'border-gray-200 hover:bg-gray-50'}`}
+                    className={`text-left p-3 rounded-lg border text-sm ${mode === 'as_is' ? 'bg-primary-50 border-primary-300 ring-2 ring-primary-200' : 'border-gray-200 hover:bg-gray-50'}`}
                   >
                     <div className="font-medium text-gray-900 mb-0.5">As a single entry</div>
-                    <p className="text-[11px] text-gray-500 leading-tight">
+                    <p className="text-xs text-gray-500 leading-tight">
                       Stores the whole paste as one entry of the type you choose. Still auto-chunked.
                     </p>
                   </button>
@@ -356,7 +356,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                   placeholder="Paste FAQs, policies, tour descriptions, or any business knowledge here…"
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono resize-y"
                 />
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   {mode === 'ai_extract'
                     ? 'Claude will detect FAQs, policies, and tour blocks automatically.'
                     : 'Long content will be split into retrieval chunks automatically.'}
@@ -374,7 +374,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                   Imported {result.created} of {result.total} entries.
                 </p>
                 {result.failures.length > 0 && (
-                  <p className="text-[11px] text-amber-700">
+                  <p className="text-xs text-amber-700">
                     {result.failures.length} chunks failed — you can review and re-import those manually.
                   </p>
                 )}
@@ -386,7 +386,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
                     {result.preview.map((p: any, idx: number) => (
                       <div key={idx} className="border border-gray-200 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] uppercase tracking-wide text-purple-700 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5">
+                          <span className="text-xs uppercase tracking-wide text-primary-700 bg-primary-50 border border-primary-100 rounded-full px-1.5 py-0.5">
                             {p.source_type.replace('kb_', '')}
                           </span>
                           {p.title && <span className="text-sm font-medium text-gray-900 truncate">{p.title}</span>}
@@ -406,7 +406,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
           {result ? (
             <button
               onClick={done}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
             >
               <Check className="w-3.5 h-3.5" />
               Done
@@ -419,7 +419,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
               <button
                 onClick={submit}
                 disabled={busy || text.trim().length < 20}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                 {busy ? (mode === 'ai_extract' ? 'Extracting…' : 'Importing…') : 'Import'}
@@ -490,13 +490,13 @@ function EntryModal({ entry, onClose, onSaved }: { entry: Entry | null; onClose:
                     <button
                       key={t}
                       onClick={() => setSourceType(t)}
-                      className={`text-left p-3 rounded-lg border text-sm ${sourceType === t ? `${m.color} ring-2 ring-purple-300` : 'border-gray-200 hover:bg-gray-50'}`}
+                      className={`text-left p-3 rounded-lg border text-sm ${sourceType === t ? `${m.color} ring-2 ring-primary-300` : 'border-gray-200 hover:bg-gray-50'}`}
                     >
                       <div className="flex items-center gap-2 font-medium mb-0.5">
                         <Icon className="w-4 h-4" />
                         {m.label}
                       </div>
-                      <p className="text-[11px] text-gray-500 leading-tight">{m.hint}</p>
+                      <p className="text-xs text-gray-500 leading-tight">{m.hint}</p>
                     </button>
                   )
                 })}
@@ -510,7 +510,7 @@ function EntryModal({ entry, onClose, onSaved }: { entry: Entry | null; onClose:
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={sourceType === 'kb_tour' ? 'e.g. Pyramids Day Tour' : sourceType === 'kb_policy' ? 'e.g. Cancellation Policy' : 'A short label'}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
             />
           </div>
 
@@ -521,7 +521,7 @@ function EntryModal({ entry, onClose, onSaved }: { entry: Entry | null; onClose:
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="What customers typically ask"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
               />
             </div>
           )}
@@ -535,9 +535,9 @@ function EntryModal({ entry, onClose, onSaved }: { entry: Entry | null; onClose:
               onChange={(e) => setContent(e.target.value)}
               placeholder={sourceType === 'kb_faq' ? 'How the copilot should answer' : meta.hint}
               rows={10}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 font-mono"
             />
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               Long content is automatically split into chunks for better retrieval.
             </p>
           </div>
@@ -550,7 +550,7 @@ function EntryModal({ entry, onClose, onSaved }: { entry: Entry | null; onClose:
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add entry'}

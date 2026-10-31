@@ -105,14 +105,14 @@ function SegmentsEditor({ segments, onChange }: { segments: Seg[]; onChange: (s:
   return (
     <div className="space-y-2">
       {segments.map((s, i) => s.type === 'slot' ? (
-        <span key={i} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-[#647C47]/10 text-[#647C47] mr-2" title="Filled from your records when the page is shown">
+        <span key={i} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-primary-500/10 text-primary-500 mr-2" title="Filled from your records when the page is shown">
           [{SLOT_LABEL[s.slot] ?? s.slot}]
           <button type="button" aria-label="Remove this fact" onClick={() => onChange(segments.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
         </span>
       ) : (
         <textarea key={i} value={s.text} rows={Math.min(8, Math.max(2, Math.ceil(s.text.length / 90)))}
           onChange={e => onChange(segments.map((x, j) => j === i ? { ...x, text: e.target.value } as Seg : x))}
-          className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:border-[#647C47] focus:ring-1 focus:ring-[#647C47]" />
+          className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:border-primary-500 focus:ring-1 focus:ring-primary-500" />
       ))}
     </div>
   )
@@ -152,7 +152,7 @@ function ContentEditor({ content, onChange, dayTitles }: { content: Content; onC
                 <td className="py-1.5">
                   <input value={item.text} aria-label={`Translation of ${item.source}`}
                     onChange={e => onChange({ ...content, items: content.items.map((x, j) => j === i ? { ...x, text: e.target.value } : x) })}
-                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1 focus:border-[#647C47] focus:ring-1 focus:ring-[#647C47]" />
+                    className="w-full text-sm border border-gray-300 rounded-md px-2 py-1 focus:border-primary-500 focus:ring-1 focus:ring-primary-500" />
                 </td>
               </tr>
             ))}
@@ -227,7 +227,7 @@ function PublicPriceCard({ pageId, rate, canManage, onDone }: { pageId: string; 
             ? <ul className="mt-1 text-amber-800 list-disc pl-5">{p.reasons.map(r => <li key={r}>{r}</li>)}</ul>
             : <BandList bands={p.bands} currency={p.currency} />}
           {canManage && (
-            <button onClick={approve} disabled={busy || !ready} className="mt-3 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+            <button onClick={approve} disabled={busy || !ready} className="mt-3 text-sm px-3 py-1.5 rounded-md bg-primary-500 text-white disabled:opacity-40">
               {busy ? 'Publishing…' : 'Publish this price'}
             </button>
           )}
@@ -305,7 +305,7 @@ function PartCard({ part, label, help, detail, canWrite, canManage, onDone }: {
             {(check?.notes ?? []).length > 0 && <p className="text-xs text-gray-500">{check!.notes!.join(' ')}</p>}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               {canWrite && <button onClick={save} disabled={!dirty || busy !== null} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-40"><Save className="h-4 w-4" />Save and check</button>}
-              {canManage && <button onClick={approve} disabled={!!dirty || open.status !== 'in_review' || busy !== null} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40" title={dirty ? 'Save your edit first' : undefined}><Check className="h-4 w-4" />Approve and publish this text</button>}
+              {canManage && <button onClick={approve} disabled={!!dirty || open.status !== 'in_review' || busy !== null} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-primary-500 text-white disabled:opacity-40" title={dirty ? 'Save your edit first' : undefined}><Check className="h-4 w-4" />Approve and publish this text</button>}
               {canManage && (
                 <span className="inline-flex items-center gap-1">
                   <input value={note} onChange={e => setNote(e.target.value)} placeholder="What should change?" className="text-sm border border-gray-300 rounded-md px-2 py-1.5 w-56" />
@@ -322,7 +322,7 @@ function PartCard({ part, label, help, detail, canWrite, canManage, onDone }: {
         {canWrite && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
             <input value={instruction} onChange={e => setInstruction(e.target.value)} placeholder="Optional: guidance for the writer" className="text-sm border border-gray-300 rounded-md px-2 py-1.5 flex-1 min-w-[200px]" />
-            <button onClick={draftWithAi} disabled={busy !== null} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md border border-[#647C47] text-[#647C47] disabled:opacity-40">
+            <button onClick={draftWithAi} disabled={busy !== null} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md border border-primary-500 text-primary-500 disabled:opacity-40">
               <Sparkles className="h-4 w-4" />{busy === 'draft' ? 'Writing…' : part === 'labels' ? (open || live ? 'Translate again' : 'Translate with AI') : open || live ? 'Draft again' : 'Draft with AI'}
             </button>
           </div>
@@ -377,7 +377,7 @@ function TourDetailsCard({ pageId, details, canManage, onDone }: { pageId: strin
             return (
               <button key={code} type="button" disabled={!canManage} aria-pressed={on}
                 onClick={() => setLanguages(on ? languages.filter(l => l !== code) : [...languages, code])}
-                className={`text-sm px-3 py-1 rounded-full border ${on ? 'bg-[#647C47] border-[#647C47] text-white' : 'border-gray-300 text-gray-700'}`}>
+                className={`text-sm px-3 py-1 rounded-full border ${on ? 'bg-primary-500 border-primary-500 text-white' : 'border-gray-300 text-gray-700'}`}>
                 {languageLabel(code)}
               </button>
             )
@@ -403,12 +403,12 @@ function TourDetailsCard({ pageId, details, canManage, onDone }: { pageId: strin
                 </div>
               ))}
             </div>
-            {canManage && stops.length < 20 && <button type="button" onClick={() => setStops([...stops, { time: null, name: '' }])} className="mt-2 text-sm text-[#647C47]">+ Add a stop</button>}
+            {canManage && stops.length < 20 && <button type="button" onClick={() => setStops([...stops, { time: null, name: '' }])} className="mt-2 text-sm text-primary-500">+ Add a stop</button>}
           </div>
         </>
       )}
       {canManage && (
-        <button type="button" onClick={save} disabled={busy} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+        <button type="button" onClick={save} disabled={busy} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-primary-500 text-white disabled:opacity-40">
           <Save className="h-4 w-4" />{busy ? 'Saving…' : 'Save tour details'}
         </button>
       )}
@@ -453,8 +453,8 @@ function FaqCard({ pageId, language, items, canManage, onDone }: { pageId: strin
       ))}
       {canManage && (
         <div className="flex items-center gap-3">
-          {list.length < 12 && <button type="button" onClick={() => setList([...list, { question: '', answer: '' }])} className="text-sm text-[#647C47]">+ Add a question</button>}
-          <button type="button" onClick={save} disabled={busy} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+          {list.length < 12 && <button type="button" onClick={() => setList([...list, { question: '', answer: '' }])} className="text-sm text-primary-500">+ Add a question</button>}
+          <button type="button" onClick={save} disabled={busy} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-primary-500 text-white disabled:opacity-40">
             <Save className="h-4 w-4" />{busy ? 'Saving…' : 'Save questions'}
           </button>
         </div>
@@ -498,22 +498,22 @@ export default function PublishPageReview({ params }: { params: Promise<{ id: st
     }
   }
 
-  if (loading && !detail) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]" /></div>
-  if (error && !detail) return <div className="p-6"><Link href="/publish" className="text-sm text-[#647C47]">← Website</Link><p className="mt-4 text-sm text-red-700">{error}</p></div>
+  if (loading && !detail) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>
+  if (error && !detail) return <div className="p-6"><Link href="/publish" className="text-sm text-primary-500">← Website</Link><p className="mt-4 text-sm text-red-700">{error}</p></div>
   if (!detail) return null
 
   const f = detail.facts
   return (
     <div className="p-6 space-y-5 max-w-4xl">
-      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-[#647C47]"><ArrowLeft className="h-4 w-4" />Website</Link>
+      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-primary-500"><ArrowLeft className="h-4 w-4" />Website</Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{detail.page.tourName}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{detail.page.tourName}</h1>
           <p className="text-sm text-gray-500 flex items-center gap-1"><Globe className="h-4 w-4" />/{detail.locale.language}/tours/{detail.locale.slug}</p>
         </div>
         <div className="flex items-center gap-1 border border-gray-200 rounded-md p-0.5">
           {detail.page.languages.map(l => (
-            <button key={l} onClick={() => setLang(l)} className={`text-sm px-3 py-1 rounded ${l === lang ? 'bg-[#647C47] text-white' : 'text-gray-600'}`}>{l.toUpperCase()}</button>
+            <button key={l} onClick={() => setLang(l)} className={`text-sm px-3 py-1 rounded ${l === lang ? 'bg-primary-500 text-white' : 'text-gray-600'}`}>{l.toUpperCase()}</button>
           ))}
         </div>
       </div>
@@ -527,7 +527,7 @@ export default function PublishPageReview({ params }: { params: Promise<{ id: st
         </div>
         {canManage && (
           <button onClick={togglePublished} disabled={!detail.locale.is_published && !!f && !f.publishable.ok}
-            className={`text-sm px-3 py-1.5 rounded-md disabled:opacity-40 ${detail.locale.is_published ? 'border border-gray-300' : 'bg-[#647C47] text-white'}`}>
+            className={`text-sm px-3 py-1.5 rounded-md disabled:opacity-40 ${detail.locale.is_published ? 'border border-gray-300' : 'bg-primary-500 text-white'}`}>
             {detail.locale.is_published ? 'Unpublish' : 'Publish this page'}
           </button>
         )}

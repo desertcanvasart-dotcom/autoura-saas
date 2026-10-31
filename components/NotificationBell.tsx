@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Bell, Check, X, ExternalLink, Loader2, Trash2 } from 'lucide-react'
+import { Bell, Check, X, ExternalLink, Loader2, Trash2, Mail, ConciergeBell, ClipboardList, AlarmClock, AlertTriangle, CheckCircle2, MessageCircle, Smartphone, AtSign, Wallet, PartyPopper } from 'lucide-react'
 import { NOTIFICATIONS_REFRESH_EVENT } from '@/lib/use-inbox-unread'
 import PushToggle from '@/components/PushToggle'
 
@@ -178,18 +178,18 @@ export default function NotificationBell() {
   // Get icon based on notification type
   const getIcon = (type: string) => {
     switch (type) {
-      case 'new_email': return '✉️'
-      case 'concierge_lead': return '🛎️'
-      case 'task_assigned': return '📋'
-      case 'task_due_soon': return '⏰'
-      case 'task_overdue': return '🚨'
-      case 'task_completed': return '✅'
-      case 'whatsapp_assigned': return '💬'
-      case 'whatsapp_new_message': return '📱'
-      case 'whatsapp_mention': return '🔔'
-      case 'invoice_paid': return '💰'
-      case 'booking_confirmed': return '🎉'
-      default: return '🔔'
+      case 'new_email': return <Mail className="w-5 h-5 text-primary-600" />
+      case 'concierge_lead': return <ConciergeBell className="w-5 h-5 text-primary-600" />
+      case 'task_assigned': return <ClipboardList className="w-5 h-5 text-primary-600" />
+      case 'task_due_soon': return <AlarmClock className="w-5 h-5 text-amber-600" />
+      case 'task_overdue': return <AlertTriangle className="w-5 h-5 text-red-600" />
+      case 'task_completed': return <CheckCircle2 className="w-5 h-5 text-green-600" />
+      case 'whatsapp_assigned': return <MessageCircle className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_new_message': return <Smartphone className="w-5 h-5 text-primary-600" />
+      case 'whatsapp_mention': return <AtSign className="w-5 h-5 text-primary-600" />
+      case 'invoice_paid': return <Wallet className="w-5 h-5 text-green-600" />
+      case 'booking_confirmed': return <PartyPopper className="w-5 h-5 text-green-600" />
+      default: return <Bell className="w-5 h-5 text-primary-600" />
     }
   }
 
@@ -206,7 +206,7 @@ export default function NotificationBell() {
         
         {/* Unread Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -301,7 +301,7 @@ export default function NotificationBell() {
                       )}
                       
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="text-[10px] text-gray-400">
+                        <span className="text-xs text-gray-400">
                           {formatTime(notification.created_at)}
                         </span>
                         
@@ -312,7 +312,7 @@ export default function NotificationBell() {
                               if (!notification.is_read) markAsRead(notification.id)
                               setIsOpen(false)
                             }}
-                            className="text-[10px] text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5"
+                            className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5"
                           >
                             View <ExternalLink className="w-2.5 h-2.5" />
                           </Link>
@@ -321,7 +321,7 @@ export default function NotificationBell() {
                         {!notification.is_read && (
                           <button
                             onClick={() => markAsRead(notification.id)}
-                            className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-0.5"
+                            className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-0.5"
                           >
                             <Check className="w-2.5 h-2.5" /> Read
                           </button>

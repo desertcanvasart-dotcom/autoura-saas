@@ -129,7 +129,7 @@ export default function InvoicePage() {
     const colors: Record<string, string> = {
       completed: 'bg-green-100 text-green-700',
       paid: 'bg-green-100 text-green-700',
-      pending: 'bg-orange-100 text-orange-700',
+      pending: 'bg-amber-100 text-amber-700',
       sent: 'bg-blue-100 text-blue-700',
       draft: 'bg-gray-100 text-gray-700',
       overdue: 'bg-red-100 text-red-700'
@@ -152,7 +152,7 @@ export default function InvoicePage() {
     return (
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-xl font-bold text-gray-900 mb-3">Invoice Not Found</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-3">Invoice Not Found</h1>
           <Link href="/payments" className="text-sm text-primary-600 hover:text-primary-700">
             ← Back to Payments
           </Link>

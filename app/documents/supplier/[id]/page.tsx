@@ -55,7 +55,7 @@ interface SupplierDocument {
   }
 }
 
-const LABEL = 'text-[10px] font-semibold uppercase tracking-[0.12em]'
+const LABEL = 'text-xs font-semibold uppercase tracking-[0.12em]'
 
 const PAYMENT_TERMS: Record<string, string> = {
   prepaid: 'Prepaid',
@@ -333,7 +333,7 @@ export default function SupplierDocumentViewPage() {
             <div className="flex items-center gap-3">
               <BackLink fallbackHref="/documents/supplier" fallbackLabel="Documents" trip={tripRef} />
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">{document.document_number}</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">{document.document_number}</h1>
                 <p className="text-sm text-gray-500">{DOCUMENT_TITLES[document.document_type]} • {document.supplier_name}</p>
                 {(document.sent_at || document.confirmed_at) && (
                   <p className="text-xs text-gray-500">
@@ -374,7 +374,7 @@ export default function SupplierDocumentViewPage() {
                 <button
                   onClick={handleSendEmail}
                   disabled={actionLoading === 'email'}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Mail className="w-4 h-4" />
                   {actionLoading === 'email' ? 'Sending...' : 'Email'}
@@ -383,7 +383,7 @@ export default function SupplierDocumentViewPage() {
               {document.supplier_contact_phone && (
                 <button
                   onClick={handleSendWhatsApp}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1.5"
                 >
                   <MessageSquare className="w-4 h-4" />
                   WhatsApp
@@ -393,7 +393,7 @@ export default function SupplierDocumentViewPage() {
                 <button
                   onClick={handleMarkConfirmed}
                   disabled={actionLoading === 'confirm'}
-                  className="px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <CheckCircle className="w-4 h-4" />
                   Mark Confirmed
@@ -450,7 +450,7 @@ export default function SupplierDocumentViewPage() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-3xl font-bold leading-none" style={{ color: accent }}>{totalPax}</p>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mt-1">Pax</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mt-1">Pax</p>
                     <p className="text-xs text-gray-600 mt-1">
                       {document.num_adults} adult{document.num_adults !== 1 ? 's' : ''}
                       {document.num_children > 0 && `, ${document.num_children} child${document.num_children !== 1 ? 'ren' : ''}`}
@@ -476,7 +476,7 @@ export default function SupplierDocumentViewPage() {
                   <div className="rounded-lg border border-gray-200 overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500" style={{ backgroundColor: `${accent}10` }}>
+                        <tr className="text-left text-xs uppercase tracking-wide text-gray-500" style={{ backgroundColor: `${accent}10` }}>
                           <th className="px-4 py-2 font-semibold w-24">Date</th>
                           <th className="px-4 py-2 font-semibold">Service</th>
                           <th className="px-4 py-2 font-semibold hidden sm:table-cell">City</th>

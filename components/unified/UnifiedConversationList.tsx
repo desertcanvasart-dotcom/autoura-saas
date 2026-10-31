@@ -92,23 +92,23 @@ export default function UnifiedConversationList({ onSelectConversation, selected
           <h2 className="font-semibold text-gray-800">Email Conversations</h2>
           <button
             onClick={() => setAwaitingOnly(v => !v)}
-            className={`text-[11px] px-2 py-1 rounded-lg font-medium mr-auto ml-2 ${
+            className={`text-xs px-2 py-1 rounded-lg font-medium mr-auto ml-2 ${
               awaitingOnly ? 'bg-amber-100 text-amber-800' : 'text-gray-500 hover:bg-gray-100'
             }`}
             title="Conversations a customer is waiting on"
           >
             Waiting on us
           </button>
-          <button onClick={handleSync} disabled={syncing} className="p-1.5 text-gray-400 hover:text-[#647C47] rounded-lg hover:bg-gray-100">
+          <button onClick={handleSync} disabled={syncing} className="p-1.5 text-gray-400 hover:text-primary-500 rounded-lg hover:bg-gray-100">
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </button>
         </div>
         <div className="relative">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-3 pr-3 py-1.5 text-sm bg-gray-100 border-none rounded-lg focus:bg-white focus:ring-1 focus:ring-[#647C47] outline-none" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-3 pr-3 py-1.5 text-sm bg-gray-100 border-none rounded-lg focus:bg-white focus:ring-1 focus:ring-primary-500 outline-none" />
         </div>
         <div className="flex gap-1 mt-2">
-          <button onClick={() => setFilter('active')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'active' ? 'bg-[#647C47] text-white' : 'text-gray-500 hover:bg-gray-100'}`}>Active</button>
-          <button onClick={() => setFilter('archived')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'archived' ? 'bg-gray-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>
+          <button onClick={() => setFilter('active')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'active' ? 'bg-primary-500 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>Active</button>
+          <button onClick={() => setFilter('archived')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'archived' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-primary-700'}`}>
             <Archive className="w-3 h-3 inline mr-1" />Archived
           </button>
         </div>
@@ -129,7 +129,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
               key={conv.id}
               onClick={() => onSelectConversation(conv)}
               className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                selectedConversationId === conv.id ? 'bg-[#647C47]/5 border-l-2 border-l-[#647C47]' : ''
+                selectedConversationId === conv.id ? 'bg-primary-500/5 border-l-2 border-l-primary-500' : ''
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -140,12 +140,12 @@ export default function UnifiedConversationList({ onSelectConversation, selected
                       {conv.client?.full_name || conv.client_name || conv.client_email || 'Unknown'}
                     </span>
                     {conv.unread_count > 0 && (
-                      <span className="bg-[#647C47] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
+                      <span className="bg-primary-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
                     )}
                     {/* Waiting on us, and for how long — dated from the
                         customer's FIRST unanswered message. */}
                     {conv.awaiting_reply_since && (
-                      <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium">
+                      <span className="bg-amber-100 text-amber-800 text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium">
                         Waiting {timeAgo(conv.awaiting_reply_since)}
                       </span>
                     )}
@@ -154,7 +154,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
                   <p className="text-xs text-gray-400 truncate mt-0.5">{conv.last_message_snippet}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="text-[10px] text-gray-400">{timeAgo(conv.last_message_at)}</span>
+                  <span className="text-xs text-gray-400">{timeAgo(conv.last_message_at)}</span>
                   <ChannelBadge channel="email" />
                 </div>
               </div>

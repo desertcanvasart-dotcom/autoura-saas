@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, MapPin, Radio, Undo2 } from 'lucide-react'
+import { Loader2, MapPin, Radio, Undo2, Lock } from 'lucide-react'
 
 // ============================================
 // TRIP TIMELINE — the office view of trip_events (the live log)
@@ -42,9 +42,9 @@ const KIND_META: Record<string, { label: string; dot: string }> = {
   arrived:     { label: 'Arrived',      dot: 'bg-green-500' },
   picked_up:   { label: 'Picked up',    dot: 'bg-green-500' },
   dropped_off: { label: 'Dropped off',  dot: 'bg-green-500' },
-  checked_in:  { label: 'Checked in',   dot: 'bg-indigo-500' },
-  checked_out: { label: 'Checked out',  dot: 'bg-indigo-500' },
-  completed:   { label: 'Completed',    dot: 'bg-emerald-600' },
+  checked_in:  { label: 'Checked in',   dot: 'bg-primary-500' },
+  checked_out: { label: 'Checked out',  dot: 'bg-primary-500' },
+  completed:   { label: 'Completed',    dot: 'bg-primary-600' },
   delayed:     { label: 'Running late', dot: 'bg-amber-500' },
   note:        { label: 'Note',         dot: 'bg-gray-400' },
 }
@@ -239,7 +239,7 @@ export default function TripTimeline({ itineraryId, startDate, endDate, today, p
             Add note
           </button>
         </div>
-        <p className="text-[11px] text-gray-400">Checkpoints appear on the traveller&apos;s live page; notes stay internal.</p>
+        <p className="text-xs text-gray-400">Checkpoints appear on the traveller&apos;s live page; notes stay internal.</p>
       </div>
 
       {pending && (
@@ -267,7 +267,7 @@ export default function TripTimeline({ itineraryId, startDate, endDate, today, p
         <div className="space-y-3">
           {groups.map(g => (
             <div key={g.key}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{g.title}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{g.title}</p>
               <ol className="divide-y divide-gray-100">
                 {g.items.map(e => {
                   const meta = KIND_META[e.event_kind] ?? { label: e.event_kind, dot: 'bg-gray-400' }
@@ -283,7 +283,7 @@ export default function TripTimeline({ itineraryId, startDate, endDate, today, p
                         </p>
                         {e.note && (
                           <p className="text-xs text-gray-500 mt-0.5 bg-gray-50 border border-gray-100 rounded px-2 py-1 inline-block">
-                            🔒 {e.note}
+                            <Lock className="w-3 h-3 inline -mt-0.5 mr-1" />{e.note}
                           </p>
                         )}
                       </div>

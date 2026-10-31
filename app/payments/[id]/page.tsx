@@ -80,10 +80,10 @@ export default function PaymentDetailPage() {
   const getStatusColor = (status: string) => {
     const colors: any = {
       completed: 'bg-success/10 text-success',
-      pending: 'bg-orange-100 text-orange-700',
+      pending: 'bg-amber-100 text-amber-700',
       deposit_received: 'bg-blue-100 text-blue-700',
-      partially_paid: 'bg-purple-100 text-purple-700',
-      partially_refunded: 'bg-yellow-100 text-yellow-700',
+      partially_paid: 'bg-primary-100 text-primary-700',
+      partially_refunded: 'bg-gray-100 text-gray-700',
       failed: 'bg-danger/10 text-danger',
       refunded: 'bg-gray-100 text-gray-700'
     }
@@ -115,7 +115,7 @@ export default function PaymentDetailPage() {
     return (
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-xl font-bold text-gray-900 mb-3">Payment Not Found</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-3">Payment Not Found</h1>
           <Link href="/payments" className="text-sm text-primary-600 hover:text-primary-700">
             ← Back to Payments
           </Link>
@@ -130,12 +130,12 @@ export default function PaymentDetailPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Payment Details</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Payment Details</h1>
             <p className="text-sm text-gray-600 mt-1">View and manage payment information</p>
           </div>
           <Link
             href="/payments"
-            className="bg-gray-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2"
+            className="bg-primary-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Payments
@@ -287,7 +287,7 @@ export default function PaymentDetailPage() {
               {payment.payment_status === 'completed' && (
                 <Link
                   href={withReturnTo(`/documents/receipt/${payment.id}`, `/payments/${payment.id}`)}
-                  className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
+                  className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 font-medium flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
                   View Receipt
@@ -296,7 +296,7 @@ export default function PaymentDetailPage() {
               
               <Link
                 href={withReturnTo(`/documents/invoice/${payment.id}`, `/payments/${payment.id}`)}
-                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+                className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 font-medium flex items-center gap-2"
               >
                 <FileText className="w-4 h-4" />
                 View Invoice

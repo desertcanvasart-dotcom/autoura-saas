@@ -164,7 +164,7 @@ export default function PDFPreviewModal({
             {onSendEmail && (
               <button
                 onClick={onSendEmail}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] hover:bg-[#4f6238] rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-500 hover:bg-primary-700 rounded-lg transition-colors"
                 title="Send via Email"
               >
                 <Mail className="w-3.5 h-3.5" />
@@ -179,7 +179,7 @@ export default function PDFPreviewModal({
                   onClick={() => onToggleBreakdown(!showBreakdown)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                     showBreakdown
-                      ? 'text-[#647C47] bg-[#647C47]/10 hover:bg-[#647C47]/20'
+                      ? 'text-primary-500 bg-primary-500/10 hover:bg-primary-500/20'
                       : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                   }`}
                   title={showBreakdown ? 'Show total only' : 'Show breakdown'}
@@ -221,7 +221,7 @@ export default function PDFPreviewModal({
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
+                <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
                 <span className="text-sm text-gray-500">Loading preview...</span>
               </div>
             </div>

@@ -44,11 +44,11 @@ export function DocumentLetterhead({
           </div>
         </div>
         <div className="sm:text-right flex-shrink-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color }}>{title}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color }}>{title}</p>
           <p className="text-lg font-semibold text-gray-900 mt-0.5">{number}</p>
           {date && <p className="text-xs text-gray-500 mt-0.5">Issued {date}</p>}
           {status && (
-            <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-600">
+            <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide bg-gray-100 text-gray-600">
               {status}
             </span>
           )}
@@ -61,10 +61,10 @@ export function DocumentLetterhead({
 export function DocumentFooter({ company }: { company: CompanyIdentity }) {
   const lines = letterheadFooterLines(company)
   if (!lines.length && !company.footerText && !company.name) {
-    return <p className="text-[11px] text-gray-400 italic">Nothing to show yet — fill in the fields above.</p>
+    return <p className="text-xs text-gray-400 italic">Nothing to show yet — fill in the fields above.</p>
   }
   return (
-    <div className="text-center text-[11px] leading-relaxed text-gray-500 space-y-0.5">
+    <div className="text-center text-xs leading-relaxed text-gray-500 space-y-0.5">
       {company.name && <p className="font-semibold text-gray-700">{company.name}</p>}
       {lines.map(l => <p key={l}>{l}</p>)}
       {company.footerText && <p className="whitespace-pre-line text-gray-400 pt-1">{company.footerText}</p>}

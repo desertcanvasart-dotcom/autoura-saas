@@ -54,7 +54,7 @@ export default function NetworkSuppliersPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-      <h1 className="text-2xl font-bold text-gray-900">Network suppliers</h1>
+      <h1 className="text-2xl font-semibold text-gray-900">Network suppliers</h1>
       <p className="text-sm text-gray-600 mt-1">Verified suppliers on Autoura who chose to be found by other agencies. Add one to your list, then ask them and agree each price — nobody else sees your rates or notes.</p>
 
       {off ? (
@@ -90,7 +90,7 @@ export default function NetworkSuppliersPage() {
                     {r.my_supplier_id ? (
                       <span className="text-green-700 font-medium">On your list</span>
                     ) : canAdd ? (
-                      <button disabled={busy === r.account_id} onClick={() => add(r)} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">Add to my suppliers</button>
+                      <button disabled={busy === r.account_id} onClick={() => add(r)} className="px-3 py-1.5 rounded-lg bg-primary-600 text-white disabled:opacity-50">Add to my suppliers</button>
                     ) : <span className="text-gray-500">A manager can add them</span>}
                   </div>
                 </li>

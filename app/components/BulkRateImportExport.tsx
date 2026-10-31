@@ -431,7 +431,7 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
                   </span>
                   <button
                     onClick={closeModal}
-                    className="px-4 py-2 text-sm font-medium text-white bg-[#647C47] hover:bg-[#4f6238] rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-700 rounded-lg transition-colors"
                   >
                     Close
                   </button>
@@ -447,7 +447,7 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
                   </button>
                   <button
                     onClick={handleConfirmImport}
-                    className="px-4 py-2 text-sm font-medium text-white bg-[#647C47] hover:bg-[#4f6238] rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-700 rounded-lg transition-colors"
                   >
                     Import {importState.preview.validRows} Row{importState.preview.validRows !== 1 ? 's' : ''}
                   </button>
@@ -456,7 +456,7 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
               {(importState.step === 'done' || importState.step === 'error') && (
                 <button
                   onClick={closeModal}
-                  className="px-4 py-2 text-sm font-medium text-white bg-[#647C47] hover:bg-[#4f6238] rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-700 rounded-lg transition-colors"
                 >
                   Close
                 </button>

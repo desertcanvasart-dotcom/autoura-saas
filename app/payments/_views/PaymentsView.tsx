@@ -262,7 +262,7 @@ export default function PaymentsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Payment Tracking</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Payment Tracking</h1>
           <p className="text-sm text-gray-600 mt-1">All payments from invoices and itineraries</p>
         </div>
         <div className="flex items-center gap-2">
@@ -300,7 +300,7 @@ export default function PaymentsPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-gray-400" />
-            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           </div>
           <h3 className="text-xs text-gray-600 font-medium">Pending Payments</h3>
           <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -402,7 +402,7 @@ export default function PaymentsPage() {
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
                       payment.source === 'invoice' 
                         ? 'bg-blue-100 text-blue-700'
-                        : 'bg-purple-100 text-purple-700'
+                        : 'bg-primary-100 text-primary-700'
                     }`}>
                       {payment.source === 'invoice' ? (
                         <FileText className="w-3 h-3" />

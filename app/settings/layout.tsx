@@ -65,7 +65,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         <div className="space-y-4">
           {groups.map(group => (
             <div key={group.key}>
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">{group.title}</p>
+              <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">{group.title}</p>
               <div className="space-y-0.5">
                 {group.items.map(item => {
                   const isActive = item.href === current
@@ -94,7 +94,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm text-gray-500">Settings › {entry.group.title}</p>
-                <h1 className="mt-1 text-2xl font-semibold text-gray-900">{entry.item.label}</h1>
+                <h1 className="text-2xl font-semibold mt-1 text-gray-900">{entry.item.label}</h1>
                 <p className="mt-1 text-sm text-gray-600">{entry.item.description}</p>
               </div>
               {entry.item.adminOnly && (

@@ -6,7 +6,7 @@ import { Fragment, useState, useEffect, useMemo } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle } from 'lucide-react'
+import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
@@ -265,7 +265,7 @@ export default function TourPriceCalculator() {
                 type="checkbox"
                 checked={selected.includes(x.id)}
                 onChange={() => toggle(x.id)}
-                className="w-4 h-4 mt-0.5 text-[#647C47] rounded"
+                className="w-4 h-4 mt-0.5 text-primary-500 rounded"
               />
               <span className="text-sm leading-tight">
                 {x.name}
@@ -500,7 +500,7 @@ export default function TourPriceCalculator() {
   if (authLoading || tenantLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#647C47]" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
       </div>
     )
   }
@@ -518,12 +518,12 @@ export default function TourPriceCalculator() {
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <XCircle className="w-8 h-8 text-red-600" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">You need manager permissions to access the B2B calculator.</p>
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35]"
           >
             Return to Dashboard
           </button>
@@ -545,8 +545,8 @@ export default function TourPriceCalculator() {
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-[#647C47]" /> B2B Price Calculator
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-primary-500" /> B2B Price Calculator
             </h1>
             <p className="text-sm text-gray-500">Calculate dynamic pricing based on actual rates</p>
           </div>
@@ -575,7 +575,7 @@ export default function TourPriceCalculator() {
           </div>
           <Link
             href={`/quotes/b2b/${savedQuote.id}`}
-            className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
             View Quote
           </Link>
@@ -599,7 +599,7 @@ export default function TourPriceCalculator() {
                   onChange={(e) => setNumPax(parseInt(e.target.value) || 1)}
                   min="1"
                   max="50"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
 
@@ -614,7 +614,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setTourLeaderIncluded(false)}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       !tourLeaderIncluded
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -625,7 +625,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setTourLeaderIncluded(true)}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       tourLeaderIncluded
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -650,7 +650,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setGuideMode('spot')}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       guideMode === 'spot'
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -661,7 +661,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setGuideMode('throughout')}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       guideMode === 'throughout'
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -706,7 +706,7 @@ export default function TourPriceCalculator() {
                   type="date"
                   value={travelDate}
                   onChange={(e) => setTravelDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
 
@@ -762,7 +762,7 @@ export default function TourPriceCalculator() {
                   onChange={(e) => setMarginPercent(parseFloat(e.target.value) || 0)}
                   min="0"
                   max="100"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
 
@@ -776,7 +776,7 @@ export default function TourPriceCalculator() {
               <button
                 onClick={() => calculatePrice()}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50"
               >
                 {loading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Calculating...</>
@@ -816,15 +816,15 @@ export default function TourPriceCalculator() {
             <>
               {result.complete === false && result.holes && result.holes.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-red-700 mb-1">
-                    ⚠ Incomplete pricing — {result.holes.length} item(s) have no rate
+                  <p className="text-sm font-semibold text-red-700 mb-1 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" /> Incomplete pricing — {result.holes.length} item(s) have no rate
                   </p>
                   <ul className="text-xs text-red-600 space-y-0.5">
                     {result.holes.map((h, i) => (
                       <li key={i}>• {h.message}</li>
                     ))}
                   </ul>
-                  <p className="text-[11px] text-red-500 mt-1.5">
+                  <p className="text-xs text-red-500 mt-1.5">
                     Add the missing rates before sending this rate sheet to a partner.
                   </p>
                 </div>
@@ -834,15 +834,15 @@ export default function TourPriceCalculator() {
                   date. The price is real; the booking may not be. */}
               {result.warnings && result.warnings.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-amber-800 mb-1">
-                    ⚠ Check this — {result.warnings.length} note(s)
+                  <p className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" /> Check this — {result.warnings.length} note(s)
                   </p>
                   <ul className="text-xs text-amber-700 space-y-0.5">
                     {result.warnings.map((w, i) => (
                       <li key={i}>• {w}</li>
                     ))}
                   </ul>
-                  <p className="text-[11px] text-amber-600 mt-1.5">
+                  <p className="text-xs text-amber-600 mt-1.5">
                     The price is correct, but confirm the itinerary can be booked as dated.
                   </p>
                 </div>
@@ -892,13 +892,13 @@ export default function TourPriceCalculator() {
                       <p className="text-xs text-amber-700 mt-1">+ {money(result.season_premium ?? 0)} {result.season_name} premium</p>
                     )}
                   </div>
-                  <div className="bg-[#647C47]/10 rounded-lg p-4">
+                  <div className="bg-primary-500/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Selling Price</p>
-                    <p className="text-xl font-bold text-[#647C47]">{money(result.selling_price)}</p>
+                    <p className="text-xl font-bold text-primary-500">{money(result.selling_price)}</p>
                   </div>
-                  <div className="bg-[#647C47]/10 rounded-lg p-4">
+                  <div className="bg-primary-500/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Per Person</p>
-                    <p className="text-xl font-bold text-[#647C47]">{money(result.price_per_person)}</p>
+                    <p className="text-xl font-bold text-primary-500">{money(result.price_per_person)}</p>
                   </div>
                 </div>
 
@@ -924,7 +924,7 @@ export default function TourPriceCalculator() {
                 <div className="mt-4 pt-4 border-t">
                   <button
                     onClick={() => setShowSaveModal(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
                   >
                     <Save className="w-4 h-4" />
                     {linkedQuote ? 'Update Quote' : 'Save as Quote'}
@@ -974,11 +974,11 @@ export default function TourPriceCalculator() {
                         <td className="px-4 py-2 text-center">
                           <span className={`px-2 py-0.5 rounded text-xs ${
                             service.extra
-                              ? 'bg-purple-100 text-purple-700'
+                              ? 'bg-primary-100 text-primary-700'
                               : service.rate_source === 'stored'
                               ? 'bg-gray-100'
                               : service.rate_source === 'manual'
-                              ? 'bg-yellow-100 text-yellow-700'
+                              ? 'bg-amber-100 text-amber-700'
                               : service.unpriced
                               ? 'bg-red-100 text-red-700'
                               : 'bg-green-100 text-green-700'
@@ -1021,8 +1021,8 @@ export default function TourPriceCalculator() {
                       </tr>
                     )}
                     <tr className="text-lg">
-                      <td colSpan={5} className="px-4 py-2 text-right text-[#647C47]">Total:</td>
-                      <td className="px-4 py-2 text-right text-[#647C47]">{money(result.selling_price)}</td>
+                      <td colSpan={5} className="px-4 py-2 text-right text-primary-500">Total:</td>
+                      <td className="px-4 py-2 text-right text-primary-500">{money(result.selling_price)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1057,7 +1057,7 @@ export default function TourPriceCalculator() {
                           // not updated by the time this runs.
                           void calculatePrice(next)
                         }}
-                        className="w-4 h-4 text-[#647C47] rounded flex-shrink-0"
+                        className="w-4 h-4 text-primary-500 rounded flex-shrink-0"
                       />
                       <span className="text-sm truncate">
                         {opt.service_name}
@@ -1071,7 +1071,7 @@ export default function TourPriceCalculator() {
                           and when the operator set that price, say so. */}
                       +{rateCurrency} {(opt.selling_price ?? opt.line_total).toFixed(2)}
                       {opt.price_basis === 'operator_price' && (
-                        <span className="block text-[11px] text-gray-400">operator price · no margin added</span>
+                        <span className="block text-xs text-gray-400">operator price · no margin added</span>
                       )}
                     </span>
                   </label>
@@ -1109,7 +1109,7 @@ export default function TourPriceCalculator() {
                 </thead>
                 <tbody className="divide-y">
                   {rateSheet.map((row) => (
-                    <tr key={row.pax} className={`hover:bg-gray-50 ${row.pax === numPax ? 'bg-[#647C47]/5' : ''}`}>
+                    <tr key={row.pax} className={`hover:bg-gray-50 ${row.pax === numPax ? 'bg-primary-500/5' : ''}`}>
                       <td className="px-4 py-2 text-center font-medium">
                         {row.pax}
                         {tourLeaderIncluded && <span className="text-xs text-blue-500 ml-1">(+1)</span>}
@@ -1117,7 +1117,7 @@ export default function TourPriceCalculator() {
                       <td className="px-4 py-2 text-right">{money(row.total_cost)}</td>
                       <td className="px-4 py-2 text-right text-green-600">{money(row.margin_amount)}</td>
                       <td className="px-4 py-2 text-right font-medium">{money(row.selling_price)}</td>
-                      <td className="px-4 py-2 text-right font-bold text-[#647C47]">{money(row.price_per_person)}</td>
+                      <td className="px-4 py-2 text-right font-bold text-primary-500">{money(row.price_per_person)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1133,7 +1133,7 @@ export default function TourPriceCalculator() {
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Save className="w-5 h-5 text-[#647C47]" />
+                <Save className="w-5 h-5 text-primary-500" />
                 Save Quote
               </h2>
               <button onClick={() => setShowSaveModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -1150,7 +1150,7 @@ export default function TourPriceCalculator() {
                 <select
                   value={quoteForm.partner_id}
                   onChange={(e) => setQuoteForm({ ...quoteForm, partner_id: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-primary-500 outline-none"
                 >
                   <option value="">No partner / Direct client</option>
                   {partners.map(partner => (
@@ -1185,7 +1185,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_name}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_name: e.target.value })}
                       placeholder="John Smith"
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                   
@@ -1198,7 +1198,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_email}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_email: e.target.value })}
                       placeholder="john@example.com"
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                   
@@ -1211,7 +1211,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_phone}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_phone: e.target.value })}
                       placeholder="+1 234 567 8900"
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                   
@@ -1224,7 +1224,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_nationality}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_nationality: e.target.value })}
                       placeholder="American, British, etc."
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                 </div>
@@ -1237,7 +1237,7 @@ export default function TourPriceCalculator() {
                   onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
                   placeholder="Any special requests or notes..."
                   rows={2}
-                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none resize-none"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none"
                 />
               </div>
 
@@ -1257,7 +1257,7 @@ export default function TourPriceCalculator() {
                 </div>
                 <div className="flex justify-between pt-2 border-t mt-2">
                   <span className="text-gray-600">Selling Price:</span>
-                  <span className="font-bold text-[#647C47]">{money(result?.selling_price)}</span>
+                  <span className="font-bold text-primary-500">{money(result?.selling_price)}</span>
                 </div>
               </div>
             </div>
@@ -1272,7 +1272,7 @@ export default function TourPriceCalculator() {
               <button
                 onClick={() => handleSaveQuote()}
                 disabled={saving}
-                className="flex-1 px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>

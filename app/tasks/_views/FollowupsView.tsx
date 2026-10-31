@@ -275,7 +275,7 @@ export default function FollowupDashboard() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Follow-up Dashboard</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Follow-up Dashboard</h1>
             <p className="text-sm text-gray-600 mt-1">Never miss a client touchpoint</p>
           </div>
           <Link
@@ -312,13 +312,13 @@ export default function FollowupDashboard() {
             onClick={() => setFilter('week')}
             className={`cursor-pointer rounded-lg border p-4 transition-all ${
               filter === 'week' 
-                ? 'border-purple-600 bg-purple-50 shadow-sm' 
-                : 'border-gray-200 bg-white hover:border-purple-300 shadow-sm'
+                ? 'border-primary-600 bg-primary-50 shadow-sm' 
+                : 'border-gray-200 bg-white hover:border-primary-300 shadow-sm'
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <div className="text-2xl font-bold text-gray-900">
               {stats.week}

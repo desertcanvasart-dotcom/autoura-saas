@@ -282,7 +282,7 @@ export default function ContractPage() {
     return (
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-lg font-semibold text-gray-900 mb-3">Itinerary Not Found</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-3">Itinerary Not Found</h1>
           <Link href="/itineraries" className="text-primary-600 hover:text-primary-700 text-sm">
             ← Back to Itineraries
           </Link>
@@ -339,7 +339,7 @@ export default function ContractPage() {
                 clientPhone={itinerary.client_phone}
                 clientName={itinerary.client_name}
                 onSuccess={() => {
-                  showToast('success', 'Contract sent via WhatsApp! ✅')
+                  showToast('success', 'Contract sent via WhatsApp!')
                 }}
               />
             )}
@@ -354,7 +354,7 @@ export default function ContractPage() {
 
           {/* Title */}
           <div className="text-center border-b border-gray-200 pb-4">
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">TRAVEL CONTRACT</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-3">TRAVEL CONTRACT</h1>
             {editMode ? (
               <div className="space-y-2 max-w-2xl mx-auto">
                 <div className="flex items-center gap-3">

@@ -7,7 +7,17 @@ import type { TripPnL } from '@/lib/trip-pnl'
 import { 
   TrendingUp,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Car,
+  UserRound,
+  Ticket,
+  UtensilsCrossed,
+  Hotel,
+  Banknote,
+  Droplets,
+  Drama,
+  Package,
+  type LucideIcon
 } from 'lucide-react'
 
 interface Service {
@@ -45,16 +55,16 @@ interface PLBreakdown {
   count: number
 }
 
-const SERVICE_ICONS: Record<string, string> = {
-  transportation: '🚗',
-  guide: '👨‍🏫',
-  entrance: '🎫',
-  meal: '🍽️',
-  accommodation: '🏨',
-  tips: '💵',
-  supplies: '💧',
-  activity: '🎭',
-  other: '📦'
+const SERVICE_ICONS: Record<string, LucideIcon> = {
+  transportation: Car,
+  guide: UserRound,
+  entrance: Ticket,
+  meal: UtensilsCrossed,
+  accommodation: Hotel,
+  tips: Banknote,
+  supplies: Droplets,
+  activity: Drama,
+  other: Package
 }
 
 export default function ItineraryPL({ 
@@ -134,14 +144,14 @@ export default function ItineraryPL({
   const getMarginColor = (percent: number) => {
     if (percent >= 25) return 'text-green-600'
     if (percent >= 15) return 'text-amber-600'
-    if (percent >= 0) return 'text-orange-600'
+    if (percent >= 0) return 'text-amber-600'
     return 'text-red-600'
   }
 
   const getMarginBg = (percent: number) => {
     if (percent >= 25) return 'bg-green-50 border-green-200'
     if (percent >= 15) return 'bg-amber-50 border-amber-200'
-    if (percent >= 0) return 'bg-orange-50 border-orange-200'
+    if (percent >= 0) return 'bg-amber-50 border-amber-200'
     return 'bg-red-50 border-red-200'
   }
 
@@ -183,22 +193,22 @@ export default function ItineraryPL({
             <div className="p-3 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-500">Client price</p>
               <p className="text-lg font-semibold text-blue-600">{formatCurrency(totals.clientPrice)}</p>
-              <p className="text-[11px] text-gray-400">What the client pays</p>
+              <p className="text-xs text-gray-400">What the client pays</p>
             </div>
             <div className="p-3 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-500">Supplier cost</p>
               <p className="text-lg font-semibold text-gray-900">{formatCurrency(totals.supplierCost)}</p>
-              <p className="text-[11px] text-gray-400">The priced services</p>
+              <p className="text-xs text-gray-400">The priced services</p>
             </div>
             <div className="p-3 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-500">Extra expenses</p>
               <p className="text-lg font-semibold text-gray-900">{extras == null ? '—' : formatCurrency(extras)}</p>
-              <p className="text-[11px] text-gray-400">{extras == null ? 'Not loaded' : 'Recorded beyond the suppliers'}</p>
+              <p className="text-xs text-gray-400">{extras == null ? 'Not loaded' : 'Recorded beyond the suppliers'}</p>
             </div>
             <div className={`p-3 rounded-lg border ${getMarginBg(netPercent)}`}>
               <p className="text-xs text-gray-500">Net margin</p>
               <p className={`text-lg font-bold ${getMarginColor(netPercent)}`}>{formatCurrency(net)} <span className="text-sm font-semibold">({netPercent.toFixed(1)}%)</span></p>
-              <p className="text-[11px] text-gray-500">
+              <p className="text-xs text-gray-500">
                 Quoted {formatCurrency(totals.margin)} ({totals.marginPercent.toFixed(1)}%)
                 {commission !== 0 && <> · commissions {commission > 0 ? '+' : ''}{formatCurrency(commission)}</>}
               </p>
@@ -241,13 +251,13 @@ export default function ItineraryPL({
             <h4 className="text-sm font-semibold text-gray-900 mb-4">Breakdown by Service Type</h4>
             <div className="space-y-3">
               {breakdown.map((item) => {
-                const icon = SERVICE_ICONS[item.service_type] || SERVICE_ICONS.other
+                const Icon = SERVICE_ICONS[item.service_type] || SERVICE_ICONS.other
                 const marginWidth = Math.min(Math.max(item.margin_percent, 0), 50) * 2
                 return (
                   <div key={item.service_type} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{icon}</span>
+                        <Icon className="w-5 h-5 text-gray-500" />
                         <span className="text-sm font-medium text-gray-900 capitalize">{item.service_type.replace('_', ' ')}</span>
                         <span className="text-xs text-gray-400">({item.count} items)</span>
                       </div>
@@ -263,7 +273,7 @@ export default function ItineraryPL({
                         className={`h-full rounded-full transition-all ${
                           item.margin_percent >= 25 ? 'bg-green-500' :
                           item.margin_percent >= 15 ? 'bg-amber-500' :
-                          item.margin_percent >= 0 ? 'bg-orange-500' : 'bg-red-500'
+                          item.margin_percent >= 0 ? 'bg-amber-500' : 'bg-red-500'
                         }`}
                         style={{ width: `${marginWidth}%` }}
                       />

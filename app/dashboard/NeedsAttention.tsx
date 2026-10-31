@@ -173,7 +173,7 @@ export default function NeedsAttention() {
           <AlertTriangle className="w-4 h-4 text-amber-500" />
           Needs attention
           {urgent > 0 && (
-            <span className="text-[11px] font-medium text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
+            <span className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
               {urgent} urgent
             </span>
           )}
@@ -223,7 +223,7 @@ export default function NeedsAttention() {
                     </p>
                   </div>
                   {item.severity === 'urgent' && (
-                    <span className="text-[10px] uppercase tracking-wide text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 shrink-0">
+                    <span className="text-xs uppercase tracking-wide text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 shrink-0">
                       urgent
                     </span>
                   )}

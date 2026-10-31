@@ -173,7 +173,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
       draft: 'bg-gray-50 text-gray-600 border-gray-200',
       sent: 'bg-primary-50 text-primary-600 border-primary-200',
       confirmed: 'bg-green-50 text-green-600 border-green-200',
-      completed: 'bg-purple-50 text-purple-600 border-purple-200',
+      completed: 'bg-gray-100 text-gray-700 border-gray-200',
       cancelled: 'bg-red-50 text-red-600 border-red-200'
     }
     return colors[status] || 'bg-gray-50 text-gray-600 border-gray-200'
@@ -287,13 +287,13 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
           onClick={() => setStatusFilter('completed')}
           className={`rounded-lg border-2 p-3 text-left transition-all hover:shadow-md ${
             statusFilter === 'completed' 
-              ? 'border-purple-500 bg-purple-50' 
+              ? 'border-primary-500 bg-primary-50' 
               : 'border-gray-200 bg-white hover:border-gray-300'
           }`}
         >
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-medium text-gray-600">Completed</span>
-            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
           </div>
           <div className="text-2xl font-bold text-gray-900">{statusCounts.completed}</div>
         </button>
@@ -374,7 +374,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
                         href={`/itineraries/${itinerary.id}`}
                         title={attention[itinerary.id].items.join('\n')}
                         aria-label={`${attention[itinerary.id].count} need attention: ${attention[itinerary.id].items.join('; ')}`}
-                        className={`ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                        className={`ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold ${
                           attention[itinerary.id].warnings > 0 ? 'bg-amber-100 text-amber-800' : 'bg-blue-50 text-blue-700'
                         }`}
                       >

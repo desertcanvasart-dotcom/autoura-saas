@@ -18,7 +18,11 @@ import {
   BarChart3,
   PieChart,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Target,
+  Wallet,
+  Handshake,
+  CheckCircle2
 } from 'lucide-react'
 
 interface FxSummary {
@@ -102,7 +106,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   draft: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
   sent: { label: 'Sent', color: 'text-blue-600', bg: 'bg-blue-100' },
   confirmed: { label: 'Confirmed', color: 'text-green-600', bg: 'bg-green-100' },
-  completed: { label: 'Completed', color: 'text-purple-600', bg: 'bg-purple-100' },
+  completed: { label: 'Completed', color: 'text-primary-600', bg: 'bg-primary-100' },
   cancelled: { label: 'Cancelled', color: 'text-red-600', bg: 'bg-red-100' }
 }
 
@@ -235,8 +239,8 @@ export default function ProfitLossPage() {
 
   const getMarginColor = (margin: number) => {
     if (margin >= 30) return 'text-green-600 bg-green-100'
-    if (margin >= 15) return 'text-yellow-600 bg-yellow-100'
-    if (margin >= 0) return 'text-orange-600 bg-orange-100'
+    if (margin >= 15) return 'text-amber-600 bg-amber-100'
+    if (margin >= 0) return 'text-amber-600 bg-amber-100'
     return 'text-red-600 bg-red-100'
   }
 
@@ -266,7 +270,7 @@ export default function ProfitLossPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -277,10 +281,10 @@ export default function ProfitLossPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg">
-            📊
+            <BarChart3 className="w-5 h-5 text-gray-500" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Profit & Loss</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Profit & Loss</h1>
             <p className="text-sm text-gray-500">Trip profitability analysis</p>
           </div>
         </div>
@@ -296,7 +300,7 @@ export default function ProfitLossPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🎯</span>
+                <Target className="w-5 h-5 text-gray-500" />
                 <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Trips</p>
@@ -305,7 +309,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💰</span>
+                <Wallet className="w-5 h-5 text-blue-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
@@ -316,7 +320,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">💸</span>
+                <Receipt className="w-5 h-5 text-red-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
@@ -327,7 +331,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🤝</span>
+                <Handshake className="w-5 h-5 text-amber-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Net Commission</p>
@@ -335,13 +339,13 @@ export default function ProfitLossPage() {
                 {netCommissionTotal >= 0 ? '+' : '−'}{reportingSymbol}
                 {Math.abs(netCommissionTotal).toLocaleString()}
               </p>
-              <p className="text-[11px] text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-400 mt-0.5">
                 in {reportingSymbol}{summary.total_commissions_receivable.toLocaleString()} · out{' '}
                 {reportingSymbol}{summary.total_commissions_payable.toLocaleString()}
               </p>
               {summary.total_disputed_receivable > 0 && (
                 <p
-                  className="text-[11px] text-amber-600 mt-0.5"
+                  className="text-xs text-amber-600 mt-0.5"
                   title="Disputed receivable commission may never be collected, so it is deliberately left out of margin."
                 >
                   {reportingSymbol}{summary.total_disputed_receivable.toLocaleString()} disputed,
@@ -352,7 +356,7 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📈</span>
+                <TrendingUp className="w-5 h-5 text-green-600" />
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Gross Profit</p>
@@ -363,29 +367,29 @@ export default function ProfitLossPage() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">📊</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                <PieChart className="w-5 h-5 text-primary-600" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Avg Margin</p>
-              <p className="text-2xl font-semibold text-purple-600">{summary.average_margin.toFixed(1)}%</p>
+              <p className="text-2xl font-semibold text-primary-600">{summary.average_margin.toFixed(1)}%</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">✅</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <CheckCircle2 className="w-5 h-5 text-primary-600" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Profitable</p>
-              <p className="text-2xl font-semibold text-emerald-600">{summary.profitable_trips}</p>
+              <p className="text-2xl font-semibold text-primary-600">{summary.profitable_trips}</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">⚠️</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Loss-Making</p>
-              <p className="text-2xl font-semibold text-orange-600">{summary.loss_trips}</p>
+              <p className="text-2xl font-semibold text-amber-600">{summary.loss_trips}</p>
             </div>
           </div>
 
@@ -440,7 +444,7 @@ export default function ProfitLossPage() {
             placeholder="Search trips..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -448,7 +452,7 @@ export default function ProfitLossPage() {
           <select
             value={sortField}
             onChange={(e) => setSortField(e.target.value as any)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="start_date">Sort by Date</option>
             <option value="gross_profit">Sort by Profit</option>
@@ -467,13 +471,13 @@ export default function ProfitLossPage() {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
               hasActiveFilters 
-                ? 'border-[#647C47] text-[#647C47] bg-[#647C47]/5' 
+                ? 'border-primary-500 text-primary-500 bg-primary-500/5' 
                 : 'border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
             <Filter className="h-4 w-4" />
             Filters
-            {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-[#647C47]"></span>}
+            {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-500"></span>}
           </button>
 
           {hasActiveFilters && (
@@ -493,7 +497,7 @@ export default function ProfitLossPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -509,7 +513,7 @@ export default function ProfitLossPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -518,7 +522,7 @@ export default function ProfitLossPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
@@ -559,7 +563,7 @@ export default function ProfitLossPage() {
                         <div>
                           <Link 
                             href={`/profit-loss/${trip.itinerary_id}`}
-                            className="text-sm font-medium text-gray-900 hover:text-[#647C47]"
+                            className="text-sm font-medium text-gray-900 hover:text-primary-500"
                           >
                             {trip.itinerary_code}
                           </Link>
@@ -656,7 +660,7 @@ export default function ProfitLossPage() {
                         <div className="flex items-center justify-end gap-1">
                           <Link
                             href={`/profit-loss/${trip.itinerary_id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                             title="View Details"
                           >
                             <Eye className="h-4 w-4" />
@@ -710,7 +714,7 @@ export default function ProfitLossPage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 text-sm rounded-lg ${
                     currentPage === pageNum
-                      ? 'bg-[#647C47] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >

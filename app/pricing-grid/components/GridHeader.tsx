@@ -96,13 +96,13 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
 
         {/* ===== TRIP PARAMETERS GROUP ===== */}
         <div className="flex items-center gap-3 border border-gray-100 rounded-lg px-3 py-1.5 bg-gray-50/50">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Trip</span>
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Trip</span>
 
           <div className="w-px h-5 bg-gray-200" />
 
           {/* Pax */}
           <div className="flex items-center gap-1.5">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pax</label>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pax</label>
             <input
               type="number"
               min={1}
@@ -116,7 +116,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
 
           {/* Start Date */}
           <div className="flex items-center gap-1.5">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Start</label>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Start</label>
             <input
               type="date"
               value={config.startDate}
@@ -147,7 +147,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
 
         {/* ===== PRICING MODE GROUP ===== */}
         <div className="flex items-center gap-3 border border-gray-100 rounded-lg px-3 py-1.5 bg-gray-50/50">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pricing</span>
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Pricing</span>
 
           <div className="w-px h-5 bg-gray-200" />
 
@@ -159,7 +159,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             title={!canB2b && config.clientType === 'b2c' ? 'B2B quotes are made by managers and admins' : undefined}
             className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-70 ${
               config.clientType === 'b2b'
-                ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 hover:bg-primary-100'
                 : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
             }`}
           >
@@ -171,7 +171,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             <select
               value={config.partnerId || ''}
               onChange={(e) => selectPartner(e.target.value)}
-              className="px-2 py-1 text-sm border border-purple-200 rounded-lg font-medium bg-purple-50 text-purple-700 focus:bg-white focus:ring-2 focus:ring-purple-200 transition-all max-w-[180px]"
+              className="px-2 py-1 text-sm border border-primary-200 rounded-lg font-medium bg-primary-50 text-primary-700 focus:bg-white focus:ring-2 focus:ring-primary-200 transition-all max-w-[180px]"
             >
               <option value="">Select Partner...</option>
               {partners.map(p => (
@@ -186,7 +186,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             onClick={toggleGuide}
             className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap ${
               config.withGuide
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 hover:bg-primary-100'
                 : 'bg-gray-100 border-gray-200 text-gray-400 hover:bg-gray-150'
             }`}
           >
@@ -203,7 +203,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             title="Throughout: one guide travels day 1 to the end — bed, meals (small parties), flight seats, +1 vehicle seat"
             className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap ${
               config.guideMode === 'throughout'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 hover:bg-primary-100'
                 : 'bg-gray-100 border-gray-200 text-gray-400 hover:bg-gray-150'
             }`}
           >
@@ -245,7 +245,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
 
           {/* Markup % — separate visible input with label */}
           <div className="flex items-center gap-1.5">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Markup %</label>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Markup %</label>
             <input
               type="number"
               min={0}
@@ -266,27 +266,27 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
             {/* Live indicator */}
             <div className="px-3 py-2 flex items-center gap-1.5 border-r border-green-100">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider whitespace-nowrap">Live Quote</span>
+              <span className="text-xs font-bold text-green-600 uppercase tracking-wider whitespace-nowrap">Live Quote</span>
             </div>
             <div className="flex-1 grid grid-cols-5 divide-x divide-green-100">
               <div className="px-3 py-2">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Cost/PP</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">Cost/PP</div>
                 <div className="text-sm font-bold text-gray-700">{sym}{fmt(cv(totals.costPerPerson))}</div>
               </div>
               <div className="px-3 py-2">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Total Cost</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Cost</div>
                 <div className="text-sm font-bold text-gray-700">{sym}{fmt(cv(totals.totalCost))}</div>
               </div>
               <div className="px-3 py-2">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Margin ({config.marginPercent}%)</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">Margin ({config.marginPercent}%)</div>
                 <div className={`text-sm font-bold ${totals.marginAmount > 0 ? 'text-amber-600' : 'text-red-500'}`}>{sym}{fmt(cv(totals.marginAmount))}</div>
               </div>
               <div className="px-3 py-2 bg-green-50/50">
-                <div className="text-[10px] text-green-600 uppercase tracking-wider font-medium">Sell/PP</div>
+                <div className="text-xs text-green-600 uppercase tracking-wider font-medium">Sell/PP</div>
                 <div className="text-sm font-extrabold text-green-700">{sym}{fmt(cv(totals.sellingPricePerPerson))}</div>
               </div>
               <div className="px-3 py-2 bg-green-50/50">
-                <div className="text-[10px] text-green-600 uppercase tracking-wider font-medium">Sell Total</div>
+                <div className="text-xs text-green-600 uppercase tracking-wider font-medium">Sell Total</div>
                 <div className="text-sm font-extrabold text-green-700">{sym}{fmt(cv(totals.sellingPriceTotal))}</div>
               </div>
             </div>
@@ -294,7 +294,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
         </div>
       ) : (
         <div className="border-t border-gray-100 px-4 py-2 bg-gray-50/50">
-          <p className="text-[11px] text-gray-400 text-center">Pricing updates automatically as you add services</p>
+          <p className="text-xs text-gray-400 text-center">Pricing updates automatically as you add services</p>
         </div>
       )}
     </div>

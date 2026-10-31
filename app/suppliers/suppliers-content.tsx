@@ -99,25 +99,25 @@ const CRUISE_ROUTES = ['Luxor to Aswan', 'Aswan to Luxor', 'Round Trip', 'Esna t
 // the fallbacks for rows whose type the vocabulary no longer lists.
 const BEHAVIOR_CONFIG: Record<string, { icon: any; label: string; singular: string; color: string; borderColor: string }> = {
   hotel: { icon: Building2, label: 'Hotels', singular: 'Hotel', color: 'bg-blue-100 text-blue-700', borderColor: 'border-blue-200' },
-  transport_company: { icon: Car, label: 'Transport', singular: 'Transport Company', color: 'bg-cyan-100 text-cyan-700', borderColor: 'border-cyan-200' },
-  airline: { icon: Plane, label: 'Airlines', singular: 'Airline', color: 'bg-sky-100 text-sky-700', borderColor: 'border-sky-200' },
-  train_operator: { icon: TrainFront, label: 'Trains', singular: 'Train Operator', color: 'bg-violet-100 text-violet-700', borderColor: 'border-violet-200' },
-  driver: { icon: Car, label: 'Drivers', singular: 'Driver', color: 'bg-teal-100 text-teal-700', borderColor: 'border-teal-200' },
+  transport_company: { icon: Car, label: 'Transport', singular: 'Transport Company', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
+  airline: { icon: Plane, label: 'Airlines', singular: 'Airline', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
+  train_operator: { icon: TrainFront, label: 'Trains', singular: 'Train Operator', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
+  driver: { icon: Car, label: 'Drivers', singular: 'Driver', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
   guide: { icon: Compass, label: 'Guides', singular: 'Guide', color: 'bg-green-100 text-green-700', borderColor: 'border-green-200' },
-  cruise: { icon: Ship, label: 'Cruises', singular: 'Cruise', color: 'bg-indigo-100 text-indigo-700', borderColor: 'border-indigo-200' },
-  activity_provider: { icon: Ticket, label: 'Activities', singular: 'Activity Provider', color: 'bg-purple-100 text-purple-700', borderColor: 'border-purple-200' },
-  attraction: { icon: MapPin, label: 'Attractions', singular: 'Attraction', color: 'bg-pink-100 text-pink-700', borderColor: 'border-pink-200' },
+  cruise: { icon: Ship, label: 'Cruises', singular: 'Cruise', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
+  activity_provider: { icon: Ticket, label: 'Activities', singular: 'Activity Provider', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
+  attraction: { icon: MapPin, label: 'Attractions', singular: 'Attraction', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
   tour_operator: { icon: Globe, label: 'Tour Operators', singular: 'Tour Operator', color: 'bg-amber-100 text-amber-700', borderColor: 'border-amber-200' },
   ground_handler: { icon: Briefcase, label: 'Ground Handlers', singular: 'Ground Handler', color: 'bg-slate-100 text-slate-700', borderColor: 'border-slate-200' },
-  restaurant: { icon: Utensils, label: 'Restaurants', singular: 'Restaurant', color: 'bg-orange-100 text-orange-700', borderColor: 'border-orange-200' },
-  shop: { icon: ShoppingBag, label: 'Shops', singular: 'Shop', color: 'bg-rose-100 text-rose-700', borderColor: 'border-rose-200' },
+  restaurant: { icon: Utensils, label: 'Restaurants', singular: 'Restaurant', color: 'bg-amber-100 text-amber-700', borderColor: 'border-amber-200' },
+  shop: { icon: ShoppingBag, label: 'Shops', singular: 'Shop', color: 'bg-primary-100 text-primary-700', borderColor: 'border-primary-200' },
   other: { icon: Briefcase, label: 'Other', singular: 'Supplier', color: 'bg-gray-100 text-gray-700', borderColor: 'border-gray-200' }
 }
 
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
   inactive: 'bg-gray-100 text-gray-500',
-  pending: 'bg-yellow-100 text-yellow-700'
+  pending: 'bg-amber-100 text-amber-700'
 }
 
 
@@ -817,7 +817,7 @@ export default function SuppliersContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-semibold text-gray-900">
+              <h1 className="text-2xl font-semibold text-gray-900">
                 {selectedType === 'all' ? 'All Suppliers' : getTypeConfig(selectedType).label}
               </h1>
               <p className="text-sm text-gray-500">Manage supplier relationships, contacts, and rates</p>
@@ -1066,18 +1066,18 @@ export default function SuppliersContent() {
                       {/* Type-specific badges */}
                       {supplier.languages && supplier.languages.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
-                          {supplier.languages.slice(0, 3).map(l => <span key={l} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px]">{l}</span>)}
-                          {supplier.languages.length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">+{supplier.languages.length - 3}</span>}
+                          {supplier.languages.slice(0, 3).map(l => <span key={l} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs">{l}</span>)}
+                          {supplier.languages.length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{supplier.languages.length - 3}</span>}
                         </div>
                       )}
                       {supplier.vehicle_types && supplier.vehicle_types.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
-                          {supplier.vehicle_types.map(v => <span key={v} className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 rounded text-[10px]"><VocabLabel kind="vehicle_type" value={v} /></span>)}
+                          {supplier.vehicle_types.map(v => <span key={v} className="px-1.5 py-0.5 bg-primary-50 text-primary-700 rounded text-xs"><VocabLabel kind="vehicle_type" value={v} /></span>)}
                         </div>
                       )}
                       {supplier.star_rating && (
                         <div className="flex items-center gap-1 mb-3">
-                          {Array.from({ length: parseInt(supplier.star_rating) || 0 }).map((_, i) => <Star key={i} className="w-3 h-3 text-yellow-400 fill-yellow-400" />)}
+                          {Array.from({ length: parseInt(supplier.star_rating) || 0 }).map((_, i) => <Star key={i} className="w-3 h-3 text-amber-400 fill-amber-400" />)}
                         </div>
                       )}
 
@@ -1346,7 +1346,7 @@ export default function SuppliersContent() {
                     <div className="space-y-3">
                       {selectedSupplier.city && <div><p className="text-xs text-gray-500">City</p><p className="text-sm font-medium text-gray-900">{selectedSupplier.city}</p></div>}
                       {selectedSupplier.address && <div><p className="text-xs text-gray-500">Address</p><p className="text-sm font-medium text-gray-900">{selectedSupplier.address}</p></div>}
-                      {selectedSupplier.star_rating && <div><p className="text-xs text-gray-500">Star Rating</p><div className="flex items-center gap-1">{Array.from({ length: parseInt(selectedSupplier.star_rating) || 0 }).map((_, i) => <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />)}</div></div>}
+                      {selectedSupplier.star_rating && <div><p className="text-xs text-gray-500">Star Rating</p><div className="flex items-center gap-1">{Array.from({ length: parseInt(selectedSupplier.star_rating) || 0 }).map((_, i) => <Star key={i} className="w-4 h-4 text-amber-400 fill-amber-400" />)}</div></div>}
                       {selectedSupplier.supplier_code && <div><p className="text-xs text-gray-500">Code</p><p className="text-sm font-mono font-medium text-gray-900">{selectedSupplier.supplier_code}</p></div>}
                       <div><p className="text-xs text-gray-500">Status</p><span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[selectedSupplier.status]}`}>{selectedSupplier.status}</span></div>
                     </div>
