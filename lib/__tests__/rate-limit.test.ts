@@ -54,7 +54,8 @@ describe('getRateLimitIdentifier', () => {
 // form, and the shared-trip report and chat) each read the LEFTMOST
 // X-Forwarded-For entry themselves — the one value a client can set — so a
 // fake IP per request walked straight past their limits. Every route must go
-// through getClientIdentifier; only lib/rate-limit.ts reads the header.
+// through getClientIdentifier; only lib/client-ip.ts (and lib/rate-limit.ts,
+// which uses it) reads the header.
 describe('no route reads X-Forwarded-For itself', () => {
   it('only lib/rate-limit.ts touches the header', async () => {
     const { readdirSync, readFileSync, statSync } = await import('node:fs')
@@ -75,7 +76,7 @@ describe('no route reads X-Forwarded-For itself', () => {
     const offenders = files
       .filter(f => /['"`]x-forwarded-for['"`]/i.test(readFileSync(f, 'utf8')))
       .map(f => relative(root, f))
-      .filter(f => f !== join('lib', 'rate-limit.ts'))
+      .filter(f => f !== join('lib', 'rate-limit.ts') && f !== join('lib', 'client-ip.ts'))
     expect(offenders, 'use getClientIdentifier (lib/rate-limit.ts) instead').toEqual([])
   })
 })

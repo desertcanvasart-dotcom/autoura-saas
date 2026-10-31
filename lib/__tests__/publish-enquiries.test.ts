@@ -173,6 +173,12 @@ describe('click-to-WhatsApp', () => {
     expect(db.tables.publish_wa_refs[0]).toMatchObject({ token: ref.token, tenant_id: T, page_id: PAGE, campaign: 'spring' })
   })
 
+  it('past the click limit: the number and tour, but no reference and nothing recorded', async () => {
+    const ref = await createWaRef(db as never, { siteId: SITE, pageId: PAGE, language: 'en', landingUrl: null }, { reference: false })
+    expect(ref).toEqual({ number: '+201551772258', token: null, tourName: 'Saqqara and the First Pyramids' })
+    expect(db.tables.publish_wa_refs).toHaveLength(0)
+  })
+
   it('a company on the shared number gets no button and no reference (Q7)', async () => {
     db.tables.tenants[0].whatsapp_number = null
     expect(await createWaRef(db as never, { siteId: SITE, pageId: PAGE, language: 'en', landingUrl: null })).toEqual({ number: null, token: null, tourName: null })

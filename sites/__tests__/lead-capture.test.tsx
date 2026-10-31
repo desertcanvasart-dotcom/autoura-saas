@@ -80,8 +80,12 @@ describe('sending the visitor back', () => {
     expect(backTo(null, 'fr', OUTCOME_ANCHOR.failed)).toBe('/fr#enquiry-failed')
   })
 
-  it("the visitor's address is the first hop", () => {
-    expect(visitorIpOf(new Headers({ 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }))).toBe('203.0.113.9')
+  it("the visitor's address is the hop the platform's edge appended, never one the visitor wrote", () => {
+    // The visitor sent "1.1.1.1" themselves; the edge appended what it saw.
+    expect(visitorIpOf(new Headers({ 'x-forwarded-for': '1.1.1.1, 203.0.113.9' }))).toBe('203.0.113.9')
+    expect(visitorIpOf(new Headers({ 'x-forwarded-for': '203.0.113.9' }))).toBe('203.0.113.9')
+    expect(visitorIpOf(new Headers({ 'x-real-ip': '192.0.2.5' }))).toBe('192.0.2.5')
+    expect(visitorIpOf(new Headers({ 'x-forwarded-for': 'not-an-ip' }))).toBeNull()
     expect(visitorIpOf(new Headers())).toBeNull()
   })
 })
@@ -92,6 +96,11 @@ describe('the WhatsApp button', () => {
     expect(link.startsWith('https://wa.me/201551772258?text=')).toBe(true)
     expect(decodeURIComponent(link.split('text=')[1])).toBe('Hello, I am interested in Saqqara.\n\nRef: ABCD2345')
     expect(whatsAppLink({ number: null, token: null, tourName: null }, 'en')).toBeNull()
+  })
+
+  it('past the click limit (no reference made) still opens WhatsApp, without a Ref line', () => {
+    const link = whatsAppLink({ number: '+201551772258', token: null, tourName: 'Saqqara' }, 'en')!
+    expect(decodeURIComponent(link.split('text=')[1])).toBe('Hello, I am interested in Saqqara.')
   })
 
   it('goes through the tracked route, and only for a company with its own number', () => {

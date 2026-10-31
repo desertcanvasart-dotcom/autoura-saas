@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { decideRoute, embedPath, frameAncestors, internalPath, MISSING_SEGMENT, UNKNOWN_HOST_PATH } from './lib/routing'
 import { siteForEmbedKey, siteForHost } from './lib/internal-api'
-import { normalizeHost } from '@/lib/publish/site-data'
+import { normalizeHost } from '@/lib/publish/host'
 
 // ============================================
 // Every request: hostname → company site → page (lib/routing.ts)
