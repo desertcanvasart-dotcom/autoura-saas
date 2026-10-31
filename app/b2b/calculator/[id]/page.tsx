@@ -552,7 +552,7 @@ export default function TourPriceCalculator() {
           </div>
         </div>
         <Link 
-          href="/quotes/b2b" 
+          href="/quotes?tab=b2b" 
           className="flex items-center gap-2 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50"
         >
           <FileText className="w-4 h-4" />

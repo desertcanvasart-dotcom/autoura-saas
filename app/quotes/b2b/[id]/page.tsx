@@ -308,7 +308,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
           <h3 className="text-lg font-bold text-red-800 text-center mb-2">Quote Not Found</h3>
           <p className="text-sm text-red-600 text-center mb-4">{error || 'This quote does not exist.'}</p>
           <Link
-            href="/quotes/b2b"
+            href="/quotes?tab=b2b"
             className="block w-full px-4 py-2 bg-red-600 text-white rounded-lg font-medium text-center hover:bg-red-700"
           >
             Back to Quotes
@@ -328,7 +328,7 @@ export default function B2BQuoteDetailPage({ params: paramsPromise }: { params: 
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <Link
-              href="/quotes/b2b"
+              href="/quotes?tab=b2b"
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft className="w-5 h-5" />

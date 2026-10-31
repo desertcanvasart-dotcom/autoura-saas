@@ -108,7 +108,7 @@ describe('quote statuses', () => {
 describe('the quote lists', () => {
   for (const t of ['b2b', 'b2c']) {
     it(`${t}: select-all is the page you see; CSV cells are escaped`, () => {
-      const page = src(`app/quotes/${t}/page.tsx`)
+      const page = src(`app/quotes/_views/${t.toUpperCase()}QuotesView.tsx`)
       expect(page).toContain('checked={pageAllSelected}')
       expect(page).toContain('row.map(csvCell)')
     })
