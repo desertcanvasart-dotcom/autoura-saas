@@ -170,8 +170,8 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
       <div className="bg-white rounded-2xl shadow-xl p-8">
         {/* Title */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Palette className="w-6 h-6 text-purple-600" />
+          <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Palette className="w-6 h-6 text-primary-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Customize Your Branding

@@ -43,8 +43,8 @@ const TOUR_SLIDES = [
   {
     id: 3,
     icon: UsersIcon,
-    iconColor: 'text-purple-600',
-    iconBg: 'bg-purple-100',
+    iconColor: 'text-primary-600',
+    iconBg: 'bg-primary-100',
     title: 'Client & Partner Management',
     description: 'Keep all your contacts organized',
     features: [
@@ -73,8 +73,8 @@ const TOUR_SLIDES = [
   {
     id: 5,
     icon: Settings,
-    iconColor: 'text-indigo-600',
-    iconBg: 'bg-indigo-100',
+    iconColor: 'text-primary-600',
+    iconBg: 'bg-primary-100',
     title: 'Rate Management',
     description: 'Configure your pricing once, use everywhere',
     features: [
