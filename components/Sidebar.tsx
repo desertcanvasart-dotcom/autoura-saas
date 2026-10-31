@@ -2,17 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useRole } from '@/hooks/useRole'
 import { useInboxUnreadCount, useTeamBadges } from '@/lib/use-inbox-unread'
-import { mainNavFor, activeHref, SETTINGS_LINK, LAST_APP_PATH_KEY, type NavBadge, type NavItem } from '@/lib/nav/config'
+import { mainNavFor, activeHref, sectionItems, SETTINGS_LINK, LAST_APP_PATH_KEY, type NavBadge, type NavItem } from '@/lib/nav/config'
 
-// The main sidebar: the daily work only, built from lib/nav/config.ts — no
-// link is written here. Setup lives in the Settings area (its own layout),
-// the rate sheets in the Rates page's menu, and the account, notifications
-// and Copilot in the top bar.
+// The main sidebar, built from lib/nav/config.ts — no link is written here.
+// Setup lives in the Settings area (its own layout); the account and
+// notifications in the top bar. The rate sheets sit in foldable groups.
 
 interface SidebarProps {
   /** Small screens: the sidebar is a drawer opened from the top bar. */
@@ -23,18 +22,30 @@ interface SidebarProps {
 // Collapsed sections, remembered per login. Storing the COLLAPSED ones means
 // a section added later starts open.
 const storageKey = (userId: string) => `autoura-sidebar-sections:${userId}`
+// Groups (the rate sheets) start folded; the OPENED ones are remembered.
+const groupsKey = (userId: string) => `autoura-sidebar-groups:${userId}`
+
+function readList(key: string): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || '[]')
+    return Array.isArray(saved) ? saved.filter((k: unknown): k is string => typeof k === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 export const ICON_PROPS = { size: 18, strokeWidth: 1.7 } as const
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
+  const search = useSearchParams()?.toString() ?? ''
   const { user } = useAuth()
   const { role, canAccess } = useRole()
   const sections = useMemo(() => mainNavFor(role), [role])
 
-  // Unread emails in the user's Gmail inbox, badged on Inbox (a new arrival
-  // also pops a toast — except on the Inbox page, which shows it itself),
-  // plus the team's unread WhatsApp messages. Leads awaiting review on Leads.
+  // Unread emails in the user's Gmail inbox, badged on Email (a new arrival
+  // also pops a toast — except on the Inbox, which shows it itself); the
+  // team's unread WhatsApp messages on WhatsApp; leads awaiting review on Leads.
   const works = canAccess(['admin', 'manager', 'member'])
   const inboxUnread = useInboxUnreadCount(works ? user?.id : null, { notify: !pathname.startsWith('/inbox') })
   const team = useTeamBadges(works, {
@@ -44,13 +55,29 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     },
   })
   const badges: Record<NavBadge, number | null> = {
-    inbox: (inboxUnread ?? 0) + (team.whatsapp ?? 0) || null,
+    email: inboxUnread || null,
+    whatsapp: team.whatsapp || null,
     leads: team.concierge || null,
   }
 
-  const allItems = useMemo(() => sections.flatMap(s => s.items), [sections])
-  const current = activeHref([...allItems, SETTINGS_LINK], pathname)
-  const currentSection = sections.find(s => s.items.some(i => i.href === current))?.key
+  const allItems = useMemo(() => sections.flatMap(sectionItems), [sections])
+  const current = activeHref([...allItems, SETTINGS_LINK], pathname, search)
+  const currentSection = sections.find(s => sectionItems(s).some(i => i.href === current))?.key
+  const currentGroup = sections.flatMap(s => s.groups ?? []).find(g => g.items.some(i => i.href === current))?.key
+
+  const [openGroups, setOpenGroups] = useState<string[]>([])
+  const [groupsLoadedFor, setGroupsLoadedFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (!user?.id) return
+    setOpenGroups(readList(groupsKey(user.id)))
+    setGroupsLoadedFor(user.id)
+  }, [user?.id])
+  useEffect(() => {
+    if (!user?.id || groupsLoadedFor !== user.id) return
+    try { localStorage.setItem(groupsKey(user.id), JSON.stringify(openGroups)) } catch { /* private mode */ }
+  }, [openGroups, user?.id, groupsLoadedFor])
+  const toggleGroup = (key: string) =>
+    setOpenGroups(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
 
   const [collapsed, setCollapsed] = useState<string[]>([])
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
@@ -124,7 +151,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           {sections.map(section => {
             const isOpen = section.key === currentSection || !collapsed.includes(section.key)
             const folded = !isOpen
-            const hasNews = folded && section.items.some(i => i.badge && badges[i.badge])
+            const hasNews = folded && sectionItems(section).some(i => i.badge && badges[i.badge])
             return (
               <div key={section.key}>
                 {section.title && (
@@ -145,6 +172,30 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   </button>
                 )}
                 {isOpen && <div className="space-y-0.5">{section.items.map(renderItem)}</div>}
+                {isOpen && section.groups?.map(group => {
+                  const groupOpen = group.key === currentGroup || openGroups.includes(group.key)
+                  return (
+                    <div key={group.key} className="mt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.key)}
+                        aria-expanded={groupOpen}
+                        className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-[14px] text-gray-700 hover:bg-gray-100"
+                      >
+                        <ChevronDown
+                          size={16}
+                          strokeWidth={1.7}
+                          className={`shrink-0 text-gray-500 transition-transform ${groupOpen ? '' : '-rotate-90'}`}
+                          aria-hidden
+                        />
+                        <span className="truncate">{group.title}</span>
+                      </button>
+                      {groupOpen && (
+                        <div className="ml-5 pl-2 border-l border-gray-200 space-y-0.5">{group.items.map(renderItem)}</div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
