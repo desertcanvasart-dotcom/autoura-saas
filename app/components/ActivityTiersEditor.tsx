@@ -62,7 +62,7 @@ export default function ActivityTiersEditor({
         <button
           type="button"
           onClick={() => onChange([...tiers, emptyTier(tiers[tiers.length - 1])])}
-          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-md hover:bg-[#4f6238]"
+          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-md hover:bg-primary-700"
         >
           <Plus className="w-3.5 h-3.5" /> Add band
         </button>

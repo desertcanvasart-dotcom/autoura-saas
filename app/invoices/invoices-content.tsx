@@ -569,7 +569,7 @@ export default function InvoicesContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -589,7 +589,7 @@ export default function InvoicesContent() {
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
         >
           <Plus className="h-4 w-4" />
           New Invoice
@@ -657,7 +657,7 @@ export default function InvoicesContent() {
             placeholder="Search invoices..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+            className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
           />
         </div>
 
@@ -665,7 +665,7 @@ export default function InvoicesContent() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white shadow-sm cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white shadow-sm cursor-pointer"
           >
             <option value="">All Types</option>
             <option value="standard">Standard</option>
@@ -679,7 +679,7 @@ export default function InvoicesContent() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white shadow-sm cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white shadow-sm cursor-pointer"
           >
             <option value="">All Status</option>
             <option value="draft">Draft</option>
@@ -832,12 +832,12 @@ export default function InvoicesContent() {
                         onClick={() => handleInvoiceTypeChange(type)}
                         className={`p-4 rounded-lg border-2 transition-all ${
                           formData.invoice_type === type
-                            ? 'border-[#647C47] bg-[#647C47]/5'
+                            ? 'border-primary-500 bg-primary-500/5'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <Icon className={`h-5 w-5 mx-auto mb-2 ${formData.invoice_type === type ? 'text-[#647C47]' : 'text-gray-400'}`} />
-                        <p className={`text-sm font-medium ${formData.invoice_type === type ? 'text-[#647C47]' : 'text-gray-600'}`}>
+                        <Icon className={`h-5 w-5 mx-auto mb-2 ${formData.invoice_type === type ? 'text-primary-500' : 'text-gray-400'}`} />
+                        <p className={`text-sm font-medium ${formData.invoice_type === type ? 'text-primary-500' : 'text-gray-600'}`}>
                           {config.label}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
@@ -905,7 +905,7 @@ export default function InvoicesContent() {
                     value={formData.client_id}
                     onChange={(e) => handleClientChange(e.target.value)}
                     required
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm bg-white"
                   >
                     <option value="">Select Client</option>
                     {clients.map(client => (
@@ -926,7 +926,7 @@ export default function InvoicesContent() {
                   <select
                     value={formData.itinerary_id}
                     onChange={(e) => handleItineraryChange(e.target.value)}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm bg-white"
                   >
                     <option value="">No Itinerary</option>
                     {itineraries.map(it => (
@@ -945,7 +945,7 @@ export default function InvoicesContent() {
                   <select
                     value={formData.currency}
                     onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm bg-white"
                   >
                     {/* Every supported currency: a JPY trip's invoice showed EUR here. */}
                     {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c} ({currencySymbol(c)})</option>)}
@@ -957,7 +957,7 @@ export default function InvoicesContent() {
                     type="date"
                     value={formData.issue_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, issue_date: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                   />
                 </div>
                 <div>
@@ -966,7 +966,7 @@ export default function InvoicesContent() {
                     type="date"
                     value={formData.due_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                   />
                 </div>
               </div>
@@ -978,7 +978,7 @@ export default function InvoicesContent() {
                   <button
                     type="button"
                     onClick={addLineItem}
-                    className="text-sm text-[#647C47] hover:text-[#4f6238] font-medium flex items-center gap-1"
+                    className="text-sm text-primary-500 hover:text-primary-700 font-medium flex items-center gap-1"
                   >
                     <Plus className="h-4 w-4" />
                     Add Item
@@ -1006,7 +1006,7 @@ export default function InvoicesContent() {
                                 value={item.description}
                                 onChange={(e) => updateLineItem(index, 'description', e.target.value)}
                                 placeholder="Item description"
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -1017,7 +1017,7 @@ export default function InvoicesContent() {
                                 // A deposit/final line is the server's share of the trip; an edit here was not saved.
                                 readOnly={formData.invoice_type !== 'standard'}
                                 min="1"
-                                className="w-full px-3 py-2 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                                className="w-full px-3 py-2 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -1028,7 +1028,7 @@ export default function InvoicesContent() {
                                 readOnly={formData.invoice_type !== 'standard'}
                                 step="0.01"
                                 min="0"
-                                className="w-full px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                                className="w-full px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                               />
                             </td>
                             <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
@@ -1070,7 +1070,7 @@ export default function InvoicesContent() {
                       onChange={(e) => updateTaxRate(parseFloat(e.target.value) || 0)}
                       step="0.1"
                       min="0"
-                      className="w-24 px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] shadow-sm"
+                      className="w-24 px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
                     />
                   </div>
                   <div className="flex justify-between text-sm">
@@ -1085,7 +1085,7 @@ export default function InvoicesContent() {
                       onChange={(e) => updateDiscount(parseFloat(e.target.value) || 0)}
                       step="0.01"
                       min="0"
-                      className="w-24 px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] shadow-sm"
+                      className="w-24 px-3 py-2 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
                     />
                   </div>
                   </>)}
@@ -1104,7 +1104,7 @@ export default function InvoicesContent() {
                     type="text"
                     value={formData.payment_terms}
                     onChange={(e) => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                   />
                 </div>
                 <div>
@@ -1114,7 +1114,7 @@ export default function InvoicesContent() {
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                     placeholder="Additional notes..."
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm"
                   />
                 </div>
               </div>
@@ -1131,7 +1131,7 @@ export default function InvoicesContent() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50 shadow-sm"
+                  className="px-5 py-2.5 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 shadow-sm"
                 >
                   {saving ? 'Creating...' : `Create ${TYPE_CONFIG[formData.invoice_type].label} Invoice`}
                 </button>

@@ -91,7 +91,7 @@ export default function UnifiedConversationComposer({ conversation, userId, onSe
           <button
             onClick={() => setChannel('email')}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-              channel === 'email' ? 'bg-[#647C47] text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              channel === 'email' ? 'bg-primary-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
             }`}
           >
             <Mail className="w-3 h-3" />
@@ -108,9 +108,9 @@ export default function UnifiedConversationComposer({ conversation, userId, onSe
             <div className="flex items-center gap-3 px-4 py-3">
               <button
                 onClick={() => setEmailOpen(true)}
-                className="flex-1 flex items-center gap-2 px-4 py-2.5 text-sm text-left text-gray-500 border border-gray-200 rounded-lg hover:border-[#647C47] hover:text-gray-700 transition-colors"
+                className="flex-1 flex items-center gap-2 px-4 py-2.5 text-sm text-left text-gray-500 border border-gray-200 rounded-lg hover:border-primary-500 hover:text-gray-700 transition-colors"
               >
-                <Reply className="w-4 h-4 text-[#647C47]" />
+                <Reply className="w-4 h-4 text-primary-500" />
                 Reply to {conversation.contact_email}…
               </button>
             </div>
@@ -591,7 +591,7 @@ function EmailCompose({
                   {d.ai_flags?.subject && <span className="text-xs text-gray-500 truncate">{d.ai_flags.subject}</span>}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-[#647C47] text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
+                  <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-primary-500 text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
                     <Check className="w-3 h-3" /> Use
                   </button>
                   <button onClick={() => dismiss(d.id)} className="p-1 text-gray-400 hover:text-red-500 rounded">
@@ -613,7 +613,7 @@ function EmailCompose({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 w-14">Subject</span>
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
         </div>
 
         <RichReplyEditor html={bodyHtml} onChange={setBodyHtml} placeholder="Write your email…" minHeight={180} />
@@ -659,7 +659,7 @@ function EmailCompose({
           <button
             onClick={send}
             disabled={!canSend}
-            className="flex items-center gap-1.5 bg-[#647C47] text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-primary-500 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             {sending ? 'Sending…' : 'Send reply'}

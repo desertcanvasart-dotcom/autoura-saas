@@ -148,7 +148,7 @@ function PromptsContent() {
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => setShowView(p)} className="p-1 text-gray-400 hover:text-gray-600"><Eye className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => handleEdit(p)} className="p-1 text-gray-400 hover:text-[#647C47]"><Edit className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => handleEdit(p)} className="p-1 text-gray-400 hover:text-primary-500"><Edit className="w-3.5 h-3.5" /></button>
                           <button onClick={() => navigator.clipboard.writeText(p.user_prompt_template)} className="p-1 text-gray-400 hover:text-blue-500"><Copy className="w-3.5 h-3.5" /></button>
                           <button onClick={() => handleDelete(p.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
@@ -182,7 +182,7 @@ function PromptsContent() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Name</label>
-                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:border-[#647C47] outline-none" />
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:border-primary-500 outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Purpose</label>
@@ -262,5 +262,5 @@ function PromptsContent() {
 }
 
 export default function PromptsPage() {
-  return <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div></div>}><PromptsContent /></Suspense>
+  return <Suspense fallback={<div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div></div>}><PromptsContent /></Suspense>
 }

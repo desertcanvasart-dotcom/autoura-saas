@@ -364,7 +364,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
                     {d.ai_flags?.subject && <span className="text-xs text-gray-500 truncate">{d.ai_flags.subject}</span>}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-[#647C47] text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
+                    <button onClick={() => accept(d)} className="flex items-center gap-1 text-xs bg-primary-500 text-white px-2.5 py-1 rounded-full hover:bg-[#566b3c]">
                       <Check className="w-3 h-3" />Use
                     </button>
                     <button onClick={() => dismiss(d.id)} className="p-1 text-gray-400 hover:text-red-500 rounded">
@@ -395,17 +395,17 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
           <>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 w-14">Cc</span>
-              <input value={cc} onChange={(e) => setCc(e.target.value)} aria-label="Cc" placeholder="Copy to" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+              <input value={cc} onChange={(e) => setCc(e.target.value)} aria-label="Cc" placeholder="Copy to" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 w-14">Bcc</span>
-              <input value={bcc} onChange={(e) => setBcc(e.target.value)} aria-label="Bcc" placeholder="Blind copy" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+              <input value={bcc} onChange={(e) => setBcc(e.target.value)} aria-label="Bcc" placeholder="Blind copy" className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
             </div>
           </>
         )}
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 w-14">Subject</span>
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40" />
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
         </div>
 
         <RichReplyEditor
@@ -463,7 +463,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
           <button
             onClick={() => send()}
             disabled={!canSend}
-            className="flex items-center gap-1.5 bg-[#647C47] text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-primary-500 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             {sending ? 'Sending…' : 'Send reply'}

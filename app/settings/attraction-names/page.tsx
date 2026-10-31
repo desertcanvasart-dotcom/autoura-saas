@@ -213,7 +213,7 @@ export default function AttractionAliasesPage() {
                       <button
                         disabled={!canWrite || rewritten || !join(choice) || busy === key}
                         onClick={async () => { if (await add(u.wording, choice, key)) setPicked(p => { const n = { ...p }; delete n[key]; return n }) }}
-                        className="px-3 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#566b3d] disabled:bg-gray-200 disabled:text-gray-500 inline-flex items-center gap-1.5 justify-center"
+                        className="px-3 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#566b3d] disabled:bg-gray-200 disabled:text-gray-500 inline-flex items-center gap-1.5 justify-center"
                       >
                         {busy === key ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Use this fee
                       </button>
@@ -242,7 +242,7 @@ export default function AttractionAliasesPage() {
                 <button
                   disabled={!newAlias.trim() || !join(newFees) || busy === 'new'}
                   onClick={async () => { if (await add(newAlias, newFees, 'new')) { setNewAlias(''); setNewFees(['']) } }}
-                  className="px-3 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#566b3d] disabled:bg-gray-200 disabled:text-gray-500 inline-flex items-center gap-1.5 justify-center"
+                  className="px-3 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#566b3d] disabled:bg-gray-200 disabled:text-gray-500 inline-flex items-center gap-1.5 justify-center"
                 >
                   {busy === 'new' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add alias
                 </button>
@@ -266,7 +266,7 @@ export default function AttractionAliasesPage() {
                             <button
                               disabled={!editing.alias.trim() || !join(editing.fees) || busy === a.id}
                               onClick={async () => { if (await send(a.id, `/api/attraction-aliases/${a.id}`, 'PATCH', { alias: editing.alias, canonical: join(editing.fees) }, 'Alias updated.')) setEditing(null) }}
-                              className="px-3 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg disabled:bg-gray-200 disabled:text-gray-500"
+                              className="px-3 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg disabled:bg-gray-200 disabled:text-gray-500"
                             >Save</button>
                             <button onClick={() => setEditing(null)} className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg">Cancel</button>
                           </div>

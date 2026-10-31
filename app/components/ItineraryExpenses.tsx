@@ -240,7 +240,7 @@ export default function ItineraryExpenses({
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Link
                       href={`/expenses/${expense.id}`}
-                      className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                       title="View details"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />

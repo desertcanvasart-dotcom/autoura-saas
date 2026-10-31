@@ -55,7 +55,7 @@ export function ChecklistSummary({ items }: { items: ChecklistItem[] }) {
         )}
       </div>
       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${p.complete ? 'bg-green-500' : 'bg-[#647C47]'}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full ${p.complete ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
@@ -189,7 +189,7 @@ export function TaskChecklist<T extends TaskWithChecklist>({
                     ) : (
                       <input
                         type="checkbox"
-                        className="w-4 h-4 accent-[#647C47] cursor-pointer"
+                        className="w-4 h-4 accent-primary-500 cursor-pointer"
                         checked={row.booked}
                         disabled={readOnly}
                         aria-label={'Booked'}
@@ -233,7 +233,7 @@ export function TaskChecklist<T extends TaskWithChecklist>({
                   <td className="px-2 py-2 align-top">
                     <input
                       type="text"
-                      className="w-full min-w-[110px] px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47] disabled:bg-gray-50"
+                      className="w-full min-w-[110px] px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50"
                       placeholder={'Conf. no.'}
                       value={drafts[row.key] ?? row.confirmation ?? ''}
                       disabled={readOnly || busy}

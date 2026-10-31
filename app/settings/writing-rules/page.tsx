@@ -256,7 +256,7 @@ export default function WritingRulesPage() {
             </p>
             <button
               onClick={handleNew}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#4f613a] transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Rule
@@ -290,8 +290,8 @@ export default function WritingRulesPage() {
             onClick={() => setFilterCategory(null)}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
               filterCategory === null
-                ? 'bg-[#647C47] text-white'
-                : 'bg-white text-gray-600 border border-gray-200 hover:border-[#647C47]'
+                ? 'bg-primary-500 text-white'
+                : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-500'
             }`}
           >
             All Rules
@@ -305,8 +305,8 @@ export default function WritingRulesPage() {
                 onClick={() => setFilterCategory(cat.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   filterCategory === cat.id
-                    ? 'bg-[#647C47] text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:border-[#647C47]'
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-primary-500'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -324,7 +324,7 @@ export default function WritingRulesPage() {
         {/* Rules List */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
           </div>
         ) : (
           <div className="space-y-6">
@@ -376,7 +376,7 @@ export default function WritingRulesPage() {
                                   e.stopPropagation()
                                   handleEdit(rule)
                                 }}
-                                className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded-lg transition-colors"
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
@@ -480,7 +480,7 @@ export default function WritingRulesPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder='e.g., "Avoid Generic Superlatives"'
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 />
               </div>
 
@@ -491,7 +491,7 @@ export default function WritingRulesPage() {
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as RuleCategory })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   >
                     {CATEGORIES.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.label}</option>
@@ -503,7 +503,7 @@ export default function WritingRulesPage() {
                   <select
                     value={formData.rule_type}
                     onChange={(e) => setFormData({ ...formData, rule_type: e.target.value as RuleType })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   >
                     {RULE_TYPES.map(type => (
                       <option key={type.id} value={type.id}>{type.label}</option>
@@ -522,7 +522,7 @@ export default function WritingRulesPage() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Explain this rule clearly..."
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] resize-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-none"
                 />
               </div>
 
@@ -537,7 +537,7 @@ export default function WritingRulesPage() {
                   max="10"
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
-                  className="w-full accent-[#647C47]"
+                  className="w-full accent-primary-500"
                 />
                 <div className="flex justify-between text-xs text-gray-400">
                   <span>Low</span>
@@ -567,7 +567,7 @@ export default function WritingRulesPage() {
                       }}
                       className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                         formData.applies_to.includes(opt.id)
-                          ? 'bg-[#647C47] text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -590,7 +590,7 @@ export default function WritingRulesPage() {
                           value={ex}
                           onChange={(e) => updateExample('bad', i, e.target.value)}
                           placeholder="What to avoid..."
-                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                         />
                         <button
                           onClick={() => removeExample('bad', i)}
@@ -620,7 +620,7 @@ export default function WritingRulesPage() {
                           value={ex}
                           onChange={(e) => updateExample('good', i, e.target.value)}
                           placeholder="Better alternative..."
-                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                         />
                         <button
                           onClick={() => removeExample('good', i)}
@@ -651,7 +651,7 @@ export default function WritingRulesPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#4f613a] disabled:opacity-50 transition-colors"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? 'Saving...' : 'Save Rule'}

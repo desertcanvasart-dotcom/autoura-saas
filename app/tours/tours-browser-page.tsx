@@ -148,7 +148,7 @@ export default function ToursBrowsePage() {
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-[#647C47] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
             <p className="text-gray-500 text-sm">Loading tours...</p>
           </div>
         </div>
@@ -188,7 +188,7 @@ export default function ToursBrowsePage() {
         </div>
         <Link 
           href="/tours/manage"
-          className="px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] transition-colors font-medium"
+          className="px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] transition-colors font-medium"
         >
           Manage Tours
         </Link>
@@ -255,13 +255,13 @@ export default function ToursBrowsePage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name, description, or city..."
-            className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none"
+            className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
         </div>
         <select
           value={filterTier}
           onChange={(e) => setFilterTier(e.target.value)}
-          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white min-w-[150px]"
+          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white min-w-[150px]"
         >
           <option value="all">All Tiers</option>
           {tierEntries.map(t => (
@@ -271,7 +271,7 @@ export default function ToursBrowsePage() {
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
-          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white min-w-[180px]"
+          className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white min-w-[180px]"
         >
           <option value="all">All Categories</option>
           {uniqueCategories.map(cat => (
@@ -291,7 +291,7 @@ export default function ToursBrowsePage() {
             setFilterTier('all')
             setFilterCategory('all')
           }}
-          className="text-sm text-[#647C47] hover:text-[#4a5c35] font-medium"
+          className="text-sm text-primary-500 hover:text-[#4a5c35] font-medium"
         >
           Clear Filters
         </button>
@@ -302,7 +302,7 @@ export default function ToursBrowsePage() {
         {filteredTours.map((tour) => (
           <div 
             key={tour.id} 
-            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-[#647C47] transition-colors"
+            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-primary-500 transition-colors"
           >
             {/* Card Header */}
             <div className="p-4 border-b border-gray-100">
@@ -391,7 +391,7 @@ export default function ToursBrowsePage() {
                     )
                     return (
                       <>
-                        <p className="text-xl font-semibold text-[#647C47]">
+                        <p className="text-xl font-semibold text-primary-500">
                           {price.starting_from ? `${sym}${price.starting_from.toLocaleString()}` : 'Price on request'}
                         </p>
                         {price.starting_from && (
@@ -418,7 +418,7 @@ export default function ToursBrowsePage() {
                     const tier = p.status === 'done' ? p.starting_from_tier : null
                     return (tier && tour.variation_code_by_tier?.[tier]) || tour.default_variation_code || tour.id
                   })()}`}
-                  className="bg-[#647C47] text-white px-4 py-2 rounded-lg hover:bg-[#4a5c35] transition-colors text-xs font-medium"
+                  className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-[#4a5c35] transition-colors text-xs font-medium"
                 >
                   View Details
                 </Link>
@@ -444,7 +444,7 @@ export default function ToursBrowsePage() {
           <p className="text-xs text-gray-500 mb-4">Try adjusting your filters or search terms</p>
           <Link 
             href="/tours/manage"
-            className="text-sm text-[#647C47] hover:text-[#4a5c35] font-medium"
+            className="text-sm text-primary-500 hover:text-[#4a5c35] font-medium"
           >
             Create a new tour →
           </Link>

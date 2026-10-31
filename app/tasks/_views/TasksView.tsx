@@ -546,14 +546,14 @@ export default function TasksPage() {
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-gray-400" />
     return sortDirection === 'asc' 
-      ? <ArrowUp className="h-3 w-3 text-[#647C47]" />
-      : <ArrowDown className="h-3 w-3 text-[#647C47]" />
+      ? <ArrowUp className="h-3 w-3 text-primary-500" />
+      : <ArrowDown className="h-3 w-3 text-primary-500" />
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -600,7 +600,7 @@ export default function TasksPage() {
 
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Task
@@ -675,7 +675,7 @@ export default function TasksPage() {
             placeholder="Search tasks..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -748,13 +748,13 @@ export default function TasksPage() {
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
             hasActiveFilters 
-              ? 'border-[#647C47] text-[#647C47] bg-[#647C47]/5' 
+              ? 'border-primary-500 text-primary-500 bg-primary-500/5' 
               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Filter className="h-4 w-4" />
           Filters
-          {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-[#647C47]"></span>}
+          {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-500"></span>}
         </button>
 
         {hasActiveFilters && (
@@ -773,7 +773,7 @@ export default function TasksPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Statuses</option>
                 {STATUSES.map(s => (
@@ -786,7 +786,7 @@ export default function TasksPage() {
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Priorities</option>
                 {PRIORITIES.map(p => (
@@ -799,7 +799,7 @@ export default function TasksPage() {
               <select
                 value={assigneeFilter}
                 onChange={(e) => setAssigneeFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Members</option>
                 {teamMembers.map(m => (
@@ -812,7 +812,7 @@ export default function TasksPage() {
               <select
                 value={dueDateFilter}
                 onChange={(e) => setDueDateFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Dates</option>
                 <option value="overdue">Overdue</option>
@@ -931,7 +931,7 @@ export default function TasksPage() {
                             {linkedConfig && task.linked_id && (
                               <Link
                                 href={`${linkedConfig.path}/${task.linked_id}`}
-                                className="flex items-center gap-1 text-xs text-[#647C47] hover:underline"
+                                className="flex items-center gap-1 text-xs text-primary-500 hover:underline"
                               >
                                 <LinkIcon className="h-3 w-3" />
                                 {linkedConfig.label}
@@ -1097,7 +1097,7 @@ export default function TasksPage() {
                         <td className="px-4 py-3">
                           {task.assigned_member ? (
                             <div className="flex items-center gap-1.5">
-                              <div className="w-6 h-6 bg-[#647C47]/10 text-[#647C47] rounded-full flex items-center justify-center text-xs font-medium">
+                              <div className="w-6 h-6 bg-primary-500/10 text-primary-500 rounded-full flex items-center justify-center text-xs font-medium">
                                 {task.assigned_member.name.charAt(0)}
                               </div>
                               <span className="text-xs text-gray-600">{task.assigned_member.name}</span>
@@ -1110,7 +1110,7 @@ export default function TasksPage() {
                           {linkedConfig && task.linked_id ? (
                             <Link
                               href={`${linkedConfig.path}/${task.linked_id}`}
-                              className="flex items-center gap-1 text-xs text-[#647C47] hover:underline"
+                              className="flex items-center gap-1 text-xs text-primary-500 hover:underline"
                             >
                               <LinkIcon className="h-3 w-3" />
                               {linkedConfig.label}
@@ -1175,7 +1175,7 @@ export default function TasksPage() {
               <select
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -1299,7 +1299,7 @@ export default function TasksPage() {
                         {linkedConfig && task.linked_id && (
                           <Link
                             href={`${linkedConfig.path}/${task.linked_id}`}
-                            className="flex items-center gap-1 text-xs text-[#647C47] hover:underline"
+                            className="flex items-center gap-1 text-xs text-primary-500 hover:underline"
                           >
                             <LinkIcon className="h-3 w-3" />
                             {linkedConfig.label}
@@ -1348,7 +1348,7 @@ export default function TasksPage() {
                   <select
                     value={itemsPerPage}
                     onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                    className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value={10}>10</option>
                     <option value={25}>25</option>
@@ -1428,7 +1428,7 @@ export default function TasksPage() {
                       <button
                         onClick={() => handleArchive(task)}
                         disabled={archiving === task.id}
-                        className="p-1 text-gray-400 hover:text-[#647C47] rounded"
+                        className="p-1 text-gray-400 hover:text-primary-500 rounded"
                         title="Unarchive"
                       >
                         {archiving === task.id ? (
@@ -1485,7 +1485,7 @@ export default function TasksPage() {
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="Task title"
                   required
                 />
@@ -1508,7 +1508,7 @@ export default function TasksPage() {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   rows={2}
                   placeholder="Task description..."
                 />
@@ -1522,7 +1522,7 @@ export default function TasksPage() {
                     type="date"
                     value={formData.due_date}
                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
 
@@ -1531,7 +1531,7 @@ export default function TasksPage() {
                   <select
                     value={formData.priority}
                     onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     {PRIORITIES.map(p => (
                       <option key={p.value} value={p.value}>{p.label}</option>
@@ -1548,7 +1548,7 @@ export default function TasksPage() {
                 <select
                   value={formData.assigned_to}
                   onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">Unassigned</option>
                   {teamMembers.map(m => (
@@ -1568,7 +1568,7 @@ export default function TasksPage() {
                     <select
                       value={formData.linked_type}
                       onChange={(e) => setFormData({ ...formData, linked_type: e.target.value, linked_id: '' })}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     >
                       <option value="">None</option>
                       {LINKED_TYPES.map(t => (
@@ -1582,7 +1582,7 @@ export default function TasksPage() {
                       <select
                         value={formData.linked_id}
                         onChange={(e) => setFormData({ ...formData, linked_id: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                       >
                         <option value="">Select client...</option>
                         {clients.map(c => (
@@ -1599,7 +1599,7 @@ export default function TasksPage() {
                       <select
                         value={formData.linked_id}
                         onChange={(e) => setFormData({ ...formData, linked_id: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                       >
                         <option value="">Select itinerary...</option>
                         {itineraries.map(i => (
@@ -1618,7 +1618,7 @@ export default function TasksPage() {
                         type="text"
                         value={formData.linked_id}
                         onChange={(e) => setFormData({ ...formData, linked_id: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         placeholder={`Enter ${formData.linked_type} ID`}
                       />
                     </div>
@@ -1645,7 +1645,7 @@ export default function TasksPage() {
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   rows={2}
                   placeholder="Additional notes..."
                 />
@@ -1662,7 +1662,7 @@ export default function TasksPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   {saving ? 'Saving...' : editingTask ? 'Update' : 'Add Task'}

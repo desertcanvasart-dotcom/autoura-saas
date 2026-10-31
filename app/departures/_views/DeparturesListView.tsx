@@ -336,8 +336,8 @@ export default function DeparturesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-            <Calendar className="w-5 h-5 text-[#647C47]" />
+          <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+            <Calendar className="w-5 h-5 text-primary-500" />
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Tour Departures</h1>
@@ -347,7 +347,7 @@ export default function DeparturesPage() {
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Departure
@@ -383,7 +383,7 @@ export default function DeparturesPage() {
               placeholder="Search tours..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-4 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+              className="w-full pl-4 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -393,7 +393,7 @@ export default function DeparturesPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
             >
               <option value="upcoming">Upcoming</option>
               <option value="all">All</option>
@@ -411,7 +411,7 @@ export default function DeparturesPage() {
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
           </div>
         ) : filteredDepartures.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-500">
@@ -501,7 +501,7 @@ export default function DeparturesPage() {
                         <select
                           value={departure.status}
                           onChange={(e) => updateStatus(departure.id, e.target.value)}
-                          className="px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47] bg-white"
+                          className="px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
                         >
                           <option value="draft">Draft</option>
                           <option value="open">Open</option>
@@ -514,7 +514,7 @@ export default function DeparturesPage() {
 
                       <button
                         onClick={() => handleClone(departure)}
-                        className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-50 rounded transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-50 rounded transition-colors"
                         title="Clone — same tour, new date"
                       >
                         <Copy className="w-4 h-4" />
@@ -564,7 +564,7 @@ export default function DeparturesPage() {
                 <select
                   value={newDeparture.template_id}
                   onChange={(e) => handleTemplateSelect(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">-- Select a template or enter custom --</option>
                   {templates.map(template => (
@@ -586,7 +586,7 @@ export default function DeparturesPage() {
                     value={newDeparture.tour_name}
                     onChange={(e) => setNewDeparture(prev => ({ ...prev, tour_name: e.target.value }))}
                     placeholder="e.g., 7-Day Highlights Tour"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               )}
@@ -601,7 +601,7 @@ export default function DeparturesPage() {
                   value={newDeparture.start_date}
                   onChange={(e) => setNewDeparture(prev => ({ ...prev, start_date: e.target.value }))}
                   min={todayLocal()}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -617,7 +617,7 @@ export default function DeparturesPage() {
                     onChange={(e) => setNewDeparture(prev => ({ ...prev, duration_days: parseInt(e.target.value) || 1 }))}
                     min="1"
                     max="30"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               )}
@@ -634,7 +634,7 @@ export default function DeparturesPage() {
                     onChange={(e) => setNewDeparture(prev => ({ ...prev, max_pax: parseInt(e.target.value) || 1 }))}
                     min="1"
                     max="100"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -647,7 +647,7 @@ export default function DeparturesPage() {
                     onChange={(e) => setNewDeparture(prev => ({ ...prev, min_pax: parseInt(e.target.value) || 1 }))}
                     min="1"
                     max={newDeparture.max_pax}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -664,7 +664,7 @@ export default function DeparturesPage() {
                   placeholder="Optional"
                   min="0"
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -676,7 +676,7 @@ export default function DeparturesPage() {
                 <select
                   value={newDeparture.status}
                   onChange={(e) => setNewDeparture(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="draft">Draft (not visible)</option>
                   <option value="open">Open (accepting bookings)</option>
@@ -694,7 +694,7 @@ export default function DeparturesPage() {
               <button
                 onClick={handleCreate}
                 disabled={creating}
-                className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white text-sm rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
                 {creating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

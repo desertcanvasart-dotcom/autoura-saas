@@ -472,7 +472,7 @@ export default function AutouraHomepage() {
             <Link href="/login" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Login</Link>
             <a
               href="/contact"
-              className="px-5 py-[9px] bg-[#647C47] text-white text-sm font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-[0_4px_16px_rgba(59,94,46,0.22)]"
+              className="px-5 py-[9px] bg-primary-500 text-white text-sm font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-[0_4px_16px_rgba(59,94,46,0.22)]"
             >
               Apply for the Assisted Pilot
             </a>
@@ -500,7 +500,7 @@ export default function AutouraHomepage() {
             <Link href="/login" className="block text-sm text-[#555] hover:text-[#111710] py-2">Login</Link>
             <a
               href="/contact"
-              className="block w-full px-4 py-2 bg-[#647C47] text-white text-sm font-semibold rounded-[9px] text-center hover:bg-[#4f6339]"
+              className="block w-full px-4 py-2 bg-primary-500 text-white text-sm font-semibold rounded-[9px] text-center hover:bg-[#4f6339]"
             >
               Apply for the Assisted Pilot
             </a>
@@ -515,8 +515,8 @@ export default function AutouraHomepage() {
         >
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-[7px] bg-white border border-[#D6D2CA] rounded-full mb-8">
-            <span className="w-[7px] h-[7px] rounded-full bg-[#647C47]" />
-            <span className="text-[13px] font-medium text-[#647C47]">AI-Powered Travel Operations</span>
+            <span className="w-[7px] h-[7px] rounded-full bg-primary-500" />
+            <span className="text-[13px] font-medium text-primary-500">AI-Powered Travel Operations</span>
           </div>
 
           {/* Headline with cycling platform */}
@@ -533,7 +533,7 @@ export default function AutouraHomepage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-[14px] mb-10">
             <a
               href="/contact"
-              className="group w-full sm:w-auto inline-flex items-center justify-center gap-[6px] px-7 py-[14px] bg-[#647C47] text-white text-[15px] font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-[0_6px_24px_rgba(59,94,46,0.25)] hover:-translate-y-px"
+              className="group w-full sm:w-auto inline-flex items-center justify-center gap-[6px] px-7 py-[14px] bg-primary-500 text-white text-[15px] font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-[0_6px_24px_rgba(59,94,46,0.25)] hover:-translate-y-px"
             >
               Apply for the Assisted Pilot
               <span className="group-hover:translate-x-[3px] transition-transform">→</span>
@@ -542,7 +542,7 @@ export default function AutouraHomepage() {
               onClick={() => setVideoModalOpen(true)}
               className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-[14px] bg-white text-[#111710] text-[15px] font-semibold rounded-[9px] border border-[#D6D2CA] hover:border-[#bbb] transition-all hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] hover:-translate-y-px"
             >
-              <span className="text-[#647C47] text-sm">▷</span>
+              <span className="text-primary-500 text-sm">▷</span>
               See How It Works
             </button>
           </div>
@@ -551,7 +551,7 @@ export default function AutouraHomepage() {
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-8 text-sm text-[#6B6B63]">
             {heroContent.trustSignals.map((signal, i) => (
               <div key={i} className="flex items-center gap-2">
-                <span className="text-[#647C47] font-bold text-[15px]">✓</span>
+                <span className="text-primary-500 font-bold text-[15px]">✓</span>
                 <span>{signal}</span>
               </div>
             ))}
@@ -617,7 +617,7 @@ export default function AutouraHomepage() {
           <AnimatedSection>
             <div className="text-center mb-12 sm:mb-16">
               <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
-                Paste a WhatsApp Message. <span className="text-[#647C47]">Get a Priced Itinerary.</span>
+                Paste a WhatsApp Message. <span className="text-primary-500">Get a Priced Itinerary.</span>
               </h2>
               <p className="text-stone-600 text-base sm:text-lg max-w-3xl mx-auto">
                 Autoura&apos;s AI reads the conversation — including industry shorthand like CAI, VoK, NTS, and pax counts — and builds a complete day-by-day itinerary with calculated pricing in under 30 seconds.
@@ -652,7 +652,7 @@ export default function AutouraHomepage() {
             {/* AI Output Card */}
             <AnimatedSection delay={300}>
               <div className="bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden transition-all duration-500 hover:shadow-2xl hover:scale-[1.01]">
-                <div className="bg-[#647C47] px-5 py-3 flex items-center gap-2">
+                <div className="bg-primary-500 px-5 py-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-white" />
                   <span className="text-white text-sm font-medium">Autoura AI Output</span>
                   <span className="ml-auto text-xs text-white/70 bg-white/20 px-2 py-0.5 rounded-full">Processed in 12s</span>
@@ -679,7 +679,7 @@ export default function AutouraHomepage() {
                     <div className="space-y-2">
                       {aiDemoItinerary.map((day) => (
                         <div key={day.day} className="flex items-center gap-3 text-sm">
-                          <span className="w-7 h-7 rounded-lg bg-[#647C47]/10 text-[#647C47] text-xs font-bold flex items-center justify-center shrink-0">D{day.day}</span>
+                          <span className="w-7 h-7 rounded-lg bg-primary-500/10 text-primary-500 text-xs font-bold flex items-center justify-center shrink-0">D{day.day}</span>
                           <day.icon className="w-4 h-4 text-stone-400 shrink-0" />
                           <span className="text-stone-700">{day.title}</span>
                         </div>
@@ -689,7 +689,7 @@ export default function AutouraHomepage() {
                   {/* Price Summary */}
                   <div className="mt-4 pt-4 border-t border-stone-100 flex items-center justify-between">
                     <span className="text-sm text-stone-500">Estimated total (3 pax, Deluxe)</span>
-                    <span className="text-lg font-bold text-[#647C47]">$4,260</span>
+                    <span className="text-lg font-bold text-primary-500">$4,260</span>
                   </div>
                 </div>
               </div>
@@ -700,7 +700,7 @@ export default function AutouraHomepage() {
           <AnimatedSection delay={500}>
             <div className="flex flex-wrap items-center justify-center gap-3 mt-10 sm:mt-12">
               {['Understands 200+ Egyptian travel abbreviations', 'Dual-passport pricing auto-applied', 'Confidence scoring on every field'].map((text, i) => (
-                <span key={i} className="inline-flex items-center gap-2 px-4 py-2 bg-[#647C47]/5 border border-[#647C47]/20 rounded-full text-sm text-[#647C47] font-medium">
+                <span key={i} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500/5 border border-primary-500/20 rounded-full text-sm text-primary-500 font-medium">
                   <Sparkles className="w-3.5 h-3.5" />
                   {text}
                 </span>
@@ -716,7 +716,7 @@ export default function AutouraHomepage() {
           <AnimatedSection>
             <div className="text-center mb-10 sm:mb-14">
               <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
-                A Pricing Engine That <span className="text-[#647C47]">Thinks Like a Tour Operator</span>
+                A Pricing Engine That <span className="text-primary-500">Thinks Like a Tour Operator</span>
               </h2>
               <p className="text-stone-600 text-base sm:text-lg max-w-3xl mx-auto">
                 14 service slots per day. Seasonal rates. Entrance fees by nationality. Automatic vehicle upgrades when the group grows. Your margin calculated on every quote.
@@ -736,7 +736,7 @@ export default function AutouraHomepage() {
             <div className="flex flex-wrap items-center justify-center gap-3 max-w-4xl mx-auto">
               {pricingPills.map((pill, i) => (
                 <div key={i} className="flex items-center gap-2 bg-white rounded-full px-4 py-2.5 border border-stone-200 text-sm font-medium text-stone-700 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-                  <pill.icon className="w-4 h-4 text-[#647C47]" />
+                  <pill.icon className="w-4 h-4 text-primary-500" />
                   {pill.label}
                 </div>
               ))}
@@ -751,7 +751,7 @@ export default function AutouraHomepage() {
           <AnimatedSection>
             <div className="text-center mb-12 sm:mb-16">
               <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
-                From Inquiry to Invoice in <span className="text-[#647C47]">One Flow</span>
+                From Inquiry to Invoice in <span className="text-primary-500">One Flow</span>
               </h2>
               <p className="text-stone-600 text-base sm:text-lg max-w-2xl mx-auto">
                 See how a booking moves through Autoura — from the first message to the final commission payment.
@@ -766,10 +766,10 @@ export default function AutouraHomepage() {
                   {/* Text */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#647C47] text-white font-bold flex items-center justify-center text-sm shadow-lg">
+                      <div className="w-10 h-10 rounded-xl bg-primary-500 text-white font-bold flex items-center justify-center text-sm shadow-lg">
                         {stage.step}
                       </div>
-                      <stage.icon className="w-5 h-5 text-[#647C47]" />
+                      <stage.icon className="w-5 h-5 text-primary-500" />
                     </div>
                     <h3 className="text-xl sm:text-2xl font-bold text-stone-900 mb-3">{stage.headline}</h3>
                     <p className="text-stone-600 leading-relaxed">{stage.description}</p>
@@ -791,7 +791,7 @@ export default function AutouraHomepage() {
           <AnimatedSection>
             <div className="text-center mb-12 sm:mb-16">
               <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
-                53 Modules. <span className="text-[#647C47]">One Platform.</span>
+                53 Modules. <span className="text-primary-500">One Platform.</span>
               </h2>
               <p className="text-stone-600 text-base sm:text-lg max-w-2xl mx-auto">
                 Every tool a tour operator needs — from the first WhatsApp message to the final commission payment.
@@ -812,7 +812,7 @@ export default function AutouraHomepage() {
                   <ul className="space-y-3 flex-1">
                     {cluster.bullets.map((bullet, j) => (
                       <li key={j} className="flex items-start gap-2.5 text-sm text-stone-600">
-                        <Check className="w-4 h-4 text-[#647C47] mt-0.5 shrink-0" />
+                        <Check className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
                         <span>{bullet}</span>
                       </li>
                     ))}
@@ -903,7 +903,7 @@ export default function AutouraHomepage() {
             {enhancedTestimonials.map((testimonial, i) => (
               <AnimatedSection key={i} delay={i * 100}>
                 <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg border border-stone-200 h-full flex flex-col hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                  <span className="inline-block self-start px-2.5 py-1 text-xs font-medium rounded-full bg-[#647C47]/10 text-[#647C47] mb-4">
+                  <span className="inline-block self-start px-2.5 py-1 text-xs font-medium rounded-full bg-primary-500/10 text-primary-500 mb-4">
                     {testimonial.featureTag}
                   </span>
                   <div className="flex items-center gap-1 mb-4">
@@ -949,7 +949,7 @@ export default function AutouraHomepage() {
           <AnimatedSection>
             <div className="relative bg-gradient-to-br from-stone-900 to-stone-800 rounded-2xl sm:rounded-3xl p-8 sm:p-12 md:p-16 overflow-hidden">
               <div className="absolute inset-0 opacity-30">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-[#647C47]/30 rounded-full blur-3xl" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/30 rounded-full blur-3xl" />
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/20 rounded-full blur-3xl" />
               </div>
               <div className="relative text-center">
@@ -962,7 +962,7 @@ export default function AutouraHomepage() {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <a
                     href="/contact"
-                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-[#647C47] text-white font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center justify-center gap-2"
+                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-primary-500 text-white font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-xl hover:shadow-primary-500/30 flex items-center justify-center gap-2"
                   >
                     Apply for the Assisted Pilot
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

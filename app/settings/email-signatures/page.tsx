@@ -61,7 +61,7 @@ export default function EmailSignaturesPage() {
       <div className="flex items-center justify-end mb-6 gap-4">
         <button
           onClick={() => setShowNew(true)}
-          className="flex items-center gap-2 bg-[#647C47] text-white px-4 py-2 rounded-lg hover:bg-[#566b3c] text-sm flex-shrink-0"
+          className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-[#566b3c] text-sm flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
           Add signature
@@ -74,7 +74,7 @@ export default function EmailSignaturesPage() {
         <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
           <PenLine className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-500 mb-3">No signatures yet. Add one to auto-append on every reply.</p>
-          <button onClick={() => setShowNew(true)} className="text-sm text-[#647C47] hover:underline">
+          <button onClick={() => setShowNew(true)} className="text-sm text-primary-500 hover:underline">
             Create your first signature
           </button>
         </div>
@@ -113,13 +113,13 @@ function SignatureCard({
   onSetDefault: () => void
 }) {
   return (
-    <div className={`border rounded-lg p-4 ${signature.is_default ? 'bg-[#647C47]/5 border-[#647C47]/30' : 'bg-white border-gray-200'}`}>
+    <div className={`border rounded-lg p-4 ${signature.is_default ? 'bg-primary-500/5 border-primary-500/30' : 'bg-white border-gray-200'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="font-medium text-gray-900 text-sm">{signature.name}</h3>
             {signature.is_default && (
-              <span className="inline-flex items-center gap-1 text-xs bg-[#647C47]/10 text-[#647C47] border border-[#647C47]/20 rounded-full px-1.5 py-0.5 font-medium">
+              <span className="inline-flex items-center gap-1 text-xs bg-primary-500/10 text-primary-500 border border-primary-500/20 rounded-full px-1.5 py-0.5 font-medium">
                 <Star className="w-2.5 h-2.5 fill-current" />
                 Default
               </span>
@@ -132,7 +132,7 @@ function SignatureCard({
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">
           {!signature.is_default && (
-            <button onClick={onSetDefault} className="p-1.5 text-gray-400 hover:text-[#647C47] rounded" title="Make default">
+            <button onClick={onSetDefault} className="p-1.5 text-gray-400 hover:text-primary-500 rounded" title="Make default">
               <Star className="w-4 h-4" />
             </button>
           )}
@@ -209,7 +209,7 @@ function SignatureModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Work, Casual, Arabic"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40"
             />
           </div>
 
@@ -220,14 +220,14 @@ function SignatureModal({
                 <button
                   type="button"
                   onClick={() => setMode('editor')}
-                  className={`px-2.5 py-1 ${mode === 'editor' ? 'bg-[#647C47] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-2.5 py-1 ${mode === 'editor' ? 'bg-primary-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                 >
                   Editor
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode('html')}
-                  className={`px-2.5 py-1 ${mode === 'html' ? 'bg-[#647C47] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-2.5 py-1 ${mode === 'html' ? 'bg-primary-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                 >
                   HTML
                 </button>
@@ -252,7 +252,7 @@ function SignatureModal({
                   onChange={(e) => setContent(e.target.value)}
                   placeholder={'<table>\n  <tr>\n    <td><img src="https://…/logo.png" width="90" alt="Logo" /></td>\n    <td style="padding-left:12px">\n      <strong>Your Name</strong><br/>\n      Title · Company<br/>\n      <a href="https://example.com">example.com</a>\n    </td>\n  </tr>\n</table>'}
                   spellCheck={false}
-                  className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40 resize-y"
+                  className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40 resize-y"
                   style={{ minHeight: 180 }}
                 />
                 <p className="text-xs text-gray-400 mt-1">
@@ -278,7 +278,7 @@ function SignatureModal({
               type="checkbox"
               checked={isDefault}
               onChange={(e) => setIsDefault(e.target.checked)}
-              className="w-4 h-4 accent-[#647C47]"
+              className="w-4 h-4 accent-primary-500"
             />
             Make this my default signature
           </label>
@@ -291,7 +291,7 @@ function SignatureModal({
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-[#647C47] text-white text-sm rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary-500 text-white text-sm rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create signature'}

@@ -87,7 +87,7 @@ export default function RatePeriodsEditor({
           onClick={() => onChange([...periods, emptyPeriod(entity)])}
           disabled={periods.length >= MAX_RATE_PERIODS}
           title={periods.length >= MAX_RATE_PERIODS ? `Up to ${MAX_RATE_PERIODS} periods per rate` : undefined}
-          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-md hover:bg-[#4f6238] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-md hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus className="w-3.5 h-3.5" /> Add period
         </button>

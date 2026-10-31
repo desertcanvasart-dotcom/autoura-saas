@@ -219,7 +219,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 text-[#647C47] animate-spin" />
+              <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
             </div>
           ) : !brief ? (
             <p className="text-sm text-gray-500 py-10 text-center">Brief not found.</p>
@@ -277,7 +277,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
                       const visitorSide = ['user', 'visitor', 'human'].includes((m.role || '').toLowerCase())
                       return (
                         <div key={i} className={`flex ${visitorSide ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${visitorSide ? 'bg-[#647C47]/10 text-gray-800' : 'bg-gray-100 text-gray-700'}`}>
+                          <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${visitorSide ? 'bg-primary-500/10 text-gray-800' : 'bg-gray-100 text-gray-700'}`}>
                             <div className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">{m.role || 'message'}</div>
                             <div className="whitespace-pre-wrap">{m.content}</div>
                           </div>
@@ -305,7 +305,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
             {/* Itinerary: create from the brief, or jump to the one already made */}
             <div className="flex items-center justify-between gap-2">
               {itinerary ? (
-                <Link href={`/itineraries/${itinerary.id}`} className="inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline">
+                <Link href={`/itineraries/${itinerary.id}`} className="inline-flex items-center gap-1 text-sm text-primary-500 hover:underline">
                   <ExternalLink className="h-4 w-4" /> View itinerary ({itinerary.code})
                 </Link>
               ) : (
@@ -315,7 +315,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
                 <button
                   onClick={handleCommitItinerary}
                   disabled={committing}
-                  className="px-3 py-1.5 text-sm font-medium rounded-lg border border-[#647C47] text-[#647C47] hover:bg-[#647C47]/5 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                  className="px-3 py-1.5 text-sm font-medium rounded-lg border border-primary-500 text-primary-500 hover:bg-primary-500/5 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
                   {committing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Create itinerary
@@ -325,7 +325,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
             {/* Client + triage status actions */}
             <div className="flex items-center justify-between gap-2">
               {brief.client_id ? (
-                <Link href={`/clients/${brief.client_id}`} className="inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline">
+                <Link href={`/clients/${brief.client_id}`} className="inline-flex items-center gap-1 text-sm text-primary-500 hover:underline">
                   <ExternalLink className="h-4 w-4" /> View client
                 </Link>
               ) : <span />}
@@ -336,7 +336,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
                     onClick={() => handleStatus(a.to)}
                     disabled={updating}
                     className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
-                      a.primary ? 'bg-[#647C47] text-white hover:bg-[#4f6238]' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+                      a.primary ? 'bg-primary-500 text-white hover:bg-primary-700' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     {a.label}

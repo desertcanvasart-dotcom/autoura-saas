@@ -89,13 +89,13 @@ export default function PublishEmbedPage() {
     ? `<script src="${settings.rendererUrl.replace(/\/$/, '')}/embed.js" data-key="${settings.key}" data-lang="${lang}" async></script>`
     : null, [settings, lang])
 
-  if (!settings) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]" /></div>
+  if (!settings) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
-      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-[#647C47]"><ArrowLeft className="h-4 w-4" />Website</Link>
+      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-primary-500"><ArrowLeft className="h-4 w-4" />Website</Link>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><Code2 className="h-5 w-5 text-[#647C47]" /></div>
+        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center"><Code2 className="h-5 w-5 text-primary-500" /></div>
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">On your own website</h1>
           <p className="text-sm text-gray-500">Show your tours on the website you already have — prices always live from Autoura, enquiries straight into your CRM.</p>
@@ -110,7 +110,7 @@ export default function PublishEmbedPage() {
         {canManage && (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => save(false)} disabled={saving}
-              className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-[#647C47] text-white disabled:opacity-40"><Save className="h-4 w-4" />{settings.key ? 'Save' : 'Save and make my code'}</button>
+              className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-primary-500 text-white disabled:opacity-40"><Save className="h-4 w-4" />{settings.key ? 'Save' : 'Save and make my code'}</button>
             {settings.key && (
               <button type="button" onClick={() => save(true)} disabled={saving}
                 className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-40"><RefreshCw className="h-4 w-4" />New key</button>
@@ -125,7 +125,7 @@ export default function PublishEmbedPage() {
             <h2 className="font-medium text-gray-900">2. Paste the code</h2>
             <div className="flex items-center gap-1 border border-gray-200 rounded-md p-0.5">
               {settings.languages.map(l => (
-                <button key={l} onClick={() => setLang(l)} className={`text-sm px-3 py-1 rounded ${l === lang ? 'bg-[#647C47] text-white' : 'text-gray-600'}`}>{l.toUpperCase()}</button>
+                <button key={l} onClick={() => setLang(l)} className={`text-sm px-3 py-1 rounded ${l === lang ? 'bg-primary-500 text-white' : 'text-gray-600'}`}>{l.toUpperCase()}</button>
               ))}
             </div>
           </div>

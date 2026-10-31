@@ -113,7 +113,7 @@ export default function VariationOptionsPage() {
       </Link>
 
       <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-[#647C47]" />
+        <Sparkles className="w-5 h-5 text-primary-500" />
         Options and upgrades
       </h1>
       {variationName && <p className="text-sm text-gray-600 mb-1">{variationName}</p>}
@@ -133,7 +133,7 @@ export default function VariationOptionsPage() {
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="font-medium text-gray-900">Options this programme sells</h2>
               <button type="button" onClick={() => { setAdding(v => !v); setError(null) }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47] rounded-lg hover:bg-[#e8ede3]">
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-500 border border-primary-500 rounded-lg hover:bg-[#e8ede3]">
                 <Plus className="w-3.5 h-3.5" /> Add option
               </button>
             </div>
@@ -229,7 +229,7 @@ export default function VariationOptionsPage() {
                     </div>
                     <button type="button" onClick={() => void patch(s.id, { is_optional: true })}
                       disabled={busy === s.id}
-                      className="flex-shrink-0 px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47] rounded-lg hover:bg-[#e8ede3] disabled:opacity-40">
+                      className="flex-shrink-0 px-2.5 py-1 text-xs font-medium text-primary-500 border border-primary-500 rounded-lg hover:bg-[#e8ede3] disabled:opacity-40">
                       {busy === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Make optional'}
                     </button>
                   </div>
@@ -317,7 +317,7 @@ function AddOptionForm({
         </label>
       </div>
       <button type="submit" disabled={busy || !name.trim()}
-        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-40">
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-40">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add option
       </button>
     </form>

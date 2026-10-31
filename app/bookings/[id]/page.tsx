@@ -679,7 +679,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   <button
                     onClick={() => resolveChangeRequest(cr.id, 'approve')}
                     disabled={resolvingCR !== null}
-                    className="px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50"
                   >
                     {resolvingCR === cr.id ? '…' : 'Approve'}
                   </button>
@@ -725,7 +725,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 onClick={mintPortalLink}
                 disabled={mintingPortal}
                 title="Create (or copy) the traveller portal link — the lead fills in everyone's details and can invite each traveller with a private link"
-                className="px-4 py-2 text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 disabled:opacity-50"
+                className="px-4 py-2 text-primary-500 border border-primary-500/40 rounded-lg hover:bg-primary-500/5 disabled:opacity-50"
               >
                 {mintingPortal ? 'Creating…' : 'Portal link'}
               </button>
@@ -1078,7 +1078,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                             href={doc.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="shrink-0 px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47]/40 rounded-md hover:bg-[#647C47]/5"
+                            className="shrink-0 px-2.5 py-1 text-xs font-medium text-primary-500 border border-primary-500/40 rounded-md hover:bg-primary-500/5"
                           >
                             View
                           </a>

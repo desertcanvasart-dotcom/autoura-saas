@@ -97,7 +97,7 @@ export default function PublishLookPage() {
     return out
   }, [palette])
 
-  if (!look || !palette) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]" /></div>
+  if (!look || !palette) return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>
 
   const font = look.choices.fontPairs.find(f => f.key === fontPair)
   const preset = look.choices.palettes.find(p => JSON.stringify(p.palette) === JSON.stringify(palette))?.key ?? 'custom'
@@ -118,9 +118,9 @@ export default function PublishLookPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
-      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-[#647C47]"><ArrowLeft className="h-4 w-4" />Website</Link>
+      <Link href="/publish" className="inline-flex items-center gap-1 text-sm text-primary-500"><ArrowLeft className="h-4 w-4" />Website</Link>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center"><PaletteIcon className="h-5 w-5 text-[#647C47]" /></div>
+        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center"><PaletteIcon className="h-5 w-5 text-primary-500" /></div>
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Look and feel</h1>
           <p className="text-sm text-gray-500">Your website&apos;s theme, colours and fonts. Prices and facts always come from your records.</p>
@@ -134,8 +134,8 @@ export default function PublishLookPage() {
             <div className="grid gap-3 md:grid-cols-3">
               {look.choices.archetypes.map(a => (
                 <button key={a.key} type="button" disabled={!canManage} onClick={() => setArchetype(a.key)}
-                  className={`text-left rounded-lg border p-3 transition ${archetype === a.key ? 'border-[#647C47] ring-2 ring-[#647C47]/20' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <span className="flex items-center justify-between font-medium text-gray-900">{THEME_TEXT[a.key]?.label ?? a.key}{archetype === a.key && <Check className="h-4 w-4 text-[#647C47]" />}</span>
+                  className={`text-left rounded-lg border p-3 transition ${archetype === a.key ? 'border-primary-500 ring-2 ring-primary-500/20' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <span className="flex items-center justify-between font-medium text-gray-900">{THEME_TEXT[a.key]?.label ?? a.key}{archetype === a.key && <Check className="h-4 w-4 text-primary-500" />}</span>
                   <span className="mt-1 block text-xs text-gray-500">{THEME_TEXT[a.key]?.text}</span>
                 </button>
               ))}
@@ -147,7 +147,7 @@ export default function PublishLookPage() {
             <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
               {look.choices.palettes.map(p => (
                 <button key={p.key} type="button" disabled={!canManage} onClick={() => setPalette(p.palette)}
-                  className={`rounded-lg border p-2 text-left ${preset === p.key ? 'border-[#647C47] ring-2 ring-[#647C47]/20' : 'border-gray-200 hover:border-gray-300'}`}>
+                  className={`rounded-lg border p-2 text-left ${preset === p.key ? 'border-primary-500 ring-2 ring-primary-500/20' : 'border-gray-200 hover:border-gray-300'}`}>
                   <span className="flex h-8 overflow-hidden rounded">
                     <span className="flex-[3]" style={{ background: p.palette.primary }} />
                     <span className="flex-1" style={{ background: p.palette.accent }} />
@@ -211,7 +211,7 @@ export default function PublishLookPage() {
             <ul className="mt-3 grid gap-1 text-sm md:grid-cols-3">
               {([['ETAA licence number', look.footer.licenseNumber], ['Address', look.footer.address], ['WhatsApp', look.footer.whatsapp]] as const).map(([label, v]) => (
                 <li key={label} className={`flex items-start gap-1 ${v ? 'text-gray-700' : 'text-amber-700'}`}>
-                  {v ? <Check className="h-4 w-4 mt-0.5 flex-none text-[#647C47]" /> : <AlertTriangle className="h-4 w-4 mt-0.5 flex-none" />}
+                  {v ? <Check className="h-4 w-4 mt-0.5 flex-none text-primary-500" /> : <AlertTriangle className="h-4 w-4 mt-0.5 flex-none" />}
                   <span>{label}: {v ?? <>missing — <Link href="/settings/company" className="underline">add it in company settings</Link></>}</span>
                 </li>
               ))}
@@ -264,7 +264,7 @@ export default function PublishLookPage() {
 
           {canManage && (
             <button type="button" onClick={save} disabled={saving || issues.length > 0}
-              className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-md bg-[#647C47] text-white disabled:opacity-40">
+              className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-md bg-primary-500 text-white disabled:opacity-40">
               <Check className="h-4 w-4" />{saving ? 'Saving…' : 'Save and update the website'}
             </button>
           )}

@@ -58,7 +58,7 @@ export default function SignupContent() {
       <div className="min-h-screen bg-[#F7F7F4] flex items-center justify-center px-4">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
-            <div className="w-16 h-16 bg-[#647C47]/10 text-[#647C47] rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+            <div className="w-16 h-16 bg-primary-500/10 text-primary-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
               ✓
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>

@@ -450,7 +450,7 @@ export default function TenantSettingsPage() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 text-[#647C47] animate-spin" />
+          <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
         </div>
       </div>
     )
@@ -482,7 +482,7 @@ export default function TenantSettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving || uploading || !companyName}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {uploading ? (
                 <>
@@ -547,7 +547,7 @@ export default function TenantSettingsPage() {
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Your Company Name"
               />
             </div>
@@ -560,7 +560,7 @@ export default function TenantSettingsPage() {
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="contact@company.com"
               />
             </div>
@@ -588,7 +588,7 @@ export default function TenantSettingsPage() {
                 step="0.5"
                 value={minMargin}
                 onChange={(e) => setMinMargin(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Not set — no warning"
               />
               <p className="mt-1 text-xs text-gray-400">
@@ -609,7 +609,7 @@ export default function TenantSettingsPage() {
                 step="1"
                 value={depositPercent}
                 onChange={(e) => setDepositPercent(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Not set — uses 30%"
               />
               <p className="mt-1 text-xs text-gray-400">
@@ -628,7 +628,7 @@ export default function TenantSettingsPage() {
                 step="1"
                 value={depositDueDays}
                 onChange={(e) => setDepositDueDays(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Not set — uses 7"
               />
               <p className="mt-1 text-xs text-gray-400">
@@ -646,7 +646,7 @@ export default function TenantSettingsPage() {
                 value={companyTimezone}
                 onChange={(e) => setCompanyTimezone(e.target.value)}
                 disabled={!isAdmin}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white disabled:bg-gray-50"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white disabled:bg-gray-50"
               >
                 <option value="">Not set (UTC)</option>
                 {TIMEZONES.filter(tz => tz.value !== 'UTC').map(tz => (
@@ -674,7 +674,7 @@ export default function TenantSettingsPage() {
                 value={operatingCountry}
                 onChange={(e) => setOperatingCountry(e.target.value)}
                 disabled={!isAdmin}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-50"
                 placeholder="e.g. Egypt"
               />
               <p className="mt-1 text-xs text-gray-400">
@@ -693,7 +693,7 @@ export default function TenantSettingsPage() {
                 value={governingLaw}
                 onChange={(e) => setGoverningLaw(e.target.value)}
                 disabled={!isAdmin}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] disabled:bg-gray-50"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-50"
                 placeholder="e.g. Egyptian law"
               />
               <p className="mt-1 text-xs text-gray-400">
@@ -711,7 +711,7 @@ export default function TenantSettingsPage() {
               value={agencyCurrency}
               onChange={(e) => setAgencyCurrency(e.target.value)}
               disabled={!isAdmin}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               {!agencyCurrency && <option value="">Choose…</option>}
               {SUPPORTED_CURRENCIES.map(c => (
@@ -732,7 +732,7 @@ export default function TenantSettingsPage() {
               value={ratesCurrency}
               onChange={(e) => setRatesCurrency(e.target.value)}
               disabled={!isAdmin}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               <option value="">EUR (default)</option>
               {SUPPORTED_CURRENCIES.filter(c => c !== 'EUR').map(c => (
@@ -766,7 +766,7 @@ export default function TenantSettingsPage() {
             </p>
             <Link
               href="/settings/billing/usage"
-              className="mt-3 inline-flex items-center gap-1 text-xs text-[#647C47] hover:text-[#4f613a] font-medium"
+              className="mt-3 inline-flex items-center gap-1 text-xs text-primary-500 hover:text-[#4f613a] font-medium"
             >
               <FileText className="w-3 h-3" />
               View limits and usage
@@ -774,7 +774,7 @@ export default function TenantSettingsPage() {
 
             <Link
               href="/settings/billing/plans"
-              className="mt-3 inline-flex items-center gap-1 text-xs text-[#647C47] hover:text-[#4f613a] font-medium"
+              className="mt-3 inline-flex items-center gap-1 text-xs text-primary-500 hover:text-[#4f613a] font-medium"
             >
               <FileText className="w-3 h-3" />
               Upgrade plan for higher limits
@@ -810,7 +810,7 @@ export default function TenantSettingsPage() {
               checked={activityEnabled || activityEnableRequested}
               onChange={(e) => handleActivityToggle(e.target.checked)}
               disabled={activitySaving}
-              className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+              className="w-3.5 h-3.5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
             />
             <span className="text-xs text-gray-700">
               {activitySaving && !activityEnableRequested
@@ -826,7 +826,7 @@ export default function TenantSettingsPage() {
                   type="checkbox"
                   checked={activityInformedConfirmed}
                   onChange={(e) => setActivityInformedConfirmed(e.target.checked)}
-                  className="mt-0.5 w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                  className="mt-0.5 w-3.5 h-3.5 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <span className="text-xs text-gray-700">
                   My team has been informed that activity summaries will be visible
@@ -836,7 +836,7 @@ export default function TenantSettingsPage() {
                 type="button"
                 onClick={() => saveActivitySummary(true)}
                 disabled={!activityInformedConfirmed || activitySaving}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {activitySaving ? (
                   <>
@@ -941,7 +941,7 @@ export default function TenantSettingsPage() {
                   type="text"
                   value={primaryColor}
                   onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] font-mono"
+                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 font-mono"
                   placeholder="#647C47"
                 />
               </div>
@@ -962,7 +962,7 @@ export default function TenantSettingsPage() {
                   type="text"
                   value={secondaryColor}
                   onChange={(e) => setSecondaryColor(e.target.value)}
-                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] font-mono"
+                  className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 font-mono"
                   placeholder="#10B981"
                 />
               </div>
@@ -1012,7 +1012,7 @@ export default function TenantSettingsPage() {
                   type="text"
                   value={value}
                   onChange={(e) => set(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                   placeholder={placeholder}
                 />
               </div>
@@ -1023,7 +1023,7 @@ export default function TenantSettingsPage() {
                 value={companyAddress}
                 onChange={(e) => setCompanyAddress(e.target.value)}
                 rows={2}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Street, city, country"
               />
             </div>
@@ -1037,7 +1037,7 @@ export default function TenantSettingsPage() {
                 onChange={(e) => setFooterText(e.target.value)}
                 rows={2}
                 maxLength={400}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="e.g. Bank: CIB · IBAN EG00 0000 0000 0000 0000 0000 000"
               />
             </div>

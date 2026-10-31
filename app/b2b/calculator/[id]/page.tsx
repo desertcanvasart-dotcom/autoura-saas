@@ -265,7 +265,7 @@ export default function TourPriceCalculator() {
                 type="checkbox"
                 checked={selected.includes(x.id)}
                 onChange={() => toggle(x.id)}
-                className="w-4 h-4 mt-0.5 text-[#647C47] rounded"
+                className="w-4 h-4 mt-0.5 text-primary-500 rounded"
               />
               <span className="text-sm leading-tight">
                 {x.name}
@@ -500,7 +500,7 @@ export default function TourPriceCalculator() {
   if (authLoading || tenantLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#647C47]" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
       </div>
     )
   }
@@ -523,7 +523,7 @@ export default function TourPriceCalculator() {
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35]"
           >
             Return to Dashboard
           </button>
@@ -546,7 +546,7 @@ export default function TourPriceCalculator() {
           </Link>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-[#647C47]" /> B2B Price Calculator
+              <Calculator className="w-5 h-5 text-primary-500" /> B2B Price Calculator
             </h1>
             <p className="text-sm text-gray-500">Calculate dynamic pricing based on actual rates</p>
           </div>
@@ -599,7 +599,7 @@ export default function TourPriceCalculator() {
                   onChange={(e) => setNumPax(parseInt(e.target.value) || 1)}
                   min="1"
                   max="50"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
 
@@ -614,7 +614,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setTourLeaderIncluded(false)}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       !tourLeaderIncluded
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -625,7 +625,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setTourLeaderIncluded(true)}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       tourLeaderIncluded
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -650,7 +650,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setGuideMode('spot')}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       guideMode === 'spot'
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -661,7 +661,7 @@ export default function TourPriceCalculator() {
                     onClick={() => setGuideMode('throughout')}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       guideMode === 'throughout'
-                        ? 'bg-[#647C47] text-white'
+                        ? 'bg-primary-500 text-white'
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -706,7 +706,7 @@ export default function TourPriceCalculator() {
                   type="date"
                   value={travelDate}
                   onChange={(e) => setTravelDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
 
@@ -762,7 +762,7 @@ export default function TourPriceCalculator() {
                   onChange={(e) => setMarginPercent(parseFloat(e.target.value) || 0)}
                   min="0"
                   max="100"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
 
@@ -776,7 +776,7 @@ export default function TourPriceCalculator() {
               <button
                 onClick={() => calculatePrice()}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50"
               >
                 {loading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Calculating...</>
@@ -892,13 +892,13 @@ export default function TourPriceCalculator() {
                       <p className="text-xs text-amber-700 mt-1">+ {money(result.season_premium ?? 0)} {result.season_name} premium</p>
                     )}
                   </div>
-                  <div className="bg-[#647C47]/10 rounded-lg p-4">
+                  <div className="bg-primary-500/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Selling Price</p>
-                    <p className="text-xl font-bold text-[#647C47]">{money(result.selling_price)}</p>
+                    <p className="text-xl font-bold text-primary-500">{money(result.selling_price)}</p>
                   </div>
-                  <div className="bg-[#647C47]/10 rounded-lg p-4">
+                  <div className="bg-primary-500/10 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Per Person</p>
-                    <p className="text-xl font-bold text-[#647C47]">{money(result.price_per_person)}</p>
+                    <p className="text-xl font-bold text-primary-500">{money(result.price_per_person)}</p>
                   </div>
                 </div>
 
@@ -1021,8 +1021,8 @@ export default function TourPriceCalculator() {
                       </tr>
                     )}
                     <tr className="text-lg">
-                      <td colSpan={5} className="px-4 py-2 text-right text-[#647C47]">Total:</td>
-                      <td className="px-4 py-2 text-right text-[#647C47]">{money(result.selling_price)}</td>
+                      <td colSpan={5} className="px-4 py-2 text-right text-primary-500">Total:</td>
+                      <td className="px-4 py-2 text-right text-primary-500">{money(result.selling_price)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1057,7 +1057,7 @@ export default function TourPriceCalculator() {
                           // not updated by the time this runs.
                           void calculatePrice(next)
                         }}
-                        className="w-4 h-4 text-[#647C47] rounded flex-shrink-0"
+                        className="w-4 h-4 text-primary-500 rounded flex-shrink-0"
                       />
                       <span className="text-sm truncate">
                         {opt.service_name}
@@ -1109,7 +1109,7 @@ export default function TourPriceCalculator() {
                 </thead>
                 <tbody className="divide-y">
                   {rateSheet.map((row) => (
-                    <tr key={row.pax} className={`hover:bg-gray-50 ${row.pax === numPax ? 'bg-[#647C47]/5' : ''}`}>
+                    <tr key={row.pax} className={`hover:bg-gray-50 ${row.pax === numPax ? 'bg-primary-500/5' : ''}`}>
                       <td className="px-4 py-2 text-center font-medium">
                         {row.pax}
                         {tourLeaderIncluded && <span className="text-xs text-blue-500 ml-1">(+1)</span>}
@@ -1117,7 +1117,7 @@ export default function TourPriceCalculator() {
                       <td className="px-4 py-2 text-right">{money(row.total_cost)}</td>
                       <td className="px-4 py-2 text-right text-green-600">{money(row.margin_amount)}</td>
                       <td className="px-4 py-2 text-right font-medium">{money(row.selling_price)}</td>
-                      <td className="px-4 py-2 text-right font-bold text-[#647C47]">{money(row.price_per_person)}</td>
+                      <td className="px-4 py-2 text-right font-bold text-primary-500">{money(row.price_per_person)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1133,7 +1133,7 @@ export default function TourPriceCalculator() {
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Save className="w-5 h-5 text-[#647C47]" />
+                <Save className="w-5 h-5 text-primary-500" />
                 Save Quote
               </h2>
               <button onClick={() => setShowSaveModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -1150,7 +1150,7 @@ export default function TourPriceCalculator() {
                 <select
                   value={quoteForm.partner_id}
                   onChange={(e) => setQuoteForm({ ...quoteForm, partner_id: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-[#647C47] outline-none"
+                  className="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-primary-500 outline-none"
                 >
                   <option value="">No partner / Direct client</option>
                   {partners.map(partner => (
@@ -1185,7 +1185,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_name}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_name: e.target.value })}
                       placeholder="John Smith"
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                   
@@ -1198,7 +1198,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_email}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_email: e.target.value })}
                       placeholder="john@example.com"
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                   
@@ -1211,7 +1211,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_phone}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_phone: e.target.value })}
                       placeholder="+1 234 567 8900"
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                   
@@ -1224,7 +1224,7 @@ export default function TourPriceCalculator() {
                       value={quoteForm.client_nationality}
                       onChange={(e) => setQuoteForm({ ...quoteForm, client_nationality: e.target.value })}
                       placeholder="American, British, etc."
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                 </div>
@@ -1237,7 +1237,7 @@ export default function TourPriceCalculator() {
                   onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
                   placeholder="Any special requests or notes..."
                   rows={2}
-                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none resize-none"
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none"
                 />
               </div>
 
@@ -1257,7 +1257,7 @@ export default function TourPriceCalculator() {
                 </div>
                 <div className="flex justify-between pt-2 border-t mt-2">
                   <span className="text-gray-600">Selling Price:</span>
-                  <span className="font-bold text-[#647C47]">{money(result?.selling_price)}</span>
+                  <span className="font-bold text-primary-500">{money(result?.selling_price)}</span>
                 </div>
               </div>
             </div>
@@ -1272,7 +1272,7 @@ export default function TourPriceCalculator() {
               <button
                 onClick={() => handleSaveQuote()}
                 disabled={saving}
-                className="flex-1 px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>

@@ -245,7 +245,7 @@ export default function TourDetailPage() {
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 text-[#647C47] animate-spin mx-auto mb-3" />
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin mx-auto mb-3" />
             <p className="text-gray-500 text-sm">Loading tour details...</p>
           </div>
         </div>
@@ -308,7 +308,7 @@ export default function TourDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Calendar className="h-4 w-4 text-[#647C47]" />
+            <Calendar className="h-4 w-4 text-primary-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Duration</p>
@@ -318,7 +318,7 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Users className="h-4 w-4 text-[#647C47]" />
+            <Users className="h-4 w-4 text-primary-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Group Size</p>
@@ -330,7 +330,7 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Tag className="h-4 w-4 text-[#647C47]" />
+            <Tag className="h-4 w-4 text-primary-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Category</p>
@@ -338,7 +338,7 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Globe className="h-4 w-4 text-[#647C47]" />
+            <Globe className="h-4 w-4 text-primary-500" />
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Languages</p>
@@ -348,11 +348,11 @@ export default function TourDetailPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[#647C47]">{sym}</span>
+            <span className="text-primary-500">{sym}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">From</p>
-          <p className="text-lg font-semibold text-[#647C47]">
+          <p className="text-lg font-semibold text-primary-500">
             {pricingLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : pricing ? (
@@ -383,7 +383,7 @@ export default function TourDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {tour.highlights.map((highlight, idx) => (
                     <div key={idx} className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-[#647C47] mt-0.5 flex-shrink-0" />
+                      <Check className="h-4 w-4 text-primary-500 mt-0.5 flex-shrink-0" />
                       <span className="text-sm text-gray-600">{highlight}</span>
                     </div>
                   ))}
@@ -396,7 +396,7 @@ export default function TourDetailPage() {
           {tour.daily_itinerary && tour.daily_itinerary.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-[#647C47]" />
+                <Calendar className="h-5 w-5 text-primary-500" />
                 Daily Itinerary
               </h2>
               <div className="space-y-3">
@@ -410,8 +410,8 @@ export default function TourDetailPage() {
                       className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-                          <span className="text-sm font-bold text-[#647C47]">{day.day_number}</span>
+                        <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+                          <span className="text-sm font-bold text-primary-500">{day.day_number}</span>
                         </div>
                         <div className="text-left">
                           <p className="text-sm font-medium text-gray-900">{day.day_title}</p>
@@ -433,7 +433,7 @@ export default function TourDetailPage() {
                     </button>
                     {expandedDays.includes(day.day_number) && (
                       <div className="px-4 pb-4 pt-0">
-                        <div className="pl-13 ml-[52px] border-l-2 border-[#647C47]/20 pl-4">
+                        <div className="pl-13 ml-[52px] border-l-2 border-primary-500/20 pl-4">
                           <p className="text-sm text-gray-600">{day.day_description}</p>
                           <div className="flex flex-wrap items-center gap-3 mt-3 text-xs">
                             {day.breakfast_included && (
@@ -503,15 +503,15 @@ export default function TourDetailPage() {
           {tour.optional_extras && tour.optional_extras.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="w-6 h-6 bg-[#647C47]/10 rounded-full flex items-center justify-center">
-                  <Plus className="h-3.5 w-3.5 text-[#647C47]" />
+                <div className="w-6 h-6 bg-primary-500/10 rounded-full flex items-center justify-center">
+                  <Plus className="h-3.5 w-3.5 text-primary-500" />
                 </div>
                 Optional Extras
               </h3>
               <ul className="space-y-2">
                 {tour.optional_extras.map((item, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
-                    <Plus className="h-4 w-4 text-[#647C47] mt-0.5 flex-shrink-0" />
+                    <Plus className="h-4 w-4 text-primary-500 mt-0.5 flex-shrink-0" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -547,7 +547,7 @@ export default function TourDetailPage() {
           ) : (
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-[#647C47]" />
+              <Calculator className="h-5 w-5 text-primary-500" />
               Calculate Your Price
             </h3>
             
@@ -559,7 +559,7 @@ export default function TourDetailPage() {
               <select
                 value={selectedPax}
                 onChange={(e) => setSelectedPax(Number(e.target.value))}
-                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white"
+                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
               >
                 {/* The variation's ceiling when it states one; otherwise a
                     plain picker range, which claims nothing about the tour. */}
@@ -581,7 +581,7 @@ export default function TourDetailPage() {
                 value={travelDate}
                 onChange={(e) => setTravelDate(e.target.value)}
                 min={todayLocal()}
-                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none"
+                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
               />
             </div>
 
@@ -593,7 +593,7 @@ export default function TourDetailPage() {
               <select
                 value={isEurPassport ? 'eur' : 'non-eur'}
                 onChange={(e) => setIsEurPassport(e.target.value === 'eur')}
-                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white"
+                className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
               >
                 <option value="eur">European Passport</option>
                 <option value="non-eur">Non-European Passport</option>
@@ -604,7 +604,7 @@ export default function TourDetailPage() {
             {/* Pricing Result */}
             {pricingLoading ? (
               <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-4 flex items-center justify-center">
-                <Loader2 className="w-5 h-5 animate-spin text-[#647C47] mr-2" />
+                <Loader2 className="w-5 h-5 animate-spin text-primary-500 mr-2" />
                 <span className="text-sm text-gray-600">Calculating...</span>
               </div>
             ) : pricingError ? (
@@ -616,17 +616,17 @@ export default function TourDetailPage() {
               </div>
             ) : pricing ? (
               <>
-                <div className="bg-[#647C47]/5 border border-[#647C47]/20 p-4 rounded-lg mb-4">
+                <div className="bg-primary-500/5 border border-primary-500/20 p-4 rounded-lg mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-gray-500">Price per person</p>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${getSeasonBadge(pricing.season)}`}>
                       {pricing.season.charAt(0).toUpperCase() + pricing.season.slice(1)} Season
                     </span>
                   </div>
-                  <p className="text-3xl font-bold text-[#647C47]">
+                  <p className="text-3xl font-bold text-primary-500">
                     {sym}{pricing.price_per_person.toFixed(0)}
                   </p>
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#647C47]/20">
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary-500/20">
                     <span className="text-sm text-gray-600">Total for {selectedPax} {selectedPax === 1 ? 'person' : 'people'}</span>
                     <span className="text-lg font-semibold text-gray-900">{sym}{pricing.selling_price.toFixed(0)}</span>
                   </div>
@@ -748,7 +748,7 @@ export default function TourDetailPage() {
           </div>
 
           {/* Contact Card */}
-          <div className="bg-[#647C47]/5 border border-[#647C47]/20 rounded-lg p-6">
+          <div className="bg-primary-500/5 border border-primary-500/20 rounded-lg p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Need Help?</h3>
             <p className="text-xs text-gray-500 mb-4">
               Contact us for custom arrangements or questions
@@ -757,19 +757,19 @@ export default function TourDetailPage() {
                 company's contact details on every tenant's public tour pages. */}
             <div className="space-y-2 text-sm">
               {operator?.contact_email && (
-                <a href={`mailto:${operator.contact_email}`} className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                <a href={`mailto:${operator.contact_email}`} className="flex items-center gap-2 text-gray-600 hover:text-primary-500">
                   <Mail className="h-4 w-4" />
                   {operator.contact_email}
                 </a>
               )}
               {operator?.company_phone && (
-                <a href={`tel:${operator.company_phone.replace(/\s+/g, '')}`} className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                <a href={`tel:${operator.company_phone.replace(/\s+/g, '')}`} className="flex items-center gap-2 text-gray-600 hover:text-primary-500">
                   <Phone className="h-4 w-4" />
                   {operator.company_phone}
                 </a>
               )}
               {operator?.company_website && (
-                <a href={operator.company_website.startsWith('http') ? operator.company_website : `https://${operator.company_website}`} target="_blank" className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                <a href={operator.company_website.startsWith('http') ? operator.company_website : `https://${operator.company_website}`} target="_blank" className="flex items-center gap-2 text-gray-600 hover:text-primary-500">
                   <ExternalLink className="h-4 w-4" />
                   {operator.company_website}
                 </a>

@@ -266,7 +266,7 @@ export default function ProfitLossPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -440,7 +440,7 @@ export default function ProfitLossPage() {
             placeholder="Search trips..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -448,7 +448,7 @@ export default function ProfitLossPage() {
           <select
             value={sortField}
             onChange={(e) => setSortField(e.target.value as any)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="start_date">Sort by Date</option>
             <option value="gross_profit">Sort by Profit</option>
@@ -467,13 +467,13 @@ export default function ProfitLossPage() {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
               hasActiveFilters 
-                ? 'border-[#647C47] text-[#647C47] bg-[#647C47]/5' 
+                ? 'border-primary-500 text-primary-500 bg-primary-500/5' 
                 : 'border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
             <Filter className="h-4 w-4" />
             Filters
-            {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-[#647C47]"></span>}
+            {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-500"></span>}
           </button>
 
           {hasActiveFilters && (
@@ -493,7 +493,7 @@ export default function ProfitLossPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -509,7 +509,7 @@ export default function ProfitLossPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
@@ -518,7 +518,7 @@ export default function ProfitLossPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
@@ -559,7 +559,7 @@ export default function ProfitLossPage() {
                         <div>
                           <Link 
                             href={`/profit-loss/${trip.itinerary_id}`}
-                            className="text-sm font-medium text-gray-900 hover:text-[#647C47]"
+                            className="text-sm font-medium text-gray-900 hover:text-primary-500"
                           >
                             {trip.itinerary_code}
                           </Link>
@@ -656,7 +656,7 @@ export default function ProfitLossPage() {
                         <div className="flex items-center justify-end gap-1">
                           <Link
                             href={`/profit-loss/${trip.itinerary_id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                             title="View Details"
                           >
                             <Eye className="h-4 w-4" />
@@ -710,7 +710,7 @@ export default function ProfitLossPage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 text-sm rounded-lg ${
                     currentPage === pageNum
-                      ? 'bg-[#647C47] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >

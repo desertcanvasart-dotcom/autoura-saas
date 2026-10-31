@@ -346,7 +346,7 @@ export default function TeamMembersPage() {
   if (loading) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -357,7 +357,7 @@ export default function TeamMembersPage() {
       <div className="flex items-center justify-end">
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Plus className="h-4 w-4" />
           Add Member
@@ -395,14 +395,14 @@ export default function TeamMembersPage() {
             placeholder="Search team members..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">All Roles</option>
           {ROLES.map(role => (
@@ -414,7 +414,7 @@ export default function TeamMembersPage() {
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
             <option value="">All Departments</option>
             {departments.map(d => (
@@ -425,7 +425,7 @@ export default function TeamMembersPage() {
 
         <Link
           href="/settings/departments"
-          className="text-sm text-[#647C47] hover:text-[#4f6238] hover:underline whitespace-nowrap"
+          className="text-sm text-primary-500 hover:text-primary-700 hover:underline whitespace-nowrap"
         >
           Manage departments
         </Link>
@@ -435,7 +435,7 @@ export default function TeamMembersPage() {
             type="checkbox"
             checked={showInactive}
             onChange={(e) => setShowInactive(e.target.checked)}
-            className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"
+            className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
           />
           Show inactive
         </label>
@@ -449,7 +449,7 @@ export default function TeamMembersPage() {
             <p className="text-gray-500">No team members found</p>
             <button
               onClick={openAddModal}
-              className="mt-3 text-sm text-[#647C47] hover:underline"
+              className="mt-3 text-sm text-primary-500 hover:underline"
             >
               Add your first team member
             </button>
@@ -585,7 +585,7 @@ export default function TeamMembersPage() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="John Doe"
                   required
                 />
@@ -597,7 +597,7 @@ export default function TeamMembersPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="john@example.com"
                 />
               </div>
@@ -608,7 +608,7 @@ export default function TeamMembersPage() {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="+ country code and number"
                 />
               </div>
@@ -623,7 +623,7 @@ export default function TeamMembersPage() {
                     role: e.target.value,
                     staff_type: e.target.value === 'driver' ? 'driver' : e.target.value === 'guide' ? 'guide' : formData.staff_type,
                   })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   {ROLES.map(role => (
                     <option key={role.value} value={role.value}>{role.icon} {role.label}</option>
@@ -639,7 +639,7 @@ export default function TeamMembersPage() {
                 <select
                   value={formData.staff_type}
                   onChange={(e) => setFormData({ ...formData, staff_type: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="office">Office</option>
                   <option value="guide">Guide</option>
@@ -654,7 +654,7 @@ export default function TeamMembersPage() {
                 <select
                   value={formData.department_id}
                   onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">— No department —</option>
                   {departments.map(d => (
@@ -668,7 +668,7 @@ export default function TeamMembersPage() {
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   rows={3}
                   placeholder="Additional notes..."
                 />
@@ -685,7 +685,7 @@ export default function TeamMembersPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editingMember ? 'Update' : 'Add Member'}
                 </button>
@@ -731,7 +731,7 @@ export default function TeamMembersPage() {
 
               {activityLoading ? (
                 <div className="flex items-center justify-center py-10">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#647C47]"></div>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
                 </div>
               ) : activityError ? (
                 <p className="text-sm text-gray-500 text-center py-8">{activityError}</p>
@@ -780,7 +780,7 @@ export default function TeamMembersPage() {
                               title={`${cell.day}: ${cell.minutes}m`}
                             >
                               <div
-                                className="w-full rounded-sm bg-[#647C47]"
+                                className="w-full rounded-sm bg-primary-500"
                                 style={{
                                   height: `${Math.max(
                                     cell.minutes > 0 ? 4 : 2,

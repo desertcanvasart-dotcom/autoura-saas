@@ -126,7 +126,7 @@ export default function UnifiedMessageThread({ conversation, onConversationUpdat
             <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] rounded-xl px-4 py-3 ${
                 msg.direction === 'outbound'
-                  ? 'bg-[#647C47]/10 border border-[#647C47]/20'
+                  ? 'bg-primary-500/10 border border-primary-500/20'
                   : 'bg-gray-100 border border-gray-200'
               }`}>
                 <div className="flex items-center justify-between gap-3 mb-1">

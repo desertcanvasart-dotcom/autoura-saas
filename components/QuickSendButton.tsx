@@ -69,7 +69,7 @@ export function QuickSendButton({
   const [showModal, setShowModal] = useState(false)
 
   const buttonStyles = {
-    primary: 'flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors',
+    primary: 'flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors',
     secondary: 'flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200',
     icon: 'p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors',
   }
@@ -285,7 +285,7 @@ function QuickSendModal({ client, itinerary, category, onClose }: QuickSendModal
                             }}
                             className={`w-full text-left p-2 rounded-lg text-sm transition-colors ${
                               selectedTemplate?.id === template.id
-                                ? 'bg-[#647C47]/10 text-[#647C47] border border-[#647C47]/30'
+                                ? 'bg-primary-500/10 text-primary-500 border border-primary-500/30'
                                 : 'hover:bg-gray-100 text-gray-700'
                             }`}
                           >
@@ -376,7 +376,7 @@ function QuickSendModal({ client, itinerary, category, onClose }: QuickSendModal
                       <button
                         onClick={handleSend}
                         disabled={sending || !client}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
                       >
                         {sending ? (
                           <Loader2 className="w-4 h-4 animate-spin" />

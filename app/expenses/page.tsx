@@ -438,7 +438,7 @@ export default function ExpensesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -466,7 +466,7 @@ export default function ExpensesPage() {
           </button>
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Expense
@@ -544,7 +544,7 @@ export default function ExpensesPage() {
             placeholder="Search expenses..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -553,14 +553,14 @@ export default function ExpensesPage() {
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
             hasActiveFilters 
-              ? 'border-[#647C47] text-[#647C47] bg-[#647C47]/5' 
+              ? 'border-primary-500 text-primary-500 bg-primary-500/5' 
               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Filter className="h-4 w-4" />
           Filters
           {hasActiveFilters && (
-            <span className="w-2 h-2 rounded-full bg-[#647C47]"></span>
+            <span className="w-2 h-2 rounded-full bg-primary-500"></span>
           )}
         </button>
 
@@ -583,7 +583,7 @@ export default function ExpensesPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Status</option>
                 <option value="pending">Pending</option>
@@ -598,7 +598,7 @@ export default function ExpensesPage() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Categories</option>
                 {CATEGORIES.map(cat => (
@@ -612,7 +612,7 @@ export default function ExpensesPage() {
               <select
                 value={supplierTypeFilter}
                 onChange={(e) => setSupplierTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Suppliers</option>
                 {SUPPLIER_TYPES.map(type => (
@@ -627,7 +627,7 @@ export default function ExpensesPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
 
@@ -637,7 +637,7 @@ export default function ExpensesPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
@@ -668,7 +668,7 @@ export default function ExpensesPage() {
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-[#647C47] rounded-full transition-all"
+                        className="h-full bg-primary-500 rounded-full transition-all"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -727,7 +727,7 @@ export default function ExpensesPage() {
             const statusConfig = STATUS_CONFIG[expense.status] || STATUS_CONFIG.pending
             const StatusIcon = statusConfig.icon
             return (
-              <div key={expense.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-[#647C47] transition-colors">
+              <div key={expense.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-primary-500 transition-colors">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">{getCategoryIcon(expense.category)}</span>
@@ -759,7 +759,7 @@ export default function ExpensesPage() {
                 <div className="flex items-center gap-1 mt-3 pt-3 border-t border-gray-100">
                   <Link
                     href={`/expenses/${expense.id}`}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-gray-600 hover:text-[#647C47] hover:bg-gray-50 rounded transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-gray-600 hover:text-primary-500 hover:bg-gray-50 rounded transition-colors"
                   >
                     <Eye className="h-3.5 w-3.5" />
                     View
@@ -817,7 +817,7 @@ export default function ExpensesPage() {
                       <tr key={expense.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <div>
-                            <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                            <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                               {expense.expense_number}
                             </Link>
                             <p className="text-xs text-gray-500 truncate max-w-[200px]">{expense.description || '-'}</p>
@@ -872,7 +872,7 @@ export default function ExpensesPage() {
                           <div className="flex items-center justify-end gap-1">
                             <Link
                               href={`/expenses/${expense.id}`}
-                              className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                               title="View"
                             >
                               <Eye className="h-4 w-4" />
@@ -943,7 +943,7 @@ export default function ExpensesPage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 text-sm rounded-lg ${
                     currentPage === pageNum
-                      ? 'bg-[#647C47] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -989,7 +989,7 @@ export default function ExpensesPage() {
                     value={formData.category}
                     onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value, supplier_id: null, supplier_name: '', supplier_type: '' }))}
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
                   >
                     <option value="">Select Category</option>
                     {CATEGORIES.map(cat => (
@@ -1005,7 +1005,7 @@ export default function ExpensesPage() {
                     <select
                       value={formData.currency}
                       onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                      className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                      className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     >
                       {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c} {getCurrencySymbol(c)}</option>)}
                     </select>
@@ -1016,7 +1016,7 @@ export default function ExpensesPage() {
                       step="0.01"
                       min="0"
                       required
-                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1030,7 +1030,7 @@ export default function ExpensesPage() {
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="What was this expense for?"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -1045,7 +1045,7 @@ export default function ExpensesPage() {
                     value={formData.expense_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, expense_date: e.target.value }))}
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -1053,7 +1053,7 @@ export default function ExpensesPage() {
                   <select
                     value={formData.itinerary_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, itinerary_id: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     <option value="">No Trip Link</option>
                     {itineraries.map(it => (
@@ -1104,7 +1104,7 @@ export default function ExpensesPage() {
                     <select
                       value={formData.payment_method}
                       onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     >
                       <option value="">Select Method</option>
                       {PAYMENT_METHODS.map(method => (
@@ -1118,7 +1118,7 @@ export default function ExpensesPage() {
                       type="date"
                       value={formData.payment_date}
                       onChange={(e) => setFormData(prev => ({ ...prev, payment_date: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1128,7 +1128,7 @@ export default function ExpensesPage() {
                       value={formData.payment_reference}
                       onChange={(e) => setFormData(prev => ({ ...prev, payment_reference: e.target.value }))}
                       placeholder="TXN-12345"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1142,7 +1142,7 @@ export default function ExpensesPage() {
                   value={formData.receipt_url}
                   onChange={(e) => setFormData(prev => ({ ...prev, receipt_url: e.target.value }))}
                   placeholder="https://drive.google.com/..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <p className="text-xs text-gray-400 mt-1">Upload receipt to Google Drive and paste the link</p>
               </div>
@@ -1155,7 +1155,7 @@ export default function ExpensesPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   placeholder="Additional notes..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] resize-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                 />
               </div>
 
@@ -1171,7 +1171,7 @@ export default function ExpensesPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                 >
                   {saving ? 'Saving...' : (editingExpense ? 'Update Expense' : 'Add Expense')}
                 </button>

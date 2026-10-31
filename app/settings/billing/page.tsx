@@ -200,14 +200,14 @@ export default function BillingPage() {
   const getUsageColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-red-500'
     if (percentage >= 75) return 'bg-amber-500'
-    return 'bg-[#647C47]'
+    return 'bg-primary-500'
   }
 
   if (loading) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
         <div className="py-8 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-[#647C47] animate-spin" />
+          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
         </div>
       </div>
     )
@@ -238,7 +238,7 @@ export default function BillingPage() {
             type="button"
             onClick={handleManageBilling}
             disabled={actionLoading === 'portal'}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#4f613a] disabled:opacity-50 transition-colors"
           >
             {actionLoading === 'portal' ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -296,8 +296,8 @@ export default function BillingPage() {
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[#647C47]/10 flex items-center justify-center">
-                  <Package className="w-4.5 h-4.5 text-[#647C47]" />
+                <div className="w-9 h-9 rounded-lg bg-primary-500/10 flex items-center justify-center">
+                  <Package className="w-4.5 h-4.5 text-primary-500" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ export default function BillingPage() {
               {subscription.plan_slug !== 'enterprise' && (
                 <Link
                   href="/settings/billing/plans"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#647C47] bg-[#647C47]/10 rounded-lg hover:bg-[#647C47]/20 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-primary-500 bg-primary-500/10 rounded-lg hover:bg-primary-500/20 transition-colors"
                 >
                   <Crown className="w-3.5 h-3.5" />
                   Upgrade
@@ -371,7 +371,7 @@ export default function BillingPage() {
               </div>
               <Link
                 href="/settings/billing/usage"
-                className="text-xs font-medium text-[#647C47] hover:text-[#4f613a] flex items-center gap-0.5"
+                className="text-xs font-medium text-primary-500 hover:text-[#4f613a] flex items-center gap-0.5"
               >
                 Details <ChevronRight className="w-3 h-3" />
               </Link>
@@ -413,7 +413,7 @@ export default function BillingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
             href="/settings/billing/plans"
-            className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#647C47]/50 hover:shadow-sm transition-all group"
+            className="bg-white border border-gray-200 rounded-xl p-3 hover:border-primary-500/50 hover:shadow-sm transition-all group"
           >
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
@@ -428,7 +428,7 @@ export default function BillingPage() {
 
           <Link
             href="/settings/billing/invoices"
-            className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#647C47]/50 hover:shadow-sm transition-all group"
+            className="bg-white border border-gray-200 rounded-xl p-3 hover:border-primary-500/50 hover:shadow-sm transition-all group"
           >
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center group-hover:bg-primary-100 transition-colors">
@@ -443,7 +443,7 @@ export default function BillingPage() {
 
           <Link
             href="/settings/billing/usage"
-            className="bg-white border border-gray-200 rounded-xl p-3 hover:border-[#647C47]/50 hover:shadow-sm transition-all group"
+            className="bg-white border border-gray-200 rounded-xl p-3 hover:border-primary-500/50 hover:shadow-sm transition-all group"
           >
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center group-hover:bg-primary-100 transition-colors">

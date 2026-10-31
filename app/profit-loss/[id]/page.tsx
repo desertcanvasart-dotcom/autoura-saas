@@ -190,7 +190,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -199,7 +199,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">{loadError || 'Trip not found'}</p>
-        <Link href="/profit-loss" className="text-[#647C47] hover:underline mt-2 inline-block">
+        <Link href="/profit-loss" className="text-primary-500 hover:underline mt-2 inline-block">
           Back to Profit & Loss
         </Link>
       </div>
@@ -245,7 +245,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
           </Link>
           <Link
             href={`/expenses?itineraryId=${pnlData.itinerary_id}`}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Expense
@@ -416,7 +416,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-gray-500">No expenses recorded</p>
               <Link
                 href={`/expenses?itineraryId=${pnlData.itinerary_id}`}
-                className="text-sm text-[#647C47] hover:underline mt-2 inline-block"
+                className="text-sm text-primary-500 hover:underline mt-2 inline-block"
               >
                 Add expenses
               </Link>
@@ -439,7 +439,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-[#647C47] rounded-full transition-all"
+                        className="h-full bg-primary-500 rounded-full transition-all"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -457,7 +457,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
             <h3 className="text-sm font-semibold text-gray-900">Expenses</h3>
             <Link
               href={`/expenses?itineraryId=${pnlData.itinerary_id}`}
-              className="text-xs text-[#647C47] hover:underline"
+              className="text-xs text-primary-500 hover:underline"
             >
               View all
             </Link>
@@ -514,7 +514,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-gray-500">No invoices created</p>
               <Link
                 href={`/itineraries/${pnlData.itinerary_id}`}
-                className="text-sm text-[#647C47] hover:underline mt-2 inline-block"
+                className="text-sm text-primary-500 hover:underline mt-2 inline-block"
               >
                 Create invoice
               </Link>

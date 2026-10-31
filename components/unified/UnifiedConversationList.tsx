@@ -99,15 +99,15 @@ export default function UnifiedConversationList({ onSelectConversation, selected
           >
             Waiting on us
           </button>
-          <button onClick={handleSync} disabled={syncing} className="p-1.5 text-gray-400 hover:text-[#647C47] rounded-lg hover:bg-gray-100">
+          <button onClick={handleSync} disabled={syncing} className="p-1.5 text-gray-400 hover:text-primary-500 rounded-lg hover:bg-gray-100">
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </button>
         </div>
         <div className="relative">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-3 pr-3 py-1.5 text-sm bg-gray-100 border-none rounded-lg focus:bg-white focus:ring-1 focus:ring-[#647C47] outline-none" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-3 pr-3 py-1.5 text-sm bg-gray-100 border-none rounded-lg focus:bg-white focus:ring-1 focus:ring-primary-500 outline-none" />
         </div>
         <div className="flex gap-1 mt-2">
-          <button onClick={() => setFilter('active')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'active' ? 'bg-[#647C47] text-white' : 'text-gray-500 hover:bg-gray-100'}`}>Active</button>
+          <button onClick={() => setFilter('active')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'active' ? 'bg-primary-500 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>Active</button>
           <button onClick={() => setFilter('archived')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'archived' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-primary-700'}`}>
             <Archive className="w-3 h-3 inline mr-1" />Archived
           </button>
@@ -129,7 +129,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
               key={conv.id}
               onClick={() => onSelectConversation(conv)}
               className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                selectedConversationId === conv.id ? 'bg-[#647C47]/5 border-l-2 border-l-[#647C47]' : ''
+                selectedConversationId === conv.id ? 'bg-primary-500/5 border-l-2 border-l-primary-500' : ''
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -140,7 +140,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
                       {conv.client?.full_name || conv.client_name || conv.client_email || 'Unknown'}
                     </span>
                     {conv.unread_count > 0 && (
-                      <span className="bg-[#647C47] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
+                      <span className="bg-primary-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
                     )}
                     {/* Waiting on us, and for how long — dated from the
                         customer's FIRST unanswered message. */}

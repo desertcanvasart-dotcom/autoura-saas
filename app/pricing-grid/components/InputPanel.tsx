@@ -215,7 +215,7 @@ export default function InputPanel({ onParseDays, onAddDay, blocks, onAddDayFrom
               title={pkg.description}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                 packageType === pkg.slug
-                  ? 'bg-[#647C47] border-[#4a5c35] text-white shadow-sm'
+                  ? 'bg-primary-500 border-[#4a5c35] text-white shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >

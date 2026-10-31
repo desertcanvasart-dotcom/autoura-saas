@@ -120,7 +120,7 @@ function AcceptInvitationContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 text-[#647C47] animate-spin mx-auto" />
+          <Loader2 className="w-10 h-10 text-primary-500 animate-spin mx-auto" />
           <p className="mt-4 text-gray-600">Verifying invitation...</p>
         </div>
       </div>
@@ -139,7 +139,7 @@ function AcceptInvitationContent() {
           <p className="text-gray-600 mb-6">{error}</p>
           <a
             href="/login"
-            className="inline-flex items-center justify-center px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors"
+            className="inline-flex items-center justify-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors"
           >
             Go to Login
           </a>
@@ -167,7 +167,7 @@ function AcceptInvitationContent() {
               </p>
               <p className="text-sm text-gray-500">
                 Open it from your inbox to finish. No email? Check spam, or use{' '}
-                <a href="/forgot-password" className="text-[#647C47] hover:underline font-medium">Forgot password</a>.
+                <a href="/forgot-password" className="text-primary-500 hover:underline font-medium">Forgot password</a>.
               </p>
             </>
           ) : (
@@ -191,8 +191,8 @@ function AcceptInvitationContent() {
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#647C47]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-8 h-8 text-[#647C47]" />
+          <div className="w-16 h-16 bg-primary-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-8 h-8 text-primary-500" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Accept Invitation</h1>
           <p className="text-gray-600 mt-2">
@@ -203,19 +203,19 @@ function AcceptInvitationContent() {
         </div>
 
         {/* Invitation Info Card */}
-        <div className="bg-[#647C47]/5 border border-[#647C47]/20 rounded-lg p-4 mb-6">
+        <div className="bg-primary-500/5 border border-primary-500/20 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-3 mb-3">
-            <Mail className="w-5 h-5 text-[#647C47]" />
+            <Mail className="w-5 h-5 text-primary-500" />
             <span className="text-sm text-gray-700">{invitation?.email}</span>
           </div>
           <div className="flex items-center gap-3 mb-3">
-            <User className="w-5 h-5 text-[#647C47]" />
+            <User className="w-5 h-5 text-primary-500" />
             <span className="text-sm text-gray-700">
               Invited by <span className="font-medium">{invitation?.inviter?.full_name || invitation?.inviter?.email || 'Admin'}</span>
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <Shield className="w-5 h-5 text-[#647C47]" />
+            <Shield className="w-5 h-5 text-primary-500" />
             <span className="text-sm text-gray-700">
               Role: <span className="font-medium capitalize">{invitation?.role}</span>
             </span>
@@ -235,7 +235,7 @@ function AcceptInvitationContent() {
               <span className="font-medium text-gray-900">{invitation.email}</span> already has an
               Autoura login. Accepting adds you to this team; afterwards, sign in with your
               <span className="font-medium"> existing password</span>. Forgot it?{' '}
-              <a href="/forgot-password" className="text-[#647C47] hover:underline font-medium">Reset it</a>.
+              <a href="/forgot-password" className="text-primary-500 hover:underline font-medium">Reset it</a>.
             </p>
           ) : (<>
           <div>
@@ -248,7 +248,7 @@ function AcceptInvitationContent() {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="Enter your full name"
                 required
               />
@@ -262,13 +262,13 @@ function AcceptInvitationContent() {
               required
               checked={acceptedTerms}
               onChange={(e) => setAcceptedTerms(e.target.checked)}
-              className="mt-0.5 w-4 h-4 border-gray-300 rounded focus:ring-[#647C47]"
+              className="mt-0.5 w-4 h-4 border-gray-300 rounded focus:ring-primary-500"
             />
             <label htmlFor="invite-terms" className="text-sm text-gray-600">
               I agree to the{' '}
-              <a href="/terms" target="_blank" className="text-[#647C47] font-medium hover:underline">Terms of Service</a>{' '}
+              <a href="/terms" target="_blank" className="text-primary-500 font-medium hover:underline">Terms of Service</a>{' '}
               and{' '}
-              <a href="/privacy" target="_blank" className="text-[#647C47] font-medium hover:underline">Privacy Policy</a>.
+              <a href="/privacy" target="_blank" className="text-primary-500 font-medium hover:underline">Privacy Policy</a>.
             </label>
           </div>
 
@@ -280,7 +280,7 @@ function AcceptInvitationContent() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 bg-[#647C47] text-white font-medium rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-primary-500 text-white font-medium rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {submitting ? (
               <>
@@ -295,7 +295,7 @@ function AcceptInvitationContent() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{' '}
-          <a href="/login" className="text-[#647C47] hover:underline font-medium">
+          <a href="/login" className="text-primary-500 hover:underline font-medium">
             Sign in
           </a>
         </p>
@@ -308,7 +308,7 @@ export default function AcceptInvitationPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-10 h-10 text-[#647C47] animate-spin" />
+        <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
       </div>
     }>
       <AcceptInvitationContent />

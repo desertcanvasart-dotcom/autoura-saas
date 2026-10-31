@@ -344,7 +344,7 @@ export default function CommissionsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -364,7 +364,7 @@ export default function CommissionsPage() {
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
         >
           <Plus className="h-4 w-4" />
           Add Commission
@@ -436,7 +436,7 @@ export default function CommissionsPage() {
             placeholder="Search commissions..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -444,7 +444,7 @@ export default function CommissionsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white cursor-pointer"
           >
             <option value="">All Types</option>
             <option value="receivable">Receivable</option>
@@ -457,7 +457,7 @@ export default function CommissionsPage() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white cursor-pointer"
           >
             <option value="">All Categories</option>
             {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
@@ -471,7 +471,7 @@ export default function CommissionsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white cursor-pointer"
+            className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white cursor-pointer"
           >
             <option value="">All Status</option>
             <option value="pending">Pending</option>
@@ -510,7 +510,7 @@ export default function CommissionsPage() {
                     <p className="text-sm text-gray-500">No commissions found</p>
                     <button
                       onClick={openAddModal}
-                      className="mt-3 text-sm text-[#647C47] hover:underline font-medium"
+                      className="mt-3 text-sm text-primary-500 hover:underline font-medium"
                     >
                       Add your first commission
                     </button>
@@ -698,12 +698,12 @@ export default function CommissionsPage() {
                         onClick={() => setFormData(prev => ({ ...prev, category: key }))}
                         className={`p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
                           formData.category === key
-                            ? 'border-[#647C47] bg-[#647C47]/5'
+                            ? 'border-primary-500 bg-primary-500/5'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <Icon className={`h-4 w-4 ${formData.category === key ? 'text-[#647C47]' : 'text-gray-400'}`} />
-                        <span className={`text-sm ${formData.category === key ? 'text-[#647C47] font-medium' : 'text-gray-600'}`}>
+                        <Icon className={`h-4 w-4 ${formData.category === key ? 'text-primary-500' : 'text-gray-400'}`} />
+                        <span className={`text-sm ${formData.category === key ? 'text-primary-500 font-medium' : 'text-gray-600'}`}>
                           {config.label}
                         </span>
                       </button>
@@ -719,7 +719,7 @@ export default function CommissionsPage() {
                   <select
                     value={formData.supplier_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, supplier_id: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     <option value="">Select Supplier</option>
                     {suppliers.map(s => (
@@ -734,7 +734,7 @@ export default function CommissionsPage() {
                     value={formData.source_name}
                     onChange={(e) => setFormData(prev => ({ ...prev, source_name: e.target.value }))}
                     placeholder="e.g., Khan El Khalili Shop"
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -745,7 +745,7 @@ export default function CommissionsPage() {
                 <select
                   value={formData.itinerary_id}
                   onChange={(e) => setFormData(prev => ({ ...prev, itinerary_id: e.target.value }))}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">No Itinerary Link</option>
                   {itineraries.map(it => (
@@ -765,7 +765,7 @@ export default function CommissionsPage() {
                     placeholder="0.00"
                     step="0.01"
                     min="0"
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Sale/booking amount</p>
                 </div>
@@ -779,7 +779,7 @@ export default function CommissionsPage() {
                     step="0.5"
                     min="0"
                     max="100"
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -787,7 +787,7 @@ export default function CommissionsPage() {
                   <select
                     value={formData.currency}
                     onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -802,7 +802,7 @@ export default function CommissionsPage() {
                     step="0.01"
                     min="0"
                     required
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -815,7 +815,7 @@ export default function CommissionsPage() {
                     type="date"
                     value={formData.transaction_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, transaction_date: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -824,7 +824,7 @@ export default function CommissionsPage() {
                     type="date"
                     value={formData.due_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
@@ -832,7 +832,7 @@ export default function CommissionsPage() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     <option value="pending">Pending</option>
                     <option value="invoiced">Invoiced</option>
@@ -852,7 +852,7 @@ export default function CommissionsPage() {
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="e.g., 10% commission on guest purchases"
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -864,7 +864,7 @@ export default function CommissionsPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   placeholder="Additional notes..."
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] resize-none"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                 />
               </div>
 
@@ -880,7 +880,7 @@ export default function CommissionsPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+                  className="px-5 py-2.5 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : editingId ? 'Update Commission' : 'Add Commission'}
                 </button>

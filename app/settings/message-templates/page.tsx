@@ -496,7 +496,7 @@ export default function TemplatesPage() {
   if (loading) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
       </div>
     )
   }
@@ -548,7 +548,7 @@ export default function TemplatesPage() {
               })
               setShowCreateModal(true)
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Template
@@ -671,7 +671,7 @@ export default function TemplatesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search templates..."
-              className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+              className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -731,7 +731,7 @@ export default function TemplatesPage() {
                 type="button"
                 onClick={loadStarterTemplates}
                 disabled={loadingStarter}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
               >
                 {loadingStarter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 Load starter templates
@@ -810,7 +810,7 @@ export default function TemplatesPage() {
                 </button>
                 <button
                   onClick={() => handleSend(template)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-[#647C47] hover:bg-[#4f6339] rounded transition-colors ml-auto"
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-primary-500 hover:bg-[#4f6339] rounded transition-colors ml-auto"
                 >
                   <Send className="w-3 h-3" />
                   Send
@@ -886,7 +886,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     required
                   />
                 </div>
@@ -895,7 +895,7 @@ export default function TemplatesPage() {
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="customer">Customer (B2C Travelers)</option>
                     <option value="supplier">Supplier (Hotels, Cruises, Guides)</option>
@@ -911,7 +911,7 @@ export default function TemplatesPage() {
                   <select
                     value={formData.channel}
                     onChange={(e) => setFormData({ ...formData, channel: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="email">Email</option>
                     <option value="whatsapp">WhatsApp</option>
@@ -925,7 +925,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.subcategory}
                     onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="e.g., quotation, voucher"
                   />
                 </div>
@@ -938,7 +938,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="Brief description of when to use this template"
                   />
                 </div>
@@ -948,7 +948,7 @@ export default function TemplatesPage() {
                     value={formData.language}
                     onChange={(e) => setFormData({ ...formData, language: e.target.value })}
                     title="Template language"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     {LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
@@ -969,7 +969,7 @@ export default function TemplatesPage() {
                     type="text"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="Email subject line with {{placeholders}}"
                   />
                 </div>
@@ -1005,7 +1005,7 @@ export default function TemplatesPage() {
                     <textarea
                       value={formData.body}
                       onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] font-mono text-sm"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
                       rows={12}
                       placeholder="Template content with {{placeholders}}"
                       required
@@ -1066,7 +1066,7 @@ export default function TemplatesPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {selectedTemplate ? 'Update Template' : 'Create Template'}
@@ -1141,7 +1141,7 @@ export default function TemplatesPage() {
                   setShowPreviewModal(false)
                   handleSend(selectedTemplate)
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors"
               >
                 <Send className="w-4 h-4" />
                 Send This Template
@@ -1697,7 +1697,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                     setIsBulkMode(false) // Can't bulk schedule yet
                   }
                 }}
-                className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
               />
               <span className="text-sm text-gray-600">Schedule</span>
             </label>
@@ -1715,7 +1715,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                     setBulkProgress(null)
                   }
                 }}
-                className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
               />
               <span className="text-sm text-gray-600">Bulk</span>
             </label>
@@ -1744,7 +1744,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                           onClick={() => handleLanguageChange(variant.id)}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                             isActive
-                              ? 'border-[#647C47] bg-[#647C47]/10 text-[#647C47] font-medium'
+                              ? 'border-primary-500 bg-primary-500/10 text-primary-500 font-medium'
                               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                           }`}
                         >
@@ -1828,7 +1828,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                           type="checkbox"
                           checked={selectedRecipients.length === recipients.length && recipients.length > 0}
                           onChange={toggleSelectAll}
-                          className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                          className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
                         />
                         <span className="text-sm font-medium text-gray-700">Select All</span>
                       </label>
@@ -1848,7 +1848,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                             checked={isSelected}
                             onChange={() => toggleRecipientSelection(recipient)}
                             disabled={!hasContact}
-                            className="w-4 h-4 text-[#647C47] rounded focus:ring-[#647C47]"
+                            className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{recipient.name}</p>
@@ -1869,7 +1869,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                       setSelectedRecipient(recipient || null)
                     }}
                     title={getRecipientLabel()}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="">-- {getRecipientLabel()} --</option>
                     {recipients.map((recipient) => (
@@ -1925,7 +1925,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                         value={filledValues[ph] || ''}
                         onChange={(e) => setFilledValues({ ...filledValues, [ph]: e.target.value })}
                         placeholder={info?.example_value || ph}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       />
                     </div>
                   )
@@ -1969,7 +1969,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 <div className="flex items-center gap-3">
                   <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#647C47] transition-all"
+                      className="h-full bg-primary-500 transition-all"
                       style={{ width: `${((bulkProgress.sent + bulkProgress.failed) / bulkProgress.total) * 100}%` }}
                     />
                   </div>
@@ -2006,7 +2006,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 type="button"
                 onClick={handleBulkSend}
                 disabled={sending || selectedRecipients.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send to {selectedRecipients.length} Recipients
@@ -2026,7 +2026,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
                 type="button"
                 onClick={handleSend}
                 disabled={sending || !selectedRecipient}
-                className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send {channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : 'Email'}

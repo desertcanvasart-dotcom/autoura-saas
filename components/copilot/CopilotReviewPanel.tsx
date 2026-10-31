@@ -47,7 +47,7 @@ export default function CopilotReviewPanel({
   }, [activeDraft?.id])
 
   if (loading) {
-    return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 text-[#647C47] animate-spin" /></div>
+    return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 text-primary-500 animate-spin" /></div>
   }
   if (!detail) {
     return (
@@ -97,7 +97,7 @@ export default function CopilotReviewPanel({
             : <Mail className="h-4 w-4 text-blue-600" />}
           <h3 className="text-sm font-semibold text-gray-900">{t.client_name || t.contact_info}</h3>
           {t.client_id && (
-            <Link href={`/clients/${t.client_id}`} className="text-xs text-[#647C47] hover:underline inline-flex items-center gap-0.5">
+            <Link href={`/clients/${t.client_id}`} className="text-xs text-primary-500 hover:underline inline-flex items-center gap-0.5">
               <ExternalLink className="h-3 w-3" /> client
             </Link>
           )}
@@ -148,7 +148,7 @@ export default function CopilotReviewPanel({
               onChange={e => setText(e.target.value)}
               disabled={isSent}
               rows={6}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-500"
             />
 
             {showRegen && (
@@ -156,7 +156,7 @@ export default function CopilotReviewPanel({
                 value={instruction}
                 onChange={e => setInstruction(e.target.value)}
                 placeholder="Optional instruction for the new draft (e.g. 'offer a 10% discount')"
-                className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             )}
           </div>
@@ -218,7 +218,7 @@ export default function CopilotReviewPanel({
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edited_body: text }),
               }))}
               disabled={!!busy}
-              className="px-4 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50 inline-flex items-center gap-1"
+              className="px-4 py-1.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50 inline-flex items-center gap-1"
             >
               {busy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               {t.channel === 'whatsapp' ? 'Send' : 'Approve & hand off'}

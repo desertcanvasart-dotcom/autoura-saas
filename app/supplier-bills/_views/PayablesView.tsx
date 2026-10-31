@@ -326,7 +326,7 @@ export default function AccountsPayablePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -353,7 +353,7 @@ export default function AccountsPayablePage() {
         </div>
         <Link
           href="/expenses"
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Receipt className="h-4 w-4" />
           View All Expenses
@@ -504,7 +504,7 @@ export default function AccountsPayablePage() {
             placeholder="Search suppliers or expenses..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -540,13 +540,13 @@ export default function AccountsPayablePage() {
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
             hasActiveFilters 
-              ? 'border-[#647C47] text-[#647C47] bg-[#647C47]/5' 
+              ? 'border-primary-500 text-primary-500 bg-primary-500/5' 
               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Filter className="h-4 w-4" />
           Filters
-          {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-[#647C47]"></span>}
+          {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-500"></span>}
         </button>
 
         {hasActiveFilters && (
@@ -565,7 +565,7 @@ export default function AccountsPayablePage() {
               <select
                 value={agingFilter}
                 onChange={(e) => setAgingFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Aging</option>
                 <option value="current">Not due yet</option>
@@ -579,7 +579,7 @@ export default function AccountsPayablePage() {
               <select
                 value={supplierTypeFilter}
                 onChange={(e) => setSupplierTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Types</option>
                 {Object.entries(SUPPLIER_TYPES).map(([key, val]) => (
@@ -592,7 +592,7 @@ export default function AccountsPayablePage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">All Statuses</option>
                 <option value="pending">Pending Approval</option>
@@ -675,7 +675,7 @@ export default function AccountsPayablePage() {
                               <div className="flex items-center gap-3">
                                 <span className="text-lg">{catConfig.icon}</span>
                                 <div>
-                                  <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                                  <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                     {expense.expense_number}
                                   </Link>
                                   <p className="text-xs text-gray-500">
@@ -718,7 +718,7 @@ export default function AccountsPayablePage() {
                                   )}
                                   <Link
                                     href={`/expenses/${expense.id}`}
-                                    className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                                    className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                                     title="View Expense"
                                   >
                                     <Eye className="h-4 w-4" />
@@ -770,7 +770,7 @@ export default function AccountsPayablePage() {
                           <div className="flex items-center gap-2">
                             <span>{catConfig.icon}</span>
                             <div>
-                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                 {expense.expense_number}
                               </Link>
                               <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
@@ -827,7 +827,7 @@ export default function AccountsPayablePage() {
                             )}
                             <Link
                               href={`/expenses/${expense.id}`}
-                              className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                               title="View"
                             >
                               <Eye className="h-4 w-4" />
@@ -875,7 +875,7 @@ export default function AccountsPayablePage() {
                           <div className="flex items-center gap-2">
                             <span>{catConfig.icon}</span>
                             <div>
-                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                              <Link href={`/expenses/${expense.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                 {expense.expense_number}
                               </Link>
                               <p className="text-xs text-gray-500">{expense.description || catConfig.label}</p>
@@ -903,7 +903,7 @@ export default function AccountsPayablePage() {
                         <td className="px-4 py-3 text-right">
                           <Link
                             href={`/expenses/${expense.id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors inline-block"
+                            className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors inline-block"
                             title="View"
                           >
                             <Eye className="h-4 w-4" />
@@ -950,7 +950,7 @@ export default function AccountsPayablePage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 text-sm rounded-lg ${
                     currentPage === pageNum
-                      ? 'bg-[#647C47] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >

@@ -213,7 +213,7 @@ export default function ContentLibraryPage() {
               </Link>
               <Link
                 href="/settings/content-library/new"
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#4f613a] transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add Content
@@ -244,8 +244,8 @@ export default function ContentLibraryPage() {
               onClick={() => setSelectedCategory(null)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 selectedCategory === null
-                  ? 'bg-[#647C47] text-white'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:border-[#647C47]'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:border-primary-500'
               }`}
             >
               All
@@ -263,8 +263,8 @@ export default function ContentLibraryPage() {
                   onClick={() => setSelectedCategory(category.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     selectedCategory === category.id
-                      ? 'bg-[#647C47] text-white'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:border-[#647C47]'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:border-primary-500'
                   }`}
                 >
                   <IconComponent className="w-4 h-4" />
@@ -288,7 +288,7 @@ export default function ContentLibraryPage() {
               placeholder="Search content by name, description, or location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-4 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+              className="w-full pl-4 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             />
             {searchQuery && (
               <button
@@ -330,7 +330,7 @@ export default function ContentLibraryPage() {
             </p>
             <Link
               href="/settings/content-library/new"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f613a] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#4f613a] transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add First Content
@@ -345,7 +345,7 @@ export default function ContentLibraryPage() {
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-xl border border-gray-200 hover:border-[#647C47]/50 hover:shadow-md transition-all group"
+                  className="bg-white rounded-xl border border-gray-200 hover:border-primary-500/50 hover:shadow-md transition-all group"
                 >
                   <div className="p-5">
                     {/* Header */}
@@ -359,7 +359,7 @@ export default function ContentLibraryPage() {
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link
                           href={`/settings/content-library/${item.id}`}
-                          className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded-lg transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                         </Link>
@@ -377,7 +377,7 @@ export default function ContentLibraryPage() {
 
                     {/* Title & Location */}
                     <Link href={`/settings/content-library/${item.id}`}>
-                      <h3 className="font-semibold text-gray-900 mb-1 hover:text-[#647C47] transition-colors">
+                      <h3 className="font-semibold text-gray-900 mb-1 hover:text-primary-500 transition-colors">
                         {item.name}
                       </h3>
                     </Link>

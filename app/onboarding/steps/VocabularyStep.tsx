@@ -108,7 +108,7 @@ export default function VocabularyStep({ onNext, onBack, currentStep }: Props) {
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
-          <BookA className="w-6 h-6 text-[#647C47]" />
+          <BookA className="w-6 h-6 text-primary-500" />
           <h2 className="text-2xl font-bold text-gray-900">Your words</h2>
         </div>
         <p className="text-gray-600">
@@ -119,7 +119,7 @@ export default function VocabularyStep({ onNext, onBack, currentStep }: Props) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 text-[#647C47] animate-spin" /></div>
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 text-primary-500 animate-spin" /></div>
       ) : (
         <div className="space-y-8">
           {/* 1. Cities */}
@@ -133,7 +133,7 @@ export default function VocabularyStep({ onNext, onBack, currentStep }: Props) {
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-sm font-medium text-gray-800">{d.name} <span className="text-gray-400 font-normal">· {d.cities.length} of {d.all_cities.length} cities</span></p>
                   {d.city_ids && (
-                    <button type="button" onClick={() => void allCities(d)} disabled={busy !== null} className="text-xs text-gray-500 hover:text-[#647C47]">Offer every city</button>
+                    <button type="button" onClick={() => void allCities(d)} disabled={busy !== null} className="text-xs text-gray-500 hover:text-primary-500">Offer every city</button>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -141,7 +141,7 @@ export default function VocabularyStep({ onNext, onBack, currentStep }: Props) {
                     const on = d.cities.some(x => x.id === c.id)
                     return (
                       <button key={c.id} type="button" onClick={() => void toggleCity(d, c.id!)} disabled={busy !== null || (on && d.cities.length === 1)}
-                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors disabled:opacity-60 ${on ? 'bg-[#647C47] text-white border-[#647C47]' : 'bg-white text-gray-500 border-gray-300 hover:border-[#647C47] hover:text-[#647C47]'}`}>
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors disabled:opacity-60 ${on ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-500 border-gray-300 hover:border-primary-500 hover:text-primary-500'}`}>
                         {c.name}
                       </button>
                     )
@@ -164,7 +164,7 @@ export default function VocabularyStep({ onNext, onBack, currentStep }: Props) {
                     onChange={e => setTierDrafts(prev => ({ ...prev, [t.id]: e.target.value }))}
                     onBlur={() => void renameTier(t)}
                     onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47]/30 focus:border-[#647C47]"
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
                   />
                   {busy === t.id ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : (
                     <button type="button" onClick={() => void removeTier(t)} disabled={busy !== null || tiers.length <= VOCABULARY_KIND_INFO.tier.minItems}
@@ -177,7 +177,7 @@ export default function VocabularyStep({ onNext, onBack, currentStep }: Props) {
                 <input value={newTier} onChange={e => setNewTier(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void addTier() }}
                   placeholder="Add a tier (e.g. Ultra luxury)" className="flex-1 px-3 py-2 text-sm border border-dashed border-gray-300 rounded-lg" />
                 <button type="button" onClick={() => void addTier()} disabled={busy !== null || !newTier.trim()}
-                  className="p-1.5 text-[#647C47] hover:bg-[#647C47]/10 rounded disabled:opacity-30"><Plus className="w-4 h-4" /></button>
+                  className="p-1.5 text-primary-500 hover:bg-primary-500/10 rounded disabled:opacity-30"><Plus className="w-4 h-4" /></button>
               </div>
             </div>
           </section>
@@ -189,7 +189,7 @@ export default function VocabularyStep({ onNext, onBack, currentStep }: Props) {
             <div className="flex flex-wrap gap-2">
               {supplierTypes.map(t => (
                 <button key={t.id} type="button" onClick={() => void toggleSupplierType(t)} disabled={busy !== null}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors ${t.is_active ? 'bg-[#647C47] text-white border-[#647C47]' : 'bg-white text-gray-500 border-gray-300 hover:border-[#647C47] hover:text-[#647C47]'}`}>
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors ${t.is_active ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-500 border-gray-300 hover:border-primary-500 hover:text-primary-500'}`}>
                   {t.is_active && <Check className="w-3.5 h-3.5" />}
                   {t.label}
                 </button>

@@ -594,7 +594,7 @@ export default function FlightsContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -611,7 +611,7 @@ export default function FlightsContent() {
           <BulkRateImportExport tableName="flight_rates" onImportComplete={fetchRates} />
           <button
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Flight Rate
@@ -673,7 +673,7 @@ export default function FlightsContent() {
             placeholder="Search flights..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-3 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-3 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -681,7 +681,7 @@ export default function FlightsContent() {
           <select
             value={routeFromFilter}
             onChange={(e) => setRouteFromFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white"
           >
             <option value="">From Any</option>
             {cityOptionsFor(cityOptions, routeFromFilter || '').map(city => (
@@ -695,7 +695,7 @@ export default function FlightsContent() {
           <select
             value={routeToFilter}
             onChange={(e) => setRouteToFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white"
           >
             <option value="">To Any</option>
             {cityOptionsFor(cityOptions, routeToFilter || '').map(city => (
@@ -707,19 +707,19 @@ export default function FlightsContent() {
 
         <div className="relative">
           <VocabSelect kind="airline" value={airlineFilter} onChange={setAirlineFilter} placeholder={"All Airlines"}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
         <div className="relative">
           <VocabSelect kind="flight_type" value={flightTypeFilter} onChange={setFlightTypeFilter} placeholder={"All Types"}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
         <div className="relative">
           <VocabSelect kind="flight_cabin" value={cabinClassFilter} onChange={setCabinClassFilter} placeholder={"All Classes"}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
@@ -768,7 +768,7 @@ export default function FlightsContent() {
                   type="checkbox"
                   checked={filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))}
                   onChange={handleSelectAll}
-                  className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                  className="h-4 w-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                   aria-label="Select all rates"
                 />
               </th>
@@ -799,7 +799,7 @@ export default function FlightsContent() {
                       checked={selectedIds.has(rate.id)}
                       onChange={() => handleSelectRate(rate.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                      className="h-4 w-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                       aria-label={`Select ${rate.service_code}`}
                     />
                   </td>
@@ -874,7 +874,7 @@ export default function FlightsContent() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => openEditModal(rate)}
-                        className="p-1 text-gray-400 hover:text-[#647C47] transition-colors"
+                        className="p-1 text-gray-400 hover:text-primary-500 transition-colors"
                         title="Edit"
                       >
                         <Edit2 className="h-4 w-4" />
@@ -910,7 +910,7 @@ export default function FlightsContent() {
                 <select
                   value={itemsPerPage}
                   onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] bg-white"
+                  className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
                 >
                   {ITEMS_PER_PAGE_OPTIONS.map(option => (
                     <option key={option} value={option}>{option}</option>
@@ -960,7 +960,7 @@ export default function FlightsContent() {
                       onClick={() => goToPage(pageNum)}
                       className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
                         currentPage === pageNum
-                          ? 'bg-[#647C47] text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
@@ -1050,7 +1050,7 @@ export default function FlightsContent() {
                       Airline <span className="text-red-500">*</span>
                     </label>
                     <VocabSelect kind="airline" value={formData.airline} onChange={handleAirlineChange} placeholder={null} required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" />
                     <div className="mt-2">
                       <label className="block text-xs font-medium text-gray-500 mb-1">IATA code</label>
                       <input
@@ -1071,7 +1071,7 @@ export default function FlightsContent() {
                     <select
                       value={formData.supplier_id}
                       onChange={(e) => handleSupplierChange(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">Select supplier (optional)</option>
                       {suppliers.map(supplier => (
@@ -1100,7 +1100,7 @@ export default function FlightsContent() {
                       value={formData.route_from}
                       onChange={(e) => handleRouteChange('route_from', e.target.value)}
                       required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">Select departure city</option>
                       {cityOptionsFor(cityOptions, formData.route_from || '').map(city => (
@@ -1117,7 +1117,7 @@ export default function FlightsContent() {
                       value={formData.route_to}
                       onChange={(e) => handleRouteChange('route_to', e.target.value)}
                       required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">Select arrival city</option>
                       {cityOptions.filter(c => c !== formData.route_from).map(city => (
@@ -1153,7 +1153,7 @@ export default function FlightsContent() {
                       value={formData.flight_number}
                       onChange={(e) => setFormData(prev => ({ ...prev, flight_number: e.target.value.toUpperCase() }))}
                       placeholder="e.g., MS091"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] font-mono"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 font-mono"
                     />
                   </div>
 
@@ -1162,7 +1162,7 @@ export default function FlightsContent() {
                       Cabin Class <span className="text-red-500">*</span>
                     </label>
                     <VocabSelect kind="flight_cabin" value={formData.cabin_class} onChange={handleCabinClassChange} placeholder={null} required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" />
                   </div>
 
                   <div>
@@ -1174,7 +1174,7 @@ export default function FlightsContent() {
                       value={formData.service_code}
                       onChange={(e) => setFormData(prev => ({ ...prev, service_code: e.target.value }))}
                       placeholder="Auto-generated"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-gray-50 font-mono"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-gray-50 font-mono"
                     />
                   </div>
                 </div>
@@ -1196,7 +1196,7 @@ export default function FlightsContent() {
                       type="time"
                       value={formData.departure_time}
                       onChange={(e) => setFormData(prev => ({ ...prev, departure_time: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
 
@@ -1208,7 +1208,7 @@ export default function FlightsContent() {
                       type="time"
                       value={formData.arrival_time}
                       onChange={(e) => setFormData(prev => ({ ...prev, arrival_time: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
 
@@ -1222,7 +1222,7 @@ export default function FlightsContent() {
                       onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: parseInt(e.target.value) || 0 }))}
                       placeholder="e.g., 80"
                       min="0"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
 
@@ -1231,7 +1231,7 @@ export default function FlightsContent() {
                       Frequency
                     </label>
                     <VocabSelect kind="flight_frequency" value={formData.frequency} onChange={v => setFormData(prev => ({ ...prev, frequency: v }))} placeholder={null}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500" />
                   </div>
                 </div>
               </div>
@@ -1253,7 +1253,7 @@ export default function FlightsContent() {
                         step="0.01"
                         min="0"
                         required
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                       />
                     </div>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
@@ -1271,7 +1271,7 @@ export default function FlightsContent() {
                         onChange={(e) => setFormData(prev => ({ ...prev, tax_eur: parseFloat(e.target.value) || 0 }))}
                         step="0.01"
                         min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                       />
                     </div>
                   </div>
@@ -1301,7 +1301,7 @@ export default function FlightsContent() {
                       value={formData.baggage_kg}
                       onChange={(e) => setFormData(prev => ({ ...prev, baggage_kg: parseInt(e.target.value) || 0 }))}
                       min="0"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                 </div>
@@ -1319,7 +1319,7 @@ export default function FlightsContent() {
                     <select
                       value={formData.season}
                       onChange={(e) => setFormData(prev => ({ ...prev, season: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">All Year</option>
                       <option value="high_season">High Season</option>
@@ -1336,7 +1336,7 @@ export default function FlightsContent() {
                       type="date"
                       value={formData.rate_valid_from}
                       onChange={(e) => setFormData(prev => ({ ...prev, rate_valid_from: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
 
@@ -1348,7 +1348,7 @@ export default function FlightsContent() {
                       type="date"
                       value={formData.rate_valid_to}
                       onChange={(e) => setFormData(prev => ({ ...prev, rate_valid_to: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                 </div>
@@ -1367,7 +1367,7 @@ export default function FlightsContent() {
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                     rows={3}
                     placeholder="Any additional notes about this flight rate..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] resize-none"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 resize-none"
                   />
                 </div>
 
@@ -1377,7 +1377,7 @@ export default function FlightsContent() {
                     id="is_active"
                     checked={formData.is_active}
                     onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                    className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                    className="h-4 w-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                   />
                   <label htmlFor="is_active" className="text-sm text-gray-600">
                     Active (available for booking)
@@ -1397,7 +1397,7 @@ export default function FlightsContent() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 text-sm bg-[#647C47] text-white rounded-md hover:bg-[#4f6238] transition-colors disabled:opacity-50 min-w-[100px]"
+                  className="px-4 py-2 text-sm bg-primary-500 text-white rounded-md hover:bg-primary-700 transition-colors disabled:opacity-50 min-w-[100px]"
                 >
                   {saving ? 'Saving...' : editingRate ? 'Update Rate' : 'Add Rate'}
                 </button>

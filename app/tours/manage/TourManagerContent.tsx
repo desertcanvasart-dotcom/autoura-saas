@@ -2977,7 +2977,7 @@ export default function TourManagerContent() {
                                             not find where options are authored otherwise. */}
                                         <Link
                                           href={`/tours/variations/${variation.id}/options`}
-                                          className="inline-flex items-center px-2 py-1 text-xs font-semibold text-[#647C47] border border-[#b8c9a8] hover:bg-[#e8ede3] rounded transition-colors whitespace-nowrap"
+                                          className="inline-flex items-center px-2 py-1 text-xs font-semibold text-primary-500 border border-[#b8c9a8] hover:bg-[#e8ede3] rounded transition-colors whitespace-nowrap"
                                           title="Options and upgrades this programme sells"
                                           onClick={(e) => e.stopPropagation()}
                                         >

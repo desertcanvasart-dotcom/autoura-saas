@@ -483,7 +483,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -492,7 +492,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">Invoice not found</p>
-        <Link href="/invoices" className="text-[#647C47] hover:underline mt-2 inline-block">
+        <Link href="/invoices" className="text-primary-500 hover:underline mt-2 inline-block">
           Back to Invoices
         </Link>
       </div>
@@ -610,7 +610,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {Number(invoice.balance_due) > 0 && invoice.status !== 'cancelled' && invoice.status !== 'draft' && (
             <button
               onClick={() => setShowPaymentModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Record Payment
@@ -851,7 +851,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {Number(invoice.balance_due) > 0 && invoice.status !== 'cancelled' && invoice.status !== 'draft' && (
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4f6238] transition-colors"
+                className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
               >
                 <Plus className="h-4 w-4" />
                 Record Payment
@@ -955,7 +955,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <h3 className="text-sm font-semibold text-gray-900">Reminder History</h3>
               <Link 
                 href="/reminders" 
-                className="text-xs text-[#647C47] hover:underline"
+                className="text-xs text-primary-500 hover:underline"
               >
                 View All
               </Link>
@@ -1043,7 +1043,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     min="0"
                     max={Number(invoice.balance_due)}
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
                 <div>
@@ -1061,7 +1061,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <select
                     value={paymentForm.payment_method}
                     onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_method: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
                   >
                     {PAYMENT_METHODS.map(method => (
                       <option key={method.value} value={method.value}>{method.label}</option>
@@ -1074,7 +1074,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     type="date"
                     value={paymentForm.payment_date}
                     onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_date: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>
@@ -1086,7 +1086,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   value={paymentForm.transaction_reference}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, transaction_reference: e.target.value }))}
                   placeholder="e.g., TXN-12345"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
 
@@ -1097,7 +1097,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   placeholder="Optional notes..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] resize-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
                 />
               </div>
 
@@ -1112,7 +1112,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <button
                   type="submit"
                   disabled={savingPayment}
-                  className="px-4 py-2 text-sm font-medium bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                 >
                   {savingPayment ? 'Recording...' : 'Record Payment'}
                 </button>

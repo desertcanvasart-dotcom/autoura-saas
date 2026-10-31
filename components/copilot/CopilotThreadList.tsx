@@ -29,7 +29,7 @@ export default function CopilotThreadList({
   loading: boolean
 }) {
   if (loading) {
-    return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#647C47]" /></div>
+    return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500" /></div>
   }
   if (threads.length === 0) {
     return (
@@ -48,7 +48,7 @@ export default function CopilotThreadList({
           <button
             key={t.id}
             onClick={() => onSelect(t.id)}
-            className={`w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors ${active ? 'bg-[#647C47]/5 border-l-2 border-[#647C47]' : 'border-l-2 border-transparent'}`}
+            className={`w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors ${active ? 'bg-primary-500/5 border-l-2 border-primary-500' : 'border-l-2 border-transparent'}`}
           >
             <div className="flex items-center gap-2 mb-1">
               <span className={`w-1.5 h-1.5 rounded-full ${URGENCY[t.urgency] || URGENCY.normal}`} title={t.urgency} />
@@ -65,7 +65,7 @@ export default function CopilotThreadList({
             {t.subject && <p className="text-xs text-gray-500 truncate mb-0.5">{t.subject}</p>}
             <p className="text-xs text-gray-400 truncate">{t.latest_inbox_snippet || '—'}</p>
             {t.pending_draft_count > 0 && (
-              <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-[#647C47]/10 text-[#647C47]">
+              <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary-500/10 text-primary-500">
                 {t.pending_draft_count} draft{t.pending_draft_count > 1 ? 's' : ''} to review
               </span>
             )}

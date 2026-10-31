@@ -280,7 +280,7 @@ export default function TransportPackagesPage() {
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-[#4a5c35]"
           >
             Return to Dashboard
           </button>

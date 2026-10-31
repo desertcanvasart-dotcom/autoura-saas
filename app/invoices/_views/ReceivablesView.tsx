@@ -255,7 +255,7 @@ export default function AccountsReceivablePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -415,7 +415,7 @@ export default function AccountsReceivablePage() {
             placeholder={viewMode === 'clients' ? 'Search clients...' : 'Search invoices...'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47]"
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 
@@ -443,7 +443,7 @@ export default function AccountsReceivablePage() {
         <select
           value={agingFilter}
           onChange={(e) => setAgingFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">All Aging</option>
           <option value="current">Current (Not Due)</option>
@@ -521,7 +521,7 @@ export default function AccountsReceivablePage() {
                           <div className="flex items-center gap-3">
                             <FileText className="h-4 w-4 text-gray-400" />
                             <div>
-                              <Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                              <Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                                 {invoice.invoice_number}
                               </Link>
                               <p className="text-xs text-gray-500">
@@ -550,7 +550,7 @@ export default function AccountsReceivablePage() {
                               </button>
                               <Link
                                 href={`/invoices/${invoice.id}`}
-                                className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                                className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                                 title="View Invoice"
                               >
                                 <Eye className="h-4 w-4" />
@@ -565,7 +565,7 @@ export default function AccountsReceivablePage() {
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <Link
                           href={`/clients/${client.client_id}`}
-                          className="text-sm text-[#647C47] hover:underline flex items-center gap-1"
+                          className="text-sm text-primary-500 hover:underline flex items-center gap-1"
                         >
                           View client profile
                           <ExternalLink className="h-3 w-3" />
@@ -608,7 +608,7 @@ export default function AccountsReceivablePage() {
                   (paginatedData as Invoice[]).map((invoice) => (
                     <tr key={invoice.id} className={`hover:bg-gray-50 ${invoice.is_overdue ? 'bg-red-50/50' : ''}`}>
                       <td className="px-4 py-3">
-                        <Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-gray-900 hover:text-[#647C47]">
+                        <Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-500">
                           {invoice.invoice_number}
                         </Link>
                       </td>
@@ -650,7 +650,7 @@ export default function AccountsReceivablePage() {
                           </button>
                           <Link
                             href={`/invoices/${invoice.id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-gray-100 rounded transition-colors"
                             title="View Invoice"
                           >
                             <Eye className="h-4 w-4" />
@@ -697,7 +697,7 @@ export default function AccountsReceivablePage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 text-sm rounded-lg ${
                     currentPage === pageNum
-                      ? 'bg-[#647C47] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >

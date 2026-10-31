@@ -495,8 +495,8 @@ export default function CapacityPage() {
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-[#647C47]" />
+            <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+              <Calendar className="w-5 h-5 text-primary-500" />
             </div>
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">Capacity Calendar</h1>
@@ -508,7 +508,7 @@ export default function CapacityPage() {
             <button
               onClick={saveChanges}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -560,7 +560,7 @@ export default function CapacityPage() {
                 value={selectedTourId}
                 onChange={(e) => setSelectedTourId(e.target.value)}
                 aria-label="Select tour or itinerary to view"
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] min-w-[250px]"
+                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[250px]"
               >
                 <option value="">Select a tour or itinerary...</option>
                 {itineraries.length > 0 && (
@@ -637,7 +637,7 @@ export default function CapacityPage() {
           <div className="p-4">
             {loading ? (
               <div className="flex items-center justify-center h-80">
-                <Loader2 className="w-8 h-8 text-[#647C47] animate-spin" />
+                <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
               </div>
             ) : (
               <>
@@ -683,15 +683,15 @@ export default function CapacityPage() {
                           className={`
                             relative p-2 min-h-[70px] rounded-lg border text-left transition-all
                             ${!inCurrentMonth ? 'opacity-40' : ''}
-                            ${today ? 'ring-2 ring-[#647C47]' : ''}
-                            ${selectedDate === dateStr ? 'border-[#647C47] bg-[#647C47]/5' : 'border-gray-200'}
+                            ${today ? 'ring-2 ring-primary-500' : ''}
+                            ${selectedDate === dateStr ? 'border-primary-500 bg-primary-500/5' : 'border-gray-200'}
                             ${hasDepartures ? 'bg-blue-50/50' : ''}
                             ${inItinerary ? 'bg-primary-50/50' : ''}
-                            hover:border-[#647C47] cursor-pointer
+                            hover:border-primary-500 cursor-pointer
                           `}
                         >
                           <div className="flex items-start justify-between">
-                            <span className={`text-sm font-medium ${today ? 'text-[#647C47]' : 'text-gray-700'}`}>
+                            <span className={`text-sm font-medium ${today ? 'text-primary-500' : 'text-gray-700'}`}>
                               {date.getDate()}
                             </span>
                             {hasDepartures && (
@@ -770,14 +770,14 @@ export default function CapacityPage() {
                         className={`
                           relative p-2 min-h-[60px] rounded-lg border text-left transition-all
                           ${!inCurrentMonth ? 'opacity-40' : ''}
-                          ${past ? 'opacity-40 cursor-not-allowed' : 'hover:border-[#647C47] cursor-pointer'}
-                          ${today ? 'ring-2 ring-[#647C47]' : ''}
-                          ${selectedDate === dateStr ? 'border-[#647C47] bg-[#647C47]/5' : 'border-gray-200'}
+                          ${past ? 'opacity-40 cursor-not-allowed' : 'hover:border-primary-500 cursor-pointer'}
+                          ${today ? 'ring-2 ring-primary-500' : ''}
+                          ${selectedDate === dateStr ? 'border-primary-500 bg-primary-500/5' : 'border-gray-200'}
                           ${pending ? 'ring-1 ring-amber-400' : ''}
                         `}
                       >
                         <div className="flex items-start justify-between">
-                          <span className={`text-sm font-medium ${today ? 'text-[#647C47]' : 'text-gray-700'}`}>
+                          <span className={`text-sm font-medium ${today ? 'text-primary-500' : 'text-gray-700'}`}>
                             {date.getDate()}
                           </span>
                           <div className={`w-2 h-2 rounded-full ${config.dotColor}`} />
@@ -880,7 +880,7 @@ export default function CapacityPage() {
                 <button
                   type="button"
                   onClick={() => router.push(`/itineraries/${selectedItinerary.id}`)}
-                  className="mt-2 w-full text-xs text-[#647C47] hover:underline text-center"
+                  className="mt-2 w-full text-xs text-primary-500 hover:underline text-center"
                 >
                   View Full Itinerary →
                 </button>
@@ -966,7 +966,7 @@ export default function CapacityPage() {
                           <button
                             type="button"
                             onClick={() => router.push(`/departures?id=${dep.id}`)}
-                            className="mt-2 w-full text-xs text-[#647C47] hover:underline text-center"
+                            className="mt-2 w-full text-xs text-primary-500 hover:underline text-center"
                           >
                             View Details →
                           </button>
@@ -1047,7 +1047,7 @@ export default function CapacityPage() {
                     }}
                     min="0"
                     max="20"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
 
@@ -1068,7 +1068,7 @@ export default function CapacityPage() {
                     }}
                     min="0"
                     max={editingEntry.max_groups}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
 
@@ -1087,7 +1087,7 @@ export default function CapacityPage() {
                         updateCapacity(selectedDate, { reason: e.target.value })
                       }}
                       placeholder="e.g., National holiday"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 )}
@@ -1103,7 +1103,7 @@ export default function CapacityPage() {
                     }}
                     rows={2}
                     placeholder="Internal notes..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -1168,13 +1168,13 @@ export default function CapacityPage() {
                     min="0"
                     max="1000"
                     placeholder="No limit"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                   <button
                     type="button"
                     onClick={() => void saveDefault()}
                     disabled={defaultSaving}
-                    className="px-3 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                    className="px-3 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-700 disabled:opacity-50"
                   >
                     {defaultSaving ? 'Saving…' : 'Save'}
                   </button>

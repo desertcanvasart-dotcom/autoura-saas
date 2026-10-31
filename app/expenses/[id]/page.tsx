@@ -212,7 +212,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     )
   }
@@ -221,7 +221,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">Expense not found</p>
-        <Link href="/expenses" className="text-[#647C47] hover:underline mt-2 inline-block">
+        <Link href="/expenses" className="text-primary-500 hover:underline mt-2 inline-block">
           Back to Expenses
         </Link>
       </div>
@@ -391,8 +391,8 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
                 href={`/itineraries/${itinerary.id}`}
                 className="flex items-start gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <div className="w-10 h-10 bg-[#647C47]/10 rounded-lg flex items-center justify-center">
-                  <MapPin className="h-5 w-5 text-[#647C47]" />
+                <div className="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center">
+                  <MapPin className="h-5 w-5 text-primary-500" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{itinerary.itinerary_code}</p>

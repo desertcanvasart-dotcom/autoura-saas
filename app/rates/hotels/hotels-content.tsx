@@ -223,7 +223,7 @@ function Pagination({
           <select
             value={itemsPerPage}
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] bg-white"
+            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
           >
             {ITEMS_PER_PAGE_OPTIONS.map(option => (
               <option key={option} value={option}>{option}</option>
@@ -273,7 +273,7 @@ function Pagination({
                 onClick={() => goToPage(pageNum)}
                 className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
                   currentPage === pageNum
-                    ? 'bg-[#647C47] text-white'
+                    ? 'bg-primary-500 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >

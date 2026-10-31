@@ -237,7 +237,7 @@ export default function DepartmentsSettingsPage() {
       <div className="flex items-center justify-end mb-6">
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New department
@@ -330,7 +330,7 @@ export default function DepartmentsSettingsPage() {
                 {(dept.service_types || []).map(type => (
                   <span
                     key={type}
-                    className="px-2 py-0.5 rounded text-xs bg-[#647C47]/10 text-[#4f6238] border border-[#647C47]/20"
+                    className="px-2 py-0.5 rounded text-xs bg-primary-500/10 text-primary-700 border border-primary-500/20"
                   >
                     {serviceTypeLabel(type)}
                   </span>
@@ -387,7 +387,7 @@ export default function DepartmentsSettingsPage() {
                   onChange={e => setForm({ ...form, name: e.target.value })}
                   required
                   maxLength={100}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 />
               </div>
 
@@ -399,7 +399,7 @@ export default function DepartmentsSettingsPage() {
                   id="dept-description"
                   value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                 />
               </div>
 
@@ -424,7 +424,7 @@ export default function DepartmentsSettingsPage() {
                           checked={form.service_types.includes(type.value)}
                           disabled={!!owner}
                           onChange={() => toggleServiceType(type.value)}
-                          className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47] disabled:opacity-40"
+                          className="rounded border-gray-300 text-primary-500 focus:ring-primary-500 disabled:opacity-40"
                         />
                         {type.label}
                         {owner && <span className="text-xs text-gray-400">· {owner}</span>}
@@ -463,7 +463,7 @@ export default function DepartmentsSettingsPage() {
                     onChange={e => { setCustomTypeInput(e.target.value); setCustomTypeNotice(null) }}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomServiceType() } }}
                     placeholder="Add custom service type"
-                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   />
                   <button
                     type="button"
@@ -493,7 +493,7 @@ export default function DepartmentsSettingsPage() {
                         type="checkbox"
                         checked={form.service_types.includes(type.value)}
                         onChange={() => toggleServiceType(type.value)}
-                        className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"
+                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                       />
                       {type.label}
                     </label>
@@ -506,7 +506,7 @@ export default function DepartmentsSettingsPage() {
                   type="checkbox"
                   checked={form.is_active}
                   onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                  className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"
+                  className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                 />
                 Active — inactive departments stay on existing records but are hidden from pickers
               </label>
@@ -528,7 +528,7 @@ export default function DepartmentsSettingsPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6238] disabled:opacity-50 text-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {editing ? 'Save changes' : 'Create department'}
