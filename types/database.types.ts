@@ -13633,6 +13633,13 @@ export interface Database {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
       }
+      is_staff_member: {
+        Args: {
+          p_tenant?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
       log_activity: {
         Args: {
           p_action_type?: string
