@@ -9,10 +9,10 @@ import FollowupsView from './_views/FollowupsView'
 // (tasks: assigned to a team member, linked to a quote/itinerary/booking;
 // client_followups: a reminder about one client, assigned to a login), so two
 // lists, not one: folding follow-ups into tasks as a type needs a migration.
-// Each tab keeps its old gate: Tasks for managers and admins, Follow-ups for
-// everyone.
+// Everyone sees both tabs; staff see only the tasks and follow-ups that are
+// theirs or no one's (the database rule, migration 457).
 const TABS: UrlTab[] = [
-  { key: 'tasks', label: 'Tasks', roles: ['admin', 'manager'], render: () => <TasksView /> },
+  { key: 'tasks', label: 'Tasks', roles: ['admin', 'manager', 'member'], render: () => <TasksView /> },
   { key: 'follow-up', label: 'Follow-ups', roles: ['admin', 'manager', 'member'], render: () => <FollowupsView /> },
 ]
 

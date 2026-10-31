@@ -683,6 +683,7 @@ describe('migration replay from scratch', () => {
       user_has_role: 'checks auth.uid() against get_user_tenant_id(); argument is a role name, not an id',
       reset_tenant_vocabulary: 'scopes to get_user_tenant_id(); argument is a vocabulary kind',
       member_can_write: "answers only whether auth.uid() itself is a non-viewer member of the given company (424's write policies call it)",
+      is_staff_member: "answers only whether auth.uid() itself is a member-role (staff) login of the given company (457's task and follow-up policies call it)",
       publish_can_manage: "answers only whether auth.uid() itself is an owner/admin/manager of the given company (440's write policies call it)",
       publish_hostname_available: 'answers only taken/free for a hostname — public DNS information — never whose it is (440)',
     }
