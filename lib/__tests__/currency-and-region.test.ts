@@ -20,7 +20,7 @@ describe('a company works in its own currency', () => {
     expect(read('app/itineraries/new/page.tsx')).toContain('tenant?.default_currency')
     expect(read('app/itineraries/new/page.tsx')).toContain('SUPPORTED_CURRENCIES.map(c =>')
     expect(read('app/api/user-preferences/route.ts')).toContain('default_currency: companyCurrency')
-    expect(read('app/departures/page.tsx')).toContain('currency: companyCurrency')
+    expect(read('app/departures/_views/DeparturesListView.tsx')).toContain('currency: companyCurrency')
     expect(read('app/dashboard/page.tsx')).toContain("tenant?.default_currency || 'EUR'")
   })
   it('payment and tour pages print the currency’s own symbol', () => {

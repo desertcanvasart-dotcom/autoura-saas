@@ -486,7 +486,7 @@ export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'B2B quotes', href: '/quotes?tab=b2b', icon: File, roles: AM, hint: 'Quotes' },
   { label: 'New itinerary', href: '/itineraries/new', icon: Map, roles: ALL, hint: 'Itineraries' },
   { label: 'Follow-ups', href: '/tasks?type=follow-up', icon: Clock, roles: ALL, hint: 'Tasks', keywords: ['reminders'] },
-  { label: 'Capacity calendar', href: '/departures/capacity', icon: CalendarRange, roles: A, hint: 'Departures' },
+  { label: 'Capacity calendar', href: '/departures?view=capacity', icon: CalendarRange, roles: A, hint: 'Departures' },
   { label: 'Network suppliers', href: '/network-suppliers', icon: Globe, roles: AM, hint: 'Suppliers' },
 ]
 

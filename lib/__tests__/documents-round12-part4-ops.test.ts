@@ -154,7 +154,7 @@ describe('departure seats', () => {
 
 describe('cloning a departure', () => {
   it('carries the source currency into the create form', () => {
-    const page = src('app/departures/page.tsx')
+    const page = src('app/departures/_views/DeparturesListView.tsx')
     expect(page).toContain("currency: d.currency || 'EUR'")
     expect(page).toContain('Price per Person ({newDeparture.currency})')
     expect(page).not.toContain('Price per Person (EUR)')
