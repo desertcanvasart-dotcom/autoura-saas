@@ -72,7 +72,7 @@ describe('the app reads the current company\'s mailbox', () => {
       'app/api/gmail/emails/route.ts', 'app/api/gmail/actions/route.ts', 'app/api/gmail/labels/route.ts',
       'app/api/gmail/attachments/route.ts', 'app/api/gmail/send/route.ts', 'app/api/gmail/poll/route.ts',
       'app/api/send-supplier-document/route.ts', 'app/api/templates/send/route.ts', 'app/api/settings/email/route.ts',
-      'app/api/email/sync/route.ts', 'app/settings/email/page.tsx', 'app/inbox/page.tsx', 'lib/email/own-address.ts',
+      'app/api/email/sync/route.ts', 'app/settings/email/page.tsx', 'app/inbox/_views/EmailView.tsx', 'lib/email/own-address.ts',
     ]) {
       const src = read(f)
       const reads = src.split("from('gmail_tokens')").length - 1

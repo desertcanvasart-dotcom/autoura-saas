@@ -50,7 +50,7 @@ describe('escalate_to_human', () => {
     expect(notifyTeam.mock.calls[0][0]).toMatchObject({
       tenant_id: 't1',
       dedupe_key: 'wa:conv-1',
-      link: '/whatsapp-inbox',
+      link: '/inbox?channel=whatsapp',
     })
     expect(notifyTeam.mock.calls[0][0].message).toContain('Wants a refund')
     expect(inserts.filter(i => i.table === 'whatsapp_messages')).toEqual([])

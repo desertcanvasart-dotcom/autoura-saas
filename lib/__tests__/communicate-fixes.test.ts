@@ -14,13 +14,13 @@ const gate = (p: string) => ROUTE_PERMISSIONS[permissionRouteFor(p) ?? ''] ?? nu
 describe('an email draft approved in Copilot', () => {
   it('opens in Conversations with the reply filled in, and sending marks it sent', () => {
     const send = src('app/api/copilot/drafts/[id]/send/route.ts')
-    expect(send).toContain("open_url: conversationId ? `/conversations?id=${conversationId}` : null")
+    expect(send).toContain("open_url: conversationId ? `/inbox?channel=all&id=${conversationId}` : null")
     const api = src('app/api/ai/suggest-email-reply/route.ts')
     expect(api).toContain(".eq('status', 'approved')")
     expect(api).toContain('body: approvedRow.edited_body || approvedRow.draft_body')
     const composer = src('components/unified/UnifiedConversationComposer.tsx')
     expect(composer).toContain('setAcceptedDraftId(data.approved.id)')
-    expect(src('app/conversations/page.tsx')).toContain("new URLSearchParams(window.location.search).get('id')")
+    expect(src('app/inbox/_views/AllChannelsView.tsx')).toContain("new URLSearchParams(window.location.search).get('id')")
     expect(src('components/copilot/CopilotReviewPanel.tsx')).toContain('Open conversation')
   })
 })
@@ -48,7 +48,7 @@ describe('Copilot', () => {
 
 describe('pages a viewer does not get', () => {
   it('the Communicate pages and Documents are gated like the sidebar', () => {
-    for (const p of ['/conversations', '/concierge-briefs', '/copilot', '/settings/message-templates', '/documents/receipt/x']) {
+    for (const p of ['/inbox', '/concierge-briefs', '/copilot', '/settings/message-templates', '/documents/receipt/x']) {
       expect(gate(p), p).toEqual(['admin', 'manager', 'member'])
     }
     // Content & AI in Settings is for managers and admins (navigation brief, 2026-10-30).

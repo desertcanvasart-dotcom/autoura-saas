@@ -143,10 +143,8 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/receipts': ['admin', 'manager', 'member'],
   '/tasks': ['admin', 'manager', 'member'],
   '/inbox': ['admin', 'manager', 'member'],
-  '/whatsapp-inbox': ['admin', 'manager', 'member'],
   // The rest of the Communicate group, and Documents: the sidebar hides them
   // from viewers, but a viewer with the link got in (no entry here = open).
-  '/conversations': ['admin', 'manager', 'member'],
   '/concierge-briefs': ['admin', 'manager', 'member'],
   // Publish: everyone who works reads and drafts; the API lets only managers
   // approve and publish (lib/publish/admin-route.ts).

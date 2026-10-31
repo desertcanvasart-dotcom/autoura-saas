@@ -44,7 +44,7 @@ describe('the WhatsApp inbox knows who you are', () => {
   })
 
   it('"Mine" and "Claim" use it; Mine with no agent shows nothing, and says why', () => {
-    const page = src('app/whatsapp-inbox/page.tsx')
+    const page = src('app/inbox/_views/WhatsAppView.tsx')
     expect(page).toContain('setCurrentAgentId(data.current_agent_id ?? null)')
     expect(page).toContain("if (filterMode === 'mine' && !currentAgentId) {")
     expect(page).toContain('add yourself in Manage Agents with your login email')

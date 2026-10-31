@@ -112,7 +112,7 @@ export const MAIN_NAV: NavSection[] = [
       { label: 'Dashboard', href: '/dashboard', icon: House, roles: ALL_AND_VIEWER, keywords: ['home'] },
       {
         label: 'Inbox', href: '/inbox', icon: Inbox, roles: ALL, badge: 'inbox',
-        match: ['/conversations', '/whatsapp-inbox', '/communications'],
+        match: ['/communications'],
         keywords: ['email', 'gmail', 'whatsapp', 'conversations', 'messages'],
       },
       {
@@ -446,8 +446,9 @@ export interface JumpPage {
 
 export const JUMP_ONLY_PAGES: JumpPage[] = [
   { label: 'Copilot', href: '/copilot', icon: Sparkles, roles: ALL, hint: 'Copilot', keywords: ['drafts', 'review'] },
-  { label: 'Conversations', href: '/conversations', icon: MessageSquare, roles: ALL, hint: 'Inbox' },
-  { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageCircle, roles: ALL, hint: 'Inbox' },
+  { label: 'All conversations', href: '/inbox?channel=all', icon: MessageSquare, roles: ALL, hint: 'Inbox', keywords: ['conversations'] },
+  { label: 'Email', href: '/inbox?channel=email', icon: Mail, roles: ALL, hint: 'Inbox', keywords: ['gmail'] },
+  { label: 'WhatsApp', href: '/inbox?channel=whatsapp', icon: MessageCircle, roles: ALL, hint: 'Inbox' },
   { label: 'Financial reports', href: '/reports?tab=finance', icon: ChartColumn, roles: AM, hint: 'Reports' },
   { label: 'Copilot analytics', href: '/reports?tab=copilot', icon: ChartColumn, roles: AM, hint: 'Reports' },
   { label: 'B2C quotes', href: '/quotes/b2c', icon: File, roles: ALL, hint: 'Quotes' },

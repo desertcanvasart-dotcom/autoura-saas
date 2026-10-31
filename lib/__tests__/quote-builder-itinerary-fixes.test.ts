@@ -76,8 +76,8 @@ describe('handing a conversation to the Quote Builder', () => {
   })
   it('the fallback encodes a long thread without a RangeError', () => {
     expect(() => toUrlBase64('مرحبا '.repeat(50000))).not.toThrow()
-    expect(src('app/whatsapp-inbox/page.tsx')).not.toContain('btoa(String.fromCharCode(...bytes))')
-    expect(src('app/inbox/page.tsx')).toContain('stashConversation(conversationText)')
+    expect(src('app/inbox/_views/WhatsAppView.tsx')).not.toContain('btoa(String.fromCharCode(...bytes))')
+    expect(src('app/inbox/_views/EmailView.tsx')).toContain('stashConversation(conversationText)')
   })
 })
 
