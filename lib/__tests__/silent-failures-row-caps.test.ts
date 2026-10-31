@@ -24,7 +24,7 @@ describe('rate admin lists read every row (AW-7)', () => {
   for (const name of RATE_LISTS) {
     it(name, () => {
       const get = handler(read(`app/api/rates/${name}/route.ts`), 'GET')
-      expect(get).toContain('fetchAllPages(')
+      expect(get).toMatch(/fetchAllPages(<[^(]*>)?\(/)
       expect(get).toMatch(/\.order\('id'\)\.range\(from, |\.order\('id'\)\s*\n\s*\.range\(from, to\)/)
       expect(get).not.toMatch(/await query\b/)
     })
@@ -40,7 +40,7 @@ describe('rate admin lists read every row (AW-7)', () => {
 describe('bookings list reads every row (AW-10, short term)', () => {
   it('pages, ordered by booking date then id', () => {
     const get = handler(read('app/api/bookings/route.ts'), 'GET')
-    expect(get).toContain('fetchAllPages(')
+    expect(get).toMatch(/fetchAllPages(<[^(]*>)?\(/)
     expect(get).toContain(".order('booking_date', { ascending: false }).order('id').range(from, to)")
   })
 })
