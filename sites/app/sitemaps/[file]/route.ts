@@ -1,4 +1,4 @@
-import { normalizeHost } from '@/lib/publish/site-data'
+import { normalizeHost } from '@/lib/publish/host'
 import { loadSitemap, siteForHost } from '../../../lib/internal-api'
 import { languageSitemapXml } from '../../../lib/seo'
 

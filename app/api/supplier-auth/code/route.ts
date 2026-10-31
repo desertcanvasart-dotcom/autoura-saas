@@ -6,6 +6,7 @@ import {
   CODE_SEND_WINDOW_MINUTES, canSendCode, codeEmails, codeExpiry, generateLoginCode, hashLoginCode, normalizeLoginPhone,
 } from '@/lib/supplier-accounts'
 import { recordsForPhone } from '@/lib/supplier-claims'
+import { supplierSignInLimited } from '@/lib/supplier-rate-limits'
 
 /**
  * Supplier sign-in, step 1 (Phase 2B): phone → a 6-digit code by email to the
@@ -20,6 +21,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const parsed = normalizeLoginPhone(body.phone)
     if (!parsed.ok) return NextResponse.json({ success: false, error: parsed.error }, { status: 400 })
+    // Counted per address and per phone BEFORE the lookup, so every number —
+    // a supplier's or not — reaches the same limit with the same answer (SN-3).
+    const limited = await supplierSignInLimited(request, parsed.phone, 'code')
+    if (limited) return limited
     const db = createAdminClient() as unknown as SupabaseClient
 
     const records = await recordsForPhone(db, parsed.phone)
@@ -34,9 +39,9 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     const since = new Date(now.getTime() - CODE_SEND_WINDOW_MINUTES * 60_000).toISOString()
     const { data: recent } = await db.from('supplier_login_codes').select('created_at').eq('account_id', account.id).gte('created_at', since)
-    if (!canSendCode((recent ?? []).map(r => r.created_at as string), now)) {
-      return NextResponse.json({ success: false, error: 'Too many codes — please wait 15 minutes and try again' }, { status: 429 })
-    }
+    // Over the per-account cap: send nothing, but answer as usual — a 429 only
+    // a known number could reach would say the number is a supplier.
+    if (!canSendCode((recent ?? []).map(r => r.created_at as string), now)) return NextResponse.json(SAME_ANSWER)
 
     const code = generateLoginCode()
     const { error: insertError } = await db.from('supplier_login_codes').insert({

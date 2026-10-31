@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { isValidSupplierPageToken } from '@/lib/supplier-portal'
 import { checkDayOff, cleanNote } from '@/lib/supplier-days-off'
 import { notifyTeam } from '@/lib/notifications'
+import { supplierLinkLimited } from '@/lib/supplier-rate-limits'
 
 /**
  * Days off from the supplier's own page (lib/supplier-days-off, migration
@@ -21,6 +22,8 @@ async function linkFor(db: SupabaseClient, token: string) {
 const today = () => new Date().toISOString().slice(0, 10)
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const limited = await supplierLinkLimited(request)
+  if (limited) return limited
   const { token } = await params
   const db = createAdminClient() as unknown as SupabaseClient
   const link = await linkFor(db, token)
@@ -48,6 +51,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const limited = await supplierLinkLimited(request)
+  if (limited) return limited
   const { token } = await params
   const db = createAdminClient() as unknown as SupabaseClient
   const link = await linkFor(db, token)

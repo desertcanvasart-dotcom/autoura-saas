@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase-server'
 import { isValidSupplierPageToken } from '@/lib/supplier-portal'
 import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
+import { supplierLinkLimited } from '@/lib/supplier-rate-limits'
 
 /**
  * A tap on the supplier's own page (lib/supplier-portal, migration 449).
@@ -13,6 +14,8 @@ import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string; lineId: string }> }) {
   try {
+    const limited = await supplierLinkLimited(request)
+    if (limited) return limited
     const { token, lineId } = await params
     if (!isValidSupplierPageToken(token)) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
     const db = createAdminClient() as unknown as SupabaseClient

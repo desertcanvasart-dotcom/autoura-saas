@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { ChevronLeft, Lock } from 'lucide-react'
 import { useRole } from '@/hooks/useRole'
 import { settingsNavFor, settingsEntryFor, activeHref, LAST_APP_PATH_KEY } from '@/lib/nav/config'
@@ -13,6 +13,7 @@ import { settingsNavFor, settingsEntryFor, activeHref, LAST_APP_PATH_KEY } from 
 // sidebar, the breadcrumb and the title can never drift apart.
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { role } = useRole()
   const groups = useMemo(() => settingsNavFor(role), [role])
   const current = activeHref(groups.flatMap(g => g.items), pathname)
@@ -27,10 +28,35 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   }, [])
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-full">
+    <div className="flex flex-col md:flex-row min-h-full">
+      {/* Phones: the page first, under one picker — the full menu stacked
+          above it pushed every page a screen down, so a click on a setting
+          seemed to do nothing (operator, 2026-10-31). */}
+      <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3 space-y-2">
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
+          <ChevronLeft size={16} strokeWidth={1.7} aria-hidden /> Back to app
+        </Link>
+        <label className="sr-only" htmlFor="settings-page">Settings page</label>
+        <select
+          id="settings-page"
+          value={current ?? ''}
+          onChange={e => router.push(e.target.value)}
+          className="w-full h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm"
+        >
+          {!current && <option value="">Settings</option>}
+          {groups.map(group => (
+            <optgroup key={group.key} label={group.title}>
+              {group.items.map(item => (
+                <option key={item.href} value={item.href}>{item.label}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+
       <nav
         aria-label="Settings"
-        className="lg:w-64 shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-gray-200 lg:sticky lg:top-0 lg:h-[calc(100vh_-_var(--app-chrome))] overflow-y-auto px-3 py-4 [scrollbar-width:thin] [scrollbar-color:#d1d5db_transparent]"
+        className="hidden md:block md:w-60 lg:w-64 shrink-0 bg-white border-r border-gray-200 md:sticky md:top-0 md:h-[calc(100vh_-_var(--app-chrome))] overflow-y-auto px-3 py-4 [scrollbar-width:thin] [scrollbar-color:#d1d5db_transparent]"
       >
         <Link href={backHref} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900">
           <ChevronLeft size={16} strokeWidth={1.7} aria-hidden /> Back to app

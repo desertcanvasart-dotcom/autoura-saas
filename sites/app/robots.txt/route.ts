@@ -1,4 +1,4 @@
-import { normalizeHost } from '@/lib/publish/site-data'
+import { normalizeHost } from '@/lib/publish/host'
 import { siteForHost } from '../../lib/internal-api'
 import { robotsTxt } from '../../lib/seo'
 

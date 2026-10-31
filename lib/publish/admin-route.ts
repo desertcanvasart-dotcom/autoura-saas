@@ -26,10 +26,24 @@ export async function withActor(level: RoleLevel | 'read', run: (db: Db, actor: 
     const data = await run(createAdminClient(), { tenantId: auth.tenant_id, userId: auth.user!.id, name })
     return NextResponse.json({ success: true, data })
   } catch (e) {
-    if (e instanceof PublishError) return NextResponse.json({ success: false, error: e.message }, { status: e.status })
+    // A broken rule (4xx), or what the hosting provider or Google answered
+    // (502/503), is said as written; a failure of our own (500) keeps its
+    // detail (often database text) in the server log.
+    if (e instanceof PublishError && e.status !== 500) return NextResponse.json({ success: false, error: e.message }, { status: e.status })
     console.error('[publish admin]', e)
-    return NextResponse.json({ success: false, error: e instanceof Error ? e.message : 'Something went wrong' }, { status: 500 })
+    if (e instanceof PublishError) return NextResponse.json({ success: false, error: failureSaid(e.message) }, { status: e.status })
+    return NextResponse.json({ success: false, error: 'Something went wrong' }, { status: 500 })
   }
+}
+
+/** What a failure says to the person: what could not be done, without the
+ *  database's own words after it ("Could not save the draft: <db text>" →
+ *  "Could not save the draft."; "reading the site: …" → "Something went
+ *  wrong reading the site."). */
+export function failureSaid(message: string): string {
+  const what = message.split(': ')[0].trim().replace(/[.:]+$/, '')
+  if (!what) return 'Something went wrong'
+  return /^reading /.test(what) ? `Something went wrong ${what}.` : `${what}.`
 }
 
 export async function jsonBody(request: Request): Promise<Record<string, unknown>> {
