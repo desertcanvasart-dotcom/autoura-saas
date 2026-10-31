@@ -123,11 +123,7 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // entry, any signed-in role (viewers too) opened them by URL — and the
   // Resources page could delete suppliers.
   '/departures': ['admin', 'manager'],
-  // The capacity calendar: how many groups a day the operation takes on.
-  '/departures/capacity': ['admin'],
   '/suppliers': ['admin', 'manager'],
-  // The supplier network search (no entry until 2026-10-30: open by URL).
-  '/network-suppliers': ['admin', 'manager'],
   '/resources': ['admin', 'manager'],
   '/airport-staff': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],
