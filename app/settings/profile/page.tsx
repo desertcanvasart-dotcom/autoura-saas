@@ -1,12 +1,13 @@
 'use client'
 import YourDataCard from '@/components/account/YourDataCard'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { showToast } from '@/app/contexts/ToastContext'
 import { createClient } from '@/app/supabase'
+import { SaveBar, useUnsavedGuard } from '@/components/settings/SettingsUI'
 import { 
   User, 
   Mail, 
@@ -14,8 +15,7 @@ import {
   Building2, 
   MapPin, 
   Lock,
-  Camera,
-  Save
+  Camera
 } from 'lucide-react'
 
 // ============================================
@@ -30,6 +30,10 @@ interface UserProfile {
   role: string
   avatar: string
 }
+
+// The fields the sticky save bar tracks — the three user_profiles stores.
+const EDITABLE = ['name', 'phone', 'company'] as const
+type Editable = Pick<UserProfile, (typeof EDITABLE)[number]>
 
 interface PasswordData {
   currentPassword: string
@@ -85,6 +89,25 @@ export default function ProfilePage() {
 
     avatar: profile?.avatar_url || ''
   })
+
+  // What the server holds for the editable fields; profileData is the draft.
+  const [savedProfile, setSavedProfile] = useState<Editable>({
+    name: profile?.full_name || '',
+    phone: profile?.phone || '',
+    company: profile?.company_name || '',
+  })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const changes = useMemo(
+    () => EDITABLE.filter(k => savedProfile[k] !== profileData[k]).length,
+    [savedProfile, profileData],
+  )
+  useUnsavedGuard(changes > 0)
+
+  const discardProfile = () => {
+    setProfileData(prev => ({ ...prev, ...savedProfile }))
+    setProfileError(null)
+  }
 
   const [passwordData, setPasswordData] = useState<PasswordData>({
     currentPassword: '',
@@ -174,9 +197,13 @@ export default function ProfilePage() {
     }
   }
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const saveProfile = async () => {
+    if (!profileData.name.trim()) {
+      setProfileError('Full name is required.')
+      return
+    }
+    setSavingProfile(true)
+    setProfileError(null)
     try {
       // Persists via the existing PUT /api/profile (RLS-scoped to the caller).
       // Only the three fields user_profiles actually stores are sent — email
@@ -194,12 +221,19 @@ export default function ProfilePage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Could not save your profile')
       }
-      showToast('success', 'Profile updated.')
+      const next = { name: profileData.name.trim(), phone: profileData.phone.trim(), company: profileData.company.trim() }
+      setSavedProfile(next)
+      setProfileData(prev => ({ ...prev, ...next }))
     } catch (err) {
-      showToast('error', err instanceof Error ? err.message : 'Could not save your profile.')
+      setProfileError(err instanceof Error ? err.message : 'Could not save your profile.')
     } finally {
-      setLoading(false)
+      setSavingProfile(false)
     }
+  }
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (changes > 0) saveProfile()
   }
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -395,18 +429,6 @@ export default function ProfilePage() {
                           />
                         </div>
                       </div>
-                    </div>
-
-                    {/* Save Button */}
-                    <div className="pt-4 border-t border-gray-100">
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="px-4 py-2 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        {loading ? 'Saving...' : 'Save Changes'}
-                      </button>
                     </div>
                   </div>
                 </form>
@@ -626,6 +648,10 @@ export default function ProfilePage() {
 
           {/* Your own data: a copy, or deleting the account (privacy policy). */}
           {user?.email && <YourDataCard email={user.email} />}
+
+          {/* The profile fields save with the one sticky bar; the photo and
+              the password stay their own actions. */}
+          <SaveBar changes={changes} saving={savingProfile} error={profileError} onDiscard={discardProfile} onSave={saveProfile} />
 
         </div>
       </div>
