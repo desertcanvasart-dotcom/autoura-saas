@@ -56,6 +56,11 @@ export type CoveredBy = 'own' | 'supplier' | 'network'
  * Where a line may go next. `cancelled` is reachable from every state except
  * done; a cancelled, declined or expired line can be put back to pending to
  * find someone else. Own resources are assigned directly (no request).
+ *
+ * Late answers (operator, 2026-11-01, audit D2): a supplier who declined or
+ * did not answer in time can still accept, name the car or decline from the
+ * same link — until the office gives the line to someone else (that revokes
+ * the link) or marks it not needed.
  */
 const NEXT: Record<ServiceBookingStatus, readonly ServiceBookingStatus[]> = {
   pending: ['requested', 'assigned', 'cancelled'],
@@ -63,8 +68,8 @@ const NEXT: Record<ServiceBookingStatus, readonly ServiceBookingStatus[]> = {
   accepted: ['assigned', 'done', 'cancelled', 'pending'],
   assigned: ['done', 'cancelled', 'pending'],
   done: [],
-  declined: ['pending', 'requested', 'assigned', 'cancelled'],
-  expired: ['pending', 'requested', 'accepted', 'assigned', 'cancelled'],
+  declined: ['pending', 'requested', 'accepted', 'assigned', 'cancelled'],
+  expired: ['pending', 'requested', 'accepted', 'assigned', 'declined', 'cancelled'],
   cancelled: ['pending'],
 }
 

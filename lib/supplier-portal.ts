@@ -87,9 +87,11 @@ export interface PortalSections {
 const byDate = (a: PortalLine, b: PortalLine) => (a.date ?? '9999').localeCompare(b.date ?? '9999') || (a.time ?? '99').localeCompare(b.time ?? '99')
 
 /**
- * Waiting for their answer → Requests; covered and not past → Upcoming;
- * done (or covered and past) within DONE_DAYS → Done. Lines the agency
- * covers itself, Not needed, declined or unanswered-in-time lines: not shown.
+ * Waiting for their answer → Requests — and so are declined or
+ * unanswered-in-time lines, which they may still accept (operator,
+ * 2026-11-01); covered and not past → Upcoming; done (or covered and past)
+ * within DONE_DAYS → Done. Lines the agency covers itself and Not needed
+ * lines: not shown.
  */
 export function portalSections(lines: PortalLine[], today: string): PortalSections {
   const since = new Date(`${today}T00:00:00Z`)
@@ -98,7 +100,7 @@ export function portalSections(lines: PortalLine[], today: string): PortalSectio
   const out: PortalSections = { requests: [], upcoming: [], done: [] }
   for (const l of lines) {
     const past = l.date !== null && l.date < today
-    if (l.status === 'requested') { if (!past) out.requests.push(l); continue }
+    if (l.status === 'requested' || l.status === 'declined' || l.status === 'expired') { if (!past) out.requests.push(l); continue }
     if (l.status === 'accepted' || l.status === 'assigned') { (past ? out.done : out.upcoming).push(l); continue }
     if (l.status === 'done' && (l.date ?? '') >= doneFrom) out.done.push(l)
   }

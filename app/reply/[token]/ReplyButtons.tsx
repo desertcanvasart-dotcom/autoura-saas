@@ -14,6 +14,12 @@ const SAID: Record<string, string> = {
   done: 'This service is done. Thank you.',
 }
 
+// Late answers (operator, 2026-11-01): still possible from the same link.
+const LATE: Record<string, string> = {
+  declined: 'Changed your mind? You can still accept below — the agency will be told.',
+  expired: 'The time to answer has passed, but you can still accept if you are free — the agency will be told.',
+}
+
 export default function ReplyButtons({ token, view, endpoint }: { token: string; view: SupplierView; endpoint?: string }) {
   const [status, setStatus] = useState(view.status)
   const [busy, setBusy] = useState(false)
@@ -39,7 +45,9 @@ export default function ReplyButtons({ token, view, endpoint }: { token: string;
   }
 
   const answered = status === 'accepted' || status === 'assigned' || status === 'declined' || status === 'done'
-  const canName = view.assign !== 'none' && status !== 'declined' && status !== 'done'
+  // A declined line can still be accepted (it was answered, so no Decline again).
+  const canAccept = !answered || status === 'declined'
+  const canName = view.assign !== 'none' && status !== 'done'
   const big = 'w-full rounded-xl py-4 text-base font-semibold disabled:opacity-50'
 
   return (
@@ -49,12 +57,13 @@ export default function ReplyButtons({ token, view, endpoint }: { token: string;
       {status === 'assigned' && (plate || guideName) && (
         <p className="text-sm text-gray-700">{view.assign === 'car' ? `Car: ${plate}` : `Guide: ${guideName}${guidePhone ? ` · ${guidePhone}` : ''}`}{driverNote ? ` · Driver: ${driverNote}` : ''}</p>
       )}
+      {LATE[status] && !naming && !declining && <p className="text-sm text-gray-700">{LATE[status]}</p>}
       {error && <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>}
 
-      {!answered && status !== 'cancelled' && !naming && !declining && (
+      {canAccept && status !== 'cancelled' && !naming && !declining && (
         <>
           <button disabled={busy} onClick={() => send({ action: 'accept' })} className={`${big} bg-green-600 text-white`}>Accept</button>
-          <button disabled={busy} onClick={() => setDeclining(true)} className={`${big} bg-white border border-gray-300 text-gray-800`}>Decline</button>
+          {!answered && <button disabled={busy} onClick={() => setDeclining(true)} className={`${big} bg-white border border-gray-300 text-gray-800`}>Decline</button>}
         </>
       )}
 

@@ -1,7 +1,6 @@
 import { bearerMatches } from '@/lib/support/probe-auth'
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient, adminDb } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
 import { notifyTeam } from '@/lib/notifications'
 import { recordServiceBookingEvent } from '@/lib/bookings/service-booking-events'
@@ -46,7 +45,7 @@ async function getHandler(request: NextRequest) {
   if (!bearerMatches(request.headers.get('authorization'), CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const now = new Date()
 
   const { data, error } = await db

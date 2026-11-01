@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
-import { isValidReplyToken, isLinkLive } from '@/lib/supplier-reply-link'
+import { adminDb } from '@/lib/supabase-server'
+import { resolveReplyLink } from '@/lib/supplier-link-lookup'
 import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
 import { supplierLinkLimited } from '@/lib/supplier-rate-limits'
 
@@ -18,16 +17,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const limited = await supplierLinkLimited(request)
     if (limited) return limited
     const { token } = await params
-    if (!isValidReplyToken(token)) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
-    const db = createAdminClient() as unknown as SupabaseClient
-
-    const { data: link } = await db
-      .from('service_booking_links')
-      .select('id, tenant_id, booking_id, service_booking_id, revoked_at, expires_at')
-      .eq('token', token)
-      .is('revoked_at', null)
-      .maybeSingle()
-    if (!link || !isLinkLive(link, new Date())) {
+    const db = adminDb()
+    const link = await resolveReplyLink(db, token)
+    if (!link) {
       return NextResponse.json({ success: false, error: 'This link has expired — please contact the agency' }, { status: 404 })
     }
 

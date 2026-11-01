@@ -20,7 +20,10 @@ export default function SupplierSourcingSetting({ canEdit }: { canEdit: boolean 
   // A failed read used to render nothing, so the setting looked missing.
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  const [attempt, setAttempt] = useState(0)
+
   useEffect(() => {
+    setLoadError(null)
     fetch('/api/settings/supplier-sourcing')
       .then(r => r.json())
       .then(d => {
@@ -28,7 +31,7 @@ export default function SupplierSourcingSetting({ canEdit }: { canEdit: boolean 
         else setLoadError(d.error || 'Could not load the supplier sourcing setting')
       })
       .catch(() => setLoadError('Could not load the supplier sourcing setting'))
-  }, [])
+  }, [attempt])
 
   const save = async (v: Sourcing) => {
     setBusy(true); setMsg(null)
@@ -44,7 +47,10 @@ export default function SupplierSourcingSetting({ canEdit }: { canEdit: boolean 
     return (
       <section className="bg-white rounded-xl border border-gray-200 p-5">
         <h2 className="text-base font-semibold text-gray-900">Supplier sourcing</h2>
-        <p className={`text-sm mt-1 ${loadError ? 'text-red-600' : 'text-gray-500'}`}>{loadError ?? 'Loading…'}</p>
+        <p className={`text-sm mt-1 ${loadError ? 'text-red-600' : 'text-gray-500'}`}>
+          {loadError ?? 'Loading…'}
+          {loadError && <> <button type="button" onClick={() => setAttempt(a => a + 1)} className="font-medium underline">Try again</button></>}
+        </p>
       </section>
     )
   }

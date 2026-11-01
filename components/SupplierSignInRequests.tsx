@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { KeyRound } from 'lucide-react'
+import LoadError from '@/components/LoadError'
 
 // Suppliers asking to sign in as one of this agency's suppliers (Phase 2B).
 // An admin confirms it is them — or not (decision §9). Until confirmed, the
@@ -34,13 +35,17 @@ function CodeSentTo({ sent }: { sent: Claim['code_sent_to'] }) {
 
 export function useClaims(query: string) {
   const [claims, setClaims] = useState<Claim[]>([])
+  // A failed read used to look like "nobody is asking" (audit SN-13).
+  const [loadFailed, setLoadFailed] = useState(false)
   const load = useCallback(async () => {
-    const res = await fetch(`/api/supplier-claims?${query}`)
-    const d = await res.json().catch(() => ({}))
-    if (res.ok && d.success) setClaims(d.data)
+    const res = await fetch(`/api/supplier-claims?${query}`).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    const ok = !!res?.ok && d.success
+    setLoadFailed(!ok)
+    if (ok) setClaims(d.data)
   }, [query])
   useEffect(() => { void load() }, [load])
-  return { claims, load }
+  return { claims, load, loadFailed }
 }
 
 export async function decideClaim(id: string, decision: 'approve' | 'reject'): Promise<string | null> {
@@ -55,9 +60,10 @@ export async function decideClaim(id: string, decision: 'approve' | 'reject'): P
  * `emptyText` so an empty list says so.
  */
 export default function SupplierSignInRequests({ isAdmin, emptyText }: { isAdmin: boolean; emptyText?: string }) {
-  const { claims, load } = useClaims('status=pending')
+  const { claims, load, loadFailed } = useClaims('status=pending')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  if (loadFailed && claims.length === 0) return <LoadError compact what="suppliers asking to sign in" onRetry={() => { void load() }} />
   if (claims.length === 0) return emptyText ? <p className="text-sm text-gray-500">{emptyText}</p> : null
 
   const decide = async (id: string, decision: 'approve' | 'reject') => {
@@ -93,8 +99,9 @@ export default function SupplierSignInRequests({ isAdmin, emptyText }: { isAdmin
 
 /** On the supplier card: whether this supplier has a sign-in, and connect / disconnect for admins. */
 export function SupplierSignInStatus({ supplierId, isAdmin }: { supplierId: string; isAdmin: boolean }) {
-  const { claims, load } = useClaims(`supplier_id=${supplierId}`)
+  const { claims, load, loadFailed } = useClaims(`supplier_id=${supplierId}`)
   const [error, setError] = useState<string | null>(null)
+  if (loadFailed && claims.length === 0) return <div className="mt-2"><LoadError compact what="this supplier’s sign-in" onRetry={() => { void load() }} /></div>
   if (claims.length === 0) return null
   const act = async (id: string, decision: 'approve' | 'reject') => {
     if (decision === 'reject' && !window.confirm('Disconnect this sign-in? They will stop seeing your bookings.')) return

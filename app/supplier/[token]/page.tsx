@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
-import { isValidSupplierPageToken } from '@/lib/supplier-portal'
+import { adminDb } from '@/lib/supabase-server'
+import { resolvePortalLink } from '@/lib/supplier-link-lookup'
 import { loadSupplierAgency } from '@/lib/supplier-page-data'
 import SupplierAgencyView from '@/components/supplier/SupplierAgencyView'
 
@@ -15,15 +14,8 @@ export const metadata = { title: 'Your bookings', robots: { index: false } }
 
 export default async function SupplierPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  if (!isValidSupplierPageToken(token)) notFound()
-
-  const db = createAdminClient() as unknown as SupabaseClient
-  const { data: link } = await db
-    .from('supplier_portal_links')
-    .select('id, tenant_id, supplier_id')
-    .eq('token', token)
-    .is('revoked_at', null)
-    .maybeSingle()
+  const db = adminDb()
+  const link = await resolvePortalLink(db, token)
   if (!link) notFound()
 
   const data = await loadSupplierAgency(db, link.tenant_id, link.supplier_id, new Date().toISOString().slice(0, 10))

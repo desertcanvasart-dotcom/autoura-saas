@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import {
   SESSION_DAYS, canTryCode, checkLoginCode, generateSessionToken, hashSessionToken, normalizeLoginPhone, sessionExpiry,
 } from '@/lib/supplier-accounts'
@@ -22,7 +21,7 @@ export async function POST(request: NextRequest) {
     // Per address and per phone, before the lookup (audit SN-2/SN-3).
     const limited = await supplierSignInLimited(request, parsed.phone, 'verify')
     if (limited) return limited
-    const db = createAdminClient() as unknown as SupabaseClient
+    const db = adminDb()
     const now = new Date()
 
     const { data: account } = await db.from('supplier_accounts').select('id, disabled_at').eq('phone', parsed.phone).maybeSingle()

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import {
   CODE_SEND_WINDOW_MINUTES, canSendCode, codeEmails, codeExpiry, generateLoginCode, hashLoginCode, normalizeLoginPhone,
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
     // a supplier's or not — reaches the same limit with the same answer (SN-3).
     const limited = await supplierSignInLimited(request, parsed.phone, 'code')
     if (limited) return limited
-    const db = createAdminClient() as unknown as SupabaseClient
+    const db = adminDb()
 
     const records = await recordsForPhone(db, parsed.phone)
     const emails = codeEmails(records)

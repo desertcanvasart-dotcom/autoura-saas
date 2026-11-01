@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Link2, MessageCircle } from 'lucide-react'
 import DaysOffEditor from '@/components/DaysOffEditor'
+import LoadError from '@/components/LoadError'
 
 // The supplier's own page (migration 449): one standing link listing every
 // request and job from this agency. Send it from the office's own WhatsApp
@@ -13,13 +14,20 @@ export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: 
   const [signIn, setSignIn] = useState<{ ok: boolean; reason: string | null } | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  // A failed read used to look like "no link sent yet" (audit SN-13).
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const url = `/api/suppliers/${supplierId}/portal-link`
 
   useEffect(() => {
     let live = true
-    fetch(url).then(r => r.json()).then(d => { if (live && d.success) { setLink(d.data); setSignIn(d.sign_in ?? null) } }).catch(() => {})
+    setLoadFailed(false)
+    fetch(url).then(r => r.json()).then(d => {
+      if (!live) return
+      if (d.success) { setLink(d.data); setSignIn(d.sign_in ?? null) } else setLoadFailed(true)
+    }).catch(() => { if (live) setLoadFailed(true) })
     return () => { live = false }
-  }, [url])
+  }, [url, attempt])
 
   const send = async () => {
     setBusy(true); setNote(null)
@@ -62,6 +70,7 @@ export default function SupplierPageLink({ supplierId, canEdit }: { supplierId: 
           <button type="button" disabled={busy} onClick={stop} className="text-xs text-red-700 hover:underline disabled:opacity-50">Switch off</button>
         )}
       </div>
+      {loadFailed && <div className="mt-1"><LoadError compact what="the supplier’s page link" onRetry={() => setAttempt(a => a + 1)} /></div>}
       {note && <p className="mt-1 text-xs text-gray-600">{note}</p>}
       {signIn && !signIn.ok && signIn.reason && <p className="mt-1 text-xs text-amber-700">{signIn.reason}</p>}
       <details className="mt-2">

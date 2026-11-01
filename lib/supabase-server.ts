@@ -8,7 +8,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { currentMembership, type MembershipDb } from '@/lib/current-membership'
 import { createClient } from '@supabase/supabase-js';
-import type { User } from '@supabase/supabase-js';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { isConfirmedSuperAdmin, IMPERSONATE_COOKIE } from '@/lib/super-admin';
 import type { Database } from '@/types/database.types';
@@ -94,6 +94,15 @@ export function createAdminClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+}
+
+/**
+ * The admin client as a plain SupabaseClient, for the helpers that take one
+ * (lib/bookings/*, lib/supplier-*): one cast here instead of one per caller
+ * (audit SN-12). Server only, bypasses RLS, like createAdminClient.
+ */
+export function adminDb(): SupabaseClient {
+  return createAdminClient() as unknown as SupabaseClient
 }
 
 /**

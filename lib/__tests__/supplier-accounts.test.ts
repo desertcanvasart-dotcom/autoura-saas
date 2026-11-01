@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   CODE_MAX_ATTEMPTS, canSendCode, checkLoginCode, codeEmails, codeExpiry, generateLoginCode, generateSessionToken,
-  hashLoginCode, hashSessionToken, isSessionLive, maskEmail, normalizeLoginPhone, phoneTail, recordMatchesPhone, sessionExpiry,
+  hashLoginCode, hashSessionToken, isSessionLive, normalizeLoginPhone, phoneTail, recordMatchesPhone, sessionExpiry,
 } from '@/lib/supplier-accounts'
 
 const now = new Date('2026-11-05T10:00:00Z')
@@ -50,10 +50,9 @@ describe('the one-time code', () => {
     expect(canSendCode([t(1), t(5), t(16)], now)).toBe(true)
   })
 
-  it('goes to the emails on the matched records, shown masked', () => {
+  it('goes to the emails on the matched records', () => {
     expect(codeEmails([{ email: 'Ahmed@Cars.eg', contact_email: 'ahmed@cars.eg' }, { email: 'bad' }, { contact_email: 'ops@nile.com' }]))
       .toEqual(['ahmed@cars.eg', 'ops@nile.com'])
-    expect(maskEmail('ahmed@cars.eg')).toBe('a•••@cars.eg')
   })
 })
 

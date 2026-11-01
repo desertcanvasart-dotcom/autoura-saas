@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import { SESSION_COOKIE, hashSessionToken } from '@/lib/supplier-accounts'
 import { supplierCookie } from '@/lib/supplier-session'
 
@@ -8,7 +7,7 @@ import { supplierCookie } from '@/lib/supplier-session'
 export async function POST(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value
   if (token) {
-    const db = createAdminClient() as unknown as SupabaseClient
+    const db = adminDb()
     const { error } = await db.from('supplier_sessions').update({ revoked_at: new Date().toISOString() })
       .eq('token_hash', hashSessionToken(token)).is('revoked_at', null)
     if (error) console.error('[supplier sign-out]', error.message)

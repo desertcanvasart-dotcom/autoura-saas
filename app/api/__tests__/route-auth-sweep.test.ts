@@ -80,8 +80,10 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   '/api/staff/': ['isValidStaffToken', 'revoked_at'],
   // Supplier reply links (448): the supplier has no session; the route checks
   // the token's shape, then needs an unrevoked, unexpired service_booking_links row.
-  '/api/reply/': ['isValidReplyToken', 'revoked_at', 'isLinkLive'],
-  '/api/supplier-page/': ['isValidSupplierPageToken', 'revoked_at', 'supplier_id'],
+  // Both resolve the token through lib/supplier-link-lookup (shape check,
+  // unrevoked, unexpired), pinned by supplier-network-tidy.test.ts.
+  '/api/reply/': ['isValidReplyToken', 'revoked_at', 'isLinkLive', 'resolveReplyLink'],
+  '/api/supplier-page/': ['isValidSupplierPageToken', 'revoked_at', 'supplier_id', 'resolvePortalLink'],
   '/api/supplier-auth/': ['normalizeLoginPhone', 'hashSessionToken'],
   '/api/supplier-account/': ['supplierFromToken'],
   // Traveller report from the share page — the traveller has no session by
