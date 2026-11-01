@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NETWORK_KINDS, PAPER_KINDS, VERIFICATION_LABEL } from '@/lib/supplier-network'
 import LoadError from '@/components/LoadError'
+import { NETWORK_CITIES, NETWORK_LANGUAGES } from '@/lib/supplier-network-lists'
 
 // Join the Autoura supplier network (Phase 3): a profile other agencies can
 // find — name, kinds of service, cities, languages, a few words — and papers
@@ -15,14 +16,36 @@ interface Profile {
 }
 interface Paper { id: string; kind: string; title: string; size_bytes: number | null; uploaded_at: string }
 
+/** Tap to choose: the cities and languages come from fixed lists, so agencies can search them. */
+function Picks({ label, options, value, onChange }: { label: string; options: readonly string[]; value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <fieldset>
+      <legend className="text-gray-700">{label}</legend>
+      <div className="mt-1 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+        {options.map(o => {
+          const on = value.includes(o)
+          return (
+            <label key={o} className={`px-2.5 py-1 rounded-full border text-xs cursor-pointer ${on ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300'}`}>
+              <input type="checkbox" className="sr-only" checked={on} onChange={e => onChange(e.target.checked ? [...value, o] : value.filter(x => x !== o))} />
+              {o}
+            </label>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
+
 export default function NetworkJoin() {
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState('unverified')
   const [note, setNote] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [kinds, setKinds] = useState<string[]>([])
-  const [cities, setCities] = useState('')
-  const [languages, setLanguages] = useState('')
+  const [cities, setCities] = useState<string[]>([])
+  const [languages, setLanguages] = useState<string[]>([])
+  // Words typed before the lists existed that match nothing: shown so the supplier picks again.
+  const [unmatched, setUnmatched] = useState<string[]>([])
   const [about, setAbout] = useState('')
   const [listed, setListed] = useState(false)
   const [papers, setPapers] = useState<Paper[]>([])
@@ -41,7 +64,9 @@ export default function NetworkJoin() {
     const p: Profile | null = d.data.profile
     setPapers(d.data.papers)
     if (p) {
-      setName(p.display_name); setKinds(p.kinds); setCities(p.cities.join(', ')); setLanguages(p.languages.join(', '))
+      // Already in the lists' words (the route reads older typed entries).
+      setName(p.display_name); setKinds(p.kinds); setCities(p.cities); setLanguages(p.languages)
+      setUnmatched(Array.isArray(d.data.unmatched) ? d.data.unmatched : [])
       setAbout(p.about ?? ''); setListed(p.listed); setStatus(p.verification_status); setNote(p.verification_note)
     } else {
       setName(d.data.default_name ?? '')
@@ -62,7 +87,7 @@ export default function NetworkJoin() {
 
   const save = async () => {
     const d = await call({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: name, kinds, cities, languages, about, listed }) })
-    if (d) { setMsg({ ok: true, text: d.rechecking ? 'Saved — sent for checking again (name or kinds changed)' : 'Saved' }); void load() }
+    if (d) { setUnmatched([]); setMsg({ ok: true, text: d.rechecking ? 'Saved — sent for checking again (name or kinds changed)' : 'Saved' }); void load() }
   }
   const submit = async () => {
     const d = await call({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submit: true }) })
@@ -89,6 +114,11 @@ export default function NetworkJoin() {
       <h2 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Join the Autoura network</h2>
       <p className="text-sm text-gray-600">Let other agencies on Autoura find you. They see only what you write here — never your phone, email or prices. If they add you, they ask you here like the agencies you already work with, and agree each price with you.</p>
       <p className={`text-sm font-medium ${statusColor}`}>{VERIFICATION_LABEL[status] ?? status}</p>
+      {(status === 'unverified' || status === 'rejected') && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <b>Other agencies can’t find you yet.</b> Save your profile, upload your papers below, then press <b>Send for checking</b>. Once the Autoura team has checked them, you appear in the network.
+        </p>
+      )}
       {status === 'rejected' && note && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{note}</p>}
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 text-sm">
@@ -106,12 +136,13 @@ export default function NetworkJoin() {
             ))}
           </div>
         </fieldset>
-        <label className="block text-gray-700">Cities you work in (comma between)
-          <input value={cities} onChange={e => setCities(e.target.value)} placeholder="Cairo, Giza, Luxor" className="mt-1 w-full" />
-        </label>
-        <label className="block text-gray-700">Languages (optional)
-          <input value={languages} onChange={e => setLanguages(e.target.value)} placeholder="English, Italian" className="mt-1 w-full" />
-        </label>
+        {unmatched.length > 0 && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-800">
+            We couldn’t match {unmatched.map(u => `“${u}”`).join(', ')} — please tap your cities and languages below, then Save.
+          </p>
+        )}
+        <Picks label="Cities you work in" options={NETWORK_CITIES} value={cities} onChange={setCities} />
+        <Picks label="Languages (optional)" options={NETWORK_LANGUAGES} value={languages} onChange={setLanguages} />
         <label className="block text-gray-700">About you (optional)
           <textarea value={about} onChange={e => setAbout(e.target.value)} maxLength={1000} rows={3} className="mt-1 w-full" />
         </label>

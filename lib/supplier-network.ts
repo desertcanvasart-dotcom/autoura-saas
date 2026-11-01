@@ -34,33 +34,6 @@ export const NETWORK_KINDS: Record<string, string> = {
   activity_provider: 'Activities',
 }
 
-const list = (v: unknown, max: number, len: number): string[] =>
-  [...new Set((Array.isArray(v) ? v : typeof v === 'string' ? v.split(',') : [])
-    .map(x => String(x).trim().replace(/\s+/g, ' ').slice(0, len))
-    .filter(Boolean))].slice(0, max)
-
-export interface ProfileInput {
-  display_name: string
-  kinds: string[]
-  cities: string[]
-  languages: string[]
-  about: string | null
-  listed: boolean
-}
-
-/** Check what a supplier typed for their network profile. */
-export function cleanProfile(body: unknown): { ok: true; value: ProfileInput } | { ok: false; error: string } {
-  const b = (body ?? {}) as Record<string, unknown>
-  const name = typeof b.display_name === 'string' ? b.display_name.trim().replace(/\s+/g, ' ') : ''
-  if (name.length < 2 || name.length > 120) return { ok: false, error: 'Type the name agencies should see (2–120 letters)' }
-  const kinds = list(b.kinds, 6, 40).filter(k => k in NETWORK_KINDS)
-  if (kinds.length === 0) return { ok: false, error: 'Choose at least one kind of service' }
-  const cities = list(b.cities, 20, 60)
-  if (cities.length === 0) return { ok: false, error: 'Type at least one city you work in' }
-  const about = typeof b.about === 'string' && b.about.trim() ? b.about.trim().slice(0, 1000) : null
-  return { ok: true, value: { display_name: name, kinds, cities, languages: list(b.languages, 12, 40), about, listed: b.listed === true } }
-}
-
 export interface PublicProfile {
   account_id: string
   display_name: string

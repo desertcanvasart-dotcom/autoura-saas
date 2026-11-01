@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { cleanProfile, isSourcing, matchesSearch, toPublicProfile, usesNetwork } from '@/lib/supplier-network'
+import { isSourcing, matchesSearch, toPublicProfile, usesNetwork } from '@/lib/supplier-network'
+import { cleanProfile } from '@/lib/supplier-network-profile'
 
 describe('the shared network — rules', () => {
   it('one sourcing setting per agency: own (default) · network · both', () => {
@@ -12,7 +13,7 @@ describe('the shared network — rules', () => {
 
   it('a profile needs a name, a known kind and a city; lists are tidied', () => {
     const ok = cleanProfile({ display_name: '  Nile  Cars ', kinds: ['transport_company', 'spaceship'], cities: 'Cairo, Giza, cairo ', languages: ['English', 'English'], listed: true })
-    expect(ok).toEqual({ ok: true, value: { display_name: 'Nile Cars', kinds: ['transport_company'], cities: ['Cairo', 'Giza', 'cairo'], languages: ['English'], about: null, listed: true } })
+    expect(ok).toEqual({ ok: true, value: { display_name: 'Nile Cars', kinds: ['transport_company'], cities: ['Cairo', 'Giza'], languages: ['English'], about: null, listed: true } })
     expect(cleanProfile({ display_name: 'X', kinds: ['guide'], cities: ['Cairo'] }).ok).toBe(false)
     expect(cleanProfile({ display_name: 'Nile', kinds: ['spaceship'], cities: ['Cairo'] }).ok).toBe(false)
     expect(cleanProfile({ display_name: 'Nile', kinds: ['guide'], cities: [] }).ok).toBe(false)

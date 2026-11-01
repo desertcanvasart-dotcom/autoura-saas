@@ -21,6 +21,7 @@ import {
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
 import SupplierDocumentsPanel from '@/components/SupplierDocumentsPanel'
 import SupplierPageLink from '@/components/SupplierPageLink'
+import SupplierNetworkProfile, { SupplierProfileLine, useConnectedProfiles } from '@/components/SupplierNetworkProfile'
 import SupplierSignInRequests, { SupplierSignInStatus } from '@/components/SupplierSignInRequests'
 import { useRole } from '@/hooks/useRole'
 import { propertyTypesForRoles } from '@/lib/supplier-properties'
@@ -208,6 +209,8 @@ export default function SuppliersContent() {
   const searchParams = useSearchParams()
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  // What connected suppliers wrote about themselves (their network profile).
+  const connected = useConnectedProfiles()
   // The agency's supplier types (Settings → Your vocabulary): what each is
   // called, and which built-in kind it behaves as.
   const { items: typeItems, all: allTypes } = useVocabulary('supplier_type')
@@ -1063,6 +1066,8 @@ export default function SuppliersContent() {
                         </div>
                       )}
 
+                      <SupplierProfileLine profile={connected.profiles[supplier.id]} />
+
                       {/* Type-specific badges */}
                       {supplier.languages && supplier.languages.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
@@ -1327,6 +1332,7 @@ export default function SuppliersContent() {
               <div className="mb-4">
                 <SupplierPageLink supplierId={selectedSupplier.id} canEdit={!isViewer} />
                 <SupplierSignInStatus supplierId={selectedSupplier.id} isAdmin={isAdmin} />
+                <SupplierNetworkProfile profile={connected.profiles[selectedSupplier.id]} loadFailed={connected.loadFailed} onRetry={connected.reload} />
               </div>
               {viewTab === 'details' && (
                 <div className="grid grid-cols-2 gap-6">
