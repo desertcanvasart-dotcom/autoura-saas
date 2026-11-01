@@ -37,7 +37,11 @@ export default function NetworkSuppliersPage() {
     setRows(res.ok && d.success ? d.data : [])
     if (!res.ok && !d.network_off) setMsg({ ok: false, text: d.error || 'Could not search' })
   }, [kind, city, language, q])
-  useEffect(() => { void search() }, [search])
+  // Searches after a short pause, not on every keystroke (audit SN-11).
+  useEffect(() => {
+    const t = setTimeout(() => { void search() }, 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   const add = async (r: Found) => {
     setBusy(r.account_id); setMsg(null)

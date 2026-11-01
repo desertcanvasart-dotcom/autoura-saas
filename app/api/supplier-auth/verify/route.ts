@@ -49,13 +49,14 @@ export async function POST(request: NextRequest) {
     const { data: spent } = await db.from('supplier_login_codes').update({ used_at: now.toISOString() }).eq('id', row!.id).is('used_at', null).select('id')
     if (!spent || spent.length === 0) return NextResponse.json({ success: false, error: 'Ask for a new code' }, { status: 400 })
 
+    // Looked up before the session is made, so a failed lookup leaves none behind.
+    const records = await recordsForPhone(db, parsed.phone)
     const token = generateSessionToken()
     const { error } = await db.from('supplier_sessions').insert({
       account_id: account!.id, token_hash: hashSessionToken(token), expires_at: sessionExpiry(now),
     })
     if (error) return NextResponse.json({ success: false, error: 'Could not sign you in — please try again' }, { status: 500 })
     await db.from('supplier_accounts').update({ last_login_at: now.toISOString() }).eq('id', account!.id)
-    const records = await recordsForPhone(db, parsed.phone)
     const fresh = await claimRecords(db, account!.id, records)
     // Each agency's owners and admins are asked to confirm it is them (§9).
     for (const claim of fresh) {

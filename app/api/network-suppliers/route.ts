@@ -22,11 +22,22 @@ export async function GET(request: NextRequest) {
   }
 
   const sp = request.nextUrl.searchParams
-  const { data, error } = await supabase.from('supplier_network_profiles')
-    .select('account_id, display_name, kinds, cities, languages, about')
-    .eq('listed', true).eq('verification_status', 'verified').order('display_name').limit(500)
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   const q = { kind: sp.get('kind'), city: sp.get('city'), language: sp.get('language'), text: sp.get('q') }
+  // Kind, city and language filter in the database (GIN indexes, 458; city
+  // and language through lower-cased copies). The free text is checked below.
+  let query = supabase.from('supplier_network_profiles')
+    .select('account_id, display_name, kinds, cities, languages, about')
+    .eq('listed', true).eq('verification_status', 'verified')
+  // A word becomes an array literal ({...}): characters that would break one are dropped.
+  const word = (v: string | null, lower = true) => {
+    const w = (v ?? '').replace(/[,{}"\\]/g, '').trim()
+    return lower ? w.toLowerCase() : w
+  }
+  if (word(q.kind, false)) query = query.contains('kinds', [word(q.kind, false)])
+  if (word(q.city)) query = query.contains('search_cities', [word(q.city)])
+  if (word(q.language)) query = query.contains('search_languages', [word(q.language)])
+  const { data, error } = await query.order('display_name').limit(500)
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   const found = (data ?? []).map(toPublicProfile).filter(p => matchesSearch(p, q))
 
   // Already on this agency's list: added from the network, or connected by

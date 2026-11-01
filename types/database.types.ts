@@ -9950,6 +9950,8 @@ export interface Database {
           verified_by: string | null
           created_at: string
           updated_at: string
+          search_cities: string[] | null
+          search_languages: string[] | null
         }
         Insert: {
           account_id: string
@@ -9965,6 +9967,8 @@ export interface Database {
           verified_by?: string | null
           created_at?: string
           updated_at?: string
+          search_cities?: string[] | null
+          search_languages?: string[] | null
         }
         Update: {
           account_id?: string
@@ -9980,6 +9984,8 @@ export interface Database {
           verified_by?: string | null
           created_at?: string
           updated_at?: string
+          search_cities?: string[] | null
+          search_languages?: string[] | null
         }
         Relationships: [
           {
@@ -10230,6 +10236,7 @@ export interface Database {
           tenant_id: string
           types: string[]
           network_account_id: string | null
+          phone_tails: string[] | null
         }
         Insert: {
           id?: string
@@ -10269,6 +10276,7 @@ export interface Database {
           tenant_id: string
           types: string[]
           network_account_id?: string | null
+          phone_tails?: string[] | null
         }
         Update: {
           id?: string
@@ -10308,6 +10316,7 @@ export interface Database {
           tenant_id?: string
           types?: string[]
           network_account_id?: string | null
+          phone_tails?: string[] | null
         }
         Relationships: [
           {

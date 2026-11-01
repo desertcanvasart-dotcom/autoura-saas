@@ -19,12 +19,16 @@ export interface MatchedRecord {
 
 export async function recordsForPhone(db: SupabaseClient, phone: string): Promise<MatchedRecord[]> {
   const tail = phoneTail(phone)
-  // Digits may be written with spaces or dashes; match the tail loosely, check exactly below.
-  const loose = `%${tail.split('').join('%')}%`
-  const { data: rows } = await db.from('suppliers')
-    .select('id, tenant_id, name, company_name, email, contact_email, whatsapp, phone, contact_phone, is_active')
-    .or(`whatsapp.ilike.${loose},phone.ilike.${loose},contact_phone.ilike.${loose}`)
-    .limit(200)
+  const columns = 'id, tenant_id, name, company_name, email, contact_email, whatsapp, phone, contact_phone, is_active'
+  // Each record stores the last 9 digits of its numbers (phone_tails, 458),
+  // indexed: match by equality, check exactly below. A number shorter than 9
+  // digits (rare) has no stored tail, so it keeps the old loose search.
+  const { data: rows, error } = tail.length === 9
+    ? await db.from('suppliers').select(columns).contains('phone_tails', [tail]).limit(200)
+    : await db.from('suppliers').select(columns)
+      .or(['whatsapp', 'phone', 'contact_phone'].map(c => `${c}.ilike.%${tail.split('').join('%')}%`).join(','))
+      .limit(200)
+  if (error) throw new Error(`Could not look up the number: ${error.message}`)
   const candidates = (rows ?? []).filter(r => r.is_active !== false && r.tenant_id)
   if (candidates.length === 0) return []
   const tenantIds = [...new Set(candidates.map(r => r.tenant_id as string))]
