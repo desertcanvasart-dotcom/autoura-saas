@@ -98,4 +98,12 @@ describe("the supplier's form", () => {
     expect(form).toContain('Other agencies can’t find you yet.')
     expect(form).not.toContain('(comma between)')
   })
+
+  it('the tick box says being found also needs Autoura to check the papers (operator, 2026-11-01)', () => {
+    const form = readFileSync('app/supplier-home/NetworkJoin.tsx', 'utf8')
+    expect(form).toContain(" once Autoura has checked my papers")
+    expect(form).toContain('Ticking this is not enough on its own')
+    expect(form).toContain('The Autoura team is checking your papers.')
+    expect(form).toContain('Upload at least one paper (licence or vehicle papers) to send for checking.')
+  })
 })
