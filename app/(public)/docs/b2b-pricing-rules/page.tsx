@@ -21,7 +21,7 @@ export default function TransportPackagesDocsPage() {
         A transport package is one price per vehicle for a stretch of a trip: the vehicle that stays
         with a cruise group for its sightseeing, the transfers around a sailing, a day tour, or a
         multi-day road journey. Find it under{' '}
-        <strong>Tours &rarr; Transport Packages</strong> (admins and managers). Ordinary transfers and
+        <strong>Products &rarr; Transport packages</strong> (admins and managers). Ordinary transfers and
         day tours are priced from <strong>Rates &rarr; Transportation</strong> instead (see{' '}
         <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>).
       </p>
@@ -49,7 +49,7 @@ export default function TransportPackagesDocsPage() {
         </ul>
         <p className="text-gray-600 mb-3">
           The vehicles are <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">your
-          own vehicle types</Link> (Settings &rarr; Vocabulary), with your names and the passenger range
+          own vehicle types</Link> (Settings &rsaquo; Catalog &rsaquo; Vocabulary), with your names and the passenger range
           each one carries. Rates are in your rates currency. Leave a vehicle blank if the package does
           not offer it: a blank is not a zero.
         </p>

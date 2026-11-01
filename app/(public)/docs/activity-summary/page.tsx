@@ -60,8 +60,8 @@ export default function ActivitySummaryDocs() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Where To Find It</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li><strong>Team Members</strong> &mdash; members with a login show an <strong>Activity</strong> button (admins and managers) that opens the summary</li>
-          <li><strong>My profile</strong> &mdash; click your name at the bottom of the sidebar: every member sees their own <strong>Your Activity</strong> card, with the same numbers their manager sees</li>
+          <li><strong>Staff directory</strong> (the <strong>Team</strong> link, or Settings &rsaquo; Staff directory) &mdash; members with a login show an <strong>Activity</strong> button (admins and managers) that opens the summary</li>
+          <li><strong>Your profile</strong> &mdash; account menu (your initials, top right) &rarr; <strong>Profile</strong>: every member sees their own <strong>Your Activity</strong> card, with the same numbers their manager sees</li>
         </ul>
         <DocScreenshot src="/docs/activity-summary/activity-modal.jpg" alt="Activity summary for a team member: last login and last seen, focused-time bars, and output tiles" />
         <DocScreenshot src="/docs/activity-summary/your-activity.jpg" alt="The Your Activity self-view on the profile page" />

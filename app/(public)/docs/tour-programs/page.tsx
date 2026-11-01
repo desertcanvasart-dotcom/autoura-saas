@@ -20,7 +20,7 @@ export default function TourProgramsPage() {
       <p className="text-gray-600 mb-8">
         The Tour Manager (titled <strong>Tour Programs Manager</strong> on the page) holds your
         catalogue: reusable tours with their day-by-day programme, and the variations that price them
-        for partners. Find it under <strong>Tours &rarr; Tour Manager</strong> (admins and managers).
+        for partners. Find it under <strong>Products &rarr; Tours</strong> in the sidebar (admins and managers).
       </p>
 
       {/* Concepts */}
@@ -57,7 +57,7 @@ export default function TourProgramsPage() {
           <li><strong>Search</strong> &mdash; matches a tour&rsquo;s name, code or city</li>
           <li><strong>Filters</strong> &mdash; <strong>Theme</strong> and <strong>Type</strong> (your vocabulary), and an <strong>Active Only / Show All</strong> toggle</li>
           <li><strong>Views</strong> &mdash; table, cards or compact list</li>
-          <li><strong>Header</strong> &mdash; <strong>Add Template</strong>, the <strong>Import / Export</strong> menu, <strong>Browse Tours</strong> (opens Tour Inventory) and <strong>&larr; Rates Hub</strong></li>
+          <li><strong>Header</strong> &mdash; <strong>Add Template</strong>, the <strong>Import / Export</strong> menu, <strong>Browse Tours</strong> (opens Tour Inventory) and <strong>&larr; Rates Hub</strong> (opens the Rates overview)</li>
         </ul>
         <p className="text-gray-600 mb-3">
           The table has the columns <strong>Template, Type, Duration, Cities, Variations, Status,
@@ -140,7 +140,7 @@ export default function TourProgramsPage() {
         </ul>
         <p className="text-gray-600 mb-3">
           <strong>Fill from a block</strong> starts a day from one of your{' '}
-          <strong>Day Blocks</strong> (Settings &rarr; Day Blocks). A preview shows what the day&rsquo;s
+          <strong>Day blocks</strong> (Settings &rsaquo; Catalog &rsaquo; Day blocks). A preview shows what the day&rsquo;s
           transport will cost. Press <strong>Update Template</strong> to save.
         </p>
       </section>
@@ -187,7 +187,7 @@ export default function TourProgramsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Tour Inventory</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Tours &rarr; Tour Inventory</strong> (or <strong>Browse Tours</strong>) is the
+          <strong>Products &rarr; Inventory</strong> (or <strong>Browse Tours</strong>) is the
           catalogue as the team browses it &mdash; inside the app, not a public page. It lists your
           active tours, featured first, with cards for the number of packages, how many have a price,
           the categories, and the lowest starting price.
@@ -203,7 +203,7 @@ export default function TourProgramsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Scheduling Departures</h2>
         <p className="text-gray-600">
-          A tour is the <em>what</em>; <strong>Tour Departures</strong> (Operate &rarr; Tour Departures)
+          A tour is the <em>what</em>; <strong>Departures</strong> (Operate &rarr; Departures)
           is the <em>when</em>. A departure is created on one of your active tours (or under a name of
           its own). See <Link href="/docs/tasks-departures" className="text-primary-600 hover:underline">Tasks, Departures &amp; Capacity</Link>.
         </p>

@@ -31,6 +31,7 @@ export default function FollowupsRemindersPage() {
           <li><strong>Follow-up Type</strong> &mdash; Phone Call, Email, WhatsApp Message, Meeting, Send Quote, Booking Confirmation, Payment Reminder, Request Feedback, or Other. It becomes the follow-up&apos;s title, with the client&apos;s name.</li>
           <li><strong>Due Date</strong> &mdash; a day, today or later</li>
           <li><strong>Priority</strong> &mdash; Low, Medium or High</li>
+          <li><strong>Assigned to</strong> &mdash; who on the team should do it (leave it unassigned for anyone to pick up)</li>
           <li><strong>Notes (Optional)</strong> &mdash; any details or context</li>
           <li>Click <strong>Schedule Follow-up</strong></li>
         </ol>
@@ -41,20 +42,20 @@ export default function FollowupsRemindersPage() {
 
       {/* Dashboard */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">The Follow-up Dashboard</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The Follow-ups Tab</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Follow-ups</strong> in the sidebar (Operate) opens the <strong>Follow-up Dashboard</strong> of everything still pending. It opens on today&apos;s:
+          Open <strong>Tasks</strong> in the sidebar (Operate) and choose the <strong>Follow-ups</strong> tab: the <strong>Follow-up Dashboard</strong> of everything still pending. Managers and admins see every follow-up and can reassign one; members see the ones assigned to them, the ones they created, and the unassigned ones. It opens on today&apos;s:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li><strong>Due Today</strong>, <strong>This Week</strong> (the next seven days), <strong>Overdue</strong> and <strong>All Pending</strong> &mdash; click one to show it</li>
           <li><strong>Filters</strong> by priority and by type (Phone Call, Email, WhatsApp, Meeting, Send Quote)</li>
-          <li><strong>Each follow-up</strong> &mdash; the client (click to open), priority, type, due date (marked Today or Overdue), notes, and the client&apos;s phone and email to call or write</li>
+          <li><strong>Each follow-up</strong> &mdash; the client (click to open), priority, type, due date (marked Today or Overdue), who it is assigned to, notes, and the client&apos;s phone and email to call or write</li>
           <li><strong>Complete</strong>, <strong>Snooze 1 day</strong> or <strong>Snooze 1 week</strong> (from today), and <strong>Delete</strong></li>
         </ul>
         <p className="text-gray-600">
           New follow-ups are made from the client, not here. A follow-up is overdue once its day has passed &mdash; there is no status to set. With nothing to show: <em>&ldquo;All Caught Up!&rdquo;</em>
         </p>
-        <DocScreenshot src="/docs/followups-reminders/followups.jpg" alt="Follow-up Dashboard with Due Today, This Week, Overdue, and All Pending stat cards and the pending list" />
+        <DocScreenshot src="/docs/followups-reminders/followups.jpg" alt="Tasks page, Follow-ups tab: the Follow-up Dashboard with Due Today, This Week, Overdue, and All Pending stat cards and the pending list" />
       </section>
 
       {/* Payment Reminders */}
@@ -74,7 +75,7 @@ export default function FollowupsRemindersPage() {
           <li>The email&apos;s wording follows where the invoice stands: upcoming, due, overdue, and &mdash; long overdue &mdash; urgent</li>
         </ul>
         <p className="text-gray-600 mb-4">
-          Reminders are emails, sent from your company&apos;s address with replies going to your contact email. The days follow your company&apos;s time zone (Settings).
+          Reminders are emails, sent from your company&apos;s address with replies going to your contact email. The days follow your company&apos;s time zone (<strong>Settings &rsaquo; Organization &rsaquo; Company</strong>).
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">The Pending Tab</h3>
@@ -91,7 +92,7 @@ export default function FollowupsRemindersPage() {
           Every reminder sent or attempted: date and time, invoice, recipient, type, <strong>Sent</strong> or <strong>Failed</strong> (with the reason), and subject. Show <strong>All Reminders</strong>, <strong>Sent Only</strong> or <strong>Failed Only</strong>; <strong>Load More</strong> shows older ones. Each invoice&apos;s own reminders are also on its <strong>Reminder History</strong> card.
         </p>
         <Tip>
-          <strong>Send Reminder</strong> on Accounts Receivable opens an email draft in your own mail program; it is not sent or recorded by the app. Payment Reminders are for invoices only &mdash; for anything else, schedule a follow-up on the client.
+          <strong>Send Reminder</strong> on the <strong>Unpaid</strong> tab of Invoices opens an email draft in your own mail program; it is not sent or recorded by the app. Payment Reminders are for invoices only &mdash; for anything else, schedule a follow-up on the client.
         </Tip>
         <DocScreenshot src="/docs/followups-reminders/reminders.jpg" alt="Payment Reminders page with Pending/History tabs, stat tiles, and batch-send selection" />
       </section>

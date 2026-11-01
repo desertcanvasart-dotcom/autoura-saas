@@ -25,7 +25,7 @@ export default function ItinerariesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Itineraries List</h2>
         <p className="text-gray-600 mb-3">
-          Go to <strong>Itineraries</strong> (Sell group, managers and admins):
+          Go to <strong>Itineraries</strong> (Sell section, managers and admins):
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Status cards</strong> &mdash; Total, Draft, Sent, Confirmed, Completed and Cancelled; click one to filter</li>

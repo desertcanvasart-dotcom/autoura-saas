@@ -18,14 +18,22 @@ export default function TasksDeparturesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Tasks, Departures &amp; Capacity</h1>
       <p className="text-gray-600 mb-8">
-        Three tools in the sidebar&apos;s <strong>Operate</strong> group: <strong>Tasks</strong> and <strong>Tour Departures</strong> for managers and admins, and the <strong>Capacity Calendar</strong> for admins.
+        Two links in the sidebar&apos;s <strong>Operate</strong> section: <strong>Tasks</strong>, for everyone who works in the app, and <strong>Departures</strong>, for managers and admins. Departures has two views: the <strong>List</strong> of tour departures and the <strong>Capacity</strong> calendar (admins only).
       </p>
 
       {/* Tasks */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Tasks</h2>
         <p className="text-gray-600 mb-3">
-          The team&apos;s to-do board. Three views, by the icons at the top right: <strong>Kanban</strong> (the default, columns To Do, In Progress and Done), <strong>Table</strong> and <strong>List</strong>.
+          <strong>Tasks</strong> opens a page with two tabs: <strong>Tasks</strong>, the team&apos;s to-do board, and <strong>Follow-ups</strong>, the reminders scheduled on clients (see <Link href="/docs/followups-reminders" className="text-primary-600 hover:underline">Follow-ups &amp; Reminders</Link>). Each tab has its own address, and old links to the Follow-ups page open the Follow-ups tab.
+        </p>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Who Sees Which Tasks</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>Managers and admins</strong> see every task and every follow-up, and can reassign any of them</li>
+          <li><strong>Members</strong> (staff) see the Tasks tab too, but only the tasks assigned to them and the ones nobody is assigned to yet. On the Follow-ups tab they see the follow-ups assigned to them, the ones they created, and the unassigned ones.</li>
+        </ul>
+        <p className="text-gray-600 mb-3">
+          The Tasks tab is the to-do board. Three views, by the icons at the top right: <strong>Kanban</strong> (the default, columns To Do, In Progress and Done), <strong>Table</strong> and <strong>List</strong>.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li><strong>Cards</strong> &mdash; Total, To Do, In Progress, Done, Overdue, Due Today, High Priority (high and urgent) and Archived, across all tasks</li>
@@ -63,9 +71,9 @@ export default function TasksDeparturesPage() {
 
       {/* Departures */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Tour Departures</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Departures: List</h2>
         <p className="text-gray-600 mb-3">
-          Scheduled group departures &mdash; a tour on a date that travellers join. The list opens on <strong>Upcoming</strong>; the filter also offers All, Open, Limited, Full, Guaranteed and Cancelled, and <strong>Search tours&hellip;</strong> finds a tour by name or code. Each row shows the tour, its date and length, <strong>booked/max (N left)</strong> with a bar (yellow from 80%, red when full), the price per person, and its status.
+          Scheduled group departures &mdash; a tour on a date that travellers join. Open <strong>Departures</strong> in the sidebar; it shows the <strong>List</strong> view (the <strong>List</strong> / <strong>Capacity</strong> switch at the top changes it). The list opens on <strong>Upcoming</strong>; the filter also offers All, Open, Limited, Full, Guaranteed and Cancelled, and <strong>Search tours&hellip;</strong> finds a tour by name or code. Each row shows the tour, its date and length, <strong>booked/max (N left)</strong> with a bar (yellow from 80%, red when full), the price per person, and its status.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li><strong>Status</strong> &mdash; change it from the row. As bookings come in it turns <strong>Limited</strong> at 80% and <strong>Full</strong> at 100% by itself, and <strong>Guaranteed</strong> once a guaranteed departure reaches its minimum.</li>
@@ -84,9 +92,9 @@ export default function TasksDeparturesPage() {
 
       {/* Capacity */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Capacity Calendar</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Departures: Capacity</h2>
         <p className="text-gray-600 mb-3">
-          A month calendar of how much you can take on each day, read by the WhatsApp AI. Two views: <strong>General Capacity</strong> and <strong>Tour Departures</strong>.
+          The <strong>Capacity</strong> view of Departures (admins only; formerly the Capacity Calendar) is a month calendar of how much you can take on each day, read by the WhatsApp AI. Old links to the Capacity Calendar open it. It has two views of its own: <strong>General Capacity</strong> and <strong>Tour Departures</strong>.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">General Capacity</h3>
@@ -97,7 +105,7 @@ export default function TasksDeparturesPage() {
           <li>A booking that would go over a day&rsquo;s limit, or fall on a Blackout day, is refused with the days named &mdash; from a quote or by confirming an itinerary (the itinerary is still confirmed). A manager or admin can <strong>Book anyway</strong>.</li>
           <li>Changed dates are marked; <strong>Save N Changes</strong> saves them all. Leaving the page before saving loses them.</li>
         </ul>
-        <DocScreenshot src="/docs/tasks-departures/capacity.jpg" alt="Capacity calendar in General Capacity view showing a month with date statuses (available/limited/busy/blackout) and per-date capacity settings" />
+        <DocScreenshot src="/docs/tasks-departures/capacity.jpg" alt="Departures, Capacity view: General Capacity view showing a month with date statuses (available/limited/busy/blackout) and per-date capacity settings" />
         <Tip>
           <strong>What the WhatsApp AI does with it:</strong> on a <strong>Blackout</strong> date it tells the client you are not operating, with your reason; when a date is full (its groups at its limit) it says the dates are busy and offers others; otherwise it says the dates work. For a trip starting within three days it does not check the calendar and answers that the notice is short.
         </Tip>

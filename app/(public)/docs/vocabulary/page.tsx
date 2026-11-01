@@ -21,7 +21,7 @@ export default function VocabularyPage() {
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Your Vocabulary</h1>
       <p className="text-gray-600 mb-8">
         The choices in your dropdowns &mdash; service tiers, supplier types, vehicles, meal types, guide languages and the
-        rest &mdash; are your own lists. <strong>Settings &rarr; Your Vocabulary</strong> (admins) is where you rename,
+        rest &mdash; are your own lists. <strong>Settings &rsaquo; Catalog &rsaquo; Vocabulary</strong> (admins) is where you rename,
         add, hide, reorder and remove them. They start from a set of Egypt defaults; each company keeps its own.
       </p>
 

@@ -18,7 +18,7 @@ export default function ExtrasPage() {
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Extras &amp; Upgrades</h1>
       <p className="text-gray-600 mb-8">
         The things a traveller can add on top of the trip &mdash; airport fast-track, extra luggage, a late
-        check-out, a balloon ride. You keep them in one list, <strong>Sell &rarr; Extras</strong> (admins and
+        check-out, a balloon ride. You keep them in one list, <strong>Products &rarr; Extras</strong> (admins and
         managers), and add them to a B2B quote or to a booking.
       </p>
 

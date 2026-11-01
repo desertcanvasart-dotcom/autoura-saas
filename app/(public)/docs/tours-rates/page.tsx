@@ -39,10 +39,10 @@ export default function ToursRatesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Tour Inventory</h2>
         <p className="text-gray-600">
-          Ready-made tours are browsed in <strong>Tours &rarr; Tour Inventory</strong> and created and
-          edited in the <strong>Tour Manager</strong> &mdash; both described on{' '}
+          Ready-made tours are browsed in <strong>Products &rarr; Inventory</strong> (Tour Inventory) and created and
+          edited in the <strong>Tour Manager</strong> (<strong>Products &rarr; Tours</strong>) &mdash; both described on{' '}
           <Link href="/docs/tour-programs" className="text-primary-600 hover:underline">Tour Manager</Link>.
-          To schedule dated departures on a tour, use <strong>Operate &rarr; Tour Departures</strong>.
+          To schedule dated departures on a tour, use <strong>Operate &rarr; Departures</strong>.
         </p>
         <DocScreenshot src="/docs/tours-rates/tours-list.jpg" alt="Tour Inventory page with tier and category filters and tour cards" />
       </section>
@@ -51,10 +51,15 @@ export default function ToursRatesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Rates</h2>
         <p className="text-gray-600 mb-4">
-          Your buying rates live under <strong>Suppliers &amp; Rates</strong> (admins and managers), in
-          four groups &mdash; Accommodation, Transport &amp; Tickets, Guides &amp; Services, Costs &mdash;
-          fourteen pages in all, with the <strong>Rates Hub</strong> above them.
+          Your buying rates live under <strong>Suppliers &amp; rates</strong> in the sidebar (admins and managers):
+          fourteen rate sheets in four groups &mdash; Accommodation, Transport &amp; tickets, Guides &amp; services, Costs.
+          There are three ways to reach a sheet:
         </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-4">
+          <li><strong>The sidebar</strong> &mdash; each group is a foldable heading under <strong>Rates overview</strong> and <strong>Rates check</strong>; open it to see its sheets. A group you open stays open.</li>
+          <li><strong>The Rates menu</strong> &mdash; every rate sheet has a menu beside it: <strong>Overview</strong>, then the fourteen sheets by group, each with its count of rates. On a phone it is a picker at the top.</li>
+          <li><strong>&#8984;K</strong> &mdash; type the sheet&apos;s name (&ldquo;hotels&rdquo;, &ldquo;tipping&rdquo;) and press Enter.</li>
+        </ul>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
@@ -91,7 +96,7 @@ export default function ToursRatesPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Currency</h3>
         <p className="text-gray-600">
-          Amounts are in your rates currency (Settings &rarr; Organization) unless a rate says otherwise:
+          Amounts are in your rates currency (Settings &rsaquo; Organization &rsaquo; Company) unless a rate says otherwise:
           each form&rsquo;s <strong>Rate currency</strong> lets one contract be entered in, say, EUR while
           the rest are in EGP. The amount is stored as you typed it; pricing converts it with your
           exchange rates.
@@ -103,16 +108,16 @@ export default function ToursRatesPage() {
           rate has one price, used for both.
         </p>
 
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Rates Hub</h3>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Rates Overview</h3>
         <p className="text-gray-600 mb-3">
-          A read-only overview of your active rates in twelve tabs &mdash; Transport, Guides, Entrances,
-          Hotels, Meals, Cruises, Sleeping trains, Trains, Flights, Airport and Hotel services, and Tipping &mdash;
-          with stats, search and filters (city; category on Entrances; tier and property type on Hotels),
-          and <strong>Export</strong> or <strong>Print</strong> of the tab you are on. Activities and Fixed
-          Costs are on their own pages only. If a tab cannot be loaded, the hub says so rather
-          than showing it empty.
+          <strong>Rates overview</strong> (the page called <strong>Rates</strong>, formerly the Rates Hub) shows what is on file at a glance:
+          <strong> Rates on file</strong>, <strong>Expiring in 30 days</strong> and <strong>Flagged by Rates check</strong> (click it
+          to open the check), then each group with its sheets &mdash; how many rates each holds, when it last changed, and how
+          many expire soon. Click a sheet to open it. <strong>Import sheet</strong> and <strong>Add rate</strong> ask which sheet
+          you mean, since each sheet has its own columns. If the counts cannot be loaded, the page says so rather than showing zeros.
+          The buttons on some sheets and in the Tour Manager that read <strong>&larr; Rates Hub</strong> open this page.
         </p>
-        <DocScreenshot src="/docs/tours-rates/rates-hub.jpg" alt="Rate Management page with stats cards, category tabs, filters, and the rates table" />
+        <DocScreenshot src="/docs/tours-rates/rates-hub.jpg" alt="Earlier Rates Hub page with stats cards, category tabs, filters, and the rates table (now the Rates overview)" />
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Importing rates from a spreadsheet</h3>
         <p className="text-gray-600">

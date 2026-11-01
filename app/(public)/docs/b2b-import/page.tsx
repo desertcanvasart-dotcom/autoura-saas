@@ -25,7 +25,7 @@ export default function B2BImportPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">From the Quote Builder</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open <strong>Quote Builder</strong> (Sell group) &mdash; or <strong>New Quote</strong> on the B2B Quotes page, which opens it in B2B mode</li>
+          <li>Open <strong>Quote Builder</strong> (Sell section) &mdash; or <strong>New Quote</strong> on the B2B quotes tab of Quotes, which opens it in B2B mode</li>
           <li>In the <strong>Pricing</strong> group of the header, switch <strong>B2C</strong> to <strong>B2B</strong>. The markup resets to 10%. Optionally <strong>Select Partner&hellip;</strong> &mdash; the partner&apos;s default margin is then used for the quote.</li>
           <li>Build the trip, or load an existing itinerary</li>
           <li>Click <strong>Save as B2B Quote</strong> (<strong>Update B2B Quote</strong> once the itinerary has been saved)</li>
@@ -44,7 +44,7 @@ export default function B2BImportPage() {
             <strong>Creates the B2B quote</strong> &mdash; or, when the trip already has one in Draft or Sent, reprices that one (the quote&apos;s history keeps the earlier version). Lines the grid priced keep their cost; any line without one is looked up in your rates. The quote&apos;s partner price list covers 2, 4, 6, 8, 10, 12, 15, 20, 25 and 30 travellers plus the trip&apos;s own group size, each priced from your rates at the quote&apos;s margin. The season is set from the start date: December&ndash;April high, July&ndash;August peak, otherwise low.
           </li>
           <li>
-            <strong>Creates a tour template and variation</strong> (once per trip; saving again updates the same template) at the trip&apos;s tier, in <strong>Tours &rarr; Tour Manager</strong>: the day structure &mdash; cities, meals (breakfast included; lunch and dinner from the meal services), cruise days, and each night&apos;s hotel or cruise. The specific hotels and prices are not copied.
+            <strong>Creates a tour template and variation</strong> (once per trip; saving again updates the same template) at the trip&apos;s tier, in <strong>Products &rarr; Tours</strong> (the Tour Manager): the day structure &mdash; cities, meals (breakfast included; lunch and dinner from the meal services), cruise days, and each night&apos;s hotel or cruise. The specific hotels and prices are not copied.
           </li>
           <li>
             <strong>Opens the B2B Calculator</strong> on the variation and on this quote (its button reads <strong>Update Quote</strong>, and saving there reprices the same quote), a second later, with the message <em>&ldquo;Saved as &hellip; + B2B Quote &hellip; &mdash; Redirecting to B2B Calculator&hellip;&rdquo;</em>. See <Link href="/docs/b2b-pricing" className="text-primary-600 hover:underline">B2B Pricing</Link>.
@@ -77,7 +77,7 @@ export default function B2BImportPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Where to Find It</h2>
         <p className="text-gray-600">
-          The quote is in <strong>Sell &rarr; B2B Quotes</strong>, with the quotes saved from the calculator; the template is in <strong>Tours &rarr; Tour Manager</strong>. Both, and the B2B Calculator, are for managers and admins.
+          The quote is on the <strong>B2B quotes</strong> tab of <strong>Sell &rarr; Quotes</strong>, with the quotes saved from the calculator; the template is in <strong>Products &rarr; Tours</strong> (the Tour Manager). Both, and the B2B Calculator, are for managers and admins.
         </p>
         <Tip>
           A trip has one B2B quote and one template: saving again updates them while the quote is a Draft or Sent. Once it is Accepted, Rejected or Expired, the next save makes a new quote.

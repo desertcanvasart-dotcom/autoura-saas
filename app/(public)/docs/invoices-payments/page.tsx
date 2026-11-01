@@ -27,16 +27,50 @@ export default function InvoicesPaymentsPage() {
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Invoices &amp; Payments</h1>
       <p className="text-gray-600 mb-8">
         The money in &mdash; invoices, payments, receipts, what clients owe &mdash; and the money out to suppliers:
-        their invoices and what you owe them. Finance is in the sidebar for managers and admins. Members open an
-        invoice or a payment from their own trips, and can create and send invoices and record payments; deleting
-        any of them is for managers and admins. Viewers see none of it.
+        their bills and what you owe them. It all lives in the sidebar&rsquo;s <strong>Finance</strong> section. Members
+        see Invoices, Payments and Receipts, can create and send invoices and record payments; the Receivables,
+        Supplier bills and Payables links, and deleting anything, are for managers and admins. Viewers see none of it.
       </p>
+
+      {/* Where things are */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Where things are</h2>
+        <p className="text-gray-600 mb-3">
+          Three pages, each with two tabs. Every tab also has its own link in the Finance section, and its own address,
+          so a bookmark opens the right one; old links to Accounts Receivable, Receipts, Supplier Invoices and Accounts
+          Payable open the matching tab.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left px-4 py-3 font-semibold text-gray-900 border-b border-gray-200">Page</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-900 border-b border-gray-200">Tabs (sidebar link)</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-700">
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2.5 font-medium whitespace-nowrap">Invoices</td>
+                <td className="px-4 py-2.5"><strong>All</strong> (Invoices) &middot; <strong>Unpaid</strong> (Receivables &mdash; managers and admins)</td>
+              </tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <td className="px-4 py-2.5 font-medium whitespace-nowrap">Payments</td>
+                <td className="px-4 py-2.5"><strong>Payments</strong> (Payments) &middot; <strong>Receipts</strong> (Receipts)</td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2.5 font-medium whitespace-nowrap">Supplier bills</td>
+                <td className="px-4 py-2.5"><strong>Bills</strong> (Supplier bills) &middot; <strong>Payables</strong> (Payables) &mdash; managers and admins</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {/* Invoices */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The invoice list</h2>
         <p className="text-gray-600 mb-3">
-          Seven cards at the top: <strong>Total</strong> invoices, <strong>Deposits</strong>, <strong>Finals</strong>,{' '}
+          The <strong>All</strong> tab of Invoices. Seven cards at the top: <strong>Total</strong> invoices, <strong>Deposits</strong>, <strong>Finals</strong>,{' '}
           <strong>Billed</strong>, <strong>Paid</strong>, <strong>Outstanding</strong> and <strong>Overdue</strong>. Money is
           shown per currency, never added across currencies. Billed and Outstanding count what was sent: drafts and
           cancelled invoices are left out.
@@ -47,7 +81,7 @@ export default function InvoicesPaymentsPage() {
           <li><strong>Overdue</strong> is worked out from the due date: a sent invoice with a balance after its due date. A draft is never overdue.</li>
           <li>Search by invoice number, client name or email.</li>
         </ul>
-        <DocScreenshot src="/docs/invoices-payments/invoices-list.jpg" alt="Invoices list page with summary cards, status filters, and invoice table" />
+        <DocScreenshot src="/docs/invoices-payments/invoices-list.jpg" alt="Invoices, All tab, with summary cards, status filters, and invoice table" />
       </section>
 
       {/* Creating */}
@@ -60,7 +94,7 @@ export default function InvoicesPaymentsPage() {
             name &mdash; and added as a client if there is none. Once it exists, the same menu opens it.
           </li>
           <li>
-            <strong>On the Invoices page</strong> &mdash; <strong>New Invoice</strong>: pick the client, link a trip if you like,
+            <strong>On the Invoices page</strong> (All tab) &mdash; <strong>New Invoice</strong>: pick the client, link a trip if you like,
             add the lines, tax and discount. The currency starts as your agency&rsquo;s. A total of 0 or less is refused.
           </li>
         </ul>
@@ -72,7 +106,7 @@ export default function InvoicesPaymentsPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Standard, deposit and final</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Standard</strong> &mdash; the whole amount.</li>
-          <li><strong>Deposit</strong> &mdash; a share of the trip. The percentage starts from your deposit rule in <strong>Settings &rarr; Payment terms</strong>, and can be changed on the invoice.</li>
+          <li><strong>Deposit</strong> &mdash; a share of the trip. The percentage starts from your deposit rule in <strong>Settings &rsaquo; Organization &rsaquo; Company</strong> (Deposit %), and can be changed on the invoice.</li>
           <li><strong>Final</strong> &mdash; the rest, created from the deposit invoice once the deposit is paid.</li>
         </ul>
         <p className="mt-3 text-gray-600">A deposit and its final invoice show a banner linking each to the other.</p>
@@ -134,7 +168,7 @@ export default function InvoicesPaymentsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Payments</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Payments</strong> lists every payment in one place: those recorded on invoices and those recorded on
+          The <strong>Payments</strong> tab of Payments lists every payment in one place: those recorded on invoices and those recorded on
           trips. Each row shows the date, where it came from, the invoice or trip, the client, the amount, the method
           and the reference, and opens the invoice or the trip.
         </p>
@@ -143,26 +177,26 @@ export default function InvoicesPaymentsPage() {
           <li><strong>Total Received</strong> and <strong>This Month</strong> count completed payments only &mdash; not pending, failed or refunded ones.</li>
           <li><strong>New Payment</strong> records a payment against an invoice or a trip (one or the other is needed).</li>
         </ul>
-        <DocScreenshot src="/docs/invoices-payments/payments-list.jpg" alt="Payment Tracking page with unified invoice and itinerary payments, source and method filters" />
+        <DocScreenshot src="/docs/invoices-payments/payments-list.jpg" alt="Payments, Payments tab: unified invoice and itinerary payments, source and method filters" />
       </section>
 
       {/* Receipts */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Receipts</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Receipts</strong> lists a receipt for every invoice payment and every completed trip payment, with{' '}
+          The <strong>Receipts</strong> tab of Payments (the <strong>Receipts</strong> link in the sidebar) lists a receipt for every invoice payment and every completed trip payment, with{' '}
           <strong>Total Receipts</strong>, <strong>Total Received</strong> and <strong>Received This Month</strong>. Download a
           receipt, or send it on WhatsApp when the client has a phone number. A receipt can also be downloaded from
           the invoice page.
         </p>
-        <DocScreenshot src="/docs/invoices-payments/receipts.jpg" alt="Receipts page with totals cards, search, and per-payment receipt downloads" />
+        <DocScreenshot src="/docs/invoices-payments/receipts.jpg" alt="Payments, Receipts tab, with totals cards, search, and per-payment receipt downloads" />
       </section>
 
       {/* Receivables */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Receivables</h2>
         <p className="text-gray-600 mb-3">
-          What clients owe: every sent invoice with a balance, grouped <strong>By Client</strong> or listed{' '}
+          The <strong>Unpaid</strong> tab of Invoices (the <strong>Receivables</strong> link in the sidebar; managers and admins). What clients owe: every sent invoice with a balance, grouped <strong>By Client</strong> or listed{' '}
           <strong>By Invoice</strong>. Drafts are not owed yet and are left out.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
@@ -170,14 +204,14 @@ export default function InvoicesPaymentsPage() {
           <li>Filter by aging, search, and open a client to see their invoices.</li>
           <li><strong>Send Reminder</strong> opens a reminder email in your own mail program (the app&rsquo;s own reminders are on the Payment Reminders page).</li>
         </ul>
-        <DocScreenshot src="/docs/invoices-payments/accounts-receivable.jpg" alt="Accounts Receivable aging report with aging buckets" />
+        <DocScreenshot src="/docs/invoices-payments/accounts-receivable.jpg" alt="Invoices, Unpaid tab: the receivables aging report with aging buckets" />
       </section>
 
       {/* Payables */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Payables</h2>
         <p className="text-gray-600 mb-3">
-          What you owe suppliers, read from your <Link href="/docs/expenses-commissions" className="text-primary-600 hover:underline">expenses</Link>{' '}
+          The <strong>Payables</strong> tab of Supplier bills (the <strong>Payables</strong> link in the sidebar). What you owe suppliers, read from your <Link href="/docs/expenses-commissions" className="text-primary-600 hover:underline">expenses</Link>{' '}
           that are pending or approved. A supplier invoice that no expense is linked to does not appear here &mdash; see
           the next section.
         </p>
@@ -189,16 +223,16 @@ export default function InvoicesPaymentsPage() {
           </li>
           <li>Three views: <strong>By Supplier</strong>, <strong>By Expense</strong> and <strong>Payment History</strong> (the last 50 paid expenses).</li>
           <li>Filter by aging, supplier type and status (Pending Approval, Approved); search suppliers or expenses.</li>
-          <li><strong>Approve</strong> a pending expense, then <strong>Mark as Paid</strong>. Marking an expense paid here does not mark its supplier invoice paid &mdash; pay the supplier invoice on its own page, which pays its expenses too.</li>
+          <li><strong>Approve</strong> a pending expense, then <strong>Mark as Paid</strong>. Marking an expense paid here does not mark its supplier invoice paid &mdash; pay the supplier bill on its own page (Bills tab), which pays its expenses too.</li>
         </ul>
-        <DocScreenshot src="/docs/invoices-payments/accounts-payable.jpg" alt="Accounts Payable aging report with supplier type and status filters" />
+        <DocScreenshot src="/docs/invoices-payments/accounts-payable.jpg" alt="Supplier bills, Payables tab: the aging report with supplier type and status filters" />
       </section>
 
       {/* Supplier invoices */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Supplier invoices</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Supplier bills</h2>
         <p className="text-gray-600 mb-3">
-          The bills your suppliers send you, matched against your expenses, approved and paid.
+          The <strong>Bills</strong> tab of <strong>Supplier bills</strong>: the invoices your suppliers send you, matched against your expenses, approved and paid. Each bill keeps its own page.
         </p>
         <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Adding one</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
@@ -226,7 +260,7 @@ export default function InvoicesPaymentsPage() {
           yet paid can be cancelled.
         </p>
         <Tip>The cards count every bill, with the total per currency.</Tip>
-        <DocScreenshot src="/docs/invoices-payments/supplier-invoices.jpg" alt="Supplier Invoices page with upload, AI extraction, statuses and match states" />
+        <DocScreenshot src="/docs/invoices-payments/supplier-invoices.jpg" alt="Supplier bills, Bills tab, with upload, AI extraction, statuses and match states" />
       </section>
 
       {/* Previous / next — from the docs order (pager.tsx) */}

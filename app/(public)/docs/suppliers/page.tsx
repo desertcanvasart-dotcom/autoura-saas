@@ -20,15 +20,37 @@ export default function SuppliersPage() {
       <p className="text-gray-600 mb-8">
         The Suppliers page is your directory of every company and person you buy from &mdash; hotels,
         transport companies, guides, cruise lines, restaurants and more. Find it under{' '}
-        <strong>Suppliers &amp; Rates &rarr; Suppliers</strong> (admins and managers).
+        <strong>Suppliers &amp; rates &rarr; Suppliers</strong> in the sidebar (admins and managers).
       </p>
+
+      {/* Tabs */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">My suppliers and Network</h2>
+        <p className="text-gray-600 mb-3">The page has two tabs:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>My suppliers</strong> &mdash; your own directory, described on the rest of this page. It is the tab Suppliers opens on.</li>
+          <li>
+            <strong>Network</strong> &mdash; the shared Autoura network: verified suppliers who chose to be found by other agencies.
+            Search by <strong>City</strong>, <strong>Language</strong> and <strong>Words</strong> (name or about), then{' '}
+            <strong>Add to my suppliers</strong>; a supplier already added shows <strong>On your list</strong>. Once added, ask them
+            like any supplier and agree each price with them &mdash; other agencies never see your rates or notes, and you never see theirs.
+            The <strong>Supplier network</strong> link in the sidebar opens this tab directly, and old links to Network Suppliers land here.
+          </li>
+        </ul>
+        <p className="text-gray-600">
+          Whether you book from your own list, the network, or both is set in{' '}
+          <strong>Settings &rsaquo; Organization &rsaquo; Supplier network</strong> (admins change it, managers can read it). The same
+          page lists suppliers waiting for you to confirm their sign-in. If network search is switched off for your agency, the Network
+          tab says so and links to Settings.
+        </p>
+      </section>
 
       {/* Types */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Supplier types</h2>
         <p className="text-gray-600 mb-3">
           The types are <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">your own</Link>{' '}
-          (Settings &rarr; Your vocabulary &rarr; Supplier types). The starter list has Hotel,
+          (Settings &rsaquo; Catalog &rsaquo; Vocabulary &rarr; Supplier types). The starter list has Hotel,
           Transport Company, Driver, Guide, Cruise, Train Operator, Airline, Activity Provider,
           Attraction, Tour Operator, Ground Handler, Restaurant, Shop and Other; rename, hide or add
           your own. A supplier can fill <strong>several</strong> roles &mdash; a ground handler that
@@ -43,6 +65,7 @@ export default function SuppliersPage() {
       {/* Browsing */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The directory</h2>
+        <p className="text-gray-600 mb-3">On the <strong>My suppliers</strong> tab:</p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
           <li><strong>Views</strong> &mdash; grid, table and list, with pages of 12 or more</li>
           <li><strong>Type tabs</strong> &mdash; the chosen type is kept in the address, so a filtered view can be bookmarked</li>
@@ -65,7 +88,7 @@ export default function SuppliersPage() {
           details (contact name, email, phone, a second phone, WhatsApp, website, address, city), the
           commission &mdash; a rate, and whether you receive it or pay it &mdash; payment terms, status
           and notes. The form is the same for every type. The country is your agency&rsquo;s operating
-          country (Settings &rarr; Organization); the cities are your destination cities.
+          country (Settings &rsaquo; Organization &rsaquo; Company); the cities are your destination cities.
         </p>
         <p className="text-gray-600">
           Saving a hotel, cruise company or train operator opens its <strong>Properties</strong> tab, so
@@ -173,8 +196,8 @@ export default function SuppliersPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Suppliers and money</h2>
         <p className="text-gray-600">
-          What suppliers bill you is recorded under <strong>Supplier Invoices</strong> and what you owe
-          under <strong>Payables</strong> &mdash; see{' '}
+          What suppliers bill you is recorded on the <strong>Bills</strong> tab of <strong>Supplier bills</strong> and what you owe
+          on its <strong>Payables</strong> tab (both in the sidebar&rsquo;s Finance section) &mdash; see{' '}
           <Link href="/docs/invoices-payments" className="text-primary-600 hover:underline">Invoices &amp; Payments</Link>.
           Their rates are on the rate pages of this group &mdash; see{' '}
           <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>.

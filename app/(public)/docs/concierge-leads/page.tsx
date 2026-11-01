@@ -33,7 +33,7 @@ export default function ConciergeLeadsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Overview</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Concierge Leads</strong> in the sidebar &mdash; in the <strong>Communicate</strong> group, below Conversations, Inbox and WhatsApp. Briefs arrive automatically &mdash; there is nothing to import. The page is organized into tabs, each with its count:
+          Open <strong>Leads</strong> in the sidebar &mdash; in the <strong>Communicate</strong> section, below Inbox, Email and WhatsApp. Briefs arrive automatically &mdash; there is nothing to import. The page is organized into tabs, each with its count:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Needs Review</strong> (opens first) &mdash; New briefs nobody has picked up yet, and briefs the visitor has since <strong>updated</strong> (an update reopens the lead)</li>

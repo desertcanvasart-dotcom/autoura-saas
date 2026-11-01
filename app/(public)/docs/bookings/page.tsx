@@ -41,7 +41,7 @@ export default function BookingsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Bookings List</h2>
         <p className="text-gray-600 mb-3">
-          Go to <strong>Bookings</strong> in the sidebar (Sell group):
+          Go to <strong>Bookings</strong> in the sidebar (Sell section):
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Tabs</strong> &mdash; <strong>All Bookings</strong>, <strong>B2C (Direct Clients)</strong> and <strong>B2B (Partners)</strong>. Bookings made from an itinerary show under All Bookings.</li>
@@ -135,7 +135,7 @@ export default function BookingsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Booking Calendar</h2>
         <p className="text-gray-600">
-          <strong>Booking Calendar</strong> (Sell group) shows your trips by month, by week or as a timeline, with filters, stats and an export. Drag a trip to move its dates, and assign guides and vehicles &mdash; the calendar warns about overlaps.
+          <strong>Calendar</strong> in the sidebar (Sell section; every role, viewers included) is the Booking Calendar. It shows your trips by month, by week or as a timeline, with filters, stats and an export. Drag a trip to move its dates, and assign guides and vehicles &mdash; the calendar warns about overlaps.
         </p>
       </section>
 

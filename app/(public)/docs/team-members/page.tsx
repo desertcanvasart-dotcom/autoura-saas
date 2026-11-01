@@ -12,14 +12,14 @@ export default function TeamMembersDocPage() {
       <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/docs" className="hover:text-primary-600 transition-colors">Docs</Link>
         <ChevronRight className="w-4 h-4" />
-        <span className="text-gray-900 font-medium">Team Members</span>
+        <span className="text-gray-900 font-medium">Staff Directory</span>
       </nav>
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">Team Members</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-4">Staff Directory</h1>
       <p className="text-gray-600 mb-8">
-        Your staff directory, under <strong>People &rarr; Team Members</strong>: the guides, drivers and office staff
+        Your staff directory (formerly Team Members): <strong>Team</strong> in the sidebar&rsquo;s Contacts section, or <strong>Settings &rsaquo; Organization &rsaquo; Staff directory</strong> &mdash; the same page. It lists the guides, drivers and office staff
         that trips, tasks and WhatsApp chats are assigned to. Adding someone here does <strong>not</strong> give them a
-        login &mdash; logins and their permissions are in <strong>User Management</strong> (see{' '}
+        login &mdash; logins and their permissions are in <strong>Settings &rsaquo; Team &amp; roles</strong> (see{' '}
         <Link href="/docs/team-settings" className="text-primary-600 hover:underline">Team &amp; Settings</Link>).
         Admins and managers see and edit the directory.
       </p>
@@ -29,9 +29,9 @@ export default function TeamMembersDocPage() {
         <p className="text-gray-600 mb-3">
           The counts at the top give the active members and how many hold each role. Search by name or email, filter by role or
           department, and tick <strong>Show inactive</strong> to see deactivated members. <strong>Manage departments</strong>{' '}
-          opens the department list.
+          opens the department list (<strong>Settings &rsaquo; Organization &rsaquo; Departments</strong>).
         </p>
-        <DocScreenshot src="/docs/team-settings/team-members.jpg" alt="Team Members staff directory with job-title roles, departments, and filters" />
+        <DocScreenshot src="/docs/team-settings/team-members.jpg" alt="Staff directory with job-title roles, departments, and filters" />
       </section>
 
       <section className="mb-10">

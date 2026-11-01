@@ -25,7 +25,7 @@ export default function MessageTemplatesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing Templates</h2>
         <p className="text-gray-600 mb-3">
-          Go to <strong>Message Templates</strong> in the sidebar (Communicate group). Each card shows the template&apos;s name, category and subcategory, a channel icon, its language flag, the start of the message, and a <strong>v2</strong>, <strong>v3</strong>&hellip; badge once it has been edited.
+          Go to <strong>Message templates</strong> in the sidebar (Communicate section) &mdash; the same page is also in <strong>Settings &rsaquo; Messaging &rsaquo; Message templates</strong>. Each card shows the template&apos;s name, category and subcategory, a channel icon, its language flag, the start of the message, and a <strong>v2</strong>, <strong>v3</strong>&hellip; badge once it has been edited.
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
           <li><strong>Search templates&hellip;</strong> finds templates by name, description, or content</li>
@@ -146,7 +146,7 @@ export default function MessageTemplatesPage() {
           <li>Click <strong>Send WhatsApp</strong>, <strong>Send SMS</strong> or <strong>Send Email</strong></li>
         </ol>
         <p className="text-gray-600 mt-3">
-          Email goes out from your own connected Gmail (connect it under <strong>Settings &rarr; Email</strong>); WhatsApp from your company&apos;s WhatsApp number.
+          Email goes out from your own connected Gmail (connect it under <strong>Settings &rsaquo; Account &rsaquo; Email &amp; signature</strong>); WhatsApp from your company&apos;s WhatsApp number.
         </p>
         <ScreenshotPlaceholder caption="Send template dialog with recipient selection, Fill Placeholders, and the preview" />
 
@@ -160,7 +160,7 @@ export default function MessageTemplatesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Templates in the Inbox</h2>
         <p className="text-gray-600">
-          When you compose or reply in the email <strong>Inbox</strong>, the <strong>Templates</strong> menu lists your Customer, B2B Partner and Internal templates. Pick one, fill its placeholders from the client, partner or itinerary, and click <strong>Apply Template</strong>. WhatsApp-only templates are greyed out there.
+          When you compose or reply on the Inbox&apos;s <strong>Email</strong> tab, the <strong>Templates</strong> menu lists your Customer, B2B Partner and Internal templates. Pick one, fill its placeholders from the client, partner or itinerary, and click <strong>Apply Template</strong>. WhatsApp-only templates are greyed out there.
         </p>
       </section>
 
