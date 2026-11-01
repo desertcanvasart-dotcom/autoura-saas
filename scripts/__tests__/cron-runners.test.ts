@@ -263,6 +263,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/client-day-reminders': { body: JSON.stringify({ success: true, bookings: 0, nudged: 0, failures: [] }) },
+      '/api/cron/network-paper-reminders': { body: JSON.stringify({ success: true, reminded: 0, no_email: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: OK_INVOICES },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })
@@ -273,8 +274,9 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     expect(hits).toContain('/api/cron/send-reminders')
     expect(hits).toContain('/api/cron/task-reminders')
     expect(hits).toContain('/api/cron/purge-closed-companies')
-    expect(auth).toEqual(['Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh'])
+    expect(auth).toEqual(['Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh', 'Bearer shh'])
     expect(hits).toContain('/api/cron/client-day-reminders')
+    expect(hits).toContain('/api/cron/network-paper-reminders')
     expect(hits).toContain('/api/cron/service-booking-done')
     expect(result.stdout).toContain('purge-closed-companies ok')
     expect(result.stdout).toContain('send-reminders ok')
@@ -288,6 +290,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/client-day-reminders': { body: JSON.stringify({ success: true, bookings: 0, nudged: 0, failures: [] }) },
+      '/api/cron/network-paper-reminders': { body: JSON.stringify({ success: true, reminded: 0, no_email: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'No reminders to send', processed: 0 }) },
       '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'Task reminders sent: 0 due soon, 0 overdue', results: { dueSoon: 0, overdue: 0, errors: [] } }) },
     })
@@ -301,6 +304,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/client-day-reminders': { body: JSON.stringify({ success: true, bookings: 0, nudged: 0, failures: [] }) },
+      '/api/cron/network-paper-reminders': { body: JSON.stringify({ success: true, reminded: 0, no_email: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'Processed 4 reminders', sent: 1, failed: 3, skipped: 0 }) },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })
@@ -315,6 +319,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/client-day-reminders': { body: JSON.stringify({ success: true, bookings: 0, nudged: 0, failures: [] }) },
+      '/api/cron/network-paper-reminders': { body: JSON.stringify({ success: true, reminded: 0, no_email: 0, failures: [] }) },
       '/api/cron/send-reminders': { body: OK_INVOICES },
       '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'done', results: { dueSoon: 0, overdue: 0, errors: ['Due soon query error: boom'] } }) },
     })
@@ -330,6 +335,7 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
       '/api/cron/purge-closed-companies': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },
       '/api/cron/service-booking-done': { body: JSON.stringify({ success: true, done: 0, failures: [] }) },
       '/api/cron/client-day-reminders': { body: JSON.stringify({ success: true, bookings: 0, nudged: 0, failures: [] }) },
+      '/api/cron/network-paper-reminders': { body: JSON.stringify({ success: true, reminded: 0, no_email: 0, failures: [] }) },
       '/api/cron/send-reminders': { status: 500, body: 'kaboom' },
       '/api/cron/task-reminders': { body: OK_TASKS },
     })

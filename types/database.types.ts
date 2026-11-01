@@ -9952,6 +9952,8 @@ export interface Database {
           updated_at: string
           search_cities: string[] | null
           search_languages: string[] | null
+          papers_reminded_at: string | null
+          papers_reminder_count: number
         }
         Insert: {
           account_id: string
@@ -9969,6 +9971,8 @@ export interface Database {
           updated_at?: string
           search_cities?: string[] | null
           search_languages?: string[] | null
+          papers_reminded_at?: string | null
+          papers_reminder_count?: number
         }
         Update: {
           account_id?: string
@@ -9986,6 +9990,8 @@ export interface Database {
           updated_at?: string
           search_cities?: string[] | null
           search_languages?: string[] | null
+          papers_reminded_at?: string | null
+          papers_reminder_count?: number
         }
         Relationships: [
           {

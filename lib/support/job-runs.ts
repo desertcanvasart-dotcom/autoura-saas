@@ -30,6 +30,7 @@ export type JobName =
   | 'service-booking-deadlines'
   | 'service-booking-done'
   | 'client-day-reminders'
+  | 'network-paper-reminders'
 
 export { STALE_AFTER_HOURS }
 
