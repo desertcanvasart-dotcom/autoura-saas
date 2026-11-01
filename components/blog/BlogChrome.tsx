@@ -47,6 +47,7 @@ export function BlogFooter() {
           <CookieSettingsLink className="hover:text-stone-700" />
           <Link href="/terms" className="hover:text-stone-700">Terms</Link>
           <Link href="/contact" className="hover:text-stone-700">Contact</Link>
+          <Link href="/supplier-login" className="hover:text-stone-700">Supplier sign-in</Link>
         </nav>
       </div>
     </footer>

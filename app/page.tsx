@@ -987,7 +987,7 @@ export default function AutouraHomepage() {
             <div className="flex items-center gap-2">
               <img src="/get-autoura-logo.png" alt="Autoura" className="h-10 w-auto max-w-none object-contain" />
             </div>
-            <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
+            <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-8 text-sm text-stone-500">
               <Link href="/pricing" className="hover:text-stone-700 transition-colors">Pricing</Link>
               <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
               <Link href="/docs" className="hover:text-stone-700 transition-colors">Docs</Link>
@@ -997,6 +997,7 @@ export default function AutouraHomepage() {
               <CookieSettingsLink className="hover:text-stone-700 transition-colors" />
               <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
               <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
+              <Link href="/supplier-login" className="hover:text-stone-700 transition-colors">Supplier sign-in</Link>
             </div>
             <p className="text-sm text-stone-400">
               © {new Date().getFullYear()} Autoura. Built in Cairo.
