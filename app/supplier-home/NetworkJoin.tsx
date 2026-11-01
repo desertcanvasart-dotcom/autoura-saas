@@ -87,7 +87,13 @@ export default function NetworkJoin() {
 
   const save = async () => {
     const d = await call({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: name, kinds, cities, languages, about, listed }) })
-    if (d) { setUnmatched([]); setMsg({ ok: true, text: d.rechecking ? 'Saved — sent for checking again (name or kinds changed)' : 'Saved' }); void load() }
+    if (d) {
+      setUnmatched([])
+      const next = d.rechecking ? 'Saved — sent for checking again (name or kinds changed)'
+        : listed && (status === 'unverified' || status === 'rejected') ? 'Saved. To appear in the network, upload your papers and press Send for checking.'
+        : 'Saved'
+      setMsg({ ok: true, text: next }); void load()
+    }
   }
   const submit = async () => {
     const d = await call({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submit: true }) })
@@ -113,7 +119,14 @@ export default function NetworkJoin() {
     <section className="space-y-3">
       <h2 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Join the Autoura network</h2>
       <p className="text-sm text-gray-600">Let other agencies on Autoura find you. They see only what you write here — never your phone, email or prices. If they add you, they ask you here like the agencies you already work with, and agree each price with you.</p>
-      <p className={`text-sm font-medium ${statusColor}`}>{VERIFICATION_LABEL[status] ?? status}</p>
+      <p className={`text-sm font-medium ${statusColor}`}>
+        {status === 'verified' && !listed ? 'Verified — hidden from other agencies (tick “Let agencies find me” and Save)' : (VERIFICATION_LABEL[status] ?? status)}
+      </p>
+      {status === 'pending' && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          The Autoura team is checking your papers. You appear in the network as soon as they approve them — we will email you.
+        </p>
+      )}
       {(status === 'unverified' || status === 'rejected') && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
           <b>Other agencies can’t find you yet.</b> Save your profile, upload your papers below, then press <b>Send for checking</b>. Once the Autoura team has checked them, you appear in the network.
@@ -146,9 +159,16 @@ export default function NetworkJoin() {
         <label className="block text-gray-700">About you (optional)
           <textarea value={about} onChange={e => setAbout(e.target.value)} maxLength={1000} rows={3} className="mt-1 w-full" />
         </label>
-        <label className="flex items-center gap-2 text-gray-700">
-          <input type="checkbox" checked={listed} onChange={e => setListed(e.target.checked)} />
-          Let agencies find me (you can turn this off any time)
+        {/* Being found needs BOTH this box and Autoura's check of the papers
+            (operator, 2026-11-01: ticking alone looked like it should be enough). */}
+        <label className="flex items-start gap-2 text-gray-700">
+          <input type="checkbox" checked={listed} onChange={e => setListed(e.target.checked)} className="mt-0.5" />
+          <span>
+            Let agencies find me{status === 'verified' ? '' : ' once Autoura has checked my papers'}
+            <span className="block text-xs text-gray-500">
+              {status === 'verified' ? 'You can turn this off any time.' : 'Ticking this is not enough on its own: upload your papers and press Send for checking below. You can turn this off any time.'}
+            </span>
+          </span>
         </label>
         <button type="button" disabled={busy} onClick={save} className="w-full rounded-xl py-3 font-semibold bg-gray-900 text-white disabled:opacity-50">Save</button>
       </div>
@@ -179,6 +199,9 @@ export default function NetworkJoin() {
         <button type="button" disabled={busy || papers.length === 0} onClick={submit} className="w-full rounded-xl py-3 font-semibold bg-green-600 text-white disabled:opacity-50">
           Send for checking
         </button>
+      )}
+      {status !== 'verified' && status !== 'pending' && papers.length === 0 && (
+        <p className="text-xs text-gray-500 text-center">Upload at least one paper (licence or vehicle papers) to send for checking.</p>
       )}
       {msg && <p className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>{msg.text}</p>}
     </section>
