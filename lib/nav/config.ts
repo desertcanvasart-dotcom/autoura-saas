@@ -30,6 +30,7 @@ import {
   Percent,
   ChartLine,
   Settings,
+  Shield,
   Sparkles,
   Hotel,
   Ship,
@@ -305,6 +306,18 @@ export const MAIN_NAV: NavSection[] = [
 export const SETTINGS_LINK: NavItem = {
   label: 'Settings', href: '/settings/profile', icon: Settings, roles: ALL_AND_VIEWER,
   match: ['/settings'],
+}
+
+/**
+ * The Autoura platform panel, for platform staff only (useAuth().isSuperAdmin
+ * decides; the role list is unused). Pinned above Settings and in ⌘K, as well
+ * as in the account menu (operator, 2026-11-01: the old Super Admin button was
+ * missed after the menu moved).
+ */
+export const PLATFORM_ADMIN_LINK: NavItem = {
+  label: 'Platform admin', href: '/super-admin', icon: Shield, roles: ALL_AND_VIEWER,
+  match: ['/super-admin'],
+  keywords: ['super admin', 'platform', 'network verification'],
 }
 
 // ============================================

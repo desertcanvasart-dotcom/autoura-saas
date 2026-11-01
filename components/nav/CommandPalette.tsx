@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Search, User, CornerDownLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useRole } from '@/hooks/useRole'
+import { useAuth } from '@/app/contexts/AuthContext'
 import {
   MAIN_NAV,
   SETTINGS_NAV,
   RATE_GROUPS,
   RATES_ROLES,
   JUMP_ONLY_PAGES,
+  PLATFORM_ADMIN_LINK,
   canSee,
   rateCategoryHref,
 } from '@/lib/nav/config'
@@ -29,7 +31,7 @@ export interface JumpEntry {
 }
 
 /** Every page a role may open, in the order ⌘K lists them when nothing is typed. */
-export function jumpEntriesFor(role: PermissionRole): JumpEntry[] {
+export function jumpEntriesFor(role: PermissionRole, opts: { platformStaff?: boolean } = {}): JumpEntry[] {
   const out: JumpEntry[] = []
   for (const section of MAIN_NAV) {
     for (const item of section.items) {
@@ -53,6 +55,10 @@ export function jumpEntriesFor(role: PermissionRole): JumpEntry[] {
   for (const page of JUMP_ONLY_PAGES) {
     if (!canSee(page.roles, role)) continue
     out.push({ label: page.label, href: page.href, icon: page.icon, hint: page.hint, keywords: page.keywords ?? [] })
+  }
+  if (opts.platformStaff) {
+    const p = PLATFORM_ADMIN_LINK
+    out.push({ label: p.label, href: p.href, icon: p.icon, hint: 'Platform staff', keywords: p.keywords ?? [] })
   }
   // One entry per address (a page can be both a sidebar link and a tab).
   return out.filter((e, i) => out.findIndex(o => o.href === e.href) === i)
@@ -89,7 +95,8 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
-  const pages = useMemo(() => jumpEntriesFor(role), [role])
+  const { isSuperAdmin } = useAuth()
+  const pages = useMemo(() => jumpEntriesFor(role, { platformStaff: isSuperAdmin }), [role, isSuperAdmin])
   const pageHits = useMemo(() => rankJump(pages, query).slice(0, query ? 12 : 40), [pages, query])
 
   // Records: clients by name, email, phone or code (the one list API that

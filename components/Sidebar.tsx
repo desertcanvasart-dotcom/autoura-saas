@@ -7,7 +7,7 @@ import { ChevronDown } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useRole } from '@/hooks/useRole'
 import { useInboxUnreadCount, useTeamBadges } from '@/lib/use-inbox-unread'
-import { mainNavFor, activeHref, sectionItems, SETTINGS_LINK, LAST_APP_PATH_KEY, type NavBadge, type NavItem } from '@/lib/nav/config'
+import { mainNavFor, activeHref, sectionItems, SETTINGS_LINK, PLATFORM_ADMIN_LINK, LAST_APP_PATH_KEY, type NavBadge, type NavItem } from '@/lib/nav/config'
 
 // The main sidebar, built from lib/nav/config.ts — no link is written here.
 // Setup lives in the Settings area (its own layout); the account and
@@ -39,7 +39,7 @@ export const ICON_PROPS = { size: 18, strokeWidth: 1.7 } as const
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const search = useSearchParams()?.toString() ?? ''
-  const { user } = useAuth()
+  const { user, isSuperAdmin } = useAuth()
   const { role, canAccess } = useRole()
   const sections = useMemo(() => mainNavFor(role), [role])
 
@@ -135,6 +135,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const settingsActive = current === SETTINGS_LINK.href
   const SettingsIcon = SETTINGS_LINK.icon
+  const PlatformIcon = PLATFORM_ADMIN_LINK.icon
 
   return (
     <>
@@ -201,7 +202,16 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           })}
         </nav>
 
-        <div className="border-t border-gray-200 px-3 py-2.5">
+        <div className="border-t border-gray-200 px-3 py-2.5 space-y-0.5">
+          {isSuperAdmin && (
+            <Link
+              href={PLATFORM_ADMIN_LINK.href}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] text-gray-700 hover:bg-gray-100"
+            >
+              <PlatformIcon {...ICON_PROPS} className="shrink-0 text-gray-500" aria-hidden />
+              {PLATFORM_ADMIN_LINK.label}
+            </Link>
+          )}
           <Link
             href={SETTINGS_LINK.href}
             aria-current={settingsActive ? 'page' : undefined}
