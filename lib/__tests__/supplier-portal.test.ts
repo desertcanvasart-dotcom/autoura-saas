@@ -25,12 +25,18 @@ describe("the supplier's own page", () => {
     expect(s.done.map(l => l.date)).toEqual(['2026-11-01', '2026-10-20'])
   })
 
-  it('never shows To arrange, Declined, No reply, Not needed, or old done jobs; a request for a past day is gone', () => {
+  it('never shows To arrange, Not needed, or old done jobs; a request for a past day is gone', () => {
     const s = sections([
-      src({ status: 'pending' }), src({ status: 'declined' }), src({ status: 'expired' }), src({ status: 'cancelled' }),
+      src({ status: 'pending' }), src({ status: 'cancelled' }),
       src({ status: 'done', service_date: '2026-08-01' }), src({ status: 'requested', service_date: '2026-11-01' }),
+      src({ status: 'declined', service_date: '2026-11-01' }), src({ status: 'expired', service_date: '2026-11-01' }),
     ])
     expect([s.requests.length, s.upcoming.length, s.done.length]).toEqual([0, 0, 0])
+  })
+
+  it('declined and unanswered-in-time lines stay in Requests — they may still accept (operator, 2026-11-01)', () => {
+    const s = sections([src({ status: 'declined' }), src({ status: 'expired' })])
+    expect(s.requests.map(l => l.status)).toEqual(['declined', 'expired'])
   })
 
   it('shows the service, not the price or the client contacts — only the lead name', () => {
@@ -55,7 +61,7 @@ describe('what the page and its link can touch', () => {
     expect(route).toContain(".eq('tenant_id', link.tenant_id)")
     expect(route).toContain(".eq('supplier_id', link.supplier_id)")
     expect(route).toContain("line.resource_kind === 'own'")
-    expect(route).toContain(".is('revoked_at', null)")
+    expect(route).toContain('resolvePortalLink(db, token)')
     expect(route).toContain('applySupplierAnswer(')
   })
 
@@ -63,7 +69,8 @@ describe('what the page and its link can touch', () => {
     const page = readFileSync('app/supplier/[token]/page.tsx', 'utf8')
     expect(page).toContain('loadSupplierAgency(db, link.tenant_id, link.supplier_id')
     expect(readFileSync('lib/supplier-page-data.ts', 'utf8')).toContain(".eq('tenant_id', tenantId).eq('supplier_id', supplierId)")
-    expect(page).toContain(".is('revoked_at', null)")
+    expect(page).toContain('resolvePortalLink(db, token)')
+    expect(readFileSync('lib/supplier-link-lookup.ts', 'utf8')).toContain(".is('revoked_at', null)")
     expect(page).toContain('notFound()')
   })
 

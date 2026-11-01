@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import { SESSION_COOKIE } from '@/lib/supplier-accounts'
 import { approvedLinks, supplierFromToken } from '@/lib/supplier-session'
 import { clearSupplierDayOff, markSupplierDayOff } from '@/lib/supplier-days-off-write'
@@ -21,7 +21,7 @@ async function linkFor(request: NextRequest, db: SupabaseClient, linkId: unknown
 }
 
 export async function POST(request: NextRequest) {
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const body = await request.json().catch(() => ({}))
   const found = await linkFor(request, db, body.link_id)
   if ('error' in found) return found.error
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const body = await request.json().catch(() => ({}))
   const found = await linkFor(request, db, body.link_id)
   if ('error' in found) return found.error

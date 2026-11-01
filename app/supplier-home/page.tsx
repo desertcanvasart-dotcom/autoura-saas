@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import { SESSION_COOKIE } from '@/lib/supplier-accounts'
 import { supplierFromToken } from '@/lib/supplier-session'
 import { loadSupplierAgency } from '@/lib/supplier-page-data'
@@ -23,7 +22,7 @@ const WAITING: Record<string, string> = {
 }
 
 export default async function SupplierHomePage() {
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const signedIn = await supplierFromToken(db, (await cookies()).get(SESSION_COOKIE)?.value)
   if (!signedIn) redirect('/supplier-login')
 

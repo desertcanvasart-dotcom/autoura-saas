@@ -276,6 +276,14 @@ Estimate: ≈ 3–5 days inside Phase 3 (setting + picker grouping + engine sour
       really "both" with network first. *(before Phase 3)*
 - [ ] **D5 detail — in "both", who wins on price?** Own supplier first always (as written), or the
       cheaper of own vs network? *(before Phase 3)*
+- [x] **Late answers (audit D2, operator 2026-11-01):** a supplier who declined or did not answer
+      in time can still accept, name the car or decline from the same link (and their page),
+      until the office gives the line to someone else or marks it not needed.
+- [x] **Viewers and supplier links (audit D3, operator 2026-11-01):** viewers may read supplier
+      links at database level (RLS unchanged). The office screen still shows the copyable URL to
+      managers and up only.
+- [ ] **Sign-in code channel (audit D1):** WhatsApp code once Meta approves the template —
+      waiting on Meta.
 
 ## 10. Rules to hold throughout
 

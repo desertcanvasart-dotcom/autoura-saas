@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { NETWORK_KINDS, PAPER_KINDS, VERIFICATION_LABEL } from '@/lib/supplier-network'
+import LoadError from '@/components/LoadError'
 
 // Join the Autoura supplier network (Phase 3): a profile other agencies can
 // find — name, kinds of service, cities, languages, a few words — and papers
@@ -30,10 +31,13 @@ export default function NetworkJoin() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // A failed read used to leave the whole section blank, forever (audit SN-13).
+  const [loadFailed, setLoadFailed] = useState(false)
   const load = async () => {
-    const res = await fetch('/api/supplier-account/network-profile')
-    const d = await res.json().catch(() => ({}))
-    if (!res.ok || !d.success) return
+    setLoadFailed(false)
+    const res = await fetch('/api/supplier-account/network-profile').catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok || !d.success) { setLoadFailed(true); return }
     const p: Profile | null = d.data.profile
     setPapers(d.data.papers)
     if (p) {
@@ -76,6 +80,7 @@ export default function NetworkJoin() {
     if (d) setPapers(prev => prev.filter(p => p.id !== id))
   }
 
+  if (loadFailed && !loaded) return <LoadError compact what="your network profile" onRetry={() => { void load() }} />
   if (!loaded) return null
   const statusColor = status === 'verified' ? 'text-green-700' : status === 'rejected' ? 'text-red-700' : status === 'pending' ? 'text-amber-700' : 'text-gray-600'
 

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { requireAuth, adminDb } from '@/lib/supabase-server'
 import { codeForClaim, codeRecipientsForAgency } from '@/lib/supplier-claims'
 
 // ============================================
@@ -29,7 +28,7 @@ export async function GET(request: NextRequest) {
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   if (!claims || claims.length === 0) return NextResponse.json({ success: true, data: [] })
 
-  const admin = createAdminClient() as unknown as SupabaseClient
+  const admin = adminDb()
   const accountIds = [...new Set(claims.map(c => c.account_id as string))]
   const [{ data: accounts }, { data: suppliers }, { data: codes }] = await Promise.all([
     admin.from('supplier_accounts').select('id, phone, last_login_at').in('id', accountIds),

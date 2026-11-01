@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { requireAuth, adminDb } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { NETWORK_KINDS, copyTypes, usesNetwork } from '@/lib/supplier-network'
 
@@ -47,7 +46,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   }
 
   // The phone they signed in with (accounts are invisible to signed-in users).
-  const admin = createAdminClient() as unknown as SupabaseClient
+  const admin = adminDb()
   const { data: account } = await admin.from('supplier_accounts').select('phone, disabled_at').eq('id', accountId).maybeSingle()
   if (!account || account.disabled_at) return NextResponse.json({ success: false, error: 'This supplier is not available' }, { status: 404 })
   const phone = `+${account.phone}`

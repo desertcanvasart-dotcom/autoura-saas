@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { CalendarX } from 'lucide-react'
 import type { DayOff } from '@/lib/supplier-days-off'
+import LoadError from '@/components/LoadError'
 
 // Days a supplier cannot work (migration 449). On the supplier's own page
 // (who = 'supplier': they remove only days they marked) and on the supplier
@@ -30,13 +31,20 @@ export default function DaysOffEditor({
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // A failed read must not read as "No days off" — that hides a clash warning's cause (audit SN-13).
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (initial) return
     let live = true
-    fetch(url).then(r => r.json()).then(d => { if (live && d.success) setDays(d.data) }).catch(() => {})
+    setLoadFailed(false)
+    fetch(url).then(r => r.json()).then(d => {
+      if (!live) return
+      if (d.success) setDays(d.data); else setLoadFailed(true)
+    }).catch(() => { if (live) setLoadFailed(true) })
     return () => { live = false }
-  }, [url, initial])
+  }, [url, initial, attempt])
 
   const call = async (method: 'POST' | 'DELETE', body: Record<string, unknown>) => {
     setBusy(true); setError(null)
@@ -65,7 +73,7 @@ export default function DaysOffEditor({
 
   return (
     <div className="space-y-2">
-      {days.length === 0
+      {loadFailed ? <LoadError compact what="the days off" onRetry={() => setAttempt(a => a + 1)} /> : days.length === 0
         ? <p className="text-sm text-gray-500">{big ? 'No days off marked.' : 'No days off marked.'}</p>
         : (
           <ul className="space-y-1">

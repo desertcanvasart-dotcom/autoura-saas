@@ -112,12 +112,6 @@ export function codeEmails(records: Array<{ email?: string | null; contact_email
   return [...out]
 }
 
-/** "a•••@gmail.com" — shown on screen so the supplier knows where to look. */
-export function maskEmail(email: string): string {
-  const [user, domain] = email.split('@')
-  return `${user.slice(0, 1)}•••@${domain}`
-}
-
 // ── Sessions ────────────────────────────────────────────────────────────
 
 export function generateSessionToken(): string {

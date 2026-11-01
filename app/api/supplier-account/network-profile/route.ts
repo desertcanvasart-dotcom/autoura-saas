@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import { SESSION_COOKIE } from '@/lib/supplier-accounts'
 import { supplierFromToken } from '@/lib/supplier-session'
 import { cleanProfile } from '@/lib/supplier-network'
@@ -20,7 +20,7 @@ async function signedIn(request: NextRequest, db: SupabaseClient) {
 }
 
 export async function GET(request: NextRequest) {
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const me = await signedIn(request, db)
   if (!me) return NextResponse.json({ success: false, error: 'Please sign in again' }, { status: 401 })
   const [{ data: profile }, { data: papers }] = await Promise.all([
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const me = await signedIn(request, db)
   if (!me) return NextResponse.json({ success: false, error: 'Please sign in again' }, { status: 401 })
   const body = await request.json().catch(() => ({}))

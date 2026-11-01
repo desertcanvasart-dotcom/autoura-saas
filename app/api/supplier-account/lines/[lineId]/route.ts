@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import { SESSION_COOKIE } from '@/lib/supplier-accounts'
 import { approvedLinks, supplierFromToken } from '@/lib/supplier-session'
 import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
@@ -14,7 +13,7 @@ import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ lineId: string }> }) {
   try {
     const { lineId } = await params
-    const db = createAdminClient() as unknown as SupabaseClient
+    const db = adminDb()
     const signedIn = await supplierFromToken(db, request.cookies.get(SESSION_COOKIE)?.value)
     if (!signedIn) return NextResponse.json({ success: false, error: 'Please sign in again' }, { status: 401 })
 

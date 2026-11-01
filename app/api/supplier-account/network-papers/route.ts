@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
+import { adminDb } from '@/lib/supabase-server'
 import { SESSION_COOKIE } from '@/lib/supplier-accounts'
 import { supplierFromToken } from '@/lib/supplier-session'
 import { MAX_PAPERS, MAX_PAPER_BYTES, NETWORK_PAPERS_BUCKET, PAPER_KINDS, checkPaperUpload, paperKey } from '@/lib/supplier-network-papers'
@@ -13,7 +12,7 @@ import { MAX_PAPERS, MAX_PAPER_BYTES, NETWORK_PAPERS_BUCKET, PAPER_KINDS, checkP
  * They can never read a paper back through here — only the Autoura team can.
  */
 export async function POST(request: NextRequest) {
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const me = await supplierFromToken(db, request.cookies.get(SESSION_COOKIE)?.value)
   if (!me) return NextResponse.json({ success: false, error: 'Please sign in again' }, { status: 401 })
 
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const db = createAdminClient() as unknown as SupabaseClient
+  const db = adminDb()
   const me = await supplierFromToken(db, request.cookies.get(SESSION_COOKIE)?.value)
   if (!me) return NextResponse.json({ success: false, error: 'Please sign in again' }, { status: 401 })
   const body = await request.json().catch(() => ({}))

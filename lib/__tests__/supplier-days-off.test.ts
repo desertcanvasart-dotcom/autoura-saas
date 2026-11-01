@@ -43,7 +43,7 @@ describe('a warning, never a block', () => {
   it('from their page a supplier marks only their own days at that agency, and removes only what they marked', () => {
     const route = readFileSync('app/api/supplier-page/[token]/days-off/route.ts', 'utf8')
     expect(route).toContain('{ tenantId: link.tenant_id, supplierId: link.supplier_id }')
-    expect(route).toContain(".is('revoked_at', null)")
+    expect(route).toContain('resolvePortalLink(db, token)')
     const writer = readFileSync('lib/supplier-days-off-write.ts', 'utf8')
     expect(writer).toContain(".eq('marked_by', 'supplier')")
     expect(writer).toContain("tenant_id: who.tenantId, supplier_id: who.supplierId")

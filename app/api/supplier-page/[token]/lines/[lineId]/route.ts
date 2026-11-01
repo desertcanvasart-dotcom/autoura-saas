@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { createAdminClient } from '@/lib/supabase-server'
-import { isValidSupplierPageToken } from '@/lib/supplier-portal'
+import { adminDb } from '@/lib/supabase-server'
+import { resolvePortalLink } from '@/lib/supplier-link-lookup'
 import { applySupplierAnswer } from '@/lib/bookings/supplier-answer'
 import { supplierLinkLimited } from '@/lib/supplier-rate-limits'
 
@@ -17,15 +16,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const limited = await supplierLinkLimited(request)
     if (limited) return limited
     const { token, lineId } = await params
-    if (!isValidSupplierPageToken(token)) return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
-    const db = createAdminClient() as unknown as SupabaseClient
-
-    const { data: link } = await db
-      .from('supplier_portal_links')
-      .select('id, tenant_id, supplier_id, revoked_at')
-      .eq('token', token)
-      .is('revoked_at', null)
-      .maybeSingle()
+    const db = adminDb()
+    const link = await resolvePortalLink(db, token)
     if (!link) return NextResponse.json({ success: false, error: 'This link no longer works — please contact the agency' }, { status: 404 })
 
     const { data: line } = await db

@@ -33,7 +33,7 @@ export async function loadSupplierAgency(db: SupabaseClient, tenantId: string, s
     db.from('suppliers').select('name, company_name').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle(),
     db.from('booking_supplier_status').select(COLUMNS)
       .eq('tenant_id', tenantId).eq('supplier_id', supplierId)
-      .in('status', ['requested', 'accepted', 'assigned', 'done'])
+      .in('status', ['requested', 'declined', 'expired', 'accepted', 'assigned', 'done'])
       .neq('resource_kind', 'own')
       .limit(500),
     db.from('supplier_unavailable_days').select('day, note, marked_by')
