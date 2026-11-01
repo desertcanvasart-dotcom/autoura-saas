@@ -31,28 +31,38 @@ export default function SignInForm() {
     if (data) router.push('/supplier-home')
   }
 
-  const big = 'w-full rounded-xl py-4 text-base font-semibold disabled:opacity-50'
+  // The app's input styles apply only to typed inputs, so each one says its type.
+  const field = 'mt-2 block w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-[#647C47] focus:outline-none focus:ring-2 focus:ring-[#647C47]/20'
+  const primary = 'w-full rounded-lg bg-[#263A29] py-3 text-base font-medium text-white transition-colors hover:bg-[#1D2B20] disabled:cursor-not-allowed disabled:opacity-60'
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <ol className="flex items-center gap-2 text-xs font-medium" aria-label="Steps">
+        <li className={step === 'phone' ? 'text-[#263A29]' : 'text-gray-400'}>1. Your number</li>
+        <li aria-hidden className="text-gray-300">→</li>
+        <li className={step === 'code' ? 'text-[#263A29]' : 'text-gray-400'}>2. The code</li>
+      </ol>
       {step === 'phone' ? (
-        <>
-          <label className="block text-sm text-gray-700">Your phone number, with the country code
-            <input value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" placeholder="+20 100 123 4567" className="mt-1 w-full" autoComplete="tel" />
+        <form onSubmit={e => { e.preventDefault(); if (phone.trim()) void sendCode() }} className="space-y-5">
+          <label className="block text-sm font-medium text-gray-700">
+            Your phone number, with the country code
+            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" placeholder="+20 100 123 4567" className={field} autoComplete="tel" autoFocus />
           </label>
-          <button disabled={busy || !phone.trim()} onClick={sendCode} className={`${big} bg-gray-900 text-white`}>Send me a code</button>
-        </>
+          <p className="text-sm text-gray-600">We email a 6-digit code to the address your agency has on file for you.</p>
+          <button type="submit" disabled={busy || !phone.trim()} className={primary}>{busy ? 'Sending…' : 'Send me a code'}</button>
+        </form>
       ) : (
-        <>
-          {message && <p className="rounded-xl bg-blue-50 text-blue-900 px-4 py-3 text-sm">{message}</p>}
-          <label className="block text-sm text-gray-700">The 6-digit code
-            <input value={code} onChange={e => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={7} className="mt-1 w-full tracking-widest text-lg" />
+        <form onSubmit={e => { e.preventDefault(); if (code.replace(/\s/g, '').length === 6) void verify() }} className="space-y-5">
+          {message && <p role="status" className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{message}</p>}
+          <label className="block text-sm font-medium text-gray-700">
+            The 6-digit code
+            <input type="text" value={code} onChange={e => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={7} placeholder="123456" className={`${field} text-center text-2xl tracking-[0.5em]`} autoFocus />
           </label>
-          <button disabled={busy || code.replace(/\s/g, '').length !== 6} onClick={verify} className={`${big} bg-green-600 text-white`}>Sign in</button>
-          <button disabled={busy} onClick={() => { setStep('phone'); setCode(''); setMessage(null) }} className="w-full py-2 text-sm text-gray-600">Use another number</button>
-        </>
+          <button type="submit" disabled={busy || code.replace(/\s/g, '').length !== 6} className={primary}>{busy ? 'Signing in…' : 'Sign in'}</button>
+          <button type="button" disabled={busy} onClick={() => { setStep('phone'); setCode(''); setMessage(null) }} className="w-full py-1 text-sm text-gray-600 hover:text-gray-900">Use another number</button>
+        </form>
       )}
-      {error && <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>}
-      <p className="text-xs text-gray-500">No email on file with an agency? Ask them to add it, or keep using the link they sent you.</p>
+      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">No email on file with an agency? Ask them to add it, or keep using the link they sent you.</p>
     </div>
   )
 }
