@@ -123,7 +123,7 @@ export default function NetworkJoin() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 text-sm">
         <label className="block text-gray-700">Name agencies will see
-          <input value={name} onChange={e => setName(e.target.value)} maxLength={120} className="mt-1 w-full" />
+          <input type="text" value={name} onChange={e => setName(e.target.value)} maxLength={120} className="mt-1 w-full" />
         </label>
         <fieldset>
           <legend className="text-gray-700">What you do</legend>

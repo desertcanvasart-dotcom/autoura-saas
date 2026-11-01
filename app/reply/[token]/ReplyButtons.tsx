@@ -77,21 +77,21 @@ export default function ReplyButtons({ token, view, endpoint }: { token: string;
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
           {view.assign === 'car' ? (
             <label className="block text-sm text-gray-700">Plate number
-              <input value={plate} onChange={e => setPlate(e.target.value)} autoCapitalize="characters" className="mt-1 w-full" />
+              <input type="text" value={plate} onChange={e => setPlate(e.target.value)} autoCapitalize="characters" className="mt-1 w-full" />
             </label>
           ) : (
             <>
               <label className="block text-sm text-gray-700">Guide’s name
-                <input value={guideName} onChange={e => setGuideName(e.target.value)} className="mt-1 w-full" />
+                <input type="text" value={guideName} onChange={e => setGuideName(e.target.value)} className="mt-1 w-full" />
               </label>
               <label className="block text-sm text-gray-700">Guide’s phone (optional)
-                <input value={guidePhone} onChange={e => setGuidePhone(e.target.value)} inputMode="tel" className="mt-1 w-full" />
+                <input type="tel" value={guidePhone} onChange={e => setGuidePhone(e.target.value)} inputMode="tel" className="mt-1 w-full" />
               </label>
             </>
           )}
           {view.assign === 'car' && (
             <label className="block text-sm text-gray-700">Driver of the day — name and phone (optional)
-              <input value={driverNote} onChange={e => setDriverNote(e.target.value)} className="mt-1 w-full" />
+              <input type="text" value={driverNote} onChange={e => setDriverNote(e.target.value)} className="mt-1 w-full" />
             </label>
           )}
           <button disabled={busy} onClick={() => send({ action: 'assign', plate, guide_name: guideName, guide_phone: guidePhone, driver_note: driverNote })} className={`${big} bg-blue-600 text-white`}>Send</button>
@@ -102,7 +102,7 @@ export default function ReplyButtons({ token, view, endpoint }: { token: string;
       {declining && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
           <label className="block text-sm text-gray-700">Reason (optional)
-            <input value={reason} onChange={e => setReason(e.target.value)} className="mt-1 w-full" />
+            <input type="text" value={reason} onChange={e => setReason(e.target.value)} className="mt-1 w-full" />
           </label>
           <button disabled={busy} onClick={() => send({ action: 'decline', reason })} className={`${big} bg-gray-800 text-white`}>Decline this request</button>
           <button disabled={busy} onClick={() => setDeclining(false)} className="w-full py-2 text-sm text-gray-600">Back</button>

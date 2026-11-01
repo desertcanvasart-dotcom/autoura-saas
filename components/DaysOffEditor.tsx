@@ -96,7 +96,7 @@ export default function DaysOffEditor({
             <input type="date" min={today} value={day} onChange={e => setDay(e.target.value)} className={big ? 'mt-1 block' : '!py-1 !text-xs mt-0.5 block'} />
           </label>
           <label className="text-gray-600 flex-1 min-w-[8rem]">Note (optional)
-            <input value={note} onChange={e => setNote(e.target.value)} maxLength={200} className={big ? 'mt-1 block w-full' : '!py-1 !text-xs mt-0.5 block w-full'} />
+            <input type="text" value={note} onChange={e => setNote(e.target.value)} maxLength={200} className={big ? 'mt-1 block w-full' : '!py-1 !text-xs mt-0.5 block w-full'} />
           </label>
           <button type="button" disabled={busy || !day} onClick={add} className={`rounded-lg bg-gray-900 text-white font-medium disabled:opacity-50 ${big ? 'px-4 py-2.5' : 'px-2.5 py-1'}`}>
             Mark day off
