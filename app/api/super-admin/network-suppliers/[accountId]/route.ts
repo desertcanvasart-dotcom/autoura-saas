@@ -39,7 +39,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Tell the supplier.
   const { data: account } = await db.from('supplier_accounts').select('phone').eq('id', accountId).maybeSingle()
-  const emails = account?.phone ? codeEmails(await recordsForPhone(db, account.phone as string)) : []
+  // The decision is saved: a failed lookup only means nobody is emailed (told: 0).
+  const records = account?.phone
+    ? await recordsForPhone(db, account.phone as string).catch(e => { console.error('[network review] lookup failed:', e); return [] })
+    : []
+  const emails = codeEmails(records)
   const mail = reviewEmail(body.decision as ReviewDecision, profile.display_name as string, change.note)
   for (const to of emails) {
     const sent = await sendMail({ to, subject: mail.subject, html: messageEmailHtml(mail.text) })

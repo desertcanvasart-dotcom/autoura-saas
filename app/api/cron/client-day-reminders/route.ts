@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
 import { notifyTeam } from '@/lib/notifications'
+import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { isCancelled } from '@/lib/bookings/service-booking-states'
 import { CLIENT_TOLD, dayHasDetails, tomorrowOf, type DayLine } from '@/lib/bookings/client-day-message'
 
@@ -27,11 +28,14 @@ async function getHandler(request: NextRequest) {
   const db = createAdminClient() as unknown as SupabaseClient
   const day = tomorrowOf(new Date())
 
-  const { data, error } = await db
+  // Every agency's lines for tomorrow, read in pages (index 458 on service_date).
+  const { data, error } = await fetchAllPages<Line, { message: string }>((from, to) => db
     .from('booking_supplier_status')
     .select('id, tenant_id, booking_id, status, service_date, service_time, service_description, supplier_type, pickup_location, dropoff_location, assigned_vehicle_plate, assigned_guide_name, assigned_guide_phone, driver_note')
     .eq('service_date', day)
     .neq('status', 'cancelled')
+    .order('id', { ascending: true })
+    .range(from, to))
   if (error) return NextResponse.json({ success: false, error: `Could not read tomorrow's services: ${error.message}` }, { status: 500 })
 
   const byBooking = new Map<string, Line[]>()
