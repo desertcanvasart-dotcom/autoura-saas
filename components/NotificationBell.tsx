@@ -212,16 +212,14 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown - FIXED: Position to the LEFT to stay within viewport */}
+      {/* Dropdown: the bell sits at the right of the top bar, so the panel
+          opens leftwards from the bell's right edge (it used to open
+          rightwards, from when the bell lived in the sidebar, and ran off
+          the screen). On a phone it spans the screen under the top bar. */}
       {isOpen && (
-        <div 
+        <div
           ref={dropdownRef}
-          className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-[100] overflow-hidden"
-          style={{ 
-            // Ensure dropdown doesn't go off-screen
-            minWidth: '320px',
-            maxWidth: 'calc(100vw - 20px)'
-          }}
+          className="fixed inset-x-2 top-14 sm:absolute sm:inset-x-auto sm:top-full sm:right-0 mt-2 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-[100] overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">

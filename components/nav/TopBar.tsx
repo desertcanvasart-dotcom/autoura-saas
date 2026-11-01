@@ -3,13 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, Sparkles, Menu, X, User, Settings, LogOut, Shield, Check } from 'lucide-react'
+import { Search, Menu, X, User, Settings, LogOut, Shield, Check } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { useRole } from '@/hooks/useRole'
 import NotificationBell from '@/components/NotificationBell'
 import CommandPalette from '@/components/nav/CommandPalette'
-import CopilotPanel from '@/components/nav/CopilotPanel'
 
 // Which build you are looking at — shown beside the tenant's name.
 //
@@ -52,10 +50,7 @@ interface TopBarProps {
 
 export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }: TopBarProps) {
   const { tenant } = useTenant()
-  const { canAccess } = useRole()
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [copilotOpen, setCopilotOpen] = useState(false)
-  const canCopilot = canAccess(['admin', 'manager', 'member'])
 
   // ⌘K / Ctrl+K anywhere, the Settings area included.
   useEffect(() => {
@@ -124,16 +119,6 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
             >
               <Search size={18} strokeWidth={1.7} />
             </button>
-            {canCopilot && (
-              <button
-                type="button"
-                onClick={() => setCopilotOpen(true)}
-                className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-lg border border-primary-200 bg-primary-50 text-primary-800 text-sm font-medium hover:bg-primary-100"
-              >
-                <Sparkles size={16} strokeWidth={1.7} aria-hidden />
-                <span className="hidden sm:inline">Copilot</span>
-              </button>
-            )}
             <NotificationBell />
           </>
         )}
@@ -141,7 +126,6 @@ export default function TopBar({ variant = 'app', sidebarOpen, onToggleSidebar }
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      {canCopilot && <CopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} />}
     </header>
   )
 }
