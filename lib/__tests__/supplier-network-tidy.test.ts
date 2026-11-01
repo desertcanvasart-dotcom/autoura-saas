@@ -109,3 +109,12 @@ describe('dead code (SN-14)', () => {
     expect(read('lib/supplier-accounts.ts')).not.toContain('maskEmail')
   })
 })
+
+describe('the shared lookup keeps every check the routes used to make', () => {
+  it('shape, unrevoked and (reply links) unexpired', () => {
+    const src = read('lib/supplier-link-lookup.ts')
+    for (const marker of ['isValidSupplierPageToken(token)', 'isValidReplyToken(token)', ".is('revoked_at', null)", 'isLinkLive(data, now)']) {
+      expect(src).toContain(marker)
+    }
+  })
+})
