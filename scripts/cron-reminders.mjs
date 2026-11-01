@@ -150,4 +150,11 @@ const clientDays = await run(
   (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} reminder(s) failed: ${p.failures.join('; ')}` : null)
 )
 
-process.exit(invoices && tasks && purge && closed && servicesDone && clientDays ? 0 : 1)
+// Network suppliers who ticked "Let agencies find me" but never sent papers.
+const networkPapers = await run(
+  'network-paper-reminders',
+  '/api/cron/network-paper-reminders',
+  (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} reminder(s) failed: ${p.failures.join('; ')}` : null)
+)
+
+process.exit(invoices && tasks && purge && closed && servicesDone && clientDays && networkPapers ? 0 : 1)
