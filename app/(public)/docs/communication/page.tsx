@@ -164,7 +164,7 @@ export default function CommunicationPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Copilot (AI-Drafted Replies)</h2>
         <p className="text-gray-600 mb-3">
-          Copilot drafts replies to incoming messages; you review each one before it goes out. The <strong>Copilot</strong> button in the top bar opens the review queue in a panel over whatever page you are on. Its pages:
+          Copilot drafts replies to incoming messages; you review each one before it goes out. Its pages:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Copilot</strong> (Communicate) &mdash; The review queue: <strong>Approve</strong> and <strong>Send</strong> a WhatsApp draft (an email draft is <strong>Approve &amp; hand off</strong>: it opens on the Inbox&apos;s All tab, filled in, for you to send), <strong>Regenerate</strong> it, or <strong>Reject</strong> it. Choose the tone: professional, friendly or formal.</li>

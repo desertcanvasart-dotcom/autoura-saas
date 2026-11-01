@@ -77,7 +77,7 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Replying Faster with Copilot</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open <strong>Copilot</strong> in the sidebar, or the <strong>Copilot</strong> button in the top bar, to see AI-drafted replies to incoming messages</li>
+          <li>Open <strong>Copilot</strong> in the sidebar (Communicate) to see AI-drafted replies to incoming messages</li>
           <li>Review each draft, edit if needed, then send &mdash; nothing is sent without your approval, unless an admin has switched on WhatsApp AI auto-reply</li>
           <li>On the Inbox&apos;s WhatsApp tab, Copilot suggestions also appear right in the composer</li>
           <li>Improve future drafts by adding facts to <strong>Copilot knowledge</strong> (Settings &rsaquo; Content &amp; AI, admins and managers); admins tune <strong>Copilot settings</strong></li>

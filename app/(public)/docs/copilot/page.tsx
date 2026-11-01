@@ -25,7 +25,7 @@ export default function CopilotPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Review Queue</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Copilot</strong> in the sidebar (Communicate section). The <strong>Copilot</strong> button in the top bar opens the same queue in a panel over the page you are on; open a thread, or the expand button, to reach the full page. Conversations waiting for a reply are listed on the left &mdash; those with the most drafts to review first, then the most recent. Each shows:
+          Open <strong>Copilot</strong> in the sidebar (Communicate section). Conversations waiting for a reply are listed on the left &mdash; those with the most drafts to review first, then the most recent. Each shows:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Urgency dot</strong> &mdash; red for urgent, amber for high, grey otherwise</li>

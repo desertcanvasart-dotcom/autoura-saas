@@ -148,7 +148,6 @@ export default function GettingStartedPage() {
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Top Bar</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Search or jump to</strong> &mdash; click it or press <strong>&#8984;K</strong> (Ctrl&nbsp;K on Windows), anywhere in the app, Settings included. Type a few letters to jump to any page you may open, any rate sheet, any setting, or a client by name. It also knows old names: &ldquo;analytics&rdquo; finds Reports, &ldquo;follow-ups&rdquo; finds the Follow-ups tab of Tasks.</li>
-          <li><strong>Copilot</strong> &mdash; opens the AI Copilot&apos;s review queue in a panel over the page you are on (see <Link href="/docs/copilot" className="text-primary-600 hover:underline">AI Copilot</Link>)</li>
           <li><strong>The bell</strong> &mdash; your notifications</li>
           <li><strong>Account menu</strong> &mdash; your initials: <strong>Profile</strong>, <strong>Settings</strong>, <strong>Switch company</strong> (when you work for more than one) and <strong>Sign out</strong></li>
         </ul>
