@@ -403,13 +403,14 @@ export default function IntegrationsPage() {
               </div>
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
             </div>
-            <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
+            <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-8 text-sm text-stone-500">
               <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
               <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>
               <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
               <CookieSettingsLink className="hover:text-stone-700 transition-colors" />
               <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
               <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
+              <Link href="/supplier-login" className="hover:text-stone-700 transition-colors">Supplier sign-in</Link>
             </div>
             <p className="text-sm text-stone-400">
               © {new Date().getFullYear()} Autoura. Built in Cairo.

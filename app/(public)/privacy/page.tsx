@@ -190,7 +190,7 @@ export default function PrivacyPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">© {new Date().getFullYear()} Autoura by Online Era. All rights reserved.</p>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap justify-center items-center gap-6">
               <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
                 About
               </Link>
@@ -200,6 +200,7 @@ export default function PrivacyPage() {
               <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Terms
               </Link>
+              <Link href="/supplier-login" className="text-gray-400 hover:text-white text-sm transition-colors">Supplier sign-in</Link>
             </div>
           </div>
         </div>
