@@ -5,9 +5,9 @@
 // cities, languages, about) plus where their network check stands. Shown on
 // the agency's supplier card for suppliers connected to that agency. Cities
 // and languages are read through normalizePicks, so a profile saved before
-// the pick-lists still shows in the list's words. Pure, client-safe.
+// the pick-lists still shows in the list's words. Pure; server (the route).
 
-import { normalizePicks } from '@/lib/supplier-network-lists'
+import { normalizePicks } from '@/lib/supplier-network-picks'
 
 export interface ConnectedProfile {
   display_name: string
@@ -36,12 +36,4 @@ export function toConnectedProfile(p: Record<string, unknown>): ConnectedProfile
     verification_status: status,
     in_network: status === 'verified' && p.listed === true,
   }
-}
-
-/** Where their network check stands, in words for the agency. */
-export const NETWORK_STATUS_FOR_AGENCY: Record<string, string> = {
-  unverified: 'Not sent for checking',
-  pending: 'Being checked by Autoura',
-  verified: 'Verified by Autoura',
-  rejected: 'Not verified',
 }

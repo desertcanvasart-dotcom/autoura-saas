@@ -3,7 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminDb } from '@/lib/supabase-server'
 import { SESSION_COOKIE } from '@/lib/supplier-accounts'
 import { supplierFromToken } from '@/lib/supplier-session'
-import { cleanProfile } from '@/lib/supplier-network'
+import { cleanProfile } from '@/lib/supplier-network-profile'
+import { normalizePicks } from '@/lib/supplier-network-picks'
 import { sendMail } from '@/lib/email-send'
 import { escapeHtml } from '@/lib/html-escape'
 
@@ -29,7 +30,20 @@ export async function GET(request: NextRequest) {
     db.from('supplier_network_documents').select('id, kind, title, mime_type, size_bytes, uploaded_at')
       .eq('account_id', me.account.id).order('uploaded_at', { ascending: false }),
   ])
-  return NextResponse.json({ success: true, data: { profile: profile ?? null, papers: papers ?? [], default_name: me.account.display_name } })
+  // Cities and languages in the lists' words; what was typed before the
+  // lists and matches nothing comes back as `unmatched`, so the form can ask
+  // the supplier to pick again.
+  const cities = normalizePicks(profile?.cities ?? [], 'city')
+  const languages = normalizePicks(profile?.languages ?? [], 'language')
+  return NextResponse.json({
+    success: true,
+    data: {
+      profile: profile ? { ...profile, cities: cities.known, languages: languages.known } : null,
+      unmatched: [...cities.unknown, ...languages.unknown],
+      papers: papers ?? [],
+      default_name: me.account.display_name,
+    },
+  })
 }
 
 export async function POST(request: NextRequest) {

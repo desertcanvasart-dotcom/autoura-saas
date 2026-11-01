@@ -4,7 +4,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { BadgeCheck, UserRound } from 'lucide-react'
 import LoadError from '@/components/LoadError'
 import { NETWORK_KINDS } from '@/lib/supplier-network'
-import { NETWORK_STATUS_FOR_AGENCY, type ConnectedProfile } from '@/lib/supplier-network-connected'
+import type { ConnectedProfile } from '@/lib/supplier-network-connected'
+
+/** Where their network check stands, in words for the agency. */
+const NETWORK_STATUS_FOR_AGENCY: Record<string, string> = {
+  unverified: 'Not sent for checking',
+  pending: 'Being checked by Autoura',
+  verified: 'Verified by Autoura',
+  rejected: 'Not verified',
+}
 
 // What a connected supplier wrote about themselves (their network profile),
 // on this agency's supplier list and card. Read-only: it is the supplier's

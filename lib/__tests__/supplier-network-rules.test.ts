@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { cleanProfile, isSourcing, matchesSearch, toPublicProfile, usesNetwork } from '@/lib/supplier-network'
+import { isSourcing, matchesSearch, toPublicProfile, usesNetwork } from '@/lib/supplier-network'
+import { cleanProfile } from '@/lib/supplier-network-profile'
 
 describe('the shared network — rules', () => {
   it('one sourcing setting per agency: own (default) · network · both', () => {

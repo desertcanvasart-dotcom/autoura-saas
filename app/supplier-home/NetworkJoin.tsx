@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NETWORK_KINDS, PAPER_KINDS, VERIFICATION_LABEL } from '@/lib/supplier-network'
 import LoadError from '@/components/LoadError'
-import { NETWORK_CITIES, NETWORK_LANGUAGES, normalizePicks } from '@/lib/supplier-network-lists'
+import { NETWORK_CITIES, NETWORK_LANGUAGES } from '@/lib/supplier-network-lists'
 
 // Join the Autoura supplier network (Phase 3): a profile other agencies can
 // find — name, kinds of service, cities, languages, a few words — and papers
@@ -64,8 +64,9 @@ export default function NetworkJoin() {
     const p: Profile | null = d.data.profile
     setPapers(d.data.papers)
     if (p) {
-      const c = normalizePicks(p.cities, 'city'), l = normalizePicks(p.languages, 'language')
-      setName(p.display_name); setKinds(p.kinds); setCities(c.known); setLanguages(l.known); setUnmatched([...c.unknown, ...l.unknown])
+      // Already in the lists' words (the route reads older typed entries).
+      setName(p.display_name); setKinds(p.kinds); setCities(p.cities); setLanguages(p.languages)
+      setUnmatched(Array.isArray(d.data.unmatched) ? d.data.unmatched : [])
       setAbout(p.about ?? ''); setListed(p.listed); setStatus(p.verification_status); setNote(p.verification_note)
     } else {
       setName(d.data.default_name ?? '')

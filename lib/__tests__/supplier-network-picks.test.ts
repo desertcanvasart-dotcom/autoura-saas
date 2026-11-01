@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
-import { normalizePicks, splitPicks, NETWORK_LANGUAGES } from '@/lib/supplier-network-lists'
-import { cleanProfile } from '@/lib/supplier-network'
+import { NETWORK_LANGUAGES } from '@/lib/supplier-network-lists'
+import { normalizePicks, splitPicks } from '@/lib/supplier-network-picks'
+import { cleanProfile } from '@/lib/supplier-network-profile'
 import { toConnectedProfile } from '@/lib/supplier-network-connected'
 
 // 2026-11-01: suppliers typed cities and languages freely (some in Arabic,
@@ -76,6 +77,16 @@ describe("the agency's view of a connected supplier", () => {
     const page = readFileSync('app/suppliers/suppliers-content.tsx', 'utf8')
     expect(page).toContain('<SupplierProfileLine profile={connected.profiles[supplier.id]} />')
     expect(page).toContain('<SupplierNetworkProfile profile={connected.profiles[selectedSupplier.id]}')
+  })
+})
+
+describe('browser bundles stay small', () => {
+  it('no client component imports the Arabic name maps', () => {
+    for (const f of ['app/supplier-home/NetworkJoin.tsx', 'components/SupplierNetworkProfile.tsx', 'lib/supplier-network.ts', 'lib/supplier-network-lists.ts']) {
+      const src = readFileSync(f, 'utf8')
+      expect(src).not.toMatch(/from '@\/lib\/supplier-network-picks'/)
+      expect(src).not.toMatch(/import \{[^}]*\} from '@\/lib\/supplier-network-connected'/)
+    }
   })
 })
 

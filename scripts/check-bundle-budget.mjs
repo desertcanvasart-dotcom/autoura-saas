@@ -46,8 +46,13 @@ const STATIC_DIR = path.join(ROOT, '.next', 'static')
 // select-all) add 13.1 KB → 2048.1 KB, past the old 2 MB line with every
 // first-load and per-chunk budget untouched. Raised to 2176 KB: room for the
 // next features, still a line a single heavy import trips.
+// Measured 2026-11-01: main 2175.8 KB — the line was used up by the
+// navigation, Settings and supplier-network work since. The connected
+// supplier's own profile + city/language pick-lists (PR #787) tipped it.
+// Raised to 2304 KB (+128 KB, ~6%); first-load and per-chunk budgets
+// untouched.
 const BUDGETS = {
-  totalJsGzip: 2176 * 1024, // 2.125 MB (was 2048 KB until 2026-10-15)
+  totalJsGzip: 2304 * 1024, // 2.25 MB (was 2176 KB until 2026-11-01)
   largestFirstLoadChunkGzip: 160 * 1024, // 160 KB — bytes before a page is usable
   // Backstop for code loaded on demand. Deliberately loose: this is not a page
   // load, so it does not deserve the same 160 KB. It exists so a single
