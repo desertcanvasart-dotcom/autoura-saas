@@ -216,29 +216,40 @@ export default function InvoicesPayments({ itineraryId, today, onCreateInvoice, 
                   )}
 
                   {recording === inv.id && (
+                    // Its own titled panel, two rows of equal-height fields: in one
+                    // row, with the select and date taller than the text boxes
+                    // (globals.css padding), the labels sat at different heights.
                     <form
-                      className="mt-2 grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_1.2fr_auto] gap-2 items-end bg-gray-50 border border-gray-200 rounded-md p-2"
+                      className="mt-3 rounded-lg border border-primary-200 bg-primary-50 p-4"
                       onSubmit={e => { e.preventDefault(); save(inv) }}
                     >
-                      <label className="text-xs text-gray-600">Amount ({inv.currency})
-                        <input type="number" step="0.01" min="0.01" max={due.toFixed(2)} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="mt-0.5 w-full px-2 py-1 text-sm border border-gray-300 rounded" required />
-                      </label>
-                      <label className="text-xs text-gray-600">Method
-                        <select value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))} className="mt-0.5 w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white">
-                          {PAYMENT_METHODS.map(m => <option key={m} value={m}>{METHOD_LABELS[m] ?? m}</option>)}
-                        </select>
-                      </label>
-                      <label className="text-xs text-gray-600">Date
-                        <input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} className="mt-0.5 w-full px-2 py-1 text-sm border border-gray-300 rounded" required />
-                      </label>
-                      <label className="text-xs text-gray-600">Reference
-                        <input type="text" value={form.transaction_reference} onChange={e => setForm(f => ({ ...f, transaction_reference: e.target.value }))} className="mt-0.5 w-full px-2 py-1 text-sm border border-gray-300 rounded" placeholder="Optional" />
-                      </label>
-                      <div className="flex gap-1 col-span-2 sm:col-span-1">
-                        <button type="submit" disabled={saving} className="px-3 py-1 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1">
-                          {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save
-                        </button>
-                        <button type="button" onClick={() => setRecording(null)} className="px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
+                      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                        <h4 className="text-sm font-semibold text-gray-900">Record payment · {inv.invoice_number}</h4>
+                        <span className="text-xs text-gray-600">Balance due <span className="font-semibold text-amber-700">{money(inv.currency, due)}</span></span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">Amount ({inv.currency})
+                          <input type="number" step="0.01" min="0.01" max={due.toFixed(2)} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="h-10" required />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">Method
+                          <select value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))} className="h-10">
+                            {PAYMENT_METHODS.map(m => <option key={m} value={m}>{METHOD_LABELS[m] ?? m}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">Date
+                          <input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} className="h-10" required />
+                        </label>
+                      </div>
+                      <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-3">
+                        <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-gray-600">Reference
+                          <input type="text" value={form.transaction_reference} onChange={e => setForm(f => ({ ...f, transaction_reference: e.target.value }))} className="h-10" placeholder="Optional — bank ref, receipt no." />
+                        </label>
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => setRecording(null)} className="h-10 px-4 text-sm font-medium text-gray-700 border border-gray-300 bg-white rounded-lg hover:bg-gray-50">Cancel</button>
+                          <button type="submit" disabled={saving} className="h-10 px-4 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1.5">
+                            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save payment
+                          </button>
+                        </div>
                       </div>
                     </form>
                   )}
