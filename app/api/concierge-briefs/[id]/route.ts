@@ -92,10 +92,10 @@ export async function PATCH(
 }
 
 // DELETE /api/concierge-briefs/[id]
-// Permanently remove a lead — test enquiries, spam. Only an ARCHIVED lead
-// (archive first, then delete: a live enquiry is never one click from gone),
-// and only manager and above. Its revisions go with it (ON DELETE CASCADE);
-// email threads linked to it are kept, unlinked (SET NULL). The CRM client
+// Permanently remove a lead — test enquiries, spam. Manager and above, from
+// any tab: it used to demand Archive first, which hid the button so well the
+// operator thought there was none. The page asks "delete permanently?" first.
+// Its revisions go with it (ON DELETE CASCADE); email threads linked to it are kept, unlinked (SET NULL). The CRM client
 // the lead created is a separate record and stays in Clients.
 export async function DELETE(
   _request: NextRequest,
@@ -118,22 +118,6 @@ export async function DELETE(
       )
     }
     const { supabase } = authResult
-
-    const { data: brief } = await supabase
-      .from('concierge_briefs')
-      .select('id, review_status')
-      .eq('id', id)
-      .eq('tenant_id', authResult.tenant_id)
-      .maybeSingle()
-    if (!brief) {
-      return NextResponse.json({ success: false, error: 'Lead not found' }, { status: 404 })
-    }
-    if (brief.review_status !== 'archived') {
-      return NextResponse.json(
-        { success: false, error: 'Archive the lead first — only an archived lead can be deleted' },
-        { status: 409 }
-      )
-    }
 
     const { data: deleted, error } = await supabase
       .from('concierge_briefs')

@@ -342,7 +342,7 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, on
                     {a.label}
                   </button>
                 ))}
-                {brief.review_status === 'archived' && onDelete && (
+                {onDelete && (
                   <button
                     onClick={() => onDelete(briefId)}
                     disabled={updating}
