@@ -4,11 +4,17 @@
 // booking — the booking cancelled with it (PUT /api/bookings/[id], managers
 // and above; it records the cancellation date). The booking goes first, so a
 // refused booking change leaves the itinerary as it was rather than half
-// cancelled. Money already received is not touched: refunds are recorded on
-// the invoice, as before.
+// cancelled.
+//
+// The trip's open invoices follow it (lib/itineraries/cancel-invoices): an
+// unpaid one is voided; one with payments asks each time — keep what was paid
+// and write off the rest, or leave it open. Money already received is never
+// refunded here: a refund is recorded on the invoice, as before. Invoices go
+// last, after the trip is cancelled; one that fails is named, not hidden.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { openInvoicesOnCancel, type CancelInvoice } from '@/lib/itineraries/cancel-invoices'
 
 export default function CancelTripDialog({ itineraryId, tripName, booking, paid, currency, onClose, onCancelled }: {
   itineraryId: string
@@ -18,12 +24,22 @@ export default function CancelTripDialog({ itineraryId, tripName, booking, paid,
   paid: number | null
   currency: string
   onClose: () => void
-  onCancelled: (reason: string | null) => void
+  onCancelled: (reason: string | null, invoiceProblems: string[]) => void
 }) {
   const [reason, setReason] = useState('')
   const [withBooking, setWithBooking] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [invoices, setInvoices] = useState<CancelInvoice[] | null>(null)
+  // Part-paid invoices: true = write off the balance, false = leave it open.
+  const [writeOff, setWriteOff] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    fetch(`/api/invoices?itineraryId=${encodeURIComponent(itineraryId)}`)
+      .then(r => r.json())
+      .then(list => setInvoices(Array.isArray(list) ? openInvoicesOnCancel(list) : []))
+      .catch(() => setInvoices([]))
+  }, [itineraryId])
 
   const submit = async () => {
     setSaving(true)
@@ -50,7 +66,17 @@ export default function CancelTripDialog({ itineraryId, tripName, booking, paid,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.success) throw new Error(data.error || 'Could not cancel the itinerary')
-      onCancelled(why)
+
+      const problems: string[] = []
+      for (const inv of invoices ?? []) {
+        if (inv.action === 'writeoff' && !writeOff[inv.id]) continue
+        const r = inv.action === 'void'
+          ? await fetch(`/api/invoices/${inv.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) })
+          : await fetch(`/api/invoices/${inv.id}/write-off`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: why }) })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok || d.success === false) problems.push(`${inv.invoice_number}: ${d.error || (inv.action === 'void' ? 'could not be voided' : 'could not be written off')}`)
+      }
+      onCancelled(why, problems)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not cancel the trip')
     } finally {
@@ -78,6 +104,32 @@ export default function CancelTripDialog({ itineraryId, tripName, booking, paid,
           </label>
         )}
 
+        {invoices === null && <p className="text-xs text-gray-400">Checking the trip&apos;s invoices…</p>}
+        {invoices && invoices.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-900">Invoices</p>
+            {invoices.map(inv => (
+              <div key={inv.id} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2">
+                {inv.action === 'void' ? (
+                  <p><span className="font-medium">{inv.invoice_number}</span> — {inv.currency} {inv.due.toFixed(2)} unpaid. It will be <span className="font-medium">voided</span>.</p>
+                ) : (
+                  <>
+                    <p><span className="font-medium">{inv.invoice_number}</span> — {inv.currency} {inv.paid.toFixed(2)} paid, {inv.currency} {inv.due.toFixed(2)} still due.</p>
+                    <label className="mt-1.5 flex items-start gap-2">
+                      <input type="radio" name={`wo-${inv.id}`} checked={!!writeOff[inv.id]} onChange={() => setWriteOff(w => ({ ...w, [inv.id]: true }))} className="mt-0.5" />
+                      <span>Keep what was paid, write off {inv.currency} {inv.due.toFixed(2)}</span>
+                    </label>
+                    <label className="mt-1 flex items-start gap-2">
+                      <input type="radio" name={`wo-${inv.id}`} checked={!writeOff[inv.id]} onChange={() => setWriteOff(w => ({ ...w, [inv.id]: false }))} className="mt-0.5" />
+                      <span>Leave it open (e.g. to refund by hand)</span>
+                    </label>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {paid != null && paid > 0.005 && (
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
             {currency} {paid.toFixed(2)} has been paid on this trip. Cancelling does not refund it — record any refund on the invoice.
@@ -88,7 +140,7 @@ export default function CancelTripDialog({ itineraryId, tripName, booking, paid,
 
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={saving} className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md">Keep the trip</button>
-          <button type="button" onClick={submit} disabled={saving} className="px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5">
+          <button type="button" onClick={submit} disabled={saving || invoices === null} className="px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />} Cancel trip
           </button>
         </div>

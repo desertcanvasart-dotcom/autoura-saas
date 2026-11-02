@@ -1155,10 +1155,13 @@ export default function ViewItineraryPage() {
           paid={actualPnl && actualPnl.invoice_count > 0 ? actualPnl.total_paid : null}
           currency={itinerary.currency || 'EUR'}
           onClose={() => setShowCancel(false)}
-          onCancelled={() => {
+          onCancelled={(_reason, invoiceProblems) => {
             setShowCancel(false)
             setItinerary(prev => (prev ? { ...prev, status: 'cancelled' } : prev))
-            showToast('success', 'Trip cancelled')
+            setExpenseRefreshTrigger(t => t + 1)
+            checkExistingInvoice()
+            if (invoiceProblems.length > 0) showToast('error', `Trip cancelled, but ${invoiceProblems.join('; ')}`)
+            else showToast('success', 'Trip cancelled')
           }}
         />
       )}
@@ -1573,7 +1576,9 @@ export default function ViewItineraryPage() {
               <div className="space-y-6">
         {/* INVOICES & PAYMENTS — what was billed, what came in, and Record payment here. */}
         <InvoicesPayments
+          key={itinerary.status === 'cancelled' ? 'cancelled' : 'live'}
           itineraryId={itinerary.id}
+          tripCancelled={itinerary.status === 'cancelled'}
           today={facts.today}
           onCreateInvoice={handleGenerateInvoice}
           creatingInvoice={generatingInvoice}
