@@ -15,6 +15,7 @@ import BookingStatusControl, { type StatusOverride } from '@/components/booking/
 import BookingSuppliersPanel from '@/components/booking/BookingSuppliersPanel'
 import { useRole } from '@/hooks/useRole'
 import { BackLink, TripBreadcrumb } from '@/components/nav/TripNav'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Booking {
   id: string
@@ -296,6 +297,31 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // A cancelled booking with no money on it can be deleted (the API's rule).
+  // Without this, an itinerary it pointed at could never be deleted either.
+  const { confirm } = useConfirmDialog()
+  const [deleting, setDeleting] = useState(false)
+  const handleDelete = async () => {
+    if (!booking) return
+    const ok = await confirm({
+      title: `Delete ${booking.booking_number}?`,
+      message: 'This cancelled booking will be removed for good, with its travellers and their uploaded documents. Its itinerary stays, and can then be deleted too.',
+      confirmText: 'Delete booking',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setDeleting(true)
+    const res = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' })
+    const d = await res.json().catch(() => ({}))
+    setDeleting(false)
+    if (!res.ok || !d.success) {
+      showToast('error', d.error || 'Could not delete the booking')
+      return
+    }
+    router.push(booking.itineraries?.id ? `/itineraries/${booking.itineraries.id}` : '/bookings')
+  }
+
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
     setToasts(prev => [...prev, { id, type, message }])
@@ -503,6 +529,17 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               onChanged={fetchBooking}
               notify={showToast}
             />
+
+            {(isAdmin || isManager) && booking.status === 'cancelled' && payments.length === 0 && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? 'Deleting…' : 'Delete booking'}
+              </button>
+            )}
 
             {/* Action Buttons */}
             {/* A direct booking often has no CRM client: its itinerary's own
