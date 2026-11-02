@@ -7,7 +7,9 @@ import path from 'path'
 // which gave tenant users an UPDATE policy on concierge_briefs — is recorded
 // as applied on production but none of its policies exist, so every triage
 // PATCH updated zero rows and the page ignored the 404. Migration 386
-// re-applies 218 and adds DELETE; the API deletes archived leads only.
+// re-applies 218 and adds DELETE. Delete used to demand Archive first, which
+// hid the button so well the operator asked for one (2026-11-02); it now
+// works from any tab, behind the page's confirm.
 // ============================================================================
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8')
@@ -71,11 +73,11 @@ describe('DELETE a concierge lead', () => {
     expect(r.status).toBe(200)
     expect(deleted).toEqual(['b1'])
   })
-  it('refuses a lead that is not archived — archive first', async () => {
+  it('deletes a lead that is still in review — no archive first', async () => {
     stored = { id: 'b1', review_status: 'needs_review' }
     const r = await del()
-    expect(r.status).toBe(409)
-    expect(deleted).toEqual([])
+    expect(r.status).toBe(200)
+    expect(deleted).toEqual(['b1'])
   })
   it('refuses a member', async () => {
     role = 'member'
@@ -95,5 +97,20 @@ describe('the page says when an action fails', () => {
     const page = read('app/concierge-briefs/page.tsx')
     const fn = page.slice(page.indexOf('const updateStatus'), page.indexOf('const deleteBrief'))
     expect(fn).toMatch(/if \(!res\.ok\) \{[\s\S]*showToast\('error'/)
+  })
+  it('offers Delete on every tab, behind a confirm', () => {
+    const page = read('app/concierge-briefs/page.tsx')
+    expect(page).not.toMatch(/review_status === 'archived' && canDelete/)
+    const fn = page.slice(page.indexOf('const deleteBrief'), page.indexOf('const deleteClientLead'))
+    expect(fn).toMatch(/await confirm\(/)
+  })
+  it('an email lead is remembered as "not a lead" before its client is deleted', () => {
+    const page = read('app/concierge-briefs/page.tsx')
+    const fn = page.slice(page.indexOf('const deleteClientLead'), page.indexOf('const briefStage'))
+    expect(fn).toMatch(/await confirm\(/)
+    const dismiss = fn.indexOf("'/api/email/leads/dismiss'")
+    const remove = fn.indexOf('`/api/clients/${lead.id}`')
+    expect(dismiss).toBeGreaterThan(-1)
+    expect(remove).toBeGreaterThan(dismiss)
   })
 })

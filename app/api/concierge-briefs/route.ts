@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         'dates_window, trip_length_days, origin_city, nationality, destinations, comfort_level, ' +
         'interests, must_see, must_avoid, brief_summary, constraint_dietary, constraint_mobility, ' +
         'constraint_religious, constraint_medical, review_status, is_actionable, flags, client_id, ' +
-        'received_at, committed_response_by'
+        'received_at, committed_response_by, client:clients(status)'
       )
       .order('received_at', { ascending: false })
       .limit(200)
