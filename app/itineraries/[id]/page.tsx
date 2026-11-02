@@ -1570,7 +1570,7 @@ export default function ViewItineraryPage() {
             )}
 
             {tab === 'finance' && (
-              <div className="space-y-4">
+              <div className="space-y-6">
         {/* INVOICES & PAYMENTS — what was billed, what came in, and Record payment here. */}
         <InvoicesPayments
           itineraryId={itinerary.id}
