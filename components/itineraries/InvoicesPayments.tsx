@@ -11,6 +11,8 @@ import { Loader2, Plus, Receipt } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { PAYMENT_METHODS } from '@/lib/payment-input'
 import { withReturnTo } from '@/lib/nav/return-to'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { cancelActionFor } from '@/lib/itineraries/cancel-invoices'
 
 interface Invoice {
   id: string
@@ -54,7 +56,7 @@ const shortDate = (d: string | null) =>
   d ? new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
 const typeLabel = (t: string | null) => (t && t !== 'standard' ? t.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()) : null)
 
-export default function InvoicesPayments({ itineraryId, today, onCreateInvoice, creatingInvoice, onChanged, openSignal = 0, onOpened }: {
+export default function InvoicesPayments({ itineraryId, today, onCreateInvoice, creatingInvoice, onChanged, openSignal = 0, onOpened, tripCancelled = false }: {
   itineraryId: string
   /** YYYY-MM-DD: the default payment date, and "overdue". */
   today: string
@@ -67,6 +69,8 @@ export default function InvoicesPayments({ itineraryId, today, onCreateInvoice, 
   openSignal?: number
   /** The signal was acted on: the page clears it, so a later visit to the tab opens nothing. */
   onOpened?: () => void
+  /** The trip is cancelled: an open invoice offers Void / Write off instead of Record payment. */
+  tripCancelled?: boolean
 }) {
   const [invoices, setInvoices] = useState<Invoice[] | null>(null)
   const [payments, setPayments] = useState<Record<string, Payment[]>>({})
@@ -111,6 +115,29 @@ export default function InvoicesPayments({ itineraryId, today, onCreateInvoice, 
     if (due) startRecording(due)
     onOpened?.()
   }, [openSignal, invoices, startRecording, onOpened])
+
+  // A cancelled trip's open invoice (lib/itineraries/cancel-invoices): void an
+  // unpaid one; write off the balance of a part-paid one.
+  const { confirm } = useConfirmDialog()
+  const [closing, setClosing] = useState<string | null>(null)
+  const closeOut = async (inv: Invoice) => {
+    const action = cancelActionFor(inv)
+    if (!action) return
+    const ok = await confirm(action.action === 'void'
+      ? { title: `Void ${inv.invoice_number}?`, message: `The trip is cancelled. ${money(inv.currency, action.due)} will no longer be due and the invoice is marked cancelled.`, confirmText: 'Void invoice', cancelText: 'Keep it', variant: 'danger' }
+      : { title: `Write off the rest of ${inv.invoice_number}?`, message: `The trip is cancelled. The ${money(inv.currency, action.paid)} paid is kept and ${money(inv.currency, action.due)} is written off, so nothing is due. Refunds are not recorded here.`, confirmText: 'Write off balance', cancelText: 'Keep it open', variant: 'warning' })
+    if (!ok) return
+    setClosing(inv.id)
+    const res = action.action === 'void'
+      ? await fetch(`/api/invoices/${inv.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) })
+      : await fetch(`/api/invoices/${inv.id}/write-off`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    const d = await res.json().catch(() => ({}))
+    setClosing(null)
+    if (!res.ok || d.success === false) { showToast('error', d.error || `Could not change ${inv.invoice_number}`); return }
+    showToast('success', action.action === 'void' ? `${inv.invoice_number} voided` : `${money(inv.currency, action.due)} written off on ${inv.invoice_number}`)
+    await load()
+    onChanged?.()
+  }
 
   const save = async (inv: Invoice) => {
     const amount = Number(form.amount)
@@ -211,8 +238,17 @@ export default function InvoicesPayments({ itineraryId, today, onCreateInvoice, 
                     </ul>
                   )}
 
-                  {inv.status !== 'cancelled' && due > 0.005 && recording !== inv.id && (
+                  {!tripCancelled && inv.status !== 'cancelled' && due > 0.005 && recording !== inv.id && (
                     <button type="button" onClick={() => startRecording(inv)} className="mt-2 text-xs font-medium text-primary-600 hover:underline">Record payment</button>
+                  )}
+                  {tripCancelled && cancelActionFor(inv) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-gray-500">Trip cancelled —</span>
+                      <button type="button" onClick={() => closeOut(inv)} disabled={closing === inv.id} className="font-medium text-red-700 hover:underline disabled:opacity-50 flex items-center gap-1">
+                        {closing === inv.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {cancelActionFor(inv)?.action === 'void' ? 'Void invoice' : 'Write off balance'}
+                      </button>
+                    </div>
                   )}
 
                   {recording === inv.id && (
