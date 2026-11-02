@@ -44,11 +44,6 @@ import {
   Eye,
   Send,
   AlertTriangle,
-  CalendarDays,
-  Bus,
-  Ship,
-  Sailboat,
-  Anchor,
   Drama,
   Briefcase,
   ClipboardList,
@@ -169,13 +164,13 @@ const CITY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
 }
 
 const PACKAGE_TYPES = [
-  { id: 'day-trips', name: 'Day Trips', icon: CalendarDays, desc: 'No accommodation', advanced: false },
-  { id: 'tours-only', name: 'Tours Only', icon: Bus, desc: 'Client has own hotel', advanced: false },
-  { id: 'land-package', name: 'Land Package', icon: Hotel, desc: 'Tours + Hotels', advanced: false },
-  { id: 'cruise-package', name: 'Cruise', icon: Ship, desc: 'Cruise only', advanced: false },
-  { id: 'full-package', name: 'Full Package', icon: Plane, desc: 'All inclusive + Airport', advanced: true },
-  { id: 'cruise-land', name: 'Cruise + Land', icon: Sailboat, desc: 'Cruise and land combo', advanced: true },
-  { id: 'shore-excursions', name: 'Shore Excursions', icon: Anchor, desc: 'Port pickup, time-limited', advanced: true }
+  { id: 'day-trips', name: 'Day Trips', desc: 'No accommodation' },
+  { id: 'tours-only', name: 'Tours Only', desc: 'Client has own hotel' },
+  { id: 'land-package', name: 'Land Package', desc: 'Tours + Hotels' },
+  { id: 'cruise-package', name: 'Cruise', desc: 'Cruise only' },
+  { id: 'full-package', name: 'Full Package', desc: 'All inclusive + Airport' },
+  { id: 'cruise-land', name: 'Cruise + Land', desc: 'Cruise and land combo' },
+  { id: 'shore-excursions', name: 'Shore Excursions', desc: 'Port pickup, time-limited' }
 ]
 
 
@@ -243,7 +238,6 @@ export default function ItineraryEditorPage() {
   // computed on the saved itinerary — a note, never a blocker.
   const [cruiseSailingNotes, setCruiseSailingNotes] = useState<string[]>([])
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
-  const [showAdvancedPackages, setShowAdvancedPackages] = useState(false)
   const [draggedDay, setDraggedDay] = useState<string | null>(null)
 
   // Services & Pricing State
@@ -1204,60 +1198,26 @@ export default function ItineraryEditorPage() {
         </div>
       </div>
 
-      {/* PACKAGE TYPE SELECTOR */}
-      <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-sm font-semibold text-gray-900">Package Type</h3>
-          <button
-            onClick={() => setShowAdvancedPackages(!showAdvancedPackages)}
-            className="text-sm text-gray-500 hover:text-primary-500 flex items-center gap-1"
-          >
-            {showAdvancedPackages ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            {showAdvancedPackages ? 'Hide' : 'Show'} advanced options
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 mb-3">
-          {PACKAGE_TYPES.filter(p => !p.advanced).map(pkg => (
+      {/* PACKAGE TYPE SELECTOR — one compact row, as in the pricing grid */}
+      <div className="bg-white rounded-xl px-5 py-3 mb-5 shadow-sm flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Package Type</h3>
+        <div className="flex flex-wrap gap-1.5">
+          {PACKAGE_TYPES.map(pkg => (
             <button
               key={pkg.id}
+              type="button"
               onClick={() => setItinerary({ ...itinerary, package_type: pkg.id })}
-              className={`p-4 rounded-xl border-2 text-center transition-all ${
+              title={pkg.desc}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                 itinerary.package_type === pkg.id
-                  ? 'border-primary-500 bg-[#e8ede3]'
-                  : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1]'
+                  ? 'bg-primary-500 border-[#4a5c35] text-white shadow-sm'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
-              <div className="mb-1 flex justify-center"><pkg.icon className="w-6 h-6 text-primary-600" /></div>
-              <div className={`text-sm font-semibold ${itinerary.package_type === pkg.id ? 'text-[#4a5c35]' : 'text-gray-700'}`}>
-                {pkg.name}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">{pkg.desc}</div>
+              {pkg.name}
             </button>
           ))}
         </div>
-
-        {showAdvancedPackages && (
-          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-200">
-            {PACKAGE_TYPES.filter(p => p.advanced).map(pkg => (
-              <button
-                key={pkg.id}
-                onClick={() => setItinerary({ ...itinerary, package_type: pkg.id })}
-                className={`p-4 rounded-xl border-2 text-center transition-all ${
-                  itinerary.package_type === pkg.id
-                    ? 'border-primary-500 bg-[#e8ede3]'
-                    : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1]'
-                }`}
-              >
-                <div className="mb-1 flex justify-center"><pkg.icon className="w-6 h-6 text-primary-600" /></div>
-                <div className={`text-sm font-semibold ${itinerary.package_type === pkg.id ? 'text-[#4a5c35]' : 'text-gray-700'}`}>
-                  {pkg.name}
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">{pkg.desc}</div>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* MAIN CONTENT - TWO COLUMNS */}
