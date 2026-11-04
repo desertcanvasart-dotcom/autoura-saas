@@ -3,12 +3,20 @@
 // Updated to pull from actual resource management tables
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { roleDenied } from '@/lib/api-role-gate'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { attachPropertyNames } from '@/lib/suppliers/attach-property-names'
 import { displayPpd } from '@/lib/rates/rate-seasons'
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
+
     // Use authenticated client - RLS automatically filters by tenant
     let supabase
     try {

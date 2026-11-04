@@ -18,6 +18,8 @@ export async function GET(
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { id } = await params
 

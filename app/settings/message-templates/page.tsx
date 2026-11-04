@@ -1415,20 +1415,22 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
         endpoint = '/api/b2b/partners'
         recipientType = 'b2b_partner'
       } else if (isSupplierTemplate) {
-        // Suppliers (hotels, cruises, guides, transport)
+        // Suppliers (hotels, cruises, guides, transport). Recipients come from
+        // the supplier list, not the rate sheets: those carry supplier costs
+        // and answer managers only, and a rate row is not a contact anyway.
         recipientType = supplierType as Recipient['type']
         switch (supplierType) {
           case 'hotel':
             endpoint = '/api/resources/hotels'
             break
           case 'cruise':
-            endpoint = '/api/rates/cruises'
+            endpoint = '/api/suppliers?type=cruise'
             break
           case 'transport':
-            endpoint = '/api/rates/transportation'
+            endpoint = '/api/suppliers?type=transport_company'
             break
           case 'guide':
-            endpoint = '/api/rates/guides'
+            endpoint = '/api/suppliers?type=guide'
             break
           default:
             endpoint = '/api/suppliers'

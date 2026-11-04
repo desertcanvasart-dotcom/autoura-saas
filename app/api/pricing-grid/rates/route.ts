@@ -3,6 +3,7 @@
 // (lib/pricing/grid-rates — the same lists a grid save prices from).
 
 import { NextRequest, NextResponse } from 'next/server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { requireAuth } from '@/lib/supabase-server'
 import { loadGridRates } from '@/lib/pricing/grid-rates'
 
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status || 401 }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
     const { searchParams } = new URL(request.url)
     const rates = await loadGridRates(authResult.supabase, authResult.tenant_id!, {
       tier: searchParams.get('tier'),

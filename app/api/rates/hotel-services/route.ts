@@ -8,6 +8,13 @@ import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 
 export async function GET() {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
+
     // Use authenticated client - RLS automatically filters by tenant
     let supabase
     try {
