@@ -174,7 +174,7 @@ tour manager. Time-poor, margin-sensitive, WhatsApp-native.
 
 | Plan | Monthly | Onboarding | Notes |
 |---|---|---|---|
-| Solo | $69 | $500 one-time | Full product, volume-limited |
+| Solo | $89 | $500 one-time | Full product, volume-limited |
 | Studio | $189 | $1,000 one-time | |
 | Agency | $449 | $1,500 one-time | |
 | Enterprise | contact sales | scoped | |
