@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { requireAuth } from '@/lib/supabase-server'
 import { fetchAllPages } from '@/lib/db/fetch-all-pages'
 import { hotelTierFindings, transportTypeFindings } from '@/lib/rates/rate-checks'
@@ -14,6 +15,8 @@ export async function GET() {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase } = authResult
 
     const [hotels, transport] = await Promise.all([

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { requireAuth } from '@/lib/supabase-server'
 import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow, exportCellValue, propertyLinkFor } from '@/lib/bulk-rate-service'
 import type { Database } from '@/types/database.types'
@@ -11,6 +12,8 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
     const { supabase, tenant_id } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 

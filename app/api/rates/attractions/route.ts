@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'staff')
+    if (denied) return denied
     const { supabase } = authResult
     if (!supabase) {
       return NextResponse.json(

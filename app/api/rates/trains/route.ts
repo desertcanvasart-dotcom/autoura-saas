@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const searchParams = request.nextUrl.searchParams
     const supplierId = searchParams.get('supplier_id')

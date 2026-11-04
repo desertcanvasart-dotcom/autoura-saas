@@ -4,6 +4,7 @@
 // shown but cannot be chosen, so a quote is never asked for a guide the
 // agency cannot price.
 import { NextResponse } from 'next/server'
+import { roleDenied } from '@/lib/api-role-gate'
 import { requireAuth } from '@/lib/supabase-server'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { languagesWithRates } from '@/lib/guides/guide-language'
@@ -11,6 +12,8 @@ import { languagesWithRates } from '@/lib/guides/guide-language'
 export async function GET() {
   const auth = await requireAuth()
   if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+  const denied = roleDenied(auth.role, 'manage')
+  if (denied) return denied
   const { supabase } = auth
   const [items, { data: rows, error }] = await Promise.all([
     loadVocabulary(supabase, 'guide_language'),

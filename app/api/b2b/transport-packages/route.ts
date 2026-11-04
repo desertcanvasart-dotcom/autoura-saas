@@ -17,6 +17,8 @@ export async function GET() {
         { status: authResult.status }
       )
     }
+    const denied = roleDenied(authResult.role, 'manage')
+    if (denied) return denied
 
     const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
