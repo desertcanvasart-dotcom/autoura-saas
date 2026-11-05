@@ -26,13 +26,17 @@ export interface PreferredToggleResult {
 interface PreferredStarProps {
   table: PreferredTable
   id: string
+  /** A transport route's vehicle rows, starred together (migration 460). */
+  ids?: string[]
   preferred: boolean | null | undefined
+  /** What the tooltip says the star chooses between. */
+  among?: string
   /** Called after the request completes — refetch and toast here. */
   onToggled: (result: PreferredToggleResult) => void
   className?: string
 }
 
-export default function PreferredStar({ table, id, preferred, onToggled, className }: PreferredStarProps) {
+export default function PreferredStar({ table, id, ids, preferred, among, onToggled, className }: PreferredStarProps) {
   const [busy, setBusy] = useState(false)
   const on = preferred === true
 
@@ -44,7 +48,7 @@ export default function PreferredStar({ table, id, preferred, onToggled, classNa
       const res = await fetch('/api/rates/preferred', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table, id, preferred: !on }),
+        body: JSON.stringify(ids && ids.length ? { table, ids, preferred: !on } : { table, id, preferred: !on }),
       })
       const data = await res.json()
       onToggled(data.success
@@ -65,7 +69,7 @@ export default function PreferredStar({ table, id, preferred, onToggled, classNa
       aria-pressed={on}
       title={on
         ? 'Preferred — the engine uses this one when several fit. Click to clear.'
-        : 'Mark as preferred: the engine uses this one when several hotels/ships/restaurants fit the same city and tier.'}
+        : `Mark as preferred: the engine uses this one when several ${among || 'hotels/ships/restaurants fit the same city and tier'}.`}
       className={`p-1.5 rounded transition-colors disabled:opacity-50 ${on ? 'text-amber-500 hover:bg-amber-50' : 'text-gray-300 hover:text-amber-500 hover:bg-amber-50'} ${className || ''}`}
     >
       <Star className={`w-4 h-4 ${on ? 'fill-amber-500' : ''}`} />

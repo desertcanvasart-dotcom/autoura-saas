@@ -48,7 +48,7 @@ const RATE_FIGURES: Record<string, readonly string[]> = {
 }
 
 /** Sheets with a preferred star (lib/rates/preferred.ts) among these. */
-const PREFERRED_COLUMN: Record<string, string> = { meal_rates: 'is_preferred' }
+const PREFERRED_COLUMN: Record<string, string> = { meal_rates: 'is_preferred', transportation_rates: 'is_preferred' }
 
 export function rateColumns(table: string): string {
   return ['id', 'supplier_id', 'rate_currency', 'is_active', ...(SAME_SERVICE_KEYS[table] ?? []), ...(RATE_FIGURES[table] ?? []), ...(PREFERRED_COLUMN[table] ? [PREFERRED_COLUMN[table]] : [])].join(', ')

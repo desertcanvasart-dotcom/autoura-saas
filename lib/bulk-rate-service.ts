@@ -22,6 +22,10 @@ export interface RateTableConfig {
    *  uniqueKey is matched on these instead of always being added — a
    *  hand-filled sheet imported twice doubled every rate. */
   identityKey?: string[]
+  /** Part of the key, but may be blank (compares as empty): transport's
+   *  supplier — several companies may price one route (migration 460), and a
+   *  row naming no company still matches the route it always did. */
+  optionalKey?: string[]
 }
 
 export interface ColumnDef {
@@ -187,6 +191,10 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     // overwrote one with the other (A-item 5). This table also has no
     // season, validity dates or notes; supplier_id arrived with migration 355.
     uniqueKey: ['route_name', 'service_type', 'city', 'vehicle_type'],
+    // Several companies may price the same route and vehicle (migration 460):
+    // the company is part of what a row is. Matching ignored it, so importing
+    // the second company's sedan overwrote the first company's price.
+    optionalKey: ['supplier_id'],
     columns: [
       id(),
       col('route_name', 'Route Name', 'text', true),
@@ -205,6 +213,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       supplierId(),
       col('capacity_min', 'Min Pax', 'number', false),
       col('capacity_max', 'Max Pax', 'number', false),
+      // The default company when several price this route and vehicle.
+      col('is_preferred', 'Preferred', 'boolean', false),
       isActive(), createdAt(), updatedAt(),
       rateCurrency(),
     ],
@@ -1156,7 +1166,8 @@ export function getSupportedTables(): string[] {
  *  missing (such rows always insert — same behaviour as before). */
 export function importRowKey(
   record: Record<string, unknown>,
-  uniqueKey: string[]
+  uniqueKey: string[],
+  optionalKey: string[] = []
 ): string | null {
   const parts: string[] = []
   for (const col of uniqueKey) {
@@ -1164,6 +1175,8 @@ export function importRowKey(
     if (v === null || v === undefined || v === '') return null
     parts.push(String(v).trim().toLowerCase())
   }
+  // Optional parts compare as empty when blank — never make the key null.
+  for (const col of optionalKey) parts.push(String(record[col] ?? '').trim().toLowerCase())
   // NUL separator: a space would let ('a b','c') collide with ('a','b c').
   return parts.join('\u0000')
 }
@@ -1186,13 +1199,14 @@ export interface ImportRowPartition<T> {
 
 export function partitionImportRows<T extends Record<string, unknown>>(
   records: T[],
-  uniqueKey: string[]
+  uniqueKey: string[],
+  optionalKey: string[] = []
 ): ImportRowPartition<T> {
   const seen = new Set<string>()
   const rows: T[] = []
   const duplicates: Array<{ record: T; message: string }> = []
   for (const record of records) {
-    const key = importRowKey(record, uniqueKey)
+    const key = importRowKey(record, uniqueKey, optionalKey)
     if (key !== null && seen.has(key)) {
       const label = uniqueKey.map(c => `${c}=${String(record[c])}`).join(', ')
       duplicates.push({

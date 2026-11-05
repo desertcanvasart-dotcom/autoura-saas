@@ -17,6 +17,7 @@ import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyTe
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
+import { resolveTransportSuppliers, type TransportSupplierRow } from '@/lib/pricing/transport-suppliers'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { aiBudgetDenied, aiInputTooLong } from '@/lib/ai-guard'
@@ -63,7 +64,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
     activityRes, accommodationRes, entranceRes, flightRes, mealRes,
     cruiseRes, sleepingTrainRes,
   ] = await Promise.all([
-    admin.from('transportation_rates').select('id, route_name, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('transportation_rates').select('id, route_name, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency, supplier_id, is_preferred').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('guide_rates').select('id, guide_type, guide_language, city, full_day_rate, half_day_rate, base_rate_eur, rate_currency').eq('tenant_id', tenantId),
     admin.from('airport_staff_rates').select('id, service_type, airport_code, direction, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('hotel_staff_rates').select('id, service_type, hotel_category, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
@@ -104,7 +105,10 @@ async function fetchAllRates(tenantId: string, tier: string) {
     transportation, guides, airport_staff, hotel_staff, tipping, activities,
     accommodation, entrance_fees, flights, meals, cruises, sleeping_trains,
   ] = await Promise.all([
-    norm('transportation_rates', transportRes.data),
+    // Several companies on one route (migration 460): where one is starred the
+    // AI sees only its rows, so it cannot pick the other company's price.
+    norm('transportation_rates', resolveTransportSuppliers((transportRes.data || []) as TransportSupplierRow[], () => '')
+      .map(r => { const out: Record<string, unknown> = { ...r }; delete out.ambiguity; delete out.supplier_id; delete out.is_preferred; return out })),
     norm('guide_rates', guideRows),
     norm('airport_staff_rates', airportRows),
     norm('hotel_staff_rates', hotelStaffRes.data),

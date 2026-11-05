@@ -7,7 +7,7 @@
 // must clear it on that row's siblings. The scopes here mirror the engine's
 // candidate pools and the partial unique indexes in migration 354.
 
-export type PreferredTable = 'accommodation_rates' | 'nile_cruises' | 'meal_rates' | 'guides'
+export type PreferredTable = 'accommodation_rates' | 'nile_cruises' | 'meal_rates' | 'guides' | 'transportation_rates'
 
 interface ScopeDef {
   /** Columns that define "the same scope". Text columns compare case-insensitively. */
@@ -27,6 +27,17 @@ export const PREFERRED_SCOPES: Record<PreferredTable, ScopeDef> = {
   // the languages overlap — approximated here as "same tier", which is what
   // the roster page can express. No unique index (migration 354).
   guides: { columns: ['tier'], nameColumn: 'name', page: 'CRM → Guides' },
+  // Transport (migration 460): several companies may price the same route and
+  // vehicle; the star picks the company. The scope is what the engine matches
+  // a journey on — NOT the route's name or its company. One row per vehicle,
+  // so starring a route stars each of its vehicle rows. No unique index: a
+  // company's several named routes in one city may all carry its star, and
+  // the engine reads the star per COMPANY (lib/pricing/transport-suppliers.ts).
+  transportation_rates: {
+    columns: ['service_type', 'city', 'origin_city', 'destination_city', 'duration', 'area', 'vehicle_type'],
+    nameColumn: 'route_name',
+    page: 'Rates → Transportation',
+  },
 }
 
 export function isPreferredTable(t: unknown): t is PreferredTable {

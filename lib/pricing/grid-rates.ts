@@ -123,6 +123,17 @@ export async function loadGridRates(
   // The company's own row wins over a shared (tenant-less) one.
   const waterRows = (fixedCosts || []).filter(r => isWaterCostType(r.cost_type))
   const waterRow = waterRows.find(r => r.tenant_id === tenantId) ?? waterRows[0]
+
+  // Transport companies, by id — named on a route that several companies
+  // price (migration 460), so the operator can tell the options apart.
+  const transportSupplierIds = [...new Set((transportRates || []).map(r => (r as { supplier_id?: string | null }).supplier_id).filter(Boolean))] as string[]
+  const transportSupplierNames = new Map<string, string>()
+  if (transportSupplierIds.length) {
+    const { data } = await supabase.from('suppliers').select('id, company_name, name').in('id', transportSupplierIds)
+    for (const s of (data ?? []) as Array<{ id: string; company_name: string | null; name: string | null }>) {
+      transportSupplierNames.set(s.id, s.company_name || s.name || '')
+    }
+  }
   const waterRate = waterRow ? toNum(waterRow.cost_per_person_per_day) : DEFAULT_WATER_PER_PERSON_PER_DAY
 
   // First stored period's guide bed rate (B-item 3); 0 in a period means
@@ -142,7 +153,7 @@ export async function loadGridRates(
       // buildTransportTierIndex can re-select the vehicle as group size grows.
       // Read-only — no schema change; uses the same grouping key as
       // travel-ops-pro migration 20260205_transportation_rates_restructure.
-      ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel, vehicleTypeLabel),
+      ...groupVehicleRowsToTiers(transportRates || [], transportTypeLabel, vehicleTypeLabel, id => transportSupplierNames.get(id) || null),
       // Cruise transport packages (bundled sightseeing vehicle for cruise days).
       // One option per vehicle the package prices (its `vehicles` list since
       // migration 381, keyed by the agency's vehicle_type vocabulary), encoded
@@ -386,7 +397,7 @@ function vehicleSlug(v: any): string {
 /**
  * Group per-vehicle transportation_rates rows into the grid's tiered option
  * shape. Rows are grouped by (service_type, city, origin_city, destination_city,
- * route_name); each group's stable keeper id (earliest created_at, then lowest
+ * route_name, supplier_id); each group's stable keeper id (earliest created_at, then lowest
  * id) becomes the option rowId, so all of a route's vehicles share one
  * `${keeperId}__${tier}` family and buildTransportTierIndex re-selects by pax.
  * Each vehicle row keeps its own rate + capacity band (falling back to the
@@ -396,11 +407,22 @@ export function groupVehicleRowsToTiers(
   rows: any[],
   typeLabel?: (serviceType: string) => string,
   vehicleLabel?: (vehicleType: string) => string,
+  supplierName?: (supplierId: string) => string | null,
 ): any[] {
   // One row per (route, vehicle) since migration 337 — nothing to expand.
-  const groupKey = (r: any) =>
+  // The company is part of the route (migration 460): two companies pricing
+  // Alexandria → Cairo are two options, never one option mixing their prices.
+  const routeKey = (r: { service_type?: unknown; city?: unknown; origin_city?: unknown; destination_city?: unknown; route_name?: unknown }) =>
     [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
      normLower(r.destination_city), normLower(r.route_name)].join('|')
+  const groupKey = (r: { supplier_id?: unknown } & Parameters<typeof routeKey>[0]) => `${routeKey(r)}|${normLower(r.supplier_id)}`
+  // Routes several companies price — only there does the option name its company.
+  const companiesByRoute = new Map<string, Set<string>>()
+  for (const r of rows) {
+    const set = companiesByRoute.get(routeKey(r)) ?? new Set<string>()
+    set.add(normLower(r.supplier_id))
+    companiesByRoute.set(routeKey(r), set)
+  }
 
   const groups = new Map<string, any[]>()
   for (const r of rows) {
@@ -427,7 +449,13 @@ export function groupVehicleRowsToTiers(
     // Trip …): two routes on the same road differ only by it, and without it
     // an "Intercity Overnight" chip read like the day's whole programme.
     const kind = keeper.service_type && typeLabel ? typeLabel(String(keeper.service_type)) : ''
-    const label = kind && !normLower(routeLabel).includes(normLower(kind)) ? `${routeLabel} · ${kind}` : routeLabel
+    const routeWithKind = kind && !normLower(routeLabel).includes(normLower(kind)) ? `${routeLabel} · ${kind}` : routeLabel
+    const shared = (companiesByRoute.get(routeKey(keeper))?.size ?? 0) > 1
+    const company = shared
+      ? (keeper.supplier_id ? (supplierName?.(String(keeper.supplier_id)) || 'Supplier') : 'No supplier')
+      : ''
+    const starred = shared && groupRows.some(r => r.is_preferred === true)
+    const label = company ? `${routeWithKind} · ${company}${starred ? ' ★' : ''}` : routeWithKind
 
     const usedTierKeys = new Map<string, number>()
     for (const r of sorted) {

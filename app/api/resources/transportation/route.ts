@@ -137,6 +137,7 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
     includes: kept('includes'),
     is_active: body.is_active !== undefined ? body.is_active : true,
     // The transport company (migration 355) — one per route, on every row.
+    // Several companies may each price the same route (migration 460).
     supplier_id: body.supplier_id || null,
     updated_at: new Date().toISOString(),
   }
@@ -159,9 +160,18 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
       if (error) return { status: 500, json: { success: false, error: `Failed to update ${v.key}: ${error.message}` } }
       out.push(data); byKey.delete(v.key)
     } else {
-      const { data, error } = await admin.from('transportation_rates').insert({ ...row, tenant_id: tenantId }).select().single()
+      // A vehicle added to a starred route carries the route's star, so the
+      // company stays the default for every vehicle it drives there.
+      const { data, error } = await admin.from('transportation_rates').insert({ ...row, tenant_id: tenantId, is_preferred: existing.some(r => r.is_preferred === true) }).select().single()
       if (error) {
-        if (error.code === '23505') return { status: 409, json: { success: false, error: `This route already prices "${v.key}" — edit that route instead of adding it again` } }
+        if (error.code === '23505') {
+          // Several companies may price one route (migration 460) — but each
+          // company once. The clash is with the SAME company's row (or, with
+          // no company picked, with another supplier-less copy).
+          return { status: 409, json: { success: false, error: routeFields.supplier_id
+            ? `This supplier already prices "${v.key}" on this route — edit that route instead of adding it again`
+            : `This route already prices "${v.key}" with no supplier — pick the supplier for this price, or edit that route` } }
+        }
         return { status: 500, json: { success: false, error: `Failed to add ${v.key}: ${error.message}` } }
       }
       out.push(data)

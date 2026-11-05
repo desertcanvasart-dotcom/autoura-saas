@@ -46,6 +46,7 @@ import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { fetchEveryRow } from '@/lib/db/fetch-all-pages'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
+import { resolveTransportSuppliers, suppliersNeedingNames } from '@/lib/pricing/transport-suppliers'
 import { presetTierFor, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
 import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant, guideGradesForTenant } from '@/lib/vocabulary-server'
 import type { VocabularyKind } from '@/lib/vocabulary'
@@ -423,6 +424,12 @@ interface TransportRate {
   capacity_min: number | null
   capacity_max: number | null
   is_active: boolean
+  /** The transport company (migration 355); several may price one route (460). */
+  supplier_id?: string | null
+  is_preferred?: boolean | null
+  /** Set when several companies price this journey and none (or several) is
+   *  starred — a lookup landing here is a hole, not a price. */
+  ambiguity?: Ambiguity
 }
 
 // ============================================
@@ -2421,11 +2428,22 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
     .select('*')
     .or(catalogOrExpr(scope))
     .eq('is_active', true))
-  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
+  const normalized = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
   const cache = new Map<string, TransportRate>()
 
-  if (!allRates) return cache
+  if (!normalized) return cache
+
+  // Several companies pricing the same journey (migration 460): the starred
+  // one's rows alone, or every row marked ambiguous — never an arbitrary pick.
+  const rows = normalized as unknown as TransportRate[]
+  const nameIds = suppliersNeedingNames(rows)
+  const names = new Map<string, string>()
+  if (nameIds.length) {
+    const { data } = await getSupabaseAdmin().from('suppliers').select('id, company_name, name').in('id', nameIds)
+    for (const s of (data ?? []) as Array<{ id: string; company_name: string | null; name: string | null }>) names.set(s.id, s.company_name || s.name || 'a supplier')
+  }
+  const allRates = resolveTransportSuppliers(rows, id => (id && names.get(id)) || 'no supplier')
 
   for (const row of allRates) {
     // One row per (route, vehicle) — migration 337 made the tall shape the
@@ -2654,14 +2672,16 @@ export async function previewDayTransport(
       let match: ReturnType<typeof findTransportRate> = null
       for (const st of [serviceType, ...alsoTry]) {
         match = findTransportRate(cache, { serviceType: st as TransportServiceType, city, duration: '' as never, area: null, vehicleType, ...(route ? { originCity: route.from, destinationCity: route.to } : {}) })
-        if (match && match.source === 'db') break
+        if (match && match.source !== 'fuzzy') break
       }
       const ok = match && match.source === 'db'
       lines.push({
         serviceType, city, route, vehicleType, label, derived,
         cost: ok ? Number(match!.rate.base_rate_eur) : null,
         rateName: ok ? (match!.rate.route_name ?? undefined) : undefined,
-        reason: ok ? undefined : match ? `Only an approximate rate (another city or length) — not used` : `No ${vehicleType} rate for ${serviceType.replace(/_/g, ' ')} ${route ? `${route.from} → ${route.to}` : `in ${city || 'this city'}`}`,
+        reason: ok ? undefined : match?.source === 'ambiguous'
+          ? transportHoleMessage(match, `${vehicleType} ${route ? `${route.from} → ${route.to}` : `in ${city || 'this city'}`}`, '')
+          : match ? `Only an approximate rate (another city or length) — not used` : `No ${vehicleType} rate for ${serviceType.replace(/_/g, ' ')} ${route ? `${route.from} → ${route.to}` : `in ${city || 'this city'}`}`,
       })
     }
     if (day.in_transit) { out.push({ day: day.day, automatic: !day.transport_lines, lines }); continue }
@@ -2800,6 +2820,31 @@ export function findTransportRate(
     originCity?: string
     destinationCity?: string
   }
+): TransportMatch | null {
+  const found = findTransportRateRaw(cache, params)
+  // Several companies price this journey and none is starred: not a price.
+  if (found && found.source === 'db' && found.rate.ambiguity) {
+    return { rate: found.rate, source: 'ambiguous', ambiguity: found.rate.ambiguity }
+  }
+  return found
+}
+
+/** What a transport lookup found: a definite row, an approximate one (another
+ *  city), or several companies with none starred. Only 'db' is a price. */
+export type TransportMatch =
+  | { rate: TransportRate; source: 'db' | 'fuzzy'; ambiguity?: undefined }
+  | { rate: TransportRate; source: 'ambiguous'; ambiguity: Ambiguity }
+
+/** The hole message for a transport lookup that found no price: the
+ *  companies to choose between when it was ambiguous, else `fallback`. */
+export function transportHoleMessage(match: TransportMatch | null, what: string, fallback: string): string {
+  if (match?.source === 'ambiguous') return ambiguityMessage(`transport companies price ${what}`, match.ambiguity, 'Rates → Transportation')
+  return fallback
+}
+
+function findTransportRateRaw(
+  cache: Map<string, TransportRate>,
+  params: Parameters<typeof findTransportRate>[1]
 ): { rate: TransportRate; source: 'db' | 'fuzzy' } | null {
   const { serviceType, city, duration, area, vehicleType, originCity, destinationCity } = params
   const cityLower = city.toLowerCase()
@@ -4630,7 +4675,7 @@ export async function calculateDayBasedPricing(
         vehicleType,
         ...(extra.originCity !== undefined ? { originCity: extra.originCity, destinationCity: extra.destinationCity } : {}),
       })
-      if (match && match.source === 'db') break
+      if (match && match.source !== 'fuzzy') break
     }
     return match
   }
@@ -4677,15 +4722,18 @@ export async function calculateDayBasedPricing(
       // No exact transport rate — record a hole, never substitute a default.
       addHole({
         kind: 'transport',
-        reason: match ? 'fuzzy' : 'missing',
+        reason: match?.source === 'fuzzy' ? 'fuzzy' : 'missing',
         tier,
         dayNumber: info.day,
         city: info.city,
         vehicleType,
         lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
-        message: isIntercity(String(needs.serviceType))
+        message: transportHoleMessage(match, isIntercity(String(needs.serviceType))
+          ? `${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}`
+          : `${vehicleType} ${String(needs.serviceType).replace(/_/g, ' ')} in ${info.city}`,
+          isIntercity(String(needs.serviceType))
           ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
-          : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
+          : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`),
       })
     }
   }
@@ -4776,13 +4824,13 @@ export async function calculateDayBasedPricing(
       } else {
         addHole({
           kind: 'transport',
-          reason: match ? 'fuzzy' : 'missing',
+          reason: match?.source === 'fuzzy' ? 'fuzzy' : 'missing',
           tier,
           dayNumber: day.day,
           city: where,
           vehicleType: extraVehicle,
           lookupAttempted: `${extra.serviceType}/one_way ${extraVehicle} in ${where}`,
-          message: `No ${extra.label.toLowerCase()} rate for ${extraVehicle} in ${where || 'this day'}. Add it in Rates → Transportation.`,
+          message: transportHoleMessage(match, `${extraVehicle} ${extra.label.toLowerCase()} in ${where || 'this day'}`, `No ${extra.label.toLowerCase()} rate for ${extraVehicle} in ${where || 'this day'}. Add it in Rates → Transportation.`),
         })
       }
     }
@@ -4839,15 +4887,18 @@ export async function calculateDayBasedPricing(
         // No exact rate for THIS pax's vehicle size — record a hole, add nothing.
         addHole({
           kind: 'transport',
-          reason: match ? 'fuzzy' : 'missing',
+          reason: match?.source === 'fuzzy' ? 'fuzzy' : 'missing',
           tier,
           dayNumber: info.day,
           city: info.city,
           vehicleType,
           lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
-          message: isIntercity(String(needs.serviceType))
+          message: transportHoleMessage(match, isIntercity(String(needs.serviceType))
+            ? `${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}`
+            : `${vehicleType} ${String(needs.serviceType).replace(/_/g, ' ')} in ${info.city}`,
+            isIntercity(String(needs.serviceType))
             ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
-            : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
+            : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`),
         })
       }
     }
@@ -4867,13 +4918,13 @@ export async function calculateDayBasedPricing(
         } else {
           addHole({
             kind: 'transport',
-            reason: match ? 'fuzzy' : 'missing',
+            reason: match?.source === 'fuzzy' ? 'fuzzy' : 'missing',
             tier,
             dayNumber: day.day,
             city: where,
             vehicleType,
             lookupAttempted: `${extra.serviceType}/one_way ${vehicleType} in ${where}`,
-            message: `No ${extra.label.toLowerCase()} rate for ${vehicleType} in ${where || 'this day'}. Add it in Rates → Transportation.`,
+            message: transportHoleMessage(match, `${vehicleType} ${extra.label.toLowerCase()} in ${where || 'this day'}`, `No ${extra.label.toLowerCase()} rate for ${vehicleType} in ${where || 'this day'}. Add it in Rates → Transportation.`),
           })
         }
       }
