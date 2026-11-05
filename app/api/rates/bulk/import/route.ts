@@ -219,6 +219,8 @@ export async function POST(request: NextRequest) {
     // column still identifies the template's example row.
     const uniqueKey = config.uniqueKey
     const uniqueKeyColumn = uniqueKey[0]
+    // Key parts that may be blank — transport's supplier (migration 460).
+    const optionalKey = config.optionalKey ?? []
 
     const rowsToUpsert: Record<string, any>[] = []
     let exampleRowsSkipped = 0
@@ -453,7 +455,7 @@ export async function POST(request: NextRequest) {
     // Two rows in the same file sharing one natural key: the second would
     // silently overwrite the first ("13 creates, 0 inserts"). Refuse them
     // row-wise with the collision named, import the rest.
-    const partition = partitionImportRows(rowsToUpsert, uniqueKey)
+    const partition = partitionImportRows(rowsToUpsert, uniqueKey, optionalKey)
     // Two rows with no code that name the same rate: the second would update
     // what the first just wrote. Refused, as two rows sharing a code are.
     if (config.identityKey) {
@@ -495,21 +497,36 @@ export async function POST(request: NextRequest) {
     // — the hotel and city, the restaurant and meal — instead of being added
     // again on every import of the same hand-filled sheet.
     const storedByIdentity = new Map<string, Array<Record<string, unknown>>>()
+    // The same key WITHOUT its optional parts: a row naming no supplier
+    // matches the route as it always did, whichever company drives it — one
+    // stored company is updated, several are refused (which one is meant?).
+    const storedByBaseKey = new Map<string, Array<Record<string, unknown>>>()
+    /** A row with its optional key parts blank, e.g. a transport row naming no supplier. */
+    const optionalBlank = (r: Record<string, unknown>) =>
+      optionalKey.length > 0 && optionalKey.every(c => String(r[c] ?? '').trim() === '')
     {
       const { data: existing } = await fetchAllPages((from, to) => (supabase
         .from(config.tableName as 'accommodation_rates') as unknown as {
           select(c: string): { eq(c: string, v: string): { order(c: string, o: { ascending: boolean }): { range(a: number, b: number): PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }> } } }
         })
-        .select([...new Set(['id', ...uniqueKey, ...(config.identityKey ?? []), ...(periodsTarget ? ['seasons'] : [])])].join(', '))
+        .select([...new Set(['id', ...uniqueKey, ...optionalKey, ...(config.identityKey ?? []), ...(periodsTarget ? ['seasons'] : [])])].join(', '))
         .eq('tenant_id', tenant_id)
         .order('id', { ascending: true })
         .range(from, to))
       for (const row of existing ?? []) {
-        const key = importRowKey(row, uniqueKey)
+        const key = importRowKey(row, uniqueKey, optionalKey)
         if (key !== null) {
           const list = storedByKey.get(key)
           if (list) list.push(row)
           else storedByKey.set(key, [row])
+        }
+        if (optionalKey.length) {
+          const base = importRowKey(row, uniqueKey)
+          if (base !== null) {
+            const list = storedByBaseKey.get(base)
+            if (list) list.push(row)
+            else storedByBaseKey.set(base, [row])
+          }
         }
         const ident = config.identityKey ? importIdentityKey(row, config.identityKey) : null
         if (ident !== null) {
@@ -518,6 +535,19 @@ export async function POST(request: NextRequest) {
           else storedByIdentity.set(ident, [row])
         }
       }
+    }
+
+    /** The stored rows this file row would update. */
+    function matchesOfRow(r: Record<string, unknown>): Array<Record<string, unknown>> {
+      const k = importRowKey(r, uniqueKey, optionalKey)
+      if (k !== null) {
+        const exact = storedByKey.get(k) ?? []
+        if (exact.length || !optionalBlank(r)) return exact
+        const base = importRowKey(r, uniqueKey)
+        return base === null ? [] : storedByBaseKey.get(base) ?? []
+      }
+      const ident = config.identityKey ? importIdentityKey(r, config.identityKey) : null
+      return ident === null ? [] : storedByIdentity.get(ident) ?? []
     }
 
     // One preferred rate per scope (migration 354's unique index): the star
@@ -544,8 +574,7 @@ export async function POST(request: NextRequest) {
           continue
         }
         claimed.add(scope)
-        const k = importRowKey(r, uniqueKey)
-        const stored = k !== null ? storedByKey.get(k) : undefined
+        const stored = matchesOfRow(r)
         const ownId = stored?.length === 1 ? String(stored[0].id) : '00000000-0000-0000-0000-000000000000'
         const cleared = await clearPreferredSiblings(supabase, table, tenant_id, r, ownId)
         if (cleared.error) importErrors.push({ row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '), message: cleared.error })
@@ -554,20 +583,17 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < partition.rows.length; i += BATCH_SIZE) {
       const batch = partition.rows.slice(i, i + BATCH_SIZE)
-      const keyOf = (r: Record<string, unknown>) => importRowKey(r, uniqueKey)
-      const matchesOf = (r: Record<string, unknown>) => {
-        const k = keyOf(r)
-        if (k !== null) return storedByKey.get(k) ?? []
-        const ident = config.identityKey ? importIdentityKey(r, config.identityKey) : null
-        return ident === null ? [] : storedByIdentity.get(ident) ?? []
-      }
+      const keyOf = (r: Record<string, unknown>) => importRowKey(r, uniqueKey, optionalKey)
+      const matchesOf = matchesOfRow
       const toInsert = batch.filter(r => matchesOf(r).length === 0)
       const toUpdate = batch.filter(r => matchesOf(r).length === 1)
       for (const r of batch.filter(r => matchesOf(r).length > 1)) {
         importErrors.push({
           row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '),
           operation: 'refused',
-          message: keyOf(r) !== null
+          message: keyOf(r) !== null && optionalBlank(r) && new Set(matchesOf(r).map(m => String(m[optionalKey[0]] ?? ''))).size > 1
+            ? `${matchesOf(r).length} suppliers price this route and vehicle — fill in its ${optionalKey.join(' + ')} so the row updates the right one.`
+            : keyOf(r) !== null
             ? `${matchesOf(r).length} of your rates share this ${uniqueKey.join(' + ')} — give each its own code in the app first, so one row cannot overwrite them all.`
             : `${matchesOf(r).length} of your rates match this row's ${(config.identityKey ?? []).join(' + ')} — add the ${uniqueKey.join(' + ')} of the one it means.`,
         })
@@ -582,6 +608,8 @@ export async function POST(request: NextRequest) {
       for (const record of toUpdate) {
         const updateData = { ...record }
         for (const col of uniqueKey) delete updateData[col]
+        // A row naming no supplier keeps the company the stored route has.
+        if (optionalBlank(record)) for (const col of optionalKey) delete updateData[col]
         delete updateData.tenant_id
         // This flat sheet is one row per property with room for ONE dated
         // period (plus the old high/peak columns). Re-importing it onto a

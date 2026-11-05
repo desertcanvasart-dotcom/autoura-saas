@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy, LayoutGrid, List, Table2 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import PreferredStar from '@/app/components/PreferredStar'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useVocabulary } from '@/hooks/useVocabulary'
 import { needsDestination } from '@/lib/vocabulary'
@@ -33,6 +34,8 @@ interface TransportationRate {
   includes?: string | null
   /** The transport company this route is bought from (migration 355). */
   supplier_id?: string | null
+  /** The default company when several price this route (migration 460). */
+  is_preferred?: boolean | null
   base_rate_eur: number | null
   base_rate_non: number
   base_rate_non_eur?: number | null
@@ -47,12 +50,20 @@ interface RouteGroup extends TransportationRate {
   rows: TransportationRate[]
   ids: string[]
   vehicles: { key: string; eur: number }[]
+  /** How many companies price this same journey (1 = only this one). */
+  companies?: number
 }
 
 type ViewMode = 'table' | 'cards' | 'compact'
 
+/** The journey the engine matches on — two companies' routes with the same
+ *  one answer the same question (the route's name is only a label). */
+const journeyKeyOf = (r: TransportationRate) =>
+  [r.service_type, r.city, r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.area ?? ''].map(v => String(v).toLowerCase()).join('|')
+// A route is one company's (migration 460): two companies pricing the same
+// road are two routes, each with its own vehicles and prices.
 const routeKeyOf = (r: TransportationRate) =>
-  [r.service_type, r.city, r.route_name ?? '', r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.area ?? ''].map(v => String(v).toLowerCase()).join('|')
+  [journeyKeyOf(r), String(r.route_name ?? '').toLowerCase(), r.supplier_id ?? ''].join('|')
 
 function groupRoutes(rows: TransportationRate[]): RouteGroup[] {
   const groups = new Map<string, RouteGroup>()
@@ -60,10 +71,17 @@ function groupRoutes(rows: TransportationRate[]): RouteGroup[] {
     const k = routeKeyOf(r)
     const g = groups.get(k)
     const chip = { key: String(r.vehicle_type || '').toLowerCase(), eur: Number(r.base_rate_eur) || 0 }
-    if (g) { g.rows.push(r); g.ids.push(r.id); g.vehicles.push(chip); g.is_active = g.is_active || r.is_active }
-    else groups.set(k, { ...r, rows: [r], ids: [r.id], vehicles: [chip] })
+    if (g) { g.rows.push(r); g.ids.push(r.id); g.vehicles.push(chip); g.is_active = g.is_active || r.is_active; g.is_preferred = g.is_preferred || r.is_preferred === true }
+    else groups.set(k, { ...r, is_preferred: r.is_preferred === true, rows: [r], ids: [r.id], vehicles: [chip] })
   }
-  return [...groups.values()]
+  // Journeys more than one company prices — there the star picks the default.
+  const companies = new Map<string, Set<string>>()
+  for (const g of groups.values()) {
+    const set = companies.get(journeyKeyOf(g)) ?? new Set<string>()
+    set.add(g.supplier_id ?? '')
+    companies.set(journeyKeyOf(g), set)
+  }
+  return [...groups.values()].map(g => ({ ...g, companies: companies.get(journeyKeyOf(g))?.size ?? 1 }))
 }
 
 // One entry per vehicle in the route-first form. Strings because they are
@@ -144,6 +162,22 @@ export default function TransportationContent() {
   // (Settings → Your vocabulary), active only.
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const supplierName = (id?: string | null) => (id && suppliers.find(s => s.id === id)?.name) || null
+  // The star — only on a journey several companies price; it picks which one
+  // the engine charges (migration 460). Without it the engine shows a gap.
+  const preferredStar = (rate: RouteGroup, className?: string) => (rate.companies ?? 1) > 1 ? (
+    <PreferredStar
+      table="transportation_rates"
+      id={rate.id}
+      ids={rate.ids}
+      preferred={rate.is_preferred}
+      among="transport companies price this same route"
+      className={className}
+      onToggled={async r => {
+        if (!r.ok) await dialog.alert('Could not update', r.error || 'Please try again.', 'warning')
+        fetchRates()
+      }}
+    />
+  ) : null
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -832,8 +866,15 @@ export default function TransportationContent() {
                     </td>
                     <td className="px-4 py-2">
                       <span className="text-sm font-medium text-gray-900">{rate.route_name || '—'}</span>
-                      {supplierName(rate.supplier_id) && (
-                        <p className="text-xs text-gray-500">{supplierName(rate.supplier_id)}</p>
+                      {(supplierName(rate.supplier_id) || (rate.companies ?? 1) > 1) && (
+                        <p className="text-xs text-gray-500">
+                          {supplierName(rate.supplier_id) || 'No supplier'}
+                          {(rate.companies ?? 1) > 1 && (
+                            <span className={rate.is_preferred ? 'text-amber-600' : 'text-gray-400'}>
+                              {' · '}{rate.is_preferred ? 'preferred of' : 'one of'} {rate.companies} companies on this route
+                            </span>
+                          )}
+                        </p>
                       )}
                     </td>
                     <td className="px-4 py-2">
@@ -875,6 +916,7 @@ export default function TransportationContent() {
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {preferredStar(rate, 'p-1')}
                         <button
                           type="button"
                           onClick={() => openEditModal(rate)}
@@ -951,10 +993,11 @@ export default function TransportationContent() {
                       )}
                     </div>
 
-                    {supplierName(rate.supplier_id) && (
+                    {(supplierName(rate.supplier_id) || (rate.companies ?? 1) > 1) && (
                       <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
                         <Building2 className="w-4 h-4" />
-                        <span className="truncate">{supplierName(rate.supplier_id)}</span>
+                        <span className="truncate">{supplierName(rate.supplier_id) || 'No supplier'}</span>
+                        {preferredStar(rate, 'p-0.5 ml-auto')}
                       </div>
                     )}
 
@@ -1044,6 +1087,7 @@ export default function TransportationContent() {
                       ))}
                     </div>
                     <div className="flex items-center gap-1">
+                      {preferredStar(rate, 'p-1')}
                       <button
                         onClick={() => openEditModal(rate)}
                         className="p-1 text-gray-400 hover:text-primary-500 transition-colors"
@@ -1259,7 +1303,7 @@ export default function TransportationContent() {
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-gray-400">
-                    Who drives this route. Only suppliers whose type behaves as a transport company are listed; add one under CRM → Suppliers.
+                    Who drives this route. Only suppliers whose type behaves as a transport company are listed; add one under CRM → Suppliers. Several companies can price the same route: add each as its own route with its own company, then star the one to use by default.
                   </p>
                 </div>
 

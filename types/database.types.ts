@@ -12382,6 +12382,7 @@ export interface Database {
           area: string | null
           duration: string | null
           is_active: boolean | null
+          is_preferred: boolean
           updated_at: string | null
           rate_currency: string | null
           capacity_min: number | null
@@ -12406,6 +12407,7 @@ export interface Database {
           area?: string | null
           duration?: string | null
           is_active?: boolean | null
+          is_preferred?: boolean
           updated_at?: string | null
           rate_currency?: string | null
           capacity_min?: number | null
@@ -12430,6 +12432,7 @@ export interface Database {
           area?: string | null
           duration?: string | null
           is_active?: boolean | null
+          is_preferred?: boolean
           updated_at?: string | null
           rate_currency?: string | null
           capacity_min?: number | null
