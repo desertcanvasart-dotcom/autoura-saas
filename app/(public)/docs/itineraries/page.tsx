@@ -116,7 +116,7 @@ export default function ItinerariesPage() {
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-2.5 font-medium">&#8943;</td>
-                <td className="px-4 py-2.5">Edit itinerary, Add expense, Operations tasks, Generate commissions, Duplicate, Cancel trip / Reopen trip</td>
+                <td className="px-4 py-2.5">Edit itinerary, Add expense, Generate tasks, Generate commissions, Duplicate, Cancel trip / Reopen trip</td>
               </tr>
               <tr>
                 <td className="px-4 py-2.5 font-medium">Main button</td>
