@@ -66,13 +66,16 @@ export async function claimRecords(
  * phone, so another agency could have typed its OWN address and signed in.
  * The approving agency is shown only the addresses that are on its own
  * record, and a count of the rest — never another agency's addresses or name.
- * `sentTo` is supplier_login_codes.sent_to (comma-separated).
+ * `sentTo` is supplier_login_codes.sent_to (comma-separated). A WhatsApp
+ * code (audit D1) went to the number itself — the one this agency matched the
+ * claim by — so it is shown as that number, with nobody else involved.
  */
 export function codeRecipientsForAgency(
   sentTo: string | null | undefined,
   ownRecord: { email?: string | null; contact_email?: string | null } | null | undefined,
-): { yours: string[]; others: number } | null {
+): { yours: string[]; others: number; whatsapp?: string } | null {
   if (!sentTo) return null
+  if (sentTo.startsWith('whatsapp:')) return { yours: [], others: 0, whatsapp: sentTo.slice('whatsapp:'.length) }
   const sent = [...new Set(sentTo.split(',').map(e => e.trim().toLowerCase()).filter(Boolean))]
   if (sent.length === 0) return null
   const own = new Set([ownRecord?.email, ownRecord?.contact_email].map(e => (e ?? '').trim().toLowerCase()).filter(Boolean))

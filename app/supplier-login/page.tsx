@@ -1,13 +1,17 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import SignInForm from './SignInForm'
+import { whatsAppCodeTemplate } from '@/lib/supplier-accounts'
 
-// Supplier sign-in (Phase 2B): phone → code by email → signed in. Suppliers
+// Supplier sign-in (Phase 2B): phone → code by WhatsApp (email while the
+// template is not set, audit D1) → signed in. Suppliers
 // are not app users; this page and its API are open, and the API answers the
 // same whether or not a number is known. Laid out like the staff sign-in
 // (/login): the brand's light background, the logo, one card (2026-11-01).
 
 export const metadata = { title: 'Supplier sign-in' }
+// Reads the template setting at request time, not at build time.
+export const dynamic = 'force-dynamic'
 
 export default function SupplierLoginPage() {
   return (
@@ -23,7 +27,7 @@ export default function SupplierLoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100">
-          <SignInForm />
+          <SignInForm whatsApp={!!whatsAppCodeTemplate()} />
         </div>
 
         <div className="mt-6 text-center text-sm text-gray-600 space-y-1">

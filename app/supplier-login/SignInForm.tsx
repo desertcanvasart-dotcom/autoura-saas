@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function SignInForm() {
+export default function SignInForm({ whatsApp = false }: { whatsApp?: boolean }) {
   const router = useRouter()
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
@@ -47,7 +47,7 @@ export default function SignInForm() {
             Your phone number, with the country code
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" placeholder="+20 100 123 4567" className={field} autoComplete="tel" autoFocus />
           </label>
-          <p className="text-sm text-gray-600">We email a 6-digit code to the address your agency has on file for you.</p>
+          <p className="text-sm text-gray-600">{whatsApp ? 'We send a 6-digit code by WhatsApp to this number.' : 'We email a 6-digit code to the address your agency has on file for you.'}</p>
           <button type="submit" disabled={busy || !phone.trim()} className={primary}>{busy ? 'Sending…' : 'Send me a code'}</button>
         </form>
       ) : (
@@ -62,7 +62,7 @@ export default function SignInForm() {
         </form>
       )}
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-      <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">No email on file with an agency? Ask them to add it, or keep using the link they sent you.</p>
+      <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">{whatsApp ? 'Use the number your agencies have for you. No code? Ask them to check it, or keep using the link they sent you.' : 'No email on file with an agency? Ask them to add it, or keep using the link they sent you.'}</p>
     </div>
   )
 }

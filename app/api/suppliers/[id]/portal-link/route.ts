@@ -5,7 +5,7 @@ import { roleDenied } from '@/lib/api-role-gate'
 import { appRedirectBase } from '@/lib/oauth-config'
 import { generateWhatsAppLink, whatsappRecipient } from '@/lib/communication-utils'
 import { buildPortalLinkMessage, generateSupplierPageToken } from '@/lib/supplier-portal'
-import { signInReadiness } from '@/lib/supplier-accounts'
+import { signInReadiness, whatsAppCodeTemplate } from '@/lib/supplier-accounts'
 
 // ============================================
 // A supplier's own page link (lib/supplier-portal, migration 449)
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   return NextResponse.json({
     success: true,
     data: link ? { url: mayHoldLink ? pageUrl(request, link.token as string) : null, created_at: link.created_at, last_opened_at: link.last_opened_at } : null,
-    sign_in: supplier ? signInReadiness(supplier, tenant?.operating_country as string | null) : null,
+    sign_in: supplier ? signInReadiness(supplier, tenant?.operating_country as string | null, !!whatsAppCodeTemplate()) : null,
   })
 }
 
