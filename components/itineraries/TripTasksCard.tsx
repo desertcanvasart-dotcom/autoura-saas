@@ -2,12 +2,12 @@
 
 // This trip's operations tasks, on its page: one per kind of service
 // (lib/tasks/itinerary-tasks), each with who has it, when it is due and how
-// much of its checklist is booked. "Create tasks" / "Sync tasks" opens the
-// same dialog the old header's Tasks button did.
+// much of its checklist is booked. "Generate tasks" (or "Sync tasks" once
+// there are some) opens the same dialog as the ⋯ menu's "Generate tasks".
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, RefreshCw, Sparkles } from 'lucide-react'
 import GenerateTasksButton from '@/components/tasks/GenerateTasksButton'
 import { ChecklistSummary } from '@/components/tasks/TaskChecklist'
 import type { ChecklistItem } from '@/lib/tasks/itinerary-tasks'
@@ -65,15 +65,31 @@ export default function TripTasksCard({ itineraryId, openSignal = 0, today }: {
           <ClipboardList className="w-3.5 h-3.5" /> Tasks
           {tasks && tasks.length > 0 && <span className="text-gray-400">· {open.length} open</span>}
         </p>
-        <button type="button" onClick={() => setSignal(n => n + 1)} className="text-xs text-primary-600 hover:underline">
-          {tasks && tasks.length > 0 ? 'Sync tasks' : 'Create tasks'}
-        </button>
+        {tasks && tasks.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setSignal(n => n + 1)}
+            title="Bring the tasks in line with the itinerary — ticks and confirmation numbers are kept"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-primary-300 text-primary-700 hover:bg-primary-50"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Sync tasks
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setSignal(n => n + 1)}
+            title="One task per kind of service, each for the department that books it"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Generate tasks
+          </button>
+        )}
       </div>
 
       {tasks === null && !failed && <p className="text-xs text-gray-400">Loading…</p>}
       {failed && <p className="text-xs text-gray-500">Could not load the tasks.</p>}
       {tasks && tasks.length === 0 && (
-        <p className="text-xs text-gray-500">No tasks yet. Create them to send each kind of service to its department.</p>
+        <p className="text-xs text-gray-500">No tasks yet. Generate them to send each kind of service to its department.</p>
       )}
 
       {tasks && tasks.length > 0 && (

@@ -59,7 +59,7 @@ export default function TasksDeparturesPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Operations Tasks from a Trip</h3>
         <p className="text-gray-600 mb-3">
-          On an itinerary, the <strong>Tasks</strong> card (<strong>Create tasks</strong> / <strong>Sync tasks</strong>) or <strong>&#8943; &rarr; Operations tasks</strong> turns the trip&apos;s services into one task per kind &mdash; Accommodation, Flights, Transportation, Guides, Airport services, Hotel services, Meals, Entrance tickets, Other services &mdash; each for the department that books it:
+          On an itinerary, the <strong>Tasks</strong> card (<strong>Generate tasks</strong> / <strong>Sync tasks</strong>) or <strong>&#8943; &rarr; Generate tasks</strong> turns the trip&apos;s services into one task per kind &mdash; Accommodation, Flights, Transportation, Guides, Airport services, Hotel services, Meals, Entrance tickets, Other services &mdash; each for the department that books it:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li>Each is due a set number of days before the trip (two weeks for hotels and flights, a week for transport and guides, fewer for the rest), and goes to the person you pick for each department</li>

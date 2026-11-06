@@ -1066,7 +1066,7 @@ export default function ViewItineraryPage() {
                 items={[
                   { label: 'Edit itinerary', icon: <Edit2 className="w-4 h-4" />, href: `/itineraries/${itinerary.id}/edit` },
                   { label: 'Add expense', icon: <Receipt className="w-4 h-4" />, onSelect: () => setExpenseSignal(n => n + 1) },
-                  { label: 'Operations tasks', icon: <ClipboardList className="w-4 h-4" />, onSelect: () => setTasksSignal(n => n + 1), title: 'Create or sync the operations tasks for this itinerary' },
+                  { label: 'Generate tasks', icon: <ClipboardList className="w-4 h-4" />, onSelect: () => setTasksSignal(n => n + 1), title: 'Generate or sync the operations tasks for each department' },
                   { label: generatingCommissions ? 'Generating commissions…' : 'Generate commissions', icon: <Handshake className="w-4 h-4" />, onSelect: handleGenerateCommissions, disabled: generatingCommissions },
                   { label: duplicating ? 'Duplicating…' : 'Duplicate', icon: <Copy className="w-4 h-4" />, onSelect: duplicateTrip, disabled: duplicating, title: 'A new draft with the same days and services' },
                   itinerary.status === 'cancelled'
@@ -1285,7 +1285,10 @@ export default function ViewItineraryPage() {
       <div className="container mx-auto px-4 py-4">
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-4">
           {/* RIGHT PANEL — who, how much, whose. Above the tabs on a narrow screen. */}
-          <aside className="lg:order-2 space-y-3 mb-4 lg:mb-0 lg:sticky lg:top-44 lg:self-start">
+          {/* Pinned under the header, and scrolls on its own when taller than the
+              screen — otherwise the last cards (Tasks) sit below the fold until
+              the very end of the page. */}
+          <aside className="lg:order-2 space-y-3 mb-4 lg:mb-0 lg:sticky lg:top-44 lg:self-start lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:-mx-1 lg:px-1 lg:pb-1">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Client</p>
               <p className="text-sm font-semibold text-gray-900">{itinerary.client_name || 'No client'}</p>
