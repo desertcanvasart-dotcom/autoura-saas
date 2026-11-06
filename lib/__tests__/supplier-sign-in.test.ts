@@ -7,8 +7,8 @@ describe('supplier sign-in', () => {
   const code = read('app/api/supplier-auth/code/route.ts')
   const verify = read('app/api/supplier-auth/verify/route.ts')
 
-  it('never says whether a phone is known: the same answer for unknown, no email, over the cap, or sent', () => {
-    expect(code.match(/return NextResponse\.json\(SAME_ANSWER\)/g)?.length).toBe(4)
+  it('never says whether a phone is known: the same answer for unknown, no email, over the cap, sent by WhatsApp, or sent by email', () => {
+    expect(code.match(/return NextResponse\.json\(SAME_ANSWER\)/g)?.length).toBe(5)
     expect(code).not.toMatch(/not found|unknown number|no supplier/i)
   })
 

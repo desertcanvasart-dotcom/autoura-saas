@@ -204,6 +204,38 @@ export async function sendWhatsAppMessage({
   }
 }
 
+/**
+ * Send an approved WhatsApp template (Twilio Content API, an `HX…` id). A
+ * template may open a conversation, so there is no 24-hour window. Goes out
+ * from the shared number (tenantId null) unless a company is named. No status
+ * callback: these are platform messages (sign-in codes), not inbox threads.
+ */
+export async function sendWhatsAppTemplate({
+  to,
+  contentSid,
+  variables,
+  tenantId,
+}: {
+  to: string
+  contentSid: string
+  variables: Record<string, string>
+  tenantId: string | null
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const from = await whatsAppSenderFor(await adminForSender(), tenantId)
+    if (!from) throw new Error('TWILIO_WHATSAPP_FROM not configured')
+    const message = await getTwilioClient().messages.create({
+      from,
+      to: formatWhatsAppNumber(to),
+      contentSid,
+      contentVariables: JSON.stringify(variables),
+    })
+    return { success: true, messageId: message.sid }
+  } catch (error) {
+    return { success: false, error: (error as Error).message }
+  }
+}
+
 // ============================================
 // QUOTE MESSAGING
 // ============================================

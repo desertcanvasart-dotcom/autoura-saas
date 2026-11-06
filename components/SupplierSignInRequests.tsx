@@ -16,12 +16,14 @@ interface Claim {
   status: 'pending' | 'approved' | 'rejected'
   requested_at: string
   /** Where their sign-in code went: the addresses on YOUR record, and how many others. */
-  code_sent_to?: { yours: string[]; others: number } | null
+  code_sent_to?: { yours: string[]; others: number; whatsapp?: string } | null
 }
 
 /** "Code sent to a@b.com and 1 other address" — the others belong to records you can't see. */
 function CodeSentTo({ sent }: { sent: Claim['code_sent_to'] }) {
   if (!sent) return <span className="block text-xs text-gray-600">We can’t tell which email their code went to.</span>
+  // A WhatsApp code went to the supplier's own number: having the code proves they have that phone.
+  if (sent.whatsapp) return <span className="block text-xs text-gray-600">Code sent by WhatsApp to <b>{sent.whatsapp}</b> — the number on your record.</span>
   const { yours, others } = sent
   const otherText = others > 0 ? `${others} other address${others === 1 ? '' : 'es'} not on your record` : ''
   return (
