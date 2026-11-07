@@ -12,6 +12,8 @@ import { buildAssignmentMessage } from '@/lib/notify/assignment-message'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import HeaderMenu from '@/components/HeaderMenu'
+import { useVocabulary } from '@/hooks/useVocabulary'
+import { citiesOf, citiesLabel } from '@/lib/suppliers/supplier-cities'
 
 // Types
 interface Resource {
@@ -111,7 +113,9 @@ const RESOURCE_TYPES = [
     apiEndpoint: '/api/guides',
     nameField: 'name',
     phoneField: 'phone',
-    displayField: (r: any) => `${r.name}${r.languages?.length ? ` (${r.languages.join(', ')})` : ''}`,
+    // The guide's languages (in the agency's words) and every city it works
+    // in — or "All cities" for a throughout guide (461).
+    displayField: (r: any, lang: (k: string) => string = k => k) => `${r.name}${r.languages?.length ? ` (${r.languages.map(lang).join(', ')})` : ''}${citiesLabel(r) ? ` - ${citiesLabel(r)}` : ''}`,
     canNotify: true,
     filterType: 'city',
     cityField: 'city'
@@ -248,6 +252,7 @@ export default function ResourceAssignmentV2({
 }: ResourceAssignmentV2Props) {
   const dialog = useConfirmDialog()
   const { tenant } = useTenant()
+  const { labelFor: languageLabel } = useVocabulary('guide_language')
   const [activeTab, setActiveTab] = useState('guide')
   const [showAllTypes, setShowAllTypes] = useState(false)
   // Changing an assignment's dates in place (PATCH /api/itinerary-resources).
@@ -392,13 +397,14 @@ export default function ResourceAssignmentV2({
       case 'city':
         // For guides, vehicles, hotels, restaurants
         if (modalCityFilter === 'all') return resources
+        // A supplier works in its base city, the others it lists, or
+        // everywhere (461): match any of them, never just the base.
         if (modalCityFilter === 'none') {
-          return resources.filter(r => !r[typeConfig.cityField || 'city'])
+          return resources.filter(r => !r.works_all_cities && citiesOf({ city: r[typeConfig.cityField || 'city'], other_cities: r.other_cities }).length === 0)
         }
-        return resources.filter(r => {
-          const city = r[typeConfig.cityField || 'city']
-          return city?.toLowerCase().includes(modalCityFilter.toLowerCase())
-        })
+        return resources.filter(r => r.works_all_cities ||
+          citiesOf({ city: r[typeConfig.cityField || 'city'], other_cities: r.other_cities })
+            .some(c => c.toLowerCase().includes(modalCityFilter.toLowerCase())))
 
       case 'airport':
         // For airport staff - filter by airport_location
@@ -461,8 +467,7 @@ export default function ResourceAssignmentV2({
 
     const cities = new Set<string>()
     resources.forEach(r => {
-      const city = r[cityField]
-      if (city) cities.add(city)
+      for (const city of citiesOf({ city: r[cityField], other_cities: r.other_cities })) cities.add(city)
     })
     return Array.from(cities).sort()
   }
@@ -1248,7 +1253,7 @@ export default function ResourceAssignmentV2({
                     <option value="">Choose...</option>
                     {filteredAvailableResources.map((resource) => (
                       <option key={resource.id} value={resource.id}>
-                        {activeTypeConfig.displayField(resource)}
+                        {(activeTypeConfig.displayField as (r: Resource, lang: (k: string) => string) => string)(resource, languageLabel)}
                       </option>
                     ))}
                   </select>

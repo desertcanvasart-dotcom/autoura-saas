@@ -10243,6 +10243,8 @@ export interface Database {
           types: string[]
           network_account_id: string | null
           phone_tails: string[] | null
+          other_cities: string[]
+          works_all_cities: boolean
         }
         Insert: {
           id?: string
@@ -10283,6 +10285,8 @@ export interface Database {
           types: string[]
           network_account_id?: string | null
           phone_tails?: string[] | null
+          other_cities?: string[]
+          works_all_cities?: boolean
         }
         Update: {
           id?: string
@@ -10323,6 +10327,8 @@ export interface Database {
           types?: string[]
           network_account_id?: string | null
           phone_tails?: string[] | null
+          other_cities?: string[]
+          works_all_cities?: boolean
         }
         Relationships: [
           {

@@ -5,29 +5,8 @@ import type { TablesInsert } from '@/types/database.types'
 import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
 import { nextSupplierCodes } from '@/lib/suppliers/supplier-code'
 import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { filterSupplierFields } from '@/lib/suppliers/supplier-fields'
 
-// All valid supplier fields (including hierarchical fields)
-const VALID_FIELDS = [
-  'name', 'type', 'types', 'contact_name', 'contact_email', 'contact_phone',
-  'phone2', 'whatsapp', 'website', 'address', 'city', 'country',
-  'default_commission_rate', 'commission_type', 'payment_terms',
-  'bank_details', 'status', 'notes',
-  // Type-specific fields
-  'languages', 'vehicle_types', 'star_rating', 'property_type',
-  'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity',
-  // Hierarchical fields (company -> property relationship)
-]
-
-// Filter object to only include valid fields
-function filterValidFields(obj: Record<string, any>): Record<string, any> {
-  const filtered: Record<string, any> = {}
-  for (const key of VALID_FIELDS) {
-    if (obj[key] !== undefined) {
-      filtered[key] = obj[key]
-    }
-  }
-  return filtered
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -80,9 +59,11 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true)
       if (propErr) console.error('Error fetching supplier properties by city:', propErr.message)
       const ids = [...new Set((props || []).map((p: { supplier_id: string }) => p.supplier_id))]
-      query = ids.length
-        ? query.or(`city.ilike."${city}",id.in.(${ids.join(',')})`)
-        : query.ilike('city', city)
+      // …or one that also works there, or travels everywhere (461 —
+      // lib/suppliers/supplier-cities.ts is the same rule in code).
+      const covers = [`city.ilike."${city}"`, `other_cities.cs.{"${city}"}`, 'works_all_cities.eq.true']
+      if (ids.length) covers.push(`id.in.(${ids.join(',')})`)
+      query = query.or(covers.join(','))
     }
 
     // The is_property / parent_supplier_id filters are gone with the columns
@@ -149,7 +130,7 @@ export async function POST(request: NextRequest) {
     // Filter to only valid fields and set defaults
     const newSupplier: TablesInsert<'suppliers'> = {
       tenant_id, // ✅ Explicit tenant_id
-      ...filterValidFields(body),
+      ...filterSupplierFields(body),
       types,
       // company_name is NOT NULL in the DB; mirror the legacy name column
       company_name: body.name,

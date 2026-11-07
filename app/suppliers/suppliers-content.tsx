@@ -29,6 +29,8 @@ import { SUPPLIER_CSV_HEADERS, supplierCsvSampleRow } from '@/lib/suppliers/csv-
 import { useVocabulary } from '@/hooks/useVocabulary'
 import { pluralize } from '@/lib/vocabulary-ui'
 import { VocabLabel } from '@/components/vocabulary'
+import { citiesLabel, citiesOf } from '@/lib/suppliers/supplier-cities'
+import { guideLanguageKey } from '@/lib/guides/guide-language'
 
 // Types
 interface Supplier {
@@ -46,6 +48,8 @@ interface Supplier {
   whatsapp?: string
   address?: string
   city?: string
+  other_cities?: string[]
+  works_all_cities?: boolean
   country?: string
   website?: string
   default_commission_rate?: number
@@ -214,6 +218,7 @@ export default function SuppliersContent() {
   // The agency's supplier types (Settings → Your vocabulary): what each is
   // called, and which built-in kind it behaves as.
   const { items: typeItems, all: allTypes } = useVocabulary('supplier_type')
+  const { items: languageItems } = useVocabulary('guide_language')
   const behaviorOf = (type: string) => allTypes.find(t => t.key === type)?.behavior ?? type
   /** Every role a supplier fills (340); rows written before carry one. */
   const typesOf = (s: { type: string; types?: string[] | null }) => (s.types && s.types.length ? s.types : [s.type]).filter(Boolean)
@@ -333,7 +338,7 @@ export default function SuppliersContent() {
         supplier.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         supplier.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         supplier.contact_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        supplier.city?.toLowerCase().includes(searchQuery.toLowerCase())
+        citiesLabel(supplier).toLowerCase().includes(searchQuery.toLowerCase())
       return matchesType && matchesStatus && matchesSearch
     })
     .sort((a, b) => {
@@ -401,7 +406,13 @@ export default function SuppliersContent() {
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier)
-    setFormData({ ...supplier, types: typesOf(supplier) })
+    // Older rows may hold a language as a word ("English"); the picker works
+    // in the agency's language keys, so read each as its key.
+    setFormData({
+      ...supplier,
+      types: typesOf(supplier),
+      ...(supplier.languages ? { languages: [...new Set(supplier.languages.map(l => guideLanguageKey(l, languageItems) || l))] } : {}),
+    })
     setError(null)
     setShowEditModal(true)
     setOpenMenuId(null)
@@ -705,8 +716,12 @@ export default function SuppliersContent() {
   }
 
 
+  // A guide's form also asks its languages (behaviour 'guide', any role).
+  const isGuideForm = (Array.isArray(formData.types) ? formData.types : [formData.type]).some((t: string) => behaviorOf(t) === 'guide')
+
   // The form collects WHO the supplier is and how to reach them — nothing
-  // more. Property type, star rating, ship name, languages, commission and
+  // more (a guide's languages and the cities it works in excepted, 461).
+  // Property type, star rating, ship name, commission and
   // payment terms all live in the RATES section against the actual rates
   // (accommodation_rates carries property_type/star_rating, guide_rates
   // carries guide_language, …) — collecting them here too created duplicate,
@@ -728,7 +743,14 @@ export default function SuppliersContent() {
       { name: 'WhatsApp', key: 'whatsapp', type: 'tel' },
       { name: 'Website', key: 'website', type: 'url' },
       // Location
-      { name: 'City', key: 'city', type: 'select', options: cityOptions },
+      { name: 'City', key: 'city', type: 'select', options: cityOptions, description: 'Where they are based.' },
+      // Where else they work (461) — a guide covering Luxor and Aswan too, or
+      // a throughout guide who travels with the group everywhere.
+      { name: 'Also works in', key: 'other_cities', type: 'multiselect', options: cityOptions.filter(c => c !== formData.city) },
+      { name: 'Travels everywhere', key: 'works_all_cities', type: 'checkbox', description: 'Works in every city — e.g. a throughout guide who goes day 1 to the end.' },
+      // A guide's languages. The PRICE per language stays in Rates → Guides;
+      // this is who can be sent on a French-speaking trip.
+      ...(isGuideForm ? [{ name: 'Languages', key: 'languages', type: 'multiselect', options: languageItems.map(l => l.key), optionLabels: Object.fromEntries(languageItems.map(l => [l.key, l.label])) }] : []),
       { name: 'Address', key: 'address', type: 'textarea' },
       // Commissions (C2): the direction decides the engine's base —
       // receivable = % of THEIR price, payable = % of OUR profit.
@@ -758,6 +780,23 @@ export default function SuppliersContent() {
       )
     }
     
+    if (field.type === 'checkbox') {
+      return (
+        <label className="flex items-start gap-2 pt-6 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={value === true}
+            onChange={(e) => setFormData(prev => ({ ...prev, [field.key]: e.target.checked }))}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+          <span>
+            <span className="block text-sm font-medium text-gray-700">{field.name}</span>
+            {field.description && <span className="block text-xs text-gray-500 mt-0.5">{field.description}</span>}
+          </span>
+        </label>
+      )
+    }
+
     if (field.type === 'select' && field.options) {
       return (
         <select
@@ -1029,7 +1068,7 @@ export default function SuppliersContent() {
                               {supplier.name}
                             </h3>
                             <p className="text-xs text-gray-500">
-                              {typeLabels(supplier)}{supplier.city && ` • ${supplier.city}`}
+                              {typeLabels(supplier)}{citiesLabel(supplier) && ` • ${citiesLabel(supplier)}`}
                             </p>
                           </div>
                         </div>
@@ -1071,7 +1110,7 @@ export default function SuppliersContent() {
                       {/* Type-specific badges */}
                       {supplier.languages && supplier.languages.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
-                          {supplier.languages.slice(0, 3).map(l => <span key={l} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs">{l}</span>)}
+                          {supplier.languages.slice(0, 3).map(l => <span key={l} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs"><VocabLabel kind="guide_language" value={l} /></span>)}
                           {supplier.languages.length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{supplier.languages.length - 3}</span>}
                         </div>
                       )}
@@ -1148,7 +1187,7 @@ export default function SuppliersContent() {
                             </div>
                           </td>
                           <td className="px-4 py-3"><span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>{typeLabels(supplier)}</span></td>
-                          <td className="px-4 py-3"><span className="text-sm text-gray-600">{supplier.city || '—'}</span></td>
+                          <td className="px-4 py-3"><span className="text-sm text-gray-600">{citiesLabel(supplier) || '—'}</span></td>
                           <td className="px-4 py-3">{supplier.contact_email ? <a href={`mailto:${supplier.contact_email}`} onClick={(e) => e.stopPropagation()} className="text-sm text-primary-600 hover:underline">{supplier.contact_email}</a> : <span className="text-sm text-gray-400">—</span>}</td>
                           <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[supplier.status]}`}>{supplier.status}</span></td>
                           <td className="px-4 py-3">
@@ -1189,7 +1228,7 @@ export default function SuppliersContent() {
                           </p>
                           <p className="text-xs text-gray-500">{typeLabels(supplier)}</p>
                         </div>
-                        <div className="flex items-center gap-1.5 text-sm text-gray-600">{supplier.city && <><MapPin className="w-3.5 h-3.5 text-gray-400" />{supplier.city}</>}</div>
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600">{citiesLabel(supplier) && <><MapPin className="w-3.5 h-3.5 text-gray-400" />{citiesLabel(supplier)}</>}</div>
                         <div>{supplier.contact_email && <a href={`mailto:${supplier.contact_email}`} onClick={(e) => e.stopPropagation()} className="text-sm text-gray-600 hover:text-primary-600 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400" /><span className="truncate">{supplier.contact_email}</span></a>}</div>
                         <div className="flex items-center gap-1.5 text-sm text-gray-600">{supplier.default_commission_rate != null && <><Percent className="w-3.5 h-3.5 text-gray-400" />{supplier.default_commission_rate}%</>}</div>
                         <div><span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[supplier.status]}`}>{supplier.status}</span></div>
@@ -1350,7 +1389,8 @@ export default function SuppliersContent() {
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /> Location & Details</h3>
                     <div className="space-y-3">
-                      {selectedSupplier.city && <div><p className="text-xs text-gray-500">City</p><p className="text-sm font-medium text-gray-900">{selectedSupplier.city}</p></div>}
+                      {citiesLabel(selectedSupplier) && <div><p className="text-xs text-gray-500">{citiesOf(selectedSupplier).length > 1 || selectedSupplier.works_all_cities ? 'Cities' : 'City'}</p><p className="text-sm font-medium text-gray-900">{citiesLabel(selectedSupplier)}</p></div>}
+                      {selectedSupplier.languages && selectedSupplier.languages.length > 0 && <div><p className="text-xs text-gray-500">Languages</p><p className="text-sm font-medium text-gray-900">{selectedSupplier.languages.map((l, i) => <span key={l}>{i > 0 && ', '}<VocabLabel kind="guide_language" value={l} /></span>)}</p></div>}
                       {selectedSupplier.address && <div><p className="text-xs text-gray-500">Address</p><p className="text-sm font-medium text-gray-900">{selectedSupplier.address}</p></div>}
                       {selectedSupplier.star_rating && <div><p className="text-xs text-gray-500">Star Rating</p><div className="flex items-center gap-1">{Array.from({ length: parseInt(selectedSupplier.star_rating) || 0 }).map((_, i) => <Star key={i} className="w-4 h-4 text-amber-400 fill-amber-400" />)}</div></div>}
                       {selectedSupplier.supplier_code && <div><p className="text-xs text-gray-500">Code</p><p className="text-sm font-mono font-medium text-gray-900">{selectedSupplier.supplier_code}</p></div>}

@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
     const fields = (r: SupplierImportRecord) => {
       const out: Record<string, unknown> = {}
       for (const k of ['contact_name', 'contact_email', 'contact_phone', 'phone2', 'whatsapp', 'address', 'city',
-        'country', 'commission_type', 'default_commission_rate', 'status', 'notes', 'website'] as const) {
+        'country', 'commission_type', 'default_commission_rate', 'status', 'notes', 'website',
+        'other_cities', 'works_all_cities', 'languages'] as const) {
         if (r[k] !== undefined) out[k] = r[k]
       }
       if (r.typeGiven !== false) { out.type = r.type; out.types = r.types }

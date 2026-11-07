@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guideRateCombos, comboServiceCode, MAX_GUIDE_RATE_COMBOS } from '@/lib/guides/guide-rate-combos'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
@@ -88,15 +89,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const newRate: TablesInsert<'guide_rates'> = {
+    // One row per city × language the form ticked (lib/guides/guide-rate-combos):
+    // a row stays one city and one language, which is what pricing matches.
+    const combos = guideRateCombos(body)
+    if (combos.length === 0) {
+      return NextResponse.json({ success: false, error: 'Choose a language' }, { status: 400 })
+    }
+    if (combos.length > MAX_GUIDE_RATE_COMBOS) {
+      return NextResponse.json(
+        { success: false, error: `That is ${combos.length} prices at once — at most ${MAX_GUIDE_RATE_COMBOS}. Tick fewer cities or languages.` },
+        { status: 400 }
+      )
+    }
+    const baseCode: string = body.service_code || `GD-${Date.now().toString(36).toUpperCase()}`
+
+    const rows: TablesInsert<'guide_rates'>[] = combos.map((combo, i) => ({
       ...rateCurrencyWriteField(body),
       tenant_id,
-      service_code: body.service_code || `GD-${Date.now().toString(36).toUpperCase()}`,
-      guide_language: body.guide_language,
+      service_code: comboServiceCode(baseCode, i),
+      guide_language: combo.guide_language,
       guide_type: body.guide_type || 'licensed',
       // The mode the rate is for; every rate so far was a Spot rate (380).
       guide_mode: body.guide_mode || 'spot',
-      city: body.city || null,
+      city: combo.city,
       tour_duration: body.tour_duration || 'full_day',
       base_rate_eur: parseFloat(body.base_rate_eur) || 0,
       base_rate_non_eur: parseFloat(body.base_rate_non_eur) || 0,
@@ -106,20 +121,21 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null,
       notes: body.notes || null,
       is_active: body.is_active !== false
-    }
+    }))
 
-    const { data, error } = await supabase
+    // One insert: every pair is saved, or none is.
+    const { data: saved, error } = await supabase
       .from('guide_rates')
-      .insert(newRate)
+      .insert(rows)
       .select('*')
-      .single()
 
     if (error) {
       console.error('POST guide_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
+    const data = saved?.[0] ?? null
 
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({ success: true, data, count: saved?.length ?? 0 })
   } catch (error: any) {
     console.error('POST guide_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
