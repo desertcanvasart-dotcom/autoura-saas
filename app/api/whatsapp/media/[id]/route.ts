@@ -26,8 +26,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
-
-const MEDIA_BUCKET = 'whatsapp-media'
+import { MEDIA_BUCKET, storagePathBelongsTo, isOwnTwilioMediaUrl } from '@/lib/whatsapp/voice-note-storage'
 
 // Long enough to open an image, short enough that a leaked URL is worthless by
 // the time it is pasted anywhere.
@@ -47,7 +46,7 @@ function admin() {
   return _admin
 }
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireAuth()
     if (auth.error || !auth.supabase) {
@@ -60,7 +59,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     // read comes back empty, and this 404s before anything is signed.
     const { data: message, error } = await supabase
       .from('whatsapp_messages')
-      .select('media_storage_path, message_sid')
+      .select('media_storage_path, message_sid, tenant_id, media_url, media_type')
       .eq('id', id)
       .single()
 
@@ -70,16 +69,25 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const storagePath = message.media_storage_path
     if (!storagePath) {
-      // Either no attachment, or one hosted elsewhere (Twilio's own media URL,
-      // an outbound PDF) — those are in media_url and are not ours to sign.
+      // On the Twilio connection inbound media stays on Twilio, behind the
+      // account's credentials — so the browser cannot load it. Stream it
+      // through here instead (2026-11-07, voice notes), but ONLY when the link
+      // is our own account's media URL: the row is editable by members, and
+      // this request carries our credentials.
+      const sid = process.env.TWILIO_ACCOUNT_SID
+      if (isOwnTwilioMediaUrl(message.media_url, sid) && process.env.TWILIO_AUTH_TOKEN) {
+        return proxyTwilioMedia(message.media_url!, sid!, process.env.TWILIO_AUTH_TOKEN, request.headers.get('range'), message.media_type)
+      }
+      // Otherwise: no attachment, or one hosted elsewhere (an outbound PDF)
+      // — those are in media_url and are not ours to sign.
       return NextResponse.json({ success: false, error: 'No stored attachment' }, { status: 404 })
     }
 
-    // The path must be the one the webhook writes for THIS message
-    // (inbound/<sid>.<ext>): members can edit the row, and the service role
-    // signs whatever path it is given — another company's file included.
-    const safeSid = String(message.message_sid ?? '').replace(/[^a-zA-Z0-9_-]/g, '_')
-    if (!safeSid || !new RegExp(`^inbound/${safeSid}\\.[a-z0-9]+$`).test(storagePath)) {
+    // The path must be the one written for THIS message — inbound/<sid>.<ext>
+    // or a voice note under its own tenant (lib/whatsapp/voice-note-storage):
+    // members can edit the row, and the service role signs whatever path it
+    // is given — another company's file included.
+    if (!storagePathBelongsTo(storagePath, { message_sid: message.message_sid, tenant_id: message.tenant_id })) {
       return NextResponse.json({ success: false, error: 'No stored attachment' }, { status: 404 })
     }
 
@@ -99,4 +107,32 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     console.error('whatsapp media route error:', e?.message)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
+}
+
+/** Twilio media, streamed with the account's credentials; Range passes through so audio can seek. */
+async function proxyTwilioMedia(url: string, sid: string, token: string, range: string | null, mediaType: string | null) {
+  const upstream = await fetch(url, {
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}`,
+      ...(range ? { Range: range } : {}),
+    },
+    // Twilio answers with a redirect to its file store; fetch drops the
+    // Authorization header on that cross-origin hop, as it should.
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  })
+  if (!upstream.ok || !upstream.body) {
+    console.error('twilio media fetch failed:', upstream.status)
+    return NextResponse.json({ success: false, error: 'Could not load the attachment' }, { status: 502 })
+  }
+  const headers = new Headers({
+    'Content-Type': upstream.headers.get('content-type') || mediaType || 'application/octet-stream',
+    'Cache-Control': 'private, max-age=300',
+    'Accept-Ranges': upstream.headers.get('accept-ranges') || 'bytes',
+  })
+  for (const h of ['content-length', 'content-range']) {
+    const v = upstream.headers.get(h)
+    if (v) headers.set(h, v)
+  }
+  return new NextResponse(upstream.body, { status: upstream.status, headers })
 }
