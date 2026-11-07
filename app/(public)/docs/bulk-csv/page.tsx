@@ -11,7 +11,7 @@ const ROWS: Array<{ what: string; suppliers: string; properties: string; rates: 
     what: 'Where',
     suppliers: 'Suppliers → Import / Export: Sample sheet · Export suppliers · Import suppliers',
     properties: 'Suppliers → Import / Export: Export properties · Import properties (no sample: start from an export)',
-    rates: 'Every rate page: Sample CSV · Export CSV · Import CSV',
+    rates: 'Every rate page: Import / Export → Export · Sample sheet · Import',
   },
   {
     what: 'A row matches',

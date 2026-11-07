@@ -1,11 +1,12 @@
 'use client'
 // @bulk-import
 import { cityOptionsFor } from '@/components/CitySelect'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 import { todayLocal } from '@/lib/today'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Clock, Luggage, ArrowRight, Copy } from 'lucide-react'
+import { Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Clock, Luggage, ArrowRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 import { airlineCode as airlineCodeOf, resolveVocabularyKey, slugifyKey } from '@/lib/vocabulary'
@@ -600,70 +601,25 @@ export default function FlightsContent() {
   }
 
   return (
+    <>
+    <RatePageHeader
+      icon={Plane}
+      title="Flights"
+      subtitle={`${totalRates} ${totalRates === 1 ? 'rate' : 'rates'} · ${uniqueAirlines} ${uniqueAirlines === 1 ? 'airline' : 'airlines'}`}
+      table="flight_rates"
+      onImported={fetchRates}
+      addLabel="Add flight rate"
+      onAdd={openAddModal}
+    />
     <div className="p-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Plane className="h-5 w-5 text-primary-600" />
-          <h1 className="text-2xl font-semibold text-gray-900">Flight Rates</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <BulkRateImportExport tableName="flight_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Flight Rate
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-6 gap-3">
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
-            <span className="text-xs text-gray-500">Total Rates</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{totalRates}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            <span className="text-xs text-gray-500">Active</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{activeRates}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-            <span className="text-xs text-gray-500">Domestic</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{domesticRoutes}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
-            <span className="text-xs text-gray-500">International</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{internationalRoutes}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-            <span className="text-xs text-gray-500">Airlines</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueAirlines}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
-            <span className="text-xs text-gray-500">Linked</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{linkedToSuppliers}</p>
-        </div>
-      </div>
+      <RateStats stats={[
+        { label: 'Rates', value: totalRates },
+        { label: 'Active', value: activeRates, tone: 'green' },
+        { label: 'Domestic', value: domesticRoutes },
+        { label: 'International', value: internationalRoutes },
+        { label: 'Airlines', value: uniqueAirlines },
+        { label: 'Linked', value: linkedToSuppliers },
+      ]} />
 
       {/* Search and Filters */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -1407,5 +1363,6 @@ export default function FlightsContent() {
         </div>
       )}
     </div>
+    </>
   )
 }

@@ -1,12 +1,12 @@
 'use client'
 // @bulk-import
 import { cityOptionsFor } from '@/components/CitySelect'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { DollarSign, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
+import { DollarSign, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -467,50 +467,24 @@ export default function TippingPage() {
         ))}
       </div>
 
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 lg:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-green-600" />
-            <h1 className="text-2xl font-semibold text-gray-900">Tipping Rates</h1>
-            <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
-          </div>
-          <div className="flex items-center gap-2">
-            <BulkRateImportExport tableName="tipping_rates" onImportComplete={fetchRates} />
-            <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">
-              <Plus className="w-4 h-4" /> Add Rate
-            </button>
-            <Link href="/rates" className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
-              ← Rates Hub
-            </Link>
-          </div>
-        </div>
-      </header>
+      <RatePageHeader
+        icon={DollarSign}
+        title="Tipping"
+        subtitle={`${stats.total} ${stats.total === 1 ? 'rate' : 'rates'}`}
+        table="tipping_rates"
+        onImported={fetchRates}
+        addLabel="Add rate"
+        onAdd={handleAddNew}
+      />
 
       <div className="container mx-auto px-4 lg:px-6 py-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Total Rates</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Active</p>
-            <p className="text-2xl font-bold text-green-600">{stats.active}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Guide Tips</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.guides}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Driver Tips</p>
-            <p className="text-2xl font-bold text-amber-600">{stats.drivers}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Avg. Tip</p>
-            <p className="text-2xl font-bold text-green-600">{fmtAverage(stats.avgTip)}</p>
-          </div>
-        </div>
+        <RateStats stats={[
+          { label: 'Rates', value: stats.total },
+          { label: 'Active', value: stats.active, tone: 'green' },
+          { label: 'Guide tips', value: stats.guides, tone: 'blue' },
+          { label: 'Driver tips', value: stats.drivers, tone: 'amber' },
+          { label: 'Avg. tip', value: fmtAverage(stats.avgTip), tone: 'green' },
+        ]} />
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md border p-3 mb-4">

@@ -6,6 +6,7 @@ import { Download, Upload, FileText, AlertCircle, CheckCircle, X, Loader2 } from
 
 import { showToast } from '@/app/contexts/ToastContext'
 import { RATE_TABLE_CONFIGS } from '@/lib/bulk-rate-service'
+import ToolbarMenu from '@/components/ToolbarMenu'
 import type { ValidationError } from '@/lib/bulk-rate-service'
 
 interface BulkRateImportExportProps {
@@ -224,49 +225,43 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
 
   return (
     <>
-      {/* Buttons */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => handleExport('export')}
-          disabled={exporting}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          title="Export all rates as CSV"
-        >
-          {exporting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Download className="w-3.5 h-3.5" />
-          )}
-          Export CSV
-        </button>
-
-        <button
-          onClick={() => handleExport('template')}
-          disabled={exporting}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          title="Download a sample CSV: the columns plus one filled-in example row"
-        >
-          <Download className="w-3.5 h-3.5" />
-          Sample CSV
-        </button>
-
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          title="Import rates from CSV"
-        >
-          <Upload className="w-3.5 h-3.5" />
-          Import CSV
-        </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-      </div>
+      {/* One menu instead of three look-alike grey buttons (2026-11-07):
+          each item has room to say what it does, and the page header keeps
+          a single line. Same menu as the Suppliers page. */}
+      <ToolbarMenu
+        label={exporting ? 'Exporting…' : 'Import / Export'}
+        icon={exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+        groups={[{
+          label: 'This rate sheet as a CSV file',
+          items: [
+            {
+              label: 'Export',
+              description: 'Every rate here, in the format the import reads back.',
+              icon: <Download className="w-4 h-4" />,
+              onSelect: () => { if (!exporting) void handleExport('export') },
+            },
+            {
+              label: 'Sample sheet',
+              description: 'The columns, with one filled-in example row.',
+              icon: <FileText className="w-4 h-4" />,
+              onSelect: () => { if (!exporting) void handleExport('template') },
+            },
+            {
+              label: 'Import',
+              description: 'Checks the file first and shows what it would change before saving.',
+              icon: <Upload className="w-4 h-4" />,
+              onSelect: () => fileInputRef.current?.click(),
+            },
+          ],
+        }]}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
 
       {/* Import Modal */}
       {showImportModal && (

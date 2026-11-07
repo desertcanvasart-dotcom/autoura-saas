@@ -57,7 +57,7 @@ export default function ToursRatesPage() {
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-4">
           <li><strong>The sidebar</strong> &mdash; each group is a foldable heading under <strong>Rates overview</strong> and <strong>Rates check</strong>; open it to see its sheets. A group you open stays open.</li>
-          <li><strong>The Rates menu</strong> &mdash; every rate sheet has a menu beside it: <strong>Overview</strong>, then the fourteen sheets by group, each with its count of rates. On a phone it is a picker at the top.</li>
+          <li><strong>Rates overview</strong> &mdash; every sheet by group, with its count of rates and when it last changed.</li>
           <li><strong>&#8984;K</strong> &mdash; type the sheet&apos;s name (&ldquo;hotels&rdquo;, &ldquo;tipping&rdquo;) and press Enter.</li>
         </ul>
 
@@ -121,8 +121,8 @@ export default function ToursRatesPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Importing rates from a spreadsheet</h3>
         <p className="text-gray-600">
-          Every rate page has <strong>Sample CSV</strong>, <strong>Export CSV</strong> and{' '}
-          <strong>Import CSV</strong>. Rate sheets that link a supplier carry a <strong>supplier code</strong>{' '}
+          Every rate page has an <strong>Import / Export</strong> menu: <strong>Export</strong>,{' '}
+          <strong>Sample sheet</strong> and <strong>Import</strong>. Rate sheets that link a supplier carry a <strong>supplier code</strong>{' '}
           column (Tipping and Fixed Costs have none), so each rate re-attaches to its supplier; a code your
           agency does not have is reported and that row skipped. See{' '}
           <Link href="/docs/bulk-csv" className="text-primary-600 hover:underline">Bulk Import (CSV)</Link>.

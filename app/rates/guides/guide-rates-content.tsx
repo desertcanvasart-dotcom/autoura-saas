@@ -1,14 +1,14 @@
 'use client'
 // @bulk-import
 import { cityOptionsFor } from '@/components/CitySelect'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader, { RateHeaderLink } from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Users, Plus, Edit, Trash2, X, Check, Copy, Filter, Globe, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
+import { Users, Plus, Edit, Trash2, X, Check, Copy, Filter, Globe, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -514,7 +514,7 @@ export default function GuideRatesContent() {
   }
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 min-h-screen">
       
       {/* Centered Notification Modal */}
       {notification && (
@@ -639,82 +639,25 @@ export default function GuideRatesContent() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-100 rounded-lg">
-            <Users className="w-6 h-6 text-primary-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-              Guide Rates
-              <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
-            </h1>
-            <p className="text-sm text-gray-600">Manage tour guide pricing by language and type</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <BulkRateImportExport tableName="guide_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={handleAddNew}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Add Rate
-          </button>
-          <Link
-            href="/resources"
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50"
-          >
-            <Users className="w-4 h-4" />
-            Guides
-          </Link>
-        </div>
-      </div>
+      <RatePageHeader
+        icon={Users}
+        title="Tour guides"
+        subtitle={`${rates.length} ${rates.length === 1 ? 'rate' : 'rates'} · ${uniqueCities} ${uniqueCities === 1 ? 'city' : 'cities'}`}
+        table="guide_rates"
+        onImported={fetchRates}
+        extra={<RateHeaderLink href="/resources" icon={Users}>Guides</RateHeaderLink>}
+        addLabel="Add guide rate"
+        onAdd={handleAddNew}
+      />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Globe className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{rates.length}</p>
-          <p className="text-xs text-gray-600">Total Rates</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Check className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{activeRates}</p>
-          <p className="text-xs text-gray-600">Active</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Users className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{linkedRates}</p>
-          <p className="text-xs text-gray-600">Linked to Guide</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-gray-400 font-bold">{rateSymbol}</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate)}</p>
-          <p className="text-xs text-gray-600">Avg. Daily Rate</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{uniqueCities}</p>
-          <p className="text-xs text-gray-600">Cities</p>
-        </div>
-      </div>
+      <div className="p-4 lg:p-6 space-y-4">
+        <RateStats stats={[
+          { label: 'Rates', value: rates.length },
+          { label: 'Active', value: activeRates, tone: 'green' },
+          { label: 'Linked to a guide', value: linkedRates },
+          { label: 'Avg. daily rate', value: fmtAverage(avgRate) },
+          { label: 'Cities', value: uniqueCities },
+        ]} />
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1379,6 +1322,7 @@ export default function GuideRatesContent() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
