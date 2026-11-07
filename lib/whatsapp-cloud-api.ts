@@ -56,8 +56,14 @@ export function formatMetaNumber(phone: string): string {
 }
 
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp)(\?|$)/i
+// Voice notes (and other sound files) go as audio: Ogg/Opus plays as a voice
+// note in WhatsApp. Audio messages take no caption.
+const AUDIO_EXTENSIONS = /\.(ogg|opus|mp3|aac|amr|m4a)(\?|$)/i
 
 function mediaPayload(mediaUrl: string, caption: string) {
+  if (AUDIO_EXTENSIONS.test(mediaUrl)) {
+    return { type: 'audio' as const, audio: { link: mediaUrl } }
+  }
   if (IMAGE_EXTENSIONS.test(mediaUrl)) {
     return { type: 'image' as const, image: { link: mediaUrl, ...(caption && { caption }) } }
   }

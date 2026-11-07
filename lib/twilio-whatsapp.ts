@@ -169,7 +169,8 @@ export async function sendWhatsAppMessage({
     const message = await client.messages.create({
       from,
       to: formattedTo,
-      body,
+      // A voice note (media only) sends no text: Twilio rejects an empty Body.
+      ...(body ? { body } : {}),
       ...(mediaUrl && { mediaUrl: [mediaUrl] }),
       ...(callbackUrl && { statusCallback: callbackUrl })
     })

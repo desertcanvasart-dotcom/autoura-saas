@@ -12,6 +12,8 @@ import {
 } from 'lucide-react'
 import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
 import { showToast } from '@/app/contexts/ToastContext'
+import MessageMedia, { hasMedia, mediaLabel } from '@/components/whatsapp/MessageMedia'
+import VoiceRecorder from '@/components/whatsapp/VoiceRecorder'
 import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
@@ -79,6 +81,9 @@ interface Message {
   direction: 'inbound' | 'outbound'
   message_body: string
   media_url: string | null
+  media_type?: string | null
+  media_storage_path?: string | null
+  metadata?: unknown
   status: string
   sent_at: string
 }
@@ -530,6 +535,8 @@ export default function WhatsAppInboxPage() {
   const [loading, setLoading] = useState(true)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  // A voice note being recorded or reviewed takes the send box's place.
+  const [voiceActive, setVoiceActive] = useState(false)
   const [showNewChat, setShowNewChat] = useState(false)
   const [newPhoneNumber, setNewPhoneNumber] = useState('')
 
@@ -841,7 +848,7 @@ export default function WhatsAppInboxPage() {
   // Parse conversation
   const parseConversation = () => {
     if (!selectedConversation || messages.length === 0) return
-    const conversationText = messages.map(m => `${m.direction === 'inbound' ? 'Client' : 'Agent'}: ${m.message_body}`).join('\n')
+    const conversationText = messages.map(m => `${m.direction === 'inbound' ? 'Client' : 'Agent'}: ${m.message_body?.trim() || (hasMedia(m) ? `[${mediaLabel(m.media_type)}]` : '')}`).join('\n')
     // The pricing grid is the pricing engine: it parses the conversation into
     // days, prices them, and saves onto the CRM client. The text goes by
     // sessionStorage, not the URL (lib/grid-handoff.ts).
@@ -885,7 +892,7 @@ export default function WhatsAppInboxPage() {
   }, [newMessage, customerLanguage, translationEnabled])
   useEffect(() => {
     if (translationEnabled && messages.length > 0) {
-      messages.forEach(msg => { if (msg.direction === 'inbound' && !incomingTranslations[msg.id]) handleTranslateMessage(msg.id, msg.message_body) })
+      messages.forEach(msg => { if (msg.direction === 'inbound' && msg.message_body?.trim() && !incomingTranslations[msg.id]) handleTranslateMessage(msg.id, msg.message_body) })
     }
   }, [translationEnabled, messages, agentLanguage])
   useEffect(() => {
@@ -1086,14 +1093,15 @@ export default function WhatsAppInboxPage() {
                     return (
                       <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] rounded-lg px-3 py-2 shadow-sm ${msg.direction === 'outbound' ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'}`}>
-                          {isInbound && translationEnabled && (
+                          <MessageMedia message={msg} />
+                          {isInbound && translationEnabled && msg.message_body?.trim() && (
                             <div className="flex items-center gap-2 mb-1 pb-1 border-b border-gray-200">
                               {isTranslatingThis ? <span className="flex items-center gap-1 text-xs text-blue-500"><Loader2 className="w-3 h-3 animate-spin" />Translating...</span>
                                 : hasTranslation ? <button type="button" onClick={() => setShowOriginalMap(p => ({ ...p, [msg.id]: !p[msg.id] }))} className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><Languages className="w-3 h-3" />{showOriginal ? `Show ${getLanguageInfo(agentLanguage).name}` : 'Show Original'}</button>
                                 : <button onClick={() => handleTranslateMessage(msg.id, msg.message_body)} className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><Languages className="w-3 h-3" />Translate</button>}
                             </div>
                           )}
-                          <p className="text-sm text-gray-900 whitespace-pre-wrap">{isInbound && hasTranslation && !showOriginal ? incomingTranslations[msg.id] : msg.message_body}</p>
+                          {(msg.message_body?.trim() || !hasMedia(msg)) && <p className="text-sm text-gray-900 whitespace-pre-wrap">{isInbound && hasTranslation && !showOriginal ? incomingTranslations[msg.id] : msg.message_body}</p>}
                           {isInbound && hasTranslation && !showOriginal && <p className="text-xs text-gray-400 mt-1 italic">Original: {msg.message_body}</p>}
                           <div className="flex items-center justify-end gap-1 mt-1">
                             <span className="text-xs text-gray-500">{new Date(msg.sent_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -1180,10 +1188,23 @@ export default function WhatsAppInboxPage() {
             {/* Message Input */}
             <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
               <div className="flex items-center gap-3">
-                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={translationEnabled ? `Type any language → sends in ${getLanguageInfo(customerLanguage).name}` : "Type a message..."} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#25D366]" />
-                <button type="submit" disabled={!newMessage.trim() || sending || (translationEnabled && isTranslating)} className="p-2.5 bg-[#25D366] text-white rounded-full hover:bg-[#20bd5a] disabled:opacity-50">
+                {!voiceActive && <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={translationEnabled ? `Type any language → sends in ${getLanguageInfo(customerLanguage).name}` : "Type a message..."} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#25D366]" />}
+                {/* Text typed → Send; empty → the microphone (as in WhatsApp). */}
+                {!voiceActive && newMessage.trim() && <button type="submit" disabled={sending || (translationEnabled && isTranslating)} className="p-2.5 bg-[#25D366] text-white rounded-full hover:bg-[#20bd5a] disabled:opacity-50">
                   {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
-                </button>
+                </button>}
+                <VoiceRecorder
+                  conversationId={selectedConversation.id}
+                  showIdleButton={!newMessage.trim()}
+                  onActiveChange={setVoiceActive}
+                  onError={msg => showToast('error', msg)}
+                  onSent={saved => {
+                    setMessages(prev => [...prev, saved as Message])
+                    setConversations(prev => prev.map(c =>
+                      c.id === selectedConversation.id ? { ...c, last_message: `🎤 ${mediaLabel('audio/ogg')}`, last_message_at: new Date().toISOString() } : c
+                    ))
+                  }}
+                />
               </div>
             </form>
           </>

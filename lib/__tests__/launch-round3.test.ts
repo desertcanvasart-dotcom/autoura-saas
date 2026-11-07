@@ -110,7 +110,10 @@ describe('round 3 — security', () => {
   })
 
   it('stored paths are checked before the service role signs or deletes them', () => {
-    expect(read('app/api/whatsapp/media/[id]/route.ts')).toContain('^inbound/${safeSid}')
+    // The rule moved to lib/whatsapp/voice-note-storage (2026-11-07); its own
+    // tests cover what it accepts (whatsapp-voice-note-storage.test.ts).
+    expect(read('app/api/whatsapp/media/[id]/route.ts')).toContain('storagePathBelongsTo(storagePath')
+    expect(read('lib/whatsapp/voice-note-storage.ts')).toContain('^inbound/${sid}')
     expect(read('app/api/supplier-invoices/[id]/route.ts')).toContain('path.startsWith(`${auth.tenant_id}/`)')
     expect(read('app/api/supplier-invoices/[id]/upload/route.ts')).toContain('previous.startsWith(`${tenant_id}/`)')
   })
