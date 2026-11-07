@@ -20,6 +20,7 @@ export const RATE_TABLES: Record<string, RateTable> = {
   meals: { table: 'meal_rates', dated: true },
   attractions: { table: 'entrance_fees', dated: true },
   activities: { table: 'activity_rates', dated: true },
+  'land-packages': { table: 'land_packages', dated: false },
   tipping: { table: 'tipping_rates', dated: false },
   'fixed-costs': { table: 'fixed_daily_costs', dated: false },
 }

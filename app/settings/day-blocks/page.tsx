@@ -19,6 +19,7 @@ import { AlertCircle, CheckCircle2, Download, Loader2, Moon, Trash2, Upload } fr
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { DAY_TYPES, nightLabel, sheetRowFromBlock, SHEET_COLUMNS, type DayBlock } from '@/lib/day-blocks/blocks'
 import { BLOCK_WRITE_DENIED } from '@/lib/day-blocks/access'
+import { packageLength } from '@/lib/pricing/land-package'
 
 interface AttractionCheck { name: string; ok: boolean; fees?: string[]; problem?: string }
 interface BlockRow extends DayBlock {
@@ -34,6 +35,7 @@ interface ImportSummary {
   applied: boolean
 }
 interface Notice { kind: 'success' | 'error'; text: string }
+interface PackageOption { id: string; package_name: string; duration_days: number }
 
 const TYPE_LABEL: Record<string, string> = {
   arrival: 'Arrival', tour: 'Tour', transfer: 'Transfer', cruise: 'Cruise', free: 'Free', departure: 'Departure',
@@ -58,6 +60,15 @@ export default function DayBlocksPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  // Land packages a block can be a day of (migration 462). Managers and up
+  // read them; for anyone else the list stays empty and the picker hidden.
+  const [packages, setPackages] = useState<PackageOption[]>([])
+  useEffect(() => {
+    fetch('/api/rates/land-packages')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.success) setPackages(d.data) })
+      .catch(() => {})
+  }, [])
   const [pending, setPending] = useState<{ csv: string; fileName: string; summary: ImportSummary } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -144,6 +155,23 @@ export default function DayBlocksPage() {
     setBusy(b.id)
     try {
       const res = await fetch(`/api/day-blocks/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: isActive }) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json?.success) { setNotice({ kind: 'error', text: json?.error || 'That did not save.' }); return }
+      await load()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** Link a block to day N of a package — `value` is "<id>|<day>", or "" to clear. */
+  const setPackage = async (b: BlockRow, value: string) => {
+    const [id, day] = value ? value.split('|') : ['', '']
+    setBusy(b.id)
+    try {
+      const res = await fetch(`/api/day-blocks/${b.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(id ? { land_package_id: id, land_package_day: Number(day) } : { land_package_id: null }),
+      })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json?.success) { setNotice({ kind: 'error', text: json?.error || 'That did not save.' }); return }
       await load()
@@ -297,6 +325,32 @@ export default function DayBlocksPage() {
                       </div>
                     )}
                   </div>
+
+                  {(packages.length > 0 || b.land_package_id) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-gray-600">Part of a land package:</span>
+                      {canWrite ? (
+                        <select
+                          aria-label={`Land package for ${b.code}`}
+                          value={b.land_package_id ? `${b.land_package_id}|${b.land_package_day ?? 1}` : ''}
+                          disabled={busy !== null}
+                          onChange={e => setPackage(b, e.target.value)}
+                          className="rounded border border-gray-300 bg-white px-2 py-1"
+                        >
+                          <option value="">No package</option>
+                          {packages.map(p => Array.from({ length: p.duration_days }, (_, i) => (
+                            <option key={`${p.id}|${i + 1}`} value={`${p.id}|${i + 1}`}>
+                              {p.package_name} — day {i + 1} of {packageLength(p)}
+                            </option>
+                          )))}
+                        </select>
+                      ) : (
+                        <span className="text-gray-800">
+                          {packages.find(p => p.id === b.land_package_id)?.package_name ?? 'a package'} — day {b.land_package_day ?? 1}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {b.attraction_checks.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">

@@ -221,6 +221,9 @@ export interface GridDay {
 
 export interface RateOption {
   id: string
+  /** Experiences only: a land package (migration 462) — priced per person,
+   *  and on its days what it includes is left off (lib/pricing/land-package). */
+  land_package?: import('@/lib/pricing/land-package').LandPackageRow
   name: string
   rateEur: number
   rateNonEur: number

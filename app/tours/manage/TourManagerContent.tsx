@@ -141,6 +141,8 @@ interface ItineraryDay {
    *  wording when present (A-item 13). */
   attraction_ids?: string[]
   activity_ids?: string[]
+  /** A land package starts on this day (migration 462). */
+  land_package_id?: string
   /** How this day travels (B-item 2). Absent = road. flight/train = the
    *  previous day's city → this day's; sleeping train = this day's city →
    *  the next day's (board tonight, wake there — no hotel that night). */
@@ -198,6 +200,13 @@ interface Attraction {
 }
 
 /** An activity the operator can add to a day (the motorboat at Philae). */
+interface LandPackageOption {
+  id: string
+  package_name: string
+  duration_days: number
+  is_active: boolean
+}
+
 interface ActivityOption {
   id: string
   activity_name: string
@@ -423,6 +432,8 @@ interface ItineraryEditorProps {
   attractionOptions: Attraction[]
   /** The activities catalogue, for adding an activity to a day BY ID. */
   activityOptions: ActivityOption[]
+  /** Rates → Land packages, for starting a package on a day (migration 462). */
+  landPackageOptions?: LandPackageOption[]
   /** Ticket catalogues for the Travel picker (B-item 2). */
   ticketOptions: Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>
   /** The tiers this template is sold at: a night is chosen PER TIER, because
@@ -433,7 +444,7 @@ interface ItineraryEditorProps {
   tourType?: string | null
 }
 
-function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptions, ticketOptions, tiers, tourType }: ItineraryEditorProps) {
+function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptions, landPackageOptions = [], ticketOptions, tiers, tourType }: ItineraryEditorProps) {
   const { cities: destinationCities } = useDestinationCities()
   // The same test the engine applies. `+ 1` while adding: a first day being
   // written into an empty programme is about to be a one-day tour.
@@ -453,6 +464,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
   // Activities added to this day, BY ID from the activities catalogue (the
   // motorboat at Philae). The engine prices them; a cruise day skips them.
   const [dayActivities, setDayActivities] = useState<Array<{ id: string; name: string }>>([])
+  const [dayLandPackage, setDayLandPackage] = useState('')
   // Travel mode + optional exact row (B-item 2). '' = road, as before.
   const [dayTransportType, setDayTransportType] = useState<'' | 'flight' | 'train' | 'sleeping_train'>('')
   const [dayTransportRateId, setDayTransportRateId] = useState('')
@@ -583,6 +595,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
     setDayMeals({ breakfast: '', lunch: '', dinner: '' })
     setDayAttractions([])
     setDayActivities([])
+    setDayLandPackage('')
     setDayTransportType('')
     setDayTransportRateId('')
     setDayLegFrom('')
@@ -618,6 +631,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
     setDayMeals({ breakfast: meals.breakfast, lunch: meals.lunch, dinner: meals.dinner } as typeof dayMeals)
     setDayAttractions((day.attraction_ids || []).map((id, i) => ({ id, name: (day.attractions || [])[i] || id })))
     setDayActivities((day.activity_ids || []).map((id: string) => ({ id, name: activityOptions.find(a => a.id === id)?.activity_name || id })))
+    setDayLandPackage(day.land_package_id || '')
     setDayTransportType((day.transport_type as typeof dayTransportType) || '')
     setDayTransportRateId(day.transport_rate_id || '')
     setDayLegFrom(day.leg_from || '')
@@ -682,8 +696,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
       cruiseAssist: dayCruiseAssist, transportLines: dayTransportLines ?? undefined,
       length: dayLength, propertiesByTier: dayProperties, noSightseeing: dayNoSightseeing,
       activityIds: dayActivities.map(a => a.id),
+      landPackageId: dayLandPackage,
     }, editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day)
-  }, [editingDayIndex, itinerary, dayTitle, dayDescription, dayMeals, dayAttractions, dayActivities, dayTransportType, dayTransportRateId, dayLegFrom, dayLegTo, dayLegAssist, dayCity, dayNight, dayCityTransfer, dayTripFromCity, dayRoad, dayCruiseAssist, dayTransportLines, dayLength, dayProperties, dayNoSightseeing])
+  }, [editingDayIndex, itinerary, dayTitle, dayDescription, dayMeals, dayAttractions, dayActivities, dayLandPackage, dayTransportType, dayTransportRateId, dayLegFrom, dayLegTo, dayLegAssist, dayCity, dayNight, dayCityTransfer, dayTripFromCity, dayRoad, dayCruiseAssist, dayTransportLines, dayLength, dayProperties, dayNoSightseeing])
   useEffect(() => {
     const idx = editingDayIndex ?? itinerary.length
     const days = itinerary.map((d, i) => (i === idx ? formDayForPreview : d))
@@ -739,6 +754,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
       propertiesByTier: dayProperties,
       noSightseeing: dayNoSightseeing,
       activityIds: dayActivities.map(a => a.id),
+      landPackageId: dayLandPackage,
     }, editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day) as unknown as ItineraryDay
 
     if (editingDayIndex === null) {
@@ -1227,6 +1243,32 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
             </p>
           )}
         </div>
+
+        {/* A land package starting on this day (migration 462): priced once per
+            person, it covers this day and the next ones, and what it includes
+            is not charged again on them. */}
+        {(landPackageOptions.length > 0 || dayLandPackage) && (
+          <div>
+            <label className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              Land package starting this day:
+              <select
+                value={dayLandPackage}
+                onChange={(e) => setDayLandPackage(e.target.value)}
+                className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">None</option>
+                {landPackageOptions.filter(p => p.is_active || p.id === dayLandPackage).map(p => (
+                  <option key={p.id} value={p.id}>{p.package_name} ({p.duration_days} day{p.duration_days === 1 ? '' : 's'})</option>
+                ))}
+              </select>
+            </label>
+            {dayLandPackage && (
+              <p className="text-xs text-gray-500 mt-1.5">
+                Covers this day and the next {Math.max(0, (landPackageOptions.find(p => p.id === dayLandPackage)?.duration_days ?? 1) - 1)}: the car, guide, meals, nights and tickets it includes are not charged on them.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Travel picker (B-item 2): how this day travels. Road is the
             default; flights/day trains run previous-day city → this day's,
@@ -1827,6 +1869,7 @@ export default function TourManagerContent() {
   const { items: bestForItems } = useVocabulary('tour_best_for')
   const { items: themeItems } = useVocabulary('tour_theme')
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
+  const [landPackages, setLandPackages] = useState<LandPackageOption[]>([])  // Rates → Land packages (migration 462)
   const [activities, setActivities] = useState<ActivityOption[]>([])  // Activities the operator can add to a day
   // Ticket catalogues for the Travel picker (B-item 2), labelled
   // operator/class/route so the operator can name THE train or flight.
@@ -1946,6 +1989,17 @@ export default function TourManagerContent() {
 
   // Activities (Rates → Activities & Add-ons) the operator can add to a day —
   // the motorboat at Philae, a felucca. The engine prices them per day.
+  const fetchLandPackages = async () => {
+    try {
+      const response = await fetch('/api/rates/land-packages')
+      if (!response.ok) return
+      const data = await response.json()
+      if (data.success && Array.isArray(data.data)) setLandPackages(data.data as LandPackageOption[])
+    } catch (error) {
+      console.error('Error fetching land packages:', error)
+    }
+  }
+
   const fetchActivities = async () => {
     try {
       const response = await fetch('/api/rates/activities?limit=500')
@@ -1990,6 +2044,7 @@ export default function TourManagerContent() {
       fetchTemplates(),
       fetchAttractions(),  // NEW: Fetch attractions on load
       fetchActivities(),   // Activities the operator can add to a day
+      fetchLandPackages(), // Land packages a day can start
       fetchTicketOptions()  // Ticket catalogues for the Travel picker (B2)
     ]).finally(() => {
       clearTimeout(loadingTimeout)
@@ -3533,6 +3588,7 @@ export default function TourManagerContent() {
                       onChange={handleItineraryChange}
                       attractionOptions={attractions}
                       activityOptions={activities}
+                      landPackageOptions={landPackages}
                       ticketOptions={ticketOptions}
                       tiers={templateTierEntries.map(t => ({ key: t.key, label: t.label }))}
                       tourType={formData.tour_type}

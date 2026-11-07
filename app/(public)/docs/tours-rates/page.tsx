@@ -19,6 +19,7 @@ const CATEGORIES: Array<{ group: string; name: string; what: string }> = [
   { group: 'Guides & Services', name: 'Meals', what: 'Per restaurant, meal type, city and tier; one preferred restaurant per tier and meal.' },
   { group: 'Guides & Services', name: 'Attractions', what: 'Entrance fees: one price, child and student discounts, linked to an Attraction supplier (such as the Supreme Council of Antiquities). An Add-on stays out of the automatic price; Sell as extra lets travellers add it after booking.' },
   { group: 'Guides & Services', name: 'Activities', what: 'The Activities & Add-ons catalogue: per person, per unit (a boat for six), a flat price, or tiered by group size.' },
+  { group: 'Guides & Services', name: 'Land packages', what: 'A trip of several days bought from one provider at one price per person — the Bahariya desert safari, say: its days, where each night is spent (desert camp or hotel), the meals of each day, and whether it includes the car from and back to the start city, a 4x4, the guide and the entrance tickets (and which sights). Charged once on a quote; on its days, what it includes is not charged again.' },
   { group: 'Costs', name: 'Tipping', what: 'By role, context (day tour, cruise …), optional city and unit (per day, service, night, cruise or person). A city row wins over the any-city row.' },
   { group: 'Costs', name: 'Fixed Costs', what: 'Per-person costs per sightseeing day. Pricing reads the water cost; your own row replaces the shared default.' },
 ]
@@ -52,7 +53,7 @@ export default function ToursRatesPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Rates</h2>
         <p className="text-gray-600 mb-4">
           Your buying rates live under <strong>Suppliers &amp; rates</strong> in the sidebar (admins and managers):
-          fourteen rate sheets in four groups &mdash; Accommodation, Transport &amp; tickets, Guides &amp; services, Costs.
+          fifteen rate sheets in four groups &mdash; Accommodation, Transport &amp; tickets, Guides &amp; services, Costs.
           Your supplier costs stay with admins and managers: members price quotes in the Quote Builder without
           being able to open or export the rate sheets, and viewers see no costs at all.
           There are three ways to reach a sheet:
@@ -96,6 +97,17 @@ export default function ToursRatesPage() {
           the row shows a star: star the one quotes should use. With exactly one starred, prices use it; with
           none or several, the quote shows a gap naming the companies instead of guessing &mdash; the same rule as
           a preferred hotel. You can still pick another company for a single trip in the pricing grid.
+        </p>
+        <p className="text-gray-600 mb-3">
+          <strong>Land packages.</strong> When a provider sells you a whole trip at one price per person &mdash;
+          the Bahariya desert safari with its car from Cairo, 4x4, a night in the desert camp or a hotel, guide,
+          meals and the protected-area ticket &mdash; add it under <strong>Land packages</strong>, one per version
+          (camp, hotel, three days&hellip;). Then put it on the day it starts: in the Tour Manager&apos;s day editor
+          (<strong>Land package starting this day</strong>), or link your standard days to it in Settings &rsaquo; Day
+          blocks (<strong>Part of a land package</strong>, day 1, day 2&hellip;) so the Quote Builder lays it down when you
+          add those days. It is charged once, price per person &times; travellers; on the days it covers, the car,
+          guide, meals, nights and tickets it includes are not charged again, and anything it leaves out is priced
+          as usual. On a package&apos;s last day the group is back in its start city, so that night&apos;s hotel is there.
         </p>
         <p className="text-gray-600 mb-3">
           <strong>One guide price for many cities or languages.</strong> When adding a guide rate, tick

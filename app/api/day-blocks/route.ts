@@ -14,6 +14,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { buildAliasIndex } from '@/lib/pricing/attraction-aliases'
 import type { FeeName } from '@/lib/pricing/alias-admin'
 import { checkBlockAttractions } from '@/lib/day-blocks/attraction-check'
+import { sightCovered } from '@/lib/pricing/land-package'
 import { BLOCK_COLS, BLOCK_WRITE_DENIED, BLOCK_WRITE_ROLES } from '@/lib/day-blocks/access'
 import { validateNewBlock } from '@/lib/day-blocks/from-grid-day'
 import type { Json } from '@/types/database.types'
@@ -38,10 +39,21 @@ export async function GET() {
 
     const fees = (feeRes.data ?? []) as FeeName[]
     const aliasIndex = buildAliasIndex(aliasRes.data ?? [])
-    const blocks = (blockRes.data ?? []).map(b => ({
-      ...b,
-      attraction_checks: checkBlockAttractions(b.attractions ?? [], fees, aliasIndex),
-    }))
+    // A block that is a day of a land package (migration 462): a sight its
+    // ticket covers needs no fee of its own.
+    const pkgIds = [...new Set((blockRes.data ?? []).map(b => b.land_package_id).filter((v): v is string => !!v))]
+    const { data: pkgRows } = pkgIds.length
+      ? await supabase.from('land_packages').select('id, package_name, includes_entrance, covered_attractions').in('id', pkgIds)
+      : { data: [] as Array<{ id: string; package_name: string; includes_entrance: boolean; covered_attractions: string[] }> }
+    const pkgById = new Map((pkgRows ?? []).map(p => [p.id, p]))
+    const blocks = (blockRes.data ?? []).map(b => {
+      const pkg = b.land_package_id ? pkgById.get(b.land_package_id) : undefined
+      return {
+        ...b,
+        attraction_checks: checkBlockAttractions(b.attractions ?? [], fees, aliasIndex).map(c =>
+          !c.ok && pkg && sightCovered(pkg, c.name) ? { name: c.name, ok: true, fees: [`included in ${pkg.package_name}`] } : c),
+      }
+    })
 
     return NextResponse.json({ success: true, data: { blocks, canWrite: BLOCK_WRITE_ROLES.includes(role || '') } })
   } catch (error) {

@@ -34,6 +34,8 @@ export const RATE_MONETARY_COLUMNS: Record<string, string[]> = {
   airport_staff_rates: ['rate_eur'],
   meal_rates: ['base_rate_eur', 'base_rate_non_eur'],
   activity_rates: ['base_rate_eur', 'base_rate_non_eur'],
+  // A land package's price per person (migration 462).
+  land_packages: ['base_rate_eur', 'base_rate_non_eur'],
   train_rates: ['rate_eur', 'guide_rate'],
   sleeping_train_rates: ['rate_oneway_eur', 'rate_roundtrip_eur', 'rate_oneway_non_eur', 'rate_roundtrip_non_eur', 'guide_rate'],
   flight_rates: ['base_rate_eur', 'tax_eur', 'base_rate_non_eur', 'tax_non_eur', 'guide_rate'],
