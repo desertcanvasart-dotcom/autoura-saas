@@ -241,7 +241,7 @@ describe('crawlers', () => {
   it('llms.txt says what Autoura is, with prices from the pricing config only', () => {
     const txt = llmsTxt()
     expect(txt.startsWith('# Autoura\n\n> ')).toBe(true)
-    expect(txt).toContain('$69/month')
+    expect(txt).toContain('$89/month')
     expect(txt).toContain('$189/month')
     expect(txt).not.toContain('$449')
     expect(txt).toContain('not a travel agency')

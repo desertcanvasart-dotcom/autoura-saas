@@ -101,7 +101,7 @@ describe('PRICING_TIERS — catalog integrity', () => {
   })
 
   it('locks the agreed price points', () => {
-    expect(PRICING_TIERS.solo.monthlyPrice).toBe(69)
+    expect(PRICING_TIERS.solo.monthlyPrice).toBe(89)
     expect(PRICING_TIERS.studio.monthlyPrice).toBe(189)
     expect(PRICING_TIERS.agency.monthlyPrice).toBe(449)
     expect(PRICING_TIERS.enterprise.monthlyPrice).toBeNull()

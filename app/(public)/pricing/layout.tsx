@@ -5,7 +5,7 @@ import { breadcrumbs, buildPageMetadata } from '@/lib/seo/site'
 
 export const metadata = buildPageMetadata({
   title: 'Pricing',
-  description: `Pricing for tour operators: Solo $69 and Studio $189 a month; Agency and Enterprise on request. Every plan has the full product and a ${TRIAL_DAYS}-day free trial.`,
+  description: `Pricing for tour operators: Solo $89 and Studio $189 a month; Agency and Enterprise on request. Every plan has the full product and a ${TRIAL_DAYS}-day free trial.`,
   path: '/pricing',
 })
 
