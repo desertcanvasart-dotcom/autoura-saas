@@ -1,13 +1,14 @@
 'use client'
 // @bulk-import
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCurrency } from '@/hooks/useCurrency'
-import { BedDouble, Plus, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
+import { BedDouble, Plus, Edit, Trash2, X, Check, Copy, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -46,7 +47,7 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function SleepingTrainRatesContent() {
   const searchParams = useSearchParams()
-  const { symbol, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<SleepingTrainRate[]>([])
@@ -494,7 +495,17 @@ export default function SleepingTrainRatesContent() {
   }
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 min-h-screen">
+    <RatePageHeader
+      icon={BedDouble}
+      title="Sleeping trains"
+      subtitle={`${rates.length} ${rates.length === 1 ? 'rate' : 'rates'} · ${uniqueRoutes} ${uniqueRoutes === 1 ? 'route' : 'routes'}`}
+      table="sleeping_train_rates"
+      onImported={fetchRates}
+      addLabel="Add rate"
+      onAdd={handleAddNew}
+    />
+    <div className="p-4 lg:p-6 space-y-4">
       
       {/* Centered Notification Modal */}
       {notification && (
@@ -576,67 +587,12 @@ export default function SleepingTrainRatesContent() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-100 rounded-lg">
-            <BedDouble className="w-6 h-6 text-primary-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-              Sleeping Train Rates
-              <Moon className="w-4 h-4 text-primary-400" />
-            </h1>
-            <p className="text-sm text-gray-600">Overnight sleeper train cabin pricing</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <BulkRateImportExport tableName="sleeping_train_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={handleAddNew}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Add Rate
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <BedDouble className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{rates.length}</p>
-          <p className="text-xs text-gray-600">Total Rates</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Check className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{activeRates}</p>
-          <p className="text-xs text-gray-600">Active</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-gray-400 font-bold">{symbol}</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgOneway)}</p>
-          <p className="text-xs text-gray-600">Avg. One-way</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary-600"></span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{uniqueRoutes}</p>
-          <p className="text-xs text-gray-600">Routes</p>
-        </div>
-      </div>
+      <RateStats stats={[
+        { label: 'Rates', value: rates.length },
+        { label: 'Active', value: activeRates, tone: 'green' },
+        { label: 'Avg. one-way', value: fmtAverage(avgOneway) },
+        { label: 'Routes', value: uniqueRoutes },
+      ]} />
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1379,6 +1335,7 @@ export default function SleepingTrainRatesContent() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

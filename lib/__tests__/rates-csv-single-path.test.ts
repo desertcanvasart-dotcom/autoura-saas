@@ -78,8 +78,15 @@ describe('one import/export path per rates page', () => {
   })
 
   it('pages offering bulk rates use the shared component', () => {
-    const withBulk = pages.filter(p =>
-      fs.readFileSync(p, 'utf8').includes('BulkRateImportExport'))
+    // A page wires it directly, or through the shared rate-page header
+    // (components/rates/RatePageHeader.tsx, 2026-11-07), whose `table` prop
+    // renders the same Import / Export menu.
+    const header = fs.readFileSync(path.join(__dirname, '..', '..', 'components', 'rates', 'RatePageHeader.tsx'), 'utf8')
+    expect(header).toContain('<BulkRateImportExport')
+    const withBulk = pages.filter(p => {
+      const src = fs.readFileSync(p, 'utf8')
+      return src.includes('BulkRateImportExport') || /<RatePageHeader[\s\S]*?\btable=/.test(src)
+    })
     // 13 rate tables are configured; each has exactly one page wiring it up.
     expect(withBulk.length).toBeGreaterThanOrEqual(13)
   })

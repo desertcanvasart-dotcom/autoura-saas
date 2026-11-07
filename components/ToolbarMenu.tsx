@@ -62,7 +62,7 @@ export default function ToolbarMenu({
         onClick={() => setOpen(v => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 h-9 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
       >
         {icon}
         {label}

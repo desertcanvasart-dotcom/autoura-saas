@@ -3,9 +3,9 @@
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
-import { Plus, Edit, Copy, Save, X, Loader2, DollarSign, Trash2 } from 'lucide-react'
+import { Edit, Copy, Save, X, Loader2, DollarSign, Trash2 } from 'lucide-react'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader from '@/components/rates/RatePageHeader'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface FixedCost {
@@ -116,25 +116,18 @@ function FixedCostsContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-primary-500" /> Fixed Daily Costs
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Per-person costs per sightseeing day. Pricing reads the water cost (a type containing &ldquo;water&rdquo;); other types are kept for reference.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <BulkRateImportExport tableName="fixed_costs" onImportComplete={fetchCosts} />
-            <button onClick={() => { setForm({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true }); setEditingId(null); setShowForm(true) }}
-              className="btn-primary text-sm px-4 py-2 rounded-lg flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Add Cost
-            </button>
-          </div>
-        </div>
-      </header>
+      <RatePageHeader
+        icon={DollarSign}
+        title="Fixed costs"
+        subtitle={loading ? undefined : `${costs.length} ${costs.length === 1 ? 'cost' : 'costs'}`}
+        table="fixed_costs"
+        onImported={fetchCosts}
+        addLabel="Add cost"
+        onAdd={() => { setForm({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true }); setEditingId(null); setShowForm(true) }}
+      />
 
       <div className="max-w-4xl mx-auto p-6">
+        <p className="text-sm text-gray-500 mb-4">Per-person costs per sightseeing day. Pricing reads the water cost (a type containing &ldquo;water&rdquo;); other types are kept for reference.</p>
         {!loading && costs.length > 0 && (
           <div className="mb-4">
             <input

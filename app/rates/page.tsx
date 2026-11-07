@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 import { RATE_GROUPS, rateCategoryHref } from '@/lib/nav/config'
-import { useRatesSummary } from '@/components/rates/RatesMenu'
+import { RatesSummaryProvider, useRatesSummary } from '@/components/rates/rates-summary'
 
 // The Rates Overview: what is on file, what runs out soon, what the Rates
 // check flags, and each rate sheet with its count and when it last changed.
@@ -58,6 +58,10 @@ function CategoryChooser({ label, primary }: { label: string; primary?: boolean 
 }
 
 export default function RatesOverviewPage() {
+  return <RatesSummaryProvider><RatesOverview /></RatesSummaryProvider>
+}
+
+function RatesOverview() {
   const { summary, error } = useRatesSummary()
   const cats = summary ? Object.values(summary.categories) : []
   const total = summary ? cats.reduce((n, c) => n + c.count, 0) : null
@@ -69,7 +73,7 @@ export default function RatesOverviewPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Rates</h1>
-          <p className="mt-1 text-sm text-gray-600">All supplier rates in one place. Pick a rate sheet from the menu.</p>
+          <p className="mt-1 text-sm text-gray-600">All supplier rates in one place. Open a rate sheet below or from the sidebar.</p>
         </div>
         <div className="flex gap-2">
           <CategoryChooser label="Import sheet" />

@@ -1,12 +1,13 @@
 'use client'
 // @bulk-import
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader, { RateHeaderLink } from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
-import { Ship, Plus, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
+import { Ship, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { SAILING_DAYS, dayName, sailingDaysLabel, sanitizeSailingDays, type SailingDay } from '@/lib/rates/cruise-sailing'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
@@ -951,62 +952,25 @@ export default function CruisesPage() {
         ))}
       </div>
 
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="container mx-auto px-4 lg:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Ship className="w-5 h-5 text-blue-600" />
-              <h1 className="text-2xl font-semibold text-gray-900">Cruises</h1>
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-            </div>
-            <div className="flex items-center gap-2">
-              <BulkRateImportExport tableName="nile_cruises" onImportComplete={fetchCruises} />
-              <button
-                onClick={handleAddNew}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Add Cruise
-              </button>
-              <Link href="/suppliers?type=cruise" className="px-3 py-1.5 text-sm border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 font-medium">
-                Cruise Suppliers
-              </Link>
-              <Link href="/rates" className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
-                ← Rates Hub
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <RatePageHeader
+        icon={Ship}
+        title="Cruises"
+        subtitle={`${stats.total} ${stats.total === 1 ? 'rate' : 'rates'} · ${stats.ships} ${stats.ships === 1 ? 'ship' : 'ships'}`}
+        table="nile_cruises"
+        onImported={fetchCruises}
+        extra={<RateHeaderLink href="/suppliers?type=cruise" icon={Ship}>Cruise suppliers</RateHeaderLink>}
+        addLabel="Add cruise"
+        onAdd={handleAddNew}
+      />
 
       <div className="container mx-auto px-4 lg:px-6 py-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Total Rates</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Active</p>
-            <p className="text-2xl font-bold text-green-600">{stats.active}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <div className="flex items-center gap-1 mb-1">
-              <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-            </div>
-            <p className="text-xs text-gray-600">Preferred</p>
-            <p className="text-2xl font-bold text-amber-600">{stats.preferred}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Ships</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.ships}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Avg. PPD Rate</p>
-            <p className="text-2xl font-bold text-primary-600">{fmtAverage(stats.avgPPD)}</p>
-          </div>
-        </div>
+        <RateStats stats={[
+          { label: 'Rates', value: stats.total },
+          { label: 'Active', value: stats.active, tone: 'green' },
+          { label: 'Preferred', value: stats.preferred, tone: 'amber' },
+          { label: 'Ships', value: stats.ships, tone: 'blue' },
+          { label: 'Avg. PPD rate', value: fmtAverage(stats.avgPPD), tone: 'primary' },
+        ]} />
 
         {/* Filters — search box + category/cabin/tier. The search has shipped
             since 2025-12-08 but a stale Railway build chunk was serving this

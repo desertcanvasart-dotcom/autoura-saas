@@ -1,7 +1,8 @@
 'use client'
 // @bulk-import
 import { cityOptionsFor } from '@/components/CitySelect'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader, { RateHeaderLink } from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
@@ -11,7 +12,7 @@ const NEW_PROPERTY = '__new__'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign, Star, Wallet } from 'lucide-react'
+import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign, Star, } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { TierBadge, TierPicker, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
@@ -1103,90 +1104,25 @@ export default function HotelsContent() {
         ))}
       </div>
 
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="container mx-auto px-4 lg:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-primary-600" />
-              <h1 className="text-2xl font-semibold text-gray-900">Hotels & Accommodation</h1>
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-            </div>
-            <div className="flex items-center gap-2">
-              <BulkRateImportExport tableName="accommodation_rates" onImportComplete={fetchRates} />
-              <Link
-                href="/suppliers?type=hotel"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                <Building2 className="w-4 h-4" />
-                Hotel Companies
-              </Link>
-              <button
-                onClick={handleAddNew}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Add Hotel
-              </button>
-              <Link 
-                href="/rates"
-                className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                ← Rates
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <RatePageHeader
+        icon={Building2}
+        title="Hotels"
+        subtitle={`${rates.length} ${rates.length === 1 ? 'hotel' : 'hotels'} · ${usedCities.length} ${usedCities.length === 1 ? 'city' : 'cities'}`}
+        table="accommodation_rates"
+        onImported={fetchRates}
+        extra={<RateHeaderLink href="/suppliers?type=hotel" icon={Building2}>Hotel companies</RateHeaderLink>}
+        addLabel="Add hotel"
+        onAdd={handleAddNew}
+      />
 
       <div className="container mx-auto px-4 lg:px-6 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Building2 className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-            </div>
-            <p className="text-xs text-gray-600">Total Hotels</p>
-            <p className="text-2xl font-bold text-gray-900">{rates.length}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Check className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
-            </div>
-            <p className="text-xs text-gray-600">Active</p>
-            <p className="text-2xl font-bold text-gray-900">{activeRates}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Building2 className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-            </div>
-            <p className="text-xs text-gray-600">Linked to Company</p>
-            <p className="text-2xl font-bold text-gray-900">{linkedRates}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Wallet className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-            </div>
-            <p className="text-xs text-gray-600">Avg. Double (Low)</p>
-            <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate)}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <MapPin className="w-4 h-4 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-            </div>
-            <p className="text-xs text-gray-600">Cities</p>
-            <p className="text-2xl font-bold text-gray-900">{usedCities.length}</p>
-          </div>
-        </div>
+        <RateStats stats={[
+          { label: 'Hotels', value: rates.length },
+          { label: 'Active', value: activeRates, tone: 'green' },
+          { label: 'Linked to a company', value: linkedRates },
+          { label: 'Avg. double (low season)', value: fmtAverage(avgRate) },
+          { label: 'Cities', value: usedCities.length },
+        ]} />
 
         {/* Search, Filters & View Toggle */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-3 mb-4">
@@ -1233,13 +1169,14 @@ export default function HotelsContent() {
 
             {/* Tier Filter */}
             <div className="relative">
-              <VocabSelect kind="tier" value={filterTier || 'all'} onChange={v => setFilterTier(v === 'all' ? null : v)} emptyValue="all" placeholder="All Tiers" className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm appearance-none pr-8" />
+              <VocabSelect kind="tier" value={filterTier || 'all'} onChange={v => setFilterTier(v === 'all' ? null : v)} emptyValue="all" placeholder="All Tiers" className="w-full md:w-36 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm appearance-none pr-8" />
               <Crown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
 
             <button
               onClick={() => setShowInactive(!showInactive)}
-              className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors ${
+              aria-pressed={!showInactive}
+              className={`whitespace-nowrap px-3 py-2 text-sm rounded-lg font-medium transition-colors ${
                 showInactive 
                   ? 'bg-gray-100 border border-gray-300 text-gray-700' 
                   : 'bg-white border border-green-300 text-green-700'
@@ -1320,7 +1257,7 @@ export default function HotelsContent() {
                         aria-label="Select all hotels"
                       />
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Hotel</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 min-w-[13rem]">Hotel</th>
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Company</th>
                     <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Tier</th>
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
@@ -1347,7 +1284,7 @@ export default function HotelsContent() {
                       <td className="px-4 py-3">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{rate.property_name}</p>
-                          <p className="text-xs text-gray-500 font-mono">{rate.service_code}</p>
+                          <p className="text-xs text-gray-500 font-mono whitespace-nowrap">{rate.service_code}</p>
                           {rate.contact_name && (
                             <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                               <User className="w-3 h-3" /> {rate.contact_name}

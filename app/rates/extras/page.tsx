@@ -21,8 +21,8 @@
 // prices. These are the extras that go with any quote.
 
 import { useCallback, useEffect, useState } from 'react'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
-import { Copy, Loader2, Pencil, Plus, Trash2, X, Sparkles } from 'lucide-react'
+import RatePageHeader from '@/components/rates/RatePageHeader'
+import { Copy, Loader2, Pencil, Trash2, X, Sparkles } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTenant } from '@/app/contexts/TenantContext'
 
@@ -120,24 +120,17 @@ export default function ExtrasPage() {
     : extras
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-start justify-between mb-1">
-        <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-primary-600" /> Extras
-        </h1>
-        <div className="flex items-center gap-2">
-          <BulkRateImportExport tableName="extras_catalogue" onImportComplete={load} />
-          {!draft && (
-            <button
-              type="button"
-              onClick={() => setDraft(EMPTY)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-            >
-              <Plus className="w-4 h-4" /> Add extra
-            </button>
-          )}
-        </div>
-      </div>
+    <div>
+      <RatePageHeader
+        icon={Sparkles}
+        title="Extras"
+        subtitle={`${extras.length} ${extras.length === 1 ? 'extra' : 'extras'}`}
+        table="extras_catalogue"
+        onImported={load}
+        addLabel={draft ? undefined : 'Add extra'}
+        onAdd={draft ? undefined : () => setDraft(EMPTY)}
+      />
+      <div className="p-6 max-w-5xl mx-auto">
       <p className="text-sm text-gray-500 mb-6">Paid extras you can add to any quote — airport fast-track, extra luggage, a late check-out. Pick them in the B2B calculator: each is priced from its cost plus the quote&apos;s margin, or at the price you set here. Upgrades that belong to one programme are set on its variation, under Tour Manager → Options.</p>
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
@@ -314,6 +307,7 @@ export default function ExtrasPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

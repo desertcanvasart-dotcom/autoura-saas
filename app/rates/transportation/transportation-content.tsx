@@ -1,11 +1,12 @@
 'use client'
 // @bulk-import
 import { cityOptionsFor } from '@/components/CitySelect'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy, LayoutGrid, List, Table2 } from 'lucide-react'
+import { Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy, LayoutGrid, List, Table2 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import PreferredStar from '@/app/components/PreferredStar'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
@@ -663,63 +664,24 @@ export default function TransportationContent() {
   }
 
   return (
+    <>
+    <RatePageHeader
+      icon={Car}
+      title="Transportation"
+      subtitle={`${totalRates} ${totalRates === 1 ? 'rate' : 'rates'} · ${uniqueCities} ${uniqueCities === 1 ? 'city' : 'cities'}`}
+      table="transportation_rates"
+      onImported={fetchRates}
+      addLabel="Add rate"
+      onAdd={openAddModal}
+    />
     <div className="p-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Car className="h-5 w-5 text-blue-600" />
-          <h1 className="text-2xl font-semibold text-gray-900">Transportation Rates</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <BulkRateImportExport tableName="transportation_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Rate
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-5 gap-3">
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-            <span className="text-xs text-gray-500">Total Rates</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{totalRates}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            <span className="text-xs text-gray-500">Active</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{activeRates}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-            <span className="text-xs text-gray-500">Inactive</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{inactiveRates}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary-500"></div>
-            <span className="text-xs text-gray-500">Cities</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueCities}</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-            <span className="text-xs text-gray-500">Vehicle Types</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueVehicleTypes}</p>
-        </div>
-      </div>
+      <RateStats stats={[
+        { label: 'Rates', value: totalRates },
+        { label: 'Active', value: activeRates, tone: 'green' },
+        { label: 'Inactive', value: inactiveRates },
+        { label: 'Cities', value: uniqueCities },
+        { label: 'Vehicle types', value: uniqueVehicleTypes },
+      ]} />
 
       {/* Search and Filters */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -1343,5 +1305,6 @@ export default function TransportationContent() {
         </div>
       )}
     </div>
+    </>
   )
 }

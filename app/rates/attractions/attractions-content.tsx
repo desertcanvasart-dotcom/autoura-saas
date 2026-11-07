@@ -1,14 +1,14 @@
 'use client'
 // @bulk-import
 import { cityOptionsFor } from '@/components/CitySelect'
-import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import RatePageHeader from '@/components/rates/RatePageHeader'
+import RateStats from '@/components/rates/RateStats'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy, Ticket, MapPin, Wallet } from 'lucide-react'
+import { Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy, Ticket } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -664,98 +664,25 @@ export default function AttractionsContent() {
         ))}
       </div>
 
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="container mx-auto px-4 lg:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold text-gray-900">Attractions & Entrance Fees</h1>
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-            </div>
-            <div className="flex items-center gap-2">
-              <BulkRateImportExport tableName="entrance_fees" onImportComplete={fetchAttractions} />
-              <button
-                onClick={handleAddNew}
-                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                Add Attraction
-              </button>
-              <Link
-                href="/rates"
-                className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                ← Resources
-              </Link>
-              <Link 
-                href="/" 
-                className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                ← Home
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <RatePageHeader
+        icon={Ticket}
+        title="Attractions"
+        subtitle={`${attractions.length} ${attractions.length === 1 ? 'attraction' : 'attractions'} · ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}`}
+        table="entrance_fees"
+        onImported={fetchAttractions}
+        addLabel="Add attraction"
+        onAdd={handleAddNew}
+      />
 
-      {/* Stats Cards - UPDATED */}
       <div className="container mx-auto px-4 lg:px-6 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Ticket className="w-5 h-5 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-            </div>
-            <p className="text-xs text-gray-600">Total Attractions</p>
-            <p className="text-2xl font-bold text-gray-900">{attractions.length}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">✓</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
-            </div>
-            <p className="text-xs text-gray-600">Active</p>
-            <p className="text-2xl font-bold text-gray-900">{activeAttractions}</p>
-          </div>
-
-          {/* NEW: Standard vs Add-on stats */}
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <MapPin className="w-5 h-5 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-            </div>
-            <p className="text-xs text-gray-600">Standard</p>
-            <p className="text-2xl font-bold text-gray-900">{standardAttractions}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-amber-200 bg-amber-50">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="text-amber-500 w-5 h-5" />
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-            </div>
-            <p className="text-xs text-amber-700">Add-ons</p>
-            <p className="text-2xl font-bold text-amber-700">{addonAttractions}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Building2 className="w-5 h-5 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-            </div>
-            <p className="text-xs text-gray-600">Cities</p>
-            <p className="text-2xl font-bold text-gray-900">{cities.length}</p>
-          </div>
-
-          <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Wallet className="w-5 h-5 text-gray-400" />
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-            </div>
-            <p className="text-xs text-gray-600">Avg. Rate</p>
-            <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate, 2)}</p>
-          </div>
-        </div>
+        <RateStats stats={[
+          { label: 'Attractions', value: attractions.length },
+          { label: 'Active', value: activeAttractions, tone: 'green' },
+          { label: 'Standard', value: standardAttractions },
+          { label: 'Add-ons', value: addonAttractions, tone: 'amber' },
+          { label: 'Cities', value: cities.length },
+          { label: 'Avg. rate', value: fmtAverage(avgRate, 2) },
+        ]} />
 
         {/* Search and Filters - UPDATED */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-3 mb-4">
