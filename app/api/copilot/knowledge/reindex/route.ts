@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { embedBatch, EMBEDDING_MODEL, toPgVector } from '@/lib/embeddings'
+import { messageWords } from '@/lib/whatsapp/transcript'
 
 const MAX_MESSAGES_PER_RUN = 500
 
@@ -67,14 +68,14 @@ export async function POST(request: NextRequest) {
     const before = msg.sent_at || new Date().toISOString()
     const { data: inbound } = await supabase
       .from('whatsapp_messages')
-      .select('message_body, message_text, sent_at')
+      .select('message_body, message_text, sent_at, metadata')
       .eq('conversation_id', msg.conversation_id)
       .eq('direction', 'inbound')
       .lt('sent_at', before)
       .order('sent_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    const inboundText = (inbound?.message_body || inbound?.message_text || '').trim()
+    const inboundText = inbound ? messageWords(inbound) : ''
     if (!inboundText) continue
     prepared.push({
       outboundId: msg.id,

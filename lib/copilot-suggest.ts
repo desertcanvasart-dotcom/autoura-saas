@@ -11,6 +11,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from './ai/anthropic-client'
 import { whatsappModel } from './ai/models'
 import { retrieveKnowledge, formatRetrievalContext, type RetrievedItem } from './copilot-retrieval'
+import { messageWords } from '@/lib/whatsapp/transcript'
 
 const MODEL = whatsappModel()
 
@@ -339,7 +340,7 @@ async function loadWhatsAppContext(
   // Messages
   const { data: rawMessages } = await supabase
     .from('whatsapp_messages')
-    .select('direction, message_body, message_text, sent_at, message_sid')
+    .select('direction, message_body, message_text, sent_at, message_sid, metadata')
     .eq('conversation_id', whatsappConversationId)
     .order('sent_at', { ascending: false })
     .limit(20)
@@ -347,7 +348,8 @@ async function loadWhatsAppContext(
   const messages = (rawMessages || [])
     .map((m: any) => ({
       direction: m.direction,
-      text: (m.message_body || m.message_text || '').trim(),
+      // A voice note's words are its transcript (lib/whatsapp/transcript).
+      text: messageWords(m),
       sent_at: m.sent_at,
       sid: m.message_sid,
     }))

@@ -14,6 +14,7 @@ import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
 import { showToast } from '@/app/contexts/ToastContext'
 import MessageMedia, { hasMedia, mediaLabel } from '@/components/whatsapp/MessageMedia'
 import VoiceRecorder from '@/components/whatsapp/VoiceRecorder'
+import { messageWords } from '@/lib/whatsapp/transcript'
 import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
@@ -848,7 +849,7 @@ export default function WhatsAppInboxPage() {
   // Parse conversation
   const parseConversation = () => {
     if (!selectedConversation || messages.length === 0) return
-    const conversationText = messages.map(m => `${m.direction === 'inbound' ? 'Client' : 'Agent'}: ${m.message_body?.trim() || (hasMedia(m) ? `[${mediaLabel(m.media_type)}]` : '')}`).join('\n')
+    const conversationText = messages.map(m => `${m.direction === 'inbound' ? 'Client' : 'Agent'}: ${messageWords(m) || (hasMedia(m) ? `[${mediaLabel(m.media_type)}]` : '')}`).join('\n')
     // The pricing grid is the pricing engine: it parses the conversation into
     // days, prices them, and saves onto the CRM client. The text goes by
     // sessionStorage, not the URL (lib/grid-handoff.ts).
@@ -892,7 +893,7 @@ export default function WhatsAppInboxPage() {
   }, [newMessage, customerLanguage, translationEnabled])
   useEffect(() => {
     if (translationEnabled && messages.length > 0) {
-      messages.forEach(msg => { if (msg.direction === 'inbound' && msg.message_body?.trim() && !incomingTranslations[msg.id]) handleTranslateMessage(msg.id, msg.message_body) })
+      messages.forEach(msg => { const words = messageWords(msg); if (msg.direction === 'inbound' && words && !incomingTranslations[msg.id]) handleTranslateMessage(msg.id, words) })
     }
   }, [translationEnabled, messages, agentLanguage])
   useEffect(() => {
@@ -1094,15 +1095,18 @@ export default function WhatsAppInboxPage() {
                       <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] rounded-lg px-3 py-2 shadow-sm ${msg.direction === 'outbound' ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'}`}>
                           <MessageMedia message={msg} />
-                          {isInbound && translationEnabled && msg.message_body?.trim() && (
+                          {isInbound && translationEnabled && messageWords(msg) && (
                             <div className="flex items-center gap-2 mb-1 pb-1 border-b border-gray-200">
                               {isTranslatingThis ? <span className="flex items-center gap-1 text-xs text-blue-500"><Loader2 className="w-3 h-3 animate-spin" />Translating...</span>
                                 : hasTranslation ? <button type="button" onClick={() => setShowOriginalMap(p => ({ ...p, [msg.id]: !p[msg.id] }))} className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><Languages className="w-3 h-3" />{showOriginal ? `Show ${getLanguageInfo(agentLanguage).name}` : 'Show Original'}</button>
-                                : <button onClick={() => handleTranslateMessage(msg.id, msg.message_body)} className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><Languages className="w-3 h-3" />Translate</button>}
+                                : <button onClick={() => handleTranslateMessage(msg.id, messageWords(msg))} className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><Languages className="w-3 h-3" />Translate</button>}
                             </div>
                           )}
                           {(msg.message_body?.trim() || !hasMedia(msg)) && <p className="text-sm text-gray-900 whitespace-pre-wrap">{isInbound && hasTranslation && !showOriginal ? incomingTranslations[msg.id] : msg.message_body}</p>}
-                          {isInbound && hasTranslation && !showOriginal && <p className="text-xs text-gray-400 mt-1 italic">Original: {msg.message_body}</p>}
+                          {isInbound && hasTranslation && !showOriginal && (msg.message_body?.trim()
+                            ? <p className="text-xs text-gray-400 mt-1 italic">Original: {msg.message_body}</p>
+                            // A voice note: its transcript shows above; this is the translation of it.
+                            : <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap"><span className="text-xs text-gray-400">Translation: </span>{incomingTranslations[msg.id]}</p>)}
                           <div className="flex items-center justify-end gap-1 mt-1">
                             <span className="text-xs text-gray-500">{new Date(msg.sent_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
                             {msg.direction === 'outbound' && getStatusIcon(msg.status)}
