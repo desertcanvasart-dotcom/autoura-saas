@@ -273,16 +273,15 @@ export default function AttractionsContent() {
   // Fetch suppliers
   const fetchSuppliers = async () => {
     try {
-      const response = await fetch('/api/suppliers')
+      // Only suppliers that fill the Attraction role — as their main type or
+      // any other (the API matches every role and the agency's own type
+      // words). It used to add Activity Providers and "Other" and, failing
+      // those, every supplier: felucca and camel companies in the list
+      // (operator, 2026-11-07). Activity providers belong on Activities.
+      // Inactive ones are kept so a fee linked to one still shows its name.
+      const response = await fetch('/api/suppliers?type=attraction')
       const data = await response.json()
-      if (data.data) {
-        // Filter to attraction-related suppliers or show all
-        const attractionSuppliers = data.data.filter((s: Supplier) => 
-          s.status === 'active' && 
-          ['attraction', 'activity_provider', 'other'].includes(s.type)
-        )
-        setSuppliers(attractionSuppliers.length > 0 ? attractionSuppliers : data.data.filter((s: Supplier) => s.status === 'active'))
-      }
+      if (data.success && Array.isArray(data.data)) setSuppliers(data.data)
     } catch (error) {
       console.error('Error fetching suppliers:', error)
     }
@@ -1011,7 +1010,7 @@ export default function AttractionsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
                     >
                       <option value="">No supplier linked</option>
-                      {suppliers.map(supplier => (
+                      {suppliers.filter(supplier => supplier.status === 'active' || supplier.id === formData.supplier_id).map(supplier => (
                         <option key={supplier.id} value={supplier.id}>
                           {supplier.name} {supplier.city && `(${supplier.city})`}
                         </option>
