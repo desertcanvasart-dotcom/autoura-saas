@@ -28,6 +28,7 @@ import {
   type MetaStatusUpdate
 } from '@/lib/whatsapp-cloud-api'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
+import { transcribeMessage, transcriptionEnabled, VOICE_ROW_COLS, type VoiceRow } from '@/lib/whatsapp/transcribe'
 import { whatsappModel } from '@/lib/ai/models'
 import { notifyTeam, bellSnippet } from '@/lib/notifications'
 import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbound-client'
@@ -765,7 +766,10 @@ async function processInboundWhatsAppMessage({
   // Respond to the provider first, then run suggest-reply post-response so
   // the webhook doesn't block. Drafts go into communication_drafts with
   // status='pending' — NOT auto-sent. Gated by copilot_pregenerate_enabled.
-  if (tenantId && conversationId && body) {
+  // `deferred`: already running after the response (the voice-note path),
+  // so generate now instead of scheduling another after().
+  const pregenerateDrafts = async (deferred = false) => {
+    if (!tenantId || !conversationId) return
     try {
       const { data: features } = await supabase
         .from('tenant_features')
@@ -774,7 +778,7 @@ async function processInboundWhatsAppMessage({
         .single()
 
       if (features?.copilot_pregenerate_enabled) {
-        after(async () => {
+        const run = async () => {
           if (!(await inboundAiAllowed(tenantId, `wa:${conversationId}`))) return
           try {
             await generateDraftReplies({
@@ -789,11 +793,37 @@ async function processInboundWhatsAppMessage({
           } catch (err: any) {
             console.error('Pre-generation (whatsapp) failed:', err?.message || err)
           }
-        })
+        }
+        if (deferred) await run()
+        else after(run)
       }
     } catch (flagErr) {
       console.error('Pregenerate flag check failed:', flagErr)
     }
+  }
+  if (body) await pregenerateDrafts()
+
+  // ============================================
+  // STEP 6: A voice note becomes text (2026-11-07)
+  // ============================================
+  // After the reply to the provider: transcribe it (lib/whatsapp/transcribe,
+  // the agency's OpenAI key) and save the words on the message, where the
+  // inbox, the copilot and summaries read them. A voice note has no typed
+  // text, so the copilot drafts (above) wait for its transcript.
+  if (tenantId && conversationId && !msgError && (mediaType || '').startsWith('audio/') && transcriptionEnabled()) {
+    after(async () => {
+      const admin = getServiceClient()
+      if (!admin) return
+      const { data: row } = await admin
+        .from('whatsapp_messages')
+        .select(VOICE_ROW_COLS)
+        .eq('tenant_id', tenantId)
+        .eq('message_sid', messageSid)
+        .maybeSingle()
+      if (!row) return
+      const out = await transcribeMessage(admin as never, row as VoiceRow)
+      if (!body && out.ok && out.transcript.status === 'done' && out.transcript.text) await pregenerateDrafts(true)
+    })
   }
 }
 

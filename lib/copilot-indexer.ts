@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { embedText, EMBEDDING_MODEL, toPgVector } from './embeddings'
+import { messageWords } from '@/lib/whatsapp/transcript'
 
 interface IndexWhatsAppReplyArgs {
   supabase: SupabaseClient          // Must have row-level access to this tenant
@@ -41,7 +42,7 @@ export async function indexWhatsAppReply(args: IndexWhatsAppReplyArgs): Promise<
     const beforeCutoff = outboundSentAt || new Date().toISOString()
     const { data: inbound } = await supabase
       .from('whatsapp_messages')
-      .select('message_body, message_text, sent_at')
+      .select('message_body, message_text, sent_at, metadata')
       .eq('conversation_id', conversationId)
       .eq('direction', 'inbound')
       .lt('sent_at', beforeCutoff)
@@ -49,7 +50,7 @@ export async function indexWhatsAppReply(args: IndexWhatsAppReplyArgs): Promise<
       .limit(1)
       .maybeSingle()
 
-    const inboundText = (inbound?.message_body || inbound?.message_text || '').trim()
+    const inboundText = inbound ? messageWords(inbound) : ''
     if (!inboundText) return null
 
     const embedding = await embedText(inboundText)

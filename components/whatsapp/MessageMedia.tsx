@@ -5,10 +5,13 @@
 // loaded through /api/whatsapp/media/[id], which re-checks the viewer may see
 // the message before handing over the file.
 
-import { FileText, Mic } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { FileText, Mic, Loader2, RotateCcw } from 'lucide-react'
+import { transcriptOf, type Transcript } from '@/lib/whatsapp/transcript'
 
 export interface MediaMessage {
   id: string
+  direction?: string
   media_type?: string | null
   media_url?: string | null
   media_storage_path?: string | null
@@ -40,12 +43,16 @@ export default function MessageMedia({ message }: { message: MediaMessage }) {
   const src = viaMediaRoute(message) ? `/api/whatsapp/media/${message.id}` : message.media_url!
 
   if (type.startsWith('audio/')) {
-    return (
+    const player = (
       <div className="mb-1 flex items-center gap-2">
         <Mic className="w-4 h-4 shrink-0 text-gray-500" aria-hidden />
         <audio controls preload="metadata" src={src} className="h-10 w-64 max-w-full" aria-label="Voice message" />
       </div>
     )
+    // A customer's voice note also shows what it says (lib/whatsapp/transcribe).
+    return message.direction === 'inbound'
+      ? <div className="mb-1">{player}<VoiceTranscript message={message} /></div>
+      : player
   }
   if (type.startsWith('image/')) {
     return (
@@ -64,5 +71,52 @@ export default function MessageMedia({ message }: { message: MediaMessage }) {
     <a href={src} target="_blank" rel="noopener noreferrer" className="mb-1 inline-flex items-center gap-1.5 text-sm text-blue-700 hover:underline">
       <FileText className="w-4 h-4" aria-hidden /> Open {mediaLabel(type).toLowerCase()}
     </a>
+  )
+}
+
+/** The words of an inbound voice note: done, in progress, failed, or not yet asked for. */
+function VoiceTranscript({ message }: { message: MediaMessage }) {
+  const stored = transcriptOf(message.metadata)
+  const [local, setLocal] = useState<Transcript | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // A fresher stored transcript (the inbox re-reads every 15 s) wins.
+  useEffect(() => { if (stored?.status === 'done') setLocal(null) }, [stored?.status])
+  const t = local ?? stored
+
+  const run = async (retry: boolean) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/whatsapp/messages/${message.id}/transcribe${retry ? '?retry=1' : ''}`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (data.transcript) setLocal(data.transcript)
+      if (!res.ok && !data.transcript) setError(data.error || 'Could not transcribe it.')
+    } catch {
+      setError('Could not transcribe it.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (t?.status === 'done') {
+    return t.text
+      ? <p className="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><span className="text-xs text-gray-400">Transcript: </span>{t.text}</p>
+      : <p className="mt-1 text-xs italic text-gray-400">No speech in this voice note.</p>
+  }
+  // A run that died (a restart mid-way) is pending for ever; after 2 min offer to try again.
+  const stalePending = t?.status === 'pending' && (!t.at || Date.now() - Date.parse(t.at) > 2 * 60_000)
+  if (busy || (t?.status === 'pending' && !stalePending)) {
+    return <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Loader2 className="w-3 h-3 animate-spin" /> Transcribing…</p>
+  }
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+      {(t?.status === 'failed' || stalePending) && <span className="text-red-600">Transcript failed.</span>}
+      {error && <span className="text-red-600">{error}</span>}
+      <button type="button" onClick={() => run(t?.status === 'failed' || stalePending)} className="inline-flex items-center gap-1 text-blue-700 hover:underline">
+        {t?.status === 'failed' || stalePending ? <RotateCcw className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+        {t?.status === 'failed' || stalePending ? 'Try again' : 'Transcribe'}
+      </button>
+    </div>
   )
 }
