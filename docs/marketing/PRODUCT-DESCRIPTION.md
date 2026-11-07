@@ -83,6 +83,10 @@ tour manager. Time-poor, margin-sensitive, WhatsApp-native.
 - Full Gmail integration (two-way, OAuth, per-tenant)
 - WhatsApp via Twilio: inbound webhook, outbound documents (quotes, invoices,
   receipts, contracts, reminders, supplier notifications)
+- WhatsApp voice notes: customers' play in the inbox and are transcribed
+  automatically (Arabic, English and more); agents record and send their own
+- One Leads list across WhatsApp, email, website and the AI Concierge, with a
+  Lead → Customer stage
 - AI itinerary generation from conversations (structured mode follows the
   operator's text verbatim; creative mode composes)
 - AI copilot: retrieval-augmented reply suggestions learned from the

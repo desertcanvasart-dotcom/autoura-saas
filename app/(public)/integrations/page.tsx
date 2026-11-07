@@ -81,6 +81,8 @@ const activeIntegrations = [
     status: "Live",
     features: [
       "Receive messages in unified inbox",
+      "Voice notes, photos and files in the chat; voice notes transcribed automatically",
+      "Record and send voice notes from the inbox",
       "AI-powered conversation parsing",
       "Send quotes and invoices on WhatsApp",
       "Team assignment and notifications",

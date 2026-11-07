@@ -53,6 +53,7 @@ const ALWAYS_INCLUDED = [
   'The pricing integrity system: missing rates are flagged, incomplete quotes cannot be sent',
   'Invoices, payments, receipts, AR aging and per-trip profit & loss',
   'Client messaging in 29 languages',
+  'WhatsApp and Gmail in one inbox — voice notes played, sent and transcribed automatically',
   'The full 15-category rate engine, with 1–40 pax rate sheets',
 ]
 

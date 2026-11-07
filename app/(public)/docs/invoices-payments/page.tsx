@@ -120,6 +120,21 @@ export default function InvoicesPaymentsPage() {
           <li><strong>Part paid</strong> and <strong>Paid</strong> follow the payments: record one and the status moves; delete one and it moves back.</li>
           <li>An invoice with payments cannot be cancelled &mdash; delete the payments first.</li>
         </ul>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">When a trip is cancelled</h3>
+        <p className="text-gray-600 mb-3">
+          <strong>Cancel trip</strong> on an itinerary lists the trip&apos;s open invoices and settles them with it, so a
+          cancelled trip no longer shows money as owed:
+        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Unpaid</strong> invoices are voided (Cancelled).</li>
+          <li>For each <strong>part-paid</strong> invoice you choose: <strong>keep what was paid and write off the rest</strong>, or <strong>leave it open</strong> &mdash; for example to arrange a refund yourself.</li>
+          <li>Paid and already-cancelled invoices are left as they are. No refund is recorded for you.</li>
+        </ul>
+        <p className="text-gray-600 mt-3">
+          A write-off (managers and admins) brings the invoice down to what was paid, so it reads <strong>Paid</strong>,
+          and adds a note saying how much was written off and why. On a trip that was already cancelled, the
+          Finance tab offers <strong>Void invoice</strong> and <strong>Write off balance</strong> instead of Record payment.
+        </p>
       </section>
 
       {/* Detail */}

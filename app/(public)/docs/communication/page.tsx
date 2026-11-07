@@ -24,7 +24,7 @@ export default function CommunicationPage() {
         <li><strong>Inbox</strong> &mdash; every channel in one place: WhatsApp, email and trip chat</li>
         <li><strong>Email</strong> &mdash; your connected Gmail (the Inbox&apos;s Email tab)</li>
         <li><strong>WhatsApp</strong> &mdash; the WhatsApp inbox (the Inbox&apos;s WhatsApp tab)</li>
-        <li><strong>Leads</strong> &mdash; briefs from the AI Concierge (<Link href="/docs/concierge-leads" className="text-primary-600 hover:underline">guide</Link>)</li>
+        <li><strong>Leads</strong> &mdash; everyone who enquired: AI Concierge briefs and new email, WhatsApp and website enquiries (<Link href="/docs/concierge-leads" className="text-primary-600 hover:underline">guide</Link>)</li>
         <li><strong>Copilot</strong> &mdash; AI-drafted replies (<Link href="/docs/copilot" className="text-primary-600 hover:underline">guide</Link>)</li>
         <li><strong>Message templates</strong> (<Link href="/docs/message-templates" className="text-primary-600 hover:underline">guide</Link>)</li>
       </ul>
@@ -89,9 +89,13 @@ export default function CommunicationPage() {
           <li><strong>New conversation</strong> &mdash; The green <strong>+</strong> opens <strong>New Conversation</strong>: enter the phone number and click <strong>Start Chat</strong></li>
           <li><strong>Delete</strong> &mdash; Hides the conversation from the inbox. If the client writes again, it comes back.</li>
         </ul>
-        <p className="text-gray-600 mt-3">
-          Photos and files a client sends are not shown in the inbox yet &mdash; ask them to email documents you need to see.
-        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Voice Notes, Photos and Files</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>What clients send shows in the chat</strong> &mdash; a voice note plays right there, a photo or video shows (click a photo to open it full size), and any other file, such as a PDF, has an <strong>Open</strong> link. Every file is opened through Autoura, which checks you may see the conversation first.</li>
+          <li><strong>Voice notes become text</strong> &mdash; a client&apos;s voice note is transcribed automatically a few seconds after it arrives, in Arabic, English and most other languages, and the text appears under the player. With translation on, the transcript is translated like a typed message. Copilot and the conversation summary read it too, so a voice-only question still gets a drafted reply. Voice notes from before transcription started have a <strong>Transcribe</strong> button; if one fails, <strong>Try again</strong>.</li>
+          <li><strong>Send a voice note</strong> &mdash; when the message box is empty, the green button is a <strong>microphone</strong>. Click it (the browser asks to use your microphone the first time), speak, then press the square to stop &mdash; up to 5 minutes. Listen back, then <strong>Send</strong> it or throw it away with the bin. It arrives as a normal WhatsApp voice message. Recording works in Chrome, Edge, Firefox and Safari&nbsp;18.4 or later.</li>
+        </ul>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Your WhatsApp Number</h3>
         <p className="text-gray-600 mb-3">
@@ -187,9 +191,9 @@ export default function CommunicationPage() {
 
       {/* Concierge */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Concierge Leads</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Leads</h2>
         <p className="text-gray-600">
-          Planning briefs from your website&apos;s <strong>AI Concierge</strong> arrive under <strong>Leads</strong> in the Communicate section. Work each one through Needs Review, In Progress and Responded, and turn it into an itinerary with <strong>Create itinerary</strong>. See the <Link href="/docs/concierge-leads" className="text-primary-600 hover:underline">Concierge Leads guide</Link>.
+          <strong>Leads</strong> in the Communicate section is one list of everyone who has enquired: planning briefs from your website&apos;s <strong>AI Concierge</strong>, and the new people who wrote by email, WhatsApp or your website&apos;s form. Filter by source and by stage &mdash; <strong>Lead</strong> or <strong>Customer</strong> (someone who has booked). Work concierge briefs through Needs Review, In Progress and Responded, and turn them into an itinerary with <strong>Create itinerary</strong>. See the <Link href="/docs/concierge-leads" className="text-primary-600 hover:underline">Leads guide</Link>.
         </p>
       </section>
 
