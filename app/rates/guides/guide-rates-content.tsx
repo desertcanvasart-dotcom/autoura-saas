@@ -59,6 +59,38 @@ interface GuideRate {
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
+/** Toggle chips for picking several values (cities, languages). */
+function ChipPicker({ label, options, value, onChange }: {
+  label: string
+  options: Array<{ value: string; label: string }>
+  value: string[]
+  onChange: (v: string[]) => void
+}) {
+  if (options.length === 0) return null
+  const toggle = (v: string) => onChange(value.includes(v) ? value.filter(x => x !== v) : [...value, v])
+  return (
+    <div>
+      <p className="block text-xs font-medium text-gray-600 mb-1.5">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(o => {
+          const on = value.includes(o.value)
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggle(o.value)}
+              className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${on ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'}`}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function GuideRatesContent() {
   // City vocabulary from the destination catalog (Egypt fallback pre-migration).
   const { cities: cityOptions } = useDestinationCities()
@@ -75,7 +107,7 @@ export default function GuideRatesContent() {
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('')
   // The agency's words for languages (Settings → Your vocabulary).
-  const { labelFor: languageLabel } = useVocabulary('guide_language')
+  const { labelFor: languageLabel, items: languageItems } = useVocabulary('guide_language')
   // A new rate starts at the agency's first grade, not 'egyptologist'.
   const { items: gradeItems } = useVocabulary('guide_grade')
   const firstGrade = gradeItems[0]?.key || 'egyptologist'
@@ -147,7 +179,10 @@ export default function GuideRatesContent() {
     rate_valid_to: nextYear,
     supplier_id: '',
     notes: '',
-    is_active: true
+    is_active: true,
+    // Add only (461): the same price saved for these cities/languages too.
+    also_cities: [] as string[],
+    also_languages: [] as string[],
   })
 
   // Fetch rates
@@ -230,7 +265,9 @@ export default function GuideRatesContent() {
       rate_valid_to: nextYear,
       supplier_id: selectedGuide || '',
       notes: '',
-      is_active: true
+      is_active: true,
+      also_cities: [],
+      also_languages: [],
     })
     setShowModal(true)
   }
@@ -252,7 +289,9 @@ export default function GuideRatesContent() {
       rate_valid_to: rate.rate_valid_to || nextYear,
       supplier_id: rate.supplier_id || '',
       notes: rate.notes || '',
-      is_active: rate.is_active
+      is_active: rate.is_active,
+      also_cities: [],
+      also_languages: [],
     })
     setShowModal(true)
   }
@@ -275,7 +314,9 @@ export default function GuideRatesContent() {
       rate_valid_to: rate.rate_valid_to || nextYear,
       supplier_id: rate.supplier_id || '',
       notes: rate.notes || '',
-      is_active: rate.is_active
+      is_active: rate.is_active,
+      also_cities: [],
+      also_languages: [],
     })
     setShowModal(true)
   }
@@ -295,7 +336,7 @@ export default function GuideRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
+          body: JSON.stringify({ ...formData, ...(editingRate ? { also_cities: undefined, also_languages: undefined } : {}), base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
         })
 
         const data = await response.json()
@@ -306,7 +347,7 @@ export default function GuideRatesContent() {
         }
 
         if (data.data) {
-          showNotification('success', 'Success', editingRate ? 'Guide rate updated successfully!' : 'Guide rate created successfully!')
+          showNotification('success', 'Success', editingRate ? 'Guide rate updated successfully!' : (data.count > 1 ? `${data.count} guide rates created — one per city and language.` : 'Guide rate created successfully!'))
           setShowModal(false)
           fetchRates()
         } else {
@@ -880,7 +921,7 @@ export default function GuideRatesContent() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">{rate.city || '—'}</span>
+                      <span className="text-sm text-gray-600">{rate.city || 'Any city'}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">
@@ -960,7 +1001,7 @@ export default function GuideRatesContent() {
 
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
                   <p><span className="text-gray-400">Type:</span> <VocabLabel kind="guide_grade" value={rate.guide_type} /></p>
-                  <p><span className="text-gray-400">City:</span> {rate.city || '—'}</p>
+                  <p><span className="text-gray-400">City:</span> {rate.city || 'Any city'}</p>
                   <p><span className="text-gray-400">Duration:</span> <VocabLabel kind="guide_duration" value={rate.tour_duration} /></p>
                 </div>
 
@@ -1011,7 +1052,7 @@ export default function GuideRatesContent() {
                   />
                   <Globe className="w-4 h-4 text-primary-500" />
                   <span className="font-medium text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></span>
-                  <span className="text-sm text-gray-500">{rate.city || '—'}</span>
+                  <span className="text-sm text-gray-500">{rate.city || 'Any city'}</span>
                   {rate.supplier_id && (
                     <span className="text-sm text-primary-600">{getGuideName(rate.supplier_id)}</span>
                   )}
@@ -1175,14 +1216,41 @@ export default function GuideRatesContent() {
                       onChange={handleChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
-                      <option value="">Select City</option>
+                      <option value="">Any city</option>
                       {cityOptionsFor(cityOptions, formData.city || '').map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
+                    {!formData.city && (
+                      <p className="text-xs text-gray-500 mt-1">Used on any day whose city has no guide price of its own — e.g. one throughout price for the whole trip.</p>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* Add only: the same price for more cities / languages (461). Each
+                  pair is saved as its own rate, so one can be repriced later. */}
+              {!editingRate && (
+                <div className="mb-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <ChipPicker
+                    label="Same price for other languages too"
+                    options={languageItems.filter(l => l.key !== formData.guide_language).map(l => ({ value: l.key, label: l.label }))}
+                    value={formData.also_languages}
+                    onChange={v => setFormData(prev => ({ ...prev, also_languages: v }))}
+                  />
+                  <ChipPicker
+                    label="Same price in other cities too"
+                    options={cityOptions.filter(c => c !== formData.city).map(c => ({ value: c, label: c }))}
+                    value={formData.also_cities}
+                    onChange={v => setFormData(prev => ({ ...prev, also_cities: v }))}
+                  />
+                  {(formData.also_languages.length > 0 || formData.also_cities.length > 0) && (
+                    <p className="text-xs text-gray-600">
+                      Saves {(1 + formData.also_languages.length) * (1 + formData.also_cities.length)} prices — one for each language in each city.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Link to Guide */}
               <div className="mb-4">

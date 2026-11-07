@@ -2,29 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { gateRole } from '@/lib/api-role-gate'
 import { SUPPLIER_CONTRACTS_BUCKET } from '@/lib/supplier-contracts'
+import { filterSupplierFields } from '@/lib/suppliers/supplier-fields'
 
-// All valid supplier fields (including new ones from migration)
-const VALID_FIELDS = [
-  'name', 'type', 'types', 'contact_name', 'contact_email', 'contact_phone',
-  'phone2', 'whatsapp', 'website', 'address', 'city', 'country',
-  'default_commission_rate', 'commission_type', 'payment_terms',
-  'bank_details', 'status', 'notes',
-  // Type-specific fields
-  'languages', 'vehicle_types', 'star_rating', 'property_type',
-  'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity',
-  // Hierarchical fields
-]
-
-// Filter object to only include valid fields
-function filterValidFields(obj: Record<string, any>): Record<string, any> {
-  const filtered: Record<string, any> = {}
-  for (const key of VALID_FIELDS) {
-    if (obj[key] !== undefined) {
-      filtered[key] = obj[key]
-    }
-  }
-  return filtered
-}
 
 export async function GET(
   request: NextRequest,
@@ -96,7 +75,7 @@ export async function PUT(
       body.types = body.types.map(String).filter(Boolean)
       body.type = body.types[0]
     }
-    const updateData = filterValidFields(body)
+    const updateData = filterSupplierFields(body)
 
     // Remove fields that shouldn't be updated
     delete (updateData as any).id

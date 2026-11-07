@@ -12,6 +12,7 @@
 // a fallback for old assignment rows).
 
 import type { Tables, TablesUpdate } from '@/types/database.types'
+import { citiesOf, cleanOtherCities } from '@/lib/suppliers/supplier-cities'
 
 export const GUIDE_SUPPLIER_TYPE = 'guide'
 
@@ -39,6 +40,9 @@ export function supplierToGuide(row: SupplierRow) {
     phone: row.contact_phone || row.whatsapp || row.phone2 || row.phone,
     email: row.contact_email || row.email,
     city: row.city,
+    // Every city the guide works in, base first (461); `works_all_cities`
+    // (spread above) = a throughout guide who goes everywhere.
+    cities: citiesOf(row),
     languages: row.languages || [],
     specialties: extra.specialties || [],
     is_active: row.status === 'active',
@@ -74,6 +78,10 @@ export function guideBodyToSupplierUpdate(
   if (body.contact_phone !== undefined) out.contact_phone = str(body.contact_phone)
   if (body.whatsapp !== undefined) out.whatsapp = str(body.whatsapp)
   if (body.city !== undefined) out.city = str(body.city)
+  if (body.other_cities !== undefined) {
+    out.other_cities = cleanOtherCities(typeof body.city === 'string' ? body.city : null, body.other_cities)
+  }
+  if (body.works_all_cities !== undefined) out.works_all_cities = body.works_all_cities === true
   if (body.address !== undefined) out.address = str(body.address)
   if (body.notes !== undefined) out.notes = str(body.notes)
   if (body.languages !== undefined) {

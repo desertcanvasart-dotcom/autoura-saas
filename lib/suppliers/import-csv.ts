@@ -61,6 +61,12 @@ export interface SupplierImportRecord {
   whatsapp?: string
   address?: string
   city?: string
+  /** Cities it also works in (461); `|` or `;` separated in the cell. */
+  other_cities?: string[]
+  /** Travels everywhere — yes/no in the cell. */
+  works_all_cities?: boolean
+  /** Guide-language keys, `|` or `;` separated. */
+  languages?: string[]
   country?: string
   commission_type?: string
   default_commission_rate?: number
@@ -115,11 +121,26 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
     const rowNum = i + 2 // header is row 1
     const record: Record<string, string | number> = {}
     let badCommission: string | null = null
+    const lists: Record<string, string[]> = {}
+    const flags: Record<string, boolean> = {}
+    let badFlag: string | null = null
     for (const [header, value] of Object.entries(raw)) {
       const field = HEADER_MAP[header]
       if (!field) continue
       const v = (value ?? '').trim()
       if (v === '') continue
+      if (field === 'other_cities' || field === 'languages') {
+        // A list cell: "Luxor|Aswan". Split on | and ; only — never on / or ,
+        // ("Sharm El-Sheikh" and friends keep their punctuation).
+        lists[field] = [...new Set(v.split(/[|;]/).map(x => x.trim()).filter(Boolean))]
+        continue
+      }
+      if (field === 'works_all_cities') {
+        const yes = /^(yes|y|true|1|all)$/i.test(v)
+        if (yes || /^(no|n|false|0)$/i.test(v)) flags[field] = yes
+        else badFlag = v
+        continue
+      }
       if (field === 'default_commission_rate') {
         // "10" or "10%". Anything else is refused: "ten" was stored as 0.
         const n = Number(v.replace(/%$/, '').trim())
@@ -135,6 +156,10 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
     }
     if (badCommission !== null) {
       refused.push({ row: rowNum, reason: `Commission "${badCommission}" is not a number — write it like 10 or 10%` })
+      return
+    }
+    if (badFlag !== null) {
+      refused.push({ row: rowNum, reason: `All Cities "${badFlag}" — write yes or no` })
       return
     }
     // WhatsApp is the only reachable number for many suppliers (the Phone cell
@@ -185,6 +210,8 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       type: types[0],
       types,
       ...(properties.length > 0 ? { properties } : {}),
+      ...lists,
+      ...flags,
     })
   })
 

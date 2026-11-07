@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
 function stringify(value: unknown): string {
   if (value === null || value === undefined) return ''
   if (Array.isArray(value)) return value.join('|')
+  if (typeof value === 'boolean') return value ? 'yes' : 'no'
   return String(value)
 }
 

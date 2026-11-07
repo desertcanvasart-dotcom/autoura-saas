@@ -60,6 +60,12 @@ export const SUPPLIER_CSV_COLUMNS: readonly SupplierCsvColumn[] = [
   { header: 'Website', field: 'website', sample: 'https://nilestar.example' },
   { header: 'Address', field: 'address', sample: '' },
   { header: 'City', field: 'city', sample: 'Cairo' },
+  // Where else it works (461), pipe-separated, and whether it travels
+  // everywhere (a throughout guide): yes / no.
+  { header: 'Also Works In', field: 'other_cities', aliases: ['other_cities', 'cities'], sample: 'Luxor|Aswan' },
+  { header: 'All Cities', field: 'works_all_cities', aliases: ['travels_everywhere', 'works_everywhere'], sample: 'no' },
+  // The languages a guide speaks — your guide-language keys, pipe-separated.
+  { header: 'Languages', field: 'languages', aliases: ['language'], sample: '' },
   { header: 'Country', field: 'country', sample: 'Egypt' },
   { header: 'Commission Type', field: 'commission_type', aliases: ['commission_kind'], sample: '' },
   { header: 'Commission', field: 'default_commission_rate', aliases: ['default_commission_rate'], sample: '10' },
