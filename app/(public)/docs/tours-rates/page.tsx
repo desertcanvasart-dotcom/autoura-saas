@@ -11,13 +11,13 @@ const CATEGORIES: Array<{ group: string; name: string; what: string }> = [
   { group: 'Accommodation', name: 'Nile Cruises', what: 'By ship and cabin, with the sailing lengths and days it runs, embark and disembark cities, meals and sightseeing, in dated periods. One preferred ship per tier.' },
   { group: 'Accommodation', name: 'Sleeping Trains', what: 'By route and cabin: one-way and round-trip fares, a guide fare, times and season.' },
   { group: 'Accommodation', name: 'Hotel Services', what: 'Porter, check-in and check-out help and the like, by hotel category; priced per group, per person or per unit.' },
-  { group: 'Transport & Tickets', name: 'Transportation', what: 'One route — a day tour, half day, airport or intercity transfer — with a rate and a passenger range per vehicle (your vehicle types).' },
+  { group: 'Transport & Tickets', name: 'Transportation', what: 'One route — a day tour, half day, airport or intercity transfer — with a rate and a passenger range per vehicle (your vehicle types). Several transport companies may price the same route; when more than one does, star the default.' },
   { group: 'Transport & Tickets', name: 'Flights', what: 'Domestic and international fares by route, airline and cabin: base fare and tax, baggage, flight number and times, a guide fare.' },
   { group: 'Transport & Tickets', name: 'Trains', what: 'Day trains by route and class, with a guide fare.' },
   { group: 'Transport & Tickets', name: 'Airport Services', what: 'Meet & greet and other assistance, by airport (any IATA code) and direction; per group, per person or per unit.' },
-  { group: 'Guides & Services', name: 'Tour Guides', what: 'By language, grade (your own grades — the first is the default a quote asks for), city and day type (full day, half day, meet & greet), for a spot or a throughout guide.' },
+  { group: 'Guides & Services', name: 'Tour Guides', what: 'By language, grade (your own grades — the first is the default a quote asks for), city and day type (full day, half day, meet & greet), for a spot or a throughout guide. A rate with no city (Any city) prices every day whose city has none of its own — one throughout price for the whole trip. When adding, tick other languages and cities to save the same price for each.' },
   { group: 'Guides & Services', name: 'Meals', what: 'Per restaurant, meal type, city and tier; one preferred restaurant per tier and meal.' },
-  { group: 'Guides & Services', name: 'Attractions', what: 'Entrance fees: one price, child and student discounts. An Add-on stays out of the automatic price; Sell as extra lets travellers add it after booking.' },
+  { group: 'Guides & Services', name: 'Attractions', what: 'Entrance fees: one price, child and student discounts, linked to an Attraction supplier (such as the Supreme Council of Antiquities). An Add-on stays out of the automatic price; Sell as extra lets travellers add it after booking.' },
   { group: 'Guides & Services', name: 'Activities', what: 'The Activities & Add-ons catalogue: per person, per unit (a boat for six), a flat price, or tiered by group size.' },
   { group: 'Costs', name: 'Tipping', what: 'By role, context (day tour, cruise …), optional city and unit (per day, service, night, cruise or person). A city row wins over the any-city row.' },
   { group: 'Costs', name: 'Fixed Costs', what: 'Per-person costs per sightseeing day. Pricing reads the water cost; your own row replaces the shared default.' },
@@ -53,6 +53,8 @@ export default function ToursRatesPage() {
         <p className="text-gray-600 mb-4">
           Your buying rates live under <strong>Suppliers &amp; rates</strong> in the sidebar (admins and managers):
           fourteen rate sheets in four groups &mdash; Accommodation, Transport &amp; tickets, Guides &amp; services, Costs.
+          Your supplier costs stay with admins and managers: members price quotes in the Quote Builder without
+          being able to open or export the rate sheets, and viewers see no costs at all.
           There are three ways to reach a sheet:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-4">
@@ -87,6 +89,20 @@ export default function ToursRatesPage() {
           (Active) rather than deleted; the pages have search and filters, and a switch to show the
           inactive rates too. Most pages link a rate to its <Link href="/docs/suppliers" className="text-primary-600 hover:underline">supplier</Link>{' '}
           &mdash; and, for hotels, ships and trains, to the supplier&rsquo;s property.
+        </p>
+        <p className="text-gray-600 mb-3">
+          <strong>Several suppliers for the same thing.</strong> Two transport companies may both price
+          Alexandria &rarr; Cairo by sedan, each as its own row. When more than one company prices a route,
+          the row shows a star: star the one quotes should use. With exactly one starred, prices use it; with
+          none or several, the quote shows a gap naming the companies instead of guessing &mdash; the same rule as
+          a preferred hotel. You can still pick another company for a single trip in the pricing grid.
+        </p>
+        <p className="text-gray-600 mb-3">
+          <strong>One guide price for many cities or languages.</strong> When adding a guide rate, tick
+          <strong> Same price for other languages too</strong> and <strong>Same price in other cities too</strong>:
+          Autoura saves one rate for each language in each city, so any one can be repriced later on its own.
+          Leave the city as <strong>Any city</strong> for a rate that applies wherever a city has no guide
+          price of its own.
         </p>
         <Tip>
           Rates price everything: the <strong>Quote Builder</strong>, tours priced from their days, and

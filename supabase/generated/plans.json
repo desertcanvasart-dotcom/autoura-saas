@@ -27,8 +27,8 @@
     "name": "Solo",
     "slug": "solo",
     "description": "For the operator who is still the whole operation.",
-    "price_monthly": 69,
-    "price_yearly": 690,
+    "price_monthly": 89,
+    "price_yearly": 890,
     "currency": "USD",
     "features": {
       "publiclyPriced": true

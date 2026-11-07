@@ -37,6 +37,18 @@ export default function SuppliersPage() {
             The <strong>Supplier network</strong> link in the sidebar opens this tab directly, and old links to Network Suppliers land here.
           </li>
         </ul>
+        <p className="text-gray-600 mb-3">
+          A supplier you are connected with &mdash; one whose sign-in you confirmed, or one you added from the
+          network &mdash; keeps a profile of their own: their services, languages, cities and a few words about
+          themselves. It shows on their card under <strong>Their own profile</strong>, with where their Autoura
+          check stands. It is read-only: your record and your rates are not changed by it. Suppliers sign in from
+          the <strong>Supplier sign-in</strong> link at the foot of the Autoura website.
+        </p>
+        <p className="text-gray-600 mb-3">
+          A supplier is found by other agencies only after the Autoura team has checked their papers. One who
+          asked to be found but has not sent papers gets a reminder email after two days, then weekly &mdash; three
+          at most &mdash; until they send them or stop asking to be found.
+        </p>
         <p className="text-gray-600">
           Whether you book from your own list, the network, or both is set in{' '}
           <strong>Settings &rsaquo; Organization &rsaquo; Supplier network</strong> (admins change it, managers can read it). The same
@@ -90,6 +102,16 @@ export default function SuppliersPage() {
           and notes. The form is the same for every type. The country is your agency&rsquo;s operating
           country (Settings &rsaquo; Organization &rsaquo; Company); the cities are your destination cities.
         </p>
+        <p className="text-gray-600 mb-3">
+          <strong>City</strong> is where the supplier is based. If they also work elsewhere, pick those
+          cities under <strong>Also works in</strong>; tick <strong>Travels everywhere</strong> for one who
+          goes wherever the group goes &mdash; a throughout guide, say. For a <strong>guide</strong>, the form also
+          asks the <strong>Languages</strong> they speak (your guide languages, Settings &rsaquo; Your vocabulary).
+          When you assign a guide on a trip, the picker lists everyone who covers that day&rsquo;s city, not only
+          those based there, and a guide&rsquo;s card shows all their cities (&ldquo;All cities&rdquo; for one who
+          travels everywhere) and languages. What a guide <em>costs</em> per city and language is set on the
+          rate sheet (<Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>).
+        </p>
         <p className="text-gray-600">
           Saving a hotel, cruise company or train operator opens its <strong>Properties</strong> tab, so
           you can add its hotels, ships or trains straight away.
@@ -138,6 +160,11 @@ export default function SuppliersPage() {
             in your words or keys. <strong>Commission</strong> is a number (<code>10</code> or{' '}
             <code>10%</code>). A <strong>Properties</strong> cell (<code>hotel:Nile Star | ship:MS Hapi</code>)
             adds the hotels, ships or trains the supplier does not have yet.
+          </li>
+          <li>
+            <strong>Also Works In</strong> lists other cities (<code>Luxor | Aswan</code>), <strong>All Cities</strong>{' '}
+            is <code>yes</code> or <code>no</code> (travels everywhere), and <strong>Languages</strong> lists a
+            guide&rsquo;s languages (<code>english | french</code>).
           </li>
           <li>
             Refused, not guessed: an unknown type, a commission that is not a number, a name or code

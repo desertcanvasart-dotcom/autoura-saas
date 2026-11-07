@@ -13,13 +13,26 @@ export default function ConciergeLeadsPage() {
       <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/docs" className="hover:text-primary-600 transition-colors">Docs</Link>
         <ChevronRight className="w-4 h-4" />
-        <span className="text-gray-900 font-medium">Concierge Leads</span>
+        <span className="text-gray-900 font-medium">Leads</span>
       </nav>
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">Concierge Leads</h1>
-      <p className="text-gray-600 mb-8">
-        When a visitor chats with the AI Concierge on your website, the conversation is distilled into a structured planning brief and delivered straight to your team. The Concierge Leads page is where you triage those briefs and respond.
+      <h1 className="text-3xl font-bold text-gray-900 mb-4">Leads</h1>
+      <p className="text-gray-600 mb-4">
+        <strong>Leads</strong> is one list of everyone who has enquired, wherever they came from: planning briefs from your website&apos;s AI Concierge, and the new people who wrote to you by email, WhatsApp or your website&apos;s form. You can see at a glance who is still a lead and who has already booked.
       </p>
+      <p className="text-gray-600 mb-8">
+        When a visitor chats with the AI Concierge on your website, the conversation is distilled into a structured planning brief and delivered straight to your team &mdash; most of this guide is about triaging those briefs.
+      </p>
+
+      {/* Every source */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">One List for Every Source</h2>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Source</strong> &mdash; filter by <strong>All</strong>, <strong>AI Concierge</strong>, <strong>Email</strong>, <strong>WhatsApp</strong> or <strong>Website</strong>. Every card says where it came from. Email, WhatsApp and website leads link to their conversation in the Inbox.</li>
+          <li><strong>Stage</strong> &mdash; <strong>Leads</strong>, <strong>Became customers</strong> or <strong>Everyone</strong>. A card reads <strong>Lead</strong> until the person has a booking; then it reads <strong>&#9733; Customer</strong>. The change happens by itself on their first booking.</li>
+          <li>The review tabs below (Needs Review, In Progress&hellip;) appear when the source is <strong>AI Concierge</strong>. Archived briefs are left out of <strong>All sources</strong>.</li>
+        </ul>
+      </section>
 
       {/* Setup */}
       <section className="mb-10">
@@ -84,10 +97,10 @@ export default function ConciergeLeadsPage() {
           <li><strong>Needs review</strong> &rarr; <strong>Start review</strong> or <strong>Archive</strong></li>
           <li><strong>In progress</strong> &rarr; <strong>Mark responded</strong> or <strong>Archive</strong></li>
           <li><strong>Responded</strong> &rarr; <strong>Reopen</strong> (back to Needs Review) or <strong>Archive</strong></li>
-          <li><strong>Archived</strong> &rarr; <strong>Reopen</strong>, or &mdash; for managers and admins &mdash; <strong>Delete</strong></li>
+          <li><strong>Archived</strong> &rarr; <strong>Reopen</strong></li>
         </ul>
         <p className="text-gray-600 mt-3">
-          <strong>Delete</strong> (<strong>Delete permanently</strong> in the drawer) removes an archived lead and its conversation for good; the client record stays in Clients. Only an archived lead can be deleted.
+          Managers and admins can <strong>Delete</strong> a lead from any tab, after a confirmation. For a concierge brief (<strong>Delete permanently</strong> in the drawer) this removes the brief and its concierge conversation for good; the client record stays in Clients. An email, WhatsApp or website lead is deleted with its client record &mdash; only while it has no bookings, itineraries or invoices &mdash; and its Inbox conversation is kept. A deleted email lead is not filed again when the mailbox next syncs. Customers have no Delete button.
         </p>
         <Tip>
           <strong>Deadline Tip:</strong> The clock stops when you mark a brief responded &mdash; not when you start reviewing it. Keep an eye on the amber &ldquo;Due in&rdquo; badges to stay inside your committed response window.
@@ -131,7 +144,7 @@ export default function ConciergeLeadsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Who Can Use It</h2>
         <p className="text-gray-600">
-          Admins, managers and members see Concierge Leads; viewers do not. Only managers and admins can delete a lead.
+          Admins, managers and members see Leads; viewers do not. Only managers and admins can delete a lead.
         </p>
       </section>
 

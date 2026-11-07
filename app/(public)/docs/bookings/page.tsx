@@ -62,7 +62,7 @@ export default function BookingsPage() {
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>In progress</strong> and <strong>Completed</strong> &mdash; The app checks that every supplier is confirmed first; <strong>Go ahead anyway</strong> moves on and records how many were</li>
-          <li><strong>Cancelled</strong> &mdash; After you confirm <strong>Cancel booking</strong></li>
+          <li><strong>Cancelled</strong> &mdash; After you confirm <strong>Cancel booking</strong>. A cancelled booking with no payments can then be removed with <strong>Delete booking</strong> (managers and admins), which takes you back to its itinerary &mdash; an itinerary cannot be deleted while a booking still points at it.</li>
           <li><strong>Active (follows payments)</strong> &mdash; Reopens the booking and lets the payments decide again</li>
         </ul>
       </section>

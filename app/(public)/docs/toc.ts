@@ -90,8 +90,8 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Communicate',
     items: [
-      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'The Inbox and its All, Email and WhatsApp tabs, AI translation, email signatures, and parsing a request into the Quote Builder.' },
-      { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Concierge Leads', description: 'Triage planning briefs from the AI Concierge and turn them into itineraries.' },
+      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'The Inbox and its All, Email and WhatsApp tabs, voice notes (played, transcribed and sent), photos and files, AI translation, email signatures, and parsing a request into the Quote Builder.' },
+      { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Leads', description: 'One list of everyone who enquired — AI Concierge briefs and new email, WhatsApp and website enquiries — by source and by stage (Lead or Customer); triage briefs and turn them into itineraries.' },
       { href: '/docs/copilot', icon: Sparkles, title: 'AI Copilot', description: 'Review and send AI-drafted replies from the sidebar, manage the knowledge base, and track Copilot in Reports.' },
       { href: '/docs/message-templates', icon: MailPlus, title: 'Message Templates', description: 'Create and send pre-designed messages via WhatsApp, email, and SMS with placeholder auto-fill.' },
     ],
