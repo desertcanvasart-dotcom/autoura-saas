@@ -96,9 +96,10 @@ tour manager. Time-poor, margin-sensitive, WhatsApp-native.
   seeded with a complete lifecycle library
 
 ### Pricing (the crown jewel)
-- Operator-owned rate database: 14 rate categories (hotels, Nile cruises,
+- Operator-owned rate database: 15 rate categories (hotels, Nile cruises,
   sleeping trains, flights, trains, meals, entrance fees, guides, activities,
-  transportation, airport services, hotel services, tipping, fixed costs)
+  transportation, airport services, hotel services, tipping, fixed costs,
+  land packages — a multi-day trip bought at one price per person)
 - **Egypt-native rate mechanics**: dual passport pricing (EU vs non-EU rates
   on every category), three-season hotel/cruise rates, per-monument entrance
   fees with a canonical attraction vocabulary the AI understands

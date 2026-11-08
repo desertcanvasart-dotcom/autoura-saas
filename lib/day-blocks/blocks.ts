@@ -62,6 +62,10 @@ export interface DayBlock {
   description: string | null
   notes: string | null
   source: string | null
+  /** This standard day is day `land_package_day` of that land package
+   *  (migration 462). Set in Settings › Day blocks; not a sheet column. */
+  land_package_id?: string | null
+  land_package_day?: number | null
 }
 
 // ── Reading the sheet ───────────────────────────────────────────────────────

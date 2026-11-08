@@ -18,6 +18,9 @@ import { loadVocabulary } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { packageVehicles, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 import { fetchEveryRow } from '@/lib/db/fetch-all-pages'
+import type { RateOption } from '@/app/pricing-grid/types'
+import { LAND_PACKAGE_COLS } from '@/lib/rates/land-package-input'
+import { landPackageOptionId, packageInclusions, packageLength, packageLineName, packagePricePerPerson, type LandPackageRow } from '@/lib/pricing/land-package'
 
 // The caller's RLS-scoped client (requireAuth's).
 type GridRatesClient = any
@@ -120,6 +123,13 @@ export async function loadGridRates(
     normalizeRateRows(supabase, 'flight_rates', rawFlightRates as Record<string, unknown>[], runCurrency, tenantId),
     normalizeRateRows(supabase, 'fixed_daily_costs', rawFixedCosts as Record<string, unknown>[], runCurrency, tenantId),
   ])
+
+  // Land packages (migration 462): offered in Experiences, priced per person.
+  const landPackages = (await normalizeRateRows(
+    supabase, 'land_packages',
+    (await fetchEveryRow('land_packages', () => supabase.from('land_packages').select(LAND_PACKAGE_COLS).eq('is_active', true))) as Record<string, unknown>[],
+    runCurrency, tenantId,
+  )) as unknown as LandPackageRow[]
   // The company's own row wins over a shared (tenant-less) one.
   const waterRows = (fixedCosts || []).filter(r => isWaterCostType(r.cost_type))
   const waterRow = waterRows.find(r => r.tenant_id === tenantId) ?? waterRows[0]
@@ -293,7 +303,7 @@ export async function loadGridRates(
       guide_rate_eur: typeof r.guide_rate === 'number' ? r.guide_rate : null,
     })),
 
-    experiences: (activityRates || [])
+    experiences: [...((activityRates || [])
       .filter((r: any) => !/boat|felucca|motor/i.test(r.activity_name || r.category || ''))
       .map((r: any) => ({
         id: r.id,
@@ -303,7 +313,20 @@ export async function loadGridRates(
         city: r.city,
         details: pricingTypeLabel(r.pricing_type),
         ...basisOf(r),
-      })),
+      })) as RateOption[]),
+      ...landPackages.map((p): RateOption => {
+        const pp = packagePricePerPerson(p) ?? 0
+        return {
+          id: landPackageOptionId(p.id),
+          name: packageLineName(p),
+          rateEur: pp,
+          rateNonEur: packagePricePerPerson(p, false) ?? pp,
+          city: p.city ?? undefined,
+          details: `Land package · ${packageLength(p)} · ${packageInclusions(p).join(' · ')}`,
+          pricing_basis: 'per_person',
+          land_package: p,
+        }
+      })],
 
     meals: (mealRates || []).map((r: any) => ({
       id: r.id,

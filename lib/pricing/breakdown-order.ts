@@ -88,6 +88,8 @@ export function flowRank(line: Pick<FlowLine, 'id' | 'category'>): number {
       return RANK.ticket
     case 'transportation':
     case 'transport':
+    // A land package (migration 462) carries the day's road with it.
+    case 'package':
       return RANK.transport
     case 'airport_service':
       return RANK.airportArrival

@@ -30,6 +30,9 @@ export interface DayForm {
   /** Activities added to this day (activity_rates ids) — the motorboat at
    *  Philae, a felucca. The picker owns them: present = exactly these. */
   activityIds: string[]
+  /** A land package starting on this day (migration 462); '' = none.
+   *  Undefined = the form does not own it (left as it was). */
+  landPackageId?: string
   /** '' = road. */
   transportType: string
   transportRateId: string
@@ -97,6 +100,12 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
     day.activity_ids = form.activityIds.filter(Boolean)
   } else {
     drop(day, 'activity_ids')
+  }
+
+  // A land package starting on this day: it covers this day and the next ones.
+  if (form.landPackageId !== undefined) {
+    if (form.landPackageId) day.land_package_id = form.landPackageId
+    else drop(day, 'land_package_id')
   }
 
   if (form.transportType) {

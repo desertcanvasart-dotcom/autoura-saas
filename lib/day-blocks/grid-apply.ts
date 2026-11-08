@@ -33,6 +33,7 @@ import { airportCodeForCity } from '@/lib/ai/staff-rate-resolution'
 import { citiesFarApart as farApart } from '@/lib/pricing/day-trip'
 import type { DayBlock } from './blocks'
 import { preferLanguage } from '@/app/pricing-grid/lib/guide-language'
+import { coverDay, landPackageOptionId, sightCovered } from '@/lib/pricing/land-package'
 
 export interface GridBlock extends DayBlock {
   /** From /api/day-blocks: each paid attraction and the fee(s) it lands on. */
@@ -135,10 +136,26 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
     if (s) slots.set(slotId, { ...s, selectedItems: items, customAmount: 0 })
   }
 
+  // A day of a LAND PACKAGE (migration 462): the package goes on its first
+  // day, priced per person; on each of its days what it includes is left off
+  // — the car, the guide, its meals, its night, the sights its ticket covers.
+  const pkgOpt = block.land_package_id
+    ? rates.experiences.find(o => o.id === landPackageOptionId(block.land_package_id!))
+    : undefined
+  const pkg = pkgOpt?.land_package
+  const cover = pkg ? coverDay(pkg, Math.max(0, (block.land_package_day ?? 1) - 1)) : null
+  if (block.land_package_id && !pkg) toPick.push('Land package (it is gone or inactive in Rates → Land packages)')
+  if (pkgOpt && cover?.index === 0) {
+    set('experiences', [item(pkgOpt)])
+    filled.push(pkgOpt.name)
+  }
+
   // Entrance fees: the paid attractions, as the library resolved them.
-  if (block.attractions.length > 0) {
+  const paidAttractions = pkg ? block.attractions.filter(a => !sightCovered(pkg, a)) : block.attractions
+  if (pkg && paidAttractions.length < block.attractions.length) filled.push('entrance (in the package)')
+  if (paidAttractions.length > 0) {
     const fees: SelectedItem[] = []
-    for (const name of block.attractions) {
+    for (const name of paidAttractions) {
       const check = block.attraction_checks?.find(c => c.name === name)
       const feeNames = check?.ok && check.fees?.length ? check.fees : [name]
       for (const feeName of feeNames) {
@@ -158,7 +175,10 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
   }
 
   // Guide.
-  if (block.guide === 'none') {
+  if (cover?.guide) {
+    set('guide', [])
+    filled.push('guide (in the package)')
+  } else if (block.guide === 'none') {
     set('guide', [])
   } else {
     const inCity = rates.guide.filter(o => sameCity(o.city, city))
@@ -179,6 +199,7 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
   for (const m of ['lunch', 'dinner'] as const) {
     const meal = block.meals?.[m]
     if (!meal?.included) continue
+    if (cover?.meals[m]) continue // the package gives it
     if (/ship|camp|hotel|board/i.test(meal.venue ?? '')) continue
     const opt = rates.meals.find(o => sameCity(o.city, city) && new RegExp(m, 'i').test(o.category || o.name))
     if (opt) {
@@ -202,7 +223,11 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
   const airport = (where: string | null) =>
     route(rates, pax, o => o.service_type === 'airport_transfer' && sameCity(o.origin_city ?? o.city, where))
   const comps = components(block)
-  if (comps.intercity === 'flight' && block.to_city) {
+  if (cover?.transport) {
+    // The package's car, out and back: no transfer or day tour of our own.
+    set('route', [])
+    filled.push('transport (in the package)')
+  } else if (comps.intercity === 'flight' && block.to_city) {
     const from = airportCodeForCity(block.city), to = airportCodeForCity(block.to_city)
     const flight = rates.flights.find(o => {
       const f = o as RateOption & { route_from?: string; route_to?: string }
@@ -262,7 +287,10 @@ export function applyBlockToGridDay(day: GridDay, block: GridBlock, rates: AllRa
   }
 
   // The night.
-  if (block.night === 'none') {
+  if (cover?.night) {
+    set('accommodation', [])
+    filled.push(`night (in the package: ${cover.night === 'camp' ? 'desert camp' : cover.night})`)
+  } else if (block.night === 'none') {
     set('accommodation', [])
     set('cruise', [])
   } else if (block.night === 'included') {

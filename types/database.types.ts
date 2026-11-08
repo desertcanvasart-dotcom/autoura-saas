@@ -3937,6 +3937,8 @@ export interface Database {
           is_active: boolean
           created_at: string
           updated_at: string
+          land_package_day: number | null
+          land_package_id: string | null
         }
         Insert: {
           id?: string
@@ -3962,6 +3964,8 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+          land_package_day?: number | null
+          land_package_id?: string | null
         }
         Update: {
           id?: string
@@ -3987,6 +3991,8 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+          land_package_day?: number | null
+          land_package_id?: string | null
         }
         Relationships: []
       }
@@ -6927,6 +6933,102 @@ export interface Database {
           created_at?: string
         }
         Relationships: []
+      }
+      land_packages: {
+        Row: {
+          base_rate_eur: number | null
+          base_rate_non_eur: number | null
+          city: string | null
+          covered_attractions: string[]
+          created_at: string
+          description: string | null
+          duration_days: number
+          id: string
+          includes_entrance: boolean
+          includes_guide: boolean
+          includes_local_vehicle: boolean
+          includes_transport: boolean
+          is_active: boolean
+          meals: Json
+          night_places: string[]
+          notes: string | null
+          package_name: string
+          rate_currency: string | null
+          service_code: string | null
+          start_city: string | null
+          supplier_id: string | null
+          tenant_id: string
+          updated_at: string
+          vehicle_capacity: number | null
+        }
+        Insert: {
+          base_rate_eur?: number | null
+          base_rate_non_eur?: number | null
+          city?: string | null
+          covered_attractions?: string[]
+          created_at?: string
+          description?: string | null
+          duration_days: number
+          id?: string
+          includes_entrance?: boolean
+          includes_guide?: boolean
+          includes_local_vehicle?: boolean
+          includes_transport?: boolean
+          is_active?: boolean
+          meals?: Json
+          night_places?: string[]
+          notes?: string | null
+          package_name: string
+          rate_currency?: string | null
+          service_code?: string | null
+          start_city?: string | null
+          supplier_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          vehicle_capacity?: number | null
+        }
+        Update: {
+          base_rate_eur?: number | null
+          base_rate_non_eur?: number | null
+          city?: string | null
+          covered_attractions?: string[]
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          id?: string
+          includes_entrance?: boolean
+          includes_guide?: boolean
+          includes_local_vehicle?: boolean
+          includes_transport?: boolean
+          is_active?: boolean
+          meals?: Json
+          night_places?: string[]
+          notes?: string | null
+          package_name?: string
+          rate_currency?: string | null
+          service_code?: string | null
+          start_city?: string | null
+          supplier_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vehicle_capacity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "land_packages_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "land_packages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meal_rates: {
         Row: {

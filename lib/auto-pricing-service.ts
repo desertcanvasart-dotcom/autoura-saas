@@ -55,6 +55,7 @@ import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { pickStartingPrice, type TierPrice } from '@/lib/tours/pick-starting-price'
 import { priceDayActivity, type ActivityRow } from '@/lib/pricing/day-activity'
+import { landPackageCoverage, packageInclusions, packageLineName, packagePricePerPerson, sightCovered, type Coverage, type LandPackageRow } from '@/lib/pricing/land-package'
 import { sailsOn, sailingDaysLabel } from '@/lib/rates/cruise-sailing'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
@@ -185,6 +186,13 @@ export interface ItineraryDay {
    *  own model. Skipped on a cruise day, where they ride in the cruise
    *  sightseeing package. Absent = none, exactly as before. */
   activity_ids?: string[]
+  /** A LAND PACKAGE starts on this day (migration 462, lib/pricing/land-package):
+   *  priced once per person and covering this day and the next ones; on those
+   *  days what it includes is not charged again. Absent = none. */
+  land_package_id?: string
+  /** Set on a package's last day: the package drives the group back to this
+   *  city, so the NEXT day is no road move from here. */
+  ends_in_city?: string
   /** How this day travels (B-item 2). Absent = road, exactly as before.
    *  flight/train legs run PREVIOUS day's city → this day's city; a
    *  sleeping train runs THIS day's city → the NEXT day's (board tonight,
@@ -692,8 +700,10 @@ export function determineTransportNeeds(
   // of it was a second charge for the same move (found on a flight day and a
   // sleeper morning that had sightseeing; sibling #447). Such a day is a
   // sightseeing day in the city it arrived in.
+  // A land package that drove the group back (ends_in_city) leaves it there:
+  // the day after is no road move from the package's own city.
   if (previousDay && 
-      previousDay.city.toLowerCase() !== cityLower &&
+      (previousDay.ends_in_city ?? previousDay.city).toLowerCase() !== cityLower &&
       !day.transport_type &&
       previousDay.transport_type !== 'sleeping_train' &&
       day.accommodation_type !== 'cruise' &&
@@ -910,6 +920,9 @@ export function parseItinerary(itineraryData: any, opts?: {
       ? day.activity_ids.filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
       : []
 
+    // A land package starting on this day (migration 462).
+    const land_package_id = typeof day.land_package_id === 'string' && day.land_package_id ? day.land_package_id : undefined
+
     // Travel mode (B-item 2). Unknown values read as road — never a guess.
     const transport_type =
       day.transport_type === 'flight' || day.transport_type === 'train' || day.transport_type === 'sleeping_train'
@@ -962,6 +975,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       attractions,
       attraction_ids,
       activity_ids,
+      ...(land_package_id ? { land_package_id } : {}),
       transport_type,
       transport_rate_id,
       // Only a day that travels by ticket has a leg to name.
@@ -2769,6 +2783,58 @@ async function loadActivitiesByIds(scope: CatalogScope, ids: string[]): Promise<
   return map
 }
 
+/** The land packages a trip's days start (Rates → Land packages), in the
+ *  run's currency, keyed by id. Only the tenant's own active rows come back,
+ *  so a withdrawn id is absent — a gap downstream, never a substitute. */
+async function loadLandPackagesByIds(scope: CatalogScope, ids: string[]): Promise<Map<string, LandPackageRow>> {
+  const map = new Map<string, LandPackageRow>()
+  if (ids.length === 0) return map
+  const { data } = await getSupabaseAdmin()
+    .from('land_packages')
+    .select('id, package_name, city, start_city, duration_days, night_places, meals, includes_transport, includes_local_vehicle, includes_guide, includes_entrance, covered_attractions, vehicle_capacity, base_rate_eur, base_rate_non_eur, rate_currency, description, tenant_id')
+    .eq('tenant_id', scope.tenantId)
+    .in('id', ids)
+    .eq('is_active', true)
+  const rows = await normalizeRateRows(getSupabaseAdmin(), 'land_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
+  for (const r of (rows ?? []) as unknown as LandPackageRow[]) map.set(r.id, r)
+  return map
+}
+
+/** What the package covers, written onto each covered day before anything is
+ *  priced — so every step below (transport, guide, meals, nights, entrance)
+ *  simply finds nothing to charge for what the package includes. The days are
+ *  the provider's, so the agency's own per-sightseeing-day extras (water,
+ *  guide tips) do not run on them either. */
+function applyLandCoverage(itinerary: ItineraryDay[], coverage: Coverage, packages: ReadonlyMap<string, LandPackageRow>): void {
+  for (const day of itinerary) {
+    const c = coverage.covered.get(day.day)
+    if (!c) continue
+    const pkg = packages.get(c.packageId)!
+    if (c.transport) {
+      // Present-and-empty transport = exactly no vehicle (lib/pricing/transport-lines).
+      day.transport_lines = []
+      day.day_trip_to = undefined
+      day.city_transfer = false
+      if (c.endsIn) {
+        // The package drives the group back: the day ENDS there — that
+        // night's hotel is in that city, and the next day is no road move.
+        day.ends_in_city = c.endsIn
+        day.city = c.endsIn
+      }
+    }
+    if (c.guide) day.services = { ...day.services, guide_required: false }
+    for (const kind of MEAL_KINDS) if (c.meals[kind]) day.meals[kind] = 'included'
+    if (c.night) {
+      day.accommodation_type = 'none'
+      day.services = { ...day.services, hotel_checkin: false }
+    }
+    if (pkg.includes_entrance) {
+      day.attractions = day.attractions.filter(a => !sightCovered(pkg, a))
+      if ((pkg.covered_attractions ?? []).length === 0) day.attraction_ids = []
+    }
+  }
+}
+
 /** What a transport lookup outside the engine found. */
 export interface DayTransportRate { rate: number; rateId: string; vehicleType: string; serviceType: string }
 
@@ -3182,6 +3248,20 @@ export async function calculateDayBasedPricing(
   }
 
 
+
+  // ============================================
+  // STEP 1b: LAND PACKAGES (migration 462)
+  // ============================================
+  // A package (the Bahariya desert trip) is charged once, per person, on the
+  // day it starts; on the days it covers, what it includes is taken off the
+  // days BEFORE pricing, so no step below charges it again.
+  const landPackageIds = [...new Set(itinerary.map(d => d.land_package_id).filter((v): v is string => !!v))]
+  const landPackages = await loadLandPackagesByIds(catalogScope, landPackageIds)
+  const landCoverage = landPackageCoverage(itinerary, landPackages)
+  for (const h of landCoverage.holes) {
+    addHole({ kind: 'activity', reason: 'missing', tier, dayNumber: h.day, lookupAttempted: `land package on day ${h.day}`, message: h.message })
+  }
+  applyLandCoverage(itinerary, landCoverage, landPackages)
 
   // ============================================
   // STEP 2: Analyze accommodation types
@@ -4396,6 +4476,27 @@ export async function calculateDayBasedPricing(
     }
   }
 
+  // ----- Land packages (per pax, once each — STEP 1b) -----
+  let landPackagesPerPax = 0
+  for (const { day, pkg } of landCoverage.charges) {
+    const perPerson = packagePricePerPerson(pkg, isEurPassport)
+    if (perPerson == null) {
+      addHole({
+        kind: 'activity', reason: 'missing', tier, dayNumber: day,
+        lookupAttempted: `land package ${pkg.id}`,
+        message: `"${pkg.package_name}" has no price per person. Set it in Rates → Land packages.`,
+      })
+      continue
+    }
+    landPackagesPerPax += perPerson
+    services.push({
+      id: `land-package-${day}-${pkg.id}`, dayNumber: day, serviceType: 'package',
+      serviceName: packageLineName(pkg), quantity: 1, quantityMode: 'per_pax',
+      unitCost: perPerson, lineTotal: perPerson, rateSource: 'land_packages',
+      isPerPax: true, isOptional: false, notes: `Includes: ${packageInclusions(pkg).join(' · ')}`,
+    })
+  }
+
   // ----- External Meals (per pax) -----
   // Any meal a day states as 'external' — the operator takes the group to a
   // restaurant — is a per-pax line from meal rates. Breakfast included: a
@@ -4489,7 +4590,7 @@ export async function calculateDayBasedPricing(
     })
   }
 
-  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax + activitiesPerPax + staffPerPax
+  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax + activitiesPerPax + staffPerPax + landPackagesPerPax
 
 
 
@@ -4942,7 +5043,7 @@ export async function calculateDayBasedPricing(
     transportAt: throughoutGuide ? (pax: number) => transportAtPax(pax + 1) : transportAtPax,
     // Tour leader: single room (PPD + single supplement) + their own per-pax costs
     // The tour leader pays CUSTOMER fare on tickets (B-item 2).
-    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax + staffPerPax,
+    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax + staffPerPax + landPackagesPerPax,
     paxFrom: PAX_COUNTS[0],
     // A group larger than the sheet is priced at its own size: 50 travellers
     // used to be priced as the 40-pax row and that total split 50 ways.

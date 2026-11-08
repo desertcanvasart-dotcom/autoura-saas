@@ -130,6 +130,7 @@ export const RATE_GROUPS: RateGroup[] = [
       { label: 'Meals', slug: 'meals', icon: UtensilsCrossed },
       { label: 'Attractions', slug: 'attractions', icon: Landmark },
       { label: 'Activities', slug: 'activities', icon: Ticket },
+      { label: 'Land packages', slug: 'land-packages', icon: Package },
     ],
   },
   {
