@@ -374,7 +374,7 @@ const enhancedTestimonials = [
     featureTag: "AI Itinerary Generation",
   },
   {
-    quote: "The WhatsApp AI parsing changed everything. Clients message at midnight with abbreviations only we understand. By morning, I have a structured itinerary with confidence scores ready to review.",
+    quote: "The WhatsApp AI parsing changed everything. Clients message at midnight with abbreviations only we understand. By morning, I have a structured itinerary, with what the AI understood spelled out for me to check.",
     author: "Hussein Farouk",
     role: "",
     company: "",
