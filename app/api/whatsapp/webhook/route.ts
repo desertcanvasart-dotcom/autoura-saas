@@ -298,7 +298,10 @@ async function persistInboundMedia(
     const admin = getServiceClient()
     if (!admin) return null
 
-    const ext = EXTENSION_BY_MIME[media.contentType] || EXTENSION_BY_MIME[mimeType || ''] || 'bin'
+    // "audio/ogg; codecs=opus" is how Meta labels a voice note: the parameters
+    // are dropped before the lookup, or it was stored as .bin.
+    const bare = (t: string | null | undefined) => String(t ?? '').split(';')[0].trim().toLowerCase()
+    const ext = EXTENSION_BY_MIME[bare(media.contentType)] || EXTENSION_BY_MIME[bare(mimeType)] || 'bin'
     const safeSid = messageSid.replace(/[^a-zA-Z0-9_-]/g, '_')
     const filePath = `inbound/${safeSid}.${ext}`
 

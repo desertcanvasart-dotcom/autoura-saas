@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/super-admin'
 import { checkTenantWhatsAppNumber, checkWhatsAppSender } from '@/lib/whatsapp-tenant'
 import { listWhatsAppSenders } from '@/lib/twilio-whatsapp'
+import { getWhatsAppProvider } from '@/lib/whatsapp'
+import { checkMetaSender } from '@/lib/whatsapp-meta-numbers'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -25,7 +27,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     let senderStatus: string | null = null
     if (checked.number) {
-      const sender = await checkWhatsAppSender(checked.number, listWhatsAppSenders)
+      // Checked where the numbers live: Meta's WhatsApp account once the
+      // platform sends directly (WHATSAPP_PROVIDER=meta), else Twilio.
+      const sender = getWhatsAppProvider() === 'meta'
+        ? await checkMetaSender(checked.number)
+        : await checkWhatsAppSender(checked.number, listWhatsAppSenders)
       if (sender.ok) senderStatus = sender.status
       else if (body?.force !== true) {
         // canForce: the page offers "Save anyway".
