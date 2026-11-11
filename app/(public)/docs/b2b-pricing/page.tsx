@@ -18,7 +18,7 @@ export default function B2BPricingPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">B2B Pricing</h1>
       <p className="text-gray-600 mb-8">
-        The B2B Calculator prices a tour programme for your partners from your live rates: the cost of every service, your margin, and a rate sheet for groups of 1 to 10 &mdash; with or without a tour leader.
+        The B2B Calculator prices a tour programme for your partners from your live rates: the cost of every service, your markup, and a rate sheet for groups of 1 to 10 &mdash; with or without a tour leader.
       </p>
 
       {/* Access */}
@@ -44,9 +44,9 @@ export default function B2BPricingPage() {
           <li><strong>Number of Passengers</strong> &mdash; 1 to 50</li>
           <li><strong>Tour Leader</strong> &mdash; <strong>+0 (No TL)</strong> or <strong>+1 (With TL)</strong>; the leader&apos;s costs are shared among the paying guests</li>
           <li><strong>Guide</strong> &mdash; <strong>Spot</strong> (a guide on the sightseeing days) or <strong>Throughout (+1)</strong> (one guide travels the whole trip: a fee every day, a bed each night at the property&apos;s guide rate, meals for small groups, one more vehicle seat); the <strong>Guide language</strong> (a language with no rate is marked <em>no rate</em>); and the <strong>grade</strong> &mdash; one of your own guide grades, the first being the default</li>
-          <li><strong>Travel Date</strong> &mdash; Picks the dated hotel and cruise rates, and your seasonal premium (added to the margin and to every row of the rate sheet)</li>
-          <li><strong>Passport Type</strong> &mdash; <strong>European Passport</strong> or <strong>Non-European Passport</strong>, for entrance fees</li>
-          <li><strong>Profit Margin (%)</strong> &mdash; 25% to start</li>
+          <li><strong>Travel Date</strong> &mdash; Picks the dated hotel and cruise rates, and your seasonal premium (added to the markup and to every row of the rate sheet)</li>
+          <li><strong>Passport Type</strong> &mdash; <strong>European Passport</strong> or <strong>Non-European Passport</strong>, for hotel and Nile cruise rates</li>
+          <li><strong>Markup (%)</strong> &mdash; added on top of cost; 25% to start</li>
           <li><strong>Extras</strong> &mdash; Tick the extras from your <Link href="/docs/extras" className="text-primary-600 hover:underline">Extras list</Link> to include</li>
         </ul>
       </section>
@@ -56,7 +56,7 @@ export default function B2BPricingPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Calculating a Price</h2>
         <p className="text-gray-600 mb-3">Click <strong>Calculate Price</strong>:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Summary</strong> &mdash; <strong>Total Cost</strong>, <strong>Margin</strong>, <strong>Selling Price</strong> and <strong>Per Person</strong>, with the season and tour leader badges</li>
+          <li><strong>Summary</strong> &mdash; <strong>Total Cost</strong>, <strong>Markup</strong>, <strong>Selling Price</strong> and <strong>Per Person</strong>, with the season and tour leader badges</li>
           <li><strong>Single Supplement</strong> &mdash; The extra per person for a single room, when the programme has one</li>
           <li><strong>Options for this programme</strong> &mdash; The programme&apos;s optional services (set in Tour Manager); tick the ones the partner is buying and the price updates</li>
           <li><strong>Check this</strong> &mdash; Notes worth a look that do not stop the price, such as a cruise whose sailing days do not match the date</li>
@@ -68,7 +68,7 @@ export default function B2BPricingPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Cost Breakdown</h2>
         <p className="text-gray-600">
-          Every service, grouped by <strong>Day</strong> (and <strong>Whole trip</strong>), with its Source, Mode, Qty, Unit and Total. Extras and options are marked <strong>Extra</strong> or <strong>Option</strong>. The foot shows the Subtotal, the tour leader&apos;s cost, the Margin and the Total.
+          Every service, grouped by <strong>Day</strong> (and <strong>Whole trip</strong>), with its Source, Mode, Qty, Unit and Total. Extras and options are marked <strong>Extra</strong> or <strong>Option</strong>. The foot shows the Subtotal, the tour leader&apos;s cost, the Markup and the Total.
         </p>
       </section>
 
@@ -84,7 +84,7 @@ export default function B2BPricingPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Rate Sheet</h2>
         <p className="text-gray-600 mb-3">
-          <strong>Generate Rate Sheet (1-10 pax)</strong> prices the same programme for every group size from 1 to 10: Pax, Cost, Margin, Selling and Per Person (marked <strong>(+1)</strong> with a tour leader). <strong>Export CSV</strong> downloads it. When you save the quote, this sheet becomes the partner&apos;s price table.
+          <strong>Generate Rate Sheet (1-10 pax)</strong> prices the same programme for every group size from 1 to 10: Pax, Cost, Markup, Selling and Per Person (marked <strong>(+1)</strong> with a tour leader). <strong>Export CSV</strong> downloads it. When you save the quote, this sheet becomes the partner&apos;s price table.
         </p>
         <ScreenshotPlaceholder caption="Rate sheet for 1-10 pax with the Export CSV button" />
       </section>

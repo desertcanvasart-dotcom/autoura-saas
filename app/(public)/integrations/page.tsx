@@ -135,7 +135,14 @@ const comingSoonIntegrations = [
     description: "Sync invoices and payments automatically with your accounting software.",
     icon: Shield,
     region: "Global",
-    eta: "Planned"
+    eta: "Q1 2027"
+  },
+  {
+    name: "Xero",
+    description: "Sync invoices and payments automatically with your accounting software.",
+    icon: Shield,
+    region: "Global",
+    eta: "Q1 2027"
   },
   {
     name: "Google Calendar",
@@ -190,9 +197,7 @@ export default function IntegrationsPage() {
               <Link href="/integrations" className="text-sm text-[#647C47] font-medium">Integrations</Link>
               <Link href="/about" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">About</Link>
               <a 
-                href="https://calendly.com/autoura"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/contact"
                 className="px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4a5c35] transition-all hover:shadow-lg hover:shadow-[#647C47]/20"
               >
                 Book a Free Demo
@@ -216,9 +221,7 @@ export default function IntegrationsPage() {
               <Link href="/integrations" className="block text-sm text-[#647C47] font-medium py-2">Integrations</Link>
               <Link href="/about" className="block text-sm text-stone-600 hover:text-stone-900 py-2">About</Link>
               <a 
-                href="https://calendly.com/autoura"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/contact"
                 className="block w-full px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg text-center hover:bg-[#4a5c35]"
               >
                 Book a Free Demo
@@ -374,9 +377,7 @@ export default function IntegrationsPage() {
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <a 
-                    href="https://calendly.com/autoura"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="/contact"
                     className="group w-full sm:w-auto px-6 py-3 bg-[#647C47] text-white font-semibold rounded-xl hover:bg-[#5a7040] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center justify-center gap-2"
                   >
                     Request an Integration

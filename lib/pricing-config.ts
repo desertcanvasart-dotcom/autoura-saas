@@ -136,12 +136,11 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
     name: 'Agency',
     icon: Crown,
     color: 'purple',
-    // Defined for sales; not published until multi-brand branding and API
-    // access exist, since higher limits alone do not justify the step up.
+    // Published 2026-11-11 (approved list: Solo 89, Studio 189, Agency 449).
     monthlyPrice: 449,
     annualPrice: 4490,
     onboardingFeeUsd: 1500,
-    publiclyPriced: false,
+    publiclyPriced: true,
     description: 'For operators running serious B2B volume or more than one brand.',
     limits: {
       users: 30,

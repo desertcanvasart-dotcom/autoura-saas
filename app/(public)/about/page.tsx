@@ -115,9 +115,7 @@ export default function AboutPage() {
             Our team combines decades of experience in tour operations, travel technology, and software development. We understand the challenges you face because we've lived them.
           </p>
           <a
-            href="https://calendly.com/autoura"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/contact"
             className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-[#2d3b2d] rounded-lg hover:bg-[#3d4b3d] transition-colors"
           >
             Schedule a Demo

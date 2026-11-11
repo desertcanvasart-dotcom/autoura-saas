@@ -79,7 +79,7 @@ describe('structured data', () => {
     const app = (siteGraph()['@graph'] as Array<Json>)[2]
     const published = Object.values(PRICING_TIERS).filter(t => t.publiclyPriced).map(t => t.monthlyPrice as number)
     expect(app.offers).toMatchObject({ '@type': 'AggregateOffer', priceCurrency: 'USD', lowPrice: Math.min(...published), highPrice: Math.max(...published) })
-    expect(JSON.stringify(app)).not.toContain('449')
+    expect(JSON.stringify(app)).toContain('449')
   })
 
   it('breadcrumbs start at Home with absolute urls', () => {
@@ -243,7 +243,7 @@ describe('crawlers', () => {
     expect(txt.startsWith('# Autoura\n\n> ')).toBe(true)
     expect(txt).toContain('$89/month')
     expect(txt).toContain('$189/month')
-    expect(txt).not.toContain('$449')
+    expect(txt).toContain('$449/month')
     expect(txt).toContain('not a travel agency')
     expect(txt).toContain(absoluteUrl('/llms-full.txt'))
   })

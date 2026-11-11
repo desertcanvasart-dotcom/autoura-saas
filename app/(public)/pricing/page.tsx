@@ -24,8 +24,7 @@ import { PRICING_FAQ as FAQ } from '@/lib/marketing/pricing-faq'
 // customer is actually charged or actually allowed to do.
 //
 // Tiers without a published price render "Talk to us" rather than a number.
-// That is driven by tier.publiclyPriced, so when Agency's roadmap items
-// ship, flipping one boolean publishes it — no edits here.
+// That is driven by tier.publiclyPriced — flipping one boolean publishes it.
 
 const formatMoney = (n: number) => `$${n.toLocaleString()}`
 
@@ -54,7 +53,7 @@ const ALWAYS_INCLUDED = [
   'Invoices, payments, receipts, AR aging and per-trip profit & loss',
   'Client messaging in 29 languages',
   'WhatsApp and Gmail in one inbox — voice notes played, sent and transcribed automatically',
-  'The full 15-category rate engine, with 1–40 pax rate sheets',
+  'The full 15-category rate engine, with rate sheets for groups of 1 to 10',
 ]
 
 /** Stated plainly, because finding out later is worse. */
@@ -63,7 +62,7 @@ const NOT_INCLUDED = [
   'No channel manager',
   'No OTA connectivity (Booking.com, Expedia)',
   'Clients cannot pay by card in-app yet — you record payments made elsewhere',
-  'Accounting sync (Xero, QuickBooks) is on the roadmap',
+  'No accounting sync yet — QuickBooks and Xero are planned for the first quarter of 2027',
   `On the roadmap, not available today: ${ROADMAP_CAPABILITIES.join(', ')}`,
 ]
 
@@ -92,7 +91,7 @@ export default function PricingPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">Pricing</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Built by a tour operator with 30+ years in tourism. Plans differ by how much you run
+            Built by a tour operator in tourism since 1993. Plans differ by how much you run
             through them &mdash; never by which half of your business you are allowed to use.
           </p>
           <p className="text-sm text-gray-500 mt-4">
@@ -209,6 +208,10 @@ export default function PricingPage() {
 
         <p className="max-w-6xl mx-auto text-center text-sm text-gray-500 mt-6">
           Onboarding covers rate-sheet setup and is charged once, at the start.
+        </p>
+        <p className="max-w-6xl mx-auto text-center text-sm text-gray-500 mt-2">
+          Prefer to run Autoura on your own servers? An on-premise installation starts from about $8,000.{' '}
+          <Link href="/contact" className="text-[#647C47] hover:underline">Talk to us</Link>.
         </p>
       </section>
 

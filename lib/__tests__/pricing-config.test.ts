@@ -23,7 +23,7 @@ const LIMIT_KEYS = [
 ] as const
 
 /** Tiers with a published, self-serve price. */
-const PRICED = ['solo', 'studio'] as const
+const PRICED = ['solo', 'studio', 'agency'] as const
 
 describe('PRICING_TIERS — catalog integrity', () => {
   it('contains exactly the four known tiers, keyed by their slug', () => {
@@ -67,7 +67,7 @@ describe('PRICING_TIERS — catalog integrity', () => {
     }
   })
 
-  it('only Solo and Studio are publicly priced', () => {
+  it('Solo, Studio and Agency are publicly priced', () => {
     const priced = Object.values(PRICING_TIERS).filter(t => t.publiclyPriced).map(t => t.slug)
     expect(priced.sort()).toEqual([...PRICED].sort())
   })
@@ -77,9 +77,10 @@ describe('PRICING_TIERS — catalog integrity', () => {
     expect(PRICING_TIERS.enterprise.annualPrice).toBeNull()
   })
 
-  it('Agency keeps a defined price for sales even though it is unpublished', () => {
-    // It flips to publiclyPriced when multi-brand branding and API access ship.
-    expect(PRICING_TIERS.agency.publiclyPriced).toBe(false)
+  it('the approved list: Solo $89, Studio $189, Agency $449', () => {
+    expect(PRICING_TIERS.solo.monthlyPrice).toBe(89)
+    expect(PRICING_TIERS.studio.monthlyPrice).toBe(189)
+    expect(PRICING_TIERS.agency.publiclyPriced).toBe(true)
     expect(PRICING_TIERS.agency.monthlyPrice).toBe(449)
   })
 
