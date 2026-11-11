@@ -75,7 +75,9 @@ describe('the numbers', () => {
     expect(await checkWhatsAppSender('+81312345678', async () => { throw new Error('401') }))
       .toMatchObject({ ok: false, reason: 'unavailable' })
     const route = src('app/api/super-admin/tenants/[id]/whatsapp/route.ts')
-    expect(route).toContain('const sender = await checkWhatsAppSender(checked.number, listWhatsAppSenders)')
+    expect(route).toContain(': await checkWhatsAppSender(checked.number, listWhatsAppSenders)')
+    // On Meta the same check runs against the WhatsApp account (lib/whatsapp-meta-numbers.ts).
+    expect(route).toContain("getWhatsAppProvider() === 'meta'\n        ? await checkMetaSender(checked.number)")
     expect(route).toContain("else if (body?.force !== true) {")
     expect(src('app/super-admin/tenants/[id]/page.tsx')).toContain('onClick={() => handleSaveWhatsapp(true)}')
   })

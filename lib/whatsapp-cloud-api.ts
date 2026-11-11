@@ -10,15 +10,18 @@
 //
 // Env vars:
 //   META_WHATSAPP_ACCESS_TOKEN         - System-user token (whatsapp_business_messaging)
-//   META_WHATSAPP_PHONE_NUMBER_ID      - Phone number ID (not the phone number itself)
+//   META_WHATSAPP_PHONE_NUMBER_ID      - Phone number ID a company WITHOUT its own number sends from
+//                                        (a company's own number: lib/whatsapp-meta-numbers.ts)
 //   META_WHATSAPP_APP_SECRET           - App secret, validates X-Hub-Signature-256
 //   META_WHATSAPP_WEBHOOK_VERIFY_TOKEN - Shared secret for the GET verification handshake
-//   META_WHATSAPP_BUSINESS_ACCOUNT_ID  - WABA ID (template management; optional for send)
+//   META_WHATSAPP_BUSINESS_ACCOUNT_ID  - WABA ID(s), comma-separated: where each company's own
+//                                        number's phone number ID is looked up
 //   META_GRAPH_API_VERSION             - Graph API version (default v21.0)
 // ============================================
 
 import crypto from 'crypto'
 import type { WhatsAppMessage } from './twilio-whatsapp'
+import { metaBusinessAccountIds, metaPhoneNumberIdFor } from './whatsapp-meta-numbers'
 
 const GRAPH_BASE = 'https://graph.facebook.com'
 
@@ -35,7 +38,31 @@ function phoneNumberId(): string | undefined {
 }
 
 export function isMetaConfigured(): boolean {
-  return !!(accessToken() && phoneNumberId())
+  return !!(accessToken() && (phoneNumberId() || metaBusinessAccountIds().length > 0))
+}
+
+/** Meta's limit on a media caption; a longer body goes as its own text. */
+export const META_CAPTION_LIMIT = 1024
+
+/** The company's own number, as Super Admin set it (migration 408), or null. */
+async function ownNumberOf(tenantId: string | null | undefined): Promise<string | null> {
+  if (!tenantId) return null
+  try {
+    const { createAdminClient } = await import('@/lib/supabase-server')
+    const { data } = await createAdminClient().from('tenants').select('whatsapp_number').eq('id', tenantId).maybeSingle()
+    return (data as { whatsapp_number?: string | null } | null)?.whatsapp_number ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The phone number ID this company sends from: its own number's, looked up
+ * in Meta (lib/whatsapp-meta-numbers.ts), else the shared one.
+ */
+export async function senderPhoneNumberId(tenantId: string | null | undefined): Promise<string | undefined> {
+  const own = await metaPhoneNumberIdFor(await ownNumberOf(tenantId))
+  return own ?? phoneNumberId()
 }
 
 // ============================================
@@ -87,13 +114,22 @@ const REENGAGEMENT_ERROR_CODES = new Set([131047, 131026])
 export async function sendViaMeta({
   to,
   body,
-  mediaUrl
+  mediaUrl,
+  tenantId
 }: WhatsAppMessage): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
+  // A caption past Meta's limit is refused: the file goes bare and the words
+  // follow as their own message.
+  if (mediaUrl && body && body.length > META_CAPTION_LIMIT) {
+    const media = await sendViaMeta({ to, body: '', mediaUrl, tenantId })
+    if (!media.success) return media
+    const text = await sendViaMeta({ to, body, tenantId })
+    return text.success ? media : { ...text, warning: 'The file was sent; its message was not.' }
+  }
   try {
     const token = accessToken()
-    const numberId = phoneNumberId()
+    const numberId = await senderPhoneNumberId(tenantId)
     if (!token || !numberId) {
-      throw new Error('Meta WhatsApp not configured: set META_WHATSAPP_ACCESS_TOKEN and META_WHATSAPP_PHONE_NUMBER_ID')
+      throw new Error('Meta WhatsApp not configured: set META_WHATSAPP_ACCESS_TOKEN, and META_WHATSAPP_PHONE_NUMBER_ID or the company’s own number in META_WHATSAPP_BUSINESS_ACCOUNT_ID')
     }
 
     const payload: Record<string, unknown> = {

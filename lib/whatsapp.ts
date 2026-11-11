@@ -18,6 +18,7 @@ import {
 import { sendViaMeta, isMetaConfigured } from './whatsapp-cloud-api'
 import { formatPhoneForWhatsApp } from './communication-utils'
 import { toConversationPhone } from './whatsapp-phone'
+import { splitWhatsAppText, META_TEXT_LIMIT, TWILIO_TEXT_LIMIT } from './whatsapp-split'
 
 export type WhatsAppProvider = 'twilio' | 'meta'
 
@@ -37,12 +38,40 @@ export async function sendWhatsAppMessage(
   message: WhatsAppMessage
 ): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
   const ready = { ...message, to: await internationalNumber(message.to, message.tenantId) }
-  const result = getWhatsAppProvider() === 'meta' ? await sendViaMeta(ready) : await sendViaTwilio(ready)
+  const provider = getWhatsAppProvider()
+
+  // Longer than one message may be (Twilio 1,600, Meta 4,096): sent as
+  // several, in order, cut at paragraph or sentence breaks
+  // (lib/whatsapp-split.ts) — the provider's refusal left the sender cutting
+  // it up by hand.
+  const limit = provider === 'meta' ? META_TEXT_LIMIT : TWILIO_TEXT_LIMIT
+  const parts = !message.mediaUrl && message.body ? splitWhatsAppText(message.body, limit) : []
+  if (parts.length > 1) {
+    let first: { success: boolean; messageId?: string; error?: string; warning?: string } | null = null
+    for (let i = 0; i < parts.length; i++) {
+      const sent = await sendOne(provider, { ...ready, body: parts[i] }, message.tenantId)
+      if (!sent.success) {
+        return i === 0 ? sent : { ...first!, warning: `Only ${i} of ${parts.length} parts were sent: ${sent.error ?? 'unknown error'}` }
+      }
+      first ??= sent
+    }
+    return { ...first!, warning: `Sent as ${parts.length} messages (WhatsApp allows ${limit.toLocaleString('en-US')} characters in one).` }
+  }
+
+  return sendOne(provider, ready, message.tenantId)
+}
+
+async function sendOne(
+  provider: WhatsAppProvider,
+  ready: WhatsAppMessage,
+  tenantId: string | null,
+): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
+  const result = provider === 'meta' ? await sendViaMeta(ready) : await sendViaTwilio(ready)
   // On record, so a delivery failure reported later reaches the sender
   // (migration 430) instead of being dropped.
   if (result.success && result.messageId) {
     const { recordOutboundWhatsApp } = await import('@/lib/whatsapp-outbound')
-    await recordOutboundWhatsApp({ tenantId: message.tenantId, messageSid: result.messageId, to: ready.to, body: message.body })
+    await recordOutboundWhatsApp({ tenantId, messageSid: result.messageId, to: ready.to, body: ready.body })
   }
   return result
 }

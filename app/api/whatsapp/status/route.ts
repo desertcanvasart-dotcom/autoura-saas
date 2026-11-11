@@ -34,8 +34,10 @@ export async function GET() {
 
     // The number THIS company's customers see (migration 408): its own when
     // the Autoura team has set one, else the shared platform number.
+    // Both providers: on Meta the company's own number is looked up there by
+    // the same field (lib/whatsapp-meta-numbers.ts).
     let ownNumber: string | null = null
-    if (provider === 'twilio' && auth.tenant_id) {
+    if (auth.tenant_id) {
       const { data } = await createAdminClient()
         .from('tenants').select('whatsapp_number').eq('id', auth.tenant_id).maybeSingle()
       ownNumber = toWhatsAppE164((data as { whatsapp_number?: string | null } | null)?.whatsapp_number)
