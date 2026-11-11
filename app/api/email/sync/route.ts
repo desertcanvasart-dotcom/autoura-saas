@@ -18,6 +18,7 @@ import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { collectCandidates, storedIds, downloadMessages } from '@/lib/email/gmail-candidates'
 import { tenantClientEmails } from '@/lib/email/tenant-client-emails'
 import { applyRulesToNewMail } from '@/lib/email/apply-rules'
+import { effectiveSender } from '@/lib/email/relayed-sender'
 import type { MailRule } from '@/lib/email/mail-rules'
 
 /** The first real address in a header, or '' (lib/email/contact-name headerAddresses). */
@@ -45,20 +46,9 @@ function extractDisplayName(from: string | null | undefined): string | null {
   return null
 }
 
-/**
- * Ours or the customer's?
- *
- * This compared the From against the connected mailbox EXACTLY, so a reply a
- * colleague sent from hello@ on the same domain read as the customer writing:
- * the conversation stayed "waiting on us" for an answer that had already gone,
- * and the colleague's address could become the conversation's customer
- * address. The office is now a rule, not one string
- * (lib/email/office-addresses.ts).
- */
-function getDirection(from: string | null | undefined, office: OfficeRule): 'inbound' | 'outbound' {
-  if (!from) return 'inbound'
-  return isOfficeAddress(office, from) ? 'outbound' : 'inbound'
-}
+// Ours or the customer's: lib/email/relayed-sender.ts (effectiveSender) —
+// the office rule (lib/email/office-addresses.ts), plus mail a form on the
+// office's own website relays for a traveller.
 
 // GET - Sync status
 export async function GET() {
@@ -286,10 +276,19 @@ export async function POST(request: NextRequest) {
 
         const firstFrom = getH(firstHeaders, 'From')
         const firstTo = getH(firstHeaders, 'To')
-        const firstDir = getDirection(firstFrom, office)
-        const customerHeader = firstDir === 'inbound' ? firstFrom : firstTo
+        // Who really wrote it: a form on the office's own website writes From
+        // and To the office, with the traveller in Reply-To
+        // (lib/email/relayed-sender.ts) — that traveller is the customer.
+        const senderOf = (headers: Array<{ name?: string | null; value?: string | null }>) => effectiveSender(office, {
+          from: getH(headers, 'From'), to: getH(headers, 'To'), cc: getH(headers, 'Cc'), replyTo: getH(headers, 'Reply-To'),
+        })
+        const firstSender = senderOf(firstHeaders)
+        const firstDir = firstSender.direction
+        const customerHeader = firstSender.relayed
+          ? getH(firstHeaders, 'Reply-To')
+          : firstDir === 'inbound' ? firstFrom : firstTo
         const contactEmail = firstDir === 'inbound'
-          ? extractEmailAddress(firstFrom)
+          ? firstSender.email
           : firstCustomerAddress(firstTo, office)
         // Any header in the thread that names the customer — not only the
         // first one, which is a bare address when the office wrote first
@@ -300,7 +299,7 @@ export async function POST(request: NextRequest) {
 
         // The customer wrote in this batch: an archived conversation comes
         // back to Active, or the new mail is filed where nobody looks.
-        const hasNewInbound = sorted.some((m: any) => getDirection(getH(m.payload?.headers || [], 'From'), office) === 'inbound')
+        const hasNewInbound = sorted.some((m: any) => senderOf(m.payload?.headers || []).direction === 'inbound')
 
         // Upsert unified_conversations keyed by (tenant_id, contact_email)
         let unifiedId: string
@@ -391,7 +390,8 @@ export async function POST(request: NextRequest) {
           const msgDate = new Date(parseInt(message.internalDate || '0')).toISOString()
           const fromRaw = getMH('From')
           const toRaw = getMH('To')
-          const msgDir = getDirection(fromRaw, office)
+          const msgSender = senderOf(mHeaders)
+          const msgDir = msgSender.direction
 
           let bodyHtml = '', bodyText = ''
           const extractBody = (p: any) => {
@@ -420,8 +420,9 @@ export async function POST(request: NextRequest) {
 
           if (existingMsg) continue
 
-          const fromEmail = extractEmailAddress(fromRaw)
-          const fromName = extractDisplayName(fromRaw)
+          // A relayed form is filed as from the traveller, so a reply goes to them.
+          const fromEmail = msgSender.relayed ? msgSender.email : extractEmailAddress(fromRaw)
+          const fromName = msgSender.relayed ? extractDisplayName(getMH('Reply-To')) : extractDisplayName(fromRaw)
           const toEmail = extractEmailAddress(toRaw)
           const toName = extractDisplayName(toRaw)
           const cc = getMH('Cc')
