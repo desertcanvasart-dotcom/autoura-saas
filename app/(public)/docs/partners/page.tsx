@@ -55,7 +55,7 @@ export default function PartnersDocPage() {
         <p className="text-gray-600 mb-3">The margin a partner&rsquo;s prices start from:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li>
-            In the <strong>B2B Calculator</strong>, pick the partner beside <strong>Profit Margin</strong> before you
+            In the <strong>B2B Calculator</strong>, pick the partner beside <strong>Markup (%)</strong> before you
             calculate &mdash; their margin is put in. Pick a partner only in the Save dialog and, if the quote was
             priced at a different margin, the dialog says so.
           </li>

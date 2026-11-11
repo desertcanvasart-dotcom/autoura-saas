@@ -478,7 +478,7 @@ export default function TourPriceCalculator() {
     const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade ? ` ${guideGradeLabel(guideGrade)}` : ''})` : ''
     const tourLeaderSuffix = (tourLeaderIncluded ? ' (+1 TL)' : ' (+0)') + guideSuffix
     const cur = result?.currency || rateCurrency
-    const headers = ['Passengers', `Total Cost (${cur})`, `Margin (${cur})`, `Selling Price (${cur})`, `Per Person (${cur})`]
+    const headers = ['Passengers', `Total Cost (${cur})`, `Markup (${cur})`, `Selling Price (${cur})`, `Per Person (${cur})`]
     const rows = rateSheet.map(row => [
       row.pax,
       row.total_cost.toFixed(2),
@@ -751,10 +751,10 @@ export default function TourPriceCalculator() {
                 </div>
               )}
 
-              {/* Profit Margin */}
+              {/* Markup on cost */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <TrendingUp className="w-4 h-4 inline mr-1" />Profit Margin (%)
+                  <TrendingUp className="w-4 h-4 inline mr-1" />Markup (%)
                 </label>
                 <input
                   type="number"
@@ -886,7 +886,7 @@ export default function TourPriceCalculator() {
                     <p className="text-xl font-bold">{money(result.total_cost)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-1">Margin ({result.margin_percent}%)</p>
+                    <p className="text-xs text-gray-500 mb-1">Markup ({result.margin_percent}%)</p>
                     <p className="text-xl font-bold text-green-600">{money(result.margin_amount)}</p>
                     {(result.season_premium ?? 0) > 0 && (
                       <p className="text-xs text-amber-700 mt-1">+ {money(result.season_premium ?? 0)} {result.season_name} premium</p>
@@ -1011,7 +1011,7 @@ export default function TourPriceCalculator() {
                       </tr>
                     )}
                     <tr>
-                      <td colSpan={5} className="px-4 py-2 text-right text-green-600">Margin ({result.margin_percent}%):</td>
+                      <td colSpan={5} className="px-4 py-2 text-right text-green-600">Markup ({result.margin_percent}%):</td>
                       <td className="px-4 py-2 text-right text-green-600">{money(result.margin_amount)}</td>
                     </tr>
                     {(result.season_premium ?? 0) > 0 && (
@@ -1102,7 +1102,7 @@ export default function TourPriceCalculator() {
                   <tr>
                     <th className="px-4 py-2 text-center font-medium text-gray-600">Pax</th>
                     <th className="px-4 py-2 text-right font-medium text-gray-600">Cost</th>
-                    <th className="px-4 py-2 text-right font-medium text-gray-600">Margin</th>
+                    <th className="px-4 py-2 text-right font-medium text-gray-600">Markup</th>
                     <th className="px-4 py-2 text-right font-medium text-gray-600">Selling</th>
                     <th className="px-4 py-2 text-right font-medium text-gray-600">Per Person</th>
                   </tr>

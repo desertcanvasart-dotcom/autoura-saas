@@ -278,7 +278,7 @@ export default function GridHeader({ config, onChange, totals, guideLanguages = 
                 <div className="text-sm font-bold text-gray-700">{sym}{fmt(cv(totals.totalCost))}</div>
               </div>
               <div className="px-3 py-2">
-                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">Margin ({config.marginPercent}%)</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-medium">Markup ({config.marginPercent}%)</div>
                 <div className={`text-sm font-bold ${totals.marginAmount > 0 ? 'text-amber-600' : 'text-red-500'}`}>{sym}{fmt(cv(totals.marginAmount))}</div>
               </div>
               <div className="px-3 py-2 bg-green-50/50">

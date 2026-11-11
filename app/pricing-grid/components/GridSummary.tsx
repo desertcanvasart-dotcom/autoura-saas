@@ -78,7 +78,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
           <SummaryCell label="Cost / person" value={cv(totals.costPerPerson)} symbol={sym} />
           <SummaryCell label="Total cost" value={cv(totals.totalCost)} symbol={sym} />
           <SummaryCell
-            label={`Margin (${marginPercent}%)`}
+            label={`Markup (${marginPercent}%)`}
             value={cv(totals.marginAmount)}
             symbol={sym}
             color={totals.marginAmount > 0 ? 'text-amber-600' : 'text-red-500'}

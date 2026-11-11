@@ -46,7 +46,7 @@ export default function B2CPricingPage() {
           <li><strong>Nile Cruises</strong> &mdash; At the trip&apos;s tier, per person per night, by cabin</li>
           <li><strong>Transportation</strong> &mdash; By route and vehicle; cruise transport packages are offered on cruise days</li>
           <li><strong>Tour Guides</strong> &mdash; By language and type of guide</li>
-          <li><strong>Attractions</strong> &mdash; EU and non-EU prices, by the trip&apos;s passport setting</li>
+          <li><strong>Attractions</strong> &mdash; one entrance price per attraction, whatever the passport</li>
           <li><strong>Meals</strong>, <strong>Activities</strong>, <strong>Flights</strong>, <strong>Airport</strong> and <strong>Hotel Services</strong>, and <strong>Tipping</strong> (by who the tip is for)</li>
           <li><strong>Water</strong> &mdash; From the Water Bottle fixed cost</li>
         </ul>
@@ -64,7 +64,7 @@ export default function B2CPricingPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Markup</h2>
         <p className="text-gray-600">
-          <strong>Markup %</strong> in the header starts at 25% for B2C and 10% for B2B (switching resets it; in B2B a partner&apos;s default margin applies). Admins can set their own starting margin as the <strong>Default Profit Margin</strong> in Settings.
+          <strong>Markup %</strong> in the header starts at 25% for B2C and 10% for B2B (switching resets it; in B2B a partner&apos;s default markup applies). Admins can set their own starting markup as the <strong>Default Profit Margin</strong> in Settings.
         </p>
       </section>
 
@@ -72,8 +72,8 @@ export default function B2CPricingPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Reading the Results</h2>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Live Quote</strong> (header) &mdash; Cost/PP, Total Cost, Margin, Sell/PP and Sell Total, once something is priced</li>
-          <li><strong>The bottom bar</strong> &mdash; Cost / person, Total cost, Margin, Selling / person and Selling total, beside the save button</li>
+          <li><strong>Live Quote</strong> (header) &mdash; Cost/PP, Total Cost, Markup, Sell/PP and Sell Total, once something is priced</li>
+          <li><strong>The bottom bar</strong> &mdash; Cost / person, Total cost, Markup, Selling / person and Selling total, beside the save button</li>
           <li><strong>Each day</strong> &mdash; Its own cost, also in the day bar</li>
         </ul>
         <p className="text-gray-600 mt-3">

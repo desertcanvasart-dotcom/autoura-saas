@@ -93,8 +93,8 @@ function AnimatedSection({
 const heroContent = {
   subheadline: "However your customers reach you, Autoura captures the enquiry and outputs a complete itinerary, calculated pricing, and a ready-to-send PDF — in minutes, not hours.",
   trustSignals: [
-    "Built by a tour operator with 30+ years in tourism",
-    "Processing real bookings since 2024"
+    "Built by Islam Hussein, in tourism since 1993",
+    "Running real bookings since 2024 at Travel2Egypt, our sister company"
   ]
 }
 
@@ -190,7 +190,7 @@ function PlatformSlot() {
 // engineer-facing, and they invited scrutiny we kept failing.
 const socialProofStats = [
   { value: '15', label: 'Rate Categories' },
-  { value: '1\u201340', label: 'Pax Rate Sheets' },
+  { value: '1\u201310', label: 'Pax Rate Sheets' },
   { value: '29', label: 'Languages on Messaging' },
   { value: '13', label: 'Commission Categories' },
   { value: '8', label: 'Payment Methods' },
@@ -212,11 +212,11 @@ const problemScenarios = [
 ]
 
 const aiDemoExtracted = [
-  { label: 'Client', value: 'Tanaka-san', confidence: 98 },
-  { label: 'Nationality', value: 'Japanese (non-EU)', confidence: 96 },
-  { label: 'Dates', value: 'Mar 15–19, 2025', confidence: 94 },
-  { label: 'Pax', value: '3 adults', confidence: 99 },
-  { label: 'Destinations', value: 'Cairo → Luxor', confidence: 97 },
+  { label: 'Client', value: 'Tanaka-san' },
+  { label: 'Nationality', value: 'Japanese (non-EU)' },
+  { label: 'Dates', value: 'Mar 15–19, 2025' },
+  { label: 'Pax', value: '3 adults' },
+  { label: 'Destinations', value: 'Cairo → Luxor' },
 ]
 
 const aiDemoItinerary = [
@@ -239,7 +239,7 @@ const platformStages = [
   {
     step: 1,
     headline: 'Every Inquiry, One Inbox',
-    description: 'WhatsApp and Gmail conversations land in a single unified inbox — photos, files and voice notes included. A client\u2019s voice note arrives already written out, in Arabic or English, and you can reply with one of your own. Paste a conversation into the parser and AI extracts client name, dates, group size, nationality and preferences, each with a confidence score, ready for you to review before anything is saved. Every enquiry — WhatsApp, email, website or AI Concierge — lands in one Leads list.',
+    description: 'WhatsApp and Gmail conversations land in a single unified inbox — photos, files and voice notes included. A client\u2019s voice note arrives already written out, in Arabic or English, and you can reply with one of your own. Paste a conversation into the parser and AI extracts client name, dates, group size, nationality and preferences, read back to you in plain words to review before anything is saved. Every enquiry — WhatsApp, email, website or AI Concierge — lands in one Leads list.',
     screenshotNote: 'Capture /whatsapp-inbox showing conversations with parsed metadata badges',
     mockupImage: '/mockups/inbox.png',
     icon: Inbox,
@@ -247,7 +247,7 @@ const platformStages = [
   {
     step: 2,
     headline: 'Itineraries That Price Themselves',
-    description: 'Build day-by-day itineraries with the visual itinerary builder or let AI generate a draft. Every service auto-priced from your rate database. Switch tiers, adjust group size, or change dates — pricing recalculates instantly across all 14 service slots.',
+    description: 'Build day-by-day itineraries with the visual itinerary builder or let AI generate a draft. Every service auto-priced from your rate database. Switch tiers, adjust group size, or change dates — pricing recalculates instantly across all 15 service slots.',
     screenshotNote: 'Capture /itineraries/new with 3+ days and pricing showing totals',
     mockupImage: '/mockups/tour-builder.png',
     icon: FileText,
@@ -276,9 +276,9 @@ const capabilityClusters = [
     iconBg: 'bg-primary-100 text-primary-700',
     title: 'AI & Automation',
     bullets: [
-      'WhatsApp parsing with 74 Egyptian travel abbreviations decoded',
+      'Reads Egyptian travel shorthand — CAI, LXR, VoK, NTS, BB and more',
       'Auto-itinerary generation from unstructured conversations',
-      'Confidence scoring on every extracted field',
+      'A plain-language readback of what the AI understood, to check before saving',
       'Client messaging in 29 languages (documents are English today)',
     ],
     badge: '5 AI modules',
@@ -290,7 +290,7 @@ const capabilityClusters = [
     bullets: [
       '15 rate categories from transport to tipping',
       'Seasonal pricing with automatic date selection',
-      'EU/non-EU dual passport rates on every service',
+      'EU and non-EU passport rates for hotels and Nile cruises',
       'Several suppliers per route — a star picks the default',
       'Guides priced by city and language, or one price for a throughout guide',
       'Bulk import/export — rates, suppliers, and whole tours day by day',
@@ -315,7 +315,7 @@ const capabilityClusters = [
     title: 'B2B Partner System',
     bullets: [
       'Partner profiles with custom pricing rules',
-      '4-tier pax-based pricing (1–40 pax, sedan to bus)',
+      'Rate sheets for groups of 1 to 10, vehicle sized to the group',
       'One-click B2B quote conversion from any itinerary',
       'Transport packages by route, vehicle, and duration',
     ],
@@ -354,9 +354,9 @@ const destinationTemplates = [
     status: 'Complete',
     statusColor: 'bg-primary-100 text-primary-700',
     bullets: [
-      '200+ entrance fees with EU/non-EU rates',
+      'Entrance fees for the main sights, one price each',
       'Pre-built Nile cruise itineraries (Luxor–Aswan)',
-      '200+ industry abbreviation glossary for AI parsing',
+      'Egyptian travel shorthand understood when AI reads a conversation',
       'Supplier rate cards by city (Cairo, Luxor, Aswan, Alexandria)',
     ],
   },
@@ -374,7 +374,7 @@ const enhancedTestimonials = [
     featureTag: "AI Itinerary Generation",
   },
   {
-    quote: "The WhatsApp AI parsing changed everything. Clients message at midnight with abbreviations only we understand. By morning, I have a structured itinerary with confidence scores ready to review.",
+    quote: "The WhatsApp AI parsing changed everything. Clients message at midnight with abbreviations only we understand. By morning, I have a structured itinerary, with what the AI understood spelled out for me to check.",
     author: "Hussein Farouk",
     role: "",
     company: "",
@@ -623,7 +623,7 @@ export default function AutouraHomepage() {
                 Paste a WhatsApp Message. <span className="text-primary-500">Get a Priced Itinerary.</span>
               </h2>
               <p className="text-stone-600 text-base sm:text-lg max-w-3xl mx-auto">
-                Autoura&apos;s AI reads the conversation — including industry shorthand like CAI, VoK, NTS, and pax counts — and builds a complete day-by-day itinerary with calculated pricing in under 30 seconds.
+                Autoura&apos;s AI reads the conversation — including industry shorthand like CAI, VoK, NTS, and pax counts — and builds a complete day-by-day itinerary, priced from your own rates.
               </p>
             </div>
           </AnimatedSection>
@@ -658,7 +658,6 @@ export default function AutouraHomepage() {
                 <div className="bg-primary-500 px-5 py-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-white" />
                   <span className="text-white text-sm font-medium">Autoura AI Output</span>
-                  <span className="ml-auto text-xs text-white/70 bg-white/20 px-2 py-0.5 rounded-full">Processed in 12s</span>
                 </div>
                 <div className="p-5">
                   {/* Extracted Fields */}
@@ -671,7 +670,6 @@ export default function AutouraHomepage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-stone-900">{field.value}</span>
-                          <span className="text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">{field.confidence}%</span>
                         </div>
                       </div>
                     ))}
@@ -702,7 +700,7 @@ export default function AutouraHomepage() {
           {/* Detail Badges */}
           <AnimatedSection delay={500}>
             <div className="flex flex-wrap items-center justify-center gap-3 mt-10 sm:mt-12">
-              {['Understands 200+ Egyptian travel abbreviations', 'Dual-passport pricing auto-applied', 'Confidence scoring on every field'].map((text, i) => (
+              {['Understands Egyptian travel shorthand', 'EU/non-EU hotel and cruise rates applied for you', 'Plain-language readback to check'].map((text, i) => (
                 <span key={i} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500/5 border border-primary-500/20 rounded-full text-sm text-primary-500 font-medium">
                   <Sparkles className="w-3.5 h-3.5" />
                   {text}
@@ -722,7 +720,7 @@ export default function AutouraHomepage() {
                 A Pricing Engine That <span className="text-primary-500">Thinks Like a Tour Operator</span>
               </h2>
               <p className="text-stone-600 text-base sm:text-lg max-w-3xl mx-auto">
-                14 service slots per day. Seasonal rates. Entrance fees by nationality. Automatic vehicle upgrades when the group grows. Your margin calculated on every quote.
+                15 service slots per day. Seasonal rates. EU and non-EU hotel and cruise rates. Automatic vehicle upgrades when the group grows. Your markup calculated on every quote.
               </p>
             </div>
           </AnimatedSection>
@@ -844,7 +842,7 @@ export default function AutouraHomepage() {
                 Destination-Ready <span className="text-amber-600">from Day One</span>
               </h2>
               <p className="text-stone-600 text-base sm:text-lg leading-relaxed mb-4">
-                Autoura ships with Egypt as a complete operational template — 200+ attractions with entrance fees, Nile cruise itineraries, and a full abbreviation glossary.
+                Autoura ships with Egypt as a complete operational template — the main attractions with their entrance fees, Nile cruise itineraries, and Egyptian travel shorthand the AI understands.
               </p>
               <p className="text-stone-600 text-base sm:text-lg leading-relaxed">
                 The architecture is destination-agnostic. Add your own rates, attractions, and supplier data for any country.
@@ -960,7 +958,7 @@ export default function AutouraHomepage() {
                   Stop Quoting from Spreadsheets
                 </h2>
                 <p className="text-stone-300 text-base sm:text-lg max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-                  From a WhatsApp message to a branded, priced PDF in under 5 minutes. From scattered Excel files to real-time per-trip P&amp;L. From manual copy-paste to AI-powered operations.
+                  From a WhatsApp message to a branded, priced PDF in minutes, not hours. From scattered Excel files to real-time per-trip P&amp;L. From manual copy-paste to AI-powered operations.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <a

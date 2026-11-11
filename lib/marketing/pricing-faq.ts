@@ -25,7 +25,11 @@ export const PRICING_FAQ: Array<{ q: string; a: string }> = [
     a: `No. The ${TRIAL_DAYS}-day trial runs without one.`,
   },
   {
-    q: 'Why do Agency and Enterprise not show a price?',
-    a: 'Because they are shaped around how you work — how many brands, how much volume, what your onboarding needs to cover. A conversation gets you a straight answer faster than a table would.',
+    q: 'Why does Enterprise not show a price?',
+    a: 'Because it is shaped around how you work — how many companies, how much volume, what your onboarding needs to cover. A conversation gets you a straight answer faster than a table would.',
+  },
+  {
+    q: 'Can Autoura be installed on our own servers?',
+    a: 'Yes. An on-premise installation starts from about $8,000. The installed version is multilingual — staff and client screens, content, itineraries and websites — while GetAutoura itself is in English. Talk to us for a quote.',
   },
 ]

@@ -66,7 +66,7 @@ export default function ClientsPage() {
           <strong>New Client</strong> opens a five-step form. You can jump between steps or save from the last one.
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li><strong>Basic Info</strong> &mdash; name, email, phones, nationality, passport type (<strong>Euro Passport</strong> or <strong>Other Passport</strong>, which decides the entrance-fee prices a quote uses), date of birth, language.</li>
+          <li><strong>Basic Info</strong> &mdash; name, email, phones, nationality, passport type (<strong>Euro Passport</strong> or <strong>Other Passport</strong>, which decides whether a quote uses the EU or non-EU hotel and Nile cruise rates), date of birth, language.</li>
           <li><strong>Contact</strong> &mdash; preferred contact method, best time, timezone (your agency&rsquo;s to start with), address.</li>
           <li><strong>Preferences</strong> &mdash; accommodation level, dietary and accessibility needs, interests.</li>
           <li><strong>Business</strong> &mdash; company, job title, whether they are a travel agent and their commission, preferred currency (your agency&rsquo;s to start with).</li>

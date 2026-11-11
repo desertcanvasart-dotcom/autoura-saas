@@ -7,7 +7,7 @@
     "price_yearly": 4490,
     "currency": "USD",
     "features": {
-      "publiclyPriced": false
+      "publiclyPriced": true
     },
     "is_active": true
   },

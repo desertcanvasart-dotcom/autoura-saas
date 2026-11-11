@@ -157,7 +157,7 @@ export const CATEGORIES: DocCategory[] = [
       { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your peak dates as a premium on the selling price after margin, matched by departure date; applied in the B2B Calculator and every B2C quote.' },
       { href: '/docs/content-library', icon: Library, title: 'Content Library', description: 'Settings › Content & AI: reusable destination content, AI prompts, and house writing rules for generated itineraries.' },
       { href: '/docs/activity-summary', icon: Activity, title: 'Team Activity', description: 'Optional, transparent activity summaries: last seen, focused time, and work counts per member.' },
-      { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp (on Autoura’s account) and your own Gmail for the inbox, both live today. Accounting sync (Xero, QuickBooks) is planned.' },
+      { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp (on Autoura’s account) and your own Gmail for the inbox, both live today. Accounting sync (QuickBooks, Xero) is planned for the first quarter of 2027.' },
     ],
   },
 ]

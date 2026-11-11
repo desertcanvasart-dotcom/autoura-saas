@@ -43,12 +43,12 @@ export default function ItineraryCreationPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Pax</strong> &mdash; The number of travellers</li>
           <li><strong>Start</strong> &mdash; The start date: hotels are priced from the rate period that covers it</li>
-          <li><strong>EU</strong> / <strong>Non-EU</strong> &mdash; Passport, for entrance fees (Non-EU to start)</li>
+          <li><strong>EU</strong> / <strong>Non-EU</strong> &mdash; Passport, for hotel and Nile cruise rates (Non-EU to start)</li>
           <li><strong>Tier</strong> &mdash; Your tiers (Budget, Standard, Deluxe, Luxury, or your own names); it picks the hotels and cruises offered</li>
           <li><strong>Guide</strong> / <strong>No Guide</strong> &mdash; No Guide removes the guide and the guide&apos;s tips. <strong>Spot</strong> or <strong>Throughout +1</strong> (one guide for the whole trip, with his bed, meals and flight seats), and the <strong>Guide language</strong>, which every day&apos;s guide follows.</li>
-          <li><strong>B2C</strong> / <strong>B2B</strong> (Pricing) &mdash; Switching resets the markup to 25% or 10%; in B2B, <strong>Select Partner&hellip;</strong> takes the partner&apos;s default margin</li>
+          <li><strong>B2C</strong> / <strong>B2B</strong> (Pricing) &mdash; Switching resets the markup to 25% or 10%; in B2B, <strong>Select Partner&hellip;</strong> takes the partner&apos;s default markup</li>
           <li><strong>Currency</strong> &mdash; Shows the prices in any of 12 currencies; the trip is saved in your rates&apos; currency</li>
-          <li><strong>Markup %</strong> &mdash; Your margin on cost</li>
+          <li><strong>Markup %</strong> &mdash; Added on top of cost: selling price = cost &times; (1 + markup)</li>
         </ul>
         <p className="text-gray-600 mt-3">
           Below it, <strong>Client &amp; Trip Details</strong> hold the tour name and the client&apos;s name, email, phone and nationality, with a <strong>CRM client</strong> tag when the trip is linked to a client.
@@ -107,7 +107,7 @@ export default function ItineraryCreationPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Price</h2>
         <p className="text-gray-600">
-          Once something is priced, the <strong>Live Quote</strong> strip shows Cost/PP, Total Cost, the Margin, Sell/PP and Sell Total, and the bar at the bottom repeats them beside the save button. How the price is built: <Link href="/docs/b2c-pricing" className="text-primary-600 hover:underline">B2C Pricing</Link>.
+          Once something is priced, the <strong>Live Quote</strong> strip shows Cost/PP, Total Cost, the Markup (selling minus cost), Sell/PP and Sell Total, and the bar at the bottom repeats them beside the save button. How the price is built: <Link href="/docs/b2c-pricing" className="text-primary-600 hover:underline">B2C Pricing</Link>.
         </p>
       </section>
 
