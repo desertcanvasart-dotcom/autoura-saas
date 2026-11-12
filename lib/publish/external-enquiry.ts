@@ -20,6 +20,8 @@ export interface ExternalEnquiry {
   reference: string
   /** 'trip' (plan a trip) or 'day_tour' (a date for one day tour). */
   kind: string
+  /** The visitor's name, when the form asks for one. */
+  name: string | null
   email: string
   whatsapp: string | null
   locale: string | null
@@ -85,6 +87,7 @@ export function validateExternalEnquiry(body: unknown): Validation {
     enquiry: {
       brand,
       reference,
+      name: str(b.name, 120),
       kind: str(b.kind, 20) ?? 'trip',
       email,
       whatsapp: str(b.whatsapp, 40),
@@ -121,6 +124,13 @@ export function nameFromEmail(email: string): string {
 
 /** The lead's first/last name from its email. One word stays the first name
  *  with an empty last name — never doubled ("Louisebarmore Louisebarmore"). */
+/** The lead's name: the one the visitor typed, else one made from the email. */
+export function leadName(e: Pick<ExternalEnquiry, 'name' | 'email'>): { first_name: string; last_name: string } {
+  const typed = (e.name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (typed.length) return { first_name: typed[0], last_name: typed.slice(1).join(' ') }
+  return leadNameFromEmail(e.email)
+}
+
 export function leadNameFromEmail(email: string): { first_name: string; last_name: string } {
   const words = nameFromEmail(email).split(' ')
   return words.length > 1 ? { first_name: words[0], last_name: words.slice(1).join(' ') } : { first_name: words[0], last_name: '' }
@@ -180,7 +190,7 @@ export async function recordExternalEnquiry(
   if (seen) return { status: 'duplicate_ignored', enquiryId: seen.id, clientId: seen.client_id }
 
   const clientId = await findOrCreateLead(db, tenantId, { email: e.email, phone: e.whatsapp }, {
-    ...leadNameFromEmail(e.email),
+    ...leadName(e),
     email: e.email,
     nationality: 'Unknown',
     status: 'lead',
@@ -230,7 +240,7 @@ export async function recordExternalEnquiry(
       tenant_id: tenantId,
       dedupe_key: `website-lead:${enquiry.id}`,
       type: 'publish_enquiry',
-      title: `Website enquiry from ${e.email}`,
+      title: `Website enquiry from ${e.name || e.email}`,
       message: [e.tourTitle, whenLabel(e)].filter(Boolean).join(' · ') || (e.notes ?? '').slice(0, 120),
       link: `/clients/${clientId}`,
     })
