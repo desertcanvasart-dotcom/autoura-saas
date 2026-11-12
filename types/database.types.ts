@@ -8067,6 +8067,7 @@ export interface Database {
           language: string | null
           tour_template_id: string | null
           dates: Json | null
+          external_ref: string | null
           travellers: number | null
           message: string | null
           concierge_brief_id: string | null
@@ -8094,6 +8095,7 @@ export interface Database {
           language?: string | null
           tour_template_id?: string | null
           dates?: Json | null
+          external_ref?: string | null
           travellers?: number | null
           message?: string | null
           concierge_brief_id?: string | null
@@ -8121,6 +8123,7 @@ export interface Database {
           language?: string | null
           tour_template_id?: string | null
           dates?: Json | null
+          external_ref?: string | null
           travellers?: number | null
           message?: string | null
           concierge_brief_id?: string | null
