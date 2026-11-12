@@ -178,18 +178,22 @@ export async function GET(request: NextRequest) {
           .select('*')
           .eq('is_active', true)
 
-        if (city) {
-          guideQuery.ilike('city', city)
-        }
-
         const guideResult = await guideQuery
 
-        data = (guideResult.data || []).map((rate: any) => ({
+        // A city filter keeps every price whose city list (city +
+        // other_cities, migration 463) has that city.
+        const wanted = city ? city.trim().toLowerCase() : ''
+        const covers = (rate: any) => !wanted ||
+          [rate.city, ...(rate.other_cities ?? [])].some((c: unknown) => String(c ?? '').trim().toLowerCase() === wanted)
+
+        data = (guideResult.data || []).filter(covers).map((rate: any) => ({
           id: rate.id,
           service_code: rate.service_code || rate.id,
           guide_language: rate.guide_language,
+          other_languages: rate.other_languages ?? [],
           guide_type: rate.guide_type,
           city: rate.city,
+          other_cities: rate.other_cities ?? [],
           tour_duration: rate.tour_duration,
           notes: rate.notes,
           rate_currency: rate.rate_currency,

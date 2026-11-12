@@ -10,6 +10,7 @@ import CitySelect from '@/components/CitySelect'
 import BlockPicker from '@/components/day-blocks/BlockPicker'
 import type { GridBlock } from '@/lib/day-blocks/grid-apply'
 import { getCurrencySymbol } from '@/lib/currency'
+import { optionCities } from '../lib/option-filters'
 
 /** A day block on a day: laid on it, suggested for it, or none fitting. */
 export interface BlockNote {
@@ -295,7 +296,7 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
     if (slotId === 'guide') {
       const selectedIds = new Set(getSlotItems('guide').map(i => i.rateId))
       const here = new Set([city, overnightCity].filter(Boolean))
-      const local = allOptions.filter(o => selectedIds.has(o.id) || !o.city || here.has(o.city.toLowerCase().trim()))
+      const local = allOptions.filter(o => selectedIds.has(o.id) || !o.city || optionCities(o).some(c => here.has(c.toLowerCase().trim())))
       return local.length > 0 ? local : allOptions
     }
 

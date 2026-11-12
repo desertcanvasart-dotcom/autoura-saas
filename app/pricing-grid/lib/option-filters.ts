@@ -56,7 +56,7 @@ export function onePerRoute(options: RateOption[], pax: number): RateOption[] {
 /** Every city an option is in or runs between. */
 export function optionCities(o: RateOption): string[] {
   const l = o as Located
-  return [l.city, l.origin_city, l.destination_city].map(c => String(c ?? '').trim()).filter(Boolean)
+  return [l.city, l.origin_city, l.destination_city, ...(o.cities ?? [])].map(c => String(c ?? '').trim()).filter(Boolean)
 }
 
 /** The cities a list of options covers, A→Z, each once (case-insensitive). */
@@ -76,11 +76,14 @@ export type Facet = { field: FacetField; values: string[] }
 const FACET_FIELDS: FacetField[] = ['service_type', 'category', 'language', 'board_basis']
 
 const facetValue = (o: RateOption, field: FacetField) => String((o as unknown as Record<string, unknown>)[field] ?? '').trim()
+/** Every value an option has for a field: a guide price may speak several languages (463). */
+const facetValues = (o: RateOption, field: FacetField): string[] =>
+  field === 'language' && o.languages?.length ? o.languages.map(l => l.trim()).filter(Boolean) : [facetValue(o, field)].filter(Boolean)
 
 export function facetsOf(options: RateOption[]): Facet[] {
   const out: Facet[] = []
   for (const field of FACET_FIELDS) {
-    const values = [...new Set(options.map(o => facetValue(o, field)).filter(Boolean))].sort()
+    const values = [...new Set(options.flatMap(o => facetValues(o, field)))].sort()
     if (values.length > 1) out.push({ field, values })
   }
   return out
@@ -115,7 +118,7 @@ export function filterOptions(
   let pool = filter.city === '' && !q ? dayOptions : allOptions
   if (filter.city && filter.city !== '*') pool = pool.filter(o => inCity(o, filter.city))
   for (const [field, value] of Object.entries(filter.facets) as [FacetField, string | undefined][]) {
-    if (value) pool = pool.filter(o => facetValue(o, field) === value)
+    if (value) pool = pool.filter(o => facetValues(o, field).includes(value))
   }
   if (q) pool = pool.filter(o => `${o.name} ${o.details ?? ''} ${optionCities(o).join(' ')}`.toLowerCase().includes(q))
   return pool

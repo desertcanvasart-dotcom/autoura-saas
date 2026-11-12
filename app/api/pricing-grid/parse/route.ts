@@ -65,7 +65,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
     cruiseRes, sleepingTrainRes,
   ] = await Promise.all([
     admin.from('transportation_rates').select('id, route_name, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency, supplier_id, is_preferred').eq('tenant_id', tenantId).eq('is_active', true),
-    admin.from('guide_rates').select('id, guide_type, guide_language, city, full_day_rate, half_day_rate, base_rate_eur, rate_currency').eq('tenant_id', tenantId),
+    admin.from('guide_rates').select('id, guide_type, guide_language, other_languages, city, other_cities, full_day_rate, half_day_rate, base_rate_eur, rate_currency').eq('tenant_id', tenantId),
     admin.from('airport_staff_rates').select('id, service_type, airport_code, direction, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('hotel_staff_rates').select('id, service_type, hotel_category, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('tipping_rates').select('id, role_type, context, rate_unit, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
@@ -90,7 +90,12 @@ async function fetchAllRates(tenantId: string, tier: string) {
   const directions = await loadVocabularyForTenant(admin as Parameters<typeof loadVocabularyForTenant>[0], tenantId, 'airport_direction')
   const airportRows = (airportRes.data || []).map((r: { direction?: string | null }) => ({ ...r, direction: r.direction ? labelFor(directions, r.direction) : r.direction }))
   const flightRows = (flightRes.data || []).map((r: { airline?: string | null }) => ({ ...r, airline: r.airline ? labelFor(airlines, r.airline) : r.airline }))
-  const guideRows = (guideRes.data || []).map((r: { guide_language?: string | null }) => ({ ...r, guide_language: r.guide_language ? labelFor(guideLanguages, r.guide_language) : r.guide_language }))
+  // One guide price may cover several languages and cities (463): the AI reads them all.
+  const guideRows = (guideRes.data || []).map((r: { guide_language?: string | null; other_languages?: string[] | null; city?: string | null; other_cities?: string[] | null }) => ({
+    ...r,
+    guide_language: [r.guide_language, ...(r.other_languages ?? [])].filter(Boolean).map(l => labelFor(guideLanguages, l as string)).join(' / ') || r.guide_language,
+    city: [r.city, ...(r.other_cities ?? [])].filter(Boolean).join(' / ') || r.city,
+  }))
 
   // Per-rate currency: a row priced in a contract currency (EGP, USD, JPY)
   // is converted into the tenant's run currency on a copy at this fetch

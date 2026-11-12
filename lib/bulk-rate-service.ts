@@ -232,6 +232,9 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       // Spot / Throughout (the agency's guide_mode vocabulary); blank = spot.
       col('guide_mode', 'Guide Mode', 'text', false),
       col('city', 'City', 'text', false),
+      // One price covers several cities / languages (463): "Luxor; Aswan".
+      col('other_cities', 'Other Cities', 'text', false),
+      col('other_languages', 'Other Languages', 'text', false),
       col('tour_duration', 'Tour Duration', 'text', true),
       col('base_rate_eur', 'Rate', 'number', true),
       legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
@@ -942,6 +945,10 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
   if (column === 'sailing_days') return formatSailingDaysCell(row.sailing_days)
   if (column === 'tiers' && table === 'activity_rates') return formatTiersCell(row.tiers)
+  if (column === 'other_cities' || column === 'other_languages') {
+    const v = row[column]
+    return Array.isArray(v) ? v.join('; ') : (v ?? '')
+  }
   if (column === 'dietary_options') return Array.isArray(row.dietary_options) ? row.dietary_options.join('; ') : (row.dietary_options ?? '')
   const direct = row[column]
   if (direct !== null && direct !== undefined && direct !== 0) return direct
@@ -1099,6 +1106,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'sailing_days') return 'mon;fri'
   if (name === 'tiers') return ''
   if (name === 'dietary_options') return 'vegetarian; vegan'
+  if (name === 'other_cities' || name === 'other_languages') return ''
   if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'

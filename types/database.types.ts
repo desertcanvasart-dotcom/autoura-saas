@@ -5483,6 +5483,8 @@ export interface Database {
           rate_valid_to: string | null
           supplier_id: string | null
           notes: string | null
+          other_cities: string[]
+          other_languages: string[]
           is_active: boolean | null
           updated_at: string | null
           rate_currency: string | null
@@ -5506,6 +5508,8 @@ export interface Database {
           rate_valid_to?: string | null
           supplier_id?: string | null
           notes?: string | null
+          other_cities?: string[]
+          other_languages?: string[]
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
@@ -5529,6 +5533,8 @@ export interface Database {
           rate_valid_to?: string | null
           supplier_id?: string | null
           notes?: string | null
+          other_cities?: string[]
+          other_languages?: string[]
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null

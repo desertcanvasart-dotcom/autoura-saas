@@ -17,7 +17,7 @@ export async function GET() {
   const { supabase } = auth
   const [items, { data: rows, error }] = await Promise.all([
     loadVocabulary(supabase, 'guide_language'),
-    supabase.from('guide_rates').select('id, guide_language, city, full_day_rate, base_rate_eur').eq('is_active', true),
+    supabase.from('guide_rates').select('id, guide_language, other_languages, city, other_cities, full_day_rate, base_rate_eur').eq('is_active', true),
   ])
   if (error) return NextResponse.json({ success: false, error: 'Could not read the guide rates' }, { status: 500 })
   return NextResponse.json({ success: true, data: languagesWithRates(items.filter(i => i.is_active).map(i => ({ key: i.key, label: i.label })), rows ?? []) })

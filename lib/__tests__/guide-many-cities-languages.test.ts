@@ -2,7 +2,12 @@
 // for several cities and languages at once (migration 461, 2026-11-07).
 import { describe, it, expect } from 'vitest'
 import { citiesOf, coversCity, citiesLabel, cleanOtherCities } from '@/lib/suppliers/supplier-cities'
-import { guideRateCombos, comboServiceCode } from '@/lib/guides/guide-rate-combos'
+import { guideRateLists } from '@/lib/guides/guide-rate-lists'
+import { pickGuideRateRow, rateCities, rateLanguages, rateSpeaks, languagesWithRates } from '@/lib/guides/guide-language'
+import { sameService } from '@/lib/bookings/cover-options'
+import { alignGuideLanguage, guideLanguages, preferLanguage } from '@/app/pricing-grid/lib/guide-language'
+import { filterOptions, facetsOf } from '@/app/pricing-grid/lib/option-filters'
+import type { GridDay, RateOption } from '@/app/pricing-grid/types'
 import { filterSupplierFields } from '@/lib/suppliers/supplier-fields'
 import { parseSuppliersCsv } from '@/lib/suppliers/import-csv'
 import { supplierToGuide } from '@/lib/guides/supplier-guide'
@@ -67,33 +72,87 @@ describe('the suppliers CSV carries them both ways', () => {
   })
 })
 
-describe('one guide price saved for several cities and languages', () => {
-  it('the form alone is one row, as before', () => {
-    expect(guideRateCombos({ city: 'Cairo', guide_language: 'english' })).toEqual([{ city: 'Cairo', guide_language: 'english' }])
-  })
-
-  it('a blank city is "any city" (null)', () => {
-    expect(guideRateCombos({ city: '', guide_language: 'english' })).toEqual([{ city: null, guide_language: 'english' }])
-  })
-
-  it('every language in every city, primary pair first, no repeats', () => {
-    const combos = guideRateCombos({
-      city: 'Cairo', guide_language: 'english',
-      also_cities: ['Luxor', 'cairo'], also_languages: ['french', 'english'],
+describe('one guide price covers several cities and languages (463)', () => {
+  it('the form\'s lists become ONE row: first in city/guide_language, the rest in the lists', () => {
+    expect(guideRateLists({ cities: ['Aswan', 'Edfu', 'Kom Ombo', 'edfu', ' '], languages: ['english', 'french', 'english'] })).toEqual({
+      city: 'Aswan', other_cities: ['Edfu', 'Kom Ombo'], guide_language: 'english', other_languages: ['french'],
     })
-    expect(combos).toEqual([
-      { city: 'Cairo', guide_language: 'english' },
-      { city: 'Luxor', guide_language: 'english' },
-      { city: 'Cairo', guide_language: 'french' },
-      { city: 'Luxor', guide_language: 'french' },
-    ])
   })
 
-  it('no language is no row', () => {
-    expect(guideRateCombos({ city: 'Cairo', guide_language: '' })).toEqual([])
+  it('no city picked is the any-city price, with no other cities', () => {
+    expect(guideRateLists({ cities: [], languages: ['english'] })).toMatchObject({ city: null, other_cities: [] })
+    expect(guideRateLists({ city: '', other_cities: ['Luxor'], guide_language: 'english' })).toMatchObject({ city: null, other_cities: [] })
   })
 
-  it('codes stay distinct: the form code, then -2, -3', () => {
-    expect([0, 1, 2].map(i => comboServiceCode('GD-ABC', i))).toEqual(['GD-ABC', 'GD-ABC-2', 'GD-ABC-3'])
+  it('the row\'s own shape (CSV, PUT) reads the same', () => {
+    expect(guideRateLists({ city: 'Cairo', other_cities: ['Luxor', 'Cairo'], guide_language: 'english', other_languages: ['spanish'] })).toEqual({
+      city: 'Cairo', other_cities: ['Luxor'], guide_language: 'english', other_languages: ['spanish'],
+    })
+  })
+
+  it('no language is refused (blank guide_language)', () => {
+    expect(guideRateLists({ cities: ['Cairo'], languages: [] }).guide_language).toBe('')
+  })
+
+  const ahmed = { id: 'ahmed', city: 'Aswan', other_cities: ['Edfu', 'Kom Ombo'], guide_language: 'english', other_languages: ['french'], base_rate_eur: 5000 }
+
+  it('a row\'s cities and languages, first first', () => {
+    expect(rateCities(ahmed)).toEqual(['Aswan', 'Edfu', 'Kom Ombo'])
+    expect(rateCities({ city: null, other_cities: [] })).toEqual([])
+    expect(rateLanguages(ahmed)).toEqual(['english', 'french'])
+  })
+
+  it('the engine prices a day in ANY of its cities from the one row', () => {
+    for (const city of ['Aswan', 'edfu', 'Kom Ombo']) {
+      const pick = pickGuideRateRow([ahmed], city)
+      expect(pick).toMatchObject({ kind: 'one', rate: 5000, cityMatched: true })
+    }
+    expect(pickGuideRateRow([ahmed], 'Luxor')).toEqual({ kind: 'none' })
+  })
+
+  it('a city\'s own price still beats the any-city price; two prices covering one city at different amounts are a gap', () => {
+    const anyCity = { id: 'any', city: null, guide_language: 'english', base_rate_eur: 3000 }
+    expect(pickGuideRateRow([ahmed, anyCity], 'Edfu')).toMatchObject({ kind: 'one', rate: 5000 })
+    expect(pickGuideRateRow([ahmed, anyCity], 'Luxor')).toMatchObject({ kind: 'one', rate: 3000, cityMatched: false })
+    const edfuOnly = { id: 'e', city: 'Edfu', guide_language: 'english', base_rate_eur: 4000 }
+    expect(pickGuideRateRow([ahmed, edfuOnly], 'Edfu')).toMatchObject({ kind: 'ambiguous' })
+  })
+
+  it('the language matches the first OR any further language', () => {
+    const items = [{ key: 'english', label: 'English' }, { key: 'french', label: 'French' }, { key: 'german', label: 'German' }]
+    expect(rateSpeaks(ahmed, 'french', items)).toBe(true)
+    expect(rateSpeaks(ahmed, 'german', items)).toBe(false)
+    expect(languagesWithRates(items, [ahmed]).filter(l => l.hasRate).map(l => l.key)).toEqual(['english', 'french'])
+  })
+
+  it('another supplier covers a line only if its price covers every city and language of ours', () => {
+    const ours = { id: 'a', supplier_id: 's1', city: 'Aswan', other_cities: ['Edfu'], guide_language: 'english', other_languages: [], guide_type: 'egyptologist', tour_duration: 'full_day', guide_mode: 'spot' }
+    const wider = { ...ours, id: 'b', supplier_id: 's2', city: 'Edfu', other_cities: ['Aswan', 'Luxor'], other_languages: ['french'] }
+    const narrower = { ...ours, id: 'c', supplier_id: 's3', other_cities: [] }
+    expect(sameService('guide_rates', ours, wider)).toBe(true)
+    expect(sameService('guide_rates', ours, narrower)).toBe(false)
+    expect(sameService('guide_rates', ours, { ...wider, guide_type: 'senior' })).toBe(false)
+  })
+})
+
+describe('the pricing grid reads a guide price\'s lists', () => {
+  const opt = (id: string, extra: Partial<RateOption>): RateOption => ({ id, name: id, rateEur: 100, rateNonEur: 100, ...extra })
+  const ahmed = opt('ahmed', { city: 'Aswan', cities: ['Aswan', 'Edfu'], language: 'English', languages: ['English', 'French'], category: 'egyptologist' })
+  const luxorDe = opt('luxor-de', { city: 'Luxor', cities: ['Luxor'], language: 'German', languages: ['German'], category: 'egyptologist' })
+
+  it('the city filter and the language facet see every city and language', () => {
+    const filter = { city: 'Edfu', facets: {}, search: '' }
+    expect(filterOptions([], [ahmed, luxorDe], filter).map(o => o.id)).toEqual(['ahmed'])
+    expect(facetsOf([ahmed, luxorDe]).find(f => f.field === 'language')?.values).toEqual(['English', 'French', 'German'])
+    expect(filterOptions([], [ahmed, luxorDe], { city: '*', facets: { language: 'French' }, search: '' }).map(o => o.id)).toEqual(['ahmed'])
+  })
+
+  it('the trip language: a price that already speaks it stays; the list offers every language', () => {
+    expect(guideLanguages([ahmed, luxorDe])).toEqual(['English', 'French', 'German'])
+    expect(preferLanguage([ahmed, luxorDe], 'French').map(o => o.id)).toEqual(['ahmed'])
+    const day = { dayNumber: 1, slots: [{ slotId: 'guide', selectedItems: [{ rateId: 'ahmed', name: 'ahmed', rateEur: 100, rateNonEur: 100 }] }] } as unknown as GridDay
+    const r = alignGuideLanguage([day], [ahmed, luxorDe], 'French')
+    expect(r.changed).toEqual([])
+    expect(r.unmatched).toEqual([])
   })
 })

@@ -187,6 +187,18 @@ export async function POST(request: NextRequest) {
       if (isExampleRow(row[config.uniqueKey[0]])) return row
       const { record, errors } = resolveRecordKeys(row, vocab, vocabColumns)
       for (const message of errors) vocabErrors.push({ row: lineOf(i), column: message.split(':')[0], message })
+      // A guide price's further languages (463): each word in the cell is a
+      // guide_language, resolved like the Language column; none is guessed.
+      if (config.tableName === 'guide_rates' && typeof record.other_languages === 'string' && record.other_languages.trim()) {
+        const items = vocab.guide_language ?? []
+        const keys: string[] = []
+        for (const word of record.other_languages.split(/[;|]/).map((x: string) => x.trim()).filter(Boolean)) {
+          const key = items.length ? resolveVocabularyKey(items, word) : word
+          if (key) keys.push(key)
+          else vocabErrors.push({ row: lineOf(i), column: 'other_languages', message: `other_languages: "${word}" is not in your guide language list (Settings → Your vocabulary)` })
+        }
+        record.other_languages = keys.join(';')
+      }
       return record as Record<string, string>
     })
     if (vocabErrors.length > 0) {
@@ -253,6 +265,13 @@ export async function POST(request: NextRequest) {
         const res = parseTiersCell(record.tiers)
         if ('tiers' in res) record.tiers = res.tiers
         else delete record.tiers
+      }
+
+      // A guide price's further cities / languages (463): the cell's list.
+      for (const listColumn of ['other_cities', 'other_languages'] as const) {
+        if (config.tableName === 'guide_rates' && typeof record[listColumn] === 'string') {
+          record[listColumn] = record[listColumn].split(/[;|]/).map((x: string) => x.trim()).filter(Boolean)
+        }
       }
 
       // A meal's dietary options: the cell's list, stored as the form stores it.
