@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { PGlite } from '@electric-sql/pglite'
-import { validateExternalEnquiry, nameFromEmail, enquiryNote, whenLabel, type ExternalEnquiry } from '@/lib/publish/external-enquiry'
+import { validateExternalEnquiry, nameFromEmail, leadNameFromEmail, enquiryNote, whenLabel, type ExternalEnquiry } from '@/lib/publish/external-enquiry'
 
 const body = {
   brand: 'travel2egypt', reference: 'T2E-7KQ2MX', kind: 'trip', email: ' John.Smith88@Example.com ',
@@ -41,6 +41,12 @@ describe('what the team reads', () => {
   it('a name from the email when the form asks for none', () => {
     expect(nameFromEmail('john.smith88@example.com')).toBe('John Smith')
     expect(nameFromEmail('a1@x.com')).toBe('Website Lead')
+  })
+
+  it('one word is the first name only — never doubled', () => {
+    expect(leadNameFromEmail('louisebarmore@gmail.com')).toEqual({ first_name: 'Louisebarmore', last_name: '' })
+    expect(leadNameFromEmail('john.smith@x.com')).toEqual({ first_name: 'John', last_name: 'Smith' })
+    expect(leadNameFromEmail('a1@x.com')).toEqual({ first_name: 'Website', last_name: 'Lead' })
   })
 
   it('when: dates, else the month', () => {

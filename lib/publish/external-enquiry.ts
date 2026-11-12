@@ -14,7 +14,6 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { findOrCreateLead } from '@/lib/clients/find-or-create-lead'
-import { splitName } from '@/lib/concierge-brief-schema'
 
 export interface ExternalEnquiry {
   brand: string
@@ -120,6 +119,13 @@ export function nameFromEmail(email: string): string {
   return words.length ? words.map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ') : 'Website Lead'
 }
 
+/** The lead's first/last name from its email. One word stays the first name
+ *  with an empty last name — never doubled ("Louisebarmore Louisebarmore"). */
+export function leadNameFromEmail(email: string): { first_name: string; last_name: string } {
+  const words = nameFromEmail(email).split(' ')
+  return words.length > 1 ? { first_name: words[0], last_name: words.slice(1).join(' ') } : { first_name: words[0], last_name: '' }
+}
+
 const LANGUAGES: Record<string, string> = { en: 'English', es: 'Spanish', ja: 'Japanese', fr: 'French', de: 'German', it: 'Italian' }
 const lang2 = (locale: string | null) => (locale ?? '').slice(0, 2).toLowerCase()
 
@@ -174,7 +180,7 @@ export async function recordExternalEnquiry(
   if (seen) return { status: 'duplicate_ignored', enquiryId: seen.id, clientId: seen.client_id }
 
   const clientId = await findOrCreateLead(db, tenantId, { email: e.email, phone: e.whatsapp }, {
-    ...splitName(nameFromEmail(e.email)),
+    ...leadNameFromEmail(e.email),
     email: e.email,
     nationality: 'Unknown',
     status: 'lead',
