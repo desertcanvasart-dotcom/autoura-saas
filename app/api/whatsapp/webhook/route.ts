@@ -34,6 +34,7 @@ import { notifyTeam, bellSnippet } from '@/lib/notifications'
 import { pickInboundClient, type InboundClientMatch } from '@/lib/whatsapp-inbound-client'
 import { toConversationPhone, conversationPhoneKeys } from '@/lib/whatsapp-phone'
 import { tenantForWhatsAppNumber } from '@/lib/whatsapp-tenant'
+import { inboundIsBlocked } from '@/lib/whatsapp-blocked'
 import { matchWaRef } from '@/lib/publish/enquiries'
 import { previousStatusesFor, type WhatsAppMessageStatus } from '@/lib/whatsapp-status'
 
@@ -471,6 +472,36 @@ async function processInboundWhatsAppMessage({
     clientId = existingClient.id
     clientName = existingClient.full_name
     clientTenantId = existingClient.tenant_id
+  }
+
+  // ============================================
+  // STEP 1c: A number this company blocked (migration 465)
+  // ============================================
+  // The company the message would be filed under — its own number, else the
+  // conversation's, else the client's — decides. Blocked: nothing is stored
+  // (no conversation, message, bell, CRM lead or AI reply); the block row
+  // only counts it. Checked before anything is created below.
+  const receivingTenantId = ownerTenantId ?? existingConversation?.tenant_id ?? existingClient?.tenant_id ?? null
+  if (receivingTenantId) {
+    let blocked = false
+    try {
+      blocked = await inboundIsBlocked(supabase as never, receivingTenantId, phoneNumber)
+    } catch (error) {
+      storeFailed('blocked-number check', error as Error)
+    }
+    if (blocked) {
+      console.log(`🚫 WhatsApp from a blocked number ${maskPhone(phoneNumber)} — ignored`)
+      // Meta's media was already copied into our bucket; a blocked sender's
+      // file is not kept either. Best-effort.
+      if (mediaStoragePath) {
+        try {
+          await getServiceClient()?.storage.from(MEDIA_BUCKET).remove([mediaStoragePath])
+        } catch (e) {
+          console.error('Blocked sender media not removed:', (e as Error).message)
+        }
+      }
+      return
+    }
   }
 
   // A first message to a company's own number: the sender becomes its

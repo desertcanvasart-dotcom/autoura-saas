@@ -8,7 +8,7 @@ import {
   Sparkles, RefreshCw, Plus, CheckCheck, Check,
   AlertCircle, X, Languages, ChevronDown, Loader2,
   Trash2, UserPlus, Users, History, ArrowRight,
-  Settings, Filter, UserCheck, UserX
+  Settings, Filter, UserCheck, UserX, Ban
 } from 'lucide-react'
 import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -18,6 +18,9 @@ import { messageWords } from '@/lib/whatsapp/transcript'
 import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
+import { useRole } from '@/hooks/useRole'
+import { useBlockedNumbers } from '@/components/whatsapp/useBlockedNumbers'
+import { findBlocked } from '@/lib/whatsapp-blocked'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -529,6 +532,12 @@ export default function WhatsAppInboxPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
+  // Blocked numbers (migration 465): managers block a sender from the header.
+  const { canAccess } = useRole()
+  const canBlock = canAccess(['admin', 'manager'])
+  const blockedNumbers = useBlockedNumbers()
+  const blockDialog = useConfirmDialog()
+  const [blockBusy, setBlockBusy] = useState(false)
   const [acceptedDraftId, setAcceptedDraftId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
@@ -704,6 +713,27 @@ export default function WhatsAppInboxPage() {
   // A message that lands in the conversation you have open is read — you are
   // looking at it (the list refreshes every 15s). Otherwise the sidebar would
   // count it as unread until you clicked away and back.
+  const selectedBlock = selectedConversation ? findBlocked(blockedNumbers.blocked, selectedConversation.phone_number) : null
+
+  const toggleBlock = async () => {
+    if (!selectedConversation || blockBusy) return
+    const phone = selectedConversation.phone_number
+    if (!selectedBlock) {
+      const ok = await blockDialog.confirm({
+        title: 'Block this number?',
+        message: `New WhatsApp messages from ${phone} will be ignored: not shown in the inbox, no notification, no lead, no AI reply. They can still send to your number — this blocks inside Autoura only. You can unblock it any time.`,
+        variant: 'danger',
+        confirmText: 'Block',
+      })
+      if (!ok) return
+    }
+    setBlockBusy(true)
+    const r = selectedBlock ? await blockedNumbers.unblock(phone) : await blockedNumbers.block(phone)
+    setBlockBusy(false)
+    if (r.ok) showToast('success', selectedBlock ? `${phone} unblocked` : `${phone} blocked`)
+    else showToast('error', r.error)
+  }
+
   const openUnread = conversations.find(c => c.id === selectedConversation?.id)?.unread_count ?? 0
   useEffect(() => {
     if (selectedConversation && openUnread > 0 && document.visibilityState === 'visible') {
@@ -1039,7 +1069,10 @@ export default function WhatsAppInboxPage() {
                   <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"><User className="w-5 h-5 text-gray-500" /></div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">{selectedConversation.client_name || selectedConversation.clients?.full_name || selectedConversation.phone_number}</p>
-                    <p className="text-xs text-gray-500">{selectedConversation.phone_number}</p>
+                    <p className="text-xs text-gray-500">
+                      {selectedConversation.phone_number}
+                      {selectedBlock && <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-medium"><Ban className="w-3 h-3" />Blocked — new messages are ignored</span>}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1055,6 +1088,16 @@ export default function WhatsAppInboxPage() {
                   <button onClick={() => setShowActivity(!showActivity)} className={`p-2 rounded-lg ${showActivity ? 'bg-primary-100 text-primary-600' : 'text-gray-500 hover:bg-gray-100'}`} title="Activity History">
                     <History className="w-4 h-4" />
                   </button>
+                  {canBlock && (
+                    <button
+                      onClick={toggleBlock}
+                      disabled={blockBusy}
+                      className={`p-2 rounded-lg disabled:opacity-50 ${selectedBlock ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-gray-100'}`}
+                      title={selectedBlock ? 'Unblock number' : 'Block number'}
+                    >
+                      <Ban className="w-4 h-4" />
+                    </button>
+                  )}
                   <button onClick={(e) => { e.stopPropagation(); setConversationToDelete(selectedConversation) }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
                   <button onClick={parseConversation} disabled={messages.length === 0} className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
                     <Sparkles className="w-4 h-4" />Parse
