@@ -65,7 +65,7 @@ import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type Property
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
 import { roadPackageCoverage } from '@/lib/pricing/road-package'
-import { guideLanguageKey, pickGuideRateRow, type GuideRateRow } from '@/lib/guides/guide-language'
+import { guideLanguageKey, pickGuideRateRow, rateSpeaks, type GuideRateRow } from '@/lib/guides/guide-language'
 import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
 import { dayTripFrom } from '@/lib/pricing/day-trip'
 import { selectVehicleFromPackage, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
@@ -1936,7 +1936,7 @@ export async function getGuideRate(
     const rateRows = await memoRead(`guide-rates|${scope.tenantId}|${grade}|${duration}`, async () => {
       const { data } = await getSupabaseAdmin()
         .from('guide_rates')
-        .select('id, guide_language, guide_type, guide_mode, tour_duration, city, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
+        .select('id, guide_language, other_languages, guide_type, guide_mode, tour_duration, city, other_cities, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
         .or(catalogOrExpr(scope))
         .eq('is_active', true)
         .eq('guide_type', grade)
@@ -1946,7 +1946,7 @@ export async function getGuideRate(
     // A row with no mode is a Spot rate — the column's default (380).
     const forLanguage = (rateRows as Array<GuideRateRow & { guide_mode?: string | null }>)
       .filter(r => (r.guide_mode || 'spot') === mode)
-      .filter(r => guideLanguageKey(r.guide_language, languageItems) === languageKey)
+      .filter(r => rateSpeaks(r, languageKey, languageItems))
     const pick = pickGuideRateRow(forLanguage, opts?.city)
     if (pick.kind === 'one') {
       return {

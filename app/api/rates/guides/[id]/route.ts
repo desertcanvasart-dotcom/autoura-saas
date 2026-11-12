@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guideRateLists, touchesCities, touchesLanguages } from '@/lib/guides/guide-rate-lists'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
@@ -78,10 +79,19 @@ export async function PUT(
 Object.assign(updateData, rateCurrencyWriteField(body))
 
     if (body.service_code !== undefined) updateData.service_code = body.service_code
-    if (body.guide_language !== undefined) updateData.guide_language = body.guide_language
+    // The cities and languages this one price covers (463), when the body sends them.
+    const lists = guideRateLists(body)
+    if (touchesLanguages(body)) {
+      if (!lists.guide_language) return NextResponse.json({ success: false, error: 'Choose a language' }, { status: 400 })
+      updateData.guide_language = lists.guide_language
+      updateData.other_languages = lists.other_languages
+    }
     if (body.guide_type !== undefined) updateData.guide_type = body.guide_type
     if (body.guide_mode !== undefined) updateData.guide_mode = body.guide_mode || 'spot'
-    if (body.city !== undefined) updateData.city = body.city || null
+    if (touchesCities(body)) {
+      updateData.city = lists.city
+      updateData.other_cities = lists.other_cities
+    }
     if (body.tour_duration !== undefined) updateData.tour_duration = body.tour_duration
     if (body.base_rate_eur !== undefined) updateData.base_rate_eur = parseFloat(body.base_rate_eur) || 0
     if (body.base_rate_non_eur !== undefined) updateData.base_rate_non_eur = parseFloat(body.base_rate_non_eur) || 0

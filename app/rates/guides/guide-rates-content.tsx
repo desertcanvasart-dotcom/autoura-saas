@@ -31,6 +31,9 @@ interface Guide {
   phone?: string
   languages?: string[]
   city?: string
+  /** Every city the guide works in, base first (461). */
+  cities?: string[]
+  works_all_cities?: boolean
   tier?: string
   is_preferred?: boolean
 }
@@ -41,9 +44,13 @@ interface GuideRate {
   id: string
   service_code: string
   guide_language: string
+  /** The further languages this same price covers (463). */
+  other_languages?: string[] | null
   guide_type: string
   guide_mode?: string | null
   city?: string
+  /** The further cities this same price covers (463). */
+  other_cities?: string[] | null
   tour_duration: string
   base_rate_eur: number
   base_rate_non_eur: number
@@ -58,6 +65,13 @@ interface GuideRate {
 }
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
+
+/** Every city one price covers, first first (463). Empty = any city. */
+const citiesOfRate = (r: Pick<GuideRate, 'city' | 'other_cities'>): string[] =>
+  r.city ? [r.city, ...(r.other_cities ?? [])] : []
+/** Every language one price covers, first first (463). */
+const languagesOfRate = (r: Pick<GuideRate, 'guide_language' | 'other_languages'>): string[] =>
+  [r.guide_language, ...(r.other_languages ?? [])].filter(Boolean)
 
 /** Toggle chips for picking several values (cities, languages). */
 function ChipPicker({ label, options, value, onChange }: {
@@ -167,10 +181,11 @@ export default function GuideRatesContent() {
 
   const [formData, setFormData] = useState({
     service_code: '',
-    guide_language: 'english',
+    languages: ['english'] as string[],
     guide_type: 'egyptologist',
     guide_mode: 'spot',
-    city: '',
+    // Every city this one price covers; none = any city (463).
+    cities: [] as string[],
     tour_duration: 'full_day',
     base_rate_eur: 0,
     base_rate_non_eur: 0,
@@ -180,9 +195,6 @@ export default function GuideRatesContent() {
     supplier_id: '',
     notes: '',
     is_active: true,
-    // Add only (461): the same price saved for these cities/languages too.
-    also_cities: [] as string[],
-    also_languages: [] as string[],
   })
 
   // Fetch rates
@@ -241,10 +253,16 @@ export default function GuideRatesContent() {
 
   const handleGuideChange = (guideId: string) => {
     const guide = guides.find(g => g.id === guideId)
+    // The guide's own cities and languages start the price's lists (one price
+    // covers them all, 463); a guide who travels everywhere = any city.
+    const guideCities = guide?.works_all_cities ? [] : (guide?.cities?.length ? guide.cities : guide?.city ? [guide.city] : null)
+    const languageKeys = new Set(languageItems.map(l => l.key))
+    const guideLanguages = (guide?.languages ?? []).filter(l => languageKeys.has(l))
     setFormData(prev => ({
       ...prev,
       supplier_id: guideId,
-      city: guide?.city || prev.city
+      cities: guideCities ?? prev.cities,
+      languages: guideLanguages.length ? guideLanguages : prev.languages,
     }))
   }
 
@@ -253,10 +271,10 @@ export default function GuideRatesContent() {
     setRateCurrency('')
     setFormData({
       service_code: generateServiceCode(),
-      guide_language: 'english',
+      languages: ['english'],
       guide_type: firstGrade,
       guide_mode: 'spot',
-      city: '',
+      cities: [],
       tour_duration: 'full_day',
       base_rate_eur: 0,
       base_rate_non_eur: 0,
@@ -266,8 +284,6 @@ export default function GuideRatesContent() {
       supplier_id: selectedGuide || '',
       notes: '',
       is_active: true,
-      also_cities: [],
-      also_languages: [],
     })
     setShowModal(true)
   }
@@ -277,10 +293,10 @@ export default function GuideRatesContent() {
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: rate.service_code || '',
-      guide_language: rate.guide_language || 'english',
+      languages: languagesOfRate(rate).length ? languagesOfRate(rate) : ['english'],
       guide_type: rate.guide_type || 'egyptologist',
       guide_mode: rate.guide_mode || 'spot',
-      city: rate.city || '',
+      cities: citiesOfRate(rate),
       tour_duration: rate.tour_duration || 'full_day',
       base_rate_eur: rate.base_rate_eur || 0,
       base_rate_non_eur: rate.base_rate_non_eur || 0,
@@ -290,8 +306,6 @@ export default function GuideRatesContent() {
       supplier_id: rate.supplier_id || '',
       notes: rate.notes || '',
       is_active: rate.is_active,
-      also_cities: [],
-      also_languages: [],
     })
     setShowModal(true)
   }
@@ -302,10 +316,10 @@ export default function GuideRatesContent() {
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: generateServiceCode(), // Generate new code
-      guide_language: rate.guide_language || 'english',
+      languages: languagesOfRate(rate).length ? languagesOfRate(rate) : ['english'],
       guide_type: rate.guide_type || 'egyptologist',
       guide_mode: rate.guide_mode || 'spot',
-      city: rate.city || '',
+      cities: citiesOfRate(rate),
       tour_duration: rate.tour_duration || 'full_day',
       base_rate_eur: rate.base_rate_eur || 0,
       base_rate_non_eur: rate.base_rate_non_eur || 0,
@@ -315,8 +329,6 @@ export default function GuideRatesContent() {
       supplier_id: rate.supplier_id || '',
       notes: rate.notes || '',
       is_active: rate.is_active,
-      also_cities: [],
-      also_languages: [],
     })
     setShowModal(true)
   }
@@ -326,6 +338,10 @@ export default function GuideRatesContent() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (formData.languages.length === 0) {
+      showNotification('error', 'Choose a language', 'Pick at least one language this price is for.')
+      return
+    }
     guard(async () => {  try {
         const url = editingRate
           ? `/api/rates/guides/${editingRate.id}`
@@ -336,7 +352,7 @@ export default function GuideRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, ...(editingRate ? { also_cities: undefined, also_languages: undefined } : {}), base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
+          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
         })
 
         const data = await response.json()
@@ -347,7 +363,7 @@ export default function GuideRatesContent() {
         }
 
         if (data.data) {
-          showNotification('success', 'Success', editingRate ? 'Guide rate updated successfully!' : (data.count > 1 ? `${data.count} guide rates created — one per city and language.` : 'Guide rate created successfully!'))
+          showNotification('success', 'Success', editingRate ? 'Guide rate updated successfully!' : 'Guide rate created successfully!')
           setShowModal(false)
           fetchRates()
         } else {
@@ -445,13 +461,12 @@ export default function GuideRatesContent() {
   // Filter rates
   const filteredRates = rates.filter(rate => {
     const matchesSearch = searchTerm === '' ||
-      rate.guide_language.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      languageLabel(rate.guide_language).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      languagesOfRate(rate).some(l => l.toLowerCase().includes(searchTerm.toLowerCase()) || languageLabel(l).toLowerCase().includes(searchTerm.toLowerCase())) ||
       rate.service_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rate.city?.toLowerCase().includes(searchTerm.toLowerCase())
+      citiesOfRate(rate).some(c => c.toLowerCase().includes(searchTerm.toLowerCase()))
 
-    const matchesCity = selectedCity === '' || rate.city === selectedCity
-    const matchesLanguage = selectedLanguage === '' || rate.guide_language === selectedLanguage
+    const matchesCity = selectedCity === '' || citiesOfRate(rate).includes(selectedCity)
+    const matchesLanguage = selectedLanguage === '' || languagesOfRate(rate).includes(selectedLanguage)
     const matchesGuide = selectedGuide === '' || rate.supplier_id === selectedGuide
     const matchesGuideType = selectedGuideType === '' || rate.guide_type === selectedGuideType
     const matchesActive = showInactive || rate.is_active
@@ -478,7 +493,7 @@ export default function GuideRatesContent() {
   const activeRates = rates.filter(r => r.is_active).length
   const linkedRates = rates.filter(r => r.supplier_id).length
   const avgRate = averageRateInOneCurrency(rates, r => r.base_rate_eur, r => r.rate_currency)
-  const uniqueCities = [...new Set(rates.map(r => r.city).filter(Boolean))].length
+  const uniqueCities = [...new Set(rates.flatMap(citiesOfRate))].length
 
   // Get guide name by ID
   const getGuideName = (supplierId: string | undefined) => {
@@ -842,7 +857,7 @@ export default function GuideRatesContent() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Globe className="w-4 h-4 text-primary-500" />
-                        <span className="text-sm font-semibold text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></span>
+                        <span className="text-sm font-semibold text-gray-900">{languagesOfRate(rate).map(languageLabel).join(', ')}</span>
                       </div>
                       <span className="text-xs text-gray-500">{rate.service_code}</span>
                     </td>
@@ -864,7 +879,7 @@ export default function GuideRatesContent() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">{rate.city || 'Any city'}</span>
+                      <span className="text-sm text-gray-600">{citiesOfRate(rate).join(', ') || 'Any city'}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">
@@ -898,7 +913,7 @@ export default function GuideRatesContent() {
                           <Copy className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => confirmDelete(rate.id, languageLabel(rate.guide_language))}
+                          onClick={() => confirmDelete(rate.id, languagesOfRate(rate).map(languageLabel).join(', '))}
                           className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
                           title="Delete"
                         >
@@ -926,7 +941,7 @@ export default function GuideRatesContent() {
                       aria-label={`Select ${languageLabel(rate.guide_language)} rate`}
                     />
                     <Globe className="w-5 h-5 text-primary-500" />
-                    <span className="font-semibold text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></span>
+                    <span className="font-semibold text-gray-900">{languagesOfRate(rate).map(languageLabel).join(', ')}</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
@@ -944,7 +959,7 @@ export default function GuideRatesContent() {
 
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
                   <p><span className="text-gray-400">Type:</span> <VocabLabel kind="guide_grade" value={rate.guide_type} /></p>
-                  <p><span className="text-gray-400">City:</span> {rate.city || 'Any city'}</p>
+                  <p><span className="text-gray-400">City:</span> {citiesOfRate(rate).join(', ') || 'Any city'}</p>
                   <p><span className="text-gray-400">Duration:</span> <VocabLabel kind="guide_duration" value={rate.tour_duration} /></p>
                 </div>
 
@@ -969,7 +984,7 @@ export default function GuideRatesContent() {
                       <Copy className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => confirmDelete(rate.id, languageLabel(rate.guide_language))}
+                      onClick={() => confirmDelete(rate.id, languagesOfRate(rate).map(languageLabel).join(', '))}
                       className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
                       title="Delete"
                     >
@@ -994,8 +1009,8 @@ export default function GuideRatesContent() {
                     aria-label={`Select ${languageLabel(rate.guide_language)} rate`}
                   />
                   <Globe className="w-4 h-4 text-primary-500" />
-                  <span className="font-medium text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></span>
-                  <span className="text-sm text-gray-500">{rate.city || 'Any city'}</span>
+                  <span className="font-medium text-gray-900">{languagesOfRate(rate).map(languageLabel).join(', ')}</span>
+                  <span className="text-sm text-gray-500">{citiesOfRate(rate).join(', ') || 'Any city'}</span>
                   {rate.supplier_id && (
                     <span className="text-sm text-primary-600">{getGuideName(rate.supplier_id)}</span>
                   )}
@@ -1014,7 +1029,7 @@ export default function GuideRatesContent() {
                     <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-blue-600" title="Clone">
                       <Copy className="w-4 h-4" />
                     </button>
-                    <button onClick={() => confirmDelete(rate.id, languageLabel(rate.guide_language))} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
+                    <button onClick={() => confirmDelete(rate.id, languagesOfRate(rate).map(languageLabel).join(', '))} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -1115,10 +1130,32 @@ export default function GuideRatesContent() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-4 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {/* The guide first: its cities and languages start the lists below. */}
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">1</span>
+                  Guide (Optional)
+                </h3>
+                <select
+                  name="supplier_id"
+                  value={formData.supplier_id}
+                  onChange={(e) => handleGuideChange(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Select a Guide --</option>
+                  {guides.map(guide => (
+                    <option key={guide.id} value={guide.id}>
+                      {guide.name} {guide.works_all_cities ? '(all cities)' : (guide.cities?.length ?? 0) > 0 ? `(${guide.cities!.join(', ')})` : guide.city ? `(${guide.city})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Picking a guide fills in the cities and languages they work in — change them below.</p>
+              </div>
+
               {/* Basic Info */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">1</span>
+                  <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">2</span>
                   Basic Information
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1131,11 +1168,6 @@ export default function GuideRatesContent() {
                       onChange={handleChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Language *</label>
-                    <VocabSelect kind="guide_language" value={formData.guide_language} onChange={v => setFormData(prev => ({ ...prev, guide_language: v }))} placeholder={null} name="guide_language" required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Guide Type *</label>
@@ -1151,69 +1183,28 @@ export default function GuideRatesContent() {
                     <VocabSelect kind="guide_mode" value={formData.guide_mode} onChange={v => setFormData(prev => ({ ...prev, guide_mode: v }))} placeholder={null} name="guide_mode" required
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
-                    <select
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Any city</option>
-                      {cityOptionsFor(cityOptions, formData.city || '').map(city => (
-                        <option key={city} value={city}>{city}</option>
-                      ))}
-                    </select>
-                    {!formData.city && (
-                      <p className="text-xs text-gray-500 mt-1">Used on any day whose city has no guide price of its own — e.g. one throughout price for the whole trip.</p>
-                    )}
-                  </div>
                 </div>
               </div>
 
-              {/* Add only: the same price for more cities / languages (461). Each
-                  pair is saved as its own rate, so one can be repriced later. */}
-              {!editingRate && (
-                <div className="mb-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <ChipPicker
-                    label="Same price for other languages too"
-                    options={languageItems.filter(l => l.key !== formData.guide_language).map(l => ({ value: l.key, label: l.label }))}
-                    value={formData.also_languages}
-                    onChange={v => setFormData(prev => ({ ...prev, also_languages: v }))}
-                  />
-                  <ChipPicker
-                    label="Same price in other cities too"
-                    options={cityOptions.filter(c => c !== formData.city).map(c => ({ value: c, label: c }))}
-                    value={formData.also_cities}
-                    onChange={v => setFormData(prev => ({ ...prev, also_cities: v }))}
-                  />
-                  {(formData.also_languages.length > 0 || formData.also_cities.length > 0) && (
-                    <p className="text-xs text-gray-600">
-                      Saves {(1 + formData.also_languages.length) * (1 + formData.also_cities.length)} prices — one for each language in each city.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Link to Guide */}
-              <div className="mb-4">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">2</span>
-                  Link to Guide (Optional)
-                </h3>
-                <select
-                  name="supplier_id"
-                  value={formData.supplier_id}
-                  onChange={(e) => handleGuideChange(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                >
-                  <option value="">-- Select a Guide --</option>
-                  {guides.map(guide => (
-                    <option key={guide.id} value={guide.id}>
-                      {guide.name} {guide.city ? `(${guide.city})` : ''}
-                    </option>
-                  ))}
-                </select>
+              {/* One price for every city and language it covers (463). */}
+              <div className="mb-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <ChipPicker
+                  label="Languages *"
+                  options={[...new Set([...languageItems.map(l => l.key), ...formData.languages])].map(k => ({ value: k, label: languageLabel(k) }))}
+                  value={formData.languages}
+                  onChange={v => setFormData(prev => ({ ...prev, languages: v }))}
+                />
+                <ChipPicker
+                  label="Cities"
+                  options={[...new Set([...cityOptions, ...formData.cities])].map(c => ({ value: c, label: c }))}
+                  value={formData.cities}
+                  onChange={v => setFormData(prev => ({ ...prev, cities: v }))}
+                />
+                <p className="text-xs text-gray-600">
+                  {formData.cities.length === 0
+                    ? 'No city picked: this is the any-city price — used on any day whose city has no guide price of its own (e.g. one throughout price for the whole trip).'
+                    : `One price for ${formData.cities.length === 1 ? formData.cities[0] : `${formData.cities.length} cities`}${formData.languages.length > 1 ? ` in ${formData.languages.length} languages` : ''}.`}
+                </p>
               </div>
 
               {/* Duration & Rates */}

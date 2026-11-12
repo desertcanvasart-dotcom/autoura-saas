@@ -18,6 +18,7 @@ import { loadVocabulary } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { packageVehicles, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 import { fetchEveryRow } from '@/lib/db/fetch-all-pages'
+import { rateCities, rateLanguages } from '@/lib/guides/guide-language'
 import type { RateOption } from '@/app/pricing-grid/types'
 import { LAND_PACKAGE_COLS } from '@/lib/rates/land-package-input'
 import { landPackageOptionId, packageInclusions, packageLength, packageLineName, packagePricePerPerson, type LandPackageRow } from '@/lib/pricing/land-package'
@@ -174,11 +175,14 @@ export async function loadGridRates(
 
     guide: (guideRates || []).map((r: any) => ({
       id: r.id,
-      name: `${r.guide_language ? guideLanguageLabel(r.guide_language) : 'Guide'} (${r.guide_type || 'Egyptologist'})`,
+      name: `${rateLanguages(r).length ? rateLanguages(r).map(guideLanguageLabel).join(' / ') : 'Guide'} (${r.guide_type || 'Egyptologist'})`,
       rateEur: toNum(r.base_rate_eur || r.rate_eur),
       rateNonEur: toNum(r.base_rate_non_eur || r.rate_non_eur || r.base_rate_eur || r.rate_eur),
       city: r.city,
-      details: guideLanguageLabel(r.guide_language),
+      // One price may cover several cities and languages (migration 463).
+      cities: rateCities(r),
+      languages: rateLanguages(r).map(guideLanguageLabel),
+      details: rateLanguages(r).map(guideLanguageLabel).join(', '),
       // The dropdown filters by language and by kind of guide.
       language: r.guide_language ? guideLanguageLabel(r.guide_language) : undefined,
       category: r.guide_type || 'Egyptologist',

@@ -7,7 +7,7 @@
 // Every read is scoped to the tenant, so the job may pass the admin client.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { SAME_SERVICE_KEYS, alternativeCost, rateColumns, type RateRow } from '@/lib/bookings/cover-options'
+import { SAME_SERVICE_KEYS, alternativeCost, rateColumns, sameService, type RateRow } from '@/lib/bookings/cover-options'
 
 export interface CoverLine {
   id: string
@@ -44,12 +44,17 @@ export async function loadSameServiceRates(db: SupabaseClient, tenantId: string,
   const { data: pinned } = await db.from(table).select(cols).eq('id', rateId).eq('tenant_id', tenantId).maybeSingle()
   if (!pinned) return { pinned: null, candidates: [] as RateRow[] }
   let q = db.from(table).select(cols).eq('tenant_id', tenantId).not('supplier_id', 'is', null)
+  // A guide price lists its cities and languages (463): those are matched in
+  // memory by sameService, never narrowed here to the first one.
+  const listed = table === 'guide_rates' ? new Set(['city', 'guide_language']) : new Set<string>()
   for (const k of SAME_SERVICE_KEYS[table]) {
+    if (listed.has(k)) continue
     const v = (pinned as unknown as Record<string, unknown>)[k]
     q = v === null || v === undefined ? q.is(k, null) : q.eq(k, v as string)
   }
   const { data } = await q
-  return { pinned: pinned as unknown as RateRow, candidates: (data ?? []) as unknown as RateRow[] }
+  const candidates = ((data ?? []) as unknown as RateRow[]).filter(r => sameService(table, pinned as unknown as RateRow, r))
+  return { pinned: pinned as unknown as RateRow, candidates }
 }
 
 export interface SupplierAlternative {

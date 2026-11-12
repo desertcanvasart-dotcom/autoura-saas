@@ -232,6 +232,10 @@ export interface RateOption {
   details?: string  // e.g., "4★", "Standard cabin", "Aswan → Luxor"
   /** Guides: the language, in the agency's word (a dropdown filter). */
   language?: string
+  /** Guides: every city one price covers (migration 463); empty = any city. */
+  cities?: string[]
+  /** Guides: every language one price covers, in the agency's words. */
+  languages?: string[]
   /** Hotels: the board basis (BB, HB …) — a dropdown filter. */
   board_basis?: string
   // Optional metadata used by the rich gate. Transport rates carry

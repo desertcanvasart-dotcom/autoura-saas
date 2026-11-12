@@ -110,11 +110,11 @@ export default function ToursRatesPage() {
           as usual. On a package&apos;s last day the group is back in its start city, so that night&apos;s hotel is there.
         </p>
         <p className="text-gray-600 mb-3">
-          <strong>One guide price for many cities or languages.</strong> When adding a guide rate, tick
-          <strong> Same price for other languages too</strong> and <strong>Same price in other cities too</strong>:
-          Autoura saves one rate for each language in each city, so any one can be repriced later on its own.
-          Leave the city as <strong>Any city</strong> for a rate that applies wherever a city has no guide
-          price of its own.
+          <strong>One guide price for many cities or languages.</strong> Pick the guide first: their cities and
+          languages fill in, and you can change them. Tick every <strong>Language</strong> and every
+          <strong> City</strong> the price is for, and it is saved once, as one price. For a city at a different
+          price, take it off the list and add it as its own price. Pick no city for a price that applies
+          wherever a city has no guide price of its own.
         </p>
         <Tip>
           Rates price everything: the <strong>Quote Builder</strong>, tours priced from their days, and

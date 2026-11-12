@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { guideRateCombos, comboServiceCode, MAX_GUIDE_RATE_COMBOS } from '@/lib/guides/guide-rate-combos'
+import { guideRateLists } from '@/lib/guides/guide-rate-lists'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
@@ -44,8 +44,6 @@ export async function GET(request: NextRequest) {
         .order('guide_language')
 
       if (supplierId) query = query.eq('supplier_id', supplierId)
-      if (language) query = query.eq('guide_language', language)
-      if (city) query = query.eq('city', city)
       if (guideType) query = query.eq('guide_type', guideType)
       if (activeOnly) query = query.eq('is_active', true)
       return query.order('id').range(from, to)
@@ -56,7 +54,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data: data || [] })
+    // A price covers its city/language AND its other ones (migration 463).
+    const has = (first: unknown, more: unknown, want: string) =>
+      [first, ...(Array.isArray(more) ? more : [])].some(v => String(v ?? '').trim().toLowerCase() === want.trim().toLowerCase())
+    const rows = (data || []).filter(r =>
+      (!city || has(r.city, r.other_cities, city)) &&
+      (!language || has(r.guide_language, r.other_languages, language)))
+
+    return NextResponse.json({ success: true, data: rows })
   } catch (error: any) {
     console.error('GET guide_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -89,29 +94,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // One row per city × language the form ticked (lib/guides/guide-rate-combos):
-    // a row stays one city and one language, which is what pricing matches.
-    const combos = guideRateCombos(body)
-    if (combos.length === 0) {
+    // ONE price for every city and language it covers (migration 463):
+    // first city/language in city/guide_language, the rest in the lists.
+    const lists = guideRateLists(body)
+    if (!lists.guide_language) {
       return NextResponse.json({ success: false, error: 'Choose a language' }, { status: 400 })
     }
-    if (combos.length > MAX_GUIDE_RATE_COMBOS) {
-      return NextResponse.json(
-        { success: false, error: `That is ${combos.length} prices at once — at most ${MAX_GUIDE_RATE_COMBOS}. Tick fewer cities or languages.` },
-        { status: 400 }
-      )
-    }
-    const baseCode: string = body.service_code || `GD-${Date.now().toString(36).toUpperCase()}`
 
-    const rows: TablesInsert<'guide_rates'>[] = combos.map((combo, i) => ({
+    const row: TablesInsert<'guide_rates'> = {
       ...rateCurrencyWriteField(body),
       tenant_id,
-      service_code: comboServiceCode(baseCode, i),
-      guide_language: combo.guide_language,
+      service_code: body.service_code || `GD-${Date.now().toString(36).toUpperCase()}`,
+      guide_language: lists.guide_language,
+      other_languages: lists.other_languages,
       guide_type: body.guide_type || 'licensed',
       // The mode the rate is for; every rate so far was a Spot rate (380).
       guide_mode: body.guide_mode || 'spot',
-      city: combo.city,
+      city: lists.city,
+      other_cities: lists.other_cities,
       tour_duration: body.tour_duration || 'full_day',
       base_rate_eur: parseFloat(body.base_rate_eur) || 0,
       base_rate_non_eur: parseFloat(body.base_rate_non_eur) || 0,
@@ -121,21 +121,20 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null,
       notes: body.notes || null,
       is_active: body.is_active !== false
-    }))
+    }
 
-    // One insert: every pair is saved, or none is.
-    const { data: saved, error } = await supabase
+    const { data, error } = await supabase
       .from('guide_rates')
-      .insert(rows)
+      .insert(row)
       .select('*')
+      .single()
 
     if (error) {
       console.error('POST guide_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
-    const data = saved?.[0] ?? null
 
-    return NextResponse.json({ success: true, data, count: saved?.length ?? 0 })
+    return NextResponse.json({ success: true, data })
   } catch (error: any) {
     console.error('POST guide_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })

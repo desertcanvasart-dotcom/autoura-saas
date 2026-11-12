@@ -17,13 +17,18 @@
 //   - several rows for the same place at the SAME price are one rate; at
 //     DIFFERENT prices they are a gap naming them — the engine never takes
 //     the cheapest.
+//   - one row may cover SEVERAL cities and languages (migration 463):
+//     `city` + `other_cities`, `guide_language` + `other_languages`. A row
+//     with no city is the all-cities rate.
 //
 // Pure and import-free (the calculator's picker reads it).
 
 export interface GuideRateRow {
   id: string
   guide_language?: string | null
+  other_languages?: readonly string[] | null
   city?: string | null
+  other_cities?: readonly string[] | null
   full_day_rate?: number | string | null
   base_rate_eur?: number | string | null
 }
@@ -41,6 +46,34 @@ export function guideLanguageKey(value: unknown, items: readonly LanguageItem[])
   const lower = raw.toLowerCase(), s = slug(raw)
   const hit = items.find(i => i.key === raw) ?? items.find(i => i.label.toLowerCase() === lower) ?? items.find(i => i.key === s) ?? items.find(i => slug(i.label) === s)
   return hit?.key ?? s
+}
+
+const uniqueTrimmed = (values: readonly unknown[]): string[] => {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const v of values) {
+    const t = String(v ?? '').trim()
+    if (!t || seen.has(t.toLowerCase())) continue
+    seen.add(t.toLowerCase())
+    out.push(t)
+  }
+  return out
+}
+
+/** The cities a guide price covers, its first city first. Empty = any city. */
+export function rateCities(r: Pick<GuideRateRow, 'city' | 'other_cities'>): string[] {
+  if (!String(r.city ?? '').trim()) return []
+  return uniqueTrimmed([r.city, ...(r.other_cities ?? [])])
+}
+
+/** The languages a guide price covers, its first language first. */
+export function rateLanguages(r: Pick<GuideRateRow, 'guide_language' | 'other_languages'>): string[] {
+  return uniqueTrimmed([r.guide_language, ...(r.other_languages ?? [])])
+}
+
+/** Does this guide price cover `language` (any spelling of the same key)? */
+export function rateSpeaks(r: GuideRateRow, languageKey: string, items: readonly LanguageItem[]): boolean {
+  return rateLanguages(r).some(l => guideLanguageKey(l, items) === languageKey)
 }
 
 export const rateOf = (r: GuideRateRow): number => {
@@ -63,8 +96,8 @@ const cityKey = (v: unknown): string => { const c = String(v ?? '').trim().toLow
 export function pickGuideRateRow(rows: readonly GuideRateRow[], city: string | null | undefined): GuideRatePick {
   const here = cityKey(city)
   const priced = rows.filter(r => rateOf(r) > 0)
-  const inCity = here ? priced.filter(r => cityKey(r.city) === here) : []
-  const pool = inCity.length > 0 ? inCity : priced.filter(r => !String(r.city ?? '').trim())
+  const inCity = here ? priced.filter(r => rateCities(r).some(c => cityKey(c) === here)) : []
+  const pool = inCity.length > 0 ? inCity : priced.filter(r => rateCities(r).length === 0)
   if (pool.length === 0) return { kind: 'none' }
   const rates = [...new Set(pool.map(rateOf))]
   if (rates.length === 1) return { kind: 'one', row: pool[0], rate: rates[0], cityMatched: inCity.length > 0 }
@@ -74,6 +107,6 @@ export function pickGuideRateRow(rows: readonly GuideRateRow[], city: string | n
 /** The languages of the vocabulary, each with whether the agency has a rate
  *  for it — for the calculator's picker. */
 export function languagesWithRates(items: readonly LanguageItem[], rows: readonly GuideRateRow[]): Array<LanguageItem & { hasRate: boolean }> {
-  const keysWithRate = new Set(rows.filter(r => rateOf(r) > 0).map(r => guideLanguageKey(r.guide_language, items)))
+  const keysWithRate = new Set(rows.filter(r => rateOf(r) > 0).flatMap(r => rateLanguages(r).map(l => guideLanguageKey(l, items))))
   return items.map(i => ({ ...i, hasRate: keysWithRate.has(i.key) }))
 }

@@ -50,8 +50,12 @@ const RATE_FIGURES: Record<string, readonly string[]> = {
 /** Sheets with a preferred star (lib/rates/preferred.ts) among these. */
 const PREFERRED_COLUMN: Record<string, string> = { meal_rates: 'is_preferred', transportation_rates: 'is_preferred' }
 
+/** Columns a sheet's "same service" also reads: a guide price lists the
+ *  further cities and languages it covers (migration 463). */
+const LIST_COLUMNS: Record<string, readonly string[]> = { guide_rates: ['other_cities', 'other_languages'] }
+
 export function rateColumns(table: string): string {
-  return ['id', 'supplier_id', 'rate_currency', 'is_active', ...(SAME_SERVICE_KEYS[table] ?? []), ...(RATE_FIGURES[table] ?? []), ...(PREFERRED_COLUMN[table] ? [PREFERRED_COLUMN[table]] : [])].join(', ')
+  return ['id', 'supplier_id', 'rate_currency', 'is_active', ...(SAME_SERVICE_KEYS[table] ?? []), ...(LIST_COLUMNS[table] ?? []), ...(RATE_FIGURES[table] ?? []), ...(PREFERRED_COLUMN[table] ? [PREFERRED_COLUMN[table]] : [])].join(', ')
 }
 
 export interface RateRow {
@@ -70,9 +74,25 @@ export interface RateRow {
 
 const norm = (v: unknown) => (v === null || v === undefined ? '' : String(v).trim().toLowerCase())
 
+const listOf = (first: unknown, more: unknown): Set<string> =>
+  new Set([first, ...(Array.isArray(more) ? more : [])].map(norm).filter(Boolean))
+
+/** Does `b` do the service `a` is for? A guide price covers a list of cities
+ *  and languages (463): `b` must cover every city and language `a` does, so
+ *  a supplier is never costed for a city or language it has no price in. */
 export function sameService(table: string, a: RateRow, b: RateRow): boolean {
   const keys = SAME_SERVICE_KEYS[table]
-  return !!keys && keys.every(k => norm(a[k]) === norm(b[k]))
+  if (!keys) return false
+  if (table === 'guide_rates') {
+    const covers = (x: Set<string>, y: Set<string>) => [...x].every(v => y.has(v))
+    const aCities = listOf(a.city, a.other_cities), bCities = listOf(b.city, b.other_cities)
+    // No city = any city: only another any-city price stands in for one.
+    const citiesOk = aCities.size === 0 ? bCities.size === 0 : covers(aCities, bCities)
+    return citiesOk
+      && covers(listOf(a.guide_language, a.other_languages), listOf(b.guide_language, b.other_languages))
+      && keys.filter(k => k !== 'city' && k !== 'guide_language').every(k => norm(a[k]) === norm(b[k]))
+  }
+  return keys.every(k => norm(a[k]) === norm(b[k]))
 }
 
 function validOn(r: RateRow, date: string | null): boolean {
