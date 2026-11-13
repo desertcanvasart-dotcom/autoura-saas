@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
 import { MEDIA_BUCKET, storagePathBelongsTo, isOwnTwilioMediaUrl } from '@/lib/whatsapp/voice-note-storage'
+import { downloadName } from '@/lib/whatsapp/attachments'
 
 // Long enough to open an image, short enough that a leaked URL is worthless by
 // the time it is pasted anywhere.
@@ -59,13 +60,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // read comes back empty, and this 404s before anything is signed.
     const { data: message, error } = await supabase
       .from('whatsapp_messages')
-      .select('media_storage_path, message_sid, tenant_id, media_url, media_type')
+      .select('media_storage_path, message_sid, tenant_id, media_url, media_type, media_filename, created_at, sent_at')
       .eq('id', id)
       .single()
 
     if (error || !message) {
       return NextResponse.json({ success: false, error: 'Message not found' }, { status: 404 })
     }
+
+    // ?download=1 saves the file under its own name (lib/whatsapp/attachments
+    // downloadName); without it the file opens in the browser as before.
+    const download = new URL(request.url).searchParams.get('download') === '1'
+    const fileName = downloadName(message)
 
     const storagePath = message.media_storage_path
     if (!storagePath) {
@@ -76,7 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       // this request carries our credentials.
       const sid = process.env.TWILIO_ACCOUNT_SID
       if (isOwnTwilioMediaUrl(message.media_url, sid) && process.env.TWILIO_AUTH_TOKEN) {
-        return proxyTwilioMedia(message.media_url!, sid!, process.env.TWILIO_AUTH_TOKEN, request.headers.get('range'), message.media_type)
+        return proxyTwilioMedia(message.media_url!, sid!, process.env.TWILIO_AUTH_TOKEN, request.headers.get('range'), message.media_type, { fileName, download })
       }
       // Otherwise: no attachment, or one hosted elsewhere (an outbound PDF)
       // — those are in media_url and are not ours to sign.
@@ -93,7 +99,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { data: signed, error: signError } = await admin()
       .storage.from(MEDIA_BUCKET)
-      .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS)
+      .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS, download ? { download: fileName } : undefined)
 
     if (signError || !signed?.signedUrl) {
       console.error('whatsapp media sign error:', signError?.message)
@@ -110,7 +116,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 /** Twilio media, streamed with the account's credentials; Range passes through so audio can seek. */
-async function proxyTwilioMedia(url: string, sid: string, token: string, range: string | null, mediaType: string | null) {
+async function proxyTwilioMedia(url: string, sid: string, token: string, range: string | null, mediaType: string | null, name: { fileName: string; download: boolean }) {
   const upstream = await fetch(url, {
     headers: {
       Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}`,
@@ -129,6 +135,8 @@ async function proxyTwilioMedia(url: string, sid: string, token: string, range: 
     'Content-Type': upstream.headers.get('content-type') || mediaType || 'application/octet-stream',
     'Cache-Control': 'private, max-age=300',
     'Accept-Ranges': upstream.headers.get('accept-ranges') || 'bytes',
+    // The file's own name whether it is opened or saved.
+    'Content-Disposition': `${name.download ? 'attachment' : 'inline'}; filename="${name.fileName}"`,
   })
   for (const h of ['content-length', 'content-range']) {
     const v = upstream.headers.get(h)

@@ -16,16 +16,31 @@ export function outboundVoicePath(tenantId: string, id: string): string {
 }
 
 /**
+ * outbound/<tenant>/<id>/<file-name> — an attachment sent from the inbox. The
+ * file's own (safe) name ends the path, so the link the provider fetches
+ * carries it and the customer's WhatsApp shows "Itinerary.pdf", not an id.
+ */
+export function outboundFilePath(tenantId: string, id: string, safeName: string): string {
+  return `outbound/${tenantId.replace(SAFE, '_')}/${id.replace(SAFE, '_')}/${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+}
+
+/** inbound/<sid>.<ext> — where a customer's file is kept once we have the bytes. */
+export function inboundFilePath(messageSid: string, ext: string): string {
+  return `inbound/${messageSid.replace(SAFE, '_')}.${ext.replace(/[^a-z0-9]/g, '') || 'bin'}`
+}
+
+/**
  * May this message row's media_storage_path be signed? Members can edit the
  * row, and the service role signs whatever it is given, so the path must be
  * the one written for THIS message: inbound/<its sid>.<ext>, or an outbound
- * file under ITS tenant.
+ * file under ITS tenant (a voice note, or <id>/<file-name> from the attach button).
  */
 export function storagePathBelongsTo(path: string, row: { message_sid: string | null; tenant_id: string }): boolean {
   const sid = String(row.message_sid ?? '').replace(SAFE, '_')
   if (sid && new RegExp(`^inbound/${sid}\\.[a-z0-9]+$`).test(path)) return true
   const tenant = row.tenant_id.replace(SAFE, '_')
-  return new RegExp(`^outbound/${tenant}/[a-zA-Z0-9_-]+\\.ogg$`).test(path)
+  return new RegExp(`^outbound/${tenant}/[a-zA-Z0-9_-]+\\.ogg$`).test(path) ||
+    new RegExp(`^outbound/${tenant}/[a-zA-Z0-9_-]+/[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$`).test(path)
 }
 
 /**

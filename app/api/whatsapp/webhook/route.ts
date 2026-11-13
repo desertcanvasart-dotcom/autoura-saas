@@ -1,3 +1,5 @@
+import { extFor } from '@/lib/whatsapp/attachments'
+import { keepTwilioMedia } from '@/lib/whatsapp/keep-inbound-media'
 import { inboundAiAllowed } from '@/lib/ai-guard'
 import { maskPhone } from '@/lib/log-mask'
 // ============================================
@@ -127,8 +129,24 @@ async function handleTwilioWebhook(request: NextRequest, rawBody: string) {
       // Twilio hosts this one itself; we never copied it into our bucket.
       mediaUrl: params['MediaUrl0'] || null,
       mediaStoragePath: null,
-      mediaType: params['MediaContentType0'] || null
+      mediaType: params['MediaContentType0'] || null,
+      // Twilio gives no file name for an inbound document.
+      mediaFilename: null
     })
+
+    // Keep our own copy of the file (lib/whatsapp/keep-inbound-media): fire
+    // and forget, so Twilio gets its answer at once. The Twilio link stays on
+    // the row as the fallback until the copy lands.
+    if (params['MediaUrl0'] && params['MessageSid']) {
+      const svc = getServiceClient()
+      if (svc) {
+        void keepTwilioMedia(svc as never, {
+          message_sid: params['MessageSid'],
+          media_url: params['MediaUrl0'],
+          media_type: params['MediaContentType0'] || null,
+        }).then(r => { if (!r.ok) console.warn('⚠️ WhatsApp media not copied:', r.reason) })
+      }
+    }
 
     // Respond to Twilio with 200 OK
     return twimlResponse(200)
@@ -196,7 +214,8 @@ async function handleMetaWebhook(request: NextRequest, rawBody: string) {
         // URL to keep, and Meta's own download link expires in ~5 minutes.
         mediaUrl: null,
         mediaStoragePath,
-        mediaType: msg.mediaType || null
+        mediaType: msg.mediaType || null,
+        mediaFilename: msg.mediaFilename ?? null
       })
     }
 
@@ -262,16 +281,6 @@ async function applyMetaStatuses(statuses: MetaStatusUpdate[]) {
 
 const MEDIA_BUCKET = 'whatsapp-media'
 
-const EXTENSION_BY_MIME: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'application/pdf': 'pdf',
-  'audio/ogg': 'ogg',
-  'audio/mpeg': 'mp3',
-  'video/mp4': 'mp4'
-}
-
 let _serviceClient: ReturnType<typeof createServiceClient> | null = null
 
 function getServiceClient() {
@@ -301,8 +310,9 @@ async function persistInboundMedia(
 
     // "audio/ogg; codecs=opus" is how Meta labels a voice note: the parameters
     // are dropped before the lookup, or it was stored as .bin.
-    const bare = (t: string | null | undefined) => String(t ?? '').split(';')[0].trim().toLowerCase()
-    const ext = EXTENSION_BY_MIME[bare(media.contentType)] || EXTENSION_BY_MIME[bare(mimeType)] || 'bin'
+    // The shared type list (lib/whatsapp/attachments): Word, Excel, CSV and
+    // the rest keep their real extension instead of being stored as .bin.
+    const ext = extFor(media.contentType) !== 'bin' ? extFor(media.contentType) : extFor(mimeType)
     const safeSid = messageSid.replace(/[^a-zA-Z0-9_-]/g, '_')
     const filePath = `inbound/${safeSid}.${ext}`
 
@@ -349,6 +359,8 @@ interface InboundWhatsAppMessage {
    *  ourselves (Meta hands us an id whose URL expires in ~5 minutes). */
   mediaStoragePath: string | null
   mediaType: string | null
+  /** A document's own file name (Meta gives one; Twilio does not). */
+  mediaFilename: string | null
   /** The sender's WhatsApp profile name (Twilio ProfileName, Meta contacts[].profile.name); null when absent. */
   senderName: string | null
 }
@@ -406,6 +418,7 @@ async function processInboundWhatsAppMessage({
   mediaUrl,
   mediaStoragePath,
   mediaType,
+  mediaFilename,
   senderName
 }: InboundWhatsAppMessage) {
   // The service connection. The provider calls with no user session, and the
@@ -593,6 +606,7 @@ async function processInboundWhatsAppMessage({
         media_url: mediaUrl,
         media_storage_path: mediaStoragePath,
         media_type: mediaType,
+        media_filename: mediaFilename,
         status: 'delivered',
         sent_at: new Date().toISOString()
       })

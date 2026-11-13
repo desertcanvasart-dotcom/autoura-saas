@@ -19,6 +19,7 @@
 //   META_GRAPH_API_VERSION             - Graph API version (default v21.0)
 // ============================================
 
+import { kindOfLink } from '@/lib/whatsapp/attachments'
 import crypto from 'crypto'
 import type { WhatsAppMessage } from './twilio-whatsapp'
 import { metaBusinessAccountIds, metaPhoneNumberIdFor } from './whatsapp-meta-numbers'
@@ -82,20 +83,17 @@ export function formatMetaNumber(phone: string): string {
   return cleaned
 }
 
-const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp)(\?|$)/i
-// Voice notes (and other sound files) go as audio: Ogg/Opus plays as a voice
-// note in WhatsApp. Audio messages take no caption.
-const AUDIO_EXTENSIONS = /\.(ogg|opus|mp3|aac|amr|m4a)(\?|$)/i
-
+// Which kind of message a link is sent as, from its extension (our stored
+// paths always end in it): lib/whatsapp/attachments.ts, one rule.
 function mediaPayload(mediaUrl: string, caption: string) {
-  if (AUDIO_EXTENSIONS.test(mediaUrl)) {
-    return { type: 'audio' as const, audio: { link: mediaUrl } }
-  }
-  if (IMAGE_EXTENSIONS.test(mediaUrl)) {
-    return { type: 'image' as const, image: { link: mediaUrl, ...(caption && { caption }) } }
-  }
-  // Everything else (PDFs are the dominant case here) goes as a document so
-  // the recipient gets a real file with a filename, matching Twilio behavior.
+  const kind = kindOfLink(mediaUrl)
+  // Voice notes and other sound files go as audio (Ogg/Opus plays as a voice
+  // note). Audio messages take no caption.
+  if (kind === 'audio') return { type: 'audio' as const, audio: { link: mediaUrl } }
+  if (kind === 'image') return { type: 'image' as const, image: { link: mediaUrl, ...(caption && { caption }) } }
+  if (kind === 'video') return { type: 'video' as const, video: { link: mediaUrl, ...(caption && { caption }) } }
+  // Everything else goes as a document, named after the link's last segment —
+  // the attach button stores files under their own name for exactly this.
   const filename = decodeURIComponent(mediaUrl.split('/').pop()?.split('?')[0] || 'document.pdf')
   return { type: 'document' as const, document: { link: mediaUrl, filename, ...(caption && { caption }) } }
 }
@@ -222,6 +220,8 @@ export interface MetaInboundMessage {
   /** Present for image/document/audio/video/sticker messages */
   mediaId?: string
   mediaType?: string
+  /** A document's own file name, as the customer's WhatsApp sent it. */
+  mediaFilename?: string
   profileName?: string
   timestamp?: string
 }
@@ -264,6 +264,7 @@ export function parseMetaWebhook(payload: any): {
         let body = ''
         let mediaId: string | undefined
         let mediaType: string | undefined
+        let mediaFilename: string | undefined
 
         if (msg.type === 'text') {
           body = msg.text?.body ?? ''
@@ -272,6 +273,7 @@ export function parseMetaWebhook(payload: any): {
           body = media?.caption ?? ''
           mediaId = media?.id
           mediaType = media?.mime_type
+          mediaFilename = typeof media?.filename === 'string' && media.filename.trim() ? media.filename.trim().slice(0, 200) : undefined
         } else if (msg.type === 'button') {
           body = msg.button?.text ?? ''
         } else if (msg.type === 'interactive') {
@@ -290,6 +292,7 @@ export function parseMetaWebhook(payload: any): {
           body,
           mediaId,
           mediaType,
+          mediaFilename,
           profileName,
           timestamp: msg.timestamp
         })

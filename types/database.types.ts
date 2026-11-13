@@ -13467,6 +13467,7 @@ export interface Database {
           metadata: Json | null
           sent_by: string | null
           media_storage_path: string | null
+          media_filename: string | null
         }
         Insert: {
           id?: string
@@ -13486,6 +13487,7 @@ export interface Database {
           metadata?: Json | null
           sent_by?: string | null
           media_storage_path?: string | null
+          media_filename?: string | null
         }
         Update: {
           id?: string
@@ -13505,6 +13507,7 @@ export interface Database {
           metadata?: Json | null
           sent_by?: string | null
           media_storage_path?: string | null
+          media_filename?: string | null
         }
         Relationships: [
           {
