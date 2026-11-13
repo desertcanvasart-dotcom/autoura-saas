@@ -7,7 +7,7 @@ import { PGlite } from '@electric-sql/pglite'
 import {
   checkSendable, resolveMime, safeFileName, downloadName, kindOfLink, extFor, labelFor, SENDABLE_ACCEPT,
 } from '@/lib/whatsapp/attachments'
-import { outboundFilePath, inboundFilePath, storagePathBelongsTo } from '@/lib/whatsapp/voice-note-storage'
+import { outboundFilePath, inboundFilePath, storagePathBelongsTo, uploadWhatsAppMedia } from '@/lib/whatsapp/voice-note-storage'
 import { keepTwilioMedia } from '@/lib/whatsapp/keep-inbound-media'
 import { parseMetaWebhook } from '@/lib/whatsapp-cloud-api'
 
@@ -149,6 +149,32 @@ describe('keeping our own copy of a Twilio file', () => {
     expect(await keepTwilioMedia(fakeAdmin({ media_storage_path: 'inbound/x.pdf' }).admin, { message_sid: sid, media_url: url, media_type: null }, opts)).toEqual({ ok: false, reason: 'already copied' })
     const failed = await keepTwilioMedia(fakeAdmin({ media_storage_path: null }).admin, { message_sid: sid, media_url: url, media_type: null }, { ...opts, fetch: twilio(404) })
     expect(failed).toEqual({ ok: false, reason: 'Twilio answered 404' })
+  })
+})
+
+describe('the storage area is created, privately, when it is missing (live 2026-11-13)', () => {
+  function store(bucketExists: boolean) {
+    const log: string[] = []
+    let exists = bucketExists
+    const client = {
+      storage: {
+        from: () => ({ upload: async (p: string) => { log.push(`upload ${p}`); return { error: exists ? null : { message: 'Bucket not found' } } } }),
+        createBucket: async (name: string, o: { public: boolean }) => { log.push(`create ${name} public=${o.public}`); exists = true; return { error: null } },
+      },
+    }
+    return { client, log }
+  }
+
+  it('creates the PRIVATE bucket and uploads again', async () => {
+    const { client, log } = store(false)
+    expect(await uploadWhatsAppMedia(client, 'inbound/MM1.jpg', new Uint8Array(1), { contentType: 'image/jpeg' })).toEqual({ error: null })
+    expect(log).toEqual(['upload inbound/MM1.jpg', 'create whatsapp-media public=false', 'upload inbound/MM1.jpg'])
+  })
+
+  it('touches nothing else when the bucket is there', async () => {
+    const { client, log } = store(true)
+    await uploadWhatsAppMedia(client, 'x.pdf', new Uint8Array(1), { contentType: 'application/pdf' })
+    expect(log).toEqual(['upload x.pdf'])
   })
 })
 

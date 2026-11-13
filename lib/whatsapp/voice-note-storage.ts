@@ -4,6 +4,38 @@
 
 export const MEDIA_BUCKET = 'whatsapp-media'
 
+/** The part of a storage client that uploads and makes buckets. */
+interface MediaStorage {
+  storage: {
+    from(bucket: string): { upload(path: string, body: Uint8Array | ArrayBuffer | Blob, opts: { contentType: string; upsert?: boolean }): PromiseLike<{ error: { message: string } | null }> }
+    createBucket(name: string, opts: { public: boolean }): PromiseLike<{ error: { message: string } | null }>
+  }
+}
+
+/**
+ * Upload into the whatsapp-media bucket, creating it — PRIVATE — the first
+ * time it is needed. Found 2026-11-13: the bucket did not exist on the live
+ * system (only Meta's inbound path knew how to make it), so every outgoing
+ * voice note, every sent attachment and every kept copy failed with "Bucket
+ * not found". Every upload goes through here so none can miss it again.
+ */
+export async function uploadWhatsAppMedia(
+  client: MediaStorage,
+  path: string,
+  body: Uint8Array | ArrayBuffer | Blob,
+  opts: { contentType: string; upsert?: boolean },
+): Promise<{ error: { message: string } | null }> {
+  let res = await client.storage.from(MEDIA_BUCKET).upload(path, body, opts)
+  if (res.error && /bucket.*not.*found/i.test(res.error.message)) {
+    // PRIVATE: customers' passports and payment slips. Reads go through
+    // /api/whatsapp/media/[id], which checks the caller and signs a link.
+    const made = await client.storage.createBucket(MEDIA_BUCKET, { public: false })
+    if (made.error && !/already exists/i.test(made.error.message)) return { error: made.error }
+    res = await client.storage.from(MEDIA_BUCKET).upload(path, body, opts)
+  }
+  return { error: res.error }
+}
+
 /** A browser voice note is ~10–30 KB a minute; this is generous. */
 export const MAX_VOICE_NOTE_BYTES = 10 * 1024 * 1024
 export const MAX_VOICE_NOTE_SECONDS = 5 * 60
