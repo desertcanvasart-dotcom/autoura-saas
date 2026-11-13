@@ -20,7 +20,7 @@ import { createClient } from '@supabase/supabase-js'
 import { sendGuard } from '@/lib/send-guard'
 import { requireAuth } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
-import { MEDIA_BUCKET, outboundFilePath } from '@/lib/whatsapp/voice-note-storage'
+import { MEDIA_BUCKET, outboundFilePath, uploadWhatsAppMedia } from '@/lib/whatsapp/voice-note-storage'
 import { checkSendable, safeFileName } from '@/lib/whatsapp/attachments'
 
 export const dynamic = 'force-dynamic'
@@ -67,8 +67,7 @@ export async function POST(request: NextRequest) {
 
     const name = safeFileName(file.name, check.mime)
     const path = outboundFilePath(tenant_id, randomUUID(), name)
-    const { error: upErr } = await admin().storage.from(MEDIA_BUCKET)
-      .upload(path, new Uint8Array(await file.arrayBuffer()), { contentType: check.mime, upsert: false })
+    const { error: upErr } = await uploadWhatsAppMedia(admin() as never, path, new Uint8Array(await file.arrayBuffer()), { contentType: check.mime, upsert: false })
     if (upErr) {
       console.error('attachment upload error:', upErr.message)
       return fail('Could not store the file.', 500)

@@ -16,7 +16,7 @@ import { sendGuard } from '@/lib/send-guard'
 import { requireAuth } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { toWhatsAppVoiceNote, oggOpusDurationSeconds, VoiceNoteFormatError } from '@/lib/whatsapp/webm-opus-to-ogg'
-import { MEDIA_BUCKET, outboundVoicePath, MAX_VOICE_NOTE_BYTES, MAX_VOICE_NOTE_SECONDS } from '@/lib/whatsapp/voice-note-storage'
+import { MEDIA_BUCKET, outboundVoicePath, MAX_VOICE_NOTE_BYTES, MAX_VOICE_NOTE_SECONDS, uploadWhatsAppMedia } from '@/lib/whatsapp/voice-note-storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     if (seconds > MAX_VOICE_NOTE_SECONDS) return fail(`Voice notes can be up to ${MAX_VOICE_NOTE_SECONDS / 60} minutes.`, 400)
 
     const path = outboundVoicePath(tenant_id, randomUUID())
-    const { error: upErr } = await admin().storage.from(MEDIA_BUCKET).upload(path, ogg, { contentType: 'audio/ogg', upsert: false })
+    const { error: upErr } = await uploadWhatsAppMedia(admin() as never, path, ogg, { contentType: 'audio/ogg', upsert: false })
     if (upErr) {
       console.error('voice note upload error:', upErr.message)
       return fail('Could not store the voice note.', 500)

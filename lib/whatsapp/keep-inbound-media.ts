@@ -15,7 +15,7 @@
 // (isOwnTwilioMediaUrl); never an arbitrary URL a row was edited to hold.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { MEDIA_BUCKET, inboundFilePath, isOwnTwilioMediaUrl } from './voice-note-storage'
+import { inboundFilePath, isOwnTwilioMediaUrl, uploadWhatsAppMedia } from './voice-note-storage'
 import { bareMime, extFor } from './attachments'
 
 /** Larger than anything WhatsApp delivers (16 MB media, 100 MB documents on Meta). */
@@ -65,7 +65,7 @@ export async function keepTwilioMedia(
 
     const mime = bareMime(res.headers.get('content-type')) || bareMime(row.media_type) || 'application/octet-stream'
     const path = inboundFilePath(row.message_sid, extFor(mime))
-    const up = await admin.storage.from(MEDIA_BUCKET).upload(path, bytes, { contentType: mime, upsert: true })
+    const up = await uploadWhatsAppMedia(admin as never, path, bytes, { contentType: mime, upsert: true })
     if (up.error) return { ok: false, reason: `storage: ${up.error.message}` }
 
     const { error } = await admin

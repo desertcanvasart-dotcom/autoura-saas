@@ -1,5 +1,6 @@
 import { extFor } from '@/lib/whatsapp/attachments'
 import { keepTwilioMedia } from '@/lib/whatsapp/keep-inbound-media'
+import { uploadWhatsAppMedia } from '@/lib/whatsapp/voice-note-storage'
 import { inboundAiAllowed } from '@/lib/ai-guard'
 import { maskPhone } from '@/lib/log-mask'
 // ============================================
@@ -316,20 +317,8 @@ async function persistInboundMedia(
     const safeSid = messageSid.replace(/[^a-zA-Z0-9_-]/g, '_')
     const filePath = `inbound/${safeSid}.${ext}`
 
-    let upload = await admin.storage
-      .from(MEDIA_BUCKET)
-      .upload(filePath, media.buffer, { contentType: media.contentType, upsert: true })
-    if (upload.error && /bucket.*not.*found/i.test(upload.error.message)) {
-      // PRIVATE. This holds whatever a customer sent into a WhatsApp thread —
-      // a passport page, a payment receipt. A public bucket would serve every
-      // one of them to anyone holding the URL, and the path carries no tenant
-      // prefix to scope even a guess. Reads go through
-      // GET /api/whatsapp/media/[id], which re-checks permission and signs.
-      await admin.storage.createBucket(MEDIA_BUCKET, { public: false })
-      upload = await admin.storage
-        .from(MEDIA_BUCKET)
-        .upload(filePath, media.buffer, { contentType: media.contentType, upsert: true })
-    }
+    // Creates the PRIVATE bucket on first use (lib/whatsapp/voice-note-storage).
+    const upload = await uploadWhatsAppMedia(admin as never, filePath, media.buffer, { contentType: media.contentType, upsert: true })
     if (upload.error) {
       console.error('❌ Error storing inbound WhatsApp media:', upload.error)
       return null
