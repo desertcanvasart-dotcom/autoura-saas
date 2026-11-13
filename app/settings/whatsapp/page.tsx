@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import BlockedNumbersCard from '@/components/whatsapp/BlockedNumbersCard'
 import { MessageCircle, Send, Check, AlertCircle, Settings, Phone, Zap, Bot, Sparkles, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 // /api/whatsapp/status — the page read /api/whatsapp/test, which only
@@ -506,6 +507,9 @@ export default function WhatsAppSettingsPage() {
             </div>
           )}
         </div>
+
+        {/* Blocked numbers (migration 465) */}
+        <BlockedNumbersCard />
 
         {/* Quick Start Guide */}
         <div className="bg-primary-600 rounded-lg shadow-sm p-5 text-white">
