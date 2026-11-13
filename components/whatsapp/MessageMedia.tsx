@@ -6,7 +6,8 @@
 // the message before handing over the file.
 
 import { useEffect, useState } from 'react'
-import { FileText, Mic, Loader2, RotateCcw } from 'lucide-react'
+import { Download, FileText, Mic, Loader2, RotateCcw } from 'lucide-react'
+import { labelFor } from '@/lib/whatsapp/attachments'
 import { transcriptOf, type Transcript } from '@/lib/whatsapp/transcript'
 
 export interface MediaMessage {
@@ -15,6 +16,8 @@ export interface MediaMessage {
   media_type?: string | null
   media_url?: string | null
   media_storage_path?: string | null
+  /** The file's own name (migration 466), when it has one. */
+  media_filename?: string | null
   metadata?: unknown
 }
 
@@ -30,11 +33,21 @@ export function hasMedia(m: MediaMessage): boolean {
 /** A short label for lists and previews: "Voice message", "Photo", … */
 export function mediaLabel(mediaType: string | null | undefined): string {
   const t = mediaType || ''
-  if (t.startsWith('audio/')) return 'Voice message'
+  if (t.startsWith('audio/ogg')) return 'Voice message'
   if (t.startsWith('image/')) return 'Photo'
   if (t.startsWith('video/')) return 'Video'
-  if (t === 'application/pdf') return 'PDF'
-  return 'Attachment'
+  // Word, Excel, CSV… by name (lib/whatsapp/attachments).
+  return labelFor(t)
+}
+
+/** "Download", saving the file under its own name (the media route's ?download=1). */
+function DownloadLink({ message }: { message: MediaMessage }) {
+  if (!viaMediaRoute(message)) return null
+  return (
+    <a href={`/api/whatsapp/media/${message.id}?download=1`} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-700 hover:underline">
+      <Download className="w-3.5 h-3.5" aria-hidden /> Download
+    </a>
+  )
 }
 
 export default function MessageMedia({ message }: { message: MediaMessage }) {
@@ -56,21 +69,31 @@ export default function MessageMedia({ message }: { message: MediaMessage }) {
   }
   if (type.startsWith('image/')) {
     return (
-      <a href={src} target="_blank" rel="noopener noreferrer" className="mb-1 block">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a signed, per-view file, not a static asset */}
-        <img src={src} alt="Photo" loading="lazy" className="max-h-64 max-w-full rounded-md" />
-      </a>
+      <div className="mb-1">
+        <a href={src} target="_blank" rel="noopener noreferrer" className="block">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a signed, per-view file, not a static asset */}
+          <img src={src} alt={message.media_filename || 'Photo'} loading="lazy" className="max-h-64 max-w-full rounded-md" />
+        </a>
+        <DownloadLink message={message} />
+      </div>
     )
   }
   if (type.startsWith('video/')) {
     return (
-      <video controls preload="metadata" src={src} className="mb-1 max-h-64 max-w-full rounded-md" />
+      <div className="mb-1">
+        <video controls preload="metadata" src={src} className="max-h-64 max-w-full rounded-md" />
+        <DownloadLink message={message} />
+      </div>
     )
   }
   return (
-    <a href={src} target="_blank" rel="noopener noreferrer" className="mb-1 inline-flex items-center gap-1.5 text-sm text-blue-700 hover:underline">
-      <FileText className="w-4 h-4" aria-hidden /> Open {mediaLabel(type).toLowerCase()}
-    </a>
+    <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <a href={src} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-700 hover:underline">
+        <FileText className="w-4 h-4 shrink-0" aria-hidden />
+        <span className="break-all">{message.media_filename || `Open ${mediaLabel(type).toLowerCase()}`}</span>
+      </a>
+      <DownloadLink message={message} />
+    </div>
   )
 }
 
