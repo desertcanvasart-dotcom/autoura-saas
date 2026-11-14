@@ -336,7 +336,7 @@ export async function loadGridRates(
     // A price that covers several meals (migration 467) is listed once per
     // meal, so a day can take lunch AND dinner from it. The first meal keeps
     // the row's id; a further meal's entry is `<row id>~<meal>`.
-    meals: ((mealRates || []) as Array<MealRateMeals & { id: string }>).flatMap(row => perMealEntries(row)).map((r: any) => ({
+    meals: ((mealRates || []) as unknown as Array<MealRateMeals & { id: string }>).flatMap(row => perMealEntries(row)).map((r: any) => ({
       id: r.id,
       name: `${r.meal_type} - ${r.restaurant_name || 'Restaurant'} (${r.city})`,
       rateEur: toNum(r.base_rate_eur || r.rate_eur),
