@@ -38,8 +38,8 @@ describe('clearPreferredSiblings', () => {
   })
   it('a blank scope column matches the other blank rows (IS NULL), and wildcards are escaped', async () => {
     const { client, calls } = recordingClient()
-    await clearPreferredSiblings(client, 'meal_rates', 't1', { tier: '', meal_type: '50%_lunch' }, 'm1')
-    expect(calls.slice(-2)).toEqual([['is', ['tier', null]], ['ilike', ['meal_type', '50\\%\\_lunch']]])
+    await clearPreferredSiblings(client, 'accommodation_rates', 't1', { tier: '', city: '50%_lunch' }, 'm1')
+    expect(calls.slice(-2)).toEqual([['ilike', ['city', '50\\%\\_lunch']], ['is', ['tier', null]]])
   })
   it('scopes mirror the engine pools and the migration-354 indexes', () => {
     expect(PREFERRED_SCOPES.accommodation_rates.columns).toEqual(['city', 'tier'])

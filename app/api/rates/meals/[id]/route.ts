@@ -3,6 +3,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
+import { mealRateLists, touchesMeals } from '@/lib/meals/meal-rate-meals'
 
 export async function GET(
   request: NextRequest,
@@ -80,7 +81,19 @@ Object.assign(updateData, rateCurrencyWriteField(body))
 
     if (body.service_code !== undefined) updateData.service_code = body.service_code
     if (body.restaurant_name !== undefined) updateData.restaurant_name = body.restaurant_name
-    if (body.meal_type !== undefined) updateData.meal_type = body.meal_type || null
+    // One price for every meal it covers (467). The form sends the whole list
+    // (`meal_types`); a body that names only `meal_type` keeps the further
+    // meals the row already has unless it says otherwise.
+    if (touchesMeals(body)) {
+      if (Array.isArray(body.meal_types) || 'other_meal_types' in body) {
+        const meals = mealRateLists(body)
+        updateData.meal_type = meals.meal_type
+        updateData.other_meal_types = meals.other_meal_types
+      } else {
+        updateData.meal_type = body.meal_type || null
+        if (!updateData.meal_type) updateData.other_meal_types = []
+      }
+    }
     if (body.cuisine_type !== undefined) updateData.cuisine_type = body.cuisine_type || null
     if (body.restaurant_type !== undefined) updateData.restaurant_type = body.restaurant_type || null
     if (body.city !== undefined) updateData.city = body.city || null
@@ -104,7 +117,7 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     // One preferred restaurant per tier + meal (migration 354): flagging this
     // one clears its siblings first, so the form can never trip the index.
     if (updateData.is_preferred === true) {
-      const { data: current } = await supabase.from('meal_rates').select('tier, meal_type').eq('id', id).eq('tenant_id', authResult.tenant_id).maybeSingle()
+      const { data: current } = await supabase.from('meal_rates').select('tier, meal_type, other_meal_types').eq('id', id).eq('tenant_id', authResult.tenant_id).maybeSingle()
       const scopeRow = { ...(current || {}), ...updateData }
       const cleared = await clearPreferredSiblings(supabase, 'meal_rates', authResult.tenant_id!, scopeRow, id)
       if (cleared.error) return NextResponse.json({ success: false, error: cleared.error }, { status: 500 })
