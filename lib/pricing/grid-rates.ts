@@ -6,7 +6,7 @@
 // Multi-tenant: read through the caller's RLS-scoped client, so every table
 // read is filtered to the authenticated user's tenant.
 
-import { perMealEntries } from '@/lib/meals/meal-rate-meals'
+import { perMealEntries, type MealRateMeals } from '@/lib/meals/meal-rate-meals'
 import { cruisePpdNightEur, cruisePpdNightNonEur } from '@/lib/rates/cruise-ppd'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
@@ -336,7 +336,7 @@ export async function loadGridRates(
     // A price that covers several meals (migration 467) is listed once per
     // meal, so a day can take lunch AND dinner from it. The first meal keeps
     // the row's id; a further meal's entry is `<row id>~<meal>`.
-    meals: (mealRates || []).flatMap((row: any) => perMealEntries(row)).map((r: any) => ({
+    meals: ((mealRates || []) as Array<MealRateMeals & { id: string }>).flatMap(row => perMealEntries(row)).map((r: any) => ({
       id: r.id,
       name: `${r.meal_type} - ${r.restaurant_name || 'Restaurant'} (${r.city})`,
       rateEur: toNum(r.base_rate_eur || r.rate_eur),
