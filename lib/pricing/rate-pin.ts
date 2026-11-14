@@ -6,6 +6,8 @@
 // itinerary later (the B2B quote, a single supplement) reads that row and
 // never re-chooses one by tier.
 
+import { mealRateRowId } from '@/lib/meals/meal-rate-meals'
+
 /** Grid slot → the rate table its options come from (see /api/pricing-grid/rates). */
 const SLOT_RATE_TABLE: Record<string, string> = {
   accommodation: 'accommodation_rates',
@@ -29,7 +31,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export function ratePin(slotId: string, rateId: unknown): { rate_table: string; rate_id: string } | Record<string, never> {
   const table = SLOT_RATE_TABLE[slotId]
-  if (!table || typeof rateId !== 'string' || !UUID_RE.test(rateId)) return {}
-  return { rate_table: table, rate_id: rateId }
+  if (!table || typeof rateId !== 'string') return {}
+  // A meal price that covers several meals is listed once per meal
+  // (`<row id>~<meal>`, migration 467): every entry is the one row's price.
+  const rowId = slotId === 'meals' ? mealRateRowId(rateId) : rateId
+  if (!UUID_RE.test(rowId)) return {}
+  return { rate_table: table, rate_id: rowId }
 }
 

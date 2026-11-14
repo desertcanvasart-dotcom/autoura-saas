@@ -74,6 +74,7 @@ import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-f
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
+import { rateServesMeal } from '@/lib/meals/meal-rate-meals'
 import { priceByBasis, toPricingBasis, unitsFor, type PricingBasis } from '@/lib/pricing/pricing-basis'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
@@ -2056,7 +2057,8 @@ export async function getMealRates(
   tier: ServiceTier
 ): Promise<MealRatesResult | null> {
   try {
-    // meal_rates holds one row per meal_type AND tier, with the rate in
+    // meal_rates holds one row per restaurant price AND tier (a price names
+    // the meal or meals it covers — meal_type + other_meal_types), with the rate in
     // `base_rate_eur`. This selected `lunch_rate_eur, dinner_rate_eur`, which
     // do not exist on the table — PostgREST returns them as absent, the null
     // check below caught it, and this function has therefore returned null for
@@ -2073,6 +2075,7 @@ export async function getMealRates(
     const rows = (mealRows ?? []) as Array<{
       id?: string
       meal_type?: string | null
+      other_meal_types?: string[] | null
       restaurant_name?: string | null
       base_rate_eur?: number | string | null
       is_preferred?: boolean | null
@@ -2084,7 +2087,10 @@ export async function getMealRates(
     for (const kind of MEAL_KINDS) {
       // Several restaurants serve the same meal in this tier: the preferred
       // one, else a hole naming them — never `find()`'s first row.
-      const matches = rows.filter((r) => String(r.meal_type ?? '').toLowerCase().includes(kind))
+      // A price serves the meal when it is its first meal or one of the
+      // further meals it covers (migration 467) — one row may be both the
+      // lunch and the dinner price.
+      const matches = rows.filter((r) => rateServesMeal(r, kind))
       const chosen = pickCandidate(matches, (r) => r.restaurant_name || r.meal_type || r.id || '?')
       if (chosen.kind === 'ambiguous') {
         ambiguous[kind] = { count: chosen.count, names: chosen.names, preferredCount: chosen.preferredCount }

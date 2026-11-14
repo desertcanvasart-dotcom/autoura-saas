@@ -253,6 +253,9 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       id(), serviceCode(),
       col('restaurant_name', 'Restaurant Name', 'text', true),
       col('meal_type', 'Meal Type', 'text', false),
+      // The further meals the same price covers (migration 467): one row,
+      // semicolon-separated, e.g. meal_type lunch + other_meal_types dinner.
+      col('other_meal_types', 'Other Meal Types', 'text', false),
       col('cuisine_type', 'Cuisine Type', 'text', false),
       col('restaurant_type', 'Restaurant Type', 'text', false),
       col('city', 'City', 'text', false),
@@ -945,7 +948,7 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
   if (column === 'sailing_days') return formatSailingDaysCell(row.sailing_days)
   if (column === 'tiers' && table === 'activity_rates') return formatTiersCell(row.tiers)
-  if (column === 'other_cities' || column === 'other_languages') {
+  if (column === 'other_cities' || column === 'other_languages' || column === 'other_meal_types') {
     const v = row[column]
     return Array.isArray(v) ? v.join('; ') : (v ?? '')
   }
@@ -1106,7 +1109,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'sailing_days') return 'mon;fri'
   if (name === 'tiers') return ''
   if (name === 'dietary_options') return 'vegetarian; vegan'
-  if (name === 'other_cities' || name === 'other_languages') return ''
+  if (name === 'other_cities' || name === 'other_languages' || name === 'other_meal_types') return ''
   if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'

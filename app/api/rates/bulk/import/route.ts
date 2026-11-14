@@ -199,6 +199,19 @@ export async function POST(request: NextRequest) {
         }
         record.other_languages = keys.join(';')
       }
+      // A meal price's further meals (467): each word is a meal type,
+      // resolved like the Meal Type column; none is guessed.
+      if (config.tableName === 'meal_rates' && typeof record.other_meal_types === 'string' && record.other_meal_types.trim()) {
+        const items = vocab.meal_type ?? []
+        const keys: string[] = []
+        for (const word of record.other_meal_types.split(/[;|]/).map((x: string) => x.trim()).filter(Boolean)) {
+          const key = items.length ? resolveVocabularyKey(items, word) : word
+          if (key) keys.push(key)
+          else vocabErrors.push({ row: lineOf(i), column: 'other_meal_types', message: `other_meal_types: "${word}" is not in your meal type list (Settings → Your vocabulary)` })
+        }
+        if (keys.length && !String(record.meal_type ?? '').trim()) vocabErrors.push({ row: lineOf(i), column: 'other_meal_types', message: 'other_meal_types: give the first meal in Meal Type' })
+        record.other_meal_types = keys.join(';')
+      }
       return record as Record<string, string>
     })
     if (vocabErrors.length > 0) {
@@ -272,6 +285,13 @@ export async function POST(request: NextRequest) {
         if (config.tableName === 'guide_rates' && typeof record[listColumn] === 'string') {
           record[listColumn] = record[listColumn].split(/[;|]/).map((x: string) => x.trim()).filter(Boolean)
         }
+      }
+
+      // A meal price's further meals (467): the cell's list, without the
+      // first meal said again.
+      if (config.tableName === 'meal_rates' && typeof record.other_meal_types === 'string') {
+        const first = String(record.meal_type ?? '').trim().toLowerCase()
+        record.other_meal_types = [...new Set(record.other_meal_types.split(/[;|]/).map((x: string) => x.trim()).filter((x: string) => x && x.toLowerCase() !== first))]
       }
 
       // A meal's dietary options: the cell's list, stored as the form stores it.

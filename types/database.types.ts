@@ -7060,6 +7060,7 @@ export interface Database {
           per_person_rate: boolean | null
           minimum_pax: number | null
           notes: string | null
+          other_meal_types: string[]
           is_active: boolean | null
           updated_at: string | null
           is_preferred: boolean | null
@@ -7088,6 +7089,7 @@ export interface Database {
           per_person_rate?: boolean | null
           minimum_pax?: number | null
           notes?: string | null
+          other_meal_types?: string[]
           is_active?: boolean | null
           updated_at?: string | null
           is_preferred?: boolean | null
@@ -7116,6 +7118,7 @@ export interface Database {
           per_person_rate?: boolean | null
           minimum_pax?: number | null
           notes?: string | null
+          other_meal_types?: string[]
           is_active?: boolean | null
           updated_at?: string | null
           is_preferred?: boolean | null

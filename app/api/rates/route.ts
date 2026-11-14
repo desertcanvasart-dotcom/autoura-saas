@@ -102,6 +102,8 @@ export async function GET(request: NextRequest) {
           service_code: meal.service_code || meal.id,
           restaurant_name: meal.restaurant_name,
           meal_type: meal.meal_type,
+          // The further meals the same price covers (migration 467).
+          other_meal_types: meal.other_meal_types ?? [],
           cuisine_type: meal.cuisine_type,
           restaurant_type: meal.restaurant_type,
           tier: meal.tier,

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     for (const target of targets) {
       const { data: row, error: readError } = await db
         .from(table)
-        .select(['id', 'tenant_id', scope.nameColumn, ...scope.columns].join(', '))
+        .select(['id', 'tenant_id', scope.nameColumn, ...scope.columns, ...(scope.listColumns ?? [])].join(', '))
         .eq('id', target)
         .eq('tenant_id', tenant_id)
         .maybeSingle()

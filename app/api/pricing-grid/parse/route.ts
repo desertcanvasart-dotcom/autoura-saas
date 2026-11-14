@@ -1,3 +1,4 @@
+import { perMealEntries } from '@/lib/meals/meal-rate-meals'
 import { operatingCountryOf, regionTravelPhrase, isEgypt } from '@/lib/tenant-region'
 // ============================================
 // POST /api/pricing-grid/parse
@@ -79,7 +80,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
     admin.from('accommodation_rates').select(HOTEL_COLUMNS).eq('tenant_id', tenantId).eq('is_active', true),
     admin.from('entrance_fees').select('id, attraction_name, city, eur_rate, non_eur_rate, category, rate_currency').eq('tenant_id', tenantId),
     admin.from('flight_rates').select('id, route_from, route_to, route_name, airline, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
-    admin.from('meal_rates').select('id, restaurant_name, meal_type, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
+    admin.from('meal_rates').select('id, restaurant_name, meal_type, other_meal_types, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
     admin.from('nile_cruises').select('id, ship_name, cabin_type, tier, route_name, embark_city, disembark_city, ppd_eur, ppd_non_eur, single_supplement_eur, duration_nights, meals_included, sightseeing_included, rate_currency').eq('tenant_id', tenantId).eq('is_active', true).eq('tier', tier),
     admin.from('sleeping_train_rates').select('id, origin_city, destination_city, cabin_type, rate_oneway_eur, operator_name, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
   ])
@@ -129,7 +130,11 @@ async function fetchAllRates(tenantId: string, tier: string) {
 
   return {
     transportation, guides, airport_staff, hotel_staff, tipping, activities,
-    accommodation, entrance_fees, flights, meals, cruises, sleeping_trains,
+    accommodation, entrance_fees, flights,
+    // A price that covers several meals (migration 467) is listed once per
+    // meal, under the same ids the grid's own list uses.
+    meals: (meals as Array<{ id: string }>).flatMap(r => perMealEntries(r)),
+    cruises, sleeping_trains,
   }
 }
 

@@ -89,7 +89,7 @@ describe('where the grid’s prices come from', () => {
     expect(save).not.toContain('totals?.sellingPriceTotal')
     expect(save).not.toContain('body.throughout_extras')
     // A rate with no pinnable row keeps its id where the reload reads it.
-    expect(save).toContain("const idNote = !('rate_id' in pin) && item.rateId ? ` |rate_id:${item.rateId}` : ''")
+    expect(save).toContain("const idNote = item.rateId && (!('rate_id' in pin) || pin.rate_id !== item.rateId) ? ` |rate_id:${item.rateId}` : ''")
   })
 
   it('the page sends its picks only, and shows today’s rates after a save that moved them', () => {

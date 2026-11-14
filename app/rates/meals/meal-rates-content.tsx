@@ -13,6 +13,8 @@ import PreferredStar, { type PreferredToggleResult } from '@/app/components/Pref
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import { TierBadge, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
+import ChipPicker from '@/components/rates/ChipPicker'
+import { mealTypesOf } from '@/lib/meals/meal-rate-meals'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
@@ -33,6 +35,8 @@ interface MealRate {
   service_code: string
   restaurant_name: string
   meal_type?: string
+  /** The further meals this same price covers (467). */
+  other_meal_types?: string[] | null
   cuisine_type?: string
   restaurant_type?: string
   city?: string
@@ -78,6 +82,13 @@ export default function MealRatesContent() {
   const [selectedMealType, setSelectedMealType] = useState('')
   const [selectedCuisine, setSelectedCuisine] = useState('')
   const { items: dietaryItems } = useVocabulary('dietary_option')
+  // The agency's meals (Settings → Your vocabulary), in its own order.
+  const { items: mealTypeItems, labelFor: mealTypeLabel } = useVocabulary('meal_type')
+  const inMealOrder = (meals: string[]) => {
+    const order = mealTypeItems.map(m => m.key)
+    const at = (k: string) => (order.indexOf(k) === -1 ? order.length : order.indexOf(k))
+    return [...meals].sort((a, b) => at(a) - at(b))
+  }
   const [selectedTier, setSelectedTier] = useState('')
   const [selectedSupplier, setSelectedSupplier] = useState(initialSupplierId)
   const [showInactive, setShowInactive] = useState(false)
@@ -131,7 +142,8 @@ export default function MealRatesContent() {
   const [formData, setFormData] = useState({
     service_code: '',
     restaurant_name: '',
-    meal_type: '',
+    // Every meal this one price covers (467), e.g. lunch and dinner.
+    meal_types: [] as string[],
     cuisine_type: '',
     restaurant_type: '',
     city: '',
@@ -240,7 +252,7 @@ export default function MealRatesContent() {
     setFormData({
       service_code: generateServiceCode(),
       restaurant_name: '',
-      meal_type: '',
+      meal_types: [],
       cuisine_type: '',
       restaurant_type: '',
       city: '',
@@ -269,7 +281,7 @@ export default function MealRatesContent() {
     setFormData({
       service_code: rate.service_code || '',
       restaurant_name: rate.restaurant_name || '',
-      meal_type: rate.meal_type || '',
+      meal_types: mealTypesOf(rate),
       cuisine_type: rate.cuisine_type || '',
       restaurant_type: rate.restaurant_type || '',
       city: rate.city || '',
@@ -298,7 +310,7 @@ export default function MealRatesContent() {
     setFormData({
       service_code: generateServiceCode(),
       restaurant_name: rate.restaurant_name || '',
-      meal_type: rate.meal_type || '',
+      meal_types: mealTypesOf(rate),
       cuisine_type: rate.cuisine_type || '',
       restaurant_type: rate.restaurant_type || '',
       city: rate.city || '',
@@ -465,7 +477,7 @@ export default function MealRatesContent() {
       rate.city?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesCity = selectedCity === '' || rate.city === selectedCity
-    const matchesMealType = selectedMealType === '' || rate.meal_type === selectedMealType
+    const matchesMealType = selectedMealType === '' || mealTypesOf(rate).includes(selectedMealType)
     const matchesCuisine = selectedCuisine === '' || rate.cuisine_type === selectedCuisine
     const matchesTier = selectedTier === '' || rate.tier === selectedTier
     const matchesSupplier = selectedSupplier === '' || rate.supplier_id === selectedSupplier
@@ -847,10 +859,14 @@ export default function MealRatesContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {rate.meal_type ? (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
-                          <VocabLabel kind="meal_type" value={rate.meal_type} />
-                        </span>
+                      {mealTypesOf(rate).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {mealTypesOf(rate).map(meal => (
+                            <span key={meal} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
+                              <VocabLabel kind="meal_type" value={meal} />
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
                       )}
@@ -928,11 +944,11 @@ export default function MealRatesContent() {
                 </div>
 
                 <div className="flex items-center gap-2 mb-2">
-                  {rate.meal_type && (
-                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
-                      <VocabLabel kind="meal_type" value={rate.meal_type} />
+                  {mealTypesOf(rate).map(meal => (
+                    <span key={meal} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                      <VocabLabel kind="meal_type" value={meal} />
                     </span>
-                  )}
+                  ))}
                   {getTierBadge(rate.tier)}
                 </div>
 
@@ -990,11 +1006,11 @@ export default function MealRatesContent() {
                   <Utensils className="w-4 h-4 text-amber-500" />
                   <span className="font-medium text-gray-900">{rate.restaurant_name}</span>
                   <span className="text-sm text-gray-500">{rate.city || '—'}</span>
-                  {rate.meal_type && (
-                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
-                      <VocabLabel kind="meal_type" value={rate.meal_type} />
+                  {mealTypesOf(rate).map(meal => (
+                    <span key={meal} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                      <VocabLabel kind="meal_type" value={meal} />
                     </span>
-                  )}
+                  ))}
                   {getTierBadge(rate.tier)}
                 </div>
                 <div className="flex items-center gap-4">
@@ -1162,9 +1178,20 @@ export default function MealRatesContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Meal Type</label>
-                    <VocabSelect kind="meal_type" name="meal_type" value={formData.meal_type} onChange={v => setFormData(prev => ({ ...prev, meal_type: v }))} placeholder="Select Meal Type" />
+                  {/* One price for every meal it covers (467): the same menu at
+                      the same price for lunch and dinner is ONE row. */}
+                  <div className="col-span-full rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <ChipPicker
+                      label="Meals this price is for"
+                      options={[...new Set([...mealTypeItems.map(m => m.key), ...formData.meal_types])].map(k => ({ value: k, label: mealTypeLabel(k) }))}
+                      value={formData.meal_types}
+                      onChange={v => setFormData(prev => ({ ...prev, meal_types: inMealOrder(v) }))}
+                    />
+                    <p className="text-xs text-gray-600 mt-2">
+                      {formData.meal_types.length > 1
+                        ? `One price for ${formData.meal_types.map(mealTypeLabel).join(' and ')} — no need to enter it again for each meal.`
+                        : 'Pick every meal this menu is served at for the same price, e.g. Lunch and Dinner.'}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Cuisine Type</label>

@@ -319,7 +319,9 @@ export async function POST(request: NextRequest) {
           // id in the description, where the reload (slot-mapping.ts) reads
           // it — so a re-save prices it from the rates again.
           const pin = ratePin(slot.slotId, item.rateId)
-          const idNote = !('rate_id' in pin) && item.rateId ? ` |rate_id:${item.rateId}` : ''
+          // (A further meal of a several-meal price is pinned to its row AND
+          // keeps its own entry id, so the reload shows the dinner as dinner.)
+          const idNote = item.rateId && (!('rate_id' in pin) || pin.rate_id !== item.rateId) ? ` |rate_id:${item.rateId}` : ''
           // Airport / hotel services and activities: quantity and total by the
           // item's own basis (per group / per person / per unit).
           const byBasis = BASIS_SLOTS.has(slot.slotId) ? itemCost(slot.slotId, item, rate, pax) : null

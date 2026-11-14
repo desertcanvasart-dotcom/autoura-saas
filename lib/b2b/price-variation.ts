@@ -18,6 +18,7 @@ import { selectVehicleFromPackage } from '@/lib/pricing/package-vehicle'
 import { vehicleBandsForTenant } from '@/lib/vocabulary-server'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getCurrencySymbol } from '@/lib/currency'
+import { rateServesMeal } from '@/lib/meals/meal-rate-meals'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR - v6
@@ -745,7 +746,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
 
             const { data: mealRowsRaw } = await (getSupabaseAdmin() as any)
               .from('meal_rates')
-              .select('meal_type, base_rate_eur, rate_currency')
+              .select('meal_type, other_meal_types, base_rate_eur, rate_currency')
               .eq('is_active', true)
               .eq('tenant_id', tenantId)
               // The variation's own tier, as every other line here.
@@ -754,7 +755,7 @@ export async function priceVariation(tenantId: string, body: any): Promise<Price
             const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', mealRowsRaw, runCurrency, tenantId)
 
             const match = (mealRows ?? []).find(
-              (r: any) => String(r.meal_type ?? '').toLowerCase().includes(mealType)
+              (r: any) => rateServesMeal(r, mealType)
             )
             const mealRate = Number(match?.base_rate_eur)
 

@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { validateRatePayload } from '@/lib/rate-validation'
 import { fetchAllPages } from '@/lib/db/fetch-all-pages'
+import { mealRateLists } from '@/lib/meals/meal-rate-meals'
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,7 +46,9 @@ export async function GET(request: NextRequest) {
 
       if (supplierId) query = query.eq('supplier_id', supplierId)
       if (city) query = query.eq('city', city)
-      if (mealType) query = query.eq('meal_type', mealType)
+      // A price serves the meal when it is its first meal or one of the
+      // further meals it covers (migration 467).
+      if (mealType) query = query.or(`meal_type.eq."${mealType.replace(/"/g, '')}",other_meal_types.cs.{"${mealType.replace(/"/g, '')}"}`)
       if (cuisineType) query = query.eq('cuisine_type', cuisineType)
       if (tier) query = query.eq('tier', tier)
       if (activeOnly) query = query.eq('is_active', true)
@@ -96,12 +99,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // One price for every meal it covers (467): the first meal and the rest.
+    const meals = mealRateLists(body)
+
     const newRate = {
       ...rateCurrencyWriteField(body),
       tenant_id,
       service_code: body.service_code || `MEAL-${Date.now().toString(36).toUpperCase()}`,
       restaurant_name: body.restaurant_name,
-      meal_type: body.meal_type || null,
+      meal_type: meals.meal_type,
+      other_meal_types: meals.other_meal_types,
       cuisine_type: body.cuisine_type || null,
       restaurant_type: body.restaurant_type || null,
       city: body.city || null,
@@ -125,7 +132,8 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== false
     }
 
-    // One preferred restaurant per tier + meal (migration 354).
+    // One preferred restaurant per tier + meal (migration 354) — every meal
+    // this price covers (467).
     if (newRate.is_preferred) {
       const cleared = await clearPreferredSiblings(supabase, 'meal_rates', authResult.tenant_id!, newRate, '00000000-0000-0000-0000-000000000000')
       if (cleared.error) return NextResponse.json({ success: false, error: cleared.error }, { status: 500 })

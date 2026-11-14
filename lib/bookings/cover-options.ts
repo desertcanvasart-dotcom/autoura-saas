@@ -17,6 +17,8 @@
 // columns below), the same currency, both valid on the day, and single-rate
 // (or scale the same for EU and non-EU) — otherwise no figure.
 
+import { coversMeals, type MealRateMeals } from '@/lib/meals/meal-rate-meals'
+
 /** Line → which of the agency's own resources may cover it (itinerary_resources.resource_type). */
 export function ownResourceTypes(supplierType: string, rateTable: string | null | undefined): string[] {
   if (rateTable === 'airport_staff_rates') return ['airport_staff']
@@ -52,7 +54,7 @@ const PREFERRED_COLUMN: Record<string, string> = { meal_rates: 'is_preferred', t
 
 /** Columns a sheet's "same service" also reads: a guide price lists the
  *  further cities and languages it covers (migration 463). */
-const LIST_COLUMNS: Record<string, readonly string[]> = { guide_rates: ['other_cities', 'other_languages'] }
+const LIST_COLUMNS: Record<string, readonly string[]> = { guide_rates: ['other_cities', 'other_languages'], meal_rates: ['other_meal_types'] }
 
 export function rateColumns(table: string): string {
   return ['id', 'supplier_id', 'rate_currency', 'is_active', ...(SAME_SERVICE_KEYS[table] ?? []), ...(LIST_COLUMNS[table] ?? []), ...(RATE_FIGURES[table] ?? []), ...(PREFERRED_COLUMN[table] ? [PREFERRED_COLUMN[table]] : [])].join(', ')
@@ -91,6 +93,12 @@ export function sameService(table: string, a: RateRow, b: RateRow): boolean {
     return citiesOk
       && covers(listOf(a.guide_language, a.other_languages), listOf(b.guide_language, b.other_languages))
       && keys.filter(k => k !== 'city' && k !== 'guide_language').every(k => norm(a[k]) === norm(b[k]))
+  }
+  // A meal price covers a list of meals (467): `b` must serve every meal `a`
+  // does, so a restaurant is never costed for a meal it has no price for.
+  if (table === 'meal_rates') {
+    return coversMeals(a as MealRateMeals, b as MealRateMeals)
+      && keys.filter(k => k !== 'meal_type').every(k => norm(a[k]) === norm(b[k]))
   }
   return keys.every(k => norm(a[k]) === norm(b[k]))
 }
