@@ -100,14 +100,18 @@ A quote with no hotel uses the day's stated zone, else the default.
   step 5.
 
 ### Step 2 — Hotels carry a zone
-- Migration: `supplier_properties.zone` (text, nullable).
-- Hotel form (app/rates/hotels/hotels-content.tsx) and supplier property form:
-  an **Area** dropdown listing the zones of the hotel's city; required if the
-  city has zones (D7); changing the city clears it.
-- Property CSV import/export (app/api/suppliers/properties/*) and the hotel rate
-  sheet (lib/rates/rate-sheet.ts) gain a `Zone` column; an unknown zone is
-  refused with the row number.
-- Hotel list: Zone column + "No zone yet" filter.
+- **Built as PR #831 (migration 470).** Stored on the hotel's **rate row**
+  (`accommodation_rates.zone`) beside its city, not on `supplier_properties`:
+  property records often have no city (Travel2Egypt 0 of 13) and some
+  agencies' hotel rows link to no property. Saving one row moves the hotel's
+  other rows in the same city to the same area.
+- Hotel form (Rates → Hotels): an **Area** dropdown listing the zones of the
+  hotel's city; required if the city has zones (D7); changing the city clears it.
+- Hotel rate sheet: a `Zone` column (name or key); an unknown or other-city
+  zone is refused with the row number; blank keeps the stored value.
+- Hotel list: the area under the city, "No area yet" for unset hotels in a
+  zoned city, and a "No area yet" filter.
+- Settings → Zones refuses to delete an area hotels are in, naming them.
 
 ### Step 3 — Transport cards carry a zone and their sights
 - Migration: `transportation_rates.zone` (text) and `covers_sights` (text[],
