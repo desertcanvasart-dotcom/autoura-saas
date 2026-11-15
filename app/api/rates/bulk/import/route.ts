@@ -14,7 +14,7 @@ import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type Voc
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { linkRowsBySupplierName, supplierNameGapMessage } from '@/lib/rates/link-supplier-by-name'
 import { fetchAllPages } from '@/lib/db/fetch-all-pages'
-import { clearPreferredSiblings, describeScope, isPreferredTable, PREFERRED_SCOPES } from '@/lib/rates/preferred'
+import { clearPreferredSiblings, describeScope, isPreferredTable, rowsShareStar } from '@/lib/rates/preferred'
 
 export async function POST(request: NextRequest) {
   try {
@@ -597,13 +597,12 @@ export async function POST(request: NextRequest) {
     // imported without the star and named.
     if (isPreferredTable(config.tableName)) {
       const table = config.tableName
-      const scopeCols = PREFERRED_SCOPES[table].columns
-      const scopeOf = (r: Record<string, unknown>) => scopeCols.map(c => String(r[c] ?? '').trim().toLowerCase()).join('\u0000')
-      const claimed = new Set<string>()
+      // Same slot = the toggle's own rule (a meal price's meals, a cruise's
+      // route, length and weekdays — lib/rates/preferred.ts rowsShareStar).
+      const claimed: Array<Record<string, unknown>> = []
       for (const r of partition.rows) {
         if (r.is_preferred !== true) continue
-        const scope = scopeOf(r)
-        if (claimed.has(scope)) {
+        if (claimed.some(c => rowsShareStar(table, c, r))) {
           r.is_preferred = false
           importErrors.push({
             row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '),
@@ -612,7 +611,7 @@ export async function POST(request: NextRequest) {
           })
           continue
         }
-        claimed.add(scope)
+        claimed.push(r)
         const stored = matchesOfRow(r)
         const ownId = stored?.length === 1 ? String(stored[0].id) : '00000000-0000-0000-0000-000000000000'
         const cleared = await clearPreferredSiblings(supabase, table, tenant_id, r, ownId)

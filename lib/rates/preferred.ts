@@ -8,6 +8,7 @@
 // candidate pools and the partial unique indexes in migration 354.
 
 import { mealsOverlap } from '@/lib/meals/meal-rate-meals'
+import { cruisesCompete, describeCruiseScope } from '@/lib/rates/cruise-candidates'
 
 export type PreferredTable = 'accommodation_rates' | 'nile_cruises' | 'meal_rates' | 'guides' | 'transportation_rates'
 
@@ -25,7 +26,13 @@ interface ScopeDef {
 
 export const PREFERRED_SCOPES: Record<PreferredTable, ScopeDef> = {
   accommodation_rates: { columns: ['city', 'tier'], nameColumn: 'property_name', page: 'Rates → Hotels' },
-  nile_cruises: { columns: ['tier'], nameColumn: 'ship_name', page: 'Rates → Cruises' },
+  // Cruises: one preferred ship per tier, ROUTE and length (operator,
+  // 2026-11-15: "one boat per route") — lib/rates/cruise-candidates.ts. It was
+  // one per tier, so starring the 4-night Luxor sailing unticked the 3-night
+  // Aswan one. Lengths are a list, so the star clears only the rows it
+  // overlaps — see clearPreferredCruiseSiblings. Migration 468 dropped the
+  // one-per-tier index.
+  nile_cruises: { columns: ['tier', 'embark_city', 'disembark_city'], listColumns: ['duration_nights'], nameColumn: 'ship_name', page: 'Rates → Cruises' },
   // Meals: one preferred restaurant per tier AND meal. A price may cover
   // several meals (migration 467), so its star clears every starred price in
   // the tier that shares a meal with it — see clearPreferredMealSiblings.
@@ -54,6 +61,7 @@ export function isPreferredTable(t: unknown): t is PreferredTable {
 
 /** Human description of a scope, for toasts: "standard · Cairo". */
 export function describeScope(table: PreferredTable, row: Record<string, unknown>): string {
+  if (table === 'nile_cruises') return describeCruiseScope(row)
   const scope = PREFERRED_SCOPES[table]
   return [...scope.columns.map(c => row[c]), ...(scope.listColumns ?? []).flatMap(c => (Array.isArray(row[c]) ? row[c] as unknown[] : []))]
     .filter(v => v !== null && v !== undefined && v !== '')
@@ -87,6 +95,7 @@ export async function clearPreferredSiblings(
   excludeId: string
 ): Promise<{ error: string | null }> {
   if (table === 'meal_rates') return clearPreferredMealSiblings(client, tenantId, row, excludeId)
+  if (table === 'nile_cruises') return clearPreferredCruiseSiblings(client, tenantId, row, excludeId)
   let q = (client as MinimalClient)
     .from(table)
     .update({ is_preferred: false })
@@ -151,4 +160,52 @@ export async function clearPreferredMealSiblings(
   if (ids.length === 0) return { error: null }
   const cleared = await db.from('meal_rates').update({ is_preferred: false }).eq('tenant_id', tenantId).in('id', ids)
   return { error: cleared.error ? cleared.error.message : null }
+}
+
+// ---- Cruises: the scope has lists ---------------------------------------------
+
+/**
+ * Starring a sailing clears the star on every other sailing a tour could be
+ * priced from instead: same tier and route, overlapping length
+ * (lib/rates/cruise-candidates.ts). The 3-night Aswan → Luxor star and the
+ * 4-night Luxor → Aswan star no longer clear each other.
+ */
+export async function clearPreferredCruiseSiblings(
+  client: unknown,
+  tenantId: string,
+  row: Record<string, unknown>,
+  excludeId: string
+): Promise<{ error: string | null }> {
+  const db = client as unknown as {
+    from(table: string): {
+      select(columns: string): MealReadBuilder
+      update(values: Record<string, unknown>): MealWriteBuilder
+    }
+  }
+  let q = db
+    .from('nile_cruises')
+    .select('id, tier, embark_city, disembark_city, duration_nights')
+    .eq('tenant_id', tenantId)
+    .eq('is_preferred', true)
+    .neq('id', excludeId)
+  const tier = row.tier
+  if (tier === null || tier === undefined || tier === '') q = q.is('tier', null)
+  else q = q.ilike('tier', String(tier).replace(/[%_]/g, m => `\\${m}`))
+  const { data, error } = await q
+  if (error) return { error: error.message }
+  const ids = (data ?? []).filter(other => cruisesCompete(row, other)).map(other => String(other.id))
+  if (ids.length === 0) return { error: null }
+  const cleared = await db.from('nile_cruises').update({ is_preferred: false }).eq('tenant_id', tenantId).in('id', ids)
+  return { error: cleared.error ? cleared.error.message : null }
+}
+
+/**
+ * Whether two rows of a table hold the same preferred slot — the bulk
+ * import's "two stars in one file" check, by the same rule the toggle clears by.
+ */
+export function rowsShareStar(table: PreferredTable, a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  if (table === 'nile_cruises') return cruisesCompete(a, b)
+  const same = (c: string) => String(a[c] ?? '').trim().toLowerCase() === String(b[c] ?? '').trim().toLowerCase()
+  if (table === 'meal_rates') return same('tier') && mealsOverlap(a, b)
+  return PREFERRED_SCOPES[table].columns.every(same)
 }

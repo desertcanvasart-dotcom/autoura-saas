@@ -64,6 +64,7 @@ import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDay
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
+import { narrowCruiseCandidates } from '@/lib/rates/cruise-candidates'
 import { roadPackageCoverage } from '@/lib/pricing/road-package'
 import { guideLanguageKey, pickGuideRateRow, rateSpeaks, type GuideRateRow } from '@/lib/guides/guide-language'
 import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
@@ -1243,6 +1244,10 @@ export async function getCruiseRates(
      *  rate when one is entered (lib/rates/passport-rate). Default EU — the
      *  column every caller read before. */
     isEurPassport?: boolean
+    /** The sailing's length in nights: the ships are narrowed to those that
+     *  sail that long (lib/rates/cruise-candidates.ts) before the preferred
+     *  star decides — one starred boat per route and length. */
+    nights?: number | null
   }
 ): Promise<{
   shipName: string
@@ -1320,6 +1325,9 @@ export async function getCruiseRates(
         }
         rows = data
       }
+      // One sailing is a route + length: a 3-night tour is not priced from the
+      // 4-night ship (the star is one boat per route and length).
+      rows = narrowCruiseCandidates(rows as Record<string, unknown>[], { nights: opts?.nights })
       const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rows as Record<string, unknown>[], await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
       const pick = pickCandidate(cruises as any[], (c: any) => c.ship_name || c.id)
@@ -3306,9 +3314,12 @@ export async function calculateDayBasedPricing(
           await loadNamedPropertyRows(catalogScope, 'nile_cruises'),
           tier
         )
+    // The first sailing's nights narrow the ships to the sailing it really is.
+    const sailingNights = cruiseSailings(itinerary)[0]?.nights ?? null
     const cr = namedShip.kind === 'ambiguous' ? null : await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate, {
       rateId: chosenShip ?? (namedShip.kind === 'one' ? namedShip.rateId : undefined),
       isEurPassport,
+      nights: sailingNights,
     })
     if (namedShip.kind === 'ambiguous') {
       addHole({
