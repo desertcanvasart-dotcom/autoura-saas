@@ -10,6 +10,8 @@ import { parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
 import { parseTiersCell } from '@/lib/rates/activity-tiers'
 import { sanitizeSeasons, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
+import { loadCityZones } from '@/lib/rates/hotel-zone'
+import { resolveZoneChoice } from '@/lib/rates/city-zones'
 import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { linkRowsBySupplierName, supplierNameGapMessage } from '@/lib/rates/link-supplier-by-name'
@@ -181,12 +183,23 @@ export async function POST(request: NextRequest) {
     const vocab: Partial<Record<VocabularyKind, VocabularyItem[]>> = {}
     for (const kind of new Set(Object.values(vocabColumns))) vocab[kind] = await loadVocabulary(supabase, kind)
     const vocabErrors: Array<{ row: number; column: string; message: string }> = []
+    // A hotel's Zone cell is one of its city's zones (migration 470), by name
+    // or key. Blank stays blank (the city's default) so an older sheet still
+    // imports; the hotel list's "No area yet" filter shows what is left.
+    const hotelZones = config.tableName === 'accommodation_rates' && config.columns.some(c => c.name === 'zone')
+      ? await loadCityZones(supabase, tenant_id!)
+      : null
     const resolvedRows = importRows.map((row, i) => {
       // The sample's example row is skipped below; its words ("standard",
       // "bb") must not refuse the file for an agency that renamed them.
       if (isExampleRow(row[config.uniqueKey[0]])) return row
       const { record, errors } = resolveRecordKeys(row, vocab, vocabColumns)
       for (const message of errors) vocabErrors.push({ row: lineOf(i), column: message.split(':')[0], message })
+      if (hotelZones && 'zone' in record) {
+        const choice = resolveZoneChoice(hotelZones, record.city, record.zone)
+        if (choice.ok) record.zone = choice.zone ?? ''
+        else vocabErrors.push({ row: lineOf(i), column: 'zone', message: `zone: ${choice.error}` })
+      }
       // A guide price's further languages (463): each word in the cell is a
       // guide_language, resolved like the Language column; none is guessed.
       if (config.tableName === 'guide_rates' && typeof record.other_languages === 'string' && record.other_languages.trim()) {

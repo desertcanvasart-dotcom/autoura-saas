@@ -3,6 +3,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
+import { checkHotelZone, syncHotelZone } from '@/lib/rates/hotel-zone'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
 
 export async function GET(
@@ -91,6 +92,10 @@ export async function PUT(
     const seasonsPatch: Record<string, unknown> = parsedSeasons === undefined
       ? {}
       : { seasons: parsedSeasons, ...legacyColumnMirror(parsedSeasons, 'accommodation') }
+    // The hotel's area within its city (migration 470): one of the city's
+    // zones, required when the city has any (owner, 2026-11-16).
+    const zoneChoice = await checkHotelZone(supabase, authResult.tenant_id!, body.city, body.zone)
+    if (!zoneChoice.ok) return NextResponse.json({ success: false, error: zoneChoice.error }, { status: 400 })
     const hotelProp = await resolveRateProperty(supabase, {
       tenantId: authResult.tenant_id!,
       propertyType: 'hotel',
@@ -111,6 +116,7 @@ export async function PUT(
       ...(hotelProp.property_id ? { property_id: hotelProp.property_id } : {}),
       property_type: body.property_type || 'hotel',
       city: body.city || null,
+      zone: zoneChoice.zone,
       board_basis: body.board_basis || 'bb',
       tier: body.tier || 'standard',
       supplier_id: body.supplier_id || null,
@@ -208,6 +214,7 @@ export async function PUT(
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
+    if (data) await syncHotelZone(supabase, { tenantId: authResult.tenant_id!, rowId: data.id, propertyId: data.property_id, city: data.city, zone: zoneChoice.zone })
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     console.error('PUT accommodation_rates catch error:', error)

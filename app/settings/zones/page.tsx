@@ -90,7 +90,8 @@ export default function ZonesPage() {
       <p className="text-xs text-gray-500 max-w-3xl">
         A transfer or day tour can cost more depending on where in the city the hotel is. List each city&apos;s areas here.
         Each city has one <strong>default</strong> zone: a hotel or transport card with no zone counts as the default.
-        Soon you&apos;ll give each hotel its zone and each transport card the zone it prices. Until then, these lists change no price.
+        Each hotel takes its area under Rates → Hotels (required once its city has zones). Transport cards follow next;
+        until they do, these lists change no price.
       </p>
 
       {state === 'ready' && !canWrite && (

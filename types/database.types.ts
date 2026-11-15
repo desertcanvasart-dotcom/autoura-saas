@@ -133,6 +133,7 @@ export interface Database {
           seasons: Json | null
           property_id: string | null
           is_preferred: boolean
+          zone: string | null
         }
         Insert: {
           id?: string
@@ -246,6 +247,7 @@ export interface Database {
           seasons?: Json | null
           property_id?: string | null
           is_preferred?: boolean
+          zone?: string | null
         }
         Update: {
           id?: string
@@ -359,6 +361,7 @@ export interface Database {
           seasons?: Json | null
           property_id?: string | null
           is_preferred?: boolean
+          zone?: string | null
         }
         Relationships: [
           {
