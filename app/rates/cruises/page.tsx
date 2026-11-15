@@ -490,7 +490,7 @@ export default function CruisesPage() {
   // The preferred star: the engine's default among several ships in the
   // same tier (one per scope, migration 354).
   const onPreferredToggled = (r: PreferredToggleResult) => {
-    if (r.ok) showToast('success', r.preferred ? `${r.name || 'Ship'} is now the preferred ${r.scope} cruise` : `${r.name || 'Ship'} is no longer preferred`)
+    if (r.ok) showToast('success', r.preferred ? `${r.name || 'Ship'} is now the preferred cruise for ${r.scope}` : `${r.name || 'Ship'} is no longer preferred`)
     else showToast('error', r.error || 'Could not update')
     fetchCruises()
   }

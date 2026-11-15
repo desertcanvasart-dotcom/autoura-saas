@@ -64,6 +64,7 @@ import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDay
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
+import { narrowCruiseCandidates } from '@/lib/rates/cruise-candidates'
 import { roadPackageCoverage } from '@/lib/pricing/road-package'
 import { guideLanguageKey, pickGuideRateRow, rateSpeaks, type GuideRateRow } from '@/lib/guides/guide-language'
 import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
@@ -1243,6 +1244,11 @@ export async function getCruiseRates(
      *  rate when one is entered (lib/rates/passport-rate). Default EU — the
      *  column every caller read before. */
     isEurPassport?: boolean
+    /** The sailing's length in nights, and the day the party boards: the
+     *  ships are narrowed to those that sail that long and leave that weekday
+     *  (lib/rates/cruise-candidates.ts) before the preferred star decides. */
+    nights?: number | null
+    boardingDate?: string | null
   }
 ): Promise<{
   shipName: string
@@ -1320,6 +1326,9 @@ export async function getCruiseRates(
         }
         rows = data
       }
+      // One sailing is a route + length + weekday: a 3-night tour is not priced
+      // from the 4-night ship, nor a Friday boarding from the Monday one.
+      rows = narrowCruiseCandidates(rows as Record<string, unknown>[], { nights: opts?.nights, boardingDate: opts?.boardingDate })
       const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rows as Record<string, unknown>[], await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
       const pick = pickCandidate(cruises as any[], (c: any) => c.ship_name || c.id)
@@ -3306,9 +3315,19 @@ export async function calculateDayBasedPricing(
           await loadNamedPropertyRows(catalogScope, 'nile_cruises'),
           tier
         )
+    // The day the party boards (the trip's start + the first cruise day) and
+    // the first sailing's nights narrow the ships to the sailing it really is.
+    const boardingDate = (() => {
+      if (!firstCruiseDay || !travelDate) return null
+      const start = Date.parse(`${travelDate.slice(0, 10)}T00:00:00Z`)
+      return Number.isNaN(start) ? null : new Date(start + (firstCruiseDay.day - 1) * 86400000).toISOString().slice(0, 10)
+    })()
+    const sailingNights = cruiseSailings(itinerary)[0]?.nights ?? null
     const cr = namedShip.kind === 'ambiguous' ? null : await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate, {
       rateId: chosenShip ?? (namedShip.kind === 'one' ? namedShip.rateId : undefined),
       isEurPassport,
+      nights: sailingNights,
+      boardingDate,
     })
     if (namedShip.kind === 'ambiguous') {
       addHole({
