@@ -1,4 +1,4 @@
-// A preferred Nile cruise per route, length and weekday — not per tier
+// A preferred Nile cruise per route and length — not per tier, and not split by weekday
 // (operator, 2026-11-15; migration 468). Starring the 4-night Luxor → Aswan
 // Ceila used to untick the 3-night Aswan → Luxor Ceila, and the engine chose
 // among every ship of the tier leaving a city whatever its length.
@@ -22,16 +22,15 @@ describe('which sailings compete for the star', () => {
   it('the opposite route never competes — the case that unticked Ceila', () => {
     expect(cruisesCompete(aswan3, luxor4)).toBe(false)
   })
-  it('same route: a different length or a different weekday does not compete', () => {
+  it('same route: a different length or tier does not compete', () => {
     expect(cruisesCompete(aswan3, { ...aswan3, duration_nights: 4 })).toBe(false)
-    expect(cruisesCompete(aswan3, { ...aswan3, sailing_days: ['wed'] })).toBe(false)
     expect(cruisesCompete(aswan3, { ...aswan3, tier: 'deluxe' })).toBe(false)
   })
-  it('same route, length and day competes; a row with no length or no fixed day overlaps any', () => {
+  it('same route and length competes whatever the weekday — one boat per route (operator, 2026-11-15)', () => {
+    expect(cruisesCompete(aswan3, { ...aswan3, sailing_days: ['mon'] })).toBe(true)
     expect(cruisesCompete(aswan3, { ...aswan3, embark_city: 'aswan ' })).toBe(true)
     expect(cruisesCompete(aswan3, { ...aswan3, duration_nights: null })).toBe(true)
-    expect(cruisesCompete(aswan3, { ...aswan3, sailing_days: [] })).toBe(true)
-    expect(cruisesCompete(aswan3, { ...aswan3, duration_nights: [3, 4], sailing_days: ['mon', 'fri'] })).toBe(true)
+    expect(cruisesCompete(aswan3, { ...aswan3, duration_nights: [3, 4] })).toBe(true)
   })
   it('the bulk import uses the same rule for two stars in one file', () => {
     expect(rowsShareStar('nile_cruises', aswan3, luxor4)).toBe(false)
@@ -39,8 +38,8 @@ describe('which sailings compete for the star', () => {
     expect(rowsShareStar('accommodation_rates', { city: 'Cairo', tier: 'standard' }, { city: 'cairo', tier: 'Standard' })).toBe(true)
   })
   it('the toast names the sailing', () => {
-    expect(describeCruiseScope(aswan3)).toBe('standard · Aswan → Luxor · 3 nights · Fri')
-    expect(describeScope('nile_cruises', luxor4)).toBe('standard · Luxor → Aswan · 4 nights · Mon')
+    expect(describeCruiseScope(aswan3)).toBe('standard · Aswan → Luxor · 3 nights')
+    expect(describeScope('nile_cruises', luxor4)).toBe('standard · Luxor → Aswan · 4 nights')
   })
 })
 
@@ -49,7 +48,8 @@ describe('starring a sailing clears only the sailings it competes with', () => {
     const starred = [
       { id: 'c-aswan-3-fri', ...aswan3 },
       { id: 'c-luxor-4-mon', ...luxor4 },
-      { id: 'c-aswan-3-any', ...aswan3, sailing_days: [] },
+      { id: 'c-aswan-3-mon', ...aswan3, sailing_days: ['mon'] },
+      { id: 'c-aswan-4-fri', ...aswan3, duration_nights: [4] },
     ]
     const calls: Array<[string, unknown[]]> = []
     type Chain = Record<string, (...a: never[]) => unknown>
@@ -61,7 +61,7 @@ describe('starring a sailing clears only the sailings it competes with', () => {
     expect(calls).toEqual([
       ['ilike', ['tier', 'standard']],
       ['update', [{ is_preferred: false }]],
-      ['in', ['id', ['c-aswan-3-fri', 'c-aswan-3-any']]],
+      ['in', ['id', ['c-aswan-3-fri', 'c-aswan-3-mon']]],
     ])
   })
 })
@@ -85,20 +85,19 @@ describe('pricing picks the sailing the tour is', () => {
     // Without the length both stars still apply — refused, never a guess.
     expect((await getCruiseRates(SCOPE, 'standard', 'Aswan'))?.ambiguous?.preferredCount).toBe(2)
   })
-  it('starred Monday and Friday sailings: the boarding weekday decides', async () => {
-    setMockTables({ nile_cruises: [ship('fri', 'Ceila', { is_preferred: true }), ship('mon', 'Adonis', { sailing_days: ['mon'], is_preferred: true })] })
-    // 2026-11-20 is a Friday, 2026-11-16 a Monday.
-    expect((await getCruiseRates(SCOPE, 'standard', 'Aswan', '2026-11-20', { nights: 3, boardingDate: '2026-11-20' }))?.shipName).toBe('Ceila')
-    expect((await getCruiseRates(SCOPE, 'standard', 'Aswan', '2026-11-16', { nights: 3, boardingDate: '2026-11-16' }))?.shipName).toBe('Adonis')
+  it('the starred boat is used whatever weekday the party boards', async () => {
+    setMockTables({ nile_cruises: [ship('fri', 'Ceila', { is_preferred: true }), ship('mon', 'Adonis', { sailing_days: ['mon'] })] })
+    // 2026-11-16 is a Monday; Ceila sails Fridays — still Ceila (the engine warns about the day).
+    expect((await getCruiseRates(SCOPE, 'standard', 'Aswan', '2026-11-16', { nights: 3 }))?.shipName).toBe('Ceila')
   })
-  it('a length or day no ship matches keeps the wider list, priced as before', async () => {
+  it('a length no ship matches keeps the wider list, priced as before', async () => {
     setMockTables({ nile_cruises: [ship('c3', 'Ceila')] })
-    expect((await getCruiseRates(SCOPE, 'standard', 'Aswan', '2026-11-16', { nights: 7, boardingDate: '2026-11-16' }))?.shipName).toBe('Ceila')
+    expect((await getCruiseRates(SCOPE, 'standard', 'Aswan', '2026-11-16', { nights: 7 }))?.shipName).toBe('Ceila')
   })
-  it('narrowing is pure and keeps rows that state no length or no fixed day', () => {
+  it('narrowing is pure, by length only, and keeps rows that state no length', () => {
     const rows = [{ id: 'a', duration_nights: [3], sailing_days: ['fri'] }, { id: 'b', duration_nights: null, sailing_days: [] }, { id: 'c', duration_nights: 4, sailing_days: ['fri'] }]
-    expect(narrowCruiseCandidates(rows, { nights: 3, boardingDate: '2026-11-20' }).map(r => r.id)).toEqual(['a', 'b'])
-    expect(narrowCruiseCandidates(rows, { nights: 3, boardingDate: '2026-11-16' }).map(r => r.id)).toEqual(['b'])
+    expect(narrowCruiseCandidates(rows, { nights: 3 }).map(r => r.id)).toEqual(['a', 'b'])
+    expect(narrowCruiseCandidates(rows, { nights: 4 }).map(r => r.id)).toEqual(['b', 'c'])
     expect(narrowCruiseCandidates(rows, {}).map(r => r.id)).toEqual(['a', 'b', 'c'])
   })
 })

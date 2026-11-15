@@ -43,9 +43,9 @@ describe('clearPreferredSiblings', () => {
   })
   it('scopes mirror the engine pools and the migration-354 indexes', () => {
     expect(PREFERRED_SCOPES.accommodation_rates.columns).toEqual(['city', 'tier'])
-    // A cruise's star is per sailing: tier + route, then length and weekdays (migration 468).
+    // A cruise's star is one boat per route and length (migration 468).
     expect(PREFERRED_SCOPES.nile_cruises.columns).toEqual(['tier', 'embark_city', 'disembark_city'])
-    expect(PREFERRED_SCOPES.nile_cruises.listColumns).toEqual(['duration_nights', 'sailing_days'])
+    expect(PREFERRED_SCOPES.nile_cruises.listColumns).toEqual(['duration_nights'])
     expect(PREFERRED_SCOPES.meal_rates.columns).toEqual(['tier', 'meal_type'])
     expect(isPreferredTable('accommodation_rates')).toBe(true)
     expect(isPreferredTable('entrance_fees')).toBe(false)

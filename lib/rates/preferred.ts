@@ -26,13 +26,13 @@ interface ScopeDef {
 
 export const PREFERRED_SCOPES: Record<PreferredTable, ScopeDef> = {
   accommodation_rates: { columns: ['city', 'tier'], nameColumn: 'property_name', page: 'Rates → Hotels' },
-  // Cruises: one preferred ship per tier, ROUTE, length and weekday — a row
-  // is one sailing (lib/rates/cruise-candidates.ts). It was one per tier, so
-  // starring the 4-night Luxor sailing unticked the 3-night Aswan one
-  // (operator, 2026-11-15). Lengths and weekdays are lists, so the star
-  // clears only the rows it overlaps — see clearPreferredCruiseSiblings.
-  // Migration 468 dropped the one-per-tier index.
-  nile_cruises: { columns: ['tier', 'embark_city', 'disembark_city'], listColumns: ['duration_nights', 'sailing_days'], nameColumn: 'ship_name', page: 'Rates → Cruises' },
+  // Cruises: one preferred ship per tier, ROUTE and length (operator,
+  // 2026-11-15: "one boat per route") — lib/rates/cruise-candidates.ts. It was
+  // one per tier, so starring the 4-night Luxor sailing unticked the 3-night
+  // Aswan one. Lengths are a list, so the star clears only the rows it
+  // overlaps — see clearPreferredCruiseSiblings. Migration 468 dropped the
+  // one-per-tier index.
+  nile_cruises: { columns: ['tier', 'embark_city', 'disembark_city'], listColumns: ['duration_nights'], nameColumn: 'ship_name', page: 'Rates → Cruises' },
   // Meals: one preferred restaurant per tier AND meal. A price may cover
   // several meals (migration 467), so its star clears every starred price in
   // the tier that shares a meal with it — see clearPreferredMealSiblings.
@@ -166,7 +166,7 @@ export async function clearPreferredMealSiblings(
 
 /**
  * Starring a sailing clears the star on every other sailing a tour could be
- * priced from instead: same tier and route, overlapping length and weekdays
+ * priced from instead: same tier and route, overlapping length
  * (lib/rates/cruise-candidates.ts). The 3-night Aswan → Luxor star and the
  * 4-night Luxor → Aswan star no longer clear each other.
  */
@@ -184,7 +184,7 @@ export async function clearPreferredCruiseSiblings(
   }
   let q = db
     .from('nile_cruises')
-    .select('id, tier, embark_city, disembark_city, duration_nights, sailing_days')
+    .select('id, tier, embark_city, disembark_city, duration_nights')
     .eq('tenant_id', tenantId)
     .eq('is_preferred', true)
     .neq('id', excludeId)
