@@ -41,7 +41,8 @@ export async function PUT(
 
     const { data, error } = await supabase
       .from('airport_staff_rates')
-      .update({ ...body, ...basis.fields })
+      // '' = no supplier picked; a uuid column refuses '' (see the create route).
+      .update({ ...body, ...('supplier_id' in body ? { supplier_id: body.supplier_id || null } : {}), ...basis.fields })
       .eq('id', id)
       .eq('tenant_id', authResult.tenant_id)
       .select()
