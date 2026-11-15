@@ -1,7 +1,7 @@
 # Transport zones — build plan
 
-Status: **PLAN, nothing built.** Written 2026-11-16 from the owner's answers
-(11-15/16). Each step below is one PR. Nothing ships without the owner's OK.
+Status: **PLAN, nothing built — all decisions settled 2026-11-16.** Written
+2026-11-16 from the owner's answers (11-15/16). Each step below is one PR. Nothing ships without the owner's OK.
 
 ## The problem
 
@@ -50,18 +50,14 @@ Zones agreed for Travel2Egypt:
 | Hurghada | Hurghada | Makadi · Sahl Hasheesh/El Gouna · El Quseir |
 | Marsa Alam | Marsa Alam | North · South · Shams Alam |
 
-## Still to decide (my recommendation first)
+## Settled 2026-11-16 (owner agreed the recommendations)
 
-1. **Is the zone required when adding a hotel** in a city that has zones?
-   *Recommend yes* — otherwise a Sheikh Zayed hotel silently prices as Cairo.
-   Existing hotels with no zone count as the default until set, and the hotel
-   list shows a "No zone yet" filter so they can be filled in.
-2. **Two equally small cards cover the day** (e.g. two West Bank cards for the
-   same zone): *recommend* the starred one, else the cheapest with a warning —
-   the same rule as today (#827).
-3. **Cruise days** (the ship is the hotel): *recommend* the city's default zone
-   unless the day states a pickup zone (Luxor ships moor on the East Bank).
-4. **Lahami Azur** (a single-hotel Marsa Alam card): which zone — probably South.
+| # | Decision |
+|---|---|
+| D7 | The zone is **required** when adding or editing a hotel in a city that has zones. Existing hotels with no zone count as the default until set; the hotel list has a "No zone yet" filter. |
+| D8 | Two equally small cards cover the day → the starred one, else the cheapest with a warning (same rule as #827). |
+| D9 | Cruise days use the city's default zone unless the day states a pickup zone. |
+| D10 | The Marsa Alam "Lahami Azur" card belongs to the **South** zone. |
 
 ## How the engine decides
 
@@ -72,7 +68,7 @@ Zones agreed for Travel2Egypt:
 | Airport arrival, any arrival transfer | the hotel they sleep in that night |
 | Airport departure | the hotel they slept in the night before |
 | Day tour, half day, in-city transfer, dinner transfer | the hotel they woke up in (else that night's) |
-| Cruise day | the city's default zone, unless the day states one (decision 3) |
+| Cruise day | the city's default zone, unless the day states one (D9) |
 | Intercity | unchanged (route-based) — out of scope |
 
 The hotel is the one the engine already chose for the city and tier
@@ -88,7 +84,7 @@ A quote with no hotel uses the day's stated zone, else the default.
    cards whose list covers **every** sight of the day and take the one with
    the **fewest** sights. None covers → **gap**: "No Luxor card covers Karnak +
    Valley of the Kings." A card that lists no sights keeps today's behaviour.
-3. Several left → starred, else cheapest + warning (decision 2).
+3. Several left → starred, else cheapest + warning (D8).
 
 ## Build steps (one PR each)
 
@@ -107,7 +103,7 @@ A quote with no hotel uses the day's stated zone, else the default.
 - Migration: `supplier_properties.zone` (text, nullable).
 - Hotel form (app/rates/hotels/hotels-content.tsx) and supplier property form:
   an **Area** dropdown listing the zones of the hotel's city; required if the
-  city has zones (decision 1); changing the city clears it.
+  city has zones (D7); changing the city clears it.
 - Property CSV import/export (app/api/suppliers/properties/*) and the hotel rate
   sheet (lib/rates/rate-sheet.ts) gain a `Zone` column; an unknown zone is
   refused with the row number.
