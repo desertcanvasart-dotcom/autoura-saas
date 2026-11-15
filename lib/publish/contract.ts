@@ -393,3 +393,41 @@ export const embedResolutionSchema = z.object({
   origins: z.array(z.string().url()).min(1),
 })
 export type EmbedResolution = z.infer<typeof embedResolutionSchema>
+
+// ---------- the data feed: the peak calendar (lib/publish/feed.ts) ----------
+// GET /api/publish/feed/v1/seasons[?date=YYYY-MM-DD] — a NEW endpoint beside
+// /tours, so nothing an existing consumer reads changes shape. The calendar is
+// the agency's, not a tour's: one answer covers every tour.
+//
+// A tour's public bands (tourFactsSchema.price) are its ORDINARY-date price.
+// For a departure inside a season the per-person price is
+//   perPerson × (1 + upliftPercent / 100), rounded to the cent —
+// the same premium quotes charge (lib/pricing/season-uplift.ts): on the whole
+// selling price, matched by the DEPARTURE date, and where windows overlap the
+// HIGHEST premium wins (never the sum).
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+
+export const feedSeasonsSchema = z.object({
+  /** The day the calendar was read for (UTC); past windows are left out. */
+  asOf: isoDate,
+  /** How to read the calendar — fixed rules, stated so a consumer need not guess. */
+  rule: z.object({
+    matchBy: z.literal('departure_date'),
+    overlap: z.literal('highest_wins'),
+    appliesTo: z.literal('per_person_band'),
+  }),
+  /** The agency's active seasons with a premium, each with its windows still to come. */
+  seasons: z.array(z.object({
+    name: z.string(),
+    upliftPercent: z.number().positive().max(200),
+    /** Inclusive at both ends, earliest first. */
+    ranges: z.array(z.object({ start: isoDate, end: isoDate, label: z.string().nullable() })).min(1),
+  })),
+  /** With ?date=: the season that date departs in (null = an ordinary date). */
+  date: z.object({
+    date: isoDate,
+    season: z.object({ name: z.string(), upliftPercent: z.number().positive() }).nullable(),
+  }).optional(),
+})
+export type FeedSeasons = z.infer<typeof feedSeasonsSchema>

@@ -160,6 +160,9 @@ export default function PublishEmbedPage() {
         {settings.rendererUrl && (
           <Snippet label="Example" help="Your tours, in English" code={`curl -H "Authorization: Bearer <your key>" "${typeof window !== 'undefined' ? window.location.origin : ''}/api/publish/feed/v1/tours?lang=en"`} />
         )}
+        {settings.rendererUrl && (
+          <Snippet label="Peak dates" help="Your Seasonal Premiums: on a date inside one, each per-person price goes up by its %" code={`curl -H "Authorization: Bearer <your key>" "${typeof window !== 'undefined' ? window.location.origin : ''}/api/publish/feed/v1/seasons?date=2026-12-31"`} />
+        )}
         {canManage && (
           <button type="button" onClick={makeFeedKey} className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md border border-gray-300">
             <RefreshCw className="h-4 w-4" />{feed?.exists ? 'Make a new key' : 'Make a key'}
