@@ -72,8 +72,9 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     if (body.origin_city !== undefined) updateData.origin_city = body.origin_city || null
     if (body.destination_city !== undefined) updateData.destination_city = body.destination_city || null
     if (body.cabin_type !== undefined) updateData.cabin_type = body.cabin_type || null
-    if (body.rate_oneway_eur !== undefined) updateData.rate_oneway_eur = parseFloat(body.rate_oneway_eur) || 0
-    if (body.rate_roundtrip_eur !== undefined) updateData.rate_roundtrip_eur = body.rate_roundtrip_eur ? parseFloat(body.rate_roundtrip_eur) : null
+    // One fare for every traveller (single-rate entry): the non-EU columns mirror it.
+    if (body.rate_oneway_eur !== undefined) updateData.rate_oneway_eur = updateData.rate_oneway_non_eur = parseFloat(body.rate_oneway_eur) || 0
+    if (body.rate_roundtrip_eur !== undefined) updateData.rate_roundtrip_eur = updateData.rate_roundtrip_non_eur = body.rate_roundtrip_eur ? parseFloat(body.rate_roundtrip_eur) : null
     if (body.departure_time !== undefined) updateData.departure_time = body.departure_time || null
     if (body.arrival_time !== undefined) updateData.arrival_time = body.arrival_time || null
     if (body.rate_valid_from !== undefined) updateData.rate_valid_from = body.rate_valid_from || null

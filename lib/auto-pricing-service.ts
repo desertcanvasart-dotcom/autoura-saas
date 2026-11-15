@@ -3647,8 +3647,13 @@ export async function calculateDayBasedPricing(
   const ticketGuideLines: PricedService[] = []
   if (ticketLegs.length > 0) {
     const runCurrencyForTickets = await getTenantRunCurrency(getSupabaseAdmin(), catalogScope.tenantId)
+    // A non-EU traveller pays the non-EU fare only when one is ENTERED (above
+    // zero) — else the EU fare, the rule hotels and cruises already follow.
+    // `nonEur ?? eur` read a stored 0 as a free ticket: the sleeper form has
+    // one fare and never filled the non-EU column, so every sleeper on
+    // production priced non-EU travellers at 0 (operator, 2026-11-15).
     const passengerFare = (eur: unknown, nonEur: unknown): number | null => {
-      const v = isEurPassport ? eur : (nonEur ?? eur)
+      const v = isEurPassport ? eur : (typeof nonEur === 'number' && nonEur > 0 ? nonEur : eur)
       return typeof v === 'number' && v >= 0 ? v : null
     }
     const validFor = (row: { rate_valid_from?: string | null; rate_valid_to?: string | null }): boolean =>
