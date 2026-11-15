@@ -1,3 +1,4 @@
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { sanitizePackageVehicles } from '@/lib/pricing/package-vehicle'
@@ -35,6 +36,9 @@ export async function PUT(
     }
     // Vehicles keyed by the agency's vehicle_type vocabulary (mig 381).
     if (body.vehicles !== undefined) update.vehicles = sanitizePackageVehicles(body.vehicles)
+    // The currency the vehicle rates are in (migration 295); '' clears it
+    // back to the agency's rates currency.
+    Object.assign(update, rateCurrencyWriteField(body))
 
     const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')

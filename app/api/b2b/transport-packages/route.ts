@@ -1,3 +1,4 @@
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { sanitizePackageVehicles } from '@/lib/pricing/package-vehicle'
@@ -64,6 +65,9 @@ export async function POST(request: NextRequest) {
         duration_days: body.duration_days || 1,
         // Vehicles keyed by the agency's vehicle_type vocabulary (mig 381).
         vehicles: sanitizePackageVehicles(body.vehicles),
+        // The currency the vehicle rates are in (migration 295); absent =
+        // the agency's rates currency. Pricing converts a copy.
+        ...rateCurrencyWriteField(body),
         description: body.description,
         includes: body.includes,
         notes: body.notes,

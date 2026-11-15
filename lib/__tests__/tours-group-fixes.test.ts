@@ -152,7 +152,8 @@ describe('who may change the catalogue', () => {
     const src = read('app/b2b/pricing-rules/page.tsx')
     expect(src).not.toMatch(/\bisAdmin\b/)
     expect(src).toContain('if (!isManager)')
-    expect(src).toContain('{currencySymbol}{v.rate}')
+    // Each package in its own currency's symbol (its rate_currency, else the agency's).
+    expect(src).toContain('{symbolFor(pkg.rate_currency)}{v.rate}')
   })
 
   it('a package PUT writes only the fields it was sent', () => {
