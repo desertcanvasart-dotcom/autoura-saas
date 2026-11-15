@@ -94,12 +94,15 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (!current) return NextResponse.json({ success: false, error: 'Zone not found' }, { status: 404 })
     const verdict = canDeleteZone(current, all ?? [])
     if (!verdict.ok) return NextResponse.json({ success: false, error: verdict.error }, { status: 400 })
-    // A zone hotels are in stays (migration 470): deleting it would quietly
-    // move them to the city's default. Step 3 adds transport cards here.
+    // A zone hotels are in, or transport cards price, stays (migrations 470,
+    // 471): deleting it would quietly move them to the city's default.
     const { data: hotels, error: hotelError } = await supabase.from('accommodation_rates')
       .select('property_name').eq('tenant_id', tenant_id).eq('zone', current.key).ilike('city', current.city.trim())
     if (hotelError) throw hotelError
-    const used = zoneInUseError(current, (hotels ?? []).map(h => h.property_name || 'a hotel'))
+    const { data: cards, error: cardError } = await supabase.from('transportation_rates')
+      .select('route_name').eq('tenant_id', tenant_id).eq('zone', current.key).ilike('city', current.city.trim())
+    if (cardError) throw cardError
+    const used = zoneInUseError(current, (hotels ?? []).map(h => h.property_name || 'a hotel'), (cards ?? []).map(c => c.route_name || 'a transport card'))
     if (used) return NextResponse.json({ success: false, error: used }, { status: 400 })
 
     const { data, error } = await supabase.from('city_zones').delete().eq('id', id).eq('tenant_id', tenant_id).select('id')

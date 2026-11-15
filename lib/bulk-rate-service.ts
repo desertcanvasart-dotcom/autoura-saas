@@ -207,6 +207,11 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('destination_city', 'Destination City', 'text', false),
       col('duration', 'Duration', 'text', false),
       col('area', 'Area', 'text', false),
+      // The card's pickup area within its city (migration 471): one of the
+      // city's zones (Settings → Zones), by name or key; blank = the default.
+      col('zone', 'Zone', 'text', false),
+      // A sightseeing card's sights, by fee-sheet name, ";"-separated.
+      col('covers_sights', 'Sights Covered', 'text', false),
       col('includes', 'Includes', 'text', false),
       // The vehicle, in your own words (Settings → Your vocabulary); the
       // importer turns "Sedan" into its key.
@@ -951,7 +956,7 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
   if (column === 'sailing_days') return formatSailingDaysCell(row.sailing_days)
   if (column === 'tiers' && table === 'activity_rates') return formatTiersCell(row.tiers)
-  if (column === 'other_cities' || column === 'other_languages' || column === 'other_meal_types') {
+  if (column === 'other_cities' || column === 'other_languages' || column === 'other_meal_types' || column === 'covers_sights') {
     const v = row[column]
     return Array.isArray(v) ? v.join('; ') : (v ?? '')
   }
@@ -1112,7 +1117,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'sailing_days') return 'mon;fri'
   if (name === 'tiers') return ''
   if (name === 'dietary_options') return 'vegetarian; vegan'
-  if (name === 'other_cities' || name === 'other_languages' || name === 'other_meal_types') return ''
+  if (name === 'other_cities' || name === 'other_languages' || name === 'other_meal_types' || name === 'covers_sights' || name === 'zone') return ''
   if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'

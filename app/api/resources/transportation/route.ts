@@ -17,6 +17,8 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { resolveVocabularyKey } from '@/lib/vocabulary'
+import { resolveCardSights, resolveZoneChoice } from '@/lib/rates/city-zones'
+import { loadCityZones } from '@/lib/rates/hotel-zone'
 
 export const dynamic = 'force-dynamic'
 
@@ -125,6 +127,29 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
   const kept = (field: 'origin_city' | 'duration' | 'area' | 'includes') =>
     body[field] !== undefined ? (body[field] || null) : (existing[0]?.[field] ?? null)
 
+  // The card's pickup area (migration 471): one of its city's zones, by key
+  // or name; blank = the city's default. Not sent = the stored value.
+  let zone: string | null = existing[0]?.zone ?? null
+  if (body.zone !== undefined) {
+    const choice = resolveZoneChoice(await loadCityZones(admin, tenantId), body.city, body.zone, { what: 'card' })
+    if (!choice.ok) return { status: 400, json: { success: false, error: choice.error } }
+    zone = choice.zone
+  } else if (zone) {
+    // A kept area that is not one of the (possibly new) city's goes back to the default.
+    const kept = resolveZoneChoice(await loadCityZones(admin, tenantId), body.city, zone, { what: 'card' })
+    zone = kept.ok ? kept.zone : null
+  }
+  // The sights a sightseeing card covers (migration 471): names on the
+  // agency's own fee sheet. Not sent = the stored list.
+  let coversSights: string[] = existing[0]?.covers_sights ?? []
+  if (body.covers_sights !== undefined) {
+    const { data: fees, error: feeError } = await admin.from('entrance_fees').select('attraction_name').eq('tenant_id', tenantId)
+    if (feeError) return { status: 500, json: { success: false, error: `Failed to read your sights: ${feeError.message}` } }
+    const sights = resolveCardSights(body.covers_sights, (fees ?? []).map((f: { attraction_name: string }) => f.attraction_name))
+    if (!sights.ok) return { status: 400, json: { success: false, error: sights.error } }
+    coversSights = sights.sights
+  }
+
   const routeFields = {
     ...rateCurrencyWriteField(body),
     route_name: body.route_name || routeCode(body),
@@ -135,6 +160,8 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
     duration: kept('duration'),
     area: kept('area'),
     includes: kept('includes'),
+    zone,
+    covers_sights: coversSights,
     is_active: body.is_active !== undefined ? body.is_active : true,
     // The transport company (migration 355) — one per route, on every row.
     // Several companies may each price the same route (migration 460).

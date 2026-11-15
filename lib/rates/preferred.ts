@@ -49,7 +49,9 @@ export const PREFERRED_SCOPES: Record<PreferredTable, ScopeDef> = {
   // company's several named routes in one city may all carry its star, and
   // the engine reads the star per COMPANY (lib/pricing/transport-suppliers.ts).
   transportation_rates: {
-    columns: ['service_type', 'city', 'origin_city', 'destination_city', 'duration', 'area', 'vehicle_type'],
+    // The pickup area (migration 471): a West Bank card and the city's card
+    // answer different hotels, so starring one leaves the other's star.
+    columns: ['service_type', 'city', 'origin_city', 'destination_city', 'duration', 'area', 'zone', 'vehicle_type'],
     nameColumn: 'route_name',
     page: 'Rates → Transportation',
   },
