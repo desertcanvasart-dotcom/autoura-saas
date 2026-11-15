@@ -88,7 +88,10 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('airport_staff_rates')
-      .insert([{ ...body, ...basis.fields, tenant_id }])
+      // The form sends '' when no supplier is picked; a uuid column refuses
+      // '' ("invalid input syntax for type uuid"), so "no supplier" is null —
+      // as every other rate page already saves it.
+      .insert([{ ...body, supplier_id: body.supplier_id || null, ...basis.fields, tenant_id }])
       .select()
       .single()
 
