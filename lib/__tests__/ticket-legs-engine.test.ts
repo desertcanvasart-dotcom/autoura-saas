@@ -209,6 +209,28 @@ describe('sleeping trains — the ticket IS the bed', () => {
   })
 })
 
+describe('a non-EU traveller pays the non-EU fare only when one is entered (2026-11-15)', () => {
+  const sleeperDays = [
+    day(1, 'Cairo', { transport_type: 'sleeping_train' }),
+    day(2, 'Luxor'),
+    day(3, 'Luxor', { accommodation_type: 'none' }),
+  ]
+  const fare = async (pair: Array<Record<string, unknown>>) => {
+    setMockTables(ticketTables(sleeperDays, { sleeping_train_rates: pair }))
+    const r = await calculateDayBasedPricing({ ...BASE_PARAMS, isEurPassport: false })
+    return r.services.find(s => s.serviceName.startsWith('Sleeping train'))?.unitCost
+  }
+  it('a stored non-EU fare of 0 is "not entered": the EU fare, never a free ticket', async () => {
+    expect(await fare(SLEEPER_PAIR.map(r => ({ ...r, rate_oneway_non_eur: 0 })))).toBe(120)
+  })
+  it('a blank non-EU fare is the EU fare too', async () => {
+    expect(await fare(SLEEPER_PAIR)).toBe(120)
+  })
+  it('an entered non-EU fare is what a non-EU traveller pays', async () => {
+    expect(await fare(SLEEPER_PAIR.map(r => ({ ...r, rate_oneway_non_eur: Number(r.rate_oneway_eur) + 30 })))).toBe(150)
+  })
+})
+
 describe('airlines are a vocabulary word (348)', () => {
   it("the flight line names the carrier in the agency's word, not the stored key", async () => {
     clearVocabularyMemo()

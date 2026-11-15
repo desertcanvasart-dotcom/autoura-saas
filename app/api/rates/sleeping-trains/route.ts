@@ -112,6 +112,10 @@ export async function POST(request: NextRequest) {
       cabin_type: body.cabin_type || null,
       rate_oneway_eur: parseFloat(body.rate_oneway_eur) || 0,
       rate_roundtrip_eur: body.rate_roundtrip_eur ? parseFloat(body.rate_roundtrip_eur) : null,
+      // The form has ONE fare (single-rate entry): every traveller pays it, so
+      // the non-EU columns mirror it, as the flight form does.
+      rate_oneway_non_eur: parseFloat(body.rate_oneway_eur) || 0,
+      rate_roundtrip_non_eur: body.rate_roundtrip_eur ? parseFloat(body.rate_roundtrip_eur) : null,
       departure_time: body.departure_time || null,
       arrival_time: body.arrival_time || null,
       rate_valid_from: body.rate_valid_from || null,
