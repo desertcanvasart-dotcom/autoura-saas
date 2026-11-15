@@ -15,6 +15,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import CitySelect from '@/components/CitySelect'
 import { VocabLabel } from '@/components/vocabulary'
 import { useVocabulary } from '@/hooks/useVocabulary'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 // One priced vehicle on a package, keyed by the agency's vehicle_type vocab.
 interface PackageVehicleRow {
@@ -41,6 +42,8 @@ interface TransportPackage {
   duration_days: number
   // Vehicles keyed by the agency's vehicle_type vocabulary (mig 381).
   vehicles: PackageVehicleRow[] | null
+  /** The currency this package's vehicle rates are in; blank = the agency's. */
+  rate_currency?: string | null
   description: string | null
   includes: string | null
   is_active: boolean
@@ -86,6 +89,12 @@ export default function TransportPackagesPage() {
   // Rates are entered and priced in the tenant's run currency
   // (tenants.rates_currency, EUR by default) — never a fixed euro.
   const currencySymbol = getCurrencySymbol(tenant?.rates_currency || 'EUR')
+  // A package may be priced in its own currency (rate_currency, migration
+  // 295), like every other rate: its own symbol, else the agency's.
+  const symbolFor = (rateCurrency?: string | null) => (rateCurrency ? getCurrencySymbol(rateCurrency) : currencySymbol)
+  // The currency picked in the form; '' = the agency's rates currency.
+  const [rateCurrency, setRateCurrency] = useState('')
+  const formSymbol = symbolFor(rateCurrency)
   const dialog = useConfirmDialog()
 
   const [transportPackages, setTransportPackages] = useState<TransportPackage[]>([])
@@ -149,12 +158,14 @@ export default function TransportPackagesPage() {
 
   const handleAddPackage = () => {
     setEditingPackage(null)
+    setRateCurrency('')
     setPackageForm(DEFAULT_PACKAGE_FORM)
     setShowPackageModal(true)
   }
 
   const handleEditPackage = (pkg: TransportPackage) => {
     setEditingPackage(pkg)
+    setRateCurrency(pkg.rate_currency || '')
     setPackageForm({
       package_code: pkg.package_code || '',
       package_name: pkg.package_name || '',
@@ -199,6 +210,8 @@ export default function TransportPackagesPage() {
         body: JSON.stringify({
           ...packageForm,
           vehicles,
+          // The currency the vehicle rates were typed in; pricing converts.
+          ...rateCurrencyPatch(rateCurrency, editingPackage?.rate_currency),
           package_code: packageForm.package_code || `PKG-${Date.now()}`
         })
       })
@@ -415,7 +428,7 @@ export default function TransportPackagesPage() {
                                 return (
                                   <div key={v.vehicle_type} className="text-center p-2 bg-gray-50 rounded min-w-[90px]">
                                     <p className="text-xs text-gray-500"><VocabLabel kind="vehicle_type" value={v.vehicle_type} /></p>
-                                    <p className="font-semibold text-gray-900">{currencySymbol}{v.rate}</p>
+                                    <p className="font-semibold text-gray-900">{symbolFor(pkg.rate_currency)}{v.rate}</p>
                                     {band && (
                                       <p className="text-xs text-gray-400">{band.min}-{band.max ?? '+'} pax</p>
                                     )}
@@ -521,8 +534,10 @@ export default function TransportPackagesPage() {
                 </div>
               </div>
 
+              <RateCurrencyField value={rateCurrency} onChange={setRateCurrency} className="max-w-xs" />
+
               <div>
-                <h4 className="font-medium text-gray-900 mb-1">Vehicle Rates ({currencySymbol})</h4>
+                <h4 className="font-medium text-gray-900 mb-1">Vehicle Rates ({formSymbol})</h4>
                 <p className="text-xs text-gray-500 mb-3">
                   Your own fleet, from Settings → Vocabulary. A group is priced for the
                   vehicle that seats it; leave a vehicle blank if the package does not offer it.
@@ -546,7 +561,7 @@ export default function TransportPackagesPage() {
                               vehicleRates: { ...packageForm.vehicleRates, [v.key]: e.target.value },
                             })}
                             className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm mb-2"
-                            placeholder={currencySymbol}
+                            placeholder={formSymbol}
                           />
                           <div className="text-xs text-gray-500">
                             {band.min}-{band.max ?? '+'} pax
