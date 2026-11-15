@@ -2406,6 +2406,50 @@ export interface Database {
           },
         ]
       }
+      city_zones: {
+        Row: {
+          id: string
+          tenant_id: string
+          city: string
+          key: string
+          label: string
+          is_default: boolean
+          rank: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          city: string
+          key: string
+          label: string
+          is_default?: boolean
+          rank?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          city?: string
+          key?: string
+          label?: string
+          is_default?: boolean
+          rank?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_zones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_followups: {
         Row: {
           id: string

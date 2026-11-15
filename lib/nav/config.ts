@@ -54,6 +54,7 @@ import {
   UserCog,
   Blocks,
   Signpost,
+  MapPinned,
   BookA,
   Library,
   PenLine,
@@ -430,6 +431,11 @@ export const SETTINGS_NAV: SettingsGroup[] = [
       {
         label: 'Day blocks', href: '/settings/day-blocks', icon: Blocks, roles: A, adminOnly: true,
         description: 'Your standard days, kept once: what each includes and where its night is.',
+      },
+      {
+        label: 'Zones', href: '/settings/zones', icon: MapPinned, roles: A, adminOnly: true,
+        keywords: ['areas', 'districts', 'east bank', 'west bank', 'transfer price'],
+        description: 'The parts of each city that change a transfer’s price, such as Luxor’s West Bank.',
       },
       {
         label: 'Attraction names', href: '/settings/attraction-names', icon: Signpost, roles: A, adminOnly: true,
