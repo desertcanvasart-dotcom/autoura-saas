@@ -116,6 +116,9 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('property_name', 'Property Name', 'text', true),
       col('property_type', 'Property Type', 'text', false),
       col('city', 'City', 'text', false),
+      // The hotel's area within its city (migration 470): one of the city's
+      // zones (Settings → Zones), by name or key; blank = the city's default.
+      col('zone', 'Zone', 'text', false),
       col('board_basis', 'Board Basis', 'text', false),
       // The engine matches hotels BY TIER — a file without it lands rows in
       // the default bucket (2026-09-05 sweep).

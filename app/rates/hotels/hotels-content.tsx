@@ -17,6 +17,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { TierBadge, TierPicker, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import { zoneLabel, zonesOfCity, type CityZone } from '@/lib/rates/city-zones'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { displayPpd } from '@/lib/rates/rate-seasons'
@@ -65,6 +66,8 @@ interface AccommodationRate {
   property_name: string
   property_type?: string
   city?: string
+  /** The hotel's area within its city (migration 470); empty = the city's default zone. */
+  zone?: string | null
   board_basis?: string
   // Hotel contacts
   contact_name?: string
@@ -337,6 +340,12 @@ export default function HotelsContent() {
   // ?q= opens the list filtered (the Rates check page links each finding here).
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') ?? '')
   const [selectedCity, setSelectedCity] = useState('all')
+  // The agency's zones (Settings → Zones, migration 469) and the "No area yet" filter.
+  const [zones, setZones] = useState<CityZone[]>([])
+  const [noAreaOnly, setNoAreaOnly] = useState(false)
+  useEffect(() => {
+    fetch('/api/settings/zones').then(r => r.json()).then(j => { if (j?.success) setZones(j.data.zones) }).catch(() => {})
+  }, [])
   const [selectedSupplier, setSelectedSupplier] = useState('all')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -375,6 +384,7 @@ export default function HotelsContent() {
     property_id: '',
     property_type: 'hotel',
     city: '',
+    zone: '',
     board_basis: 'bb',
     // Hotel contacts
     contact_name: '',
@@ -500,7 +510,7 @@ export default function HotelsContent() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedCity, selectedSupplier, showInactive, filterTier, itemsPerPage])
+  }, [searchTerm, selectedCity, selectedSupplier, showInactive, filterTier, itemsPerPage, noAreaOnly])
 
   // Handle form changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -556,6 +566,8 @@ export default function HotelsContent() {
     setFormData(prev => ({
       ...prev,
       city,
+      // An area belongs to one city: a new city starts with none chosen.
+      zone: prev.city === city ? prev.zone : '',
       service_code: prev.service_code || generateServiceCode(city)
     }))
   }
@@ -580,6 +592,7 @@ export default function HotelsContent() {
     property_id: '',
       property_type: 'hotel',
       city: '',
+      zone: '',
       board_basis: 'bb',
       // Hotel contacts
       contact_name: '',
@@ -719,6 +732,7 @@ export default function HotelsContent() {
       property_id: (rate as { property_id?: string | null }).property_id || '',
       property_type: rate.property_type || 'hotel',
       city: rate.city || '',
+      zone: rate.zone || '',
       board_basis: rate.board_basis || 'bb',
       // Hotel contacts
       contact_name: rate.contact_name || '',
@@ -923,6 +937,7 @@ export default function HotelsContent() {
       property_id: (rate as { property_id?: string | null }).property_id || '',
       property_type: rate.property_type || 'hotel',
       city: rate.city || '',
+      zone: rate.zone || '',
       board_basis: rate.board_basis || 'bb',
       // Hotel contacts
       contact_name: rate.contact_name || '',
@@ -998,8 +1013,10 @@ export default function HotelsContent() {
     const matchesSupplier = selectedSupplier === 'all' || rate.supplier_id === selectedSupplier
     const matchesActive = showInactive || rate.is_active
     const matchesTier = filterTier === null || rate.tier === filterTier
+    // Hotels in a city that has zones but with none chosen yet (D7).
+    const matchesArea = !noAreaOnly || (!rate.zone && zonesOfCity(zones, rate.city).length > 0)
 
-    return matchesSearch && matchesCity && matchesSupplier && matchesActive && matchesTier
+    return matchesSearch && matchesCity && matchesSupplier && matchesActive && matchesTier && matchesArea
   })
 
   // Pagination calculations
@@ -1151,6 +1168,13 @@ export default function HotelsContent() {
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
+
+            {zones.length > 0 && (
+              <label className="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
+                <input type="checkbox" checked={noAreaOnly} onChange={e => setNoAreaOnly(e.target.checked)} className="rounded border-gray-300" />
+                No area yet
+              </label>
+            )}
 
             {/* Supplier/Company Filter */}
             <div className="md:w-48 relative">
@@ -1309,6 +1333,9 @@ export default function HotelsContent() {
                         <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                           {rate.city || '—'}
                         </span>
+                        {rate.zone
+                          ? <span className="block mt-1 text-xs text-gray-500">{zoneLabel(zones, rate.city, rate.zone)}</span>
+                          : zonesOfCity(zones, rate.city).length > 0 && <span className="block mt-1 text-xs text-amber-700">No area yet</span>}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
@@ -1696,6 +1723,24 @@ export default function HotelsContent() {
                       ))}
                     </select>
                   </div>
+                  {zonesOfCity(zones, formData.city).length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Area *</label>
+                      <select
+                        name="zone"
+                        value={formData.zone}
+                        onChange={e => setFormData(prev => ({ ...prev, zone: e.target.value }))}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
+                      >
+                        <option value="">Select area…</option>
+                        {zonesOfCity(zones, formData.city).sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.rank - b.rank).map(z => (
+                          <option key={z.key} value={z.key}>{z.label}{z.is_default ? ' (default)' : ''}</option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">Where in {formData.city} the hotel is. Transfers to it are priced for this area.</p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Property Type *</label>
                     <VocabSelect kind="hotel_property_type" name="property_type" value={formData.property_type} onChange={v => setFormData({ ...formData, property_type: v })} required placeholder={null}

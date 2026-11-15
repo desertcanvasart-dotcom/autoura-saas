@@ -90,6 +90,45 @@ export function validateZone(
   return { ok: true, city, label }
 }
 
+export type ZoneChoice = { ok: true; zone: string | null } | { ok: false; error: string }
+
+/**
+ * The zone a hotel (or card) is saved with, from what the form or sheet gave:
+ * a key or a label of one of its city's zones, matched ignoring capitals.
+ * Blank → null (the city's default). `required` (the forms, D7): a city with
+ * zones must be given one. A city with no zones takes none.
+ */
+export function resolveZoneChoice(
+  zones: readonly Pick<CityZone, 'city' | 'key' | 'label'>[],
+  city: unknown,
+  value: unknown,
+  opts: { required?: boolean; what?: string } = {},
+): ZoneChoice {
+  const what = opts.what ?? 'hotel'
+  const word = String(value ?? '').trim()
+  const cityName = String(city ?? '').trim()
+  const inCity = zonesOfCity(zones, cityName)
+  if (!word) {
+    if (opts.required && inCity.length > 0) {
+      return { ok: false, error: `Choose the area of ${inCity[0].city.trim()} this ${what} is in (${inCity.map(z => z.label).join(', ')}).` }
+    }
+    return { ok: true, zone: null }
+  }
+  if (inCity.length === 0) {
+    return { ok: false, error: cityName ? `${cityName} has no zones, so the ${what} cannot have the area "${word}". Add it under Settings → Zones, or leave the area empty.` : `Choose the ${what}'s city before its area.` }
+  }
+  const lower = word.toLowerCase()
+  const hit = inCity.find(z => z.key === lower) ?? inCity.find(z => z.label.trim().toLowerCase() === lower)
+  if (!hit) return { ok: false, error: `"${word}" is not one of ${inCity[0].city.trim()}'s zones (${inCity.map(z => z.label).join(', ')}).` }
+  return { ok: true, zone: hit.key }
+}
+
+/** The label to show for a stored zone key ('' when none or unknown). */
+export function zoneLabel(zones: readonly Pick<CityZone, 'city' | 'key' | 'label'>[], city: unknown, key: unknown): string {
+  if (!key) return ''
+  return zonesOfCity(zones, city).find(z => z.key === key)?.label ?? String(key)
+}
+
 /**
  * Whether a zone may be deleted. The default goes last: a city with zones
  * always has a default, or a hotel with no zone would belong nowhere.
@@ -99,4 +138,12 @@ export function canDeleteZone(zone: Pick<CityZone, 'id' | 'city' | 'is_default' 
     return { ok: false, error: `"${zone.label}" is ${zone.city}'s default zone. Make another ${zone.city} zone the default first.` }
   }
   return { ok: true }
+}
+
+/** Refusal for deleting a zone that hotels are in, naming a few (null = free to delete). */
+export function zoneInUseError(zone: Pick<CityZone, 'label' | 'city'>, hotelNames: readonly string[]): string | null {
+  const names = [...new Set(hotelNames)]
+  if (names.length === 0) return null
+  const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
+  return `${names.length} hotel${names.length === 1 ? ' is' : 's are'} in "${zone.label}" (${shown}). Move ${names.length === 1 ? 'it' : 'them'} to another ${zone.city.trim()} area under Rates → Hotels first.`
 }

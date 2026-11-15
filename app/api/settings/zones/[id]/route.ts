@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { ZONE_COLS, ZONE_WRITE_DENIED, ZONE_WRITE_ROLES, canDeleteZone, validateZone, zonesOfCity } from '@/lib/rates/city-zones'
+import { ZONE_COLS, ZONE_WRITE_DENIED, ZONE_WRITE_ROLES, canDeleteZone, validateZone, zoneInUseError, zonesOfCity } from '@/lib/rates/city-zones'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,14 +88,19 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (!ZONE_WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: ZONE_WRITE_DENIED }, { status: 403 })
 
     const { id } = await params
-    const { data: all, error: readError } = await supabase.from('city_zones').select('id, city, label, is_default').eq('tenant_id', tenant_id)
+    const { data: all, error: readError } = await supabase.from('city_zones').select('id, city, key, label, is_default').eq('tenant_id', tenant_id)
     if (readError) throw readError
     const current = (all ?? []).find(z => z.id === id)
     if (!current) return NextResponse.json({ success: false, error: 'Zone not found' }, { status: 404 })
     const verdict = canDeleteZone(current, all ?? [])
     if (!verdict.ok) return NextResponse.json({ success: false, error: verdict.error }, { status: 400 })
-    // Steps 2 and 3 add hotels and transport cards that point at a zone; from
-    // then on a zone in use is refused here, naming where it is used.
+    // A zone hotels are in stays (migration 470): deleting it would quietly
+    // move them to the city's default. Step 3 adds transport cards here.
+    const { data: hotels, error: hotelError } = await supabase.from('accommodation_rates')
+      .select('property_name').eq('tenant_id', tenant_id).eq('zone', current.key).ilike('city', current.city.trim())
+    if (hotelError) throw hotelError
+    const used = zoneInUseError(current, (hotels ?? []).map(h => h.property_name || 'a hotel'))
+    if (used) return NextResponse.json({ success: false, error: used }, { status: 400 })
 
     const { data, error } = await supabase.from('city_zones').delete().eq('id', id).eq('tenant_id', tenant_id).select('id')
     if (error) throw error
