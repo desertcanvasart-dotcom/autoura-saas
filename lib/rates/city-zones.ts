@@ -86,7 +86,7 @@ export function validateZone(
   if (!label) return { ok: false, error: 'Give the zone a name, for example "West Bank".' }
   if (label.length > LABEL_MAX) return { ok: false, error: `Keep the name under ${LABEL_MAX} characters.` }
   const clash = zonesOfCity(existing, city).find(z => z.id !== selfId && z.label.trim().toLowerCase() === label.toLowerCase())
-  if (clash) return { ok: false, error: `${city} already has a zone called "${clash.label}".` }
+  if (clash) return { ok: false, error: `${clash.city.trim()} already has a zone called "${clash.label}".` }
   return { ok: true, city, label }
 }
 

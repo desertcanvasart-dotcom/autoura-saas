@@ -52,7 +52,7 @@ describe('validateZone', () => {
   it('refuses a second zone with the same name in the city', () => {
     const v = validateZone({ city: 'luxor', label: 'west bank' }, luxor)
     expect(v.ok).toBe(false)
-    if (!v.ok) expect(v.error).toContain('West Bank')
+    if (!v.ok) expect(v.error).toBe('Luxor already has a zone called "West Bank".')
   })
   it('allows the same name in another city', () => {
     expect(validateZone({ city: 'Aswan', label: 'West Bank' }, luxor)).toEqual({ ok: true, city: 'Aswan', label: 'West Bank' })

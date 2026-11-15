@@ -74,10 +74,15 @@ export default function ZonesPage() {
   const cityHasZones = (city: string) => zones.some(z => cityMatch(z.city) === cityMatch(city))
 
   const add = async () => {
+    if (busy === 'new') return
+    const label = newLabel
     const first = !cityHasZones(newCity)
-    const ok = await send('new', '/api/settings/zones', 'POST', { city: newCity, label: newLabel },
-      first ? `Added "${newLabel.trim()}" — ${newCity}'s first zone, so it is the default.` : `Added "${newLabel.trim()}" to ${newCity}.`)
-    if (ok) setNewLabel('')
+    // Clear the box at once: typing the next name while this one saves must
+    // start a fresh name, not run on into this one (found click-testing).
+    setNewLabel('')
+    const ok = await send('new', '/api/settings/zones', 'POST', { city: newCity, label },
+      first ? `Added "${label.trim()}" — ${newCity}'s first zone, so it is the default.` : `Added "${label.trim()}" to ${newCity}.`)
+    if (!ok) setNewLabel(current => current || label)
   }
 
   return (
@@ -121,7 +126,7 @@ export default function ZonesPage() {
                   {cities.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <input value={newLabel} onChange={e => setNewLabel(e.target.value)} aria-label="Zone name"
-                  onKeyDown={e => { if (e.key === 'Enter' && newCity && newLabel.trim()) add() }}
+                  onKeyDown={e => { if (e.key === 'Enter' && newCity && newLabel.trim() && busy !== 'new') add() }}
                   placeholder="Zone name, for example West Bank" className={inputCls} />
                 <button disabled={!newCity || !newLabel.trim() || busy === 'new'} onClick={add}
                   className="px-3 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-[#566b3d] disabled:bg-gray-200 disabled:text-gray-500 inline-flex items-center gap-1.5 justify-center">
