@@ -46,7 +46,7 @@ import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { fetchEveryRow } from '@/lib/db/fetch-all-pages'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
-import { resolveTransportSuppliers, suppliersNeedingNames } from '@/lib/pricing/transport-suppliers'
+import { chooseTransportCards, resolveTransportSuppliers, routeChoiceWarning, suppliersNeedingNames, type RouteChoice } from '@/lib/pricing/transport-suppliers'
 import { presetTierFor, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
 import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant, guideGradesForTenant } from '@/lib/vocabulary-server'
 import type { VocabularyKind } from '@/lib/vocabulary'
@@ -2471,7 +2471,10 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
     const { data } = await getSupabaseAdmin().from('suppliers').select('id, company_name, name').in('id', nameIds)
     for (const s of (data ?? []) as Array<{ id: string; company_name: string | null; name: string | null }>) names.set(s.id, s.company_name || s.name || 'a supplier')
   }
-  const allRates = resolveTransportSuppliers(rows, id => (id && names.get(id)) || 'no supplier')
+  // Several companies → the starred one (or a hole); then one company's
+  // several cards for the same lookup → the starred card, else the cheapest
+  // with a warning — never the row read last (lib/pricing/transport-suppliers).
+  const allRates = chooseTransportCards(resolveTransportSuppliers(rows, id => (id && names.get(id)) || 'no supplier'))
 
   for (const row of allRates) {
     // One row per (route, vehicle) — migration 337 made the tall shape the
@@ -4782,6 +4785,15 @@ export async function calculateDayBasedPricing(
 
   /** The rate for one of a day's extra transfers (dinner out, a local
    *  transfer), for a vehicle. One lookup, used by the lines AND the total. */
+  // A lookup several cards answered (none starred): priced at the cheapest,
+  // said once per day and lookup.
+  const noteRouteChoice = (day: number, rate: TransportRate, what: string) => {
+    const choice = (rate as TransportRate & { routeChoice?: RouteChoice }).routeChoice
+    if (!choice) return
+    const w = routeChoiceWarning(day, what, choice)
+    if (!warnings.includes(w)) warnings.push(w)
+  }
+
   const findExtraTransfer = (day: ItineraryDay, extra: ExtraTransfer, vehicleType: VehicleType) => {
     // No duration: `transportation_rates.duration` is NULL on all 2,040
     // production rows — the length of a journey is carried by the service
@@ -4827,6 +4839,7 @@ export async function calculateDayBasedPricing(
     })
 
     if (match && match.source === 'db') {
+      noteRouteChoice(info.day, match.rate, `${String(needs.serviceType).replace(/_/g, ' ')} · ${vehicleType} · ${info.city}`)
       services.push({
         id: `day${info.day}-transport`,
         dayNumber: info.day,
@@ -4930,6 +4943,7 @@ export async function calculateDayBasedPricing(
       const extraVehicle = vehicleFor(shownSeats, where)
       const match = findExtraTransfer(day, extra, extraVehicle)
       if (match && match.source === 'db') {
+        noteRouteChoice(day.day, match.rate, `${extra.label.toLowerCase()} · ${extraVehicle} · ${where}`)
         services.push({
           id: `day${day.day}-${extra.slug}`,
           dayNumber: day.day,
