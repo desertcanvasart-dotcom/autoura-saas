@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { FEED_KEY, feedOf, feedTour, hashFeedKey, newFeedKey, siteForFeedKey } from '@/lib/publish/feed'
+import { FEED_KEY, feedOf, feedSeasons, feedTour, hashFeedKey, loadFeedSeasons, newFeedKey, peakPerPerson, siteForFeedKey, type SeasonDateRow, type SeasonRow } from '@/lib/publish/feed'
 import { feedKeyOf, newFeedKeyFor, type Actor, type AdminDeps } from '@/lib/publish/admin'
-import type { PagePayload, TourFacts } from '@/lib/publish/contract'
+import { feedSeasonsSchema, type PagePayload, type TourFacts } from '@/lib/publish/contract'
 
 // ============================================================================
 // The data feed for an agency's own developer (own-website plan, option 4).
@@ -79,5 +79,53 @@ describe('a tour in the feed', () => {
       text: { overview: expect.stringMatching(/^From .*99 per person\.$/), highlights: ['The Sphinx at dawn'], days: [{ day: 1, text: 'The plateau.' }], seo: null },
       facts,
     })
+  })
+})
+
+describe('the peak calendar in the feed', () => {
+  const seasons: SeasonRow[] = [
+    { id: 'win', name: 'Winter peak', uplift_percent: '10.00', is_active: true },
+    { id: 'ny', name: 'New Year', uplift_percent: 25, is_active: true },
+    { id: 'off', name: 'Switched off', uplift_percent: 50, is_active: false },
+    { id: 'zero', name: 'Watching', uplift_percent: 0, is_active: true },
+  ]
+  const dates: SeasonDateRow[] = [
+    { season_id: 'win', start_date: '2026-12-01', end_date: '2027-02-28', label: 'Winter 26/27' },
+    { season_id: 'win', start_date: '2025-12-01', end_date: '2026-02-28', label: 'Winter 25/26' },
+    { season_id: 'ny', start_date: '2026-12-24', end_date: '2027-01-02', label: null },
+    { season_id: 'off', start_date: '2026-12-01', end_date: '2026-12-31', label: null },
+    { season_id: 'zero', start_date: '2026-11-01', end_date: '2026-11-30', label: null },
+  ]
+
+  it('lists active, charging seasons with the windows still to come, earliest first', () => {
+    const out = feedSeasons(seasons, dates, '2026-11-15')
+    expect(feedSeasonsSchema.parse(out)).toEqual(out)
+    expect(out.rule).toEqual({ matchBy: 'departure_date', overlap: 'highest_wins', appliesTo: 'per_person_band' })
+    expect(out.seasons).toEqual([
+      { name: 'Winter peak', upliftPercent: 10, ranges: [{ start: '2026-12-01', end: '2027-02-28', label: 'Winter 26/27' }] },
+      { name: 'New Year', upliftPercent: 25, ranges: [{ start: '2026-12-24', end: '2027-01-02', label: null }] },
+    ])
+    expect(out.date).toBeUndefined()
+  })
+  it('answers for one date: overlapping windows take the highest premium, an ordinary date none', () => {
+    expect(feedSeasons(seasons, dates, '2026-11-15', '2026-12-31').date).toEqual({ date: '2026-12-31', season: { name: 'New Year', upliftPercent: 25 } })
+    expect(feedSeasons(seasons, dates, '2026-11-15', '2027-02-28').date).toEqual({ date: '2027-02-28', season: { name: 'Winter peak', upliftPercent: 10 } })
+    // A switched-off season and a 0% season charge nothing, exactly as in quotes.
+    expect(feedSeasons(seasons, dates, '2026-11-15', '2026-11-20').date).toEqual({ date: '2026-11-20', season: null })
+  })
+  it('prices a band on a peak date as the band × (1 + premium), to the cent', () => {
+    expect(peakPerPerson(99, 25)).toBe(123.75)
+    expect(peakPerPerson(408.75, 15)).toBe(470.06)
+    expect(peakPerPerson(99, 0)).toBe(99)
+  })
+  it('reads the calendar of the key\'s own tenant only', async () => {
+    const asked: Array<[string, string, string]> = []
+    const db = { from: (table: string) => {
+      const q = { select: () => q, eq: (c: string, v: string) => { asked.push([table, c, v]); return Promise.resolve({ data: table === 'pricing_seasons' ? seasons : dates, error: null }) } }
+      return q
+    } }
+    const out = await loadFeedSeasons(db as never, T, '2026-11-15', '2027-01-01')
+    expect(asked).toEqual([['pricing_seasons', 'tenant_id', T], ['pricing_season_dates', 'tenant_id', T]])
+    expect(out.date?.season?.name).toBe('New Year')
   })
 })
