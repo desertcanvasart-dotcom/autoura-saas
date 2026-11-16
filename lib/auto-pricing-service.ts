@@ -46,7 +46,7 @@ import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { fetchEveryRow } from '@/lib/db/fetch-all-pages'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
-import { chooseTransportCards, resolveTransportSuppliers, routeChoiceWarning, suppliersNeedingNames, type RouteChoice } from '@/lib/pricing/transport-suppliers'
+import { chooseTransportCards, resolveTransportSuppliers, routeChoiceWarning, suppliersNeedingNames, transportLookupKey, type RouteChoice } from '@/lib/pricing/transport-suppliers'
 import { presetTierFor, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
 import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant, guideGradesForTenant } from '@/lib/vocabulary-server'
 import type { VocabularyKind } from '@/lib/vocabulary'
@@ -75,7 +75,8 @@ import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-f
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
-import { isNonDefaultZone, type CityZone } from '@/lib/rates/city-zones'
+import { isNonDefaultZone, zoneLabel, type CityZone } from '@/lib/rates/city-zones'
+import { chooseCardForSights, pickupZoneFor } from '@/lib/pricing/transport-zone'
 import { rateServesMeal } from '@/lib/meals/meal-rate-meals'
 import { priceByBasis, toPricingBasis, unitsFor, type PricingBasis } from '@/lib/pricing/pricing-basis'
 
@@ -184,6 +185,10 @@ export interface ItineraryDay {
    *  present they WIN and silence the free-text `attractions` wording —
    *  an id is a decision, wording is a guess. */
   attraction_ids?: string[]
+  /** The pickup area of the day's transport (a zone key, migration 469) when
+   *  the day has no hotel there to say it — a cruise day, a quote with no
+   *  hotel (docs/transport-zones/PLAN.md D9). Absent = from the hotel. */
+  pickup_zone?: string | null
   /** Activities the operator added on this day (the motorboat at Philae, a
    *  felucca) — activity_rates ids, priced from the catalogue by each row's
    *  own model. Skipped on a cruise day, where they ride in the cruise
@@ -438,6 +443,11 @@ interface TransportRate {
   /** The transport company (migration 355); several may price one route (460). */
   supplier_id?: string | null
   is_preferred?: boolean | null
+  /** The card's pickup area within its city (migration 471). Normalised in
+   *  the cache: the city's default area reads as null. */
+  zone?: string | null
+  /** The sights a sightseeing card covers (migration 471). */
+  covers_sights?: string[] | null
   /** Set when several companies price this journey and none (or several) is
    *  starred — a lookup landing here is a hole, not a price. */
   ambiguity?: Ambiguity
@@ -987,6 +997,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       city_transfer: day.city_transfer === true,
       ...(typeof day.road_transfers === 'boolean' ? { road_transfers: day.road_transfers } : {}),
       ...(Array.isArray(day.transport_lines) ? { transport_lines: sanitizeTransportLines(day.transport_lines) } : {}),
+      ...(typeof day.pickup_zone === 'string' && /^[a-z0-9][a-z0-9_]{0,59}$/.test(day.pickup_zone.trim()) ? { pickup_zone: day.pickup_zone.trim() } : {}),
       sightseeing_length:
         day.sightseeing_length === 'half_day' || day.sightseeing_length === 'long_day_tour'
           ? day.sightseeing_length
@@ -1554,6 +1565,8 @@ export async function getHotelRates(
   hotelName: string
   /** The accommodation_rates row priced from — the pin a caller may store. */
   hotelId?: string
+  /** The hotel's area within its city (migration 470) — where its transfers start. */
+  zone?: string | null
   ppdNight: number
   singleSuppNight: number
   tripleRedNight: number
@@ -1707,7 +1720,7 @@ export async function getHotelRates(
       const { data: rawPinned } = await base().eq('id', opts.rateId).limit(1)
       const pinned = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!pinned || pinned.length === 0) return null
-      return mapRow(pinned[0], 'db')
+      return { ...mapRow(pinned[0], 'db'), zone: (pinned[0] as { zone?: string | null }).zone ?? null }
     }
 
     // Primary: exact tier; city matched by ilike (substring). EVERY candidate
@@ -1737,7 +1750,7 @@ export async function getHotelRates(
           ambiguous: { count: pick.count, names: pick.names, preferredCount: pick.preferredCount },
         }
       }
-      if (pick.kind === 'one') return mapRow(pick.row, exact.length > 0 ? 'db' : 'fuzzy')
+      if (pick.kind === 'one') return { ...mapRow(pick.row, exact.length > 0 ? 'db' : 'fuzzy'), zone: (pick.row as { zone?: string | null }).zone ?? null }
     }
 
     // Fallback: any tier for this city — wrong tier ⇒ fuzzy, never deliverable.
@@ -1751,7 +1764,7 @@ export async function getHotelRates(
     const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
 
     if (anyHotel && anyHotel.length > 0) {
-      return mapRow(anyHotel[0], 'fuzzy')
+      return { ...mapRow(anyHotel[0], 'fuzzy'), zone: (anyHotel[0] as { zone?: string | null }).zone ?? null }
     }
 
     // No rate at all.
@@ -2450,8 +2463,8 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
 }
 
 /** The tenant's zones (migration 469) for the engine; none when unreadable. */
-async function loadEngineCityZones(tenantId: string): Promise<Array<Pick<CityZone, 'city' | 'key' | 'is_default'>> | null> {
-  const { data, error } = await getSupabaseAdmin().from('city_zones').select('city, key, is_default').eq('tenant_id', tenantId)
+async function loadEngineCityZones(tenantId: string): Promise<Array<Pick<CityZone, 'city' | 'key' | 'label' | 'is_default'>> | null> {
+  const { data, error } = await getSupabaseAdmin().from('city_zones').select('city, key, label, is_default').eq('tenant_id', tenantId)
   // Unreadable: price every card as before rather than dropping default-area ones.
   if (error) { console.error('city zones read error:', error); return null }
   return data ?? []
@@ -2473,12 +2486,14 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
 
   // Several companies pricing the same journey (migration 460): the starred
   // one's rows alone, or every row marked ambiguous — never an arbitrary pick.
-  // A card in a NON-default area of its city (migration 471) is left out until
-  // the engine prices by the hotel's area (docs/transport-zones/PLAN.md step
-  // 4): it would otherwise compete with the city's card on the same lookup.
+  // Each card answers for its pickup area (migration 471): the city's default
+  // area reads as no area, so an old card and a card set to the default are
+  // the same card; a West Bank card answers only a West Bank lookup.
   const zones = await loadEngineCityZones(scope.tenantId)
   const rows = (normalized as unknown as TransportRate[])
-    .filter(r => !zones || !isNonDefaultZone(zones, r.city, (r as { zone?: string | null }).zone))
+    // Zones unreadable: every card as the city's (never a non-default card in its place).
+    .filter(r => zones || !r.zone)
+    .map(r => ({ ...r, zone: zones && isNonDefaultZone(zones, r.city, r.zone) ? r.zone : null, covers_sights: Array.isArray(r.covers_sights) ? r.covers_sights : [] }))
   const nameIds = suppliersNeedingNames(rows)
   const names = new Map<string, string>()
   if (nameIds.length) {
@@ -2488,7 +2503,23 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
   // Several companies → the starred one (or a hole); then one company's
   // several cards for the same lookup → the starred card, else the cheapest
   // with a warning — never the row read last (lib/pricing/transport-suppliers).
-  const allRates = chooseTransportCards(resolveTransportSuppliers(rows, id => (id && names.get(id)) || 'no supplier'))
+  const resolved = resolveTransportSuppliers(rows, id => (id && names.get(id)) || 'no supplier')
+  // A lookup whose cards list the sights they cover (migration 471) is chosen
+  // per DAY, from the day's sights (lib/pricing/transport-zone): every card
+  // of such a lookup is kept here; the cache below holds the plain choice for
+  // a lookup asked without sights.
+  const sightCards = new Map<string, TransportRate[]>()
+  {
+    const byLookup = new Map<string, TransportRate[]>()
+    for (const r of resolved) {
+      const k = transportLookupKey(r)
+      byLookup.set(k, [...(byLookup.get(k) ?? []), r])
+    }
+    for (const [k, group] of byLookup) if (group.some(r => (r.covers_sights?.length ?? 0) > 0)) sightCards.set(k, group)
+  }
+  const allRates = chooseTransportCards(resolved)
+  ;(cache as TransportCache).sightCards = sightCards
+  ;(cache as TransportCache).zones = zones ?? []
 
   for (const row of allRates) {
     // One row per (route, vehicle) — migration 337 made the tall shape the
@@ -2501,6 +2532,7 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
       (rate.city || '').toLowerCase(),
       rate.duration || '',
       rate.area || '',
+      rate.zone || '',
       vehicleKey(rate.vehicle_type)
     ].join('|')
 
@@ -2512,6 +2544,7 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
       (rate.city || '').toLowerCase(),
       rate.duration || '',
       '',
+      rate.zone || '',
       vehicleKey(rate.vehicle_type)
     ].join('|')
 
@@ -2704,7 +2737,7 @@ export async function previewDayTransport(
 ): Promise<Array<{ day: number; automatic: boolean; lines: DayTransportPreviewLine[] }>> {
   const days = Array.isArray(itineraryData) ? itineraryData : []
   const itinerary = parseItinerary(days, { dayTour: isDayTourProgramme(opts.tourType, days.length) })
-  const [cache, bands] = await Promise.all([buildTransportCache(scope), tenantVehicleBands(scope.tenantId)])
+  const [cache, bands, aliasIndex] = await Promise.all([buildTransportCache(scope), tenantVehicleBands(scope.tenantId), loadAttractionAliasIndex(getSupabaseAdmin(), scope.tenantId)])
   const seats = (opts.pax ?? 2) + (opts.throughoutGuide ? 1 : 0)
   const out: Array<{ day: number; automatic: boolean; lines: DayTransportPreviewLine[] }> = []
   for (let i = 0; i < itinerary.length; i++) {
@@ -2712,11 +2745,16 @@ export async function previewDayTransport(
     const previousDay = groundedNeighbour(itinerary, i, -1)
     const nextDay = groundedNeighbour(itinerary, i, 1)
     const lines: DayTransportPreviewLine[] = []
+    // The preview has no hotel chosen: the day's own pickup area, else the
+    // city's default; the day's worded sights pick among cards listing theirs.
+    const sights = day.attraction_ids && day.attraction_ids.length > 0
+      ? undefined
+      : [...new Set(day.attractions.flatMap(w => resolveAttractionAlias(w, aliasIndex)))]
     const lookup = (serviceType: string, city: string, route: { from: string; to: string } | undefined, alsoTry: string[], label: string, derived: boolean) => {
       const vehicleType = getVehicleTypeByPax(seats, city, bands)
       let match: ReturnType<typeof findTransportRate> = null
       for (const st of [serviceType, ...alsoTry]) {
-        match = findTransportRate(cache, { serviceType: st as TransportServiceType, city, duration: '' as never, area: null, vehicleType, ...(route ? { originCity: route.from, destinationCity: route.to } : {}) })
+        match = findTransportRate(cache, { serviceType: st as TransportServiceType, city, duration: '' as never, area: null, vehicleType, zone: pickupZoneFor(itinerary, i, city, () => null), sights, ...(route ? { originCity: route.from, destinationCity: route.to } : {}) })
         if (match && match.source !== 'fuzzy') break
       }
       const ok = match && match.source === 'db'
@@ -2724,7 +2762,7 @@ export async function previewDayTransport(
         serviceType, city, route, vehicleType, label, derived,
         cost: ok ? Number(match!.rate.base_rate_eur) : null,
         rateName: ok ? (match!.rate.route_name ?? undefined) : undefined,
-        reason: ok ? undefined : match?.source === 'ambiguous'
+        reason: ok ? undefined : match?.source === 'ambiguous' || match?.source === 'uncovered'
           ? transportHoleMessage(match, `${vehicleType} ${route ? `${route.from} → ${route.to}` : `in ${city || 'this city'}`}`, '')
           : match ? `Only an approximate rate (another city or length) — not used` : `No ${vehicleType} rate for ${serviceType.replace(/_/g, ' ')} ${route ? `${route.from} → ${route.to}` : `in ${city || 'this city'}`}`,
       })
@@ -2878,7 +2916,7 @@ export interface DayTransportRate { rate: number; rateId: string; vehicleType: s
  */
 export async function getTransportRateFor(
   scope: CatalogScope,
-  need: { serviceType: TransportServiceType; city: string | null | undefined; duration?: TransportDuration; originCity?: string | null; specialVehicleType?: VehicleType },
+  need: { serviceType: TransportServiceType; city: string | null | undefined; duration?: TransportDuration; originCity?: string | null; specialVehicleType?: VehicleType; zone?: string | null; sights?: readonly string[] },
   totalPax: number
 ): Promise<DayTransportRate | null> {
   const where = String(need.city ?? '').trim()
@@ -2888,6 +2926,7 @@ export async function getTransportRateFor(
   const match = findTransportRate(cache, {
     serviceType: need.serviceType, city: where, duration: need.duration ?? ('' as TransportDuration), area: null, vehicleType,
     originCity: need.originCity ?? undefined, destinationCity: where,
+    zone: need.zone, sights: need.sights,
   })
   if (!match || match.source !== 'db') return null
   const rate = Number(match.rate.base_rate_eur)
@@ -2916,6 +2955,10 @@ export function findTransportRate(
     vehicleType: VehicleType
     originCity?: string
     destinationCity?: string
+    /** The pickup area (a zone key) — from the guests' hotel (lib/pricing/transport-zone). */
+    zone?: string | null
+    /** The day's sights, by fee-sheet name: picks among cards that list theirs. */
+    sights?: readonly string[]
   }
 ): TransportMatch | null {
   const found = findTransportRateRaw(cache, params)
@@ -2923,7 +2966,28 @@ export function findTransportRate(
   if (found && found.source === 'db' && found.rate.ambiguity) {
     return { rate: found.rate, source: 'ambiguous', ambiguity: found.rate.ambiguity }
   }
+  // Cards that list their sights (migration 471): the day's sights choose.
+  if (found && found.source === 'db' && params.sights) {
+    const group = (cache as TransportCache).sightCards?.get(transportLookupKey(found.rate))
+    if (group) {
+      const pick = chooseCardForSights(group, params.sights)
+      if (pick.kind === 'uncovered') return { rate: found.rate, source: 'uncovered', cards: pick.cards, sights: [...params.sights] }
+      // The day's own choice replaces the plain one's warning.
+      const card: TransportRate & { routeChoice?: RouteChoice } = { ...pick.card }
+      delete card.routeChoice
+      if (pick.routeChoice) card.routeChoice = pick.routeChoice
+      return { rate: card, source: 'db' }
+    }
+  }
   return found
+}
+
+/** The transport cache, with what a per-day choice needs (migration 471). */
+type TransportCache = Map<string, TransportRate> & {
+  /** Every card of a lookup whose cards list their sights, by transportLookupKey. */
+  sightCards?: Map<string, TransportRate[]>
+  /** The tenant's zones, to read a lookup's default area as none. */
+  zones?: Array<Pick<CityZone, 'city' | 'key' | 'label' | 'is_default'>>
 }
 
 /** What a transport lookup found: a definite row, an approximate one (another
@@ -2931,11 +2995,14 @@ export function findTransportRate(
 export type TransportMatch =
   | { rate: TransportRate; source: 'db' | 'fuzzy'; ambiguity?: undefined }
   | { rate: TransportRate; source: 'ambiguous'; ambiguity: Ambiguity }
+  /** Cards list their sights and none covers the day's — a gap naming them. */
+  | { rate: TransportRate; source: 'uncovered'; ambiguity?: undefined; cards: string[]; sights: string[] }
 
 /** The hole message for a transport lookup that found no price: the
  *  companies to choose between when it was ambiguous, else `fallback`. */
 export function transportHoleMessage(match: TransportMatch | null, what: string, fallback: string): string {
   if (match?.source === 'ambiguous') return ambiguityMessage(`transport companies price ${what}`, match.ambiguity, 'Rates → Transportation')
+  if (match?.source === 'uncovered') return `No ${what} card covers ${match.sights.join(' + ')} (cards: ${match.cards.join(', ')}). Add a card that covers them, or add the sight to a card's "Sights covered", in Rates → Transportation.`
   return fallback
 }
 
@@ -2945,6 +3012,9 @@ function findTransportRateRaw(
 ): { rate: TransportRate; source: 'db' | 'fuzzy' } | null {
   const { serviceType, city, duration, area, vehicleType, originCity, destinationCity } = params
   const cityLower = city.toLowerCase()
+  // The pickup area, normalised like the cards: the default area is none.
+  const zones = (cache as TransportCache).zones ?? []
+  const zone = params.zone && isNonDefaultZone(zones, city, params.zone) ? params.zone : ''
 
   // A ROAD TRANSFER BETWEEN CITIES IS ITS ROUTE, NOT A CITY. The rate form
   // stores the departure in `city` and the engine looks a day up by the day's
@@ -2963,13 +3033,13 @@ function findTransportRateRaw(
   }
 
   // Priority 1: Exact match (service_type + city + duration + area + vehicle) — definite.
-  const exactKey = [serviceType, cityLower, duration, area || '', vehicleKey(vehicleType)].join('|')
+  const exactKey = [serviceType, cityLower, duration, area || '', zone, vehicleKey(vehicleType)].join('|')
   if (cache.has(exactKey)) {
     return { rate: cache.get(exactKey)!, source: 'db' }
   }
 
   // Priority 2: Match without area — still definite (area is optional metadata).
-  const noAreaKey = [serviceType, cityLower, duration, '', vehicleKey(vehicleType)].join('|')
+  const noAreaKey = [serviceType, cityLower, duration, '', zone, vehicleKey(vehicleType)].join('|')
   if (cache.has(noAreaKey)) {
     return { rate: cache.get(noAreaKey)!, source: 'db' }
   }
@@ -2982,8 +3052,8 @@ function findTransportRateRaw(
   // service type asked for, not an approximate one; treating it as
   // approximate turned every real day-tour rate into a gap.
   for (const key of [
-    [serviceType, cityLower, '', area || '', vehicleKey(vehicleType)].join('|'),
-    [serviceType, cityLower, '', '', vehicleKey(vehicleType)].join('|'),
+    [serviceType, cityLower, '', area || '', zone, vehicleKey(vehicleType)].join('|'),
+    [serviceType, cityLower, '', '', zone, vehicleKey(vehicleType)].join('|'),
   ]) {
     if (cache.has(key)) return { rate: cache.get(key)!, source: 'db' }
   }
@@ -2997,7 +3067,7 @@ function findTransportRateRaw(
   for (const fallbackCity of fallbackCities) {
     if (fallbackCity === cityLower) continue
 
-    const fallbackKey = [serviceType, fallbackCity, duration, '', vehicleKey(vehicleType)].join('|')
+    const fallbackKey = [serviceType, fallbackCity, duration, '', '', vehicleKey(vehicleType)].join('|')
     if (cache.has(fallbackKey)) {
       return { rate: cache.get(fallbackKey)!, source: 'fuzzy' }
     }
@@ -4453,6 +4523,22 @@ export async function calculateDayBasedPricing(
     }
   })
 
+  // Each day's sights, by fee-sheet name — what a sightseeing card's "Sights
+  // covered" is matched against (migration 471, lib/pricing/transport-zone).
+  // Per DAY, not first-seen: a sight seen on two days counts on both.
+  const feeNameByLookup = new Map<string, string>()
+  entranceLookups.forEach(({ attraction, feeId }, i) => {
+    const fee = entranceFees[i]
+    if (fee && fee.source === 'db') feeNameByLookup.set(feeId ? `id:${feeId}` : String(attraction).toLowerCase(), fee.name)
+  })
+  const daySights = new Map<number, string[]>()
+  for (const day of itinerary) {
+    const names = day.attraction_ids && day.attraction_ids.length > 0
+      ? day.attraction_ids.map(id => feeNameByLookup.get(`id:${id}`))
+      : day.attractions.flatMap(w => resolveAttractionAlias(w, aliasIndex)).map(a => feeNameByLookup.get(a.toLowerCase()) ?? a)
+    daySights.set(day.day, [...new Set(names.filter((n): n is string => !!n))])
+  }
+
   // ----- Day activities (the motorboat at Philae, a felucca) -----
   // Activities the operator added on a day, priced from Rates → Activities by
   // each row's own model (per person / tiered scale with the group; per unit /
@@ -4797,6 +4883,21 @@ export async function calculateDayBasedPricing(
   const vehicleFor = (seats: number, city: string | undefined): VehicleType =>
     getVehicleTypeByPax(seats, city, vehicleBands)
 
+  // Where each transport line starts, and what it sees (docs/transport-zones
+  // PLAN step 4): the pickup area is the area of the hotel the guests leave
+  // from or arrive at in that city (lib/pricing/transport-zone); the sights
+  // pick among cards that list theirs. One context for the lines AND the
+  // per-group money below, so they always price the same card.
+  const hotelZoneIn = (city: string) => hotelRatesMap.get(city)?.zone ?? null
+  const lookupContext = (dayNumber: number, city: string) => ({
+    zone: pickupZoneFor(itinerary, itinerary.findIndex(d => d.day === dayNumber), city, hotelZoneIn),
+    sights: daySights.get(dayNumber) ?? [],
+  })
+  const cacheZones = (transportCache as TransportCache).zones ?? []
+  /** " for West Bank hotels" when the line is in a non-default area — named in its gap. */
+  const zoneText = (city: string, zone: string | null) =>
+    zone && isNonDefaultZone(cacheZones, city, zone) ? ` for ${zoneLabel(cacheZones, city, zone)} hotels` : ''
+
   /** The rate for one of a day's extra transfers (dinner out, a local
    *  transfer), for a vehicle. One lookup, used by the lines AND the total. */
   // A lookup several cards answered (none starred): priced at the cheapest,
@@ -4822,6 +4923,7 @@ export async function calculateDayBasedPricing(
         duration: '' as never,
         area: null,
         vehicleType,
+        ...lookupContext(day.day, extra.city ?? day.city),
         ...(extra.originCity !== undefined ? { originCity: extra.originCity, destinationCity: extra.destinationCity } : {}),
       })
       if (match && match.source !== 'fuzzy') break
@@ -4849,7 +4951,8 @@ export async function calculateDayBasedPricing(
       vehicleType,
       // Previous day city for intercity; a day trip names its own road.
       originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
-      destinationCity: needs.destinationCity ?? info.city
+      destinationCity: needs.destinationCity ?? info.city,
+      ...lookupContext(info.day, info.city),
     })
 
     if (match && match.source === 'db') {
@@ -4880,10 +4983,10 @@ export async function calculateDayBasedPricing(
         lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
         message: transportHoleMessage(match, isIntercity(String(needs.serviceType))
           ? `${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}`
-          : `${vehicleType} ${String(needs.serviceType).replace(/_/g, ' ')} in ${info.city}`,
+          : `${vehicleType} ${String(needs.serviceType).replace(/_/g, ' ')} in ${info.city}${zoneText(info.city, lookupContext(info.day, info.city).zone)}`,
           isIntercity(String(needs.serviceType))
           ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
-          : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`),
+          : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}${zoneText(info.city, lookupContext(info.day, info.city).zone)}. Add it in Rates → Transportation${zoneText(info.city, lookupContext(info.day, info.city).zone) ? ', with that pickup area' : ''}.`),
       })
     }
   }
@@ -4981,7 +5084,7 @@ export async function calculateDayBasedPricing(
           city: where,
           vehicleType: extraVehicle,
           lookupAttempted: `${extra.serviceType}/one_way ${extraVehicle} in ${where}`,
-          message: transportHoleMessage(match, `${extraVehicle} ${extra.label.toLowerCase()} in ${where || 'this day'}`, `No ${extra.label.toLowerCase()} rate for ${extraVehicle} in ${where || 'this day'}. Add it in Rates → Transportation.`),
+          message: transportHoleMessage(match, `${extraVehicle} ${extra.label.toLowerCase()} in ${where || 'this day'}${zoneText(where, lookupContext(day.day, where).zone)}`, `No ${extra.label.toLowerCase()} rate for ${extraVehicle} in ${where || 'this day'}${zoneText(where, lookupContext(day.day, where).zone)}. Add it in Rates → Transportation.`),
         })
       }
     }
@@ -5029,7 +5132,8 @@ export async function calculateDayBasedPricing(
         area: needs.area,
         vehicleType,
         originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
-        destinationCity: needs.destinationCity ?? info.city
+        destinationCity: needs.destinationCity ?? info.city,
+        ...lookupContext(info.day, info.city),
       })
 
       if (match && match.source === 'db') {
@@ -5046,10 +5150,10 @@ export async function calculateDayBasedPricing(
           lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
           message: transportHoleMessage(match, isIntercity(String(needs.serviceType))
             ? `${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}`
-            : `${vehicleType} ${String(needs.serviceType).replace(/_/g, ' ')} in ${info.city}`,
+            : `${vehicleType} ${String(needs.serviceType).replace(/_/g, ' ')} in ${info.city}${zoneText(info.city, lookupContext(info.day, info.city).zone)}`,
             isIntercity(String(needs.serviceType))
             ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
-            : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`),
+            : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}${zoneText(info.city, lookupContext(info.day, info.city).zone)}. Add it in Rates → Transportation${zoneText(info.city, lookupContext(info.day, info.city).zone) ? ', with that pickup area' : ''}.`),
         })
       }
     }
@@ -5075,7 +5179,7 @@ export async function calculateDayBasedPricing(
             city: where,
             vehicleType,
             lookupAttempted: `${extra.serviceType}/one_way ${vehicleType} in ${where}`,
-            message: transportHoleMessage(match, `${vehicleType} ${extra.label.toLowerCase()} in ${where || 'this day'}`, `No ${extra.label.toLowerCase()} rate for ${vehicleType} in ${where || 'this day'}. Add it in Rates → Transportation.`),
+            message: transportHoleMessage(match, `${vehicleType} ${extra.label.toLowerCase()} in ${where || 'this day'}${zoneText(where, lookupContext(day.day, where).zone)}`, `No ${extra.label.toLowerCase()} rate for ${vehicleType} in ${where || 'this day'}${zoneText(where, lookupContext(day.day, where).zone)}. Add it in Rates → Transportation.`),
           })
         }
       }
