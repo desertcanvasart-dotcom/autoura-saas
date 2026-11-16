@@ -206,7 +206,6 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('origin_city', 'Origin City', 'text', false),
       col('destination_city', 'Destination City', 'text', false),
       col('duration', 'Duration', 'text', false),
-      col('area', 'Area', 'text', false),
       // The card's pickup area within its city (migration 471): one of the
       // city's zones (Settings → Zones), by name or key; blank = the default.
       col('zone', 'Zone', 'text', false),

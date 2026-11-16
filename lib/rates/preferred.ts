@@ -51,7 +51,7 @@ export const PREFERRED_SCOPES: Record<PreferredTable, ScopeDef> = {
   transportation_rates: {
     // The pickup area (migration 471): a West Bank card and the city's card
     // answer different hotels, so starring one leaves the other's star.
-    columns: ['service_type', 'city', 'origin_city', 'destination_city', 'duration', 'area', 'zone', 'vehicle_type'],
+    columns: ['service_type', 'city', 'origin_city', 'destination_city', 'duration', 'zone', 'vehicle_type'],
     nameColumn: 'route_name',
     page: 'Rates → Transportation',
   },

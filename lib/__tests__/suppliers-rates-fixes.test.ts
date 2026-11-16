@@ -131,7 +131,10 @@ describe('rate pages', () => {
   it('editing a transport route keeps the fields the form does not show', () => {
     const src = read('app/api/resources/transportation/route.ts')
     expect(src).toContain("duration: kept('duration')")
-    expect(src).toContain("area: kept('area')")
+    // The pickup area (migration 471) is kept the same way; the old `area`
+    // column is gone (migration 472).
+    expect(src).toMatch(/let zone: string \| null = existing\[0\]\?\.zone \?\? null/)
+    expect(src).not.toContain("kept('area')")
   })
 
   it('hotel supplements are saved; a cruise save does not wipe them', () => {

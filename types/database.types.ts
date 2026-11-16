@@ -12546,7 +12546,6 @@ export interface Database {
           created_at: string | null
           route_name: string | null
           includes: string | null
-          area: string | null
           duration: string | null
           is_active: boolean | null
           is_preferred: boolean
@@ -12573,7 +12572,6 @@ export interface Database {
           created_at?: string | null
           route_name?: string | null
           includes?: string | null
-          area?: string | null
           duration?: string | null
           is_active?: boolean | null
           is_preferred?: boolean
@@ -12600,7 +12598,6 @@ export interface Database {
           created_at?: string | null
           route_name?: string | null
           includes?: string | null
-          area?: string | null
           duration?: string | null
           is_active?: boolean | null
           is_preferred?: boolean

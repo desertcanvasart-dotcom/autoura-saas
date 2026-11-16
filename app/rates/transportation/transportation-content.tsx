@@ -32,7 +32,6 @@ interface TransportationRate {
   origin_city?: string | null
   destination_city?: string | null
   duration?: string | null
-  area?: string | null
   /** The card's pickup area within its city (migration 471); empty = the city's default zone. */
   zone?: string | null
   /** The sights a sightseeing card covers (migration 471). */
@@ -65,7 +64,7 @@ type ViewMode = 'table' | 'cards' | 'compact'
 /** The journey the engine matches on — two companies' routes with the same
  *  one answer the same question (the route's name is only a label). */
 const journeyKeyOf = (r: TransportationRate) =>
-  [r.service_type, r.city, r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.area ?? '', r.zone ?? ''].map(v => String(v).toLowerCase()).join('|')
+  [r.service_type, r.city, r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.zone ?? ''].map(v => String(v).toLowerCase()).join('|')
 // A route is one company's (migration 460): two companies pricing the same
 // road are two routes, each with its own vehicles and prices.
 const routeKeyOf = (r: TransportationRate) =>

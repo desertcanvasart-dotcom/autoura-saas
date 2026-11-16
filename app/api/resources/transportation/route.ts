@@ -121,10 +121,10 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
     existing = data ?? []
   }
   // A field the request does not carry keeps the route's stored value: the
-  // edit form has no origin, duration, area or includes, and saving a price
-  // wrote all four as null — and the engine finds transport by duration and
-  // area, so a CSV-imported half-day route stopped matching.
-  const kept = (field: 'origin_city' | 'duration' | 'area' | 'includes') =>
+  // edit form has no origin, duration or includes, and saving a price
+  // wrote all three as null — and the engine finds transport by duration and
+  // its pickup area, so a CSV-imported half-day route stopped matching.
+  const kept = (field: 'origin_city' | 'duration' | 'includes') =>
     body[field] !== undefined ? (body[field] || null) : (existing[0]?.[field] ?? null)
 
   // The card's pickup area (migration 471): one of its city's zones, by key
@@ -158,7 +158,6 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
     origin_city: kept('origin_city'),
     destination_city: body.destination_city || null,
     duration: kept('duration'),
-    area: kept('area'),
     includes: kept('includes'),
     zone,
     covers_sights: coversSights,
