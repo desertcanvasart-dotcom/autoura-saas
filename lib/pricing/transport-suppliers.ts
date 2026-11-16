@@ -31,6 +31,8 @@ export interface TransportSupplierRow {
   destination_city?: string | null
   duration?: string | null
   area?: string | null
+  /** The pickup area (migration 471), normalised: the city's default area is null. */
+  zone?: string | null
   vehicle_type?: string | null
   supplier_id?: string | null
   is_preferred?: boolean | null
@@ -40,7 +42,7 @@ const low = (v: unknown) => String(v ?? '').trim().toLowerCase()
 
 /** What the engine matches a journey on — the same question both companies answer. */
 export function transportJourneyKey(r: TransportSupplierRow): string {
-  return [low(r.service_type), low(r.city), low(r.origin_city), low(r.destination_city), low(r.duration), low(r.area), low(r.vehicle_type)].join('\u0000')
+  return [low(r.service_type), low(r.city), low(r.origin_city), low(r.destination_city), low(r.duration), low(r.area), low(r.zone), low(r.vehicle_type)].join('\u0000')
 }
 
 const NO_SUPPLIER = ''
@@ -150,7 +152,8 @@ export function transportLookupKey(r: TransportSupplierRow): string {
   if (isIntercityType(r.service_type)) {
     return ['road', low(r.service_type), low(r.origin_city || r.city), low(r.destination_city), low(r.vehicle_type)].join('\u0000')
   }
-  return ['city', low(r.service_type), low(r.city), low(r.duration), low(r.area), low(r.vehicle_type)].join('\u0000')
+  // A West Bank card and the city's card answer different hotels (migration 471).
+  return ['city', low(r.service_type), low(r.city), low(r.duration), low(r.area), low(r.zone), low(r.vehicle_type)].join('\u0000')
 }
 
 const cardName = (r: RouteChoiceRow) => String(r.route_name ?? '').trim()

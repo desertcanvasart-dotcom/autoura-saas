@@ -53,10 +53,10 @@ describe('sheet, star and engine wiring', () => {
   it('the star scope separates areas', () => {
     expect(PREFERRED_SCOPES.transportation_rates.columns).toContain('zone')
   })
-  it('the engine leaves out non-default-area cards until step 4, and keeps every card if zones cannot be read', () => {
+  it('the engine reads a card\'s default area as none, and with zones unreadable never prices an area card in the city card\'s place', () => {
     const src = readFileSync(path.join(process.cwd(), 'lib/auto-pricing-service.ts'), 'utf8')
-    expect(src).toMatch(/\.filter\(r => !zones \|\| !isNonDefaultZone\(zones, r\.city, \(r as \{ zone\?: string \| null \}\)\.zone\)\)/)
-    expect(src).toMatch(/if \(error\) \{ console\.error\('city zones read error:', error\); return null \}/)
+    expect(src).toMatch(/\.filter\(r => zones \|\| !r\.zone\)/)
+    expect(src).toMatch(/zone: zones && isNonDefaultZone\(zones, r\.city, r\.zone\) \? r\.zone : null/)
   })
   it('migration 471 adds the columns and puts the area in the route\'s unique index', () => {
     const sql = readFileSync(path.join(process.cwd(), 'supabase/migrations/471_transport_card_zone.sql'), 'utf8')

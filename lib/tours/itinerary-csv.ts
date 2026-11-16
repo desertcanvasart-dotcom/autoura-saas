@@ -45,6 +45,7 @@
 
 export type DayCsvKind = 'text' | 'int' | 'bool' | 'list'
 
+import { zoneKeyFromLabel } from '@/lib/rates/city-zones'
 import { readDayMeals } from '@/lib/tours/day-meals'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, SIGHTSEEING_NOT_STATED } from '@/lib/tours/day-sightseeing'
@@ -95,6 +96,10 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   // The day's own transport list (lib/pricing/transport-lines): blank = the
   // rules decide; "none" = no transport; else "day_tour@Luxor; intercity_dropoff:Luxor>Aswan".
   { name: 'transport_lines', label: 'Transport Lines' },
+  // The day's pickup area when it has no hotel there to say it — a cruise
+  // day (docs/transport-zones/PLAN.md D9). A zone of the day's city
+  // (Settings → Zones), by name or key; blank = from the hotel.
+  { name: 'pickup_zone', label: 'Pickup Zone' },
   { name: 'road_transfers', label: 'Road Transfers', allowed: YES_NO },
   { name: 'cruise_embark', label: 'Cruise Boarding Assist', allowed: YES_NO },
   { name: 'cruise_disembark', label: 'Cruise Leaving Assist', allowed: YES_NO },
@@ -165,6 +170,7 @@ export function serializeDaysCsv(
         leg_assist_from: yesNo(sanitizeLegAssist(d.leg_assist)?.from),
         leg_assist_to: yesNo(sanitizeLegAssist(d.leg_assist)?.to),
         transport_lines: transportLinesToCell(sanitizeTransportLines(d.transport_lines)),
+        pickup_zone: typeof d.pickup_zone === 'string' ? d.pickup_zone : '',
         road_transfers: yesNo(typeof d.road_transfers === 'boolean' ? d.road_transfers : undefined),
         cruise_embark: yesNo(typeof services.cruise_embark === 'boolean' ? services.cruise_embark : undefined),
         cruise_disembark: yesNo(typeof services.cruise_disembark === 'boolean' ? services.cruise_disembark : undefined),
@@ -466,6 +472,8 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
     },
     ...(rec.road_transfers ? { road_transfers: rec.road_transfers === 'yes' } : {}),
     ...(transportLinesFromCell(rec.transport_lines) !== undefined ? { transport_lines: transportLinesFromCell(rec.transport_lines) } : {}),
+    // A name ("West Bank") becomes its key the way Settings → Zones makes keys.
+    ...(typeof rec.pickup_zone === 'string' && rec.pickup_zone.trim() ? { pickup_zone: zoneKeyFromLabel(rec.pickup_zone) } : {}),
   }
   // Absent has always meant road; keep it absent so a re-read matches what the
   // day editor writes, rather than introducing a value it never sets.
