@@ -75,6 +75,7 @@ import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-f
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
+import { isNonDefaultZone, type CityZone } from '@/lib/rates/city-zones'
 import { rateServesMeal } from '@/lib/meals/meal-rate-meals'
 import { priceByBasis, toPricingBasis, unitsFor, type PricingBasis } from '@/lib/pricing/pricing-basis'
 
@@ -2448,6 +2449,14 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
   return memoRead(`transport|${scope.tenantId}`, () => buildTransportCacheUncached(scope))
 }
 
+/** The tenant's zones (migration 469) for the engine; none when unreadable. */
+async function loadEngineCityZones(tenantId: string): Promise<Array<Pick<CityZone, 'city' | 'key' | 'is_default'>> | null> {
+  const { data, error } = await getSupabaseAdmin().from('city_zones').select('city, key, is_default').eq('tenant_id', tenantId)
+  // Unreadable: price every card as before rather than dropping default-area ones.
+  if (error) { console.error('city zones read error:', error); return null }
+  return data ?? []
+}
+
 async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<string, TransportRate>> {
   // Every row (not PostgREST's first 1000); a failed read throws rather than
   // leaving an empty cache that would price every transfer as "no rate".
@@ -2464,7 +2473,12 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
 
   // Several companies pricing the same journey (migration 460): the starred
   // one's rows alone, or every row marked ambiguous — never an arbitrary pick.
-  const rows = normalized as unknown as TransportRate[]
+  // A card in a NON-default area of its city (migration 471) is left out until
+  // the engine prices by the hotel's area (docs/transport-zones/PLAN.md step
+  // 4): it would otherwise compete with the city's card on the same lookup.
+  const zones = await loadEngineCityZones(scope.tenantId)
+  const rows = (normalized as unknown as TransportRate[])
+    .filter(r => !zones || !isNonDefaultZone(zones, r.city, (r as { zone?: string | null }).zone))
   const nameIds = suppliersNeedingNames(rows)
   const names = new Map<string, string>()
   if (nameIds.length) {

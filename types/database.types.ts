@@ -12555,6 +12555,8 @@ export interface Database {
           capacity_min: number | null
           capacity_max: number | null
           supplier_id: string | null
+          zone: string | null
+          covers_sights: string[]
         }
         Insert: {
           id?: string
@@ -12580,6 +12582,8 @@ export interface Database {
           capacity_min?: number | null
           capacity_max?: number | null
           supplier_id?: string | null
+          zone?: string | null
+          covers_sights?: string[]
         }
         Update: {
           id?: string
@@ -12605,6 +12609,8 @@ export interface Database {
           capacity_min?: number | null
           capacity_max?: number | null
           supplier_id?: string | null
+          zone?: string | null
+          covers_sights?: string[]
         }
         Relationships: [
           {

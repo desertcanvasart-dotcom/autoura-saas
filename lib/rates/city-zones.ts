@@ -140,10 +140,49 @@ export function canDeleteZone(zone: Pick<CityZone, 'id' | 'city' | 'is_default' 
   return { ok: true }
 }
 
-/** Refusal for deleting a zone that hotels are in, naming a few (null = free to delete). */
-export function zoneInUseError(zone: Pick<CityZone, 'label' | 'city'>, hotelNames: readonly string[]): string | null {
-  const names = [...new Set(hotelNames)]
-  if (names.length === 0) return null
-  const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
-  return `${names.length} hotel${names.length === 1 ? ' is' : 's are'} in "${zone.label}" (${shown}). Move ${names.length === 1 ? 'it' : 'them'} to another ${zone.city.trim()} area under Rates → Hotels first.`
+/** Refusal for deleting a zone hotels are in or transport cards price, naming a few (null = free to delete). */
+export function zoneInUseError(zone: Pick<CityZone, 'label' | 'city'>, hotelNames: readonly string[], cardNames: readonly string[] = []): string | null {
+  const list = (names: string[]) => names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
+  const hotels = [...new Set(hotelNames)]
+  const cards = [...new Set(cardNames)]
+  if (hotels.length === 0 && cards.length === 0) return null
+  const parts: string[] = []
+  if (hotels.length) parts.push(`${hotels.length} hotel${hotels.length === 1 ? ' is' : 's are'} in "${zone.label}" (${list(hotels)})`)
+  if (cards.length) parts.push(`${cards.length} transport card${cards.length === 1 ? ' prices' : 's price'} it (${list(cards)})`)
+  const where = [hotels.length ? 'Rates → Hotels' : '', cards.length ? 'Rates → Transportation' : ''].filter(Boolean).join(' and ')
+  return `${parts.join('; ')}. Move ${hotels.length + cards.length === 1 ? 'it' : 'them'} to another ${zone.city.trim()} area under ${where} first.`
+}
+
+/**
+ * Whether a card or hotel sits in a NON-default area of its city. Empty, or the
+ * city's default zone, is not (it means what a card with no area always meant).
+ */
+export function isNonDefaultZone(zones: readonly Pick<CityZone, 'city' | 'key' | 'is_default'>[], city: unknown, zone: unknown): boolean {
+  if (!zone) return false
+  return !zonesOfCity(zones, city).some(z => z.key === zone && z.is_default)
+}
+
+export type SightsChoice = { ok: true; sights: string[] } | { ok: false; error: string }
+
+/**
+ * The sights a sightseeing card covers, from the form or a sheet cell: each one
+ * a name on the agency's fee sheet (matched ignoring capitals, saved in the
+ * sheet's own spelling), each once. Unknown names are refused — a misspelt
+ * sight would quietly never match a day in step 4.
+ */
+export function resolveCardSights(input: unknown, feeNames: readonly string[]): SightsChoice {
+  const words = (Array.isArray(input) ? input : String(input ?? '').split(/[;|\n]/))
+    .map(w => String(w ?? '').trim()).filter(Boolean)
+  const byLower = new Map(feeNames.map(n => [n.trim().toLowerCase(), n.trim()]))
+  const out: string[] = []
+  const unknown: string[] = []
+  for (const w of words) {
+    const hit = byLower.get(w.toLowerCase())
+    if (!hit) { unknown.push(w); continue }
+    if (!out.includes(hit)) out.push(hit)
+  }
+  if (unknown.length) {
+    return { ok: false, error: `Not on your entrance-fee sheet: ${unknown.map(u => `"${u}"`).join(', ')}. Use the sight's name as it is under Rates → Attractions.` }
+  }
+  return { ok: true, sights: out }
 }

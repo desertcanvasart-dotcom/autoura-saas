@@ -13,6 +13,7 @@ import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useVocabulary } from '@/hooks/useVocabulary'
 import { needsDestination } from '@/lib/vocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import { zoneLabel, zonesOfCity, type CityZone } from '@/lib/rates/city-zones'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
@@ -32,6 +33,10 @@ interface TransportationRate {
   destination_city?: string | null
   duration?: string | null
   area?: string | null
+  /** The card's pickup area within its city (migration 471); empty = the city's default zone. */
+  zone?: string | null
+  /** The sights a sightseeing card covers (migration 471). */
+  covers_sights?: string[] | null
   includes?: string | null
   /** The transport company this route is bought from (migration 355). */
   supplier_id?: string | null
@@ -60,7 +65,7 @@ type ViewMode = 'table' | 'cards' | 'compact'
 /** The journey the engine matches on — two companies' routes with the same
  *  one answer the same question (the route's name is only a label). */
 const journeyKeyOf = (r: TransportationRate) =>
-  [r.service_type, r.city, r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.area ?? ''].map(v => String(v).toLowerCase()).join('|')
+  [r.service_type, r.city, r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.area ?? '', r.zone ?? ''].map(v => String(v).toLowerCase()).join('|')
 // A route is one company's (migration 460): two companies pricing the same
 // road are two routes, each with its own vehicles and prices.
 const routeKeyOf = (r: TransportationRate) =>
@@ -104,6 +109,10 @@ interface FormData {
   service_type: string
   city: string
   destination_city: string
+  /** Pickup area within the city ('' = the city's default zone). */
+  zone: string
+  /** For sightseeing cards: the sights the price covers. */
+  covers_sights: string[]
   vehicles: Record<string, VehicleRateEntry>
   supplier_id: string
   is_active: boolean
@@ -114,6 +123,8 @@ const initialFormData: FormData = {
   service_type: 'airport_transfer',
   city: '',
   destination_city: '',
+  zone: '',
+  covers_sights: [],
   vehicles: {},
   supplier_id: '',
   is_active: true
@@ -162,6 +173,22 @@ export default function TransportationContent() {
   // Transport companies — the supplier types that behave as transport_company
   // (Settings → Your vocabulary), active only.
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  // The agency's zones (Settings → Zones) and fee-sheet sights, for the card's
+  // Pickup area and Sights covered (migration 471).
+  const [zones, setZones] = useState<CityZone[]>([])
+  const [feeSights, setFeeSights] = useState<{ attraction_name: string; city: string | null }[]>([])
+  const [sightDraft, setSightDraft] = useState('')
+  useEffect(() => {
+    fetch('/api/settings/zones').then(r => r.json()).then(j => { if (j?.success) setZones(j.data.zones) }).catch(() => {})
+    fetch('/api/attraction-aliases').then(r => r.json()).then(j => { if (j?.success) setFeeSights(j.data.fees ?? []) }).catch(() => {})
+  }, [])
+  const addSight = (word: string) => {
+    const w = word.trim()
+    if (!w) return
+    const hit = feeSights.find(f => f.attraction_name.toLowerCase() === w.toLowerCase())?.attraction_name ?? w
+    setFormData(prev => prev.covers_sights.some(x => x.toLowerCase() === hit.toLowerCase()) ? prev : { ...prev, covers_sights: [...prev.covers_sights, hit] })
+    setSightDraft('')
+  }
   const supplierName = (id?: string | null) => (id && suppliers.find(s => s.id === id)?.name) || null
   // The star — only on a journey several companies price; it picks which one
   // the engine charges (migration 460). Without it the engine shows a gap.
@@ -264,6 +291,8 @@ export default function TransportationContent() {
     setFormData(prev => ({
       ...prev,
       city,
+      // An area and its sights belong to one city: a new city starts with none.
+      ...(prev.city === city ? {} : { zone: '', covers_sights: [] }),
       route_name: prev.route_name || generateServiceCode(city, prev.service_type, prev.destination_city)
     }))
   }
@@ -326,6 +355,8 @@ export default function TransportationContent() {
       service_type: rate.service_type,
       city: rate.city,
       destination_city: rate.destination_city || '',
+      zone: rate.zone || '',
+      covers_sights: rate.covers_sights ?? [],
       vehicles: rowToVehicles(rate),
       supplier_id: rate.supplier_id || '',
       is_active: rate.is_active
@@ -386,6 +417,9 @@ export default function TransportationContent() {
         service_type: formData.service_type,
         city: formData.city,
         destination_city: formData.destination_city,
+        // An intercity card is a road, priced by its route — no area or sights.
+        zone: needsDestinationCity(formData.service_type) ? '' : formData.zone,
+        covers_sights: needsDestinationCity(formData.service_type) ? [] : formData.covers_sights,
         supplier_id: formData.supplier_id || null,
         is_active: formData.is_active,
         ...rateCurrencyPatch(rateCurrency, editingRate?.rate_currency),
@@ -517,6 +551,8 @@ export default function TransportationContent() {
       service_type: rate.service_type,
       city: rate.city,
       destination_city: rate.destination_city || '',
+      zone: rate.zone || '',
+      covers_sights: rate.covers_sights ?? [],
       vehicles: rowToVehicles(rate),
       supplier_id: rate.supplier_id || '',
       is_active: rate.is_active
@@ -864,7 +900,13 @@ export default function TransportationContent() {
                           <span className="text-gray-900">{rate.destination_city}</span>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-600">{rate.city}</span>
+                        <span className="text-sm text-gray-600">
+                          {rate.city}
+                          {rate.zone && <span className="block text-xs text-gray-500">{zoneLabel(zones, rate.city, rate.zone)}</span>}
+                          {(rate.covers_sights?.length ?? 0) > 0 && (
+                            <span className="block text-xs text-gray-400" title={rate.covers_sights!.join(', ')}>{rate.covers_sights!.length} sight{rate.covers_sights!.length === 1 ? '' : 's'}</span>
+                          )}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2 text-center">
@@ -1159,6 +1201,60 @@ export default function TransportationContent() {
                     </div>
                   )}
                 </div>
+
+                {!needsDestinationCity(formData.service_type) && formData.city && (
+                  <div className="space-y-4">
+                    {zonesOfCity(zones, formData.city).length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">Pickup area</label>
+                        <select
+                          name="zone"
+                          value={formData.zone}
+                          onChange={e => setFormData(prev => ({ ...prev, zone: e.target.value }))}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                        >
+                          <option value="">{zonesOfCity(zones, formData.city).find(z => z.is_default)?.label ?? formData.city} (the city&apos;s default)</option>
+                          {zonesOfCity(zones, formData.city).filter(z => !z.is_default).sort((a, b) => a.rank - b.rank).map(z => (
+                            <option key={z.key} value={z.key}>{z.label}</option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">The area of {formData.city} whose hotels this price is for. Each area is its own card.</p>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1.5">Sights covered <span className="text-gray-400 font-normal">(sightseeing cards only)</span></label>
+                      {formData.covers_sights.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {formData.covers_sights.map(sight => (
+                            <span key={sight} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
+                              {sight}
+                              <button type="button" aria-label={`Remove ${sight}`} onClick={() => setFormData(prev => ({ ...prev, covers_sights: prev.covers_sights.filter(x => x !== sight) }))} className="text-gray-400 hover:text-red-600"><X className="w-3 h-3" /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          list="card-sight-names"
+                          value={sightDraft}
+                          onChange={e => setSightDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSight(sightDraft) } }}
+                          placeholder="Add a sight from your fee sheet"
+                          aria-label="Sight covered"
+                          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                        />
+                        <button type="button" onClick={() => addSight(sightDraft)} disabled={!sightDraft.trim()}
+                          className="px-3 py-2 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40">Add</button>
+                      </div>
+                      <datalist id="card-sight-names">
+                        {feeSights
+                          .filter(f => !f.city || f.city.trim().toLowerCase() === formData.city.trim().toLowerCase())
+                          .map(f => <option key={f.attraction_name} value={f.attraction_name} />)}
+                      </datalist>
+                      <p className="mt-1 text-xs text-gray-500">For a sightseeing price (e.g. East Bank: Karnak, Luxor Temple). Leave empty for a transfer.</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Show route preview for intercity */}
                 {needsDestinationCity(formData.service_type) && formData.city && formData.destination_city && (

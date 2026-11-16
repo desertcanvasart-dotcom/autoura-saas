@@ -11,7 +11,7 @@ import { parseTiersCell } from '@/lib/rates/activity-tiers'
 import { sanitizeSeasons, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { loadCityZones } from '@/lib/rates/hotel-zone'
-import { resolveZoneChoice } from '@/lib/rates/city-zones'
+import { resolveCardSights, resolveZoneChoice } from '@/lib/rates/city-zones'
 import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { linkRowsBySupplierName, supplierNameGapMessage } from '@/lib/rates/link-supplier-by-name'
@@ -186,9 +186,15 @@ export async function POST(request: NextRequest) {
     // A hotel's Zone cell is one of its city's zones (migration 470), by name
     // or key. Blank stays blank (the city's default) so an older sheet still
     // imports; the hotel list's "No area yet" filter shows what is left.
-    const hotelZones = config.tableName === 'accommodation_rates' && config.columns.some(c => c.name === 'zone')
+    const hotelZones = (config.tableName === 'accommodation_rates' || config.tableName === 'transportation_rates') && config.columns.some(c => c.name === 'zone')
       ? await loadCityZones(supabase, tenant_id!)
       : null
+    // A transport card's Sights Covered (migration 471): fee-sheet names.
+    let feeNames: string[] | null = null
+    if (config.tableName === 'transportation_rates') {
+      const { data: fees } = await supabase.from('entrance_fees').select('attraction_name').eq('tenant_id', tenant_id!)
+      feeNames = (fees ?? []).map(f => f.attraction_name)
+    }
     const resolvedRows = importRows.map((row, i) => {
       // The sample's example row is skipped below; its words ("standard",
       // "bb") must not refuse the file for an agency that renamed them.
@@ -199,6 +205,11 @@ export async function POST(request: NextRequest) {
         const choice = resolveZoneChoice(hotelZones, record.city, record.zone)
         if (choice.ok) record.zone = choice.zone ?? ''
         else vocabErrors.push({ row: lineOf(i), column: 'zone', message: `zone: ${choice.error}` })
+      }
+      if (feeNames && typeof record.covers_sights === 'string' && record.covers_sights.trim()) {
+        const sights = resolveCardSights(record.covers_sights, feeNames)
+        if (sights.ok) record.covers_sights = sights.sights.join(';')
+        else vocabErrors.push({ row: lineOf(i), column: 'covers_sights', message: `covers_sights: ${sights.error}` })
       }
       // A guide price's further languages (463): each word in the cell is a
       // guide_language, resolved like the Language column; none is guessed.
@@ -291,6 +302,11 @@ export async function POST(request: NextRequest) {
         const res = parseTiersCell(record.tiers)
         if ('tiers' in res) record.tiers = res.tiers
         else delete record.tiers
+      }
+
+      // A transport card's sights (471): the cell's list.
+      if (config.tableName === 'transportation_rates' && typeof record.covers_sights === 'string') {
+        record.covers_sights = record.covers_sights.split(/[;|]/).map((x: string) => x.trim()).filter(Boolean)
       }
 
       // A guide price's further cities / languages (463): the cell's list.
