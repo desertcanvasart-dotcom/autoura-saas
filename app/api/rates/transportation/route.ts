@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
     const city = searchParams.get('city')
     const serviceType = searchParams.get('service_type')
     const duration = searchParams.get('duration')
-    const area = searchParams.get('area')
     const vehicleType = searchParams.get('vehicle_type')
     const originCity = searchParams.get('origin_city')
     const destinationCity = searchParams.get('destination_city')
@@ -84,14 +83,12 @@ export async function GET(request: NextRequest) {
         .order('city')
         .order('service_type')
         .order('duration')
-        .order('area')
         .order('vehicle_type')
 
       // Apply filters
       if (city) query = query.ilike('city', `%${city}%`)
       if (serviceType) query = query.eq('service_type', serviceType)
       if (duration) query = query.eq('duration', duration)
-      if (area) query = query.eq('area', area)
       if (vehicleType) query = query.eq('vehicle_type', vehicleType)
       if (originCity) query = query.ilike('origin_city', `%${originCity}%`)
       if (destinationCity) query = query.ilike('destination_city', `%${destinationCity}%`)
@@ -169,7 +166,6 @@ export async function POST(request: NextRequest) {
       origin_city: body.origin_city || null,
       destination_city: body.destination_city || null,
       duration: body.duration || null,
-      area: body.area || null,
       route_name: routeName,
       base_rate_eur: parseFloat(body.base_rate_eur) || 0,
       base_rate_non_eur: parseFloat(body.base_rate_non_eur) || parseFloat(body.base_rate_eur) || 0,
@@ -253,7 +249,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Regenerate route_name if relevant fields changed
-    if (updates.city || updates.service_type || updates.duration || updates.area || updates.vehicle_type) {
+    if (updates.city || updates.service_type || updates.duration || updates.vehicle_type) {
       // Fetch current record to merge with updates
       const { data: current } = await supabase
         .from('transportation_rates')
@@ -364,19 +360,6 @@ function generateRouteName(data: any): string {
 
   const parts: string[] = []
   parts.push(data.city || 'City')
-
-  if (data.area) {
-    const areaNames: Record<string, string> = {
-      'east_bank': 'East Bank',
-      'west_bank': 'West Bank',
-      'pyramids': 'Pyramids',
-      'islamic_cairo': 'Islamic Cairo',
-      'old_cairo': 'Old Cairo',
-      'temple_visit': 'Temple Visit',
-      'nubian_village': 'Nubian Village'
-    }
-    parts.push(areaNames[data.area] || data.area)
-  }
 
   if (data.duration === 'half_day') {
     parts.push('Half Day')

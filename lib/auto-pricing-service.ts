@@ -10,7 +10,7 @@
 // - Mixed itineraries (Hotel + Cruise)
 // - Tour Leader (+0/+1) support
 // - Multi-pax calculation (1-40)
-// - Smart transportation selection (duration, area)
+// - Smart transportation selection (duration, pickup area, sights)
 // - All service types (accommodation, meals, entrances, transport, guide, airport, hotel services)
 //
 // v4 Changes:
@@ -158,16 +158,6 @@ const isIntercity = (t: string): boolean =>
 
 export type TransportDuration = 'full_day' | 'half_day' | 'one_way'
 
-export type TransportArea = 
-  | 'east_bank'
-  | 'west_bank'
-  | 'pyramids'
-  | 'islamic_cairo'
-  | 'old_cairo'
-  | 'temple_visit'
-  | 'nubian_village'
-  | null
-
 // Enhanced Itinerary Day Structure
 export interface ItineraryDay {
   day: number
@@ -292,7 +282,6 @@ export interface ItineraryDay {
   transport?: {
     service_type?: TransportServiceType
     duration?: TransportDuration
-    area?: TransportArea
     vehicle_type?: string // e.g., 'Horse Carriage' for Edfu
   }
 }
@@ -433,7 +422,6 @@ interface TransportRate {
   origin_city: string | null
   destination_city: string | null
   duration: string | null
-  area: string | null
   route_name: string | null
   base_rate_eur: number
   base_rate_non_eur: number
@@ -474,37 +462,6 @@ export const VEHICLE_CAPACITY: Record<string, { min: number; max: number }> = {
  *  above are the Egypt default. Matching is by slug, so 'Sedan' and 'sedan'
  *  are one vehicle. */
 export type VehicleType = string
-
-// Area to attractions mapping (for auto-detection)
-const AREA_ATTRACTIONS: Record<string, string[]> = {
-  'east_bank': [
-    'karnak', 'karnak temple', 'luxor temple'
-  ],
-  'west_bank': [
-    'valley of the kings', 'valley of kings', 'hatshepsut', 'hatshepsut temple',
-    'colossi of memnon', 'medinet habu', 'valley of the queens',
-    'deir el-medina', 'ramesseum'
-  ],
-  'pyramids': [
-    'pyramids', 'pyramid', 'giza', 'sphinx', 'great sphinx',
-    'solar boat', 'khufu', 'khafre', 'menkaure'
-  ],
-  'islamic_cairo': [
-    'citadel', 'saladin citadel', 'khan el khalili', 'khan el-khalili',
-    'al-azhar', 'hussein mosque', 'old cairo bazaar'
-  ],
-  'old_cairo': [
-    'coptic cairo', 'hanging church', 'ben ezra', 'coptic museum',
-    'st. sergius', 'church of st. george'
-  ],
-  'temple_visit': [
-    'edfu', 'edfu temple', 'kom ombo', 'kom ombo temple',
-    'horus temple', 'sobek temple'
-  ],
-  'nubian_village': [
-    'nubian', 'nubian village', 'elephantine', 'elephantine island'
-  ]
-}
 
 // Cities that use special vehicles
 const SPECIAL_VEHICLE_CITIES: Record<string, VehicleType> = {
@@ -605,27 +562,6 @@ export function getTierCategory(tier: ServiceTier, ladder?: readonly string[]): 
 }
 
 /**
- * Detect area from attractions list
- */
-export function detectAreaFromAttractions(attractions: string[]): TransportArea {
-  if (!attractions || attractions.length === 0) return null
-
-  const attractionsLower = attractions.map(a => a.toLowerCase())
-
-  for (const [area, keywords] of Object.entries(AREA_ATTRACTIONS)) {
-    for (const keyword of keywords) {
-      for (const attraction of attractionsLower) {
-        if (attraction.includes(keyword)) {
-          return area as TransportArea
-        }
-      }
-    }
-  }
-
-  return null
-}
-
-/**
  * Detect duration from number of attractions
  */
 export function detectDurationFromAttractions(attractions: string[]): TransportDuration {
@@ -647,7 +583,6 @@ export function determineTransportNeeds(
 ): {
   serviceType: TransportServiceType
   duration: TransportDuration
-  area: TransportArea
   useSpecialVehicle: boolean
   specialVehicleType?: VehicleType
   /** The road the vehicle runs when it is not "yesterday's city → today's":
@@ -660,7 +595,6 @@ export function determineTransportNeeds(
     return {
       serviceType: day.transport.service_type,
       duration: day.transport.duration || 'full_day',
-      area: day.transport.area || null,
       useSpecialVehicle: !!day.transport.vehicle_type,
       specialVehicleType: day.transport.vehicle_type as VehicleType
     }
@@ -677,7 +611,6 @@ export function determineTransportNeeds(
     return {
       serviceType: 'airport_transfer',
       duration: 'one_way',
-      area: null,
       useSpecialVehicle: false
     }
   }
@@ -687,7 +620,6 @@ export function determineTransportNeeds(
     return {
       serviceType: 'airport_transfer',
       duration: 'one_way',
-      area: null,
       useSpecialVehicle: false
     }
   }
@@ -700,7 +632,6 @@ export function determineTransportNeeds(
     return {
       serviceType: 'intercity_day_trip',
       duration: 'full_day',
-      area: null,
       useSpecialVehicle: false,
       originCity: day.city,
       destinationCity: day.day_trip_to,
@@ -729,7 +660,6 @@ export function determineTransportNeeds(
       // (sibling #462). A same-day return is a day tour, not a city change.
       serviceType: roadShape?.kind === 'overnight_return' ? 'intercity_overnight' : 'intercity_dropoff',
       duration: 'one_way',
-      area: null,
       useSpecialVehicle: false
     }
   }
@@ -739,7 +669,6 @@ export function determineTransportNeeds(
   const guideRequired = day.services.guide_required
 
   if (hasAttractions || guideRequired) {
-    const area = detectAreaFromAttractions(day.attractions)
     const duration = detectDurationFromAttractions(day.attractions)
 
     return {
@@ -747,7 +676,6 @@ export function determineTransportNeeds(
       // routes, so the length is the service type.
       serviceType: day.sightseeing_length ?? 'day_tour',
       duration,
-      area,
       useSpecialVehicle,
       specialVehicleType
     }
@@ -757,7 +685,6 @@ export function determineTransportNeeds(
   return {
     serviceType: 'day_tour',
     duration: 'full_day',
-    area: null,
     useSpecialVehicle,
     specialVehicleType
   }
@@ -2455,7 +2382,7 @@ export async function getTippingRate(
 
 /**
  * Build transport cache from database
- * Key format: "service_type|city|duration|area|vehicle_type"
+ * Key format: "service_type|city|duration|zone|vehicle_type" (zone = the card's pickup area, empty = the city's default)
  */
 export async function buildTransportCache(scope: CatalogScope): Promise<Map<string, TransportRate>> {
   // Every tier reads the same transport rows. Once per calculation.
@@ -2531,26 +2458,11 @@ async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<str
       rate.service_type || '',
       (rate.city || '').toLowerCase(),
       rate.duration || '',
-      rate.area || '',
       rate.zone || '',
       vehicleKey(rate.vehicle_type)
     ].join('|')
 
     cache.set(baseKey, rate)
-
-    // Also cache without area for fallback
-    const keyNoArea = [
-      rate.service_type || '',
-      (rate.city || '').toLowerCase(),
-      rate.duration || '',
-      '',
-      rate.zone || '',
-      vehicleKey(rate.vehicle_type)
-    ].join('|')
-
-    if (!cache.has(keyNoArea)) {
-      cache.set(keyNoArea, rate)
-    }
 
     // An intercity rate IS its route, so it is cached by one. The departure is
     // `city` — the rate form calls that field "Departure City" — and
@@ -2754,7 +2666,7 @@ export async function previewDayTransport(
       const vehicleType = getVehicleTypeByPax(seats, city, bands)
       let match: ReturnType<typeof findTransportRate> = null
       for (const st of [serviceType, ...alsoTry]) {
-        match = findTransportRate(cache, { serviceType: st as TransportServiceType, city, duration: '' as never, area: null, vehicleType, zone: pickupZoneFor(itinerary, i, city, () => null), sights, ...(route ? { originCity: route.from, destinationCity: route.to } : {}) })
+        match = findTransportRate(cache, { serviceType: st as TransportServiceType, city, duration: '' as never, vehicleType, zone: pickupZoneFor(itinerary, i, city, () => null), sights, ...(route ? { originCity: route.from, destinationCity: route.to } : {}) })
         if (match && match.source !== 'fuzzy') break
       }
       const ok = match && match.source === 'db'
@@ -2924,7 +2836,7 @@ export async function getTransportRateFor(
   const [cache, bands] = await Promise.all([buildTransportCache(scope), tenantVehicleBands(scope.tenantId)])
   const vehicleType = need.specialVehicleType ?? getVehicleTypeByPax(totalPax, undefined, bands)
   const match = findTransportRate(cache, {
-    serviceType: need.serviceType, city: where, duration: need.duration ?? ('' as TransportDuration), area: null, vehicleType,
+    serviceType: need.serviceType, city: where, duration: need.duration ?? ('' as TransportDuration), vehicleType,
     originCity: need.originCity ?? undefined, destinationCity: where,
     zone: need.zone, sights: need.sights,
   })
@@ -2951,7 +2863,6 @@ export function findTransportRate(
     serviceType: TransportServiceType
     city: string
     duration: TransportDuration
-    area: TransportArea
     vehicleType: VehicleType
     originCity?: string
     destinationCity?: string
@@ -3010,7 +2921,7 @@ function findTransportRateRaw(
   cache: Map<string, TransportRate>,
   params: Parameters<typeof findTransportRate>[1]
 ): { rate: TransportRate; source: 'db' | 'fuzzy' } | null {
-  const { serviceType, city, duration, area, vehicleType, originCity, destinationCity } = params
+  const { serviceType, city, duration, vehicleType, originCity, destinationCity } = params
   const cityLower = city.toLowerCase()
   // The pickup area, normalised like the cards: the default area is none.
   const zones = (cache as TransportCache).zones ?? []
@@ -3032,16 +2943,10 @@ function findTransportRateRaw(
     return null
   }
 
-  // Priority 1: Exact match (service_type + city + duration + area + vehicle) — definite.
-  const exactKey = [serviceType, cityLower, duration, area || '', zone, vehicleKey(vehicleType)].join('|')
+  // Priority 1: Exact match (service_type + city + duration + pickup area + vehicle) — definite.
+  const exactKey = [serviceType, cityLower, duration, zone, vehicleKey(vehicleType)].join('|')
   if (cache.has(exactKey)) {
     return { rate: cache.get(exactKey)!, source: 'db' }
-  }
-
-  // Priority 2: Match without area — still definite (area is optional metadata).
-  const noAreaKey = [serviceType, cityLower, duration, '', zone, vehicleKey(vehicleType)].join('|')
-  if (cache.has(noAreaKey)) {
-    return { rate: cache.get(noAreaKey)!, source: 'db' }
   }
 
   // Priority 3: the row carries no duration — which is EVERY row on
@@ -3051,12 +2956,8 @@ function findTransportRateRaw(
   // A row that simply does not use the column is an exact answer for the
   // service type asked for, not an approximate one; treating it as
   // approximate turned every real day-tour rate into a gap.
-  for (const key of [
-    [serviceType, cityLower, '', area || '', zone, vehicleKey(vehicleType)].join('|'),
-    [serviceType, cityLower, '', '', zone, vehicleKey(vehicleType)].join('|'),
-  ]) {
-    if (cache.has(key)) return { rate: cache.get(key)!, source: 'db' }
-  }
+  const noDurationKey = [serviceType, cityLower, '', zone, vehicleKey(vehicleType)].join('|')
+  if (cache.has(noDurationKey)) return { rate: cache.get(noDurationKey)!, source: 'db' }
 
   // (The old "match without duration, approximately" rule is the exact match
   // above now. A row that DOES carry a different duration is still only ever
@@ -3067,7 +2968,7 @@ function findTransportRateRaw(
   for (const fallbackCity of fallbackCities) {
     if (fallbackCity === cityLower) continue
 
-    const fallbackKey = [serviceType, fallbackCity, duration, '', '', vehicleKey(vehicleType)].join('|')
+    const fallbackKey = [serviceType, fallbackCity, duration, '', vehicleKey(vehicleType)].join('|')
     if (cache.has(fallbackKey)) {
       return { rate: cache.get(fallbackKey)!, source: 'fuzzy' }
     }
@@ -4921,7 +4822,6 @@ export async function calculateDayBasedPricing(
         serviceType,
         city: extra.city ?? day.city,
         duration: '' as never,
-        area: null,
         vehicleType,
         ...lookupContext(day.day, extra.city ?? day.city),
         ...(extra.originCity !== undefined ? { originCity: extra.originCity, destinationCity: extra.destinationCity } : {}),
@@ -4947,8 +4847,7 @@ export async function calculateDayBasedPricing(
       serviceType: needs.serviceType,
       city: info.city,
       duration: needs.duration,
-      area: needs.area,
-      vehicleType,
+            vehicleType,
       // Previous day city for intercity; a day trip names its own road.
       originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
       destinationCity: needs.destinationCity ?? info.city,
@@ -4969,7 +4868,7 @@ export async function calculateDayBasedPricing(
         rateSource: 'transportation_rates',
         isPerPax: false,
         isOptional: false,
-        notes: `${needs.serviceType} | ${needs.duration}${needs.area ? ` | ${needs.area}` : ''}`
+        notes: `${needs.serviceType} | ${needs.duration}`
       })
     } else {
       // No exact transport rate — record a hole, never substitute a default.
@@ -5129,8 +5028,7 @@ export async function calculateDayBasedPricing(
         serviceType: needs.serviceType,
         city: info.city,
         duration: needs.duration,
-        area: needs.area,
-        vehicleType,
+                vehicleType,
         originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
         destinationCity: needs.destinationCity ?? info.city,
         ...lookupContext(info.day, info.city),

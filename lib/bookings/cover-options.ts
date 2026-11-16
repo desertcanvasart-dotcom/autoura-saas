@@ -37,7 +37,8 @@ export function ownResourceTypes(supplierType: string, rateTable: string | null 
 export const SAME_SERVICE_KEYS: Record<string, readonly string[]> = {
   guide_rates: ['city', 'guide_type', 'guide_language', 'tour_duration', 'guide_mode'],
   meal_rates: ['city', 'meal_type', 'tier'],
-  transportation_rates: ['service_type', 'vehicle_type', 'city', 'origin_city', 'destination_city', 'area', 'duration'],
+  // The pickup area (migration 471): another company's card for the same area is the same service.
+  transportation_rates: ['service_type', 'vehicle_type', 'city', 'origin_city', 'destination_city', 'zone', 'duration'],
   airport_staff_rates: ['airport_code', 'service_type', 'direction'],
 }
 
