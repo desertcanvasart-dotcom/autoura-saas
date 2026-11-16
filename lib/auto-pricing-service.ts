@@ -900,7 +900,9 @@ export function parseItinerary(itineraryData: any, opts?: {
       sightseeingUnstated: statement === 'unstated' && !isDayTour,
       /** A day-tour day that names no attraction: the guide, the vehicle and
        *  the tips are asked for, but its entrance fees cannot be. */
-      dayTourWithoutAttractions: isDayTour && !saysNoSightseeing && attractions.length === 0 && attraction_ids.length === 0,
+      // A car & guide day (`sightseeing: 'guide_only'`) sells no entrance
+      // fees on purpose — no fixed route (operator, 2026-11-16) — so no gap.
+      dayTourWithoutAttractions: isDayTour && !saysNoSightseeing && day.sightseeing !== 'guide_only' && attractions.length === 0 && attraction_ids.length === 0,
       city: tripFrom ?? dayCity,
       ...(tripFrom ? { day_trip_to: String(day.city).trim() } : {}),
       // A sleeping-train night has no hotel bed — the ticket IS the bed

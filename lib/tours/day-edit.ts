@@ -187,6 +187,9 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
     (Array.isArray(day.attractions) && day.attractions.length > 0) ||
     (Array.isArray(day.attraction_ids) && day.attraction_ids.length > 0)
   if (form.noSightseeing && !hasAttractions) day.sightseeing = 'none'
+  // A car & guide day (set from the days sheet) stays one while it names no
+  // sight — the editor has no box for it, and a save must not wipe it.
+  else if (day.sightseeing === 'guide_only' && !hasAttractions) day.sightseeing = 'guide_only'
   else drop(day, 'sightseeing')
 
   return day

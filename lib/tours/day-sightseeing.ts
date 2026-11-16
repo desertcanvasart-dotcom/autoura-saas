@@ -20,6 +20,8 @@
 //     template creator write a day; on production these are the arrival,
 //     departure and travel days, written on purpose with their airport
 //     transfers — or
+//   - saying `sightseeing: 'guide_only'`: a car & guide day — guided, with no
+//     fixed route, so no entrance fees are sold (operator, 2026-11-16), or
 //   - saying `sightseeing: 'none'`: the day editor's "No guided sightseeing on
 //     this day", for the days it writes, which carry no services block.
 //
@@ -45,6 +47,8 @@ const nonEmptyList = (v: unknown): boolean =>
 export function sightseeingStatement(day: DayLike | null | undefined): SightseeingStatement {
   if (!day) return 'unstated'
   if (nonEmptyList(day.attractions) || nonEmptyList(day.attraction_ids)) return 'attractions'
+  // Car & guide: guided, entrance fees not included (no fixed route).
+  if (day.sightseeing === 'guide_only') return 'guided'
   const services = day.services && typeof day.services === 'object' ? (day.services as { guide_required?: unknown }) : null
   if (services?.guide_required === true) return 'guided'
   if (day.sightseeing === 'none') return 'none'
@@ -86,7 +90,8 @@ export function isDayTourProgramme(tourType: string | null | undefined, dayCount
 
 /** On a day tour, the one thing a day can still fail to say. */
 export function dayTourNamesNoAttractions(day: DayLike | null | undefined): boolean {
-  if (!day || day.sightseeing === 'none') return false
+  // "none" has no sightseeing; "guide_only" sells no entrance fees on purpose.
+  if (!day || day.sightseeing === 'none' || day.sightseeing === 'guide_only') return false
   return sightseeingStatement({ attractions: day.attractions, attraction_ids: day.attraction_ids }) !== 'attractions'
 }
 

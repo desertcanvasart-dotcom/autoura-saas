@@ -113,7 +113,9 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   // exports as "false" and a blank imports as false, so without this column a
   // round trip turned a day nobody had described into a day that "says" it has
   // no guide — and the gap the engine records for it quietly disappeared.
-  { name: 'sightseeing', label: 'Sightseeing', allowed: ['none'] },
+  // 'guide_only' = a car & guide day: guided, no fixed route, entrance fees
+  // not included (operator, 2026-11-16).
+  { name: 'sightseeing', label: 'Sightseeing', allowed: ['none', 'guide_only'] },
   // A transfer to somewhere else in town that is not sightseeing: the sound &
   // light show, the market, an evening out (operator, 2026-09-18).
   { name: 'city_transfer', label: 'Local Transfer', kind: 'bool' },
@@ -183,7 +185,7 @@ export function serializeDaysCsv(
         // block written without a guide (an arrival, a departure). Blank for a
         // day with attractions or a guide (they say it themselves), and blank
         // for a day that says nothing: a re-import must not invent the answer.
-        sightseeing: sightseeingStatement(d) === 'none' ? 'none' : '',
+        sightseeing: d.sightseeing === 'guide_only' ? 'guide_only' : sightseeingStatement(d) === 'none' ? 'none' : '',
         city_transfer: !!d.city_transfer,
         day_trip_from: typeof d.day_trip_from === 'string' ? d.day_trip_from : '',
         sightseeing_length: d.sightseeing_length ?? '',
@@ -377,12 +379,16 @@ export function parseDaysCsv(
     // other thing a day's price hangs on. Only for a sheet that HAS the column:
     // an older file imports exactly as it did.
     const namesAttractions = Array.isArray(rec.attractions) && rec.attractions.length > 0
+    if (rec.sightseeing === 'guide_only' && namesAttractions) {
+      refuse(`"${code}" day ${day}: Sightseeing says "guide_only" (car & guide, no entrance fees) but the day lists attractions — clear one`)
+      return
+    }
     if (rec.sightseeing === 'none' && (namesAttractions || rec.guide_required === true)) {
       refuse(`"${code}" day ${day}: Sightseeing says "none" but the day ${namesAttractions ? 'lists attractions' : 'asks for a guide'} — it cannot be both`)
       return
     }
     // (A day in the air has said everything: nothing on it is sold.)
-    if (hasSightseeingColumn && rec.accommodation_type !== 'in_the_air' && !namesAttractions && rec.guide_required !== true && rec.sightseeing !== 'none') {
+    if (hasSightseeingColumn && rec.accommodation_type !== 'in_the_air' && !namesAttractions && rec.guide_required !== true && rec.sightseeing !== 'none' && rec.sightseeing !== 'guide_only') {
       refuse(`"${code}" day ${day} ${SIGHTSEEING_NOT_STATED}. List its Attractions, set Guide to true, or put "none" in Sightseeing`)
       return
     }
@@ -454,7 +460,7 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
     ...(rec.city_transfer ? { city_transfer: true } : {}),
     ...(String(rec.day_trip_from ?? '').trim() ? { day_trip_from: String(rec.day_trip_from).trim() } : {}),
     ...(rec.sightseeing_length ? { sightseeing_length: rec.sightseeing_length } : {}),
-    ...(rec.sightseeing === 'none' ? { sightseeing: 'none' } : {}),
+    ...(rec.sightseeing === 'none' || rec.sightseeing === 'guide_only' ? { sightseeing: rec.sightseeing } : {}),
     meals: {
       breakfast: rec.breakfast ?? 'none',
       lunch: rec.lunch ?? 'none',
