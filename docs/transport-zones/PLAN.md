@@ -1,7 +1,24 @@
 # Transport zones — build plan
 
-Status: **PLAN, nothing built — all decisions settled 2026-11-16.** Written
-2026-11-16 from the owner's answers (11-15/16). Each step below is one PR. Nothing ships without the owner's OK.
+Status: **COMPLETE — all six steps built and live 2026-11-16.** Written
+2026-11-16 from the owner's answers (11-15/16); one PR per step.
+
+| Step | PR | Migration |
+|---|---|---|
+| 1 Settings → Zones | #830 | 469 `city_zones` |
+| 2 Hotels carry an area | #831 | 470 `accommodation_rates.zone` |
+| 3 Cards carry a pickup area and sights | #832 | 471 `transportation_rates.zone`, `covers_sights` |
+| 4 The engine prices by them | #833 | — |
+| 5 Travel2Egypt's data | (data, owner-approved) | — |
+| 6 Retire `transportation_rates.area` | #834 | 472 |
+
+Step 5 as entered: Luxor has East Bank and West Bank only (no "South City");
+Aswan's "South of the Aswan bridge" is where cruises dock; every current T2E
+hotel is in its city's default area; 22 cards carry an area and 18 Aswan /
+Luxor cards their sights. The Luxor scope cards (East Bank: Karnak, Luxor
+Temple, Luxor Museum · West Bank: Valley Of Kings, Hatshepsut, Colossi ·
+both · West Bank Extended adds Valley Of The Queens and Medinet Habu) are
+the owner's to add, with their prices.
 
 ## The problem
 
