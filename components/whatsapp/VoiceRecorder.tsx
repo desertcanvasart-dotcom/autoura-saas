@@ -6,6 +6,7 @@
 // voice note WhatsApp plays (POST /api/whatsapp/voice-note). A browser that
 // records neither gets a disabled button that says so.
 
+import { microphoneErrorMessage } from '@/lib/whatsapp/microphone-error'
 import { useEffect, useRef, useState } from 'react'
 import { Mic, Square, Trash2, Send, Loader2 } from 'lucide-react'
 
@@ -70,8 +71,8 @@ export default function VoiceRecorder({ conversationId, onActiveChange, onSent, 
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch {
-      onError('The browser did not allow the microphone. Allow it in the address bar and try again.')
+    } catch (err) {
+      onError(microphoneErrorMessage(err))
       return
     }
     chunks.current = []
@@ -171,3 +172,4 @@ export default function VoiceRecorder({ conversationId, onActiveChange, onSent, 
     </div>
   )
 }
+

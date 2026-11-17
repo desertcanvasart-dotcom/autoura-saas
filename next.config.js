@@ -23,7 +23,11 @@ const securityHeaders = [
   { key: 'X-XSS-Protection', value: '1; mode=block' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  // microphone=(self): the WhatsApp voice note (components/whatsapp/
+  // VoiceRecorder) records in the page. `microphone=()` blocked it on every
+  // page — the browser refused without even asking (seen live 2026-11-17).
+  // Camera and location stay off; nothing in the app uses them.
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
 ]
 
 const nextConfig = {
