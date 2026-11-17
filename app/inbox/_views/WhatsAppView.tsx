@@ -23,6 +23,7 @@ import { useRole } from '@/hooks/useRole'
 import { useBlockedNumbers } from '@/components/whatsapp/useBlockedNumbers'
 import { findBlocked } from '@/lib/whatsapp-blocked'
 import MessageBox from '@/components/whatsapp/MessageBox'
+import PolishBar from '@/components/whatsapp/PolishBar'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -1271,6 +1272,7 @@ export default function WhatsAppInboxPage() {
                   <button type="button" onClick={() => setAttachedFile(null)} className="shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-700" aria-label="Remove the file"><X className="w-4 h-4" /></button>
                 </div>
               )}
+              {!voiceActive && <PolishBar conversationId={selectedConversation.id} text={newMessage} setText={setNewMessage} disabled={sending} />}
               <div className="flex items-end gap-3">
                 {!voiceActive && (
                   <>

@@ -6,6 +6,7 @@ import {
   Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine, MessageSquare, Mail, Reply, ChevronDown,
 } from 'lucide-react'
 import MessageBox from '@/components/whatsapp/MessageBox'
+import PolishBar from '@/components/whatsapp/PolishBar'
 import RichReplyEditor, { plainTextToHtml, htmlToPlainText } from './RichReplyEditor'
 
 type Channel = 'whatsapp' | 'email'
@@ -329,6 +330,7 @@ function WhatsAppCompose({
       )}
 
       <div className="p-4">
+        <PolishBar conversationId={conversation.whatsapp_conversation_id} text={text} setText={setText} disabled={sending} />
         <div className="flex items-end gap-2">
           <MessageBox
             value={text}
