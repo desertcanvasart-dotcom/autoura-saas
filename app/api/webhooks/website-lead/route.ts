@@ -28,8 +28,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // Service-role client — webhooks have no user session. Lazy: build-safe.
-let _supabase: SupabaseClient<any, any, any, any, any> | null = null
-function getSupabase(): SupabaseClient<any, any, any, any, any> {
+let _supabase: SupabaseClient | null = null
+function getSupabase(): SupabaseClient {
   if (!_supabase) _supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   return _supabase
 }
