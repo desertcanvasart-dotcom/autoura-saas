@@ -22,6 +22,7 @@ import { stashConversation, toUrlBase64 } from '@/lib/grid-handoff'
 import { useRole } from '@/hooks/useRole'
 import { useBlockedNumbers } from '@/components/whatsapp/useBlockedNumbers'
 import { findBlocked } from '@/lib/whatsapp-blocked'
+import MessageBox from '@/components/whatsapp/MessageBox'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -552,6 +553,7 @@ export default function WhatsAppInboxPage() {
   // A file chosen with the attach button; the typed text goes with it as the caption.
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const composerFormRef = useRef<HTMLFormElement>(null)
   const [showNewChat, setShowNewChat] = useState(false)
   const [newPhoneNumber, setNewPhoneNumber] = useState('')
 
@@ -1260,7 +1262,7 @@ export default function WhatsAppInboxPage() {
             />
 
             {/* Message Input */}
-            <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
+            <form ref={composerFormRef} onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
               {attachedFile && (
                 <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
                   <Paperclip className="w-4 h-4 shrink-0 text-gray-500" aria-hidden />
@@ -1269,7 +1271,7 @@ export default function WhatsAppInboxPage() {
                   <button type="button" onClick={() => setAttachedFile(null)} className="shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-700" aria-label="Remove the file"><X className="w-4 h-4" /></button>
                 </div>
               )}
-              <div className="flex items-center gap-3">
+              <div className="flex items-end gap-3">
                 {!voiceActive && (
                   <>
                     <input
@@ -1291,7 +1293,7 @@ export default function WhatsAppInboxPage() {
                     </button>
                   </>
                 )}
-                {!voiceActive && <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={attachedFile ? 'Add a caption (optional)…' : translationEnabled ? `Type any language → sends in ${getLanguageInfo(customerLanguage).name}` : "Type a message..."} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#25D366]" />}
+                {!voiceActive && <MessageBox value={newMessage} onChange={setNewMessage} onSend={() => composerFormRef.current?.requestSubmit()} placeholder={attachedFile ? 'Add a caption (optional)…' : translationEnabled ? `Type any language → sends in ${getLanguageInfo(customerLanguage).name}` : "Type a message... (Shift+Enter for a new line)"} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#25D366]" />}
                 {/* Text typed → Send; empty → the microphone (as in WhatsApp). */}
                 {!voiceActive && (newMessage.trim() || attachedFile) && <button type="submit" disabled={sending || (translationEnabled && isTranslating)} className="p-2.5 bg-[#25D366] text-white rounded-full hover:bg-[#20bd5a] disabled:opacity-50">
                   {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
