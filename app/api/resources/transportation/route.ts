@@ -19,6 +19,7 @@ import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { resolveVocabularyKey } from '@/lib/vocabulary'
 import { resolveCardSights, resolveZoneChoice } from '@/lib/rates/city-zones'
 import { loadCityZones } from '@/lib/rates/hotel-zone'
+import { duplicateTransportCardMessage } from '@/lib/rates/transport-duplicate'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,13 +131,14 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
   // The card's pickup area (migration 471): one of its city's zones, by key
   // or name; blank = the city's default. Not sent = the stored value.
   let zone: string | null = existing[0]?.zone ?? null
+  const cityZones = await loadCityZones(admin, tenantId)
   if (body.zone !== undefined) {
-    const choice = resolveZoneChoice(await loadCityZones(admin, tenantId), body.city, body.zone, { what: 'card' })
+    const choice = resolveZoneChoice(cityZones, body.city, body.zone, { what: 'card' })
     if (!choice.ok) return { status: 400, json: { success: false, error: choice.error } }
     zone = choice.zone
   } else if (zone) {
     // A kept area that is not one of the (possibly new) city's goes back to the default.
-    const kept = resolveZoneChoice(await loadCityZones(admin, tenantId), body.city, zone, { what: 'card' })
+    const kept = resolveZoneChoice(cityZones, body.city, zone, { what: 'card' })
     zone = kept.ok ? kept.zone : null
   }
   // The sights a sightseeing card covers (migration 471): names on the
@@ -168,6 +170,16 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
     updated_at: new Date().toISOString(),
   }
 
+  // Same service, city, route name, area, vehicle and supplier = the same card.
+  const sameCard = (vehicle: string) => ({ status: 409, json: { success: false, error: duplicateTransportCardMessage({
+    vehicle,
+    routeName: routeFields.route_name,
+    city: routeFields.city,
+    areaLabel: cityZones.find(z => z.key === zone && z.city.trim().toLowerCase() === String(routeFields.city ?? '').trim().toLowerCase())?.label ?? null,
+    hasSupplier: Boolean(routeFields.supplier_id),
+    coversSights: coversSights,
+  }) } })
+
   const byKey = new Map<string, any>(existing.map(r => [String(r.vehicle_type || '').toLowerCase(), r]))
   const out: any[] = []
 
@@ -183,21 +195,20 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
     const current = byKey.get(v.key)
     if (current) {
       const { data, error } = await admin.from('transportation_rates').update(row).eq('id', current.id).eq('tenant_id', tenantId).select().single()
-      if (error) return { status: 500, json: { success: false, error: `Failed to update ${v.key}: ${error.message}` } }
+      if (error) {
+        // Renaming a card onto another one's route name / area / supplier.
+        if (error.code === '23505') return sameCard(v.key)
+        return { status: 500, json: { success: false, error: `Failed to update ${v.key}: ${error.message}` } }
+      }
       out.push(data); byKey.delete(v.key)
     } else {
       // A vehicle added to a starred route carries the route's star, so the
       // company stays the default for every vehicle it drives there.
       const { data, error } = await admin.from('transportation_rates').insert({ ...row, tenant_id: tenantId, is_preferred: existing.some(r => r.is_preferred === true) }).select().single()
       if (error) {
-        if (error.code === '23505') {
-          // Several companies may price one route (migration 460) — but each
-          // company once. The clash is with the SAME company's row (or, with
-          // no company picked, with another supplier-less copy).
-          return { status: 409, json: { success: false, error: routeFields.supplier_id
-            ? `This supplier already prices "${v.key}" on this route — edit that route instead of adding it again`
-            : `This route already prices "${v.key}" with no supplier — pick the supplier for this price, or edit that route` } }
-        }
+        // Several companies may price one route (migration 460) — but each
+        // company once; and the sights listed don't make it a different card.
+        if (error.code === '23505') return sameCard(v.key)
         return { status: 500, json: { success: false, error: `Failed to add ${v.key}: ${error.message}` } }
       }
       out.push(data)
