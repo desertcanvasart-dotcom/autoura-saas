@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import {
   Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine, MessageSquare, Mail, Reply, ChevronDown,
 } from 'lucide-react'
+import MessageBox from '@/components/whatsapp/MessageBox'
 import RichReplyEditor, { plainTextToHtml, htmlToPlainText } from './RichReplyEditor'
 
 type Channel = 'whatsapp' | 'email'
@@ -329,13 +330,12 @@ function WhatsAppCompose({
 
       <div className="p-4">
         <div className="flex items-end gap-2">
-          <input
-            type="text"
+          <MessageBox
             value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder="Type a message…"
-            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+            onChange={setText}
+            onSend={send}
+            placeholder="Type a message… (Shift+Enter for a new line)"
+            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#25D366]"
           />
           <button
             onClick={send}
