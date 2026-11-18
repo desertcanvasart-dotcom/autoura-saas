@@ -17,7 +17,7 @@ const ROWS: Array<{ what: string; suppliers: string; properties: string; rates: 
     what: 'A row matches',
     suppliers: 'its Code, else its Name',
     properties: 'its Property ID, else the same supplier, kind and name',
-    rates: 'its key — the Service Code on most sheets; Cruise Code on cruises; route, service type, city and vehicle on transportation; Name on extras; Cost Type on fixed costs',
+    rates: 'its key — the Service Code on most sheets; Cruise Code on cruises; route, service type, city, area and vehicle on transportation; Name on extras; Cost Type on fixed costs',
   },
   {
     what: 'Matched',
@@ -118,6 +118,14 @@ export default function BulkCsvPage() {
           supplier&rsquo;s several roles (<code>hotel | transport_company</code>), its properties&rsquo;
           names (<code>hotel:Nile Star | ship:MS Hapi</code>), an activity&rsquo;s group-size bands
           (<code>1-4:25; 5-8:40</code>), a cruise&rsquo;s sailing days (<code>mon;fri</code>).
+        </p>
+        <p className="text-gray-600 mt-3">
+          Lists of that kind on the rate sheets: a guide price&rsquo;s <strong>Other Cities</strong> and{' '}
+          <strong>Other Languages</strong>, a meal price&rsquo;s <strong>Other Meal Types</strong>, and a transport
+          card&rsquo;s <strong>Sights Covered</strong> (<code>Karnak Temple; Luxor Temple</code>), each checked against
+          your entrance-fee sheet. Hotels and transportation have a <strong>Zone</strong> column, the area within the
+          city from Settings &rsaquo; Zones (a name such as <code>West Bank</code>). An area that belongs to another city is
+          refused, and the row is named. A blank cell in any of these keeps what is stored, so older sheets still import.
         </p>
       </section>
 

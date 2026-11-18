@@ -53,7 +53,7 @@ export default function CommunicationPage() {
           <li><strong>Filter</strong> by channel (All Channels, WhatsApp Only, Email Only, Trip Chat Only) and by status (Active, Archived, All), or <strong>search</strong> conversations</li>
           <li><strong>Star</strong> the ones to come back to; unread conversations carry a badge</li>
           <li><strong>Sync Emails</strong> pulls in the latest mail from your connected Gmail</li>
-          <li><strong>Reply</strong> from the composer at the bottom: plain text on WhatsApp; on email a rich-text editor with your signatures and attachments. Both offer Copilot&apos;s suggested reply.</li>
+          <li><strong>Reply</strong> from the composer at the bottom: on WhatsApp, text with line breaks and <strong>Polish</strong> (below), with files sent from the WhatsApp tab; on email a rich-text editor with your signatures and attachments. Both offer Copilot&apos;s suggested reply.</li>
           <li><strong>View Client</strong> opens the linked client&apos;s profile</li>
         </ul>
         <Tip>
@@ -88,11 +88,20 @@ export default function CommunicationPage() {
           <li><strong>Activity History</strong> &mdash; The history icon shows what has happened on the conversation</li>
           <li><strong>New conversation</strong> &mdash; The green <strong>+</strong> opens <strong>New Conversation</strong>: enter the phone number and click <strong>Start Chat</strong></li>
           <li><strong>Delete</strong> &mdash; Hides the conversation from the inbox. If the client writes again, it comes back.</li>
+          <li><strong>Block number</strong> &mdash; (owners, admins and managers) The 🚫 button in the header blocks the number, after you confirm. From then on, a message from that number to your company is ignored. Nothing is stored and no bell rings. No lead is created and the AI doesn&apos;t reply. The header shows a red <strong>Blocked</strong> tag, and the same button unblocks. The conversation you already have stays as it is. Your company&apos;s block list is in Settings &rsaquo; WhatsApp &rsaquo; <strong>Blocked numbers</strong>. The sender&apos;s own WhatsApp still shows the message as delivered, because Autoura ignores it rather than refusing it.</li>
+        </ul>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Writing a Message</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Line breaks are kept</strong> &mdash; <strong>Enter</strong> sends and <strong>Shift+Enter</strong> starts a new line, as in WhatsApp Web. Pasted text keeps its layout, and <code>*bold*</code> shows bold on the client&apos;s phone.</li>
+          <li><strong>Long messages</strong> &mdash; a message longer than WhatsApp allows goes out as several messages, split at a paragraph, line or sentence.</li>
+          <li><strong>Polish</strong> &mdash; type your reply your own way, in any language or a mix, as rough notes. Then pick a style (<strong>Professional &amp; friendly</strong>, <strong>Short</strong>, <strong>Detailed</strong> or <strong>Formal</strong>) and click <strong>Polish</strong>. The box fills with a ready-to-send message in the language of the client&apos;s last message. Nothing is sent until you press Send. <strong>Undo</strong> brings your notes back, and polishing again in another style starts from your notes. Polish adds no price, date, time or number of people that isn&apos;t in your notes or the chat. If one appears anyway, it&apos;s flagged for you to check. Polish is on both the WhatsApp tab and the Inbox&apos;s All tab.</li>
         </ul>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Voice Notes, Photos and Files</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>What clients send shows in the chat</strong> &mdash; a voice note plays right there, a photo or video shows (click a photo to open it full size), and any other file, such as a PDF, has an <strong>Open</strong> link. Every file is opened through Autoura, which checks you may see the conversation first.</li>
+          <li><strong>What clients send shows in the chat</strong> &mdash; a voice note plays right there, a photo or video shows (click a photo to open it full size), and any other file, such as a PDF, shows its name with an <strong>Open</strong> link. Every photo, video and document also has a <strong>Download</strong> link, which saves it under its own file name. Autoura keeps its own copy of every file a client sends. Every file is opened through Autoura, which checks you may see the conversation first.</li>
+          <li><strong>Send a file</strong> &mdash; the paperclip in the WhatsApp tab&apos;s message box attaches a photo (JPG, PNG, up to 5 MB), a video (MP4), a PDF, Word, Excel, PowerPoint, text or CSV file (up to 16 MB). Whatever you typed goes with it as the caption.</li>
           <li><strong>Voice notes become text</strong> &mdash; a client&apos;s voice note is transcribed automatically a few seconds after it arrives, in Arabic, English and most other languages, and the text appears under the player. With translation on, the transcript is translated like a typed message. Copilot and the conversation summary read it too, so a voice-only question still gets a drafted reply. Voice notes from before transcription started have a <strong>Transcribe</strong> button; if one fails, <strong>Try again</strong>.</li>
           <li><strong>Send a voice note</strong> &mdash; when the message box is empty, the green button is a <strong>microphone</strong>. Click it (the browser asks to use your microphone the first time), speak, then press the square to stop &mdash; up to 5 minutes. Listen back, then <strong>Send</strong> it or throw it away with the bin. It arrives as a normal WhatsApp voice message. Recording works in Chrome, Edge, Firefox and Safari&nbsp;18.4 or later.</li>
         </ul>

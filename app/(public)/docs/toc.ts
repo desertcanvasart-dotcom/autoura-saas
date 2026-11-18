@@ -90,8 +90,8 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Communicate',
     items: [
-      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'The Inbox and its All, Email and WhatsApp tabs, voice notes (played, transcribed and sent), photos and files, AI translation, email signatures, and parsing a request into the Quote Builder.' },
-      { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Leads', description: 'One list of everyone who enquired — AI Concierge briefs and new email, WhatsApp and website enquiries — by source and by stage (Lead or Customer); triage briefs and turn them into itineraries.' },
+      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'The Inbox and its All, Email and WhatsApp tabs, voice notes (played, transcribed and sent), sending and downloading files, Polish, blocking a number, AI translation, email signatures, and parsing a request into the Quote Builder.' },
+      { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Leads', description: 'One list of everyone who enquired — AI Concierge briefs and new email, WhatsApp and website enquiries, your own site’s form included — by source and by stage (Lead or Customer); triage briefs and turn them into itineraries.' },
       { href: '/docs/copilot', icon: Sparkles, title: 'AI Copilot', description: 'Review and send AI-drafted replies from the sidebar, manage the knowledge base, and track Copilot in Reports.' },
       { href: '/docs/message-templates', icon: MailPlus, title: 'Message Templates', description: 'Create and send pre-designed messages via WhatsApp, email, and SMS with placeholder auto-fill.' },
     ],
@@ -129,7 +129,7 @@ export const CATEGORIES: DocCategory[] = [
     label: 'Suppliers & Rates',
     items: [
       { href: '/docs/suppliers', icon: Building2, title: 'Suppliers', description: 'Your supplier directory and the shared Autoura network: several roles per supplier, a SUP-#### code each, their hotels, ships and trains, contracts, and import / export that updates by code.' },
-      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'The fifteen rate sheets — land packages included — and the Rates overview: what each rate holds, its currency, EU and non-EU prices, and CSV import.' },
+      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'The fifteen rate sheets — land packages included — and the Rates overview: what each rate holds, transport by the hotel’s area and the sights a card covers, which card a quote uses, its currency, EU and non-EU prices, and CSV import.' },
       { href: '/docs/bulk-csv', icon: Upload, title: 'Bulk Import (CSV)', description: 'Sample, export, import — and how the supplier, property and rate sheets each match rows, treat blank cells and refuse what they cannot read.' },
     ],
   },
@@ -152,7 +152,7 @@ export const CATEGORIES: DocCategory[] = [
   {
     label: 'Settings',
     items: [
-      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'The Settings area and its groups: your profile, email and notifications; Company, Team & roles, Supplier network and Billing; Pricing defaults and Currencies & rates; Destinations, Day blocks, Attraction names; Copilot and WhatsApp.' },
+      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'The Settings area and its groups: your profile, email and notifications; Company, Team & roles, Supplier network and Billing; Pricing defaults and Currencies & rates; Destinations, Day blocks, Zones, Attraction names; Copilot, WhatsApp and blocked numbers.' },
       { href: '/docs/vocabulary', icon: BookOpen, title: 'Your Vocabulary', description: 'The 40 lists behind your dropdowns — tiers, supplier types, vehicles and more: rename, add, hide, reorder, delete or reset them.' },
       { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your peak dates as a premium on the selling price after margin, matched by departure date; applied in the B2B Calculator and every B2C quote.' },
       { href: '/docs/content-library', icon: Library, title: 'Content Library', description: 'Settings › Content & AI: reusable destination content, AI prompts, and house writing rules for generated itineraries.' },

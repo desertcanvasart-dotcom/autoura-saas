@@ -54,6 +54,7 @@ export default function SeasonalPremiumsPage() {
           <li><strong>The departure date</strong> decides. A trip that leaves before a window and runs into it is an ordinary departure.</li>
           <li><strong>Overlapping windows</strong> &mdash; the higher premium wins; they are never added together.</li>
           <li>The date you quote does not matter: a Christmas trip quoted in July still takes the December premium.</li>
+          <li><strong>Your website</strong> &mdash; a site that reads your Publish data feed gets the same calendar (<code>/feed/v1/seasons</code>, with an optional <code>?date=</code>). It can then show a departure&rsquo;s peak price, which is the per-person price &times; (1 + premium), with the same higher-premium-wins rule. Seasons switched off or at 0% are left out. Publish &rsaquo; Embed shows an example call.</li>
         </ul>
         <Tip>
           Keep a broad &ldquo;Winter peak&rdquo; at a small premium and a short &ldquo;New Year&rdquo; window at a higher one: departures

@@ -191,6 +191,12 @@ export default function ImportingToursPage() {
           listing attractions or a guide is refused too. A day in the air is exempt. (A sheet saved
           before the Sightseeing column existed is not held to this rule.)
         </p>
+        <p className="text-gray-600 mb-3">
+          A <strong>car &amp; guide</strong> day (car, guide, water and the driver&rsquo;s tip for up to eight hours, with no
+          fixed route) puts <code>guide_only</code> in <strong>Sightseeing</strong>. The guide and vehicle are priced and no
+          entrance fees are sold, so the tour is not marked incomplete for naming no attractions. <code>guide_only</code>{' '}
+          beside listed attractions is refused.
+        </p>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-2">The other columns</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
@@ -201,6 +207,7 @@ export default function ImportingToursPage() {
           <li><strong>Transport</strong> &mdash; <code>road</code> (the default), <code>flight</code>, <code>train</code> or <code>sleeping_train</code>. A flight or day train runs from the <em>previous</em> day&rsquo;s city into this one; a sleeping train leaves this day&rsquo;s city for the next. <strong>Leg From / Leg To</strong> give a ticket its own route, and are refused on a road day.</li>
           <li><strong>Assist At Departure / Arrival</strong> &mdash; <code>yes</code> or <code>no</code>, airport assistance on a flight day only.</li>
           <li><strong>Transport Lines, Road Transfers, Cruise Boarding Assist, Cruise Leaving Assist, Local Transfer, Day Trip From, Sightseeing Length</strong> &mdash; the same settings as the day editor in the Tour Manager. Blank leaves them to the usual rules.</li>
+          <li><strong>Pickup Zone</strong> &mdash; the area of the day&rsquo;s city its transport picks up from, for a day with no hotel night in that city (a cruise day). Blank means the area of the guests&rsquo; hotel, or the city&rsquo;s default.</li>
           <li><strong>Airport Arrival / Departure, Hotel Check-in / Check-out, Guide</strong> &mdash; <code>true</code> or <code>false</code> (yes / no and 1 / 0 also work). Anything else refuses the row.</li>
         </ul>
       </section>

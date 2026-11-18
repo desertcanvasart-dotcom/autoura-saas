@@ -7,16 +7,16 @@ import { docMetadata } from '../seo'
 export const metadata = docMetadata('/docs/tours-rates')
 
 const CATEGORIES: Array<{ group: string; name: string; what: string }> = [
-  { group: 'Accommodation', name: 'Hotels', what: 'By city, tier and board basis. Prices are dated rate periods (up to six): per person in a double, single supplement, triple reduction — each for EU and non-EU passports — and optional room supplements (a view, a meal plan) with low, high and peak prices, offered in the Quote Builder under Hotel Services on that hotel’s nights. One hotel per city and tier can be starred Preferred.' },
-  { group: 'Accommodation', name: 'Nile Cruises', what: 'By ship and cabin, with the sailing lengths and days it runs, embark and disembark cities, meals and sightseeing, in dated periods. One preferred ship per tier.' },
+  { group: 'Accommodation', name: 'Hotels', what: 'By city, its area within the city (when the city has zones), tier and board basis. Prices are dated rate periods (up to six): per person in a double, single supplement, triple reduction — each for EU and non-EU passports — and optional room supplements (a view, a meal plan) with low, high and peak prices, offered in the Quote Builder under Hotel Services on that hotel’s nights. One hotel per city and tier can be starred Preferred.' },
+  { group: 'Accommodation', name: 'Nile Cruises', what: 'By ship and cabin, with the sailing lengths and days it runs, embark and disembark cities, meals and sightseeing, in dated periods. One preferred ship per tier, route and sailing length.' },
   { group: 'Accommodation', name: 'Sleeping Trains', what: 'By route and cabin: one-way and round-trip fares, a guide fare, times and season.' },
   { group: 'Accommodation', name: 'Hotel Services', what: 'Porter, check-in and check-out help and the like, by hotel category; priced per group, per person or per unit.' },
-  { group: 'Transport & Tickets', name: 'Transportation', what: 'One route — a day tour, half day, airport or intercity transfer — with a rate and a passenger range per vehicle (your vehicle types). Several transport companies may price the same route; when more than one does, star the default.' },
+  { group: 'Transport & Tickets', name: 'Transportation', what: 'One route — a day tour, half day, airport or intercity transfer — with a rate and a passenger range per vehicle (your vehicle types), its pickup area (when the city has zones) and, for a day or half day, the sights it covers. Several cards or companies may answer the same trip; star the one quotes should use.' },
   { group: 'Transport & Tickets', name: 'Flights', what: 'Domestic and international fares by route, airline and cabin: base fare and tax, baggage, flight number and times, a guide fare.' },
   { group: 'Transport & Tickets', name: 'Trains', what: 'Day trains by route and class, with a guide fare.' },
   { group: 'Transport & Tickets', name: 'Airport Services', what: 'Meet & greet and other assistance, by airport (any IATA code) and direction; per group, per person or per unit.' },
-  { group: 'Guides & Services', name: 'Tour Guides', what: 'By language, grade (your own grades — the first is the default a quote asks for), city and day type (full day, half day, meet & greet), for a spot or a throughout guide. A rate with no city (Any city) prices every day whose city has none of its own — one throughout price for the whole trip. When adding, tick other languages and cities to save the same price for each.' },
-  { group: 'Guides & Services', name: 'Meals', what: 'Per restaurant, meal type, city and tier; one preferred restaurant per tier and meal.' },
+  { group: 'Guides & Services', name: 'Tour Guides', what: 'By language, grade (your own grades — the first is the default a quote asks for), city and day type (full day, half day, meet & greet), for a spot or a throughout guide. One price can list several cities and languages. A rate with no city (Any city) prices every day whose city has none of its own — one throughout price for the whole trip.' },
+  { group: 'Guides & Services', name: 'Meals', what: 'Per restaurant, city and tier, and the meals the price is for — one row can serve both lunch and dinner. One preferred restaurant per tier and meal.' },
   { group: 'Guides & Services', name: 'Attractions', what: 'Entrance fees: one price, child and student discounts, linked to an Attraction supplier (such as the Supreme Council of Antiquities). An Add-on stays out of the automatic price; Sell as extra lets travellers add it after booking.' },
   { group: 'Guides & Services', name: 'Activities', what: 'The Activities & Add-ons catalogue: per person, per unit (a boat for six), a flat price, or tiered by group size.' },
   { group: 'Guides & Services', name: 'Land packages', what: 'A trip of several days bought from one provider at one price per person — the Bahariya desert safari, say: its days, where each night is spent (desert camp or hotel), the meals of each day, and whether it includes the car from and back to the start city, a 4x4, the guide and the entrance tickets (and which sights). Charged once on a quote; on its days, what it includes is not charged again.' },
@@ -99,6 +99,45 @@ export default function ToursRatesPage() {
           a preferred hotel. You can still pick another company for a single trip in the pricing grid.
         </p>
         <p className="text-gray-600 mb-3">
+          <strong>Several cards for the same trip.</strong> One company often keeps several cards that answer the
+          same trip &mdash; a dozen Luxor local transfers, say. With one of them starred, quotes use it. With none
+          starred, the quote uses the <strong>cheapest</strong> and shows a warning naming the others, so you know
+          which trip still needs a star. Pricing never stops for this, but the cheapest can under-price until you
+          star your usual card.
+        </p>
+        <p className="text-gray-600 mb-3">
+          <strong>Transport by the hotel&apos;s area.</strong> When a city has zones (Settings &rsaquo; Catalog &rsaquo;{' '}
+          <strong>Zones</strong>, such as Luxor: East Bank and West Bank), each hotel in it has an <strong>Area</strong>,
+          and it is required. Hotels with none show <strong>No area yet</strong>, and a filter lists them.
+          Each transport card has a <strong>Pickup area</strong>, which defaults to the city&apos;s default area when left empty.
+          Transfers, day tours and dinner or local transfers are then priced for the area of the guests&apos; hotel in
+          that city: tonight&apos;s hotel on arrival, last night&apos;s when they set out. A day with no hotel night there (a
+          cruise day) can state its own <strong>Pickup Zone</strong>, otherwise the city&apos;s default area is used. With
+          no card for the hotel&apos;s area, the quote shows a gap naming the area (&ldquo;&hellip; in Luxor for West
+          Bank hotels&rdquo;). It never falls back to the city&apos;s price. A city with no zones prices exactly as before.
+        </p>
+        <p className="text-gray-600 mb-3">
+          <strong>Sights a card covers.</strong> A day-tour or half-day card can list its <strong>Sights covered</strong>,
+          chosen from your entrance-fee sheet. One card covers several sights: Karnak and Luxor Temple
+          on one East Bank card, rather than a card per sight (a second card under the same name, area and
+          vehicle is refused, and the message says to add the sight to the existing card). A day is
+          priced from the <strong>smallest card that covers every sight of the day</strong>: Karnak alone takes the East
+          Bank card, Karnak and the Valley of the Kings take the both-banks card. Ties go to the starred card,
+          otherwise to the cheapest, with a warning. If no card covers the day, a card that lists no sights is used,
+          and with none of those either, the gap names the sights.
+        </p>
+        <p className="text-gray-600 mb-3">
+          <strong>Preferred Nile cruise.</strong> The star is one boat per <strong>tier, route (embark &rarr; disembark)
+          and sailing length</strong>. Starring a boat for the 4-night Luxor &rarr; Aswan sailing leaves your 3-night
+          Aswan &rarr; Luxor star alone, and the same ship can be starred on several routes. The weekday does
+          not split the star. A quote picks among ships of the trip&apos;s sailing length first.
+        </p>
+        <p className="text-gray-600 mb-3">
+          <strong>One meal price for several meals.</strong> In the meal form, tick every meal under{' '}
+          <strong>Meals this price is for</strong>. The same menu at lunch and dinner is then one row, and a day
+          can take either meal from it. Starring it preferred clears the other stars in that tier that share a meal with it.
+        </p>
+        <p className="text-gray-600 mb-3">
           <strong>Land packages.</strong> When a provider sells you a whole trip at one price per person &mdash;
           the Bahariya desert safari with its car from Cairo, 4x4, a night in the desert camp or a hotel, guide,
           meals and the protected-area ticket &mdash; add it under <strong>Land packages</strong>, one per version
@@ -126,14 +165,15 @@ export default function ToursRatesPage() {
         <p className="text-gray-600">
           Amounts are in your rates currency (Settings &rsaquo; Organization &rsaquo; Company) unless a rate says otherwise:
           each form&rsquo;s <strong>Rate currency</strong> lets one contract be entered in, say, EUR while
-          the rest are in EGP. The amount is stored as you typed it; pricing converts it with your
+          the rest are in EGP. B2B transport packages have it too, and the list shows each package in its own currency. The amount is stored as you typed it; pricing converts it with your
           exchange rates.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">EU and non-EU passports</h3>
         <p className="text-gray-600">
           Hotels and Nile cruises have separate prices for EU and non-EU passport holders. Every other
-          rate has one price, used for both.
+          rate has one price, used for both. A non-EU price left at 0 counts as not entered, so the EU
+          price is used. A non-EU traveller is never priced at zero.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Rates Overview</h3>

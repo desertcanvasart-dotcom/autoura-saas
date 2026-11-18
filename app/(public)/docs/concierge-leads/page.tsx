@@ -30,6 +30,8 @@ export default function ConciergeLeadsPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Source</strong> &mdash; filter by <strong>All</strong>, <strong>AI Concierge</strong>, <strong>Email</strong>, <strong>WhatsApp</strong> or <strong>Website</strong>. Every card says where it came from. Email, WhatsApp and website leads link to their conversation in the Inbox.</li>
           <li><strong>Stage</strong> &mdash; <strong>Leads</strong>, <strong>Became customers</strong> or <strong>Everyone</strong>. A card reads <strong>Lead</strong> until the person has a booking; then it reads <strong>&#9733; Customer</strong>. The change happens by itself on their first booking.</li>
+          <li><strong>Your own website&apos;s enquiry form</strong> &mdash; a website you already have, not built in Autoura, can send its form straight here. Each enquiry becomes a <strong>Website</strong> lead: the person is matched to a client by email or WhatsApp, or added as new, every answer they gave is saved as a note on the client, and the team gets a bell. If the same enquiry is sent twice, it is filed once. The Autoura team connects your form.</li>
+          <li><strong>Forms that email your office</strong> &mdash; when your website emails an enquiry from your own address with the traveller in <em>Reply-To</em>, the inbox files it as the traveller writing to you, so it becomes a lead and your reply goes to them. The mailbox it is sent to must be one you have connected.</li>
           <li>The review tabs below (Needs Review, In Progress&hellip;) appear when the source is <strong>AI Concierge</strong>. Archived briefs are left out of <strong>All sources</strong>.</li>
         </ul>
       </section>

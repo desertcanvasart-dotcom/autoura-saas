@@ -50,7 +50,8 @@ export default function TransportPackagesDocsPage() {
         <p className="text-gray-600 mb-3">
           The vehicles are <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">your
           own vehicle types</Link> (Settings &rsaquo; Catalog &rsaquo; Vocabulary), with your names and the passenger range
-          each one carries. Rates are in your rates currency. Leave a vehicle blank if the package does
+          each one carries. Rates are in your rates currency unless you pick another under <strong>Rate currency</strong>
+          (a supplier who quotes in EUR, say); pricing converts it with your exchange rates. Leave a vehicle blank if the package does
           not offer it: a blank is not a zero.
         </p>
         <ScreenshotPlaceholder caption="Transport Packages: a package with its type, route, duration, and one rate per vehicle from your vocabulary" />
