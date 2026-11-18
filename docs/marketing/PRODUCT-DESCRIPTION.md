@@ -85,8 +85,19 @@ tour manager. Time-poor, margin-sensitive, WhatsApp-native.
   receipts, contracts, reminders, supplier notifications)
 - WhatsApp voice notes: customers' play in the inbox and are transcribed
   automatically (Arabic, English and more); agents record and send their own
+- WhatsApp files both ways: agents send photos, video, PDF, Word, Excel, CSV
+  from the inbox; every client file is downloadable under its own name and
+  kept in Autoura's own storage (not only at the provider)
+- WhatsApp Polish: the agent types rough notes in any language, picks a style
+  (Professional & friendly, Short, Detailed, Formal) and gets a ready-to-send
+  message in the client's language; never sent automatically, adds no new
+  facts (unsourced numbers are flagged)
+- Per-company WhatsApp number blocking (no message stored, no lead, no alert,
+  no AI reply); line breaks kept, over-long messages split automatically
 - One Leads list across WhatsApp, email, website and the AI Concierge, with a
-  Lead → Customer stage
+  Lead → Customer stage. An operator's own existing website form can post
+  enquiries straight in as leads (signed webhook, duplicates filed once), and
+  form emails relayed from the office's own address are filed as the traveller's
 - AI itinerary generation from conversations (structured mode follows the
   operator's text verbatim; creative mode composes)
 - AI copilot: retrieval-augmented reply suggestions learned from the
@@ -101,15 +112,27 @@ tour manager. Time-poor, margin-sensitive, WhatsApp-native.
   transportation, airport services, hotel services, tipping, fixed costs,
   land packages — a multi-day trip bought at one price per person)
 - **Egypt-native rate mechanics**: dual passport pricing (EU vs non-EU rates
-  on every category), three-season hotel/cruise rates, per-monument entrance
+  for hotels and Nile cruises; a non-EU price left at 0 falls back to EU), three-season hotel/cruise rates, per-monument entrance
   fees with a canonical attraction vocabulary the AI understands
 - **Route-first transport pricing**: one route, five vehicle classes with
   capacity bands — the engine re-selects the vehicle automatically as group
   size changes
+- **Transport by zone and sights**: a city can be split into zones (Luxor
+  East / West Bank); hotels carry their zone and transport is priced for the
+  guests' hotel area — a missing zone price is a named gap, never the city
+  price. Day-tour cards list the sights they cover and the engine takes the
+  smallest card covering the whole day. Several matching cards → the starred
+  one, else the cheapest with a warning
+- One guide price covers several cities and languages; one meal price covers
+  several meals (lunch + dinner); preferred Nile cruise per route and length;
+  transport packages in their own currency
+- Car & guide day tours (guided, no entrance fees) price without a gap
 - Pricing grid: per-day slot pricing for B2C (margin-based, per-person price)
   and B2B (1–40 pax rate sheet with tour-leader columns) — one engine, two
   commercial shapes
 - CSV bulk import/export for every rate table, idempotent re-import
+- Publish data feed exposes the operator's peak-season calendar
+  (`/feed/v1/seasons`) so an external website can price peak departures
 - Quote versioning with revert; quote validity, sent/viewed tracking
 
 ### Sales & operations

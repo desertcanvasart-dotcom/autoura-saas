@@ -53,7 +53,7 @@ export default function TeamSettingsPage() {
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-2.5 font-medium whitespace-nowrap">Catalog</td>
-                <td className="px-4 py-2.5">Destinations &middot; Day blocks &middot; Attraction names &middot; Vocabulary &mdash; all admins</td>
+                <td className="px-4 py-2.5">Destinations &middot; Day blocks &middot; Zones &middot; Attraction names &middot; Vocabulary &mdash; all admins</td>
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="px-4 py-2.5 font-medium whitespace-nowrap">Messaging</td>
@@ -157,6 +157,7 @@ export default function TeamSettingsPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Destinations</strong> &mdash; the countries you operate and the cities you sell. Every city dropdown follows this list. A country or city the catalogue lacks can be added (names are matched without regard to capitals, so &ldquo;luxor&rdquo; finds Luxor); additions join the shared catalogue.</li>
           <li><strong>Day blocks</strong> &mdash; your standard days, kept once: what each includes and where its night is. Export the sheet, edit it in Excel or Google Sheets and import it back; you see what would change before anything is saved. A paid sight with no fee behind it is flagged. A block can be marked as day 1, day 2&hellip; of a <strong>land package</strong> (Rates &rsaquo; Land packages): the Quote Builder then puts the package in once and leaves off what it includes, and a sight its ticket covers needs no fee of its own.</li>
+          <li><strong>Zones</strong> &mdash; the areas of a city that transport is priced by, such as Luxor: East Bank and West Bank. Pick a city from your Destinations and add its zones. You can rename them, reorder them and mark one as the city&apos;s <strong>default</strong>; the first zone added becomes the default. Hotels in a zoned city then need an area, and transport cards have a pickup area (see <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>). A zone that hotels or transport cards use can&apos;t be deleted; the message names them. The default can only be deleted when it is the city&apos;s last zone. A city with no zones prices as it always has.</li>
           <li><strong>Attraction names</strong> &mdash; your tours name a sight one way, your entrance-fee sheet may name it another. Say which fee a wording means and every tour using it is priced from that fee. The top panel lists every wording in your tours that reaches no fee &mdash; each is a gap in the price.</li>
           <li><strong><Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Vocabulary</Link></strong> &mdash; the 40 lists behind your dropdowns: tiers, supplier types, vehicles, meal types and more.</li>
         </ul>
@@ -203,6 +204,7 @@ export default function TeamSettingsPage() {
         <h3 className="text-lg font-medium text-gray-900 mb-3">WhatsApp</h3>
         <p className="text-gray-600 mb-4">
           (Messaging.) WhatsApp runs on Autoura&rsquo;s WhatsApp account; your number is connected by the Autoura support team, not entered here. The page shows whether it is set up, sends a test message, and holds the same AI auto-reply switch.
+          <strong> Blocked numbers</strong> lists the numbers your company has blocked, with when, why, how many messages were ignored and the last one&apos;s time. You can block a number by typing it, or unblock one. Owners, admins and managers can change the list. Staff can only see it.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Capacity calendar</h3>
