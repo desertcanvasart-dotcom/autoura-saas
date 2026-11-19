@@ -3,12 +3,12 @@ import { requireAuth } from '@/lib/supabase-server'
 import { roleDenied } from '@/lib/api-role-gate'
 import {
   FOLLOW_UP_LANGUAGES,
-  fetchTwilioTemplate,
   isContentSid,
   isFollowUpLanguage,
   readFollowUpTemplates,
   withFollowUpTemplates,
 } from '@/lib/whatsapp-templates'
+import { fetchTwilioTemplate } from '@/lib/whatsapp-templates-twilio'
 
 // ============================================
 // The company's WhatsApp follow-up templates (lib/whatsapp-templates.ts)
