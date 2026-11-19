@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import BlockedNumbersCard from '@/components/whatsapp/BlockedNumbersCard'
+import FollowUpTemplatesCard from '@/components/whatsapp/FollowUpTemplatesCard'
 import { MessageCircle, Send, Check, AlertCircle, Settings, Phone, Zap, Bot, Sparkles, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 // /api/whatsapp/status — the page read /api/whatsapp/test, which only
@@ -507,6 +508,9 @@ export default function WhatsAppSettingsPage() {
             </div>
           )}
         </div>
+
+        {/* Follow-up templates for after WhatsApp's 24-hour window (lib/whatsapp-templates.ts) */}
+        <FollowUpTemplatesCard />
 
         {/* Blocked numbers (migration 465) */}
         <BlockedNumbersCard />
