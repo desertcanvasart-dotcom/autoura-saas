@@ -245,6 +245,22 @@ describe('a day tour is priced as what it is', () => {
     expect(templateHoles(result)[0].message).toMatch(/a meal is not the price of a tour/)
   })
 
+  it('a day whose one thing is a picked activity is a product, not a meal — Travel2Egypt\'s Nubian village by boat', async () => {
+    // No guide, no car, no sights: the boat to the village IS the tour (2026-11-19).
+    const BOAT = { id: 'act-nubian', tenant_id: 'test-tenant', activity_name: 'Nubian Village', city: 'Cairo', base_rate_eur: 100, base_rate_non_eur: 100, pricing_type: 'per_unit', unit_label: 'boat', min_capacity: 1, max_capacity: 99, is_active: true, rate_currency: 'EUR' }
+    const tables = fullRateTables()
+    tables.activity_rates = [BOAT]
+    const template = JSON.parse(JSON.stringify(cairoTemplateRow))
+    template.itinerary = [{ ...AS_STORED, sightseeing: 'none', services: NO_SERVICES, transport_lines: [], meals: { breakfast: 'none', lunch: 'none', dinner: 'none' }, activity_ids: ['act-nubian'] }]
+    template.tour_type = 'day_tour'; template.duration_days = 1
+    tables.tour_templates = [template]
+    setMockTables(tables)
+    const result = await calculateDayBasedPricing({ templateId: TEMPLATE_ID, tenantId: 'test-tenant', tier: 'standard', isEurPassport: true, language: 'English', marginPercent: 25 } as never)
+    expect(templateHoles(result)).toEqual([])
+    expect(result.services.some(s => s.serviceType === 'activity' && s.lineTotal > 0)).toBe(true)
+    expect(result.services.some(s => s.serviceType === 'guide')).toBe(false)
+  })
+
   it('"explicitly nothing" is no longer complete at 0.00 — Sawa\'s desert safari', async () => {
     // Whale Valley: a city, a services block with everything off, no sights, an
     // included lunch. It came out COMPLETE at 0.00 with no vehicle on it.

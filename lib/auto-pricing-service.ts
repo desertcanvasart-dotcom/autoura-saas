@@ -3229,6 +3229,9 @@ export async function calculateDayBasedPricing(
     d.accommodation_type !== 'none' ||
     d.attractions.length > 0 ||
     (d.attraction_ids?.length ?? 0) > 0 ||
+    // A picked activity is what the day sells (Travel2Egypt's Nubian village by
+    // motor boat: the boat, nothing else — no guide, no car, no sights), not a meal.
+    (d.activity_ids?.length ?? 0) > 0 ||
     d.services.guide_required ||
     d.services.airport_arrival || d.services.airport_departure ||
     d.services.hotel_checkin || d.services.hotel_checkout ||
