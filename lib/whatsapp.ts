@@ -12,6 +12,7 @@
 
 import {
   sendWhatsAppMessage as sendViaTwilio,
+  sendWhatsAppTemplate as sendTemplateViaTwilio,
   formatWhatsAppNumber,
   type WhatsAppMessage
 } from './twilio-whatsapp'
@@ -72,6 +73,33 @@ async function sendOne(
   if (result.success && result.messageId) {
     const { recordOutboundWhatsApp } = await import('@/lib/whatsapp-outbound')
     await recordOutboundWhatsApp({ tenantId, messageSid: result.messageId, to: ready.to, body: ready.body })
+  }
+  return result
+}
+
+/**
+ * Send an approved template (lib/whatsapp-templates.ts) — the one message
+ * WhatsApp accepts after the customer's 24-hour window. Twilio only for now:
+ * on the Meta Cloud API a template is sent by name, and no company has one
+ * there yet. Recorded like any send, so a later delivery failure reaches the
+ * sender. `text` is the filled template text, for the record.
+ */
+export async function sendWhatsAppTemplate(input: {
+  to: string
+  contentSid: string
+  variables: Record<string, string>
+  text: string
+  tenantId: string | null
+  statusCallback?: string
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  if (getWhatsAppProvider() === 'meta') {
+    return { success: false, error: 'Follow-up templates are not set up for the Meta WhatsApp connection yet.' }
+  }
+  const to = await internationalNumber(input.to, input.tenantId)
+  const result = await sendTemplateViaTwilio({ ...input, to })
+  if (result.success && result.messageId) {
+    const { recordOutboundWhatsApp } = await import('@/lib/whatsapp-outbound')
+    await recordOutboundWhatsApp({ tenantId: input.tenantId, messageSid: result.messageId, to, body: input.text })
   }
   return result
 }

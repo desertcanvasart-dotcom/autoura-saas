@@ -205,6 +205,45 @@ export async function sendWhatsAppMessage({
   }
 }
 
+/**
+ * Send an approved WhatsApp template (Twilio Content API). The only message
+ * WhatsApp accepts once the customer's 24-hour window has closed
+ * (lib/whatsapp-templates.ts). From the company's own number, like any send.
+ */
+export async function sendWhatsAppTemplate({
+  to,
+  contentSid,
+  variables,
+  tenantId,
+  statusCallback,
+}: {
+  to: string
+  contentSid: string
+  variables: Record<string, string>
+  tenantId: string | null
+  statusCallback?: string
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const client = getTwilioClient()
+    const from = await whatsAppSenderFor(await adminForSender(), tenantId)
+    if (!from) throw new Error('TWILIO_WHATSAPP_FROM not configured')
+    const callbackUrl =
+      statusCallback ??
+      (process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/api/whatsapp/status-callback` : undefined)
+    const message = await client.messages.create({
+      from,
+      to: formatWhatsAppNumber(to),
+      contentSid,
+      ...(Object.keys(variables).length ? { contentVariables: JSON.stringify(variables) } : {}),
+      ...(callbackUrl && { statusCallback: callbackUrl }),
+    })
+    return { success: true, messageId: message.sid }
+  } catch (error: unknown) {
+    console.error('❌ Failed to send WhatsApp template:', error)
+    return { success: false, error: (error as { message?: string } | null)?.message || 'Twilio refused the template' }
+  }
+}
+
 // ============================================
 // QUOTE MESSAGING
 // ============================================

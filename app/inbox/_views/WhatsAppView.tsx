@@ -24,6 +24,7 @@ import { useBlockedNumbers } from '@/components/whatsapp/useBlockedNumbers'
 import { findBlocked } from '@/lib/whatsapp-blocked'
 import MessageBox from '@/components/whatsapp/MessageBox'
 import PolishBar from '@/components/whatsapp/PolishBar'
+import FollowUpNotice from '@/components/whatsapp/FollowUpNotice'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -549,6 +550,8 @@ export default function WhatsAppInboxPage() {
   const [loading, setLoading] = useState(true)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  // WhatsApp's 24-hour window (components/whatsapp/FollowUpNotice): closed = a typed message would be refused.
+  const [windowOpen, setWindowOpen] = useState(true)
   // A voice note being recorded or reviewed takes the send box's place.
   const [voiceActive, setVoiceActive] = useState(false)
   // A file chosen with the attach button; the typed text goes with it as the caption.
@@ -926,6 +929,7 @@ export default function WhatsAppInboxPage() {
   // Select conversation
   const selectConversation = (conv: Conversation) => {
     setSelectedConversation(conv)
+    setWindowOpen(true) // until FollowUpNotice has read this conversation's window
     fetchMessages(conv.id, true)
     fetchActivity(conv.id)
     if (conv.unread_count > 0) markAsRead(conv.id)
@@ -1263,7 +1267,32 @@ export default function WhatsAppInboxPage() {
             />
 
             {/* Message Input */}
-            <form ref={composerFormRef} onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
+            <FollowUpNotice
+              key={selectedConversation.id}
+              conversationId={selectedConversation.id}
+              refreshKey={messages.length}
+              onWindowChange={setWindowOpen}
+              onSent={saved => {
+                setMessages(prev => [...prev, saved as Message])
+                setConversations(prev => prev.map(c =>
+                  c.id === selectedConversation.id ? { ...c, last_message: (saved as Message).message_body, last_message_at: new Date().toISOString() } : c
+                ))
+              }}
+            />
+            <form
+              ref={composerFormRef}
+              onSubmit={e => {
+                // Outside the 24-hour window Twilio refuses a typed message (63016):
+                // say so now instead of after a failed send.
+                if (!windowOpen) {
+                  e.preventDefault()
+                  showToast('error', 'WhatsApp will not deliver a typed message: the client has not written in 24 hours. Send the follow-up above first.')
+                  return
+                }
+                sendMessage(e)
+              }}
+              className="p-4 bg-white border-t border-gray-200"
+            >
               {attachedFile && (
                 <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
                   <Paperclip className="w-4 h-4 shrink-0 text-gray-500" aria-hidden />
