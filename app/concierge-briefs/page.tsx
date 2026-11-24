@@ -79,6 +79,33 @@ interface ClientLead {
   conversation_id: string | null
   last_message_preview: string | null
   last_message_at: string | null
+  /** The newest website-form enquiry from this person, and how many they sent. */
+  enquiry?: WebsiteEnquiry | null
+  enquiry_count?: number
+}
+
+interface WebsiteEnquiry {
+  landing_url: string | null
+  dates: { from?: string; to?: string; month?: string } | null
+  travellers: number | null
+  adults: number | null
+  children: number | null
+  message: string | null
+  utm: Record<string, string> | null
+  language: string | null
+  created_at: string
+}
+
+/** "/cairo-private-day-tours" from a full address — the page, not the site. */
+function pagePath(url: string | null): string {
+  if (!url) return ''
+  try { const u = new URL(url); return u.pathname === '/' ? 'Home page' : u.pathname } catch { return url }
+}
+
+function enquiryDates(d: WebsiteEnquiry['dates']): string {
+  if (!d) return ''
+  if (d.from && d.to) return `${d.from} → ${d.to}`
+  return d.from || d.month || ''
 }
 
 type SourceKey = 'all' | 'concierge' | 'email' | 'whatsapp' | 'website'
@@ -529,7 +556,29 @@ export default function ConciergeBriefsPage() {
               {phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{phone}</span>}
               <span className="flex items-center gap-1 text-gray-400"><Clock className="h-3 w-3" />{timeAgo(l.last_message_at || l.created_at)}</span>
             </div>
-            {l.last_message_preview && (
+            {l.enquiry && (
+              <div className="mt-2 rounded-md bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 space-y-1">
+                <p>
+                  <span className="font-medium text-gray-700">Sent from:</span>{' '}
+                  {l.enquiry.landing_url ? (
+                    <a href={l.enquiry.landing_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline break-all">{pagePath(l.enquiry.landing_url)}</a>
+                  ) : '—'}
+                  {l.enquiry.utm?.source ? <span className="text-gray-400"> · via {l.enquiry.utm.source}</span> : null}
+                </p>
+                <p className="flex flex-wrap gap-x-3">
+                  {enquiryDates(l.enquiry.dates) && <span>Dates: {enquiryDates(l.enquiry.dates)}</span>}
+                  {l.enquiry.travellers != null && (
+                    <span>
+                      Travellers: {l.enquiry.travellers}
+                      {l.enquiry.adults != null ? ` (${l.enquiry.adults} adult${l.enquiry.adults === 1 ? '' : 's'}${l.enquiry.children ? `, ${l.enquiry.children} child${l.enquiry.children === 1 ? '' : 'ren'}` : ''})` : ''}
+                    </span>
+                  )}
+                  {(l.enquiry_count ?? 0) > 1 && <span className="text-amber-700">{l.enquiry_count} enquiries from this person</span>}
+                </p>
+                {l.enquiry.message && <p className="text-gray-700 whitespace-pre-line line-clamp-4">{l.enquiry.message}</p>}
+              </div>
+            )}
+            {!l.enquiry && l.last_message_preview && (
               <p className="mt-2 text-sm text-gray-700 line-clamp-2">{l.last_message_preview}</p>
             )}
           </div>
