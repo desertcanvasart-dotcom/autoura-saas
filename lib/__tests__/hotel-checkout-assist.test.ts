@@ -85,3 +85,14 @@ describe('getHotelServiceRate — checkout_assist', () => {
     expect(asked).toEqual(['checkin_assist'])
   })
 })
+
+describe('getHotelServiceRate — city (migration 473)', () => {
+  it("prefers the day's city, then the anywhere row, never another city's", async () => {
+    const { getHotelServiceRate } = await import('@/lib/auto-pricing-service')
+    byType = { porter: [{ rate_eur: 5, city: 'Aswan' }, { rate_eur: 9, city: 'Cairo' }, { rate_eur: 7, city: null }] } as never
+    expect(await getHotelServiceRate(SCOPE, 'porter', 'standard', 'Cairo')).toBe(9)
+    expect(await getHotelServiceRate(SCOPE, 'porter', 'standard', 'Luxor')).toBe(7)
+    byType = { porter: [{ rate_eur: 5, city: 'Aswan' }] } as never
+    expect(await getHotelServiceRate(SCOPE, 'porter', 'standard', 'Cairo')).toBeNull()
+  })
+})

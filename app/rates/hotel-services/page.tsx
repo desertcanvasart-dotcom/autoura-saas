@@ -16,6 +16,8 @@ import { pricingBasisLabel, toPricingBasis, type PricingBasis } from '@/lib/pric
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 import { uniqueServiceCode } from '@/lib/rates/unique-code'
+import { cityOptionsFor } from '@/components/CitySelect'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 // ============================================
 // CONSTANTS
@@ -45,6 +47,8 @@ interface HotelStaffRate {
   /** Per group (flat) / per person / per unit — migration 393. */
   pricing_type?: string | null
   max_capacity?: number | null
+  /** The city this is bought in; blank = anywhere (migration 473). */
+  city?: string | null
 }
 
 interface Toast { 
@@ -221,8 +225,10 @@ export default function HotelServicesPage() {
     supplier_id: '',
     supplier_name: '',
     pricing_type: 'flat' as PricingBasis,
-    max_capacity: '' as number | ''
+    max_capacity: '' as number | '',
+    city: ''
   })
+  const { cities: cityOptions } = useDestinationCities()
 
   const showToast = (type: 'success' | 'error', message: string) => {
     const id = Date.now().toString()
@@ -280,7 +286,8 @@ export default function HotelServicesPage() {
     const svc = formData.service_type.replace('_', '').toUpperCase().substring(0, 6)
     const cat = formData.hotel_category.toUpperCase().substring(0, 3)
     // Steps past a code another rate has (two suppliers' porter rates).
-    return uniqueServiceCode(`HOTEL-${svc}-${cat}`, rates.filter(r => r.id !== editingRate?.id).map(r => r.service_code))
+    const where = (formData.city || '').toUpperCase().replace(/[^A-Z0-9]+/g, '').substring(0, 4)
+    return uniqueServiceCode(`HOTEL-${svc}-${cat}${where ? `-${where}` : ''}`, rates.filter(r => r.id !== editingRate?.id).map(r => r.service_code))
   }
 
   const handleAddNew = () => {
@@ -297,7 +304,8 @@ export default function HotelServicesPage() {
       supplier_id: '',
       supplier_name: '',
       pricing_type: 'flat' as PricingBasis,
-      max_capacity: '' as number | ''
+      max_capacity: '' as number | '',
+      city: ''
     })
     setShowModal(true)
   }
@@ -316,7 +324,8 @@ export default function HotelServicesPage() {
       supplier_id: rate.supplier_id || '',
       supplier_name: rate.supplier_name || '',
       pricing_type: toPricingBasis(rate.pricing_type) ?? 'flat',
-      max_capacity: rate.max_capacity ?? ''
+      max_capacity: rate.max_capacity ?? '',
+      city: rate.city || ''
     })
     setShowModal(true)
   }
@@ -362,7 +371,8 @@ export default function HotelServicesPage() {
       supplier_id: rate.supplier_id || '',
       supplier_name: rate.supplier_name || '',
       pricing_type: toPricingBasis(rate.pricing_type) ?? 'flat',
-      max_capacity: rate.max_capacity ?? ''
+      max_capacity: rate.max_capacity ?? '',
+      city: rate.city || ''
     })
     setShowModal(true)
     showToast('success', 'Rate cloned - modify and save as new')
@@ -598,6 +608,7 @@ export default function HotelServicesPage() {
                     />
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-primary-800">Service Type</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-primary-800">City</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-primary-800">Hotel Category</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-primary-800">Rate</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-primary-800">Description</th>
@@ -627,6 +638,9 @@ export default function HotelServicesPage() {
                       }`}>
                         {formatServiceType(rate.service_type)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {rate.city || <span className="text-gray-400">Any city</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -742,6 +756,23 @@ export default function HotelServicesPage() {
                     <option value="all">All hotels</option>
                     {tierItems.map(t => (
                       <option key={t.key} value={t.key}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  {/* A porter in Cairo is not a porter in Aswan. Blank = the
+                      rate for every city; the engine prefers the day's city
+                      and falls back to it. */}
+                  <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                  <select
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
+                  >
+                    <option value="">Any city</option>
+                    {cityOptionsFor(cityOptions, formData.city || '').map(city => (
+                      <option key={city} value={city}>{city}</option>
                     ))}
                   </select>
                 </div>

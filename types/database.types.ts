@@ -5968,6 +5968,7 @@ export interface Database {
           supplier_name: string | null
           pricing_type: string
           max_capacity: number | null
+          city: string | null
         }
         Insert: {
           id?: string
@@ -5987,6 +5988,7 @@ export interface Database {
           supplier_name?: string | null
           pricing_type?: string
           max_capacity?: number | null
+          city?: string | null
         }
         Update: {
           id?: string
@@ -6006,6 +6008,7 @@ export interface Database {
           supplier_name?: string | null
           pricing_type?: string
           max_capacity?: number | null
+          city?: string | null
         }
         Relationships: [
           {
