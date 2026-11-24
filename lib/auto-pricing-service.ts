@@ -2191,16 +2191,18 @@ export async function getAirportServiceRateDetail(
 export async function getHotelServiceRate(
   scope: CatalogScope,
   serviceType: HotelServiceType,
-  tier: ServiceTier
+  tier: ServiceTier,
+  city?: string | null
 ): Promise<number | null> {
-  return (await getHotelServiceRateDetail(scope, serviceType, tier))?.rate ?? null
+  return (await getHotelServiceRateDetail(scope, serviceType, tier, city))?.rate ?? null
 }
 
 /** getHotelServiceRate, with the rate's pricing basis. */
 export async function getHotelServiceRateDetail(
   scope: CatalogScope,
   serviceType: HotelServiceType,
-  tier: ServiceTier
+  tier: ServiceTier,
+  city?: string | null
 ): Promise<StaffServiceRate | null> {
   try {
     const category = getTierCategory(tier, await tenantTierLadder(scope.tenantId))
@@ -2213,12 +2215,19 @@ export async function getHotelServiceRateDetail(
         .eq('is_active', true)
         .eq('service_type', type)
         .or(`hotel_category.eq.${category},hotel_category.eq.all`)
-        // Unambiguous on today's data (service_type + category resolves to one
-        // row), but ordered anyway so it cannot become arbitrary the day a
-        // second row is added.
+        // Ordered so it can never be arbitrary when several rows answer.
         .order('rate_eur', { ascending: true })
-        .limit(1)
-      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
+        .limit(50)
+      // A row with a city is that city's; a row without one is "anywhere".
+      // For a day in a city: that city's row, else the anywhere row — never
+      // another city's. No city on the day: any row, as before.
+      const want = String(city ?? '').trim().toLowerCase()
+      const rowCity = (r: { city?: string | null }) => String(r.city ?? '').trim().toLowerCase()
+      const all = (rawHotelStaffRates ?? []) as Array<{ city?: string | null }>
+      const ofCity = want ? all.filter(r => rowCity(r) === want) : []
+      const anywhere = all.filter(r => !rowCity(r))
+      const pool = !want ? all : ofCity.length > 0 ? ofCity : anywhere
+      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', pool.slice(0, 1) as typeof rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId), scope.tenantId)
       if (!rates || rates.length === 0) return null
       return staffRateOf(rates[0])
     }
@@ -4196,7 +4205,7 @@ export async function calculateDayBasedPricing(
 
     // ----- HOTEL SERVICES (fixed per service) -----
     if (day.services.hotel_checkin) {
-      const rate = await getHotelServiceRateDetail(catalogScope, checkinLevel, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, checkinLevel, tier, day.city)
       if (rate != null) {
         const priced = priceStaff(rate)
         services.push({
@@ -4222,7 +4231,7 @@ export async function calculateDayBasedPricing(
     }
 
     if (day.services.hotel_checkout) {
-      const rate = await getHotelServiceRateDetail(catalogScope, checkoutLevel, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, checkoutLevel, tier, day.city)
       if (rate != null) {
         const priced = priceStaff(rate)
         services.push({
@@ -4259,7 +4268,7 @@ export async function calculateDayBasedPricing(
       [boarding.disembark, checkoutLevel, 'cruise-disembark', 'Cruise Leaving Assistance'],
     ] as const) {
       if (!wanted) continue
-      const rate = await getHotelServiceRateDetail(catalogScope, level, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, level, tier, day.city)
       if (rate != null) {
         const priced = priceStaff(rate)
         services.push({
