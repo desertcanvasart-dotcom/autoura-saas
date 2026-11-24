@@ -55,13 +55,35 @@ export async function GET() {
     }
   }
 
+  // The website form's own record: the page the visitor sent it from, the
+  // dates and party, and what they wrote. Newest first; the card shows the
+  // latest and how many there were.
+  const enquiriesByClient = new Map<string, Array<Record<string, unknown>>>()
+  if (ids.length > 0) {
+    const { data: enqs } = await supabase
+      .from('publish_enquiries')
+      .select('client_id, landing_url, dates, travellers, adults, children, message, utm, language, created_at')
+      .eq('tenant_id', tenant_id)
+      .in('client_id', ids)
+      .order('created_at', { ascending: false })
+    for (const e of enqs || []) {
+      if (!e.client_id) continue
+      const list = enquiriesByClient.get(e.client_id) ?? []
+      list.push(e)
+      enquiriesByClient.set(e.client_id, list)
+    }
+  }
+
   const data = (clients || []).map(c => {
     const conv = conversationByClient.get(c.id)
+    const enquiries = enquiriesByClient.get(c.id) ?? []
     return {
       ...c,
       conversation_id: conv?.id ?? null,
       last_message_preview: conv?.preview ?? null,
       last_message_at: conv?.at ?? null,
+      enquiry: enquiries[0] ?? null,
+      enquiry_count: enquiries.length,
     }
   })
 
