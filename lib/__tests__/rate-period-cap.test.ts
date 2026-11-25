@@ -4,7 +4,7 @@ import path from 'node:path'
 import { ratePeriodCapError, countProposedSeasons, sanitizeSeasons, MAX_RATE_PERIODS } from '@/lib/rates/rate-seasons'
 
 // ============================================
-// Six periods per rate, at every write
+// The period cap (hotels 6, cruises 24), at every write
 // ============================================
 // The editor stops at six and the CSV reports a seventh as an error, but the
 // four save routes did not check at all: anything posting straight to the API
@@ -70,9 +70,11 @@ describe('every save route checks the cap', () => {
   for (const rel of ROUTES) {
     it(rel, () => {
       const src = readFileSync(path.join(__dirname, '..', '..', rel), 'utf8')
-      expect(src).toContain('ratePeriodCapError(body.seasons)')
+      // Cruises pass their own entity: they hold more periods than hotels.
+      const call = rel.includes('/cruises/') ? "ratePeriodCapError(body.seasons, 'cruise')" : 'ratePeriodCapError(body.seasons)'
+      expect(src).toContain(call)
       // Before the payload is sanitised, so the refusal names the real count.
-      expect(src.indexOf('ratePeriodCapError(body.seasons)')).toBeLessThan(
+      expect(src.indexOf(call)).toBeLessThan(
         src.indexOf('sanitizeSeasons(body.seasons')
       )
       expect(src).toMatch(/status: 400/)

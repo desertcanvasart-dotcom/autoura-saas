@@ -5,10 +5,11 @@ import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, par
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES, keepStoredPeriods } from '@/lib/rates/periods-csv'
+import { cruiseImportWarnings } from '@/lib/rates/cruise-import-checks'
 import { usesOneSheet, detectOneSheet, parseOneSheet, oneSheetEntity } from '@/lib/rates/rate-sheet'
 import { parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
 import { parseTiersCell } from '@/lib/rates/activity-tiers'
-import { sanitizeSeasons, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
+import { sanitizeSeasons, legacyColumnMirror, type RateSeason, maxRatePeriods } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { loadCityZones } from '@/lib/rates/hotel-zone'
 import { resolveCardSights, resolveZoneChoice } from '@/lib/rates/city-zones'
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     // creates a property (it has no city or tier to create one with).
     const periodsTarget = PERIODS_CSV_TABLES[table]
     if (periodsTarget && detectPeriodsCsv(parsed.meta.fields ?? [])) {
-      const sheet = parsePeriodsCsv(rows)
+      const sheet = parsePeriodsCsv(rows, maxRatePeriods(periodsTarget.entity))
       const validRows = sheet.totalRows - sheet.errors.length
       if (dryRun) {
         return NextResponse.json({
@@ -243,7 +244,9 @@ export async function POST(request: NextRequest) {
       if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...merged })
       return NextResponse.json({ success: false, error: `${merged.invalidRows} rows have errors`, ...merged })
     }
-    if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...preview })
+    // Valid, but probably not what was meant — said before anything is written.
+    const warnings = config.tableName === 'nile_cruises' ? cruiseImportWarnings(importRows) : []
+    if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...preview, warnings })
     if (preview.invalidRows > 0) return NextResponse.json({ success: false, error: `${preview.invalidRows} rows have errors`, ...preview })
 
     // The config's tableName is dynamic; the typed client cannot narrow it.

@@ -24,6 +24,8 @@ interface ImportState {
     invalidRows: number
     errors: ValidationError[]
     sampleData: Record<string, any>[]
+    /** Valid, but probably not what was meant (cruise sheets). */
+    warnings?: string[]
   }
   result?: {
     inserted: number
@@ -123,6 +125,7 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
               invalidRows: data.invalidRows,
               errors: data.errors || [],
               sampleData: data.sampleData || [],
+              warnings: data.warnings || [],
             },
           })
         } else {
@@ -335,6 +338,20 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
                             ...and {importState.preview.errors.length - 10} more
                           </div>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {(importState.preview.warnings?.length ?? 0) > 0 && (
+                    <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                        <span className="text-sm font-medium text-amber-800">Check before importing</span>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {importState.preview.warnings!.map((w, i) => (
+                          <div key={i} className="text-xs text-amber-700">{w}</div>
+                        ))}
                       </div>
                     </div>
                   )}
