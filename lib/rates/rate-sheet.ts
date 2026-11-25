@@ -31,7 +31,7 @@
 
 import type { RateTableConfig } from '@/lib/bulk-rate-service'
 import { parsePeriodsCsv, type PeriodsCsvParse } from '@/lib/rates/periods-csv'
-import type { RateSeason, RateSeasonEntity } from '@/lib/rates/rate-seasons'
+import { maxRatePeriods, type RateSeason, type RateSeasonEntity } from '@/lib/rates/rate-seasons'
 
 /** The flat columns the periods replace, per table — left out of the sheet. */
 const PERIOD_CARRIED: Record<string, ReadonlySet<string>> = {
@@ -238,7 +238,7 @@ export function parseOneSheet(rows: Array<Record<string, string>>, config: RateT
     }
   })
 
-  const periods: PeriodsCsvParse = parsePeriodsCsv(periodRows)
+  const periods: PeriodsCsvParse = parsePeriodsCsv(periodRows, maxRatePeriods(ENTITY[config.tableName] ?? 'accommodation'))
   errors.push(...periods.errors.filter(e => !(e.column === 'service_code')))
   const periodsByKey = new Map(periods.groups.map(g => [g.key, g.periods]))
 

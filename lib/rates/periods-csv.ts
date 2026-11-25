@@ -86,7 +86,7 @@ export interface PeriodsCsvParse {
 // Shape AND calendar: the regex alone passed 2026-02-30 (documents audit,
 // round 12) — isRealIsoDate checks the day exists.
 
-export function parsePeriodsCsv(rows: Array<Record<string, string>>): PeriodsCsvParse {
+export function parsePeriodsCsv(rows: Array<Record<string, string>>, maxPeriods = MAX_RATE_PERIODS): PeriodsCsvParse {
   const errors: PeriodsCsvParse['errors'] = []
   const byKey = new Map<string, PeriodsCsvGroup>()
 
@@ -152,11 +152,11 @@ export function parsePeriodsCsv(rows: Array<Record<string, string>>): PeriodsCsv
     if (!group.service_code && code) group.service_code = code
     if (!group.property_name && name) group.property_name = name
 
-    if (group.periods.length >= MAX_RATE_PERIODS) {
+    if (group.periods.length >= maxPeriods) {
       errors.push({
         row: rowNum,
         column: 'period',
-        message: `"${name || code}" already has ${MAX_RATE_PERIODS} periods — the model caps at ${MAX_RATE_PERIODS} per rate`,
+        message: `"${name || code}" already has ${maxPeriods} periods — the model caps at ${maxPeriods} per rate`,
       })
       return
     }

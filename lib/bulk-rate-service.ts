@@ -424,6 +424,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       id(), serviceCode(),
       col('service_type', 'Service Type', 'text', true),
       col('hotel_category', 'Hotel Category', 'text', true),
+      // Blank = any city (migration 473).
+      col('city', 'City', 'text', false),
       col('rate_eur', 'Rate', 'number', true),
       // flat (per group, the default) / per_person / per_unit — migration 393.
       col('pricing_type', 'Pricing Type', 'text', false),

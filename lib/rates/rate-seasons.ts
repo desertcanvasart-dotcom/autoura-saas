@@ -40,9 +40,17 @@ export const seasonKey = (v: unknown): string | undefined => {
 /** The rate fields each catalog's periods carry, in display order.
  *  These are THIS app's per-person-per-day model — the columns
  *  getHotelRates/getCruiseRates actually read. */
-/** Up to six free-text-named periods per rate (every agency cuts its
+/** Up to six free-text-named periods per hotel rate (every agency cuts its
  *  seasons differently — locked with the flexible-periods model). */
 export const MAX_RATE_PERIODS = 6
+
+/** A cruise contract is often a year of dated departures, one period each
+ *  (operator, 2026-11-25: seven for one sailing), so cruises hold more. */
+export const MAX_CRUISE_PERIODS = 24
+
+export function maxRatePeriods(entity: RateSeasonEntity): number {
+  return entity === 'cruise' ? MAX_CRUISE_PERIODS : MAX_RATE_PERIODS
+}
 
 export const RATE_FIELDS = {
   accommodation: [
@@ -121,16 +129,17 @@ export function countProposedSeasons(input: unknown): number {
   return n
 }
 
-/** The cap, enforced at every WRITE. The editor and the CSV both stop at six,
+/** The cap, enforced at every WRITE. The editor and the CSV both stop at it,
  *  but the save routes did not — anything posting straight to the API (or a UI
  *  that drifts) stored a seventh period that the editor could then never show
  *  and the operator could never correct. Reads stay tolerant on purpose: a row
  *  that somehow holds more must still price, not fall back to the legacy
  *  columns. Returns the error message, or null when the payload is fine. */
-export function ratePeriodCapError(input: unknown): string | null {
+export function ratePeriodCapError(input: unknown, entity: RateSeasonEntity = 'accommodation'): string | null {
   const n = countProposedSeasons(input)
-  return n > MAX_RATE_PERIODS
-    ? `A rate holds at most ${MAX_RATE_PERIODS} periods — this one has ${n}. Remove ${n - MAX_RATE_PERIODS} before saving.`
+  const max = maxRatePeriods(entity)
+  return n > max
+    ? `A rate holds at most ${max} periods — this one has ${n}. Remove ${n - max} before saving.`
     : null
 }
 

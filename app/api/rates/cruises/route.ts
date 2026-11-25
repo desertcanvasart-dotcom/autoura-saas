@@ -99,10 +99,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Include supplier_id in insert
-    // Six periods per rate, enforced here as well as in the editor and the
+    // The period cap, enforced here as well as in the editor and the
     // CSV: a seventh saved through the API could never be shown or corrected.
     if ('seasons' in body) {
-      const capError = ratePeriodCapError(body.seasons)
+      const capError = ratePeriodCapError(body.seasons, 'cruise')
       if (capError) {
         return NextResponse.json({ success: false, error: capError }, { status: 400 })
       }
