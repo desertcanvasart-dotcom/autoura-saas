@@ -65,7 +65,7 @@ export interface SuggestResult {
     draft_body: string
     ai_confidence: 'high' | 'medium' | 'low' | null
     ai_flags: Record<string, any>
-    context_used?: Record<string, any> | null
+    context_used?: Record<string, unknown> | null
     created_at: string
   }>
   generation_time_ms?: number
@@ -197,8 +197,8 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
         tenantId, templateIds: match.templateIds, travelDate: match.travelDate, pax: match.pax,
       })
       ratesContext = { rates: ratesBlock, template_ids: match.templateIds, travel_date: match.travelDate, pax: match.pax, matched_by_model: match.usedModel }
-    } catch (err: any) {
-      console.error('Copilot rates lookup failed:', err?.message)
+    } catch (err: unknown) {
+      console.error('Copilot rates lookup failed:', err instanceof Error ? err.message : err)
     }
   }
 

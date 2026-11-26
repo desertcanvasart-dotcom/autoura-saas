@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
   // the composer opens with it filled in, with the reviewer's edits.
   const { data: approvedRows } = await supabase
     .from('communication_drafts')
-    .select('id, draft_body, edited_body, ai_flags')
+    .select('id, draft_body, edited_body, ai_flags, context_used')
     .eq('tenant_id', tenant_id)
     .eq('inbox_message_id', inbox.id)
     .eq('status', 'approved')
@@ -125,6 +125,10 @@ export async function GET(request: NextRequest) {
         id: approvedRow.id,
         body: approvedRow.edited_body || approvedRow.draft_body,
         subject: (approvedRow.ai_flags as { subject?: string } | null)?.subject ?? null,
+        // The RATES block it was written from (company prompt only) — "Prices used".
+        rates: typeof (approvedRow.context_used as { rates?: unknown } | null)?.rates === 'string'
+          ? (approvedRow.context_used as { rates: string }).rates
+          : null,
       }
     : null
 

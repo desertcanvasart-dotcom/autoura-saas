@@ -12,7 +12,7 @@ function fakeDb(tables: Record<string, Array<Record<string, unknown>>>) {
       const q = {
         select: () => q,
         eq: (col: string, val: unknown) => { rows = rows.filter(r => r[col] === val); return q },
-        not: (col: string, _op: string, _v: unknown) => { rows = rows.filter(r => r[col] !== null && r[col] !== undefined); return q },
+        not: (col: string) => { rows = rows.filter(r => r[col] !== null && r[col] !== undefined); return q },
         order: () => q,
         limit: () => q,
         maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
