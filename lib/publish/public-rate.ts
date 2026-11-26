@@ -213,14 +213,19 @@ export interface EngineRuns {
 }
 
 /** The engine's answer for a tour: every tier, both bases, house margin, lowest season. */
-export async function runEngine(db: Db, tenantId: string, templateId: string): Promise<EngineRuns> {
+/** The company's house margin, as the public rate is priced at. */
+export async function houseMarginPercent(db: Db, tenantId: string): Promise<number> {
   const { data: tenant, error } = await db.from('tenants').select('default_margin_percent').eq('id', tenantId).maybeSingle()
   if (error) throw new Error(`reading the company: ${error.message}`)
   // null/absent is "not set" (25%), never 0%: Number(null) would be 0 and
   // publish every price at cost. A set 0% is a choice and is kept.
   const stored = tenant?.default_margin_percent
   const margin = stored === null || stored === undefined || stored === '' ? NaN : Number(stored)
-  const marginPercent = Number.isFinite(margin) && margin >= 0 ? margin : DEFAULT_MARGIN_PERCENT
+  return Number.isFinite(margin) && margin >= 0 ? margin : DEFAULT_MARGIN_PERCENT
+}
+
+export async function runEngine(db: Db, tenantId: string, templateId: string): Promise<EngineRuns> {
+  const marginPercent = await houseMarginPercent(db, tenantId)
 
   const [currency, tiers, tierLabels] = await Promise.all([
     getTenantRunCurrency(db, tenantId),
