@@ -7,9 +7,13 @@ import { SaveBar, useUnsavedGuard } from '@/components/settings/SettingsUI'
 interface Features {
   copilot_pregenerate_enabled: boolean
   whatsapp_ai_enabled: boolean
+  copilot_system_prompt: string
 }
 
-const KEYS: (keyof Features)[] = ['copilot_pregenerate_enabled', 'whatsapp_ai_enabled']
+const KEYS: (keyof Features)[] = ['copilot_pregenerate_enabled', 'whatsapp_ai_enabled', 'copilot_system_prompt']
+
+/** Same ceiling as the API (lib/copilot-suggest MAX_TENANT_SYSTEM_PROMPT_CHARS). */
+const MAX_PROMPT_CHARS = 20_000
 
 export default function CopilotSettingsPage() {
   // saved = what the server holds; draft = the toggles as shown. The sticky
@@ -50,7 +54,7 @@ export default function CopilotSettingsPage() {
     if (!saved || !draft) return
     setSaving(true)
     setError(null)
-    const patch: Partial<Features> = {}
+    const patch: Record<string, unknown> = {}
     for (const k of KEYS) if (saved[k] !== draft[k]) patch[k] = draft[k]
     try {
       const res = await fetch('/api/copilot/tenant-settings', {
@@ -105,6 +109,25 @@ export default function CopilotSettingsPage() {
             onChange={(v) => setDraft(d => (d ? { ...d, whatsapp_ai_enabled: v } : d))}
             danger
           />
+
+          <div className="border border-gray-200 bg-white rounded-lg p-4">
+            <label htmlFor="copilot-system-prompt" className="block text-sm font-medium text-gray-900 mb-0.5">
+              Copilot system prompt (advanced)
+            </label>
+            <p className="text-xs leading-relaxed text-gray-500 mb-2">
+              Leave blank to use the built-in prompt. When set, email drafts use this text as written. {'{{COMPANY_NAME}}'}, {'{{TONE}}'} and {'{{RATES_BLOCK}}'} are filled in; the RATES block lists the approved public rate of the tours an enquiry mentions. A reply of NO_DRAFT: &lt;reason&gt; skips the draft.
+            </p>
+            <textarea
+              id="copilot-system-prompt"
+              value={draft.copilot_system_prompt}
+              onChange={(e) => setDraft(d => (d ? { ...d, copilot_system_prompt: e.target.value } : d))}
+              disabled={!isAdmin || saving}
+              maxLength={MAX_PROMPT_CHARS}
+              rows={14}
+              className="w-full rounded border border-gray-300 p-2 font-mono text-xs disabled:bg-gray-50"
+            />
+            <p className="mt-1 text-right text-xs text-gray-400">{draft.copilot_system_prompt.length.toLocaleString('en-US')} / {MAX_PROMPT_CHARS.toLocaleString('en-US')}</p>
+          </div>
 
           {isAdmin && (
             <SaveBar changes={changes} saving={saving} error={error} onDiscard={() => { setDraft(saved); setError(null) }} onSave={save} />

@@ -166,10 +166,20 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
     console.error('Copilot RAG retrieval failed:', err?.message)
   }
 
+  // The company's own system prompt (migration 474), email only.
+  let tenantSystemPrompt: string | null = null
+  if (channel === 'email') {
+    const { data: features } = await supabase
+      .from('tenant_features').select('copilot_system_prompt').eq('tenant_id', tenantId).maybeSingle()
+    const raw = (features as { copilot_system_prompt?: string | null } | null)?.copilot_system_prompt
+    tenantSystemPrompt = typeof raw === 'string' && raw.trim() ? raw : null
+  }
+
   // Build prompts
   const { systemPrompt, userPromptParts } = buildPrompt({
     businessName,
     channel, tone, ctx, retrievalContext, count, parentDraftId, instruction,
+    tenantSystemPrompt,
   })
 
   // Call Claude
@@ -527,15 +537,30 @@ async function loadEmailContext(
 // ============================================
 // Prompt builder
 // ============================================
-function buildPrompt(args: {
+/** The placeholders a company's own system prompt may use. */
+export function fillTenantPrompt(template: string, values: { businessName: string; tone: Tone; ratesBlock: string }): string {
+  return template
+    .replace(/\{\{\s*COMPANY_NAME\s*\}\}/g, values.businessName)
+    .replace(/\{\{\s*TONE\s*\}\}/g, values.tone)
+    .replace(/\{\{\s*RATES_BLOCK\s*\}\}/g, values.ratesBlock)
+}
+
+/** Longest company system prompt accepted (settings route and here). */
+export const MAX_TENANT_SYSTEM_PROMPT_CHARS = 20_000
+
+export function buildPrompt(args: {
   businessName: string
   channel: Channel
   tone: Tone
-  ctx: LoadedContext & { ok: true }
+  ctx: Pick<LoadedContext & { ok: true }, 'transcript' | 'latestInboundText' | 'latestInboundSubject' | 'threadSubject'>
   retrievalContext: string
   count: number
   parentDraftId: string | null
   instruction: string | null
+  /** tenant_features.copilot_system_prompt — email only; null/blank = the built-in prompt. */
+  tenantSystemPrompt?: string | null
+  /** lib/copilot-rates buildRatesBlock — '' when no tour matched. */
+  ratesBlock?: string
 }): { systemPrompt: string; userPromptParts: string[] } {
   const { businessName, channel, tone, ctx, retrievalContext, count, parentDraftId, instruction } = args
 
@@ -580,7 +605,13 @@ Generate exactly ${count} distinct draft reply option${count === 1 ? '' : 's'}. 
     ? ctx.latestInboundSubject
     : `Re: ${ctx.latestInboundSubject || ctx.threadSubject || ''}`.trim()
 
-  const systemPrompt = `You are an AI reply assistant for a travel agency named "${businessName}". You help a human agent draft email replies to customers.
+  // A company's own prompt, verbatim, when it has one. The built-in prompt
+  // below stays exactly as it was for everyone else.
+  const tenantPrompt = args.tenantSystemPrompt?.trim()
+    ? fillTenantPrompt(args.tenantSystemPrompt, { businessName, tone, ratesBlock: args.ratesBlock ?? '' })
+    : null
+
+  const systemPrompt = tenantPrompt ?? `You are an AI reply assistant for a travel agency named "${businessName}". You help a human agent draft email replies to customers.
 
 TONE: ${tone}
 ${toneInstructions(tone, 'email')}
