@@ -3102,6 +3102,7 @@ export interface Database {
           received_at: string
           processed_at: string | null
           created_at: string
+          copilot_skip_reason: string | null
         }
         Insert: {
           id?: string
@@ -3118,6 +3119,7 @@ export interface Database {
           received_at?: string
           processed_at?: string | null
           created_at?: string
+          copilot_skip_reason?: string | null
         }
         Update: {
           id?: string
@@ -3134,6 +3136,7 @@ export interface Database {
           received_at?: string
           processed_at?: string | null
           created_at?: string
+          copilot_skip_reason?: string | null
         }
         Relationships: [
           {

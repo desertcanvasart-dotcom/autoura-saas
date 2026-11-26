@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPrompt, fillTenantPrompt } from '@/lib/copilot-suggest'
+import { buildPrompt, fillTenantPrompt, readDraftReply } from '@/lib/copilot-suggest'
 
 // A company's own email-copilot system prompt (migration 474).
 
@@ -56,5 +56,26 @@ describe('buildPrompt — company system prompt', () => {
   it('never applies the company prompt to WhatsApp', () => {
     const { systemPrompt } = buildPrompt({ ...base, channel: 'whatsapp', tenantSystemPrompt: 'Own prompt' })
     expect(systemPrompt).toContain('draft WhatsApp replies')
+  })
+})
+
+describe('readDraftReply', () => {
+  it('NO_DRAFT: is a skip with its one-line reason', () => {
+    expect(readDraftReply('NO_DRAFT: supplier email\n', { plainTextAllowed: true })).toEqual({ kind: 'skip', reason: 'supplier email' })
+    expect(readDraftReply('NO_DRAFT:', { plainTextAllowed: false })).toEqual({ kind: 'skip', reason: 'not a travel enquiry' })
+  })
+
+  it('the built-in JSON shape still reads, fenced or not', () => {
+    const r = readDraftReply('```json\n{"drafts":[{"body":"Hi"}],"escalate":{"needed":false}}\n```', { plainTextAllowed: false })
+    expect(r).toMatchObject({ kind: 'drafts', drafts: [{ body: 'Hi' }] })
+  })
+
+  it('under a company prompt, plain text is the one draft', () => {
+    expect(readDraftReply('Dear Anna,\n\nThank you…', { plainTextAllowed: true }))
+      .toEqual({ kind: 'drafts', drafts: [{ body: 'Dear Anna,\n\nThank you…', confidence: 'medium' }], escalate: null })
+  })
+
+  it('under the built-in prompt, plain text is still an error', () => {
+    expect(() => readDraftReply('Dear Anna', { plainTextAllowed: false })).toThrow()
   })
 })

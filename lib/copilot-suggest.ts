@@ -12,6 +12,8 @@ import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyTe
 import { whatsappModel } from './ai/models'
 import { retrieveKnowledge, formatRetrievalContext, type RetrievedItem } from './copilot-retrieval'
 import { messageWords } from '@/lib/whatsapp/transcript'
+import { matchEnquiry } from './copilot-match'
+import { buildRatesBlock } from './copilot-rates'
 
 const MODEL = whatsappModel()
 
@@ -63,10 +65,14 @@ export interface SuggestResult {
     draft_body: string
     ai_confidence: 'high' | 'medium' | 'low' | null
     ai_flags: Record<string, any>
+    context_used?: Record<string, any> | null
     created_at: string
   }>
   generation_time_ms?: number
   retrieved_count?: number
+  /** The prompt answered NO_DRAFT: — no draft stored, the reason is on the inbox entry. */
+  skipped?: boolean
+  skip_reason?: string
 }
 
 // ============================================
@@ -175,11 +181,35 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
     tenantSystemPrompt = typeof raw === 'string' && raw.trim() ? raw : null
   }
 
+  // A company prompt quotes prices: find the tours the enquiry is about and
+  // hand the model their approved public rates (lib/copilot-match,
+  // lib/copilot-rates). The built-in prompt never quotes prices, so nothing
+  // is matched — or spent — for it. A failure here drafts without prices.
+  let ratesBlock = ''
+  let ratesContext: { rates: string; template_ids: string[]; travel_date: string | null; pax: number | null; matched_by_model: boolean } | null = null
+  if (tenantSystemPrompt) {
+    try {
+      const match = await matchEnquiry(supabase, {
+        tenantId,
+        text: [ctx.latestInboundSubject, ctx.latestInboundText].filter(Boolean).join('\n\n'),
+      })
+      ratesBlock = await buildRatesBlock(supabase, {
+        tenantId, templateIds: match.templateIds, travelDate: match.travelDate, pax: match.pax,
+      })
+      ratesContext = { rates: ratesBlock, template_ids: match.templateIds, travel_date: match.travelDate, pax: match.pax, matched_by_model: match.usedModel }
+    } catch (err: any) {
+      console.error('Copilot rates lookup failed:', err?.message)
+    }
+  }
+
+  // One send-ready reply under a company prompt; options under the built-in one.
+  const draftCount = tenantSystemPrompt ? 1 : count
+
   // Build prompts
   const { systemPrompt, userPromptParts } = buildPrompt({
     businessName,
-    channel, tone, ctx, retrievalContext, count, parentDraftId, instruction,
-    tenantSystemPrompt,
+    channel, tone, ctx, retrievalContext, count: draftCount, parentDraftId, instruction,
+    tenantSystemPrompt, ratesBlock,
   })
 
   // Call Claude
@@ -188,6 +218,8 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
   // The AI's call on whether a person must take this one (ai_flags.escalate).
   let escalation: { escalate: boolean; escalation_reason: string | null } = { escalate: false, escalation_reason: null }
   let lastError: string | null = null
+  // "NO_DRAFT: <reason>" — the prompt decided a person handles this one.
+  let skipReason: string | null = null
 
   // The shared client retries 429/529/500/503. A service failure is named
   // (getUserFriendlyError) — it used to reach the operator as the SDK's raw
@@ -200,14 +232,14 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
       system: systemPrompt,
       messages: [{ role: 'user', content: userPromptParts.join('\n') }],
     })
-    let jsonText = replyText(resp).trim()
-    if (!jsonText) throw new Error('Non-text response')
-    jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
-    const parsed = JSON.parse(jsonText)
-    if (!parsed || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0) throw new Error('No drafts in response')
-    rawDrafts = parsed.drafts.slice(0, count)
-    if (rawDrafts.length === 0) throw new Error('All drafts were empty')
-    escalation = readEscalation(parsed.escalate)
+    const reply = readDraftReply(replyText(resp), { plainTextAllowed: Boolean(tenantSystemPrompt) })
+    if (reply.kind === 'skip') {
+      skipReason = reply.reason
+    } else {
+      rawDrafts = reply.drafts.slice(0, draftCount)
+      if (rawDrafts.length === 0) throw new Error('All drafts were empty')
+      escalation = readEscalation(reply.escalate)
+    }
   } catch (err: any) {
     lastError = isAiServiceError(err)
       ? getUserFriendlyError(err).message
@@ -215,6 +247,14 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
   }
 
   const generationTimeMs = Date.now() - startedAt
+
+  if (skipReason !== null) {
+    // No draft row: the inbox says why (migration 475).
+    await supabase.from('communication_inbox').update({
+      status: 'skipped', copilot_skip_reason: skipReason, processed_at: new Date().toISOString(),
+    }).eq('id', ctx.inboxId)
+    return { success: true, thread_id: ctx.threadId, inbox_message_id: ctx.inboxId, tone, drafts: [], skipped: true, skip_reason: skipReason, generation_time_ms: generationTimeMs }
+  }
 
   if (rawDrafts.length === 0) {
     await supabase.from('communication_inbox').update({ status: 'new' }).eq('id', ctx.inboxId)
@@ -277,6 +317,9 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
     context_used: {
       message_count: ctx.messages.length,
       retrieved: retrieved.map((r) => ({ id: r.id, type: r.source_type, similarity: Number(r.similarity.toFixed(3)) })),
+      // What prices the model was given — the composer's "Prices used" panel.
+      ...(ratesContext ?? {}),
+      ...(tenantSystemPrompt ? { tenant_prompt: true } : {}),
     },
     generation_time_ms: generationTimeMs,
     status: 'pending',
@@ -286,7 +329,7 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
   const { data: inserted, error: insertErr } = await supabase
     .from('communication_drafts')
     .insert(rows)
-    .select('id, draft_body, ai_confidence, ai_flags, created_at')
+    .select('id, draft_body, ai_confidence, ai_flags, context_used, created_at')
 
   if (insertErr) return { success: false, error: insertErr.message }
 
@@ -645,6 +688,34 @@ Generate exactly ${count} distinct draft option${count === 1 ? '' : 's'}. Each d
   if (parentDraftId) userPromptParts.push(`\nThe previous drafts were dismissed. Offer different angles this time.`)
 
   return { systemPrompt, userPromptParts }
+}
+
+type DraftReply =
+  | { kind: 'skip'; reason: string }
+  | { kind: 'drafts'; drafts: Array<{ body?: unknown; subject?: unknown; confidence?: unknown; rationale?: unknown }>; escalate: unknown }
+
+/**
+ * Read the model's reply: "NO_DRAFT: <reason>" is a skip; the built-in JSON
+ * shape is drafts; under a company prompt, which writes the email itself,
+ * any other text is the one draft. Throws when nothing usable came back.
+ */
+export function readDraftReply(raw: string, opts: { plainTextAllowed: boolean }): DraftReply {
+  const text = (raw ?? '').trim()
+  if (!text) throw new Error('Non-text response')
+  const skip = /^NO_DRAFT:\s*(.*)/i.exec(text)
+  if (skip) return { kind: 'skip', reason: (skip[1].split('\n')[0].trim() || 'not a travel enquiry').slice(0, 300) }
+
+  const unfenced = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
+  try {
+    const parsed = JSON.parse(unfenced)
+    if (parsed && Array.isArray(parsed.drafts) && parsed.drafts.length > 0) {
+      return { kind: 'drafts', drafts: parsed.drafts, escalate: parsed.escalate }
+    }
+    if (!opts.plainTextAllowed) throw new Error('No drafts in response')
+  } catch (err) {
+    if (!opts.plainTextAllowed) throw err instanceof SyntaxError ? new Error('AI reply was not valid JSON') : err
+  }
+  return { kind: 'drafts', drafts: [{ body: text, confidence: 'medium' }], escalate: null }
 }
 
 /** The AI's escalation verdict, from `{ needed, reason }`; anything else is "no". */
