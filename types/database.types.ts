@@ -3102,6 +3102,7 @@ export interface Database {
           received_at: string
           processed_at: string | null
           created_at: string
+          copilot_skip_reason: string | null
         }
         Insert: {
           id?: string
@@ -3118,6 +3119,7 @@ export interface Database {
           received_at?: string
           processed_at?: string | null
           created_at?: string
+          copilot_skip_reason?: string | null
         }
         Update: {
           id?: string
@@ -3134,6 +3136,7 @@ export interface Database {
           received_at?: string
           processed_at?: string | null
           created_at?: string
+          copilot_skip_reason?: string | null
         }
         Relationships: [
           {
@@ -11023,6 +11026,7 @@ export interface Database {
           whatsapp_ai_enabled: boolean | null
           concierge_enabled: boolean
           copilot_pregenerate_enabled: boolean
+          copilot_system_prompt: string | null
           activity_summary_enabled: boolean
         }
         Insert: {
@@ -11041,6 +11045,7 @@ export interface Database {
           whatsapp_ai_enabled?: boolean | null
           concierge_enabled?: boolean
           copilot_pregenerate_enabled?: boolean
+          copilot_system_prompt?: string | null
           activity_summary_enabled?: boolean
         }
         Update: {
@@ -11059,6 +11064,7 @@ export interface Database {
           whatsapp_ai_enabled?: boolean | null
           concierge_enabled?: boolean
           copilot_pregenerate_enabled?: boolean
+          copilot_system_prompt?: string | null
           activity_summary_enabled?: boolean
         }
         Relationships: [

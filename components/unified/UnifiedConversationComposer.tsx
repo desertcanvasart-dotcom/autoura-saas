@@ -24,7 +24,24 @@ interface Draft {
   draft_body: string
   ai_confidence?: 'high' | 'medium' | 'low' | null
   ai_flags?: { subject?: string | null; rationale?: string | null; pregenerated?: boolean } | null
+  /** lib/copilot-suggest: `rates` is the RATES block the model was given (company prompt only). */
+  context_used?: { rates?: string | null } | null
 }
+
+/** The RATES block a draft was written from, collapsed — what a reviewer checks the prices against. */
+function PricesUsed({ rates }: { rates: string }) {
+  return (
+    <details className="mb-2 rounded border border-gray-200 bg-gray-50 text-xs">
+      <summary className="cursor-pointer select-none px-2 py-1 font-medium text-gray-600">Prices used</summary>
+      <pre className="whitespace-pre-wrap px-2 pb-2 font-mono text-[11px] leading-relaxed text-gray-700">
+        {rates.trim() || 'None — no tour with an approved public rate matched this enquiry.'}
+      </pre>
+    </details>
+  )
+}
+
+const ratesOf = (d: Draft): string | null =>
+  typeof d.context_used?.rates === 'string' ? d.context_used.rates : null
 
 interface Signature {
   id: string
@@ -372,6 +389,9 @@ function EmailCompose({
   const [lastParentId, setLastParentId] = useState<string | null>(null)
   const [acceptedDraftId, setAcceptedDraftId] = useState<string | null>(null)
   const [fromPregenerate, setFromPregenerate] = useState(false)
+  // The accepted draft's RATES block, shown above the body; why the copilot wrote none.
+  const [pricesUsed, setPricesUsed] = useState<string | null>(null)
+  const [skipReason, setSkipReason] = useState<string | null>(null)
 
   const [signatures, setSignatures] = useState<Signature[]>([])
   const [signatureId, setSignatureId] = useState<string | null>(null)
@@ -397,6 +417,7 @@ function EmailCompose({
     setSendError(null); setPanelError(null); setAttachErr(null)
     setAttachments([]); setDrafts([]); setAcceptedDraftId(null)
     setFromPregenerate(false); setRetrievedCount(0); setLastParentId(null)
+    setPricesUsed(null); setSkipReason(null)
 
     const sig = signatures.find((s) => s.id === signatureId)
     setBodyHtml(sig ? `<p><br/></p>${sigToHtml(sig)}` : '')
@@ -412,8 +433,10 @@ function EmailCompose({
           setBodyHtml(sig ? `${draftHtml}${sigToHtml(sig)}` : draftHtml)
           if (data.approved.subject) setSubject(data.approved.subject)
           setAcceptedDraftId(data.approved.id)
+          setPricesUsed(typeof data.approved.rates === 'string' ? data.approved.rates : null)
           return
         }
+        if (data?.success && data.skipped) setSkipReason(data.skip_reason || 'not a travel enquiry')
         if (data?.success && data.drafts?.length > 0) {
           setDrafts(data.drafts)
           setLastParentId(data.drafts[0]?.id || null)
@@ -458,6 +481,7 @@ function EmailCompose({
         setRetrievedCount(data.retrieved_count || 0)
         setLastParentId(data.drafts?.[0]?.id || null)
         setFromPregenerate(false)
+        setSkipReason(data.skipped ? (data.skip_reason || 'not a travel enquiry') : null)
       }
     } catch (e: any) {
       setPanelError(e?.message || 'Network error')
@@ -473,6 +497,7 @@ function EmailCompose({
     setBodyHtml(combined)
     if (draft.ai_flags?.subject) setSubject(draft.ai_flags.subject)
     setAcceptedDraftId(draft.id)
+    setPricesUsed(ratesOf(draft))
     setDrafts([])
     fetch(`/api/ai/suggest-reply/${draft.id}`, {
       method: 'PATCH',
@@ -601,6 +626,7 @@ function EmailCompose({
                   </button>
                 </div>
               </div>
+              {ratesOf(d) !== null && <PricesUsed rates={ratesOf(d)!} />}
               <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{d.draft_body}</p>
               {d.ai_flags?.rationale && <p className="mt-1.5 text-xs text-gray-400 italic">{d.ai_flags.rationale}</p>}
             </div>
@@ -618,6 +644,10 @@ function EmailCompose({
           <input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
         </div>
 
+        {skipReason && drafts.length === 0 && (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">Copilot skipped: {skipReason}</div>
+        )}
+        {pricesUsed !== null && <PricesUsed rates={pricesUsed} />}
         <RichReplyEditor html={bodyHtml} onChange={setBodyHtml} placeholder="Write your email…" minHeight={180} />
 
         {attachments.length > 0 && (

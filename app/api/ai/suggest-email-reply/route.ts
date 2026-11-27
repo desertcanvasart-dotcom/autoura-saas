@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
       drafts: result.drafts,
       generation_time_ms: result.generation_time_ms,
       retrieved_count: result.retrieved_count,
+      // The company prompt answered NO_DRAFT: (migration 475).
+      skipped: result.skipped ?? false,
+      skip_reason: result.skip_reason ?? null,
     })
   } catch (err: any) {
     console.error('suggest-email-reply error:', err)
@@ -86,7 +89,7 @@ export async function GET(request: NextRequest) {
 
   const { data: inbox } = await supabase
     .from('communication_inbox')
-    .select('id, status')
+    .select('id, status, copilot_skip_reason')
     .eq('tenant_id', tenant_id)
     .eq('thread_id', thread.id)
     .order('received_at', { ascending: false })
@@ -94,12 +97,13 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
 
   if (!inbox?.id || inbox.status === 'responded' || inbox.status === 'skipped') {
-    return NextResponse.json({ success: true, drafts: [] })
+    const skipReason = inbox?.status === 'skipped' ? (inbox as { copilot_skip_reason?: string | null }).copilot_skip_reason ?? null : null
+    return NextResponse.json({ success: true, drafts: [], skipped: Boolean(skipReason), skip_reason: skipReason })
   }
 
   const { data: drafts } = await supabase
     .from('communication_drafts')
-    .select('id, draft_body, ai_confidence, ai_flags, created_at')
+    .select('id, draft_body, ai_confidence, ai_flags, context_used, created_at')
     .eq('tenant_id', tenant_id)
     .eq('inbox_message_id', inbox.id)
     .eq('status', 'pending')
@@ -109,7 +113,7 @@ export async function GET(request: NextRequest) {
   // the composer opens with it filled in, with the reviewer's edits.
   const { data: approvedRows } = await supabase
     .from('communication_drafts')
-    .select('id, draft_body, edited_body, ai_flags')
+    .select('id, draft_body, edited_body, ai_flags, context_used')
     .eq('tenant_id', tenant_id)
     .eq('inbox_message_id', inbox.id)
     .eq('status', 'approved')
@@ -121,6 +125,10 @@ export async function GET(request: NextRequest) {
         id: approvedRow.id,
         body: approvedRow.edited_body || approvedRow.draft_body,
         subject: (approvedRow.ai_flags as { subject?: string } | null)?.subject ?? null,
+        // The RATES block it was written from (company prompt only) — "Prices used".
+        rates: typeof (approvedRow.context_used as { rates?: unknown } | null)?.rates === 'string'
+          ? (approvedRow.context_used as { rates: string }).rates
+          : null,
       }
     : null
 

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { MAX_TENANT_SYSTEM_PROMPT_CHARS } from '@/lib/copilot-suggest'
 
 export async function GET() {
   const auth = await requireAuth()
@@ -15,7 +16,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('tenant_features')
-    .select('copilot_pregenerate_enabled, whatsapp_ai_enabled')
+    .select('copilot_pregenerate_enabled, whatsapp_ai_enabled, copilot_system_prompt')
     .eq('tenant_id', tenant_id)
     .single()
 
@@ -27,6 +28,7 @@ export async function GET() {
     features: {
       copilot_pregenerate_enabled: !!data?.copilot_pregenerate_enabled,
       whatsapp_ai_enabled: !!data?.whatsapp_ai_enabled,
+      copilot_system_prompt: data?.copilot_system_prompt ?? '',
     },
   })
 }
@@ -46,6 +48,13 @@ export async function PATCH(request: NextRequest) {
   const patch: Record<string, any> = {}
   if (typeof body.copilot_pregenerate_enabled === 'boolean') patch.copilot_pregenerate_enabled = body.copilot_pregenerate_enabled
   if (typeof body.whatsapp_ai_enabled === 'boolean') patch.whatsapp_ai_enabled = body.whatsapp_ai_enabled
+  // The company's own email-copilot prompt (migration 474). Blank = the built-in prompt.
+  if (typeof body.copilot_system_prompt === 'string') {
+    if (body.copilot_system_prompt.length > MAX_TENANT_SYSTEM_PROMPT_CHARS) {
+      return NextResponse.json({ success: false, error: `The system prompt is too long (over ${MAX_TENANT_SYSTEM_PROMPT_CHARS.toLocaleString('en-US')} characters)` }, { status: 400 })
+    }
+    patch.copilot_system_prompt = body.copilot_system_prompt.trim() ? body.copilot_system_prompt : null
+  }
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ success: false, error: 'Nothing to update' }, { status: 400 })
@@ -60,9 +69,9 @@ export async function PATCH(request: NextRequest) {
     .from('tenant_features')
     .update(patch)
     .eq('tenant_id', tenant_id)
-    .select('copilot_pregenerate_enabled, whatsapp_ai_enabled')
+    .select('copilot_pregenerate_enabled, whatsapp_ai_enabled, copilot_system_prompt')
     .single()
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-  return NextResponse.json({ success: true, features: data })
+  return NextResponse.json({ success: true, features: { ...data, copilot_system_prompt: data?.copilot_system_prompt ?? '' } })
 }
