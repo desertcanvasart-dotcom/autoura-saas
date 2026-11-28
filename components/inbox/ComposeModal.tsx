@@ -13,6 +13,9 @@ import {
   replyRecipients, replySubject, forwardSubject, quotedOriginal, forwardedOriginal,
 } from '@/lib/email/reply-rules'
 import RecipientInput from './RecipientInput'
+import ComposeCopilot, { type UsedDraft } from './ComposeCopilot'
+import PricesUsed from '@/components/copilot/PricesUsed'
+import { plainTextToHtml } from '@/components/unified/RichReplyEditor'
 import { UNDO_SEND_MS, schedulePresets, toDateTimeLocal, scheduleTimeProblem } from '@/lib/email/scheduled-send'
 import type { Email, Attachment, EmailSignature, EmailTemplate, Client } from './types'
 
@@ -126,6 +129,9 @@ export default function ComposeModal({
   const [subject, setSubject] = useState(initial.subject)
   const [body, setBody] = useState(initial.quote ? `<p></p>${initial.quote}` : '')
   const [threadId, setThreadId] = useState<string | null>(initial.threadId)
+  // A copilot draft put in the message: sent with its id and conversation, so
+  // the send marks it sent and files the reply (as the Conversations box does).
+  const [copilotDraft, setCopilotDraft] = useState<Pick<UsedDraft, 'id' | 'conversationId' | 'rates'> | null>(null)
   const [carried, setCarried] = useState<CarriedAttachment[]>(initial.carried)
 
   // The Gmail draft this message is saved as, and where saving stands.
@@ -609,6 +615,10 @@ export default function ComposeModal({
             : undefined,
           // The saved draft this send replaces — removed once sent.
           gmail_draft_id: draftId ?? undefined,
+          // A copilot draft: the reply is filed in its conversation and the
+          // draft marked sent.
+          conversation_id: copilotDraft?.conversationId ?? undefined,
+          draft_id: copilotDraft?.id ?? undefined,
         }),
       })
 
@@ -828,6 +838,22 @@ export default function ComposeModal({
               </div>
             )}
           </div>
+
+          {/* The AI Copilot, for a reply in a thread (components/inbox/ComposeCopilot). */}
+          {(mode === 'reply' || mode === 'replyAll') && threadId && (
+            <ComposeCopilot
+              gmailThreadId={threadId}
+              onUse={d => {
+                markDirty()
+                // The company's own prompt signs the email itself; a built-in
+                // draft has no signature, so the default one goes under it.
+                const sig = !d.signed ? signatures.find(s => s.is_default)?.content : null
+                setBody(`${plainTextToHtml(d.body)}${sig ? `<br/>${sig}` : ''}${initial.quote}`)
+                setCopilotDraft({ id: d.id, conversationId: d.conversationId, rates: d.rates })
+              }}
+            />
+          )}
+          {copilotDraft?.rates != null && <div className="px-4 pt-3"><PricesUsed rates={copilotDraft.rates} /></div>}
 
           {/* Rich Text Editor */}
           {/* The editor re-formats content it is given (the signature, the
