@@ -8,6 +8,7 @@ import {
 import MessageBox from '@/components/whatsapp/MessageBox'
 import PolishBar from '@/components/whatsapp/PolishBar'
 import RichReplyEditor, { plainTextToHtml, htmlToPlainText } from './RichReplyEditor'
+import PricesUsed, { ratesOf } from '@/components/copilot/PricesUsed'
 
 type Channel = 'whatsapp' | 'email'
 
@@ -28,20 +29,6 @@ interface Draft {
   context_used?: { rates?: string | null } | null
 }
 
-/** The RATES block a draft was written from, collapsed — what a reviewer checks the prices against. */
-function PricesUsed({ rates }: { rates: string }) {
-  return (
-    <details className="mb-2 rounded border border-gray-200 bg-gray-50 text-xs">
-      <summary className="cursor-pointer select-none px-2 py-1 font-medium text-gray-600">Prices used</summary>
-      <pre className="whitespace-pre-wrap px-2 pb-2 font-mono text-[11px] leading-relaxed text-gray-700">
-        {rates.trim() || 'None — no tour with an approved public rate matched this enquiry.'}
-      </pre>
-    </details>
-  )
-}
-
-const ratesOf = (d: Draft): string | null =>
-  typeof d.context_used?.rates === 'string' ? d.context_used.rates : null
 
 interface Signature {
   id: string

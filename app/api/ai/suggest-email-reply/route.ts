@@ -9,6 +9,26 @@ import { requireAuth } from '@/lib/supabase-server'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { aiBudgetDenied } from '@/lib/ai-guard'
 
+/**
+ * The conversation a Gmail thread is filed under — the Email tab knows only
+ * the thread. Null when the thread has not synced in yet.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function conversationForThread(supabase: any, tenantId: string, gmailThreadId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('email_messages')
+    .select('unified_conversation_id')
+    .eq('tenant_id', tenantId)
+    .eq('gmail_thread_id', gmailThreadId)
+    .not('unified_conversation_id', 'is', null)
+    .order('sent_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return (data as { unified_conversation_id?: string | null } | null)?.unified_conversation_id ?? null
+}
+
+const NOT_SYNCED = 'This email has not reached Conversations yet — it syncs every few minutes. Try again shortly.'
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth()
@@ -21,8 +41,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     // Canonical param is unified_conversation_id; keep email_conversation_id as a deprecated alias.
-    const unified_conversation_id: string | undefined =
+    // The Email tab sends the Gmail thread instead (gmail_thread_id).
+    let unified_conversation_id: string | undefined =
       body.unified_conversation_id || body.email_conversation_id
+    if (!unified_conversation_id && typeof body.gmail_thread_id === 'string' && body.gmail_thread_id) {
+      unified_conversation_id = (await conversationForThread(supabase, tenant_id, body.gmail_thread_id)) ?? undefined
+      if (!unified_conversation_id) return NextResponse.json({ success: false, error: NOT_SYNCED }, { status: 404 })
+    }
     const count: number = Math.min(3, Math.max(1, Number(body.count) || 2))
     const parent_draft_id: string | null = body.parent_draft_id || null
     const instruction: string | null = body.instruction || null
@@ -51,6 +76,7 @@ export async function POST(request: NextRequest) {
       drafts: result.drafts,
       generation_time_ms: result.generation_time_ms,
       retrieved_count: result.retrieved_count,
+      unified_conversation_id,
       // The company prompt answered NO_DRAFT: (migration 475).
       skipped: result.skipped ?? false,
       skip_reason: result.skip_reason ?? null,
@@ -68,9 +94,15 @@ export async function GET(request: NextRequest) {
   }
   const { supabase, tenant_id } = auth
 
-  const unifiedConvId =
+  let unifiedConvId =
     request.nextUrl.searchParams.get('unified_conversation_id') ||
     request.nextUrl.searchParams.get('email_conversation_id')
+  const gmailThreadId = request.nextUrl.searchParams.get('gmail_thread_id')
+  if (!unifiedConvId && gmailThreadId) {
+    unifiedConvId = await conversationForThread(supabase, tenant_id, gmailThreadId)
+    // Not synced yet: nothing to show, and Suggest Reply will say why.
+    if (!unifiedConvId) return NextResponse.json({ success: true, drafts: [], unified_conversation_id: null })
+  }
   if (!unifiedConvId) {
     return NextResponse.json({ success: false, error: 'unified_conversation_id required' }, { status: 400 })
   }
@@ -84,7 +116,7 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
 
   if (!thread?.id) {
-    return NextResponse.json({ success: true, drafts: [] })
+    return NextResponse.json({ success: true, drafts: [], unified_conversation_id: unifiedConvId })
   }
 
   const { data: inbox } = await supabase
@@ -98,7 +130,7 @@ export async function GET(request: NextRequest) {
 
   if (!inbox?.id || inbox.status === 'responded' || inbox.status === 'skipped') {
     const skipReason = inbox?.status === 'skipped' ? (inbox as { copilot_skip_reason?: string | null }).copilot_skip_reason ?? null : null
-    return NextResponse.json({ success: true, drafts: [], skipped: Boolean(skipReason), skip_reason: skipReason })
+    return NextResponse.json({ success: true, drafts: [], skipped: Boolean(skipReason), skip_reason: skipReason, unified_conversation_id: unifiedConvId })
   }
 
   const { data: drafts } = await supabase
@@ -138,5 +170,6 @@ export async function GET(request: NextRequest) {
     inbox_message_id: inbox.id,
     drafts: drafts || [],
     approved,
+    unified_conversation_id: unifiedConvId,
   })
 }
